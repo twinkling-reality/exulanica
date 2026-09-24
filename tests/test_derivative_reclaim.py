@@ -928,10 +928,11 @@ def test_a_worker_with_no_vision_model_gets_the_stated_floor(tmp_path, monkeypat
 
 
 def test_the_vision_budget_is_the_chain_the_timeout_and_the_retries(client, manifest):
-    """The arithmetic `walk` actually performs, not a number typed beside it."""
+    """The arithmetic `walk` actually performs, from the manifest's own vision timeout."""
     chain = len(manifest[Role.VISION].chain)
     assert chain == 2
-    assert client.worst_case_seconds(Role.VISION) == pytest.approx(chain * 180.0)
+    timeout = manifest[Role.VISION].timeout_seconds
+    assert client.worst_case_seconds(Role.VISION) == pytest.approx(chain * timeout)
 
 
 def test_worker_runs_injected_caption_embedding_after_vision(queued, client, monkeypatch):

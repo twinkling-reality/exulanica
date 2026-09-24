@@ -42,6 +42,11 @@ Everything here exists because of something that was measured, not assumed:
     by the code that knows whose data the request carries; policies only accumulate. See
     :mod:`exulanica.models.policy`.
 
+*   **Each role's request is bounded by the role's own timeout**, which the manifest derives
+    from the longest latency measured for the role's primary. ``timeout`` overrides it for every
+    role, for a caller that reserves wall clock by a timeout of its own; the default is the
+    manifest's, and no other number stands in for it.
+
 The client holds a cache, a budget guard and a ledger. All three are optional collaborators with
 inert defaults, so a caller gets no caching and generous limits unless it asks, and a test gets
 exact ones.
@@ -99,8 +104,6 @@ __all__ = [
 
 T = TypeVar("T", bound=BaseModel)
 
-_DEFAULT_TIMEOUT: Final = 180.0
-
 #: A payload naming any of these is refused before it reaches the network. ``guided_json`` and
 #: its relatives are the silent-failure family: accepted, ignored, HTTP 200, prose returned.
 _FORBIDDEN_PARAMS: Final = frozenset(
@@ -141,7 +144,7 @@ class ModelClient:
         transport: Transport | None = None,
         cache: ResponseCache | None = None,
         budget: BudgetGuard | None = None,
-        timeout: float = _DEFAULT_TIMEOUT,
+        timeout: float | None = None,
         max_attempts: int = 1,
         sleep: Callable[[float], None] = time.sleep,
         policy: HostedRequestPolicy | None = None,
@@ -271,10 +274,11 @@ class ModelClient:
         """The longest one call for this role can take on THIS client, timeouts and retries in.
 
         Asked by anything that has to decide how long a caller may be silent before the silence
-        means something. It is a question about this client rather than about the role, because
-        the timeout and the retry count are constructor arguments: the API builds
-        ``ModelClient()`` with the defaults and ``exulanica-ingest`` builds one with
-        ``max_attempts=3``, and a caller that typed a constant would be right for one of them.
+        means something. It is a question about this client rather than about the role alone,
+        because the retry count and any explicit timeout are constructor arguments: the API builds
+        ``ModelClient()`` with the manifest's timeouts and one attempt and ``exulanica-ingest``
+        builds one with ``max_attempts=3``, and a caller that typed a constant would be right for
+        one of them.
         """
         return self._chain.worst_case_seconds(role)
 
@@ -448,6 +452,7 @@ class ModelClient:
             attempts=served.attempts,
             tried=served.tried,
             response_format=response_format,
+            usd_bound=served.reserved_usd,
         )
         if use_cache:
             # Only the response is cached. Headers carry the credential and never go to disk.
@@ -628,7 +633,14 @@ class ModelClient:
         if cached is not None:
             spec = self._manifest.spec(cached["model_id"])
             return embedding_from_body(
-                role, spec, cached["response"], budget=self._budget, cache_hit=True
+                role,
+                spec,
+                cached["response"],
+                budget=self._budget,
+                cache_hit=True,
+                used_fallback=bool(cached.get("used_fallback", False)),
+                attempts=0,
+                tried=(spec.model_id,),
             )
 
         served = self._chain.walk(
@@ -647,9 +659,19 @@ class ModelClient:
                     "role": str(role),
                     "pipeline_version": self._manifest.pipeline_version,
                     "prompt_version": prompt_version,
+                    "used_fallback": served.used_fallback,
                     "response": served.body,
                 },
             )
         return embedding_from_body(
-            role, served.spec, served.body, budget=self._budget, cache_hit=False
+            role,
+            served.spec,
+            served.body,
+            budget=self._budget,
+            cache_hit=False,
+            used_fallback=served.used_fallback,
+            latency_s=served.latency_s,
+            attempts=served.attempts,
+            tried=served.tried,
+            usd_bound=served.reserved_usd,
         )

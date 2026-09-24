@@ -11,14 +11,18 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Final, Generic, TypeVar
 
 from pydantic import BaseModel
 
 from exulanica.models.manifest import PROVIDER, Role
 from exulanica.models.usage import CallUsage
 
-__all__ = ["ChatResult", "EmbeddingResult", "StructuredResult"]
+__all__ = ["NO_MODEL_IN_RESPONSE", "ChatResult", "EmbeddingResult", "StructuredResult"]
+
+#: Why a result names no served model: the response body carried no ``model`` field. The one
+#: reason there is, named so a record can say it rather than leave a bare null.
+NO_MODEL_IN_RESPONSE: Final = "response_names_no_model"
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -76,7 +80,22 @@ class StructuredResult(Generic[T]):
 
 @dataclass(frozen=True, slots=True)
 class EmbeddingResult:
+    """One completed embedding call: the vectors, what they cost, and who served them.
+
+    ``model_id`` is the identifier the chain sent. ``served_model_id`` is the one the response body
+    named, read off the wire and never filled from the request: when the body names none it is
+    ``None`` and ``served_model_unavailable`` says why, so a record never presents the
+    configuration as an observation.
+    """
+
     model_id: str
     vectors: tuple[tuple[float, ...], ...]
     usage: CallUsage
     dimensions: int
+    served_model_id: str | None = None
+    served_model_unavailable: str | None = NO_MODEL_IN_RESPONSE
+    #: HTTP requests issued, retries and failover included. Zero on a cache hit; ``None`` only
+    #: when whoever built the result did not say, which the client never does.
+    attempts: int | None = None
+    tried: tuple[str, ...] = ()
+    used_fallback: bool = False

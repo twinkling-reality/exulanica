@@ -11,7 +11,14 @@ this walks it. Three policies live here and nowhere else, each because of someth
     provide automatic retry, recovery, or redundancy mechanisms", so retries exist, but a caller
     whose operation is not idempotent gets exactly one request unless it asks otherwise.
 *   **Every attempt is reserved against the budget separately**, so a retry storm is spend the
-    guard can see rather than spend it discovers afterwards.
+    guard can see rather than spend it discovers afterwards. **And every attempt that fails is
+    recorded**, priced by whether it left: a timeout, a dropped connection or an error status is a
+    row charged at its reservation with its cost stated unknown, and a connection never made is a
+    row that cost nothing. Before this, a failed attempt reserved and recorded nothing, so a run of
+    timeouts spent no budget and counted no calls.
+*   **Each role waits for its own timeout**, read from the manifest, where it is derived from the
+    longest latency measured for the role's primary. A caller may pass one explicit timeout for
+    every role instead, as a lens budget does for the per-call timeout it reserves wall clock by.
 
 Split out of the client because these are decisions about the network, and the client's own job
 is what a request means and whether a reply may be believed. A change to the retry policy should
@@ -24,12 +31,14 @@ import random
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Final
 
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.errors import ModelUnavailableError, NoFallbackError, TransportError
 from exulanica.models.manifest import Manifest, ModelSpec, Role
 from exulanica.models.transport import HttpResponse, Transport
+from exulanica.models.usage import CallUsage, usd_string
 
 __all__ = ["ChainResponse", "ModelChain"]
 
@@ -66,6 +75,9 @@ class ChainResponse:
     attempts: int
     #: Every identifier tried, in order, including the ones that failed.
     tried: tuple[str, ...]
+    #: What the answering attempt was reserved at: the most it can have cost. A reply whose usage
+    #: omits a priced count is charged this rather than a count's default zero.
+    reserved_usd: Decimal = Decimal(0)
 
 
 class ModelChain:
@@ -78,12 +90,14 @@ class ModelChain:
         transport: Transport,
         api_key: str,
         budget: BudgetGuard,
-        timeout: float,
+        timeout: float | None,
         max_attempts: int,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
+        if timeout is not None and not timeout > 0:
+            raise ValueError(f"an explicit timeout must be positive, got {timeout!r}")
         self._manifest = manifest
         self._transport = transport
         self._api_key = api_key
@@ -113,10 +127,18 @@ class ModelChain:
             return "model" in message and any(p in message for p in _NOT_FOUND_PHRASES)
         return False
 
-    def _post(self, path: str, payload: Mapping[str, Any], spec: ModelSpec) -> dict[str, Any]:
+    def timeout_seconds(self, role: Role) -> float:
+        """How long one request for ``role`` may take: the explicit timeout, else the manifest's."""
+        if self._timeout is not None:
+            return self._timeout
+        return float(self._manifest[role].timeout_seconds)
+
+    def _post(
+        self, path: str, payload: Mapping[str, Any], spec: ModelSpec, *, timeout: float
+    ) -> dict[str, Any]:
         url = f"{self._manifest.base_url}{path}"
         response = self._transport.post_json(
-            url, headers=self._headers(), payload=payload, timeout=self._timeout
+            url, headers=self._headers(), payload=payload, timeout=timeout
         )
         if self._is_model_missing(response):
             raise ModelUnavailableError(
@@ -130,11 +152,17 @@ class ModelChain:
                 f"HTTP {response.status_code} from {path} for {spec.model_id}: "
                 f"{response.error_message()[:300]}",
                 retryable=response.status_code in _RETRYABLE_STATUS,
+                reached_provider=True,
             )
-        body = response.json_body()
+        try:
+            body = response.json_body()
+        except TransportError as exc:
+            raise TransportError(str(exc), retryable=exc.retryable, reached_provider=True) from exc
         if not isinstance(body, dict):
             raise TransportError(
-                f"{path} returned a {type(body).__name__}, expected an object", retryable=False
+                f"{path} returned a {type(body).__name__}, expected an object",
+                retryable=False,
+                reached_provider=True,
             )
         return body
 
@@ -153,15 +181,14 @@ class ModelChain:
         fallback. Backoff is added for the gaps between those retries, at its ceiling rather than
         its jittered value.
 
-        **It bounds the arithmetic and not the wall clock**, which is stated here because the
-        difference has already been measured on this transport:
-        :mod:`exulanica.models.transport` passes one float to httpx, which sets connect, read,
-        write and pool each to it, and httpx has no total-request timeout. A response that
-        dribbles one chunk every ``timeout`` seconds is never cut off. So this is the right
-        number to size a lease from and the wrong number to call a guarantee.
+        **It bounds the wall clock** through :class:`~exulanica.models.transport.HttpxTransport`,
+        which ends every request at its timeout however the response stalls, name resolution
+        included. A transport that does not enforce a deadline, such as a test double, is bounded
+        only by what it does.
         """
         chain = self._manifest[role].chain
-        return (len(chain) - 1 + self._max_attempts) * self._timeout + self._backoff_ceiling()
+        timeout = self.timeout_seconds(role)
+        return (len(chain) - 1 + self._max_attempts) * timeout + self._backoff_ceiling()
 
     def _backoff_ceiling(self) -> float:
         """The unjittered sum of the sleeps between ``max_attempts`` requests to one model."""
@@ -186,29 +213,65 @@ class ModelChain:
         prompt_chars: int,
         extra_prompt_tokens: int,
         max_tokens: int,
-    ) -> tuple[dict[str, Any], int]:
-        """One model, up to ``max_attempts`` requests. Returns the body and requests issued.
+        used_fallback: bool,
+    ) -> tuple[dict[str, Any], int, Decimal]:
+        """One model, up to ``max_attempts`` requests. Returns the body, requests issued, and the
+        answering attempt's reservation.
 
         Only a retryable status or a failed connection is retried. A ``ModelUnavailableError`` is
         never retried here: the same withdrawn identifier will be withdrawn again, and the answer
         to it is the fallback, one level up. Each attempt is reserved against the budget
-        separately, so a retry storm is spend the guard can see.
+        separately, so a retry storm is spend the guard can see, and each one that fails is
+        recorded against it, so the storm is also spend the ledger shows.
         """
+        timeout = self.timeout_seconds(role)
         for attempt in range(1, self._max_attempts + 1):
-            self._budget.reserve(
+            reserved = self._budget.reserve(
                 spec,
                 role=role,
                 prompt_chars=prompt_chars,
                 max_tokens=max_tokens,
                 extra_prompt_tokens=extra_prompt_tokens,
             )
+            started = time.monotonic()
             try:
-                return self._post(path, payload, spec), attempt
+                return self._post(path, payload, spec, timeout=timeout), attempt, reserved
+            except ModelUnavailableError as exc:
+                self._record_failure(
+                    role, spec, exc, reserved, started, used_fallback, reached_provider=True
+                )
+                raise
             except TransportError as exc:
+                usage = self._record_failure(
+                    role, spec, exc, reserved, started, used_fallback, exc.reached_provider
+                )
                 if not exc.retryable or attempt == self._max_attempts:
-                    raise
+                    raise _with_cost(exc, usage, attempt) from exc
                 self._backoff(attempt)
         raise AssertionError("unreachable: the last attempt either returns or raises")
+
+    def _record_failure(
+        self,
+        role: Role,
+        spec: ModelSpec,
+        exc: Exception,
+        reserved: Decimal,
+        started: float,
+        used_fallback: bool,
+        reached_provider: bool | None,
+    ) -> CallUsage:
+        return self._budget.record(
+            CallUsage.failed(
+                role=role,
+                spec=spec,
+                reached_provider=reached_provider,
+                timed_out=bool(getattr(exc, "timed_out", False)),
+                failure=str(exc)[:300],
+                usd_bound=reserved,
+                used_fallback=used_fallback,
+                latency_s=time.monotonic() - started,
+            )
+        )
 
     def walk(
         self,
@@ -229,7 +292,7 @@ class ModelChain:
             tried.append(spec.model_id)
             started = time.monotonic()
             try:
-                body, made = self._post_with_retries(
+                body, made, reserved = self._post_with_retries(
                     path,
                     {**payload, "model": spec.model_id},
                     spec,
@@ -237,6 +300,7 @@ class ModelChain:
                     prompt_chars=prompt_chars,
                     extra_prompt_tokens=extra_prompt_tokens,
                     max_tokens=max_tokens,
+                    used_fallback=index > 0,
                 )
             except ModelUnavailableError as exc:
                 # Not retried, so exactly one request was issued against this identifier.
@@ -250,6 +314,7 @@ class ModelChain:
                 latency_s=time.monotonic() - started,
                 attempts=attempts + made,
                 tried=tuple(tried),
+                reserved_usd=reserved,
             )
 
         detail = "; ".join(failures)
@@ -262,3 +327,20 @@ class ModelChain:
             f"role {role}: every model in the chain is unavailable. This is what a deprecation "
             f"round looks like. Run the preflight against the live catalog. Failures: {detail}"
         )
+
+
+def _with_cost(exc: TransportError, usage: CallUsage, attempts: int) -> TransportError:
+    """The same failure, saying what the ledger charged for it, so a refusal carries its cost."""
+    if usage.usd_known:
+        cost = f"it cost nothing: the request never reached {usage.model_id}"
+    else:
+        cost = (
+            f"its cost is unknown, since the provider may bill a request it received, so this "
+            f"process charged the most it can have cost, ${usd_string(usage.usd)}, to its budget"
+        )
+    return TransportError(
+        f"{exc} ({attempts} attempt{'s' if attempts != 1 else ''}; for the last, {cost})",
+        retryable=exc.retryable,
+        timed_out=exc.timed_out,
+        reached_provider=exc.reached_provider,
+    )

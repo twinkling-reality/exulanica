@@ -61,7 +61,7 @@ from exulanica.env import env_get, env_name
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import ModelSpec, Role
-from exulanica.models.usage import USD_QUANTUM, CallUsage, CostLedger
+from exulanica.models.usage import USD_QUANTUM, CallUsage, CostBasis, CostLedger, usd_string
 
 __all__ = [
     "LENS_BUDGETS_ENV",
@@ -100,18 +100,6 @@ class LensBudgetAxis(StrEnum):
     CALLS = "calls"
     WALL_CLOCK = "wall_clock"
     COST = "cost"
-
-
-def usd_string(value: Decimal) -> str:
-    """A cost as a plain decimal string at the ledger's quantum: ``0.00000001``, never ``1E-8``.
-
-    ``str(Decimal)`` switches to exponent notation for small values and for a quantised zero, so
-    two equal budgets could otherwise digest differently and a record would carry a number an
-    invoice never shows.
-    """
-    quantised = value.quantize(USD_QUANTUM)
-    # A negative zero is zero, and it must not digest as a different amount.
-    return f"{quantised.copy_abs() if quantised.is_zero() else quantised:f}"
 
 
 def _whole(value: object, name: str) -> int:
@@ -366,12 +354,18 @@ class LensBudgetGuard(BudgetGuard):
         """Replace the most recent open reservation with what the provider reported.
 
         A cache hit issued no request and was never reserved, so it is recorded in the ledger
-        and changes no ceiling.
+        and changes no ceiling. A failed attempt settles by its cost basis: one that never left
+        costs nothing, and one whose cost is unknown stays charged at its reservation, tokens and
+        dollars, because the provider may have done all of it.
         """
         if not usage.cache_hit and self._open:
-            self._open.pop()
-            self._settled_tokens += usage.total_tokens
-            self._settled_usd += usage.usd
+            reservation = self._open.pop()
+            if usage.cost_basis is CostBasis.UNKNOWN:
+                self._settled_tokens += reservation.tokens
+                self._settled_usd += max(reservation.usd, usage.usd)
+            else:
+                self._settled_tokens += usage.total_tokens
+                self._settled_usd += usage.usd
         if self._process is not None:
             self._process.record(usage)
         return self.ledger.record(usage)

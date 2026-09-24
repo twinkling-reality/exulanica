@@ -347,7 +347,7 @@ def test_a_connection_failure_is_typed_as_a_retryable_transport_error():
     """Every httpx failure mode collapses to one type: the caller's decision is the same."""
 
     class RefusingClient:
-        def post(self, *args: Any, **kwargs: Any) -> Any:
+        def stream(self, *args: Any, **kwargs: Any) -> Any:
             raise OSError("no route to host")
 
     with pytest.raises(TransportError, match="no route to host") as exc:

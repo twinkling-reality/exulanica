@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from exulanica.models.manifest import Role
-from exulanica.models.results import ChatResult, EmbeddingResult
+from exulanica.models.results import NO_MODEL_IN_RESPONSE, ChatResult, EmbeddingResult
+from exulanica.models.usage import usd_string
 
 __all__ = ["CallLog", "ModelCall"]
 
@@ -59,6 +60,9 @@ class ModelCall:
     completion_tokens: int | None
     reasoning_tokens: int | None
     usd: str | None = None
+    #: Why ``served_model`` is null, by name, when it is: the response body named no model.
+    #: ``None`` whenever ``served_model`` is present.
+    served_model_unavailable: str | None = None
 
     @classmethod
     def from_result(cls, call: ChatResult) -> ModelCall:
@@ -66,16 +70,15 @@ class ModelCall:
         usage = usage if isinstance(usage, Mapping) else {}
         details = usage.get("completion_tokens_details")
         details = details if isinstance(details, Mapping) else {}
+        echoed = call.raw.get("model")
+        # ChatResult fills an absent echo with the requested model for compatibility.
+        # Measurement must read the wire, otherwise a missing observation looks verified.
+        served = echoed if isinstance(echoed, str) and echoed else None
         return cls(
             role=str(call.role),
             requested_model=call.model_id,
-            # ChatResult fills an absent echo with the requested model for compatibility.
-            # Measurement must read the wire, otherwise a missing observation looks verified.
-            served_model=(
-                call.raw.get("model")
-                if isinstance(call.raw.get("model"), str) and call.raw.get("model")
-                else None
-            ),
+            served_model=served,
+            served_model_unavailable=None if served is not None else NO_MODEL_IN_RESPONSE,
             used_fallback=call.used_fallback,
             attempts=call.attempts,
             latency_ms=round(call.usage.latency_s * 1000),
@@ -83,7 +86,7 @@ class ModelCall:
             completion_tokens=_reported(usage, "completion_tokens"),
             reasoning_tokens=_reported(details, "reasoning_tokens"),
             usd=(
-                str(call.usage.usd)
+                usd_string(call.usage.usd)
                 if _reported(usage, "prompt_tokens") is not None
                 and _reported(usage, "completion_tokens") is not None
                 else None
@@ -133,23 +136,27 @@ class CallLog:
         return call
 
     def record_embedding(self, result: EmbeddingResult, latency_ms: int) -> None:
-        """Record vector-call accounting without inventing metadata the client omits.
+        """Record one query-vector call as the response reported it.
 
-        EmbeddingResult exposes the selected model and usage but no served-model echo or
-        HTTP attempt count. Those remain null; elapsed time is measured around the call.
+        The served model is the one the response body named, and when it named none the record
+        says so by :data:`~exulanica.models.results.NO_MODEL_IN_RESPONSE` rather than filling in
+        the requested one. ``latency_ms`` is measured by the caller around the whole call. The
+        cost is left null when the provider's report did not price it, as a chat call's is.
         """
+        usage = result.usage
         self._calls.append(
             ModelCall(
                 role=str(Role.EMBEDDING),
                 requested_model=result.model_id,
-                served_model=None,
-                used_fallback=result.usage.used_fallback,
-                attempts=None,
+                served_model=result.served_model_id,
+                used_fallback=result.used_fallback,
+                attempts=result.attempts,
                 latency_ms=latency_ms,
-                prompt_tokens=result.usage.prompt_tokens,
-                completion_tokens=result.usage.completion_tokens,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
                 reasoning_tokens=None,
-                usd=str(result.usage.usd),
+                usd=usd_string(usage.usd) if usage.usd_known else None,
+                served_model_unavailable=result.served_model_unavailable,
             )
         )
 

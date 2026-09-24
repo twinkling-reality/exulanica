@@ -196,40 +196,106 @@
     }
   },
 
+  "timeout_rule_note": "A hosted request is abandoned once its role's timeout_seconds have passed since it was sent, whether or not bytes are still arriving. Each timeout is derived from its basis by timeout_rule, and parse_manifest refuses one that is not: longest_ms times headroom_factor, rounded up to a whole multiple of round_up_to_seconds. The headroom covers a tail the recorded calls did not reach; the rounding keeps one new measurement from moving the bound. Re-run scripts/survey_hosted_call_latency.py --write and restate the basis when the records grow or a primary changes.",
+  "timeout_rule": {
+    "headroom_factor": 2,
+    "round_up_to_seconds": 5
+  },
+
   "roles": {
     "reasoning_cheap": {
       "primary": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
       "fallback": "nvidia/Nemotron-3_5-Lightning",
+      "timeout_seconds": 60,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-24-hosted-call-latency.json",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "rows": 217,
+        "p50_ms": 7076,
+        "p99_ms": 24764,
+        "longest_ms": 28031,
+        "note": "Single composer calls on the Companion answer path. No retained record measures the Lightning fallback, which serves under this timeout when the primary is withdrawn."
+      },
       "required_use_cases": ["text", "reasoning"],
       "rationale": "Used by selection.question.compose_answer to produce cited Companion answers from validated evidence packets. The comparison in docs/evaluation/2026-09-09-companion-memory.json supports Nano latency and validator conformance on four packets; it does not establish general reasoning quality or coverage of every continuity decision. Model-unavailability errors can select Lightning. Answer validation failures receive a repair attempt and then a deterministic answer, not automatic escalation to a larger model."
     },
     "reasoning_mid": {
       "primary": "nvidia/nemotron-3-super-120b-a12b",
       "fallback": "nvidia/Nemotron-3_5-Lightning",
+      "timeout_seconds": 20,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-24-hosted-call-latency.json",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "rows": 8,
+        "p50_ms": 3157,
+        "p99_ms": 7528,
+        "longest_ms": 7528,
+        "note": "Eight per-question answers from the pre-registered model comparison, each one composer call or two when repaired. No production caller."
+      },
       "required_use_cases": ["text", "reasoning"],
       "rationale": "Configured reasoning candidate with no production caller. Adoption requires task-specific quality comparisons against the current caller baseline. Its declared Lightning fallback handles model-unavailability errors; no automatic quality escalation selects this role."
     },
     "reasoning_hard": {
       "primary": "nvidia/Nemotron-3-Ultra-550b-a55b",
       "fallback": "nvidia/nemotron-3-super-120b-a12b",
+      "timeout_seconds": 15,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-24-hosted-call-latency.json",
+        "model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+        "rows": 8,
+        "p50_ms": 1809,
+        "p99_ms": 7437,
+        "longest_ms": 7437,
+        "note": "Eight per-question answers from the pre-registered model comparison, each one composer call or two when repaired. No production caller."
+      },
       "required_use_cases": ["text", "reasoning"],
       "rationale": "Configured reasoning candidate with no production caller. No task-specific comparison establishes an advantage for Companion answers or continuity reasoning. Promotion requires evidence of improved answer quality and task success. The declared Super fallback handles model-unavailability errors; this role is not an implemented quality escalation path."
     },
     "vision": {
       "primary": "MiniMaxAI/MiniMax-M3",
       "fallback": "openbmb/MiniCPM-V-4_5",
+      "timeout_seconds": 25,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-24-hosted-call-latency.json",
+        "model": "MiniMaxAI/MiniMax-M3",
+        "rows": 137,
+        "p50_ms": 4598,
+        "p99_ms": 7995,
+        "longest_ms": 11001,
+        "note": "Every row bounds one vision call from above: a photograph's one or two calls in the place-proposal outcomes, or a whole ingest capture in the rehearsal. The photographs are synthetic drawings."
+      },
       "required_use_cases": ["image"],
       "rationale": "One structured-extraction pass per photograph at ingest. The primary is chosen on measured behaviour: it is a third the input price of the fallback, carries 32x the context, and was runtime-verified to comprehend an image rather than merely accept the request."
     },
     "structured_extraction": {
       "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
       "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "timeout_seconds": 25,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-24-hosted-call-latency.json",
+        "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "rows": 217,
+        "p50_ms": 1864,
+        "p99_ms": 7772,
+        "longest_ms": 12326,
+        "note": "Single classifier, planner and drafter calls."
+      },
       "required_use_cases": ["text"],
       "rationale": "Used by classify_request, propose_plan, draft_appearance and draft_environment_operation for structured intent, query and authored-change proposals. Callers validate these outputs before execution or presentation. The declared DeepSeek fallback handles model-unavailability errors, not failed quality checks or an automatic transfer of work from the reasoning role."
     },
     "embedding": {
       "primary": "Qwen/Qwen3-Embedding-8B",
       "fallback": null,
+      "timeout_seconds": 35,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-24-hosted-call-latency.json",
+        "model": "Qwen/Qwen3-Embedding-8B",
+        "rows": 19,
+        "p50_ms": 3485,
+        "p99_ms": 16676,
+        "longest_ms": 16676,
+        "note": "Single query-vector calls on the Companion answer path, timed around the client call."
+      },
       "required_use_cases": ["retrieval"],
       "rationale": "The only embedding-typed model in the catalog. This role has NO same-tier runtime fallback and the client says so loudly rather than degrading into a different vector space, which would silently poison every stored embedding."
     }

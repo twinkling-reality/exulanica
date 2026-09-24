@@ -20,6 +20,7 @@ each the answer to something measured:
 from __future__ import annotations
 
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any
 
 from exulanica.models.budget import BudgetGuard
@@ -32,7 +33,7 @@ from exulanica.models.errors import (
 )
 from exulanica.models.manifest import ModelSpec, Role
 from exulanica.models.reasoning import SplitContent, split_message
-from exulanica.models.results import ChatResult, EmbeddingResult
+from exulanica.models.results import NO_MODEL_IN_RESPONSE, ChatResult, EmbeddingResult
 from exulanica.models.schema import (
     AmbiguousStructuredOutputError,
     extract_json_object,
@@ -56,6 +57,7 @@ def result_from_body(
     attempts: int,
     tried: tuple[str, ...],
     response_format: Mapping[str, Any] | None = None,
+    usd_bound: Decimal | None = None,
 ) -> ChatResult:
     choices = body.get("choices") or []
     if not choices:
@@ -72,6 +74,7 @@ def result_from_body(
         cache_hit=cache_hit,
         used_fallback=used_fallback,
         latency_s=latency_s,
+        usd_bound=usd_bound,
     )
     budget.record(usage)
 
@@ -123,6 +126,7 @@ def result_from_body(
         tried=tried,
         payload=payload,
     )
+
 
 def checked_payload(
     answer: str, response_format: Mapping[str, Any], model_id: str
@@ -176,11 +180,22 @@ def embedding_from_body(
     *,
     budget: BudgetGuard,
     cache_hit: bool,
+    used_fallback: bool = False,
+    latency_s: float = 0.0,
+    attempts: int = 0,
+    tried: tuple[str, ...] = (),
+    usd_bound: Decimal | None = None,
 ) -> EmbeddingResult:
     rows = body.get("data") or []
     vectors = tuple(tuple(float(x) for x in row.get("embedding") or ()) for row in rows)
     usage = CallUsage.from_response(
-        role=role, spec=spec, usage=body.get("usage"), cache_hit=cache_hit
+        role=role,
+        spec=spec,
+        usage=body.get("usage"),
+        cache_hit=cache_hit,
+        used_fallback=used_fallback,
+        latency_s=latency_s,
+        usd_bound=usd_bound,
     )
     budget.record(usage)
     dimensions = len(vectors[0]) if vectors else 0
@@ -190,6 +205,16 @@ def embedding_from_body(
             f"{spec.model_id} returned {dimensions}-dimensional vectors, manifest declares "
             f"{expected}. Storing these alongside existing vectors would corrupt the index."
         )
+    echoed = body.get("model")
+    served = echoed if isinstance(echoed, str) and echoed else None
     return EmbeddingResult(
-        model_id=spec.model_id, vectors=vectors, usage=usage, dimensions=dimensions
+        model_id=spec.model_id,
+        vectors=vectors,
+        usage=usage,
+        dimensions=dimensions,
+        served_model_id=served,
+        served_model_unavailable=None if served is not None else NO_MODEL_IN_RESPONSE,
+        attempts=attempts,
+        tried=tried or (spec.model_id,),
+        used_fallback=used_fallback,
     )

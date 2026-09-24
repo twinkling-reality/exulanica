@@ -277,9 +277,10 @@ with what it cost; a request that failed without a report stays charged at its w
 
 **What it does not cover.** OPEN.
 
-- The wall clock bounds when a call may start, not how long a started call runs: httpx has no
-  total-request timeout, so a response that arrives slowly inside each per-operation timeout is not
-  cut off.
+- The wall clock bounds how long a started call runs only through a transport that enforces a
+  deadline. `HttpxTransport` does: it abandons a request at its timeout however the response stalls
+  ([transport](../exulanica/models/transport.py)). A transport supplied in its place is bounded only
+  by what it does.
 - The guard is in memory. A durable ledger of lens spend and refusals belongs to the lens lane.
 - A process-wide guard can be passed as `process=` so a lens cannot exceed it; nothing forces a
   caller to pass one.

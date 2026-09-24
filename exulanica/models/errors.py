@@ -59,11 +59,26 @@ class TransportError(ModelError):
 
     A response the endpoint understood and refused is not this: a 4xx that is not a rate limit
     will be refused identically forever, and retrying it is spend with no new information.
+
+    ``timed_out`` says the role's timeout passed before a whole response arrived.
+    ``reached_provider`` is what the ledger prices the attempt by: ``False`` when the request never
+    left (the connection was not made), ``True`` when the provider answered with a status, and
+    ``None`` when it was sent and nothing whole came back, which is the case where the provider may
+    bill for work nobody received.
     """
 
-    def __init__(self, message: str, *, retryable: bool = True) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = True,
+        timed_out: bool = False,
+        reached_provider: bool | None = None,
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.timed_out = timed_out
+        self.reached_provider = reached_provider
 
 
 class ModelUnavailableError(ModelError):

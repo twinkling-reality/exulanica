@@ -1,0 +1,151 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "measured": {
+      "manifest_sha256": "d3286482025e75b51bd9f75c0dc1e3bb5ef0a06ed7af287a797f5b2dea234412",
+      "roles": {
+        "embedding": {
+          "fallback": null,
+          "fallback_measured": null,
+          "primary": "Qwen/Qwen3-Embedding-8B",
+          "primary_measured": {
+            "longest_covers_requests": 1,
+            "longest_ms": 16676,
+            "longest_shape": "call",
+            "longest_source": "docs/evaluation/artifacts/2026-09-24-companion-absent-place/held-out-run.json",
+            "p50_ms": 3485,
+            "p99_ms": 16676,
+            "rows": 19,
+            "shapes": {
+              "call": 19
+            },
+            "single_request_rows": 19
+          },
+          "retried_calls": []
+        },
+        "reasoning_cheap": {
+          "fallback": "nvidia/Nemotron-3_5-Lightning",
+          "fallback_measured": null,
+          "primary": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "primary_measured": {
+            "longest_covers_requests": 1,
+            "longest_ms": 28031,
+            "longest_shape": "call",
+            "longest_source": "docs/evaluation/artifacts/2026-09-24-companion-absent-place/held-out-run.json",
+            "p50_ms": 7076,
+            "p99_ms": 24764,
+            "rows": 217,
+            "shapes": {
+              "call": 209,
+              "per_question_arm": 8
+            },
+            "single_request_rows": 217
+          },
+          "retried_calls": [
+            {
+              "attempts": 2,
+              "latency_ms": 196615,
+              "source": "docs/evaluation/artifacts/2026-09-24-companion-absent-place/held-out-run.json"
+            }
+          ]
+        },
+        "reasoning_hard": {
+          "fallback": "nvidia/nemotron-3-super-120b-a12b",
+          "fallback_measured": null,
+          "primary": "nvidia/Nemotron-3-Ultra-550b-a55b",
+          "primary_measured": {
+            "longest_covers_requests": 1,
+            "longest_ms": 7437,
+            "longest_shape": "per_question_arm",
+            "longest_source": "docs/evaluation/2026-09-22-model-selection-outcome.json",
+            "p50_ms": 1809,
+            "p99_ms": 7437,
+            "rows": 8,
+            "shapes": {
+              "per_question_arm": 8
+            },
+            "single_request_rows": 8
+          },
+          "retried_calls": []
+        },
+        "reasoning_mid": {
+          "fallback": "nvidia/Nemotron-3_5-Lightning",
+          "fallback_measured": null,
+          "primary": "nvidia/nemotron-3-super-120b-a12b",
+          "primary_measured": {
+            "longest_covers_requests": 1,
+            "longest_ms": 7528,
+            "longest_shape": "per_question_arm",
+            "longest_source": "docs/evaluation/2026-09-22-model-selection-outcome.json",
+            "p50_ms": 3157,
+            "p99_ms": 7528,
+            "rows": 8,
+            "shapes": {
+              "per_question_arm": 8
+            },
+            "single_request_rows": 8
+          },
+          "retried_calls": []
+        },
+        "structured_extraction": {
+          "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "fallback_measured": null,
+          "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "primary_measured": {
+            "longest_covers_requests": 1,
+            "longest_ms": 12326,
+            "longest_shape": "call",
+            "longest_source": "docs/evaluation/artifacts/2026-09-24-companion-absent-place/development-run.json",
+            "p50_ms": 1864,
+            "p99_ms": 7772,
+            "rows": 217,
+            "shapes": {
+              "call": 217
+            },
+            "single_request_rows": 217
+          },
+          "retried_calls": []
+        },
+        "vision": {
+          "fallback": "openbmb/MiniCPM-V-4_5",
+          "fallback_measured": null,
+          "primary": "MiniMaxAI/MiniMax-M3",
+          "primary_measured": {
+            "longest_covers_requests": 2,
+            "longest_ms": 11001,
+            "longest_shape": "ingest_capture",
+            "longest_source": "docs/evaluation/artifacts/2026-09-23-rehearsal-main/result.json",
+            "p50_ms": 4598,
+            "p99_ms": 7995,
+            "rows": 137,
+            "shapes": {
+              "ingest_capture": 3,
+              "per_photograph": 134
+            },
+            "single_request_rows": 72
+          },
+          "retried_calls": []
+        }
+      },
+      "sources": {
+        "docs/evaluation/2026-09-22-model-selection-outcome.json": "0c8259dc9df03b0bcd00b6152121b61ceb25c5a6918a190095f890ee9fad5538",
+        "docs/evaluation/2026-09-22-vision-place-proposal-b-outcome.json": "e425a51011a988c69237564e62fe4f729e9f238b0c2acc4a46f9062d11aa6f1e",
+        "docs/evaluation/2026-09-22-vision-place-proposal-c-outcome.json": "674771363a4b325d027736d2d5db3a3302627f4157b60d1395ad025c41617b48",
+        "docs/evaluation/2026-09-22-vision-place-proposal-outcome.json": "c088a649128a684c54143c087165c9138e74ed8bd3d6bff64fea9f90cba42c6f",
+        "docs/evaluation/2026-09-23-companion-place-link-outcome.json": "29ba5341fde46ca1afd40d70be0a19962c1207655b747cee1fc419a27429b6d0",
+        "docs/evaluation/2026-09-23-vision-place-proposal-d-outcome.json": "b725944cac3115b50b8538d257abf4dc6e925e0723ec268b8bc3a8b735d0b7e2",
+        "docs/evaluation/artifacts/2026-09-23-rehearsal-main/result.json": "99b1d55258b853e5d22a112772e94f5b7e587931068694fc66c08ae5bb6cf14c",
+        "docs/evaluation/artifacts/2026-09-24-companion-absent-place/development-run.json": "efc5ae77ad4c00fcf0e2b2205f4004cbdddb1addf8ffba1089d4fabfc95b8518",
+        "docs/evaluation/artifacts/2026-09-24-companion-absent-place/held-out-run.json": "b308ddca5cd813e79cdf32e945d4a2ecc84c9d4d99ac9732b763b988a862ec4c"
+      }
+    },
+    "measured_with_sha256": "82b129c814604aadb26e447181cc901c787f95f2e7618981cf4c285db3b102a0",
+    "not_established": [
+      "Latency on real personal photographs: every vision row is a synthetic drawing.",
+      "Latency under concurrent load: each record asked one question at a time.",
+      "What the provider bills for a request the client stopped waiting for."
+    ],
+    "profile_note": "Per-role latency of hosted model calls, read from the retained evaluation records by scripts/survey_hosted_call_latency.py. The model manifest's timeout_basis quotes longest_ms for each role's primary."
+  },
+  "record_sha256": "dec0d0b6947b523581f333c4d24810928d5a41feee1c95b09121ecc69052b9fe"
+}

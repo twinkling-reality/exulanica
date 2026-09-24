@@ -49,6 +49,49 @@ policy. DINOv2 appearance embeddings, YuNet/SFace biometric recognition, speech 
 reranker and MapAnything appear in earlier plans or candidate discussions, not in implemented
 model paths found by this review. Do not count them as delivered capabilities.
 
+### Hosted call bounds and cost
+
+Each hosted role waits for its own timeout, stated once in the
+[model manifest](../exulanica/models/models.manifest.json) beside its measured basis. The manifest's
+`timeout_rule` derives a timeout from the longest latency recorded for the role's primary: twice
+that latency, rounded up to a multiple of 5 seconds. The manifest parser refuses a timeout the
+rule does not produce, and refuses a basis measured on a model other than the primary. The basis
+is read from the retained evaluation records by
+[`scripts/survey_hosted_call_latency.py`](../scripts/survey_hosted_call_latency.py) and recorded in
+[the latency record](evaluation/2026-09-24-hosted-call-latency.json).
+
+| Role | Primary's longest measured call | Timeout |
+| --- | --- | --- |
+| `reasoning_cheap` (Companion answers) | 28,031 ms of 217 calls | 60 s |
+| `structured_extraction` (classification, planning, drafts) | 12,326 ms of 217 calls | 25 s |
+| `embedding` (query and caption vectors) | 16,676 ms of 19 calls | 35 s |
+| `vision` (photograph observations) | 11,001 ms of 137 rows, each an upper bound | 25 s |
+| `reasoning_mid` | 7,528 ms of 8 answers | 20 s |
+| `reasoning_hard` | 7,437 ms of 8 answers | 15 s |
+
+The timeout is a deadline on the whole request. The transport abandons a request when it passes,
+however the response stalls: name resolution, connection, or a body that arrives slowly
+([transport](../exulanica/models/transport.py)). A request cut off this way reports that it timed
+out. A fallback serves under its role's timeout, and no retained record measures a fallback's
+latency. The vision rows are synthetic drawings, and none of the records measures latency under
+concurrent load.
+
+The API client makes one attempt per call, so a question to `/selection/ask` waits on its model
+calls for at most the sum of their timeouts. A planner call and its repair
+([planner](../exulanica/selection/planner.py)), the query vector, and a composer call and its
+repair ([question](../exulanica/selection/question.py)) come to 205 seconds. A withdrawn primary
+adds the time its refusal took before the fallback is asked.
+
+Every attempt enters the process's cost ledger, failed ones included
+([usage](../exulanica/models/usage.py)). A completed call is priced from the provider's usage
+report. An attempt whose connection was never made costs a known zero. A timeout, an error status,
+a dropped connection, or a reply without a usage report is recorded with its cost unknown and
+charged the attempt's reservation, the most it can have cost, because the provider may bill work
+whose result never arrived. The budget guard spends from the same ledger, so an unknown cost
+counts against the ceiling at that bound and a failed attempt counts toward the call limit. The
+error that reaches the caller states the cost the same way. What the provider actually bills for
+an abandoned request is not observable from this side.
+
 ### Decision and evidence
 
 **DECISION:** retain the implemented stack as the comparison baseline. Add the evaluations in the

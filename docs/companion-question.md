@@ -307,14 +307,18 @@ That leaks nothing, and what it costs vector retrieval is measured under Evidenc
 
 The Selection response's execution block records prompt version, validator rejections and model
 calls returned to the workflow. A call identifies requested and served model, fallback use,
-attempts, latency and available token counts. Provider usage that is absent remains absent rather
-than becoming a measured zero. Read the exact fields in
-[Selection response models](../exulanica/api/routes/selection.py).
+attempts, latency and available token counts. The served model of every call, the query-vector
+call included, is the identifier the response body named; when a body names none, the record keeps
+it null with the reason `response_names_no_model` rather than repeating the requested model.
+Provider usage that is absent remains absent rather than becoming a measured zero. Read the exact
+fields in [Selection response models](../exulanica/api/routes/selection.py) and
+[the call record](../exulanica/selection/calls.py).
 
 The list is per question, not the process-wide model ledger. A discarded answer that returned a
 model result can have a recorded call; a failure before a result reaches the workflow need not have
-one. The list is therefore not a complete transport audit. The transport and request-policy evidence
-have their own scope.
+one. The list is therefore not a complete transport audit. The process-wide ledger does record every
+attempt, failed and timed-out ones included, with its cost stated as known or unknown; see
+[model and service selection](model-and-service-selection.md#hosted-call-bounds-and-cost).
 
 A deterministic or abstained answer does not mean no model executed: a planner can run even when
 there is no composing call. UI provenance must distinguish search/planning from answer composition.

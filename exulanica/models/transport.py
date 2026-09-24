@@ -19,6 +19,20 @@ passes through as well. Redirects are not followed in any case. A refusal is rai
 :class:`~exulanica.models.egress.EgressRefused` and is never folded into ``TransportError``,
 because a ``TransportError`` is retryable by default and a refused destination must not be.
 
+**The timeout is a deadline on the whole request**, measured on the monotonic clock from the moment
+the request is handed over. httpx applies one float to connect, read, write and pool separately and
+has no total-request timeout, so a response that arrives one chunk inside every read timeout was
+never cut off: measured on a local server, a 1 s timeout returned after 4.84 s. The request now runs
+on a worker thread that streams the body and checks the deadline after every chunk, and the caller
+waits for that thread no longer than the deadline, so name resolution, a slow connect and a trickled
+body all end at it. A worker still reading when the caller has gone is abandoned; its next chunk, or
+httpx's own per-read timeout, ends it within one more timeout.
+
+**A failure says whether the request left.** A connection that was never made cannot have been
+billed; a request that was sent and not answered in full may have been. :class:`TransportError`
+carries that as ``reached_provider`` and the ledger prices the attempt from it; see
+:mod:`exulanica.models.usage`.
+
 An injected ``client`` is the seam tests use to avoid the network. A real ``httpx.Client``
 passed that way still needs an allowlist, and nothing in the package passes one:
 ``tests/test_egress_allowlist.py`` greps for it. A test double that is not an ``httpx.Client``
@@ -29,6 +43,8 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -72,9 +88,7 @@ class HttpResponse:
             return json.loads(self.text)
         except json.JSONDecodeError as exc:
             excerpt = self.text[:200]
-            raise TransportError(
-                f"HTTP {self.status_code} body is not JSON: {excerpt!r}"
-            ) from exc
+            raise TransportError(f"HTTP {self.status_code} body is not JSON: {excerpt!r}") from exc
 
     def error_message(self) -> str:
         """Best-effort provider error string, used to classify a 400 as model-not-found."""
@@ -199,13 +213,6 @@ class HttpxTransport:
     def __exit__(self, *exc_info: object) -> None:
         self.close()
 
-    def _wrap(self, response: Any) -> HttpResponse:
-        return HttpResponse(
-            status_code=int(response.status_code),
-            text=response.text,
-            headers={k.lower(): v for k, v in response.headers.items()},
-        )
-
     def post_json(
         self,
         url: str,
@@ -216,27 +223,90 @@ class HttpxTransport:
     ) -> HttpResponse:
         if self.egress is not None:
             self.egress.require(url)
-        try:
-            return self._wrap(
-                self._client.post(url, headers=dict(headers), json=dict(payload), timeout=timeout)
-            )
-        except EgressRefused:
-            # Raised by the mounted check inside the client. Not a transport failure, and not
-            # retryable, so it must not be collapsed into the type below.
-            raise
-        # Every httpx failure mode is collapsed into one type: the caller's decision is
-        # the same for a timeout, a DNS failure and a reset connection.
-        except Exception as exc:
-            raise TransportError(f"POST {url} failed: {exc!r}") from exc
+        return self._within_deadline(
+            "POST", url, timeout, headers=dict(headers), json=dict(payload)
+        )
 
-    def get_json(
-        self, url: str, *, headers: Mapping[str, str], timeout: float
-    ) -> HttpResponse:
+    def get_json(self, url: str, *, headers: Mapping[str, str], timeout: float) -> HttpResponse:
         if self.egress is not None:
             self.egress.require(url)
-        try:
-            return self._wrap(self._client.get(url, headers=dict(headers), timeout=timeout))
-        except EgressRefused:
-            raise
-        except Exception as exc:
-            raise TransportError(f"GET {url} failed: {exc!r}") from exc
+        return self._within_deadline("GET", url, timeout, headers=dict(headers))
+
+    def _within_deadline(
+        self, method: str, url: str, timeout: float, **request: Any
+    ) -> HttpResponse:
+        """One request, returned or refused by ``timeout`` seconds from now, however it stalls."""
+        if not timeout > 0:
+            raise ValueError(f"a request timeout must be positive, got {timeout!r}")
+        deadline = time.monotonic() + timeout
+        outcome: dict[str, Any] = {}
+
+        def send() -> None:
+            try:
+                outcome["response"] = self._read(method, url, deadline, timeout, request)
+            except BaseException as exc:  # handed to the caller's thread, which raises it
+                outcome["error"] = exc
+
+        worker = threading.Thread(target=send, name=f"model-request {method}", daemon=True)
+        worker.start()
+        worker.join(timeout)
+        if worker.is_alive():
+            raise _deadline_passed(method, url, timeout)
+        error = outcome.get("error")
+        if error is None:
+            response: HttpResponse = outcome["response"]
+            return response
+        if isinstance(error, EgressRefused | TransportError):
+            # Raised by the mounted check inside the client (not a transport failure, and not
+            # retryable), or already classified by the deadline check below.
+            raise error
+        raise _classified(method, url, error) from error
+
+    def _read(
+        self,
+        method: str,
+        url: str,
+        deadline: float,
+        timeout: float,
+        request: Mapping[str, Any],
+    ) -> HttpResponse:
+        with self._client.stream(method, url, timeout=timeout, **request) as response:
+            chunks: list[bytes] = []
+            for chunk in response.iter_bytes():
+                chunks.append(chunk)
+                if time.monotonic() > deadline:
+                    raise _deadline_passed(method, url, timeout)
+            return HttpResponse(
+                status_code=int(response.status_code),
+                text=b"".join(chunks).decode(response.encoding or "utf-8", errors="replace"),
+                headers={k.lower(): v for k, v in response.headers.items()},
+            )
+
+
+def _deadline_passed(method: str, url: str, timeout: float) -> TransportError:
+    return TransportError(
+        f"{method} {url} timed out: no whole response within {timeout:g} s. The request was "
+        "sent, so the provider may still bill for it.",
+        timed_out=True,
+        reached_provider=None,
+    )
+
+
+def _classified(method: str, url: str, exc: BaseException) -> TransportError:
+    """Every httpx failure mode as one type, saying whether it timed out and whether it left.
+
+    The caller's retry decision is the same for a timeout, a DNS failure and a reset connection,
+    so they stay one type. What differs is the bill: a connection that was never made carries no
+    request, and anything after it may have reached the provider.
+    """
+    httpx = sys.modules.get("httpx")
+    never_left: tuple[type[BaseException], ...] = ()
+    timeouts: tuple[type[BaseException], ...] = ()
+    if httpx is not None:
+        never_left = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+        timeouts = (httpx.TimeoutException,)
+    return TransportError(
+        f"{method} {url} failed: {exc!r}",
+        timed_out=isinstance(exc, timeouts),
+        reached_provider=False if isinstance(exc, never_left) else None,
+    )

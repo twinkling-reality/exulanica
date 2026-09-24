@@ -28,6 +28,13 @@ another is entirely lowercase, a third uses an underscore where its display name
 manifest and the preflight both read ``flavors[].model_id`` and never ``name``. A typo here is a
 silent 404-class failure.
 
+**Every role declares how long a request to it may take**, as data with its measured basis:
+``timeout_seconds`` beside a ``timeout_basis`` quoting the longest latency recorded for the role's
+primary, and one ``timeout_rule`` saying how the first follows from the second. The parser derives
+each timeout from its basis and refuses a manifest that states a different one, so a timeout can
+not drift from the measurement it claims, and a changed primary cannot keep the old primary's
+basis. The client reads the timeout from here; no second constant exists in code.
+
 **Region strings are informational.** Token Factory reports its public endpoints as Region
 "Global" and warns the processing location can change without notice, so only the global base URL
 is ever used and nothing in this codebase branches on a region.
@@ -42,6 +49,7 @@ from decimal import Decimal
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Final
 
 from exulanica.models.errors import ManifestError
@@ -53,6 +61,7 @@ __all__ = [
     "ModelSpec",
     "Role",
     "RoleBinding",
+    "TimeoutRule",
     "load_manifest",
     "load_manifest_from",
     "parse_manifest",
@@ -132,14 +141,37 @@ class ModelSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class TimeoutRule:
+    """How a role's timeout follows from the longest latency measured for its primary.
+
+    ``headroom_factor`` covers a tail the recorded calls did not reach, and ``round_up_to_seconds``
+    keeps one new measurement from moving the bound. Both are the manifest's, stated once.
+    """
+
+    headroom_factor: int
+    round_up_to_seconds: int
+
+    def timeout_for(self, longest_ms: int) -> int:
+        """Whole seconds: ``longest_ms`` times the headroom, rounded up to the step. No floats."""
+        step_ms = self.round_up_to_seconds * 1000
+        return -(-longest_ms * self.headroom_factor // step_ms) * self.round_up_to_seconds
+
+
+@dataclass(frozen=True, slots=True)
 class RoleBinding:
-    """A role, its primary model, and the model tried when the primary is withdrawn."""
+    """A role, its primary model, the model tried when the primary is withdrawn, and its timeout."""
 
     role: Role
     primary: ModelSpec
     fallback: ModelSpec | None
     required_use_cases: tuple[str, ...]
     rationale: str
+    #: How long one request to this role may take before it is abandoned, in whole seconds.
+    #: Derived from ``timeout_basis`` by the manifest's :class:`TimeoutRule` in ``parse_manifest``.
+    timeout_seconds: int
+    #: The measurement the timeout rests on, as the manifest states it: the record it was read
+    #: from, the primary it measured, and the longest latency recorded for that primary.
+    timeout_basis: Mapping[str, Any]
 
     @property
     def chain(self) -> tuple[ModelSpec, ...]:
@@ -185,6 +217,7 @@ class Manifest:
     catalog_retrieved_at: str
     models: Mapping[str, ModelSpec]
     roles: Mapping[Role, RoleBinding]
+    timeout_rule: TimeoutRule
 
     def __getitem__(self, role: Role | str) -> RoleBinding:
         try:
@@ -267,14 +300,66 @@ def _reject_unknown_roles(raw_roles: Mapping[str, Any]) -> None:
         )
 
 
+def _positive_whole(value: Any, where: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ManifestError(f"{where} must be a positive whole number, got {value!r}")
+    return value
+
+
+def _timeout_rule(raw: Any) -> TimeoutRule:
+    if not isinstance(raw, Mapping):
+        raise ManifestError("manifest timeout_rule must be an object")
+    return TimeoutRule(
+        headroom_factor=_positive_whole(raw.get("headroom_factor"), "timeout_rule.headroom_factor"),
+        round_up_to_seconds=_positive_whole(
+            raw.get("round_up_to_seconds"), "timeout_rule.round_up_to_seconds"
+        ),
+    )
+
+
+def _role_timeout(
+    role: Role, raw: Mapping[str, Any], primary: ModelSpec, rule: TimeoutRule
+) -> tuple[int, Mapping[str, Any]]:
+    """The role's timeout and its basis, or ``ManifestError`` naming the disagreement."""
+    stated = _positive_whole(raw.get("timeout_seconds"), f"role {role}: timeout_seconds")
+    basis = raw.get("timeout_basis")
+    if not isinstance(basis, Mapping):
+        raise ManifestError(f"role {role}: timeout_basis must be an object naming its measurement")
+    if basis.get("model") != primary.model_id:
+        raise ManifestError(
+            f"role {role}: timeout_basis measured {basis.get('model')!r}, but the primary is "
+            f"{primary.model_id!r}. A timeout rests on the model it bounds: measure the primary "
+            "and restate the basis."
+        )
+    if not isinstance(basis.get("record"), str) or not basis["record"]:
+        raise ManifestError(f"role {role}: timeout_basis names no record")
+    longest = _positive_whole(basis.get("longest_ms"), f"role {role}: timeout_basis.longest_ms")
+    derived = rule.timeout_for(longest)
+    if stated != derived:
+        raise ManifestError(
+            f"role {role}: timeout_seconds is {stated}, but its basis ({longest} ms longest) and "
+            f"the timeout_rule give {derived}. Restate one of them; they may not disagree."
+        )
+    return stated, MappingProxyType(dict(basis))
+
+
 def parse_manifest(document: Mapping[str, Any]) -> Manifest:
     """Validate a manifest document and freeze it. Raises ``ManifestError`` on anything wrong."""
-    for key in ("models", "roles", "pipeline_version", "base_url", "catalog_url", "api_key_env"):
+    for key in (
+        "models",
+        "roles",
+        "pipeline_version",
+        "base_url",
+        "catalog_url",
+        "api_key_env",
+        "timeout_rule",
+    ):
         if key not in document:
             raise ManifestError(f"manifest is missing top-level key {key!r}")
 
     raw_models: Mapping[str, Any] = document["models"]
     raw_roles: Mapping[str, Any] = document["roles"]
+    rule = _timeout_rule(document["timeout_rule"])
     specs = {model_id: _spec_from(model_id, raw) for model_id, raw in raw_models.items()}
 
     _reject_unknown_roles(raw_roles)
@@ -298,12 +383,15 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
                 f"role {role}: the fallback is the same identifier as the primary, which is not a "
                 "fallback. Declare null if this role genuinely has none."
             )
+        timeout_seconds, timeout_basis = _role_timeout(role, raw, specs[primary_id], rule)
         bindings[role] = RoleBinding(
             role=role,
             primary=specs[primary_id],
             fallback=None if fallback_id is None else specs[fallback_id],
             required_use_cases=tuple(str(u) for u in raw.get("required_use_cases", ())),
             rationale=str(raw.get("rationale", "")),
+            timeout_seconds=timeout_seconds,
+            timeout_basis=timeout_basis,
         )
 
     return Manifest(
@@ -315,6 +403,7 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
         catalog_retrieved_at=str(document.get("catalog_retrieved_at", "")),
         models=specs,
         roles=bindings,
+        timeout_rule=rule,
     )
 
 
