@@ -401,11 +401,19 @@ def _outcome(run) -> str:
     return "registered_scene" if run["accepted"] else "registered_partial"
 
 
+#: The most the 210-photograph verdict may cost, in seconds of this process's CPU time. The
+#: retained runs took 41.5 and 42.1 s of wall clock (docs/capture-overlap-and-recovery-state.md,
+#: Cost), and the verdict runs in this one process with process creation refused, so its CPU time
+#: is its work. Wall clock is printed and not held: a full suite shares the machine, and at a load
+#: average near 40 the same verdict took 122.7 s of wall clock.
+VERDICT_CPU_BOUND_SECONDS = 120
+
+
 def test_the_210_photograph_verdict_costs_seconds_and_starts_nothing(volcanic):
     verdict, wall, cpu, newly = volcanic
     print(f"210-photograph verdict: wall {wall:.2f} s, cpu {cpu:.2f} s")
     assert newly == []
-    assert wall < 120, f"{wall:.1f} s is not a cheap verdict"
+    assert cpu < VERDICT_CPU_BOUND_SECONDS, f"{cpu:.1f} s of CPU is not a cheap verdict"
     assert verdict.graph.photograph_count == verdict.graph.measured_count == 210
     assert len(verdict.graph.measurement.pair_scores) == 21945
     assert verdict.predicted_ceiling == "registered_scene"

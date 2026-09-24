@@ -22,6 +22,7 @@ server and are checked first.
 from __future__ import annotations
 
 import json
+import random
 import re
 import shutil
 import stat
@@ -68,6 +69,13 @@ ASKED_FOR_A_PASSWORD = "no password supplied"
 #: The first marker profile, which every cluster made or adopted before passwords were required
 #: carries.
 FIRST_MARKER_PROFILE = "exulanica.local-database/v1"
+
+#: Where a serving copy's own port is drawn: below every operating system's ephemeral range
+#: (macOS 49152, Linux 32768), which binding port 0 draws from, and above the fixed ports this
+#: machine's runtimes use. A conversion stops a serving copy and starts it again on that port;
+#: a port from the ephemeral range could be handed to another test's server in between, as one
+#: run measured (refused port-in-use on restart, with six workers starting servers).
+SERVING_PORTS = range(21000, 30000)
 
 
 # -- the password file and the rules, without a server -----------------------------------------
@@ -207,11 +215,19 @@ def trusted_world(servers_machine, tmp_path_factory) -> Iterator[Path]:
         made.stop_all()
 
 
+def _serving_port() -> int:
+    """A free port from :data:`SERVING_PORTS`, which no other test's port-0 draw can be given."""
+    for port in random.sample(SERVING_PORTS, k=64):
+        if cluster.port_is_free(port):
+            return port
+    raise AssertionError(f"no free port among 64 drawn from {SERVING_PORTS}")
+
+
 def _serving_copy(world: Path, servers: Servers, directory: Path) -> LocalDatabase:
     """A copy of the trusted world, serving the application on a port of its own."""
     shutil.copytree(world, directory, symlinks=True)
     database = servers.track(directory)
-    port = cluster._free_port()
+    port = _serving_port()
     database.cluster.start(port)
     with database.connect(port) as connection:
         connection.execute(f"alter system set port = {port}")
