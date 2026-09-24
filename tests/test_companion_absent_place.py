@@ -156,6 +156,9 @@ def _ask(saved, question: str, *replies: SelectionPlan | Answer, plan=None):
         now=NOW,
         store=store,
         before_compose=composer_rights_check(repository.connection, repository.workspace_id),
+        # These questions read photographs and saved places, which belong to the workspace and not
+        # to a world, so no world's authored or simulated content is asked for.
+        world_id=None,
     )
     return outcome, transport
 
@@ -339,7 +342,7 @@ def test_the_answer_to_a_guess_says_nothing_was_searched():
 def _packet(saved):
     repository, store, session, entities = saved
     validated = validate(repository.connection, _stood_in(entities), session)
-    result = execute(repository.connection, validated, store=store)
+    result = execute(repository.connection, validated, world_id=None, store=store)
     return build_packet(repository.connection, result, workspace_id=repository.workspace_id)
 
 
