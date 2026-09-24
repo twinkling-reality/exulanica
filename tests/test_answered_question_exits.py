@@ -111,6 +111,9 @@ class Context:
             plan=plan,
             now=NOW,
             store=self.store,
+            # Every exit reads captures or memories, which belong to the workspace and not to a
+            # world, so no world's authored or simulated content is asked for.
+            world_id=None,
             before_compose=before_compose
             or composer_rights_check(self.connection, self.repository.workspace_id),
         )

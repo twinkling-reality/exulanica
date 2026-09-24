@@ -37,7 +37,6 @@ from exulanica.world import (
 )
 from exulanica.world.interaction_repository import WorldInteractionPolicyRepository
 from exulanica.world.models import (
-    DEFAULT_WORLD_ID,
     ProposalOrigin,
     ProposalProvenance,
     StyleProposal,
@@ -48,6 +47,7 @@ from psycopg.rows import dict_row
 
 import pg_harness
 from test_interaction_policy_postgres import proposal as interaction_proposal
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -151,14 +151,17 @@ def _admit(admin, workspace, store, place_id, tmp_path) -> uuid.UUID:
 
 def _styles(admin, workspace, topology) -> WorldStyleRepository:
     _as(admin, workspace)
-    styles = WorldStyleRepository(admin, workspace, world_id=DEFAULT_WORLD_ID)
+    registered_world(admin, workspace)
+    styles = WorldStyleRepository(admin, workspace, world_id=FIXTURE_WORLD_ID)
     if (
         admin.execute(
             "select 1 from world_style_state where workspace_id = %s", (workspace,)
         ).fetchone()
         is None
     ):
-        styles.register_topology(TopologyContract(topology, ("region-a",)))
+        styles.register_topology(
+            TopologyContract(topology, ("region-a",), world_id=FIXTURE_WORLD_ID)
+        )
     return styles
 
 
@@ -182,7 +185,8 @@ def _style_preview(admin, workspace, proposal_id):
 
 def _interaction_preview(admin, workspace, proposal_id):
     _as(admin, workspace)
-    policies = WorldInteractionPolicyRepository(admin, workspace, world_id=DEFAULT_WORLD_ID)
+    registered_world(admin, workspace)
+    policies = WorldInteractionPolicyRepository(admin, workspace, world_id=FIXTURE_WORLD_ID)
     return policies.preview(interaction_proposal(policies, FIELD_OF_VIEW, proposal_id=proposal_id))
 
 

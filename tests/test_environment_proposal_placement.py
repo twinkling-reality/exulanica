@@ -151,7 +151,10 @@ def test_a_place_proposal_names_anchors_and_places_the_selected_building(
     }
     with TestClient(create_app(services, verify=False)) as client:
         response = client.post(
-            "/selection/environment", headers={"Authorization": f"Bearer {token}"}, json=body
+            "/selection/environment",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"world_id": composed.worlds.world_id},
+            json=body,
         )
     assert response.status_code == 200, response.text
     proposal = response.json()["proposal"]

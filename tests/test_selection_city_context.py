@@ -29,7 +29,12 @@ HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
 def _ask(content: dict, body: dict) -> tuple[int, dict]:
     with TestClient(create_app(content["services"], verify=False)) as client:
-        response = client.post("/selection/ask", json=body, headers=HEADERS)
+        response = client.post(
+            "/selection/ask",
+            params={"world_id": content["world_id"]},
+            json=body,
+            headers=HEADERS,
+        )
     return response.status_code, response.json()
 
 

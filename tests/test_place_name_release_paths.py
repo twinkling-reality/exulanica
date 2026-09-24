@@ -81,7 +81,7 @@ from conftest import (
 from model_fakes import FakeTransport, chat_body
 from test_companion_saved_names import PERSON, PLACE, TEXT, _vector_reply, named
 from test_hosted_boundary import HOSTED_CALL_PATHS
-from test_selection_proposal import _seed_world, current_reference, draft
+from test_selection_proposal import WORLD, _seed_world, current_reference, draft
 from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_support import registered_world
 
@@ -814,7 +814,7 @@ def _send_a_query(instance: Instance, _client: ModelClient, http: TestClient) ->
 def _ask_in_words(instance: Instance, _client: ModelClient, http: TestClient) -> None:
     """``POST /selection/ask`` with a question in words naming the place: planner and composer."""
     response = http.post(
-        "/selection/ask",
+        instance.asking,
         headers=AUTH,
         json={"question": f"Which photographs show the running club at {PLACE}?"},
     )
@@ -831,13 +831,15 @@ def _hosted(instance: Instance, client: ModelClient) -> ModelClient:
 
 
 def _classify(instance: Instance, client: ModelClient, _http: TestClient) -> None:
-    """The appearance path on a workspace with no world: classified, and refused before a draft."""
+    """The appearance path in a world that holds no evidence: classified, refused before a draft."""
     propose_appearance(
         instance.repository.connection,
         _hosted(instance, client),
         f"make the light warmer outside {PLACE}",
         instance.session,
         current=None,
+        world_id=WORLD,
+        store=None,
     )
 
 
@@ -854,6 +856,8 @@ def _draft_appearance(instance: Instance, client: ModelClient, _http: TestClient
         f"make the light warmer outside {PLACE}",
         instance.session,
         current=current_reference(),
+        world_id=WORLD,
+        store=None,
     )
     assert outcome.proposal is not None, outcome.refusal
 

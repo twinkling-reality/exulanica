@@ -41,6 +41,8 @@ def test_environment_instance_relation_is_forced_scoped_and_composite_bound(spin
             "environment_source_admission",
             "derived_environment_asset",
             "environment_feature_index_publication",
+            # Migration 0099: every world table names a registered world.
+            "world_identity",
         }
     finally:
         connection.close()

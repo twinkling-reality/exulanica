@@ -91,7 +91,7 @@ def test_a_decision_carries_no_place_allowed_for_the_composer(
     client = ModelClient(api_key="test-key-not-real", manifest=manifest, transport=transport)
     api.client.app.state.society_decision_provider = provider_for(client, transport, manifest)
 
-    response = api.post(route + "/decisions", body)
+    response = api.post(api.in_world(route + "/decisions"), body)
 
     assert response.status_code == 200, response.text
     assert response.json()["decision"]["status"] == "accepted", response.text

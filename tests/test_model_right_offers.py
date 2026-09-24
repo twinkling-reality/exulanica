@@ -268,6 +268,8 @@ def _ask(upload, client):
         Session(workspace_id=upload.workspace_id, actor=uuid.uuid4()),
         plan=SelectionPlan(intent=Intent.CAPTURES, semantic_query="gullfoss"),
         store=upload.store,
+        # A captures plan reads photographs, which belong to the workspace and not to a world.
+        world_id=None,
         before_compose=composer_rights_check(upload.repository.connection, upload.workspace_id),
     )
 

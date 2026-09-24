@@ -68,11 +68,12 @@ QUESTION = f"Is {PERSON} wearing the running club shirt outside {PLACE}?"
 LONGER_PLACE = "The Old Harbour Lighthouse"
 
 
-def _ask(http, question: str, plan: SelectionPlan | None = None) -> dict:
+def _ask(instance: Instance, http, question: str, plan: SelectionPlan | None = None) -> dict:
+    """``POST /selection/ask`` in the instance's world."""
     body = {"question": question}
     if plan is not None:
         body["plan"] = plan.model_dump(mode="json")
-    response = http.post("/selection/ask", headers=AUTH, json=body)
+    response = http.post(instance.asking, headers=AUTH, json=body)
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -92,7 +93,7 @@ def test_a_place_allowed_for_the_composer_reaches_the_composers_request_and_no_o
     instance.grant(COMPOSER)
 
     with instance.http(services) as http:
-        answer = _ask(http, QUESTION)
+        answer = _ask(instance, http, QUESTION)
 
     (planned,) = transport.sent_by("planner")
     (composed,) = transport.sent_by("composer")
@@ -113,9 +114,9 @@ def test_a_stop_holds_the_composers_next_request_back(instance):
     instance.grant(COMPOSER)
 
     with instance.http(services) as http:
-        _ask(http, QUESTION)
+        _ask(instance, http, QUESTION)
         instance.withdraw(COMPOSER)
-        _ask(http, QUESTION)
+        _ask(instance, http, QUESTION)
 
     allowed, stopped = transport.sent_by("composer")
     assert _carries_the_place(allowed)
@@ -141,7 +142,7 @@ def test_a_place_the_planner_is_sent_by_name_is_no_search_term(instance):
     instance.grant()
 
     with instance.http(services) as http:
-        answer = _ask(http, f"Photographs of the running club at {PLACE}")
+        answer = _ask(instance, http, f"Photographs of the running club at {PLACE}")
 
     (planned,) = transport.sent_by("planner")
     (searched,) = transport.sent_by("query embedding")
@@ -195,7 +196,7 @@ def test_the_question_and_its_packet_name_each_withheld_place_one_way(instance):
     plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query="harbour lighthouse")
 
     with instance.http(services) as http:
-        answer = _ask(http, f"Is the running club outside {PLACE}?", plan)
+        answer = _ask(instance, http, f"Is the running club outside {PLACE}?", plan)
 
     (composed,) = transport.sent_by("composer")
     message = _user_message(composed)
