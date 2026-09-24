@@ -80,7 +80,12 @@ The API client makes one attempt per call, so a question to `/selection/ask` wai
 calls for at most the sum of their timeouts. A planner call and its repair
 ([planner](../exulanica/selection/planner.py)), the query vector, and a composer call and its
 repair ([question](../exulanica/selection/question.py)) come to 205 seconds. A withdrawn primary
-adds the time its refusal took before the fallback is asked.
+adds the time its refusal took before the fallback is asked, which the bound counts as one more
+timeout for each call whose role has a fallback: 375 seconds on the API's client.
+`answer_bound_seconds` in [question](../exulanica/selection/question.py) computes that bound from
+`ModelClient.worst_case_seconds` and the answer path's own call counts, and the page waits for an
+answer that long plus its allowance for an ordinary read;
+`tests/test_companion_ask_deadline.py` holds the page's `ASK_TIMEOUT_MS` to it.
 
 Every attempt enters the process's cost ledger, failed ones included
 ([usage](../exulanica/models/usage.py)). A completed call is priced from the provider's usage
