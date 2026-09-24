@@ -246,9 +246,10 @@ a page drawing fewer than ten frames a second runs the motion slower than its st
 Two consequences outside this plane. A saved world's society recomposes its input in the same
 transaction as each behaviour edit, and while any object carries a behaviour that input is
 unavailable with the reason `unsupported_active_behaviour:<object id>`; taking the behaviour away
-makes it available again. A version whose edit chain carries `set_object_behaviour` is withheld
-from package export, as [world-memory-package.md](world-memory-package.md#what-is-not-exported)
-describes; a behaviour named by `add_object` exports with its object.
+makes it available again. A version whose edit chain carries `set_object_behaviour` exports under
+the 1.1 package extensions and is withheld under 1.0, as
+[world-memory-package.md](world-memory-package.md#which-versions-an-extension-carries) describes; a
+behaviour named by `add_object` exports with its object under either.
 
 ## 4. The reviewed asset registry
 

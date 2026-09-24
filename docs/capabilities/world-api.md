@@ -83,13 +83,14 @@ Its run against the reference copy, with the wire transcript, is retained in
 
 ## Carrying a version elsewhere
 
-A World Memory Package projected with `--extension authored-world-1.0` carries alternate versions,
-their objects with asset digests and origins, and behaviour identifiers with parameters, without
-asset bytes. `--extension environment-instances-1.0` carries environment-inclusive authored
-state for versions that have environment instances or environment edits, the schema-v1
-ancestors those parent pointers require, and schema-v1 descendants that cannot live in
-authored-world 1.0 because an ancestor is environment-bearing. A loader that lacks
-that capability must omit those versions rather than treat authored-world 1.0 objects as the
+A World Memory Package projected with `--extension authored-world-1.0` or `authored-world-1.1`
+carries alternate versions, their objects with asset digests and origins, and behaviour identifiers
+with parameters, without asset bytes; 1.1 also carries the versions whose chains give, change or
+take away an object's behaviour, which 1.0 withholds. `--extension environment-instances-1.0` (or
+`-1.1`) carries environment-inclusive authored state for versions that have environment instances or
+environment edits, the schema-v1 ancestors those parent pointers require, and schema-v1 descendants
+that cannot live in authored-world 1.0 because an ancestor is environment-bearing. A loader that
+lacks that capability must omit those versions rather than treat authored-world 1.0 objects as the
 whole authored state. `exulanica-wmp import-check` compares a receiving loader's declared
 capabilities with what the package needs and names what it cannot load; see
 [world-memory-package.md](../world-memory-package.md#authored-world-extension-10) and
