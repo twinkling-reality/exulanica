@@ -5,12 +5,12 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from exulanica.canonical import sha256_of_canonical
 from exulanica.ingest.repository import IngestRepository
-from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepository
-from exulanica.world.worlds import ensure_personal_source_world
-
-SOURCE_NAMESPACE = uuid.UUID("d3f0565b-c4b2-4d19-8ea9-a3f79bbb5649")
+from exulanica.world.personal_composition import (
+    ComposedSource,
+    register_composition,
+    source_slot,
+)
 
 
 def compose_reference_sources(
@@ -32,7 +32,7 @@ def compose_reference_sources(
     """
     if not region_id or not captures or len({row[0] for row in captures}) != len(captures):
         raise ValueError("source composition needs a region and unique selected captures")
-    slots = []
+    sources = []
     records = []
     for capture_id, expected_sha256, label in captures:
         capture = repository.capture(capture_id)
@@ -50,19 +50,9 @@ def compose_reference_sources(
         ).fetchone()
         if row is None:
             raise ValueError("source composition needs an existing original-image evidence span")
-        source_id = uuid.uuid5(SOURCE_NAMESPACE, f"{repository.workspace_id}:{capture_id}")
-        slot_key = f"source-{capture_id}"
-        slots.append(TopologySourceSlot(source_id, slot_key, region_id, row["span_id"], None))
-        records.append(
-            {
-                "source_id": str(source_id),
-                "capture_id": str(capture_id),
-                "source_sha256": expected_sha256,
-                "evidence_span_id": str(row["span_id"]),
-                "slot_key": slot_key,
-                "source_label": label,
-            }
-        )
+        source = ComposedSource(capture_id, expected_sha256, row["span_id"], region_id)
+        sources.append(source)
+        records.append({**source_slot(repository.workspace_id, source)[1], "source_label": label})
     record = {
         "profile": "exulanica.authored-reference-source-composition/v1",
         "workspace_id": str(repository.workspace_id),
@@ -71,19 +61,13 @@ def compose_reference_sources(
         "source_slots": records,
         "interpretation": "authored gallery membership only; no new reconstruction or evidence",
     }
-    digest = sha256_of_canonical(record).hex()
-    world_id = ensure_personal_source_world(
+    registered = register_composition(
         repository.connection,
         repository.workspace_id,
-        created_by=actor,
+        record=record,
+        sources=sources,
+        region_ids=(region_id,),
+        actor=actor,
         reason="reference photographs composed into a region",
     )
-    version = WorldStyleRepository(
-        repository.connection, repository.workspace_id, world_id=world_id
-    ).register_topology(TopologyContract(digest, (region_id,), tuple(slots), world_id=world_id))
-    return {
-        "record": record,
-        "world_id": world_id,
-        "topology_digest": digest,
-        "style_version_id": str(version.version_id),
-    }
+    return {"record": record, **registered}

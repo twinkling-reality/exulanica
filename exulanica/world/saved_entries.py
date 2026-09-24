@@ -16,6 +16,7 @@ from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.errors import InvalidStyleData, StaleStyleVersion, UnknownWorldResource
 from exulanica.world.repository import WorldStyleRepository
+from exulanica.world.reviewed_sources import reviewed_personal_sources
 from exulanica.world.source_membership_events import (
     DetachEvent,
     MembershipEventConflict,
@@ -307,9 +308,7 @@ class SavedWorldEntryRepository:
                         # A retry never renames or adopts a newer cursor. Explicit PUT remains the
                         # only rename/update authority.
                         return existing[0]
-                    raise ValueError(
-                        "the authored starter already exists under a different title"
-                    )
+                    raise ValueError("the authored starter already exists under a different title")
                 raise ValueError("the workspace already has a different saved world entry")
 
             from exulanica.world.starter import create_starter_authorities
@@ -1014,48 +1013,29 @@ class SavedWorldEntryRepository:
     def _resolve_attachment(
         self, source: SourceAttachmentSelection, attached_by: uuid.UUID
     ) -> dict[str, object]:
-        row = self.connection.execute(
-            "select c.blob_sha256 as source_sha256,a.authorization_id,p.screening_id,"
-            "a.authorized_at,p.screened_at,statement_timestamp() as evaluated_at "
-            "from capture c join evidence_span s on s.workspace_id=c.workspace_id "
-            "and s.span_id=%s and s.blob_sha256=c.blob_sha256 "
-            "and s.modality='still_image' and s.track_key='img' "
-            "and s.t_start_ns=0 and s.t_end_ns=1 and s.region is null and s.text_anchor is null "
-            "join blob b on b.blob_sha256=c.blob_sha256 and b.media_type like 'image/%%' "
-            "join capture_reconstruction_authorization a on a.workspace_id=c.workspace_id "
-            "and a.capture_id=c.capture_id and a.source_sha256=c.blob_sha256 "
-            "and a.corpus_class='personal' and a.authorized_by=%s "
-            "join reconstruction_privacy_screening p on p.workspace_id=c.workspace_id "
-            "and p.authorization_id=a.authorization_id and p.capture_id=c.capture_id "
-            "and p.source_sha256=c.blob_sha256 and p.screening_method='human_review' "
-            "and p.eligibility_state='eligible' and p.reviewed_by is not null "
-            "where c.workspace_id=%s and c.capture_id=%s and c.deleted_at is null "
-            "and not tombstone_blocks_capture(c.workspace_id,c.capture_id) "
-            "and not tombstone_blocks_span(c.workspace_id,s.blob_sha256,s.track_key,"
-            "s.t_start_ns,s.t_end_ns) "
-            "and privacy_screening_allows_capture(c.workspace_id,c.capture_id,p.screening_id) "
-            "order by p.screened_at desc,p.screening_id,a.authorized_at desc,a.authorization_id "
-            "limit 1",
-            (
-                source.evidence_span_id,
-                attached_by,
-                self.workspace_id,
-                source.capture_id,
-            ),
-        ).fetchone()
-        if row is None:
+        """The review and authorization to pin, by the one rule every world writer reads."""
+        found = reviewed_personal_sources(
+            self.connection,
+            self.workspace_id,
+            reviewed_for=attached_by,
+            store=self.store,
+            capture_id=source.capture_id,
+            evidence_span_id=source.evidence_span_id,
+        )
+        if not found:
             raise ValueError(
                 "source attachment requires an exact current human-reviewed personal photograph"
             )
-        selected = selected_image(
-            self.connection,
-            self.workspace_id,
-            bytes(row["source_sha256"]),
-            row["evaluated_at"],
-        )
-        if selected is None or self.store is None or not self.store.exists(BlobId(selected.sha256)):
+        [reviewed] = found
+        if not reviewed.viewer_available:
             raise ValueError("current authorized viewer bytes are unavailable for a source")
-        return row
+        return {
+            "source_sha256": reviewed.source_sha256,
+            "authorization_id": reviewed.authorization_id,
+            "screening_id": reviewed.screening_id,
+            "authorized_at": reviewed.authorized_at,
+            "screened_at": reviewed.screened_at,
+        }
 
     def lock_authored_advance_base(
         self,
@@ -1217,8 +1197,7 @@ class SavedWorldEntryRepository:
         ).fetchone()
         if row is None or row["current_style_version_id"] != style_version_id:
             raise StaleStyleVersion(
-                "restore the visible saved appearance before editing; "
-                "another appearance is active"
+                "restore the visible saved appearance before editing; another appearance is active"
             )
 
     def advance_style_locked(
@@ -1436,9 +1415,10 @@ class SavedWorldEntryRepository:
             selected = None
             if not row["source_live"] or not row["span_live"] or not source_matches:
                 reason = "source_unavailable"
-            elif row["authorization_valid_until"] is not None and row[
-                "authorization_valid_until"
-            ] <= at:
+            elif (
+                row["authorization_valid_until"] is not None
+                and row["authorization_valid_until"] <= at
+            ):
                 reason = "authorization_expired"
             elif row["screening_valid_until"] is not None and row["screening_valid_until"] <= at:
                 reason = "screening_expired"

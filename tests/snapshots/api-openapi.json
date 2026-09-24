@@ -11278,6 +11278,115 @@
      }
     }
    }
+  },
+  "/worlds/personal-source": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Whether a world can be made or brought up to date from your reviewed photographs now.",
+    "operationId": "personal_source_world_worlds_personal_source_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PersonalWorldView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Compose your reviewed photographs into your personal-source world, as last read.",
+    "operationId": "compose_personal_source_world_worlds_personal_source_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ComposePersonalWorldBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ComposedPersonalWorldView"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Refused by name; nothing was written."
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -13365,6 +13474,70 @@
      "fatigue_p95_milli"
     ],
     "title": "Comparison"
+   },
+   "ComposePersonalWorldBody": {
+    "properties": {
+     "topology_digest": {
+      "type": "string",
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Topology Digest"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "topology_digest"
+    ],
+    "title": "ComposePersonalWorldBody"
+   },
+   "ComposedPersonalWorldView": {
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "create_world",
+       "update_world",
+       "save_entry"
+      ],
+      "title": "Action"
+     },
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "topology_digest": {
+      "type": "string",
+      "title": "Topology Digest"
+     },
+     "style_version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Style Version Id"
+     },
+     "saved_entry_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Saved Entry Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "action",
+     "world_id",
+     "topology_digest",
+     "style_version_id",
+     "saved_entry_id"
+    ],
+    "title": "ComposedPersonalWorldView"
    },
    "CompositionApplyBody": {
     "properties": {
@@ -17541,6 +17714,125 @@
     "title": "PersonalBatch",
     "description": "An exact upload inventory; identity always comes from the authenticated session."
    },
+   "PersonalPhotographsView": {
+    "properties": {
+     "reviewed": {
+      "type": "integer",
+      "title": "Reviewed"
+     },
+     "composed": {
+      "type": "integer",
+      "title": "Composed"
+     },
+     "outside_scene_groups": {
+      "type": "integer",
+      "title": "Outside Scene Groups"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "reviewed",
+     "composed",
+     "outside_scene_groups"
+    ],
+    "title": "PersonalPhotographsView"
+   },
+   "PersonalWorldView": {
+    "properties": {
+     "action": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "create_world",
+         "update_world",
+         "save_entry"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action"
+     },
+     "refusal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RefusalView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "world_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "World Id"
+     },
+     "saved_entry_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Saved Entry Id"
+     },
+     "photographs": {
+      "$ref": "#/components/schemas/PersonalPhotographsView"
+     },
+     "regions": {
+      "type": "integer",
+      "title": "Regions"
+     },
+     "topology_digest": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Topology Digest"
+     },
+     "current_topology_digest": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Current Topology Digest"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "action",
+     "refusal",
+     "world_id",
+     "saved_entry_id",
+     "photographs",
+     "regions",
+     "topology_digest",
+     "current_topology_digest"
+    ],
+    "title": "PersonalWorldView"
+   },
    "PhotoPointMapApplyBody": {
     "properties": {
      "base_state_sha256": {
@@ -18769,6 +19061,25 @@
     ],
     "title": "ReconstructionSceneRow",
     "description": "A durable multi-photograph scene with recorded and deliverable state kept separate."
+   },
+   "RefusalView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "code",
+     "detail"
+    ],
+    "title": "RefusalView"
    },
    "RefusedPart": {
     "properties": {

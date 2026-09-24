@@ -78,7 +78,11 @@ import { requireMetadataOnlyEntryUpdate } from './world-entry-api.js';
 import { mountCharacter } from './composition/character.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
-import { buildWorldEntrySurface } from './composition/world-entry.js';
+import {
+  buildPersonalWorldChoice,
+  buildWorldEntrySurface,
+  type PersonalWorldControl,
+} from './composition/world-entry.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
 import { mountSocietyExperimentResult } from './composition/society-experiment-result.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
@@ -308,6 +312,30 @@ function showWorldOpeningFailure(
   shell.removeAttribute('data-booting');
 }
 
+/**
+ * The offer to make a world from reviewed photographs, or none where no saved worlds are served.
+ *
+ * Whatever it makes is opened the way a chosen saved world is: its entry becomes the active one,
+ * so every request after it names that entry's world, and the world is mounted afresh.
+ */
+function personalWorldControl(): PersonalWorldControl | undefined {
+  const client = state.worldEntries;
+  if (client === null) return undefined;
+  const control = buildPersonalWorldChoice({
+    read: () => client.personalWorld(),
+    make: (made, title) => client.makeFromPersonalSources(made, title),
+    open: async (entry) => {
+      state.savedWorldEntries = await client.entries();
+      await openWorldEntryContext(state, entry);
+      state.worldEntryError = null;
+      shell.removeAttribute('data-world-state');
+      await mount();
+    },
+  });
+  void control.refresh();
+  return control;
+}
+
 /** Show the list. Only `mountNoWorld` calls this, and only when there is a choice to make. */
 async function mountWorldEntry(): Promise<void> {
   const entries = state.worldEntries;
@@ -323,6 +351,10 @@ async function mountWorldEntry(): Promise<void> {
     entries: state.savedWorldEntries,
     open,
     arrivalFailure: worldOpeningReason(state.worldEntryError),
+    ...(() => {
+      const personalWorld = personalWorldControl();
+      return personalWorld === undefined ? {} : { personalWorld };
+    })(),
     adoptLatest: async (entry) => {
       if (entries === null) throw new Error('The saved world is not connected.');
       const adopted = await entries.adoptLatestAuthored(entry);
@@ -466,6 +498,10 @@ async function mount(): Promise<void> {
     media: state.previewSourceMedia,
     reloadSnapshot: () => currentSession.snapshot(),
     refreshWorld: async () => { state.snapshot = await currentSession.snapshot(); await mount(); },
+    ...(() => {
+      const personalWorld = preview ? undefined : personalWorldControl();
+      return personalWorld === undefined ? {} : { personalWorld };
+    })(),
     ...(state.activeWorldEntry === null ? {} : {
       getEntry: () => state.activeWorldEntry,
       attachSources: async (request) => {
@@ -538,11 +574,13 @@ async function mount(): Promise<void> {
   };
 
   const firstUse = createFirstUseGuidance(window.localStorage, {
-    // A person who has already built in this world is not new, whatever this device remembers.
+    // A person who has already built in this world is not new, whatever this device remembers,
+    // and a world drawn from their photographs is not empty: its places are drawn content.
     worldHasContent: () => {
       const entry = state.activeWorldEntry;
       return entry !== null &&
-        (entry.currentAuthoredEditSeq > 0 || entry.sourceAttachments.length > 0);
+        (entry.currentAuthoredEditSeq > 0 || entry.sourceAttachments.length > 0 ||
+          built.scene.islands.length > 0);
     },
   });
   let inputMode: FirstUseMode = 'converse';

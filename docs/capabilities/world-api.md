@@ -17,6 +17,8 @@ gets. The reviewed asset and behaviour registries are the same for every world a
 | Method and path | Responsibility |
 | --- | --- |
 | `GET /worlds` | The worlds the workspace holds, each with its kind, and how many of each it may hold |
+| `GET /worlds/personal-source` | Whether the account holder's reviewed photographs can make or update the personal-source world now, or the named refusal |
+| `POST /worlds/personal-source` | Compose the selection that read showed, by its `topology_digest`, and return the world's `world_id` |
 | `GET /world-read/scenes/{scene_id}` | Read an authorized scene bundle, placed in the regions of the named world |
 | `GET /world-read/places/{place_id}` | Read a place in the named world, optionally resolved at a requested time |
 | `POST /world-write/scenes/{scene_id}/generated` | Record a generated-scene receipt tied to its conditioning sources |
@@ -33,6 +35,11 @@ gets. The reviewed asset and behaviour registries are the same for every world a
 | `GET /world/behaviours` | The reviewed behaviours an object may be given, with each parameter's bounds |
 | `GET /world-entries` | The workspace's saved worlds, each naming the version and state it reopens at |
 | `GET /world/source-media` | Protected topology source slots, including their region ids |
+
+The personal-source pair takes no `world_id`: the server chooses the photographs and the world,
+and the write returns the `world_id` every later route is given. It needs `admission.read` beside
+`world.read` or `world.write`, because it reads the review state of each photograph. Its rule and
+refusals are in [saved-world-entry.md](../saved-world-entry.md#which-photographs-a-personal-source-world-is-composed-from).
 
 World Write records provenance; it does not deliver generated assets or execute behavior. The
 `/world/versions` routes are the object-editing surface, and their full contract, including every

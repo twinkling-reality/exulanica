@@ -341,6 +341,10 @@ def test_source_metadata_review_and_mask_bytes_agree(delivery):
     c = d.case
     span = uuid.UUID(d.path.rsplit("/", 1)[1])
     source = uuid.uuid4()
+    # A world draws a personal photograph only under a current human review, the rule saved-world
+    # references follow; a detection receipt permits looking and nothing else. So the review is
+    # recorded wherever this test expects the slot drawn, and a region edit makes it stale again.
+    c.screen()
     world_id = registered_world(c.repo.connection, c.repo.workspace_id)
     WorldStyleRepository(
         c.repo.connection, c.repo.workspace_id, world_id=world_id
@@ -358,6 +362,9 @@ def test_source_metadata_review_and_mask_bytes_agree(delivery):
     c.edit()
     c.build()
     [row] = d.get(media).json()
+    assert row["state"] == "unavailable_asset" and row["evidence_path"] is None
+    c.screen()
+    [row] = d.get(media).json()
     assert row["state"] == "available" and d.get(row["evidence_path"]).status_code == 200
     c.edit("confirm", outline=Silhouette(((0, 0), (900000, 0), (900000, 500000), (0, 500000))))
     [row] = d.get(media).json()
@@ -366,6 +373,7 @@ def test_source_metadata_review_and_mask_bytes_agree(delivery):
     assert d.get().status_code == 409
     assert d.get("/person-regions/" + str(c.capture)).status_code == 200
     c.build()
+    c.screen()
     [row] = d.get(media).json()
     assert row["state"] == "available"
     (c.store.root / c.store.key_for(BlobId(c.mask().content_sha256))).unlink()

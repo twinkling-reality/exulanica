@@ -477,6 +477,7 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_tick": 0, "base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /worlds/personal-source": {"json": {"topology_digest": _ZERO_DIGEST}},
 }
 
 

@@ -550,9 +550,10 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/society/steps",
 )
 
-#: World writes that read admission state. Attach and rebind resolve and pin a human review, and
+#: World writes that read admission state. Attach and rebind resolve and pin a human review,
 #: resolving a depth estimate reads the photograph's admission state: the depth right the account
-#: holder granted and the review the estimate was made under. The generic composition routes
+#: holder granted and the review the estimate was made under, and composing the personal-source
+#: world selects the photographs the account holder reviewed. The generic composition routes
 #: refuse the photo_point_map kind for every caller. Detach is absent on purpose: it reads no
 #: admission receipt and answers with the same entry body PUT /world-entries/{entry_id} already
 #: returns to a world.write token, so admission.read would guard nothing there.
@@ -562,6 +563,14 @@ _WORLD_WRITES_READING_ADMISSION: Final = _every(
     "POST /world-entries/{entry_id}/source-rebinds",
     "POST /world/versions/{version_id}/compositions/photo-point-maps/apply",
     "POST /world/versions/{version_id}/compositions/photo-point-maps/preview",
+    "POST /worlds/personal-source",
+)
+
+#: A world read that reads admission state: which photographs the account holder reviewed and may
+#: compose into their personal-source world, the preview of the write above.
+_WORLD_READS_READING_ADMISSION: Final = _every(
+    _requires(_P.WORLD_READ, _P.ADMISSION_READ),
+    "GET /worlds/personal-source",
 )
 
 #: Every section, in reading order. A route is declared by appearing in exactly one of them.
@@ -585,6 +594,7 @@ ROUTE_RULE_SECTIONS: Final[tuple[Mapping[str, Public | Authentication | Requires
     _TILES,
     _WORLD_WRITES,
     _WORLD_WRITES_READING_ADMISSION,
+    _WORLD_READS_READING_ADMISSION,
 )
 
 

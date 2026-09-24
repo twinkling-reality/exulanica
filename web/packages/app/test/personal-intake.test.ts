@@ -823,3 +823,17 @@ it('keeps preview intake read-only and closes its reading workflow with Escape',
   expect(document.activeElement).toBe(workflow.querySelector(':scope > summary'));
   mounted.dispose();
 });
+
+it('shows the offer of a world from these photographs beside them, asked again on reload', async () => {
+  const f = fixture();
+  f.seedReviewed();
+  const refresh = vi.fn(async () => undefined);
+  const offer = { root: document.createElement('section'), refresh };
+  const mounted = f.make(createPersonalIntakeSession(), { personalWorld: offer });
+  document.body.append(mounted.root);
+  await mounted.begin();
+  expect(mounted.root.querySelector('.photo-previous')?.nextElementSibling).toBe(offer.root);
+  // Reviewing here can make a world possible, so the drawer's reload asks the server again.
+  expect(refresh).toHaveBeenCalledOnce();
+  mounted.dispose();
+});

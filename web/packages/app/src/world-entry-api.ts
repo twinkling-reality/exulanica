@@ -60,6 +60,41 @@ export function personalSourceWorld(worlds: WorkspaceWorlds): string {
   );
 }
 
+/** What composing the workspace's reviewed photographs into a world would do now. */
+export type PersonalWorldAction = 'create_world' | 'update_world' | 'save_entry';
+
+/**
+ * The server's answer to "can a world be made from my reviewed photographs now?"
+ *
+ * Every decision in it is the server's (`GET /worlds/personal-source`): which photographs count,
+ * how they group into places, and each refusal with the words it is shown in. The browser reads
+ * it and never works any of it out again.
+ */
+export interface PersonalWorldState {
+  readonly action: PersonalWorldAction | null;
+  readonly refusal: { readonly code: string; readonly detail: string } | null;
+  readonly worldId: string | null;
+  readonly savedEntryId: string | null;
+  readonly photographs: {
+    readonly reviewed: number;
+    readonly composed: number;
+    readonly outsideSceneGroups: number;
+  };
+  readonly regions: number;
+  /** The digest the write takes back, so it composes exactly what this read showed. */
+  readonly topologyDigest: string | null;
+  readonly currentTopologyDigest: string | null;
+}
+
+/** What `POST /worlds/personal-source` composed, and the world every later request names. */
+export interface ComposedPersonalWorld {
+  readonly action: PersonalWorldAction;
+  readonly worldId: string;
+  readonly topologyDigest: string;
+  readonly styleVersionId: string;
+  readonly savedEntryId: string | null;
+}
+
 export interface SavedWorldEntry {
   readonly entryId: string;
   readonly worldId: string;
@@ -363,6 +398,35 @@ export class WorldEntryClient {
     });
   }
 
+  /** Whether a world can be made or brought up to date from the reviewed photographs now. */
+  async personalWorld(): Promise<PersonalWorldState> {
+    return parsePersonalWorld(await this.#transport.getJson<unknown>('/worlds/personal-source'));
+  }
+
+  /**
+   * Compose exactly the photographs `state` showed, then save or reopen the world they make.
+   *
+   * The composition is refused by the server if the photographs changed since `state` was read.
+   * When a saved world already names the personal-source world, that entry is read and returned
+   * rather than a second one created; otherwise the new world is opened through the protected
+   * bootstrap and saved under `title`. A state the server refused is not sent.
+   */
+  async makeFromPersonalSources(
+    state: PersonalWorldState,
+    title: string,
+  ): Promise<SavedWorldEntry> {
+    if (state.action === null || state.topologyDigest === null) {
+      throw new Error(state.refusal?.detail ?? 'A world cannot be made from your photographs now.');
+    }
+    const composed = parseComposedPersonalWorld(await this.#transport.postJson<unknown>(
+      '/worlds/personal-source',
+      { topology_digest: state.topologyDigest },
+    ));
+    return composed.savedEntryId !== null
+      ? this.entry(composed.savedEntryId)
+      : this.createFromPersonalSources(title, composed.worldId);
+  }
+
   async saveVersion(
     base: SavedWorldEntry,
     input: {
@@ -511,6 +575,60 @@ function parseWorlds(value: unknown): WorkspaceWorlds {
         createdAt: text(world['created_at'], 'world creation time'),
       });
     })),
+  });
+}
+
+const PERSONAL_WORLD_ACTIONS: ReadonlySet<string> = new Set<PersonalWorldAction>([
+  'create_world', 'update_world', 'save_entry',
+]);
+
+function personalWorldAction(value: unknown): PersonalWorldAction {
+  if (typeof value !== 'string' || !PERSONAL_WORLD_ACTIONS.has(value)) {
+    throw new TypeError('The server returned an unknown personal world action.');
+  }
+  return value as PersonalWorldAction;
+}
+
+function parsePersonalWorld(value: unknown): PersonalWorldState {
+  const body = record(value, 'personal world state');
+  const photographs = record(body['photographs'], 'personal world photographs');
+  const action = body['action'] === null ? null : personalWorldAction(body['action']);
+  const refusal = body['refusal'] === null ? null : record(body['refusal'], 'refusal');
+  // Exactly one of the two: an action the server allows, or its refusal with its words.
+  if ((action === null) === (refusal === null)) {
+    throw new TypeError('The server returned a personal world state with no single answer.');
+  }
+  return Object.freeze({
+    action,
+    refusal: refusal === null ? null : Object.freeze({
+      code: text(refusal['code'], 'refusal code'),
+      detail: text(refusal['detail'], 'refusal detail'),
+    }),
+    worldId: optionalText(body['world_id'], 'world ID'),
+    savedEntryId: optionalText(body['saved_entry_id'], 'saved entry ID'),
+    photographs: Object.freeze({
+      reviewed: integer(photographs['reviewed'], 'reviewed photograph count'),
+      composed: integer(photographs['composed'], 'composed photograph count'),
+      outsideSceneGroups: integer(
+        photographs['outside_scene_groups'], 'ungrouped photograph count',
+      ),
+    }),
+    regions: integer(body['regions'], 'region count'),
+    topologyDigest: optionalText(body['topology_digest'], 'topology digest'),
+    currentTopologyDigest: optionalText(
+      body['current_topology_digest'], 'current topology digest',
+    ),
+  });
+}
+
+function parseComposedPersonalWorld(value: unknown): ComposedPersonalWorld {
+  const body = record(value, 'composed personal world');
+  return Object.freeze({
+    action: personalWorldAction(body['action']),
+    worldId: text(body['world_id'], 'world ID'),
+    topologyDigest: text(body['topology_digest'], 'topology digest'),
+    styleVersionId: text(body['style_version_id'], 'style version ID'),
+    savedEntryId: optionalText(body['saved_entry_id'], 'saved entry ID'),
   });
 }
 

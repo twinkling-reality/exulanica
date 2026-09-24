@@ -27,6 +27,7 @@ import {
   type SourceDetachRequest,
   type SourceRebindRequest,
 } from '../world-entry-api.js';
+import type { PersonalWorldControl } from './world-entry.js';
 
 type MembershipRequest = SourceDetachRequest | SourceRebindRequest;
 
@@ -104,9 +105,15 @@ export function mountPersonalIntake(deps: {
   storage?: Storage;
   /** Injectable for tests. Production builds a client from the same credentials. */
   entryClient?: Pick<WorldEntryClient, 'detachSources' | 'rebindSources'>;
+  /**
+   * The offer to make a world from reviewed photographs. The drawer shows it beside the photos
+   * and asks the server again after every reload, since a review recorded here can change it.
+   */
+  personalWorld?: PersonalWorldControl;
 }) {
   deps.session.dispose?.();
   const ui = buildPersonalIntake();
+  if (deps.personalWorld !== undefined) ui.previous.after(deps.personalWorld.root);
   const api = new PersonalAdmissionApi(deps.credentials);
   const reviewApi = new PersonReviewApi(deps.credentials);
   const entryClient = deps.entryClient
@@ -689,6 +696,7 @@ export function mountPersonalIntake(deps: {
     const pendingWrite = await reviewApi.requests.pending();
     ui.retryReview.hidden = !pendingWrite || pendingWrite.path === '/personal-admission';
     sourceOptions(); renderReview(); persist();
+    await deps.personalWorld?.refresh();
   }
   function renderReview(): void {
     const captureId = ui.source.value;

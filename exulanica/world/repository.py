@@ -45,6 +45,7 @@ from exulanica.world.models import (
     WorldSourceMedia,
 )
 from exulanica.world.registry import STYLE_REGISTRY, StyleRegistry
+from exulanica.world.reviewed_sources import lapsed_personal_captures
 from exulanica.world.style_structure import (
     AuthoredVersionRef,
     CompatibilityIntent,
@@ -629,7 +630,8 @@ class WorldStyleRepository:
     ) -> tuple[WorldSourceMedia, ...]:
         digest = self._source_topology_digest(topology_digest, source_snapshot_id)
         rows = self._source_rows(digest)
-        return tuple(self._source_from_row(row, store) for row in rows)
+        lapsed = self._lapsed(rows)
+        return tuple(self._source_from_row(row, store, lapsed) for row in rows)
 
     def require_source_media(
         self,
@@ -643,7 +645,7 @@ class WorldStyleRepository:
         rows = self._source_rows(digest, source_id=source_id)
         if not rows:
             raise UnknownWorldResource("no such world source slot")
-        source = self._source_from_row(rows[0], store)
+        source = self._source_from_row(rows[0], store, self._lapsed(rows))
         if source.state is not SourceMediaState.AVAILABLE:
             raise UnavailableAsset(
                 f"world source {source.slot_key} is {source.state.value}: {source.reason}"
@@ -1456,8 +1458,20 @@ class WorldStyleRepository:
             raise UnknownWorldResource("no such world topology")
         return requested
 
+    def _lapsed(self, rows: Sequence[Mapping[str, Any]]) -> frozenset[uuid.UUID]:
+        """The slots' personal photographs whose authorization or review is no longer current."""
+        return lapsed_personal_captures(
+            self.connection,
+            self.workspace_id,
+            sorted({capture for row in rows for capture in row["capture_ids"] or ()}),
+        )
+
     @staticmethod
-    def _source_from_row(row: Mapping[str, Any], store: ContentAddressedStore) -> WorldSourceMedia:
+    def _source_from_row(
+        row: Mapping[str, Any],
+        store: ContentAddressedStore,
+        lapsed: frozenset[uuid.UUID] = frozenset(),
+    ) -> WorldSourceMedia:
         state = SourceMediaState.AVAILABLE
         reason: str | None = None
         if row["evidence_span_id"] is None:
@@ -1469,6 +1483,11 @@ class WorldStyleRepository:
         elif not row["live_capture"]:
             state = SourceMediaState.UNAVAILABLE_ASSET
             reason = "source capture was deleted"
+        elif any(capture in lapsed for capture in row["capture_ids"] or ()):
+            # The rule saved-world references follow: the library keeps the photograph, and a
+            # world stops drawing it until a new review admits it again.
+            state = SourceMediaState.UNAVAILABLE_ASSET
+            reason = "its personal authorization or human review is no longer current"
         elif row["purged_at"] is not None or row["storage_key"] is None:
             state = SourceMediaState.UNAVAILABLE_ASSET
             reason = "source bytes were purged"

@@ -53,10 +53,54 @@ Creation has one source-independent first-world path and two explicit personal-s
 
 1. `POST /world-entries/starter` creates an authored starter with no personal source dependency.
 2. Choose an existing authored version and an appearance version from the same named world.
-3. Choose **Create from current personal sources**, which reads the workspace's personal-source
-   world from `GET /worlds`, calls the protected bootstrap in that world with the reviewed topology
-   digest, receives the exact authored version it opened, and saves that version together with the
-   exact style version read before bootstrap.
+3. Choose **Make a world from my photographs**, offered in the photo drawer and under the list of
+   saved worlds. `GET /worlds/personal-source` answers whether composing the account holder's
+   reviewed photographs now would make the personal-source world (`create_world`), give a world
+   composed but never made its next topology (`update_world`) or need only a saved entry
+   (`save_entry`), or refuses by name (`no_reviewed_personal_sources`,
+   `no_grouped_personal_sources`, `personal_world_already_made`, `personal_world_current`,
+   `several_personal_source_worlds`) in words the browser shows as they are, with how many
+   photographs are reviewed, composed and in no scene group. The browser offers the choice only
+   when that read names an action and holds no copy of the rule. `POST /worlds/personal-source`
+   takes back the read's `topology_digest`, composes exactly that selection or refuses
+   `personal_sources_changed` with nothing written, and returns the world's `world_id`. The browser
+   then calls the protected bootstrap in that world with the reviewed topology digest from
+   `/world/styles/current`, receives the exact authored version it opened, and saves that version
+   together with the exact style version read before bootstrap; when a saved world already names
+   the personal-source world, that entry is reopened instead. The saved world opens at once, and
+   its `world_id` is the world every later request names.
+
+### Which photographs a personal-source world is composed from
+
+The server chooses; a request names no photograph and no region. A photograph is composed when the
+account holder authorized it as personal, a human review of it found it eligible and still stands,
+it is live, and the viewer bytes that review allows are present: one rule in
+`exulanica/world/reviewed_sources.py`, which attaching and adding back a reference read as well.
+Each live scene group holding such a photograph becomes one region, named by the group, so a
+composition of several groups has several regions. A reviewed photograph in no live scene group,
+such as one with no capture time, is left out and counted rather than refused, because grouping
+never places it and refusing would keep every other photograph out. The route and the operator
+script `scripts/compose_reference_sources.py` register through one writer,
+`register_composition` in `exulanica/world/personal_composition.py`, which creates the world under
+the count policy.
+
+A made world is not changed. Once the personal-source world has a structural snapshot, every saved
+world of it opens that snapshot and nothing advances it, so composing again could only change a
+topology nobody sees. When the reviewed photographs differ from the ones the world was made with,
+the read refuses `personal_world_already_made` and offers no button. Its words say how many
+photographs the world was made with, and for each kind of change what the world shows: a photograph
+reviewed since is not in it; a photograph no longer allowed (deleted, withdrawn, or without a
+current review) is no longer shown; a photograph still reviewed but in no live scene group is still
+shown where it was placed.
+
+A world draws a personal photograph only while its personal authorization and human review are
+current, the rule saved-world references follow. `GET /world/source-media` reads the same rule
+(`lapsed_personal_captures` in `exulanica/world/reviewed_sources.py`) and gives a slot whose
+photograph it no longer admits `unavailable_asset`, the reason "its personal authorization or human
+review is no longer current", and no evidence path; its depth estimate is refused with the review
+it was made under. A new review draws the photograph again. The photograph stays in the library,
+and `/evidence/{span_id}/masked` still serves it to the account holder, which is where the
+Companion's citations read it; only the world stops drawing it.
 
 The starter route takes the workspace structural lock and commits one immutable structural
 snapshot, its matching default style, one authored alternate, and the saved entry in one
@@ -199,7 +243,7 @@ with the kind its stored rows state; no dataset package was registered as a worl
 
 | Kind | What it is | Created by |
 | --- | --- | --- |
-| `personal-source` | A world composed from the workspace's own photographs and other personal sources | Composing personal sources into a region; a frontier build manifest |
+| `personal-source` | A world composed from the workspace's own photographs and other personal sources | `POST /worlds/personal-source`; composing personal sources into a region; a frontier build manifest |
 | `authored-starter` | A source-independent authored world that starts empty | `POST /world-entries/starter` |
 
 **One personal-source world per account.** `exulanica/world/world-count-policy.v1.json` states,
@@ -509,6 +553,8 @@ cannot be restored over them; recovery is a restore from backup.
 | `POST` | `/world-entries/starter` | Atomically create or exactly reuse the source-independent authored starter |
 | `GET` | `/world-entries/{entry_id}` | One entry, with cross-workspace IDs answered as absent |
 | `GET` | `/worlds` | The workspace's worlds with their kinds, and the count policy |
+| `GET` | `/worlds/personal-source` | Whether a world can be made or brought up to date from the reviewed photographs, or why not |
+| `POST` | `/worlds/personal-source` | Compose exactly what that read showed into the personal-source world |
 | `PUT` | `/world-entries/{entry_id}` | Compare and advance the exact version references |
 | `POST` | `/world-entries/{entry_id}/source-attachments` | Attach reviewed reference photographs while preserving the world cursor |
 | `POST` | `/world-entries/{entry_id}/source-detachments` | Remove references from the current collection; no row or media is deleted |
@@ -524,6 +570,17 @@ answering exactly as an invented one. `tests/test_world_registry_backfill.py` ap
 populated schema as a superuser and as a table owner without superuser or `BYPASSRLS`, and requires
 every world to be registered with the kind its rows state, no dataset package to be registered, and
 FORCE row-level security to end as it began.
+
+`tests/test_personal_source_world_api.py` drives `/worlds/personal-source` through an application
+connected as the runtime roles, with row-level security in force: each named refusal and that it
+writes nothing, a photograph reviewed only for detection, by somebody else, or never, a reviewed
+photograph in no scene group counted and left out, a digest the person was not shown, the world
+the browser then saves and names, a made world refused rather than changed after a new review,
+the refusal's words for a photograph added, no longer allowed and in no place, each against what the
+world's source media then shows, a slot that stops drawing a photograph whose review lapsed and
+draws it again after a new review while its depth estimate stays refused, one world shared with the
+operator script, and a stranger who sees none of it. `web/packages/app/test/personal-world.test.ts`
+covers the client calls and each state of the choice.
 
 `tests/test_authored_starter_scene.py` pins the exact bytes each ground module version commits,
 version 1's taken from the tree that created the worlds already holding it, and checks that a

@@ -1,7 +1,11 @@
 /** Choosing between saved worlds. The one-world states live in `ui/startup-state.ts`. */
 
 import { ApiError } from '@exulanica/graph-client';
-import type { SavedWorldEntry } from '../world-entry-api.js';
+import type {
+  PersonalWorldAction,
+  PersonalWorldState,
+  SavedWorldEntry,
+} from '../world-entry-api.js';
 import { el } from '../ui/dom.js';
 
 export interface WorldEntrySurface {
@@ -13,6 +17,8 @@ export interface WorldEntrySurface {
    * make either way, so this is a line above the list rather than the subject of the screen.
    */
   readonly arrivalFailure?: string | null;
+  /** The offer to make a world from reviewed photographs, placed after the saved worlds. */
+  readonly personalWorld?: PersonalWorldControl;
 }
 
 /**
@@ -105,7 +111,132 @@ export function buildWorldEntrySurface(deps: WorldEntrySurface): HTMLElement {
     list.append(item);
   }
   root.append(list);
+  if (deps.personalWorld !== undefined) root.append(deps.personalWorld.root);
   return root;
+}
+
+/** How the choice to make a world from reviewed photographs reaches the server and the world. */
+export interface PersonalWorldChoice {
+  /** The server's current answer; see `WorldEntryClient.personalWorld`. */
+  readonly read: () => Promise<PersonalWorldState>;
+  /** Compose what `state` showed and return the saved world it makes or brings up to date. */
+  readonly make: (state: PersonalWorldState, title: string) => Promise<SavedWorldEntry>;
+  /** Open the returned world: from then on it is the world every request names. */
+  readonly open: (entry: SavedWorldEntry) => Promise<void>;
+}
+
+/**
+ * The words on the one button, by the action the server says composing would take. Updating is
+ * offered only for a world that was composed and never made, so to the person it is making one.
+ */
+const PERSONAL_WORLD_ACTION_LABELS: Readonly<Record<PersonalWorldAction, string>> = {
+  create_world: 'Make a world from my photographs',
+  update_world: 'Make a world from my photographs',
+  save_entry: 'Open a world from my photographs',
+};
+
+/** The name a new world from photographs is saved under unless the person gives another. */
+const PERSONAL_WORLD_DEFAULT_TITLE = 'My photographs';
+
+export interface PersonalWorldControl {
+  readonly root: HTMLElement;
+  /** Ask the server again, for example after a review is recorded. */
+  readonly refresh: () => Promise<void>;
+}
+
+/**
+ * Offer to make a world from the person's reviewed photographs, exactly when the server says so.
+ *
+ * The control holds no rule. It shows the server's refusal words when composing is not possible,
+ * the server's counts when it is, and a button whose label follows the server's action. Pressing
+ * it sends back the digest that read returned, so the server composes exactly what was shown or
+ * refuses by name; a refusal is shown in the server's words and the state is read again.
+ */
+export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWorldControl {
+  const status = el('p', {
+    class: 'personal-world-status', role: 'status', 'aria-live': 'polite',
+  });
+  const counts = el('p', { class: 'personal-world-counts' });
+  const title = el('input', {
+    type: 'text', class: 'personal-world-title', value: PERSONAL_WORLD_DEFAULT_TITLE,
+    'aria-label': 'Name for the world',
+  }) as HTMLInputElement;
+  const titleRow = el('label', { class: 'personal-world-title-row' }, ['Name ', title]);
+  const make = el('button', { type: 'button', class: 'personal-world-make' });
+  const failure = el('p', { class: 'gate-failure personal-world-failure', role: 'alert' });
+  const root = el('section', {
+    class: 'personal-world-choice', 'aria-label': 'A world from your photographs',
+  }, [
+    el('h3', { text: 'A world from your photographs' }),
+    status, counts, titleRow, make, failure,
+  ]);
+  let current: PersonalWorldState | null = null;
+  let busy = false;
+
+  const show = (state: PersonalWorldState | null): void => {
+    current = state;
+    root.dataset['state'] = state === null ? 'unknown' : state.action ?? 'refused';
+    const action = state?.action ?? null;
+    status.textContent = state === null
+      ? 'Checking your reviewed photographs…'
+      : state.refusal !== null
+        ? state.refusal.detail
+        : '';
+    status.hidden = status.textContent === '';
+    counts.hidden = state === null || state.photographs.reviewed === 0;
+    if (state !== null) {
+      const { composed, outsideSceneGroups } = state.photographs;
+      counts.textContent = [
+        composed > 0
+          ? `${composed} reviewed photograph${composed === 1 ? '' : 's'} ` +
+            `in ${state.regions} place${state.regions === 1 ? '' : 's'}.`
+          : '',
+        outsideSceneGroups > 0
+          ? outsideSceneGroups === 1
+            ? '1 reviewed photograph is not in any place, so it is left out.'
+            : `${outsideSceneGroups} reviewed photographs are not in any place, so they are left out.`
+          : '',
+      ].filter(Boolean).join(' ');
+    }
+    // A name is asked for only where a new saved world will be made under it.
+    titleRow.hidden = action === null || state?.savedEntryId !== null;
+    make.hidden = action === null;
+    make.textContent = action === null ? '' : PERSONAL_WORLD_ACTION_LABELS[action];
+    make.disabled = busy || action === null;
+  };
+
+  const refresh = async (): Promise<void> => {
+    try {
+      // A refused press keeps its words on screen through this read; only a new press clears them.
+      show(await deps.read());
+    } catch (error) {
+      show(null);
+      status.textContent = entryFailure(error, 'Your photographs could not be checked.');
+    }
+  };
+
+  make.addEventListener('click', () => {
+    const state = current;
+    if (state === null || state.action === null || busy) return;
+    busy = true;
+    failure.hidden = true;
+    make.disabled = true;
+    status.hidden = false;
+    status.textContent = 'Making your world from your photographs…';
+    void deps.make(state, title.value.trim() || PERSONAL_WORLD_DEFAULT_TITLE)
+      .then((entry) => deps.open(entry))
+      .catch(async (error: unknown) => {
+        failure.hidden = false;
+        failure.textContent = entryFailure(error, 'The world could not be made.');
+        busy = false;
+        await refresh();
+      })
+      .finally(() => { busy = false; });
+  });
+
+  failure.hidden = true;
+  show(null);
+  return { root, refresh };
 }
 
 function unavailableMessage(reason: string | null): string {
@@ -119,6 +250,12 @@ function unavailableMessage(reason: string | null): string {
 function entryFailure(error: unknown, fallback: string): string {
   if (error instanceof ApiError && error.code === 'stale_saved_world_entry') {
     return 'This saved world changed again. Reload to compare the latest changes before trying again.';
+  }
+  // The server's own words: the detail after the code, never the code itself.
+  if (error instanceof ApiError) {
+    return error.message.startsWith(`${error.code}: `)
+      ? error.message.slice(error.code.length + 2)
+      : error.message;
   }
   return error instanceof Error ? error.message : fallback;
 }
