@@ -216,7 +216,7 @@ https://caniuse.com/pointerlock
 
 ### 2.3 Controls
 
-**Camera direction, updated 2026-09-13; implementation absent.** A person can switch between
+**Camera direction.** A person can switch between
 first-person and third-person views of the same controllable player. Provide a visible camera
 control and a keyboard binding that does not fire while typing. Switching preserves the player's
 position, grounded collision state and interaction context. The player avatar is distinct from the

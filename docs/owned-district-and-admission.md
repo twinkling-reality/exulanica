@@ -42,7 +42,8 @@ NYC or third-party map data may be extracted, trained on, or redistributed.
 
 Google photorealistic tiles remain a reference-only optional visualization under the separate
 provider policy. They do not supply owned-district collision, semantic identity, persistence,
-extraction, model inputs, or export.
+extraction, model inputs, or export. The binding can draw them, and the app passes it none:
+`googlePhotorealisticTiles` in `web/packages/app/src/config.ts` is read only by its own test.
 
 ## The admission chain, and the place an admitted source belongs to
 
