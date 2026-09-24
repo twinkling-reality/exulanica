@@ -32,6 +32,16 @@ resolve citations. The [application composition](../web/packages/app/src/main.ts
 appearance and conversation-memory clients. The [frontend contract](atlas-frontend-integration.md)
 defines how a reviewed proposal becomes a preview and an accepted world change.
 
+A question is asked in a world. `POST /selection`, `POST /selection/ask` and `POST /selection/packet`
+require the open world as `world_id`, and a world the workspace does not hold answers
+`404 unknown_reference`. Photographs and admitted environment sources belong to the workspace and
+answer the same in every world. The authored environment instances, synthetic inhabitants and
+simulation events a content answer may cite are the named world's and no other world's, and the
+host is asked to authorize only that world's society inputs (`execute` in
+`exulanica/selection/executor.py`). `tests/test_companion_reads_one_world.py` asks in each of two
+worlds that stand over one place, through these routes, and no answer, evidence packet or content
+page names the other world.
+
 A question that cannot be understood, one with no supporting evidence, unavailable models and a
 failed network request remain distinguishable. None authorizes an invented factual answer. The
 exact response shapes and refusal codes live in the route models and API schema snapshots.
@@ -340,6 +350,12 @@ autonomous activity, complete lifelong shared context or model training.
 the proposal. The [proposal implementation](../exulanica/selection/proposal.py) classifies the request,
 drafts from the reviewed style registry and validates the result. A question about evidence and a
 request to change appearance have distinct inputs and responsibilities.
+
+A proposal cites the evidence of the world it is asked in: the slots that world's current topology
+binds, then the reviewed photographs attached to its saved entry that are available when it is
+read, each named to the drafter by its attachment id alone. A world with neither, such as a starter
+with no attached photograph, is refused as `unsupported_reference`, in words saying that attaching a
+reviewed photograph makes a proposal possible.
 
 The drafter's schema derives from the registry's profiles, controls, ranges and choices. An invalid
 value is refused, not silently converted into a different proposed value. Apply remains a separate
