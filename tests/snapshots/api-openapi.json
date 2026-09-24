@@ -17006,6 +17006,17 @@
        }
       ],
       "title": "Usd"
+     },
+     "served_model_unavailable": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Served Model Unavailable"
      }
     },
     "additionalProperties": false,

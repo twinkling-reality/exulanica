@@ -216,6 +216,10 @@ class ModelCallView(BaseModel):
     completion_tokens: int | None
     reasoning_tokens: int | None
     usd: str | None = None
+    #: Why ``served_model`` is null, by name: ``response_names_no_model`` when the response body
+    #: named no model, so a null is never read as the requested model. ``null`` when
+    #: ``served_model`` names one.
+    served_model_unavailable: str | None = None
 
 
 class ExecutionView(BaseModel):
@@ -596,6 +600,7 @@ def _execution(
                 completion_tokens=call.completion_tokens,
                 reasoning_tokens=call.reasoning_tokens,
                 usd=call.usd,
+                served_model_unavailable=call.served_model_unavailable,
             )
             for call in calls
         ],
