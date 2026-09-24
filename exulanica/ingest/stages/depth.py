@@ -19,6 +19,7 @@ is not the same fact as a stage that failed.
 from __future__ import annotations
 
 import uuid
+from typing import Final
 
 from PIL import Image
 
@@ -47,7 +48,14 @@ from exulanica.reconstruction import (
 )
 from exulanica.reconstruction.moge import MoGeDepthModel
 
-__all__ = ["encode_point_map", "model_handoff", "run"]
+__all__ = ["AWAITING_ADMISSION", "encode_point_map", "model_handoff", "run"]
+
+#: What the ledger records for a photograph the depth stage reached before any eligible privacy
+#: screening existed for it. A stated wait rather than a failure: its admission queues the stage.
+AWAITING_ADMISSION: Final = (
+    "awaiting privacy admission: no eligible privacy screening receipt admits these bytes to "
+    "point-map inference yet; admitting the photograph queues this stage again"
+)
 
 
 def model_handoff(model: DepthModel) -> ModelHandoff | None:
@@ -102,11 +110,17 @@ def run(
         return
 
     if privacy_screening_id is None:
-        from exulanica.errors import PrivacyAdmissionError
-
-        raise PrivacyAdmissionError(
-            "point-map inference requires an exact eligible privacy screening receipt"
-        )
+        # Waiting, not failed. An upload queues its job before the person has reviewed the
+        # photograph, and a worker that runs the depth model claims that job at once, so at a
+        # person's pace (upload, look, then admit) nearly every upload reaches this line. Raising
+        # here failed each of those jobs. The admission that records the screening queues the
+        # photograph's derivative job again (`exulanica.ingest.personal_admission`), which runs
+        # this stage with the exact receipt; a photograph never admitted keeps no point map, and
+        # the ledger says why. Nothing reaches the model without that receipt either way.
+        outcome.stages_skipped.append(spec.key)
+        outcome.stages_unavailable.append(spec.key)
+        ledger.unavailable(spec, reason=AWAITING_ADMISSION, input_blob=blob_id)
+        return
     screening = require_privacy_screening(writes.repository, capture_id, privacy_screening_id)
 
     # The confirmed regions and the consent states in force are part of what this point map was
@@ -137,7 +151,7 @@ def run(
     source = masked_image if masked_image is not None else upright
     # Geometry permission is not permission for this checkpoint. A personal photograph goes to the
     # depth model only under a current right naming it, checked last, under the final read check.
-    # Unavailable rather than raised, unlike a missing screening: a person who has not let this
+    # Unavailable rather than raised, as a missing screening is: a person who has not let this
     # model see the photograph has made a choice, and the photograph stays a rung 4 region.
     try:
         permission = require_model_right(
@@ -188,9 +202,7 @@ def run(
             # Inside the publication transaction, so the map and the statement of what permitted
             # it land together or not at all. A withdrawal that arrived while the model was
             # running refuses this insert and takes the artifact with it.
-            bind_point_map(
-                writes.repository, artifact_id=result.artifact_id, decision=permission
-            )
+            bind_point_map(writes.repository, artifact_id=result.artifact_id, decision=permission)
             _record_rung(writes, capture_id, image_span_id, decision, result, prediction, ledger)
     # `persist_artifact` already recorded the stage as run. Appending it here as well is what
     # printed "depth+depth" in the command line's per-file summary.

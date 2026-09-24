@@ -20,6 +20,8 @@ from exulanica.selection import environment_proposal, prompts, proposal
 PINNED = {
     "selection-8": "127e11c1d78fa9bed8f222ab06a087a6d8ee7388f5751f32949a1a41df83ea20",
     "proposal-2": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
+    # The same texts: `proposal-3` changed the draft schema's construction and no prompt.
+    "proposal-3": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
     "environment-proposal-1": "88314630219bea7f6571a54fff583920ac765581a25efa581e20f4b04e9e0a92",
 }
 

@@ -220,6 +220,17 @@ class EvidencePacket:
         """
         return self._by_token.get(token.strip().strip("[]"))
 
+    def canonical(self, token: str) -> str | None:
+        """The packet's own spelling of the token :meth:`resolve` accepts, or None.
+
+        The one form every reader of an answer uses. The route keys ``citations`` by the bare
+        token, so a clause that kept the brackets the composer copied cited a photograph no
+        client could look up: measured in the rehearsal of the personal path, the page offered
+        no chip for ``[2EXZHVS3UA]`` while the map held ``2EXZHVS3UA``.
+        """
+        item = self.resolve(token)
+        return None if item is None else item.token
+
     def value(self, key: str) -> ValueReference | None:
         return self._by_key.get(key)
 

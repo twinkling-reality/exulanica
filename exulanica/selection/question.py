@@ -365,7 +365,7 @@ def compose_answer(
             # False, not `attempt == 2`. The second value means "the model's output was
             # discarded", and an answer that passed on the retry was not discarded. Conflating
             # the two reported every successful repair as a fallback.
-            return validate_answer(answer, packet), False, rejections
+            return _in_canonical_form(validate_answer(answer, packet), packet), False, rejections
         except AnswerRejected as rejected:
             rejections = rejected.reasons
             if attempt == COMPOSER_ATTEMPTS:
@@ -391,6 +391,22 @@ def compose_answer(
             rejections = (str(exc),)
             break
     return render_deterministic_answer(packet), True, rejections
+
+
+def _in_canonical_form(answer: Answer, packet: EvidencePacket) -> Answer:
+    """Every clause's citations in the packet's own spelling, once each, in the model's order.
+
+    The validator accepts a bracketed token because :meth:`EvidencePacket.resolve` strips the
+    brackets the composer copies. What leaves the server is the token it validated against, so
+    every client reads one form: the route's ``citations`` map, the page's chips and a remembered
+    answer's spans all look the bare token up.
+    """
+    clauses = []
+    for clause in answer.clauses:
+        cited = (packet.canonical(token) for token in clause.citations)
+        tokens = list(dict.fromkeys(token for token in cited if token is not None))
+        clauses.append(clause.model_copy(update={"citations": tokens}))
+    return answer.model_copy(update={"clauses": clauses})
 
 
 def answer_question(

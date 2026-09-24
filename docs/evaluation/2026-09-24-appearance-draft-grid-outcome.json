@@ -1,0 +1,550 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "after": {
+      "attempts": [
+        {
+          "changed": [
+            "garden-density",
+            "horizon-softness",
+            "relationship-energy",
+            "source-hue",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 374,
+              "finish_reason": "stop",
+              "prompt_tokens": 1373,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "rehearsal",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "horizon-softness",
+            "relationship-energy",
+            "source-hue",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 404,
+              "finish_reason": "stop",
+              "prompt_tokens": 1373,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "rehearsal",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [],
+          "drafted": true,
+          "refusal": "unregistered",
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 404,
+              "content": "{\n  \"profile\": \"origin-landscape@1\",\n  \"modules\": [\n    \"source-light-v1\",\n    \"aeroheart-optics-v1\"\n  ],\n  \"parameters\": {\n    \"vitality\": 0.75,\n    \"glass\": 0.75,\n    \"relationship_energy\": 0.65000000000000002,\n    \"garden_density\": 0.65000000000000002,\n    \"horizon_softness\": 0.5,\n    \"surface_finish\": \"source-paper\",\n    \"source_hue\": 0.65000000000000002,\n    \"source_warmth\": 0.25,\n    \"source_depth\": 0.35999999999999999,\n    \"source_light\": 0.85999999999999999\n  ,\n  \"world_tempo\": 1\n  },\n  \"references\": [\n    \"f9f65394-24a5-4581-886a-a17b9bcbac61\",\n    \"6717751f-c4a4-4ffb-a895-648e838a2679\",\n    \"9e49a5c3-46f1-4322-bbed-2ce126582f6a\"\n  ],\n  \"spoken\": \"The tones are now a little warmer, and the visual weave is slightly softer and less detailed, giving a calmer, more open feeling.\",\n  \"impossible\": null\n}",
+              "finish_reason": "stop",
+              "prompt_tokens": 1373,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "two-part",
+          "verdict": "refusal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "horizon-softness",
+            "relationship-energy",
+            "source-light",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 351,
+              "finish_reason": "stop",
+              "prompt_tokens": 1373,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "two-part",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "horizon-softness"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 272,
+              "finish_reason": "stop",
+              "prompt_tokens": 1371,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "single-soft",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "horizon-softness"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 275,
+              "finish_reason": "stop",
+              "prompt_tokens": 1371,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "single-soft",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "glass",
+            "horizon-softness",
+            "relationship-energy",
+            "source-depth",
+            "source-light",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 374,
+              "finish_reason": "stop",
+              "prompt_tokens": 1369,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "single-bright",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "glass",
+            "horizon-softness",
+            "relationship-energy",
+            "source-depth",
+            "source-light",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 373,
+              "finish_reason": "stop",
+              "prompt_tokens": 1369,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "single-bright",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "surface-finish"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 273,
+              "finish_reason": "stop",
+              "prompt_tokens": 1372,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "surface",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "surface-finish"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 273,
+              "finish_reason": "stop",
+              "prompt_tokens": 1372,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "surface",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [],
+          "drafted": true,
+          "refusal": "not_in_catalogue",
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 287,
+              "content": "{\n  \"profile\": \"origin-landscape@1\",\n  \"modules\": [],\n  \"parameters\": {\n  \"vitality\": null,\n  \"glass\": null,\n  \"relationship_energy\": null,\n  \"garden_density\": null,\n  \"horizon_softness\": null,\n  \"surface_finish\": null,\n  \"source_hue\": null,\n  \"source_warmth\": null,\n  \"source_depth\": null,\n  \"source_light\": null,\n  \"world_tempo\": null\n  },\n  \"references\": [\n    \"f9f65394-24a5-4581-886a-a17b9bcbac61\",\n    \"6717751f-c4a4-4ffb-a895-648e838a2679\",\n    \"9e49a5c3-46f1-4322-bbed-2ce126582f6a\"\n  ],\n  \"spoken\": \"I can't add a red neon sign saying hello \u2014 this world's design doesn't support placing specific text or artificial lights like signs.\",\n  \"impossible\": \"Adding a red neon sign with specific text is outside the capabilities of this design. No such control exists in the catalogue.\"\n}",
+              "finish_reason": "stop",
+              "prompt_tokens": 1372,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "impossible",
+          "verdict": "refusal"
+        },
+        {
+          "changed": [],
+          "drafted": true,
+          "refusal": "not_in_catalogue",
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 291,
+              "content": "{\n  \"profile\": \"origin-landscape@1\",\n  \"modules\": [],\n  \"parameters\": {\n  \"vitality\": null,\n  \"glass\": null,\n  \"relationship_energy\": null,\n  \"garden_density\": null,\n  \"horizon_softness\": null,\n  \"surface_finish\": null,\n  \"source_hue\": null,\n  \"source_warmth\": null,\n  \"source_depth\": null,\n  \"source_light\": null,\n  \"world_tempo\": null\n  },\n  \"references\": [\n    \"f9f65394-24a5-4581-886a-a17b9bcbac61\",\n    \"6717751f-c4a4-4ffb-a895-648e838a2679\",\n    \"9e49a5c3-46f1-4322-bbed-2ce126582f6a\"\n  ],\n  \"spoken\": \"I can't add a red neon sign saying 'hello' because this world's design doesn't support adding specific text or artificial lights like signs.\",\n  \"impossible\": \"Adding a red neon sign with specific text is not supported by the available controls; no such capability exists in the current module set.\"\n}",
+              "finish_reason": "stop",
+              "prompt_tokens": 1372,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "impossible",
+          "verdict": "refusal"
+        }
+      ],
+      "attempts_total": 12,
+      "drafted": 12,
+      "harness_sha256": "adffe516910bbdfc4ed15414998e646db363164314e2ee9d27f1501dd0717600",
+      "not_drafted": 0,
+      "prompt_version": "proposal-3",
+      "proposal_module_sha256": "e0809fc74282fe7747f0098d529b5e9d29665743bab1b0539dfacf84ec8181f7",
+      "proposals": 9,
+      "refusals": [
+        "not_in_catalogue",
+        "not_in_catalogue",
+        "unregistered"
+      ],
+      "spent_usd": "0.00566260"
+    },
+    "before": {
+      "attempts": [
+        {
+          "detail": "Qwen/Qwen3-235B-A22B-Instruct-2507 returned text that is not JSON and contains no JSON object, even though response_format was json_schema strict. That is what an unenforced schema looks like. Answer was '{\\n  \"profile\": \"origin-landscape@1\",\\n  \"modules\": [\\n    \"aeroheart-optics-v1\",\\n    \"source-light-v1\"\\n  ],\\n  \"parameters\": {\\n    \"vitality\": 0.87,\\n    \"glass\": 0.71,\\n    \"relationship_energy\": 0.68,\\n    \"garden_density\": 0.72,\\n    \"horizon_softness\": 0.51,\\n    \"surface_finish\": null,\\n    \"source_hue\"'",
+          "drafted": false,
+          "raised": "StructuredOutputError",
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 316,
+              "content": "{\n  \"profile\": \"origin-landscape@1\",\n  \"modules\": [\n    \"aeroheart-optics-v1\",\n    \"source-light-v1\"\n  ],\n  \"parameters\": {\n    \"vitality\": 0.87,\n    \"glass\": 0.71,\n    \"relationship_energy\": 0.68,\n    \"garden_density\": 0.72,\n    \"horizon_softness\": 0.51,\n    \"surface_finish\": null,\n    \"source_hue\": 0.6,\n    \"source_warmth\": 0.24,\n    \"source_depth\": 0.36,\n    \"source_light\": 0.86,\n    \"world_tempo\": 1\n25\n  },\n  \"references\": [\n    \"e14da38f-1dd7-4774-a5cf-dc13ab20f19a\",\n    \"b92aa0f1-6ae8-42f0-b983-7c126fce4df4\",\n    \"2226ac8e-613b-4dfa-b5bf-14764e51a470\"\n  ],\n  \"spoken\": \"The horizon will sit softer and the colours will carry a touch more warmth, gently enhancing the mood of the scene without shifting its structure.\",\n  \"impossible\": null\n}",
+              "finish_reason": "stop",
+              "prompt_tokens": 1366,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            },
+            {
+              "completion_tokens": 309,
+              "content": "{\n  \"profile\": \"origin-landscape@1\",\n  \"modules\": [\n    \"aeroheart-optics-v1\",\n    \"source-light-v1\"\n  ],\n  \"parameters\": {\n    \"vitality\": 0.87,\n    \"glass\": 0.71,\n    \"relationship_energy\": 0.68,\n    \"garden_density\": 0.72,\n    \"horizon_softness\": 0.51,\n    \"surface_finish\": null,\n    \"source_hue\": null,\n    \"source_warmth\": 0.24,\n    \"source_depth\": 0.36,\n    \"source_light\": 0.86,\n    \"world_tempo\": 1\n25\n  },\n  \"references\": [\n    \"e14da38f-1dd7-4774-a5cf-dc13ab20f19a\",\n    \"b92aa0f1-6ae8-42f0-b983-7c126fce4df4\",\n    \"2226ac8e-613b-4dfa-b5bf-14764e51a470\"\n  ],\n  \"spoken\": \"The horizon will sit softer and the colours will carry a touch more warmth, as if touched by late afternoon light.\"\n  ,\n  \"impossible\": null\n}",
+              "finish_reason": "stop",
+              "prompt_tokens": 1581,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "rehearsal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "glass",
+            "horizon-softness",
+            "relationship-energy",
+            "source-hue",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 300,
+              "finish_reason": "stop",
+              "prompt_tokens": 1366,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "rehearsal",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "glass",
+            "horizon-softness",
+            "relationship-energy",
+            "source-light",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 312,
+              "finish_reason": "stop",
+              "prompt_tokens": 1366,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "two-part",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "glass",
+            "horizon-softness",
+            "relationship-energy",
+            "source-light",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 322,
+              "finish_reason": "stop",
+              "prompt_tokens": 1366,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "two-part",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "horizon-softness"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 272,
+              "finish_reason": "stop",
+              "prompt_tokens": 1364,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "single-soft",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "horizon-softness"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 270,
+              "finish_reason": "stop",
+              "prompt_tokens": 1364,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "single-soft",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "glass",
+            "horizon-softness",
+            "relationship-energy",
+            "source-depth",
+            "source-light",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 311,
+              "finish_reason": "stop",
+              "prompt_tokens": 1362,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "single-bright",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "garden-density",
+            "glass",
+            "horizon-softness",
+            "relationship-energy",
+            "source-depth",
+            "source-light",
+            "source-warmth",
+            "vitality"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 314,
+              "finish_reason": "stop",
+              "prompt_tokens": 1362,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "single-bright",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "surface-finish"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 264,
+              "finish_reason": "stop",
+              "prompt_tokens": 1365,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "surface",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [
+            "surface-finish"
+          ],
+          "drafted": true,
+          "refusal": null,
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 264,
+              "finish_reason": "stop",
+              "prompt_tokens": 1365,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "surface",
+          "verdict": "proposal"
+        },
+        {
+          "changed": [],
+          "drafted": true,
+          "refusal": "not_in_catalogue",
+          "repeat": 0,
+          "replies": [
+            {
+              "completion_tokens": 272,
+              "content": "{\n  \"profile\": \"origin-landscape@1\",\n  \"modules\": [],\n  \"parameters\": {\n  \"vitality\": null,\n  \"glass\": null,\n  \"relationship_energy\": null,\n  \"garden_density\": null,\n  \"horizon_softness\": null,\n  \"surface_finish\": null,\n  \"source_hue\": null,\n  \"source_warmth\": null,\n  \"source_depth\": null,\n  \"source_light\": null,\n  \"world_tempo\": null\n  },\n  \"references\": [\n    \"e14da38f-1dd7-4774-a5cf-dc13ab20f19a\",\n    \"b92aa0f1-6ae8-42f0-b983-7c126fce4df4\",\n    \"2226ac8e-613b-4dfa-b5bf-14764e51a470\"\n  ],\n  \"spoken\": \"I can't add a red neon sign saying hello \u2014 this world's design doesn't support placing specific text or signs like that.\",\n  \"impossible\": \"Adding a red neon sign with specific text is outside the capabilities of this design.\"\n}",
+              "finish_reason": "stop",
+              "prompt_tokens": 1365,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "impossible",
+          "verdict": "refusal"
+        },
+        {
+          "changed": [],
+          "drafted": true,
+          "refusal": "not_in_catalogue",
+          "repeat": 1,
+          "replies": [
+            {
+              "completion_tokens": 279,
+              "content": "{\n  \"profile\": \"origin-landscape@1\",\n  \"modules\": [],\n  \"parameters\": {\n  \"vitality\": null,\n  \"glass\": null,\n  \"relationship_energy\": null,\n  \"garden_density\": null,\n  \"horizon_softness\": null,\n  \"surface_finish\": null,\n  \"source_hue\": null,\n  \"source_warmth\": null,\n  \"source_depth\": null,\n  \"source_light\": null,\n  \"world_tempo\": null\n  },\n  \"references\": [\n    \"e14da38f-1dd7-4774-a5cf-dc13ab20f19a\",\n    \"b92aa0f1-6ae8-42f0-b983-7c126fce4df4\",\n    \"2226ac8e-613b-4dfa-b5bf-14764e51a470\"\n  ],\n  \"spoken\": \"I can't add a red neon sign saying hello \u2014 this world's design doesn't support adding text or artificial lights like signs.\",\n  \"impossible\": \"Adding a red neon sign with text is outside the capabilities of this design; no such control exists in the catalogue.\"\n}",
+              "finish_reason": "stop",
+              "prompt_tokens": 1365,
+              "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            }
+          ],
+          "request": "impossible",
+          "verdict": "refusal"
+        }
+      ],
+      "attempts_total": 12,
+      "drafted": 11,
+      "harness_sha256": "adffe516910bbdfc4ed15414998e646db363164314e2ee9d27f1501dd0717600",
+      "not_drafted": 1,
+      "prompt_version": "proposal-2",
+      "proposal_module_sha256": "4751fcf00d7d589cd9d81595ca5285b7effbe5afcf06d9e94739e5f56a93f92a",
+      "proposals": 9,
+      "refusals": [
+        "not_in_catalogue",
+        "not_in_catalogue"
+      ],
+      "spent_usd": "0.00587440"
+    },
+    "decision_rule": "The fix is accepted when the after arm has no not_drafted caused by the diagnosed cause across all 12 attempts and drafts at least as many as the before arm; any not_drafted in the after arm is reported with its reply. No incomplete or repaired object is ever accepted.",
+    "diagnosis": "Before: 1 of 12 attempts not drafted, the rehearsal's request, both of its calls refused as not JSON. Each reply finished with finish_reason stop at 316 and 309 completion tokens against a 2048 ceiling, so neither was truncated at the token limit; neither carried text after the object. Inside the object the value of world_tempo, whose range is 0.75 to 1.25, was written as 1 and 25 on two lines, so the endpoint's constrained decoding did not hold the bounded-number grammar the strict json_schema requested. world_tempo is the only control whose range runs above 1, and every reply of this arm that parsed left it null.",
+    "fix": "Each range control is stated in the draft schema as an enum of the values on its registry grid (minimum, then each step to maximum) rather than as a number with minimum and maximum. The local validator still checks every reply against the schema sent and against the registry; nothing incomplete is accepted.",
+    "limitations": [
+      "Twelve attempts per arm on six requests; a rare failure of another kind is not ruled out by this sample.",
+      "Measured through draft_appearance with the default reference of the first proposable profile and three fresh evidence references, not through the route in a made world; the drafter sees only those inputs."
+    ],
+    "other_observations": [
+      "After: one draft of 'make this place feel warmer and less busy' was refused unregistered by the validator, because it set surface-finish to its current value without naming the module that owns it. Choice controls were enums in both arms; this is the drafter restating controls, not an unreadable reply.",
+      "Both arms: each proposal drawn for the two-part and single-bright requests moved 6 to 8 controls, the restating defect recorded under proposal-2."
+    ],
+    "preregistration": {
+      "record": "docs/evaluation/2026-09-24-appearance-draft-grid-preregistration.json",
+      "record_sha256": "6465fe9772c851d78136b64584f8a0eba3b7bddf8a6288dd1b61d2c6f8ddbb12"
+    },
+    "question": "Does draft_appearance fill the appearance form for requests in a world whose evidence catalogue holds three photographs, and what is the cause when it does not?",
+    "spent_usd_total": "0.01153700",
+    "verdict": "Accepted. After: 12 of 12 drafted and 0 not drafted, against 11 of 12 and 1 before, and no reply wrote a number across a line break. The endpoint wrote enum members in a 17-digit form (0.65000000000000002), which is valid JSON and equal to the member."
+  },
+  "record_sha256": "23cfccd956642cf226f8e6aee5775965fba3c2bb41b10f3fdfbe67e703445b5e"
+}

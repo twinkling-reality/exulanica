@@ -139,6 +139,13 @@ export type Composed =
    * was no evidence and no search: what happened is that the catalogue has no such control.
    */
   | 'refused'
+  /**
+   * A model was asked to draw a change and gave back no reply the server could read.
+   *
+   * Not `refused`: that one states a limit of the reviewed design, and nothing here says the
+   * design could not make the change.
+   */
+  | 'undrafted'
   | 'none';
 
 export interface AnswerProvenance {
@@ -610,8 +617,18 @@ function asAskFailure(error: unknown): AskUnavailable {
  * once, from `ask`, rather than twice from two clients about one sentence.
  */
 
-/** Long enough for two extraction calls and a repair. No reasoning core is on this path. */
-const PROPOSE_TIMEOUT_MS = 90_000;
+/**
+ * How long the page waits for the appearance route: the server's bound on one request's model
+ * calls, then the same allowance for the route's own reads that `ASK_TIMEOUT_MS` carries,
+ * `PACKET_TIMEOUT_MS`.
+ *
+ * The bound is `appearance_bound_seconds` in `exulanica/selection/proposal.py`: the classifier and
+ * the draft and its repair, each times the longest one call to their role can take. A page that
+ * gave up sooner reported a failure for a change the server was still drafting.
+ * `tests/test_companion_propose_deadline.py` fails when this is less than that bound plus the
+ * allowance.
+ */
+const PROPOSE_TIMEOUT_MS = 170_000;
 
 /**
  * Why an appearance request produced no proposal.

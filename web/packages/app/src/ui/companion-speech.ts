@@ -81,6 +81,8 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
       : fill('provenance.search', { model: provenance.plannedBy, duration: spent });
   }
 
+  if (provenance.composed === 'undrafted') return say('provenance.undrafted');
+
   if (provenance.composed === 'proposed' || provenance.composed === 'refused') {
     // Both name the model that read the request, and neither mentions evidence or a search,
     // because a proposal is not an answer and nothing was looked at to make one. A refusal can

@@ -62,7 +62,7 @@ from exulanica.ingest.continuity import run_continuity
 from exulanica.ingest.ledger import Ledger
 from exulanica.ingest.model_rights import ModelHandoff, require_model_right
 from exulanica.ingest.person_detectors import RecordedObservationDetector
-from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.pipeline import TRANSIENT_DATABASE_REFUSALS, PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.stages.segmentation import ObjectSegmenter
 from exulanica.ingest.vision import VisionModel
@@ -538,6 +538,14 @@ class DerivativeWorker:
             return outcome
         except Exception as exc:
             outcome.errors.append(f"{type(exc).__name__}: {exc}")
+            failure_class = type(exc).__name__
+            if isinstance(exc, TRANSIENT_DATABASE_REFUSALS):
+                # Outside the per-capture loop, in `run_continuity` or between captures. The
+                # database accepts the same write once the reader is done, so the job goes back
+                # to the queue as a retryable stage failure does, under the same bound.
+                if self._retry(connection, workspace_id, claimed, outcome, failure_class):
+                    return outcome
+                failure_class = "retry_exhausted"
             held = derivative_queue.finish(
                 connection,
                 workspace_id,
@@ -545,7 +553,7 @@ class DerivativeWorker:
                 state="failed",
                 claim_token=claimed.claim_token,
                 error="; ".join(outcome.errors)[:2000],
-                failure_class=type(exc).__name__,
+                failure_class=failure_class,
                 cost=outcome.cost,
                 progress_completed=outcome.captures,
                 worker=self._name,
@@ -561,37 +569,14 @@ class DerivativeWorker:
             self._close_batch(repository, claimed.batch_id, "failed")
             return outcome
 
-        if outcome.retryable_failures:
-            error = "; ".join(outcome.errors)[:2000]
-            failure_class = self._failure_class(outcome, default="retryable_stage_failure")
-            if claimed.attempts < derivative_queue.MAX_CLAIMS:
-                held = derivative_queue.retry(
-                    connection,
-                    workspace_id,
-                    job_id=claimed.job_id,
-                    claim_token=claimed.claim_token,
-                    delay_seconds=self._retry_delay(claimed.attempts),
-                    error=error,
-                    failure_class=failure_class,
-                    worker=self._name,
-                    cost=outcome.cost,
-                )
-                if not held:
-                    outcome.lease_lost = True
-                    derivative_queue.record_lease_lost(
-                        connection,
-                        workspace_id,
-                        worker=self._name,
-                        claimed=claimed,
-                        message="claim was lost while scheduling a retry",
-                    )
-                else:
-                    outcome.retry_scheduled = True
-                return outcome
-            outcome.retry_exhausted = True
-            outcome.errors.append(
-                f"retry budget exhausted after {claimed.attempts} delivery attempts"
-            )
+        if outcome.retryable_failures and self._retry(
+            connection,
+            workspace_id,
+            claimed,
+            outcome,
+            self._failure_class(outcome, default="retryable_stage_failure"),
+        ):
+            return outcome
         held = derivative_queue.finish(
             connection,
             workspace_id,
@@ -614,6 +599,51 @@ class DerivativeWorker:
             return outcome
         self._close_batch(repository, claimed.batch_id, self._batch_state(outcome))
         return outcome
+
+    def _retry(
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        claimed: derivative_queue.QueuedDerivatives,
+        outcome: JobOutcome,
+        failure_class: str | None,
+    ) -> bool:
+        """Give a held job back to the queue, or say that its bound is spent.
+
+        True when this worker is done with the job: it was released for another attempt, which
+        its events record as ``retry_scheduled``, or its claim was lost on the way. False when the
+        job has used every one of :data:`derivative_queue.MAX_CLAIMS`; ``retry_exhausted`` is
+        then set and said among its errors, and the caller finishes it ``failed``.
+        """
+        if claimed.attempts >= derivative_queue.MAX_CLAIMS:
+            outcome.retry_exhausted = True
+            outcome.errors.append(
+                f"retry budget exhausted after {claimed.attempts} delivery attempts"
+            )
+            return False
+        held = derivative_queue.retry(
+            connection,
+            workspace_id,
+            job_id=claimed.job_id,
+            claim_token=claimed.claim_token,
+            delay_seconds=self._retry_delay(claimed.attempts),
+            error="; ".join(outcome.errors)[:2000],
+            failure_class=failure_class or "retryable_stage_failure",
+            worker=self._name,
+            cost=outcome.cost,
+        )
+        if held:
+            outcome.retry_scheduled = True
+            return True
+        outcome.lease_lost = True
+        derivative_queue.record_lease_lost(
+            connection,
+            workspace_id,
+            worker=self._name,
+            claimed=claimed,
+            message="claim was lost while scheduling a retry",
+        )
+        return True
 
     def _abandon_stranded(
         self, connection: psycopg.Connection, repository: IngestRepository

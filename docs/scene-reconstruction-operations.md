@@ -284,7 +284,8 @@ A later deliberate re-import of the same source bytes creates or reuses a new li
 Under the shared purge lock it also restores a globally purged blob row's storage key and clears its
 purged marker before the post-commit store publication finishes. The old capture tombstone continues
 to block the old scene identity. Without a new exact privacy screening receipt, a derivative worker
-fails closed before producing a replacement point map.
+produces no replacement point map: its depth stage records that the photograph awaits admission and
+sends nothing to the model.
 
 ## 7. Running the worker
 
@@ -301,6 +302,23 @@ export EXULANICA_DEPTH_MODEL=moge
 export EXULANICA_DEPTH_DEVICE=cpu
 uv run --extra reconstruction exulanica-derivative-worker
 ```
+
+**A photograph awaiting admission waits; its job does not fail.** An upload queues its derivative
+job before anybody has reviewed the photograph, and a worker that runs the depth model can claim it
+first. The depth stage then records `stage_unavailable` with the reason `AWAITING_ADMISSION` in
+[depth.py](../exulanica/ingest/stages/depth.py), sends nothing to the model, and the job ends
+succeeded. Admitting the photograph through `POST /personal-admission` records its screening and
+queues its derivative job again, and that job runs the depth stage under the exact receipt. A
+photograph that is never admitted keeps no point map, and its ledger states why.
+[test_depth_awaits_admission.py](../tests/test_depth_awaits_admission.py) walks both orders through
+the routes and the worker.
+
+**A write the database defers is retried, not failed.** While a delivery holds the asset read lock,
+migration 0041 refuses every guarded write with SQLSTATE 40001, including the stage registration a
+derivative job makes when it is claimed. The worker returns such a job to the queue, recorded as
+`retry_scheduled` in its events, as it does a retryable stage failure. After `MAX_CLAIMS` delivery
+attempts ([derivative_queue.py](../exulanica/ingest/derivative_queue.py)) the job fails as
+`retry_exhausted`, with each refusal in its error.
 
 For the scene worker, install or invoke the pose extra explicitly.
 

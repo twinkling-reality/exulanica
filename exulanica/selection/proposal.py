@@ -67,6 +67,7 @@ from exulanica.world.registry import ParameterDefinition, ProfileDefinition
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 
 __all__ = [
+    "APPEARANCE_PATH_CALLS",
     "MAX_REFERENCE_CATALOGUE",
     "PROMPT_VERSION",
     "AppearanceOutcome",
@@ -75,6 +76,7 @@ __all__ = [
     "RefusalCode",
     "RequestKind",
     "SourceChoice",
+    "appearance_bound_seconds",
     "classify_request",
     "draft_appearance",
     "propose_appearance",
@@ -133,7 +135,12 @@ __all__ = [
 #: candidates are a `max_tokens` ceiling for this call, a simpler schema shape than seven nullable
 #: bounded numbers, or a different extraction model. None of those is a prompt change and none of
 #: them is made here.
-PROMPT_VERSION: Final = "proposal-2"
+#:
+#: ``proposal-3`` changes the DRAFT SCHEMA and neither prompt: each range control is an enum of the
+#: values on its grid rather than a bounded number (:func:`_control_type` says why). The drafter's
+#: "knife edge" above was, in its measured failures on this form, the endpoint writing 1.25 as
+#: ``1`` and ``25`` on two lines; that is the one control whose range runs above 1.
+PROMPT_VERSION: Final = "proposal-3"
 
 #: How many evidence references the drafter may be shown, and therefore how many it may name.
 #: A bound for the same reason :data:`~exulanica.selection.planner.MAX_CATALOGUE` is one: the
@@ -146,6 +153,31 @@ MAX_REFERENCE_CATALOGUE: Final = 24
 #: default proposal to fall back to. An empty proposal is not "no change", it is every control
 #: at its default, which is a change nobody asked for presented as the one they did.
 DRAFT_ATTEMPTS: Final = 2
+
+#: How many times one utterance is classified: once, because a failure is a question
+#: (:func:`classify_request`) and is never retried.
+CLASSIFIER_CALLS: Final = 1
+
+#: Every hosted call one appearance request can make, as the role it is sent to and the most times
+#: its call sites may send it: the classifier, then the draft and its repair.
+#: ``tests/test_companion_propose_deadline.py`` drives each call site to its worst case and fails
+#: when it sends a role, or a count, this does not state.
+APPEARANCE_PATH_CALLS: Final[tuple[tuple[Role, int], ...]] = (
+    (Role.STRUCTURED_EXTRACTION, CLASSIFIER_CALLS + DRAFT_ATTEMPTS),
+)
+
+
+def appearance_bound_seconds(client: ModelClient) -> float:
+    """The longest the model calls of one appearance request can take on ``client``.
+
+    Each call site's count times what the client says one call to that role can take at worst
+    (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`), as
+    :func:`~exulanica.selection.question.answer_bound_seconds` states it for an answer. The browser
+    waits for a proposal at least this long; ``tests/test_companion_propose_deadline.py`` holds
+    its deadline to it.
+    """
+    return sum(count * client.worst_case_seconds(role) for role, count in APPEARANCE_PATH_CALLS)
+
 
 #: The longest sentence the Companion may say about a change it is proposing. Bounded because it
 #: is model output rendered to a person, and because a paragraph in the speech band is a wall.
@@ -556,9 +588,7 @@ def propose_appearance(
     sent = names.sendable(utterance)
     kind, classified_by = classify_request(client, sent, log=log, placeholders=names.placeholders)
     if kind is RequestKind.QUESTION:
-        return AppearanceOutcome(
-            kind=kind, classified_by=classified_by, calls=log.calls
-        )
+        return AppearanceOutcome(kind=kind, classified_by=classified_by, calls=log.calls)
     if current is None:
         return AppearanceOutcome(
             kind=kind,
@@ -675,9 +705,7 @@ def _draft_model(
     """
     parameters = _parameter_model(proposable)
     profile_keys = tuple(_profile_key(profile) for profile in proposable)
-    module_ids = tuple(
-        sorted({module for profile in proposable for module in profile.modules})
-    )
+    module_ids = tuple(sorted({module for profile in proposable for module in profile.modules}))
     reference_ids = tuple(str(choice.source_id) for choice in catalogue)
     return create_model(
         "AppearanceDraft",
@@ -762,23 +790,27 @@ def _parameter_model(proposable: Sequence[ProfileDefinition]) -> type[BaseModel]
 
 
 def _control_type(definition: ParameterDefinition) -> Any:
-    """The type for one control, carrying the registry's own bound into the JSON Schema.
+    """The type for one control, carrying the registry's own values into the JSON Schema.
 
-    ``ge``/``le`` become ``minimum``/``maximum`` and an option list becomes an ``enum``, both of
-    which survive hardening and are enforced by the endpoint and again by the local validator.
-    So an out-of-range value is refused before it is ever a Python object, and
-    :func:`_validate_draft` refuses it a second time for the case where it is.
+    A range becomes an ``enum`` of the values its grid holds and an option list becomes an
+    ``enum`` of its options. Both survive hardening and are enforced by the endpoint as literal
+    alternatives and again by the local validator, so a value the control cannot hold is refused
+    before it is ever a Python object, and :func:`_validate_draft` refuses it a second time for
+    the case where it is.
     """
     if definition.kind == "range":
-        assert definition.minimum is not None and definition.maximum is not None
-        # The bounds only. The step is NOT expressed as `multipleOf`, and that was measured
-        # rather than assumed: the endpoint does not enforce it, so the local validator refused
-        # the reply instead, and two of the five recorded utterances came back `not_drafted`
-        # for asking to move a control by an amount the model had no way to know was illegal.
-        # The registry's own default for that control is 0.46, which is not on its 0.05 grid
-        # either, so the grid was never a constraint the world itself respected. It is applied
-        # to the VALUE below instead, where it belongs.
-        return Annotated[float, Field(ge=definition.minimum, le=definition.maximum)]
+        # The values, not the bounds, and the difference was measured. As a bounded number
+        # (`minimum`/`maximum`) the endpoint's constrained decoding did not hold the number's own
+        # grammar: `world-tempo`, the one control whose range runs above 1 (0.75 to 1.25), came
+        # back as `1` and `25` on two lines where 1.25 was meant, an object that is not JSON,
+        # with `finish_reason` stop: 2 of 2 in the rehearsal of the personal path, and measured
+        # before and after in docs/evaluation/2026-09-24-appearance-draft-grid-outcome.json
+        # (11 of 12 drafted, then 12 of 12). An enum is a set of literals the endpoint writes
+        # whole. It is also the grid `_at_control_resolution` rounds to, which `multipleOf` was
+        # measured not to enforce, so the model cannot propose a value the panel would rewrite.
+        # The registry's off-grid defaults (0.46 on a 0.05 step) stay reachable by leaving the
+        # control null.
+        return Literal[_grid(definition)]  # type: ignore[valid-type]
     if definition.kind == "choice":
         return Literal[tuple(definition.options)]  # type: ignore[valid-type]
     if definition.kind == "toggle":
@@ -787,6 +819,20 @@ def _control_type(definition: ParameterDefinition) -> Any:
     # branch exists because `_KINDS` has four members and a form built from a registry must be
     # buildable from every registry the loader accepts, not only from the current file.
     return Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
+
+
+def _grid(definition: ParameterDefinition) -> tuple[float, ...]:
+    """Every value a range control can hold: its minimum, then each step up to its maximum.
+
+    Computed in decimal so each value is the number the registry states (0.35, never
+    0.35000000000000003), and read from the registry, so a reviewed bound or step moves the form.
+    """
+    if definition.minimum is None or definition.maximum is None or definition.step is None:
+        raise InvalidStyleData(f"range control {definition.key} states no bounds or step")
+    minimum = Decimal(str(definition.minimum))
+    step = Decimal(str(definition.step))
+    count = int((Decimal(str(definition.maximum)) - minimum) / step)
+    return tuple(float(minimum + index * step) for index in range(count + 1))
 
 
 def _field_name(key: str) -> str:
@@ -832,8 +878,7 @@ def _render_catalogue(
             )
             if definition.kind == "range":
                 bound = (
-                    f"{definition.minimum} to {definition.maximum} "
-                    f"in steps of {definition.step}"
+                    f"{definition.minimum} to {definition.maximum} in steps of {definition.step}"
                 )
             elif definition.kind == "choice":
                 bound = "one of " + ", ".join(definition.options)
@@ -931,8 +976,7 @@ def _validate_draft(
             # derives would name a module this proposal never claimed to touch.
             return ProposalRefusal(
                 RefusalCode.UNREGISTERED,
-                f"draft set {key!r} without naming the module that owns "
-                f"{definition.capability}",
+                f"draft set {key!r} without naming the module that owns {definition.capability}",
             )
         changed[key] = value
 
@@ -954,12 +998,9 @@ def _validate_draft(
     # Filtering is the honest merge. A control the drafted profile declares and the current
     # style does not carry is filled from its registry default by `validate_reference`, and
     # `changed` names it below so the surface can say it moved.
-    carried = {
-        key: value for key, value in current.parameters.items() if key in profile.controls
-    }
+    carried = {key: value for key, value in current.parameters.items() if key in profile.controls}
     changed = {
-        key: _at_control_resolution(profile.controls[key], value)
-        for key, value in changed.items()
+        key: _at_control_resolution(profile.controls[key], value) for key, value in changed.items()
     }
     # **Compared on the control's own grid, and dropped from the merge when it matches.**
     #

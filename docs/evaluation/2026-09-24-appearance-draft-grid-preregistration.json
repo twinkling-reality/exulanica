@@ -1,0 +1,59 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": {
+      "after": "the drafter with each range control stated as the values of its grid, proposal-3",
+      "before": "the drafter at main 1d20004b, prompt version proposal-2, no product change"
+    },
+    "call_under_test": "exulanica.selection.proposal.draft_appearance, structured_extraction role, through ModelClient with a WorkspaceRequestPolicy (the hosted policy boundary) over a private scratch workspace with no saved names",
+    "decision_rule": "The fix is accepted when the after arm has no not_drafted caused by the diagnosed cause across all 12 attempts and drafts at least as many as the before arm; any not_drafted in the after arm is reported with its reply. No incomplete or repaired object is ever accepted.",
+    "inputs": {
+      "catalogue": "three SourceChoice rows with fresh uuid4 source ids and regions region-1, region-2, region-3, matching the made world's 3 composed photographs in 3 regions",
+      "current": "the first proposable profile's validated default reference (the made world in the rehearsal drafted against origin-landscape@1)",
+      "registry": "STYLE_REGISTRY as in the tree under test"
+    },
+    "outcome_measures": [
+      "drafted: draft_appearance returned and _validate_draft produced a proposal or a refusal other than not_drafted",
+      "not_drafted count and its exception classes",
+      "diagnosis of each not_drafted from the full reply: truncation at the token limit, trailing text, malformed JSON inside the object, or a schema the provider did not enforce"
+    ],
+    "question": "Does draft_appearance fill the appearance form for requests in a world whose evidence catalogue holds three photographs, and what is the cause when it does not?",
+    "recorded_per_attempt": "every HTTP response body in full (choices[0].message.content and finish_reason), usage, the exception class and message, the served model, the draft verdict",
+    "repeats_per_request_per_arm": 2,
+    "requests": [
+      {
+        "key": "rehearsal",
+        "utterance": "Make the horizon softer and the colours warmer",
+        "why": "the rehearsal's exact request, failed 2 of 2"
+      },
+      {
+        "key": "two-part",
+        "utterance": "make this place feel warmer and less busy",
+        "why": "the request every earlier measurement of this call used"
+      },
+      {
+        "key": "single-soft",
+        "utterance": "Soften the horizon a little",
+        "why": "one control, small step"
+      },
+      {
+        "key": "single-bright",
+        "utterance": "Make everything much brighter",
+        "why": "one idea, large step"
+      },
+      {
+        "key": "surface",
+        "utterance": "Give the surfaces a glassier finish",
+        "why": "a choice-kind control"
+      },
+      {
+        "key": "impossible",
+        "utterance": "Add a red neon sign saying hello",
+        "why": "not expressible; the form's impossible field"
+      }
+    ],
+    "spend": "each arm is one run bounded at 0.04 USD and at most 48 calls",
+    "written_at": "2026-09-24, before any hosted call of this measurement"
+  },
+  "record_sha256": "6465fe9772c851d78136b64584f8a0eba3b7bddf8a6288dd1b61d2c6f8ddbb12"
+}

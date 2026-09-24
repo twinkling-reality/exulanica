@@ -46,6 +46,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Final
 
+import psycopg
 from PIL import Image
 
 from exulanica.canonical import sha256_digest
@@ -89,11 +90,20 @@ from exulanica.models.errors import (
 from exulanica.reconstruction import DepthModel
 from exulanica.store.base import ContentAddressedStore
 
-__all__ = ["SUPPORTED_SUFFIXES", "PhotoIngestPipeline"]
+__all__ = ["SUPPORTED_SUFFIXES", "TRANSIENT_DATABASE_REFUSALS", "PhotoIngestPipeline"]
 
 SUPPORTED_SUFFIXES: Final = frozenset(
     {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".heic", ".heif"}
 )
+
+#: A write the database refused at that instant and accepts once the reader is done. SQLSTATE
+#: 40001: migration 0041's ``tg_asset_read_mutation`` refuses a guarded write outright, "asset
+#: delivery in progress; retry mutation", while any reader holds the asset read lock, rather than
+#: making it wait. Measured in the rehearsal of the personal path: a derivative job failed for good
+#: 0.17 s after its claim while the page was reading assets. Retried by the queue
+#: (``derivative_queue.retry``), bounded by ``derivative_queue.MAX_CLAIMS``, and recorded as
+#: ``retry_scheduled`` in the job's events.
+TRANSIENT_DATABASE_REFUSALS: Final = (psycopg.errors.SerializationFailure,)
 
 
 @dataclass(frozen=True, slots=True)
@@ -713,7 +723,9 @@ def _retryable(exc: Exception) -> bool:
     """
     if isinstance(exc, TransportError):
         return exc.retryable
-    return isinstance(exc, (StructuredOutputError, TruncatedResponseError))
+    return isinstance(
+        exc, (StructuredOutputError, TruncatedResponseError, *TRANSIENT_DATABASE_REFUSALS)
+    )
 
 
 def _iter_images(directory: Path, *, recursive: bool) -> Iterator[Path]:

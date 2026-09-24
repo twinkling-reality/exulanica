@@ -156,7 +156,7 @@ def test_the_draft_schema_is_built_from_the_registry_rather_than_restated_beside
         value, null = controls[key.replace("-", "_")]["anyOf"]
         assert null == {"type": "null"}, key
         if definition.kind == "range":
-            assert (value["minimum"], value["maximum"]) == (definition.minimum, definition.maximum)
+            assert (value["enum"][0], value["enum"][-1]) == (definition.minimum, definition.maximum)
         else:
             assert value["enum"] == list(definition.options)
 
@@ -476,7 +476,7 @@ def test_the_prompt_version_is_this_paths_own_and_not_the_question_paths():
     # Pinned as a literal on purpose. It is stored on every world style proposal this path
     # creates and it keys the response cache, so a bump has to be a decision somebody made
     # rather than a constant that drifted.
-    assert PROMPT_VERSION == "proposal-2"
+    assert PROMPT_VERSION == "proposal-3"
     assert PROMPT_VERSION != QUESTION_PROMPT_VERSION
 
 
@@ -836,16 +836,29 @@ def test_a_value_that_rounds_onto_the_world_as_it_is_changes_nothing():
     assert outcome.code is RefusalCode.NO_CHANGE
 
 
-def test_the_schema_states_the_bounds_and_not_the_grid():
-    """Measured: `multipleOf` is not enforced by the endpoint, so it only refused good drafts."""
+def test_the_schema_states_each_range_as_the_values_its_grid_holds():
+    """Measured: as a bounded number the endpoint wrote 1.25 as `1` and `25` on two lines.
+
+    That was `world-tempo`, 0.75 to 1.25, in every refused draft of the rehearsal's request and
+    of docs/evaluation/2026-09-24-appearance-draft-grid-outcome.json before `proposal-3`. An enum
+    is a set of literals the endpoint writes whole; `multipleOf` was measured not to be enforced
+    at all, so the grid is stated as its values rather than as a rule over numbers.
+    """
     schema = strict_json_schema(_draft_model(_proposable_profiles(STYLE_REGISTRY), catalogue()))
     controls = schema["$defs"]["AppearanceParameters"]["properties"]
     for key, definition in PROFILE.controls.items():
         if definition.kind != "range":
             continue
-        bound = controls[key.replace("-", "_")]["anyOf"][0]
-        assert (bound["minimum"], bound["maximum"]) == (definition.minimum, definition.maximum)
-        assert "multipleOf" not in bound
+        values = controls[key.replace("-", "_")]["anyOf"][0]
+        assert {"minimum", "maximum", "multipleOf"}.isdisjoint(values), key
+        steps = [
+            round(later - earlier, 9)
+            for earlier, later in zip(values["enum"], values["enum"][1:], strict=False)
+        ]
+        assert values["enum"][0] == definition.minimum, key
+        assert values["enum"][-1] == definition.maximum, key
+        assert set(steps) == {definition.step}, key
+    assert 1.25 in controls["world_tempo"]["anyOf"][0]["enum"]
 
 
 def test_the_module_lookup_uses_the_registry_it_was_given():

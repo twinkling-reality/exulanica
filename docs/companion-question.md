@@ -95,6 +95,15 @@ unconsented person reached a viewer's screen. That is why the client makes a sec
 random per request, so the packet's tokens are not the answer's tokens. Matching them would
 resolve nothing, silently, and every chip would open nothing.
 
+**Every clause cites in the packet's own spelling.** The packet shows each photograph to the
+composer as a bracketed token, `[2EXZHVS3UA]`, and a composer that copies the brackets is not
+refused: `EvidencePacket.resolve` in [packet.py](../exulanica/selection/packet.py) strips them,
+because a token resolves bracketed exactly when it resolves bare. What the route returns is the
+token that resolved, once per clause (`_in_canonical_form` in
+[question.py](../exulanica/selection/question.py)), so the response's `citations` map, the page's
+chips and a remembered answer read one form. A remembered answer stores the span each citation
+resolved to, never a token.
+
 **A citation opens inside the Companion.** A chip, or `E`, draws the masked photograph in the
 Companion's own surface in place of the answer or question that cited it, with the date its citation
 carries and a way back: `Back to the answer`, or `Back to the question` for the photograph a
@@ -404,8 +413,20 @@ reviewed photograph makes a proposal possible. A draft that names none of the ev
 evidence outside it, is refused as `unsupported_reference`, and the page says each of the two in
 its own words (`proposal.refused.*` in `web/packages/app/src/ui/copy.ts`).
 
-The drafter's schema derives from the registry's profiles, controls, ranges and choices. An invalid
-value is refused, not silently converted into a different proposed value. Apply remains a separate
+The drafter's schema derives from the registry's profiles, controls, ranges and choices. It states
+each range control as the values on its grid rather than as a number between two bounds: as a
+number, the endpoint's constrained decoding wrote 1.25 as `1` and `25` on two lines, a reply that is
+not JSON ([measured before and after](evaluation/2026-09-24-appearance-draft-grid-outcome.json)).
+An invalid value is refused, not silently converted into a different proposed value.
+
+When no draft can be read after its repair, or a draft is cut at its token limit, the request is
+refused as `not_drafted`. The page says that a model's reply could not be read
+(`provenance.undrafted`), and keeps "The reviewed design has no way to make that change"
+(`provenance.refused`) for a refusal that states a limit of the design, such as `not_in_catalogue`.
+The page waits for the route as long as the server may take: `appearance_bound_seconds` in the
+proposal implementation, the classifier and the draft and its repair at their role's worst case,
+plus the page's read allowance, held by
+[test_companion_propose_deadline.py](../tests/test_companion_propose_deadline.py). Apply remains a separate
 reviewed operation through [world style](world-style-backend.md) and the
 [customization contract](atlas-world-customization-contract.md). Conflicts require review against
 the relevant version; natural language does not bypass the same validation as direct controls.

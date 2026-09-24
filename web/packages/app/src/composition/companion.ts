@@ -481,7 +481,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
 function spokenAnswer(
   outcome: CompanionProposal,
   sentences: readonly string[],
-  composed: 'proposed' | 'refused',
+  composed: 'proposed' | 'refused' | 'undrafted',
 ): CompanionAnswer {
   const calls = outcome.calls;
   return {
@@ -525,11 +525,15 @@ function spokenAnswer(
 function refusalAnswer(outcome: CompanionProposal): CompanionAnswer {
   const refusal = outcome.refusal;
   if (refusal === null) {
-    return spokenAnswer(outcome, [say('proposal.refused.not_drafted')], 'refused');
+    return spokenAnswer(outcome, [say('proposal.refused.not_drafted')], 'undrafted');
   }
   const spoken = say(`proposal.refused.${refusal.code}`);
   const detail = refusal.code === 'not_in_catalogue' ? refusal.detail : '';
-  return spokenAnswer(outcome, [spoken, detail], 'refused');
+  return spokenAnswer(
+    outcome,
+    [spoken, detail],
+    refusal.code === 'not_drafted' ? 'undrafted' : 'refused',
+  );
 }
 
 /** What became of a proposal, as a remembered answer to the sentence that asked for it. */
