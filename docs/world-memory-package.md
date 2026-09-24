@@ -390,11 +390,11 @@ declarations, and shows a verifier that knows only 1.0 naming 1.1 as not checked
 `tests/test_world_package_behaviour_extension.py` refuses the same chain under 1.0 and holds the
 1.1 `withheld` rules.
 
-[evaluation/2026-09-11-developer-proof.json](evaluation/2026-09-11-developer-proof.json) retains the
-same proof on the reference copy: a package projected from the version the second client edited,
-verified by this code and by the verifier at 90edb49, checked against four loader declarations, and
-the same snapshot projected without the extension by this code and by the 90edb49 projector,
-byte-identical in every file including the signature.
+The developer-proof record (`2026-09-11-developer-proof`), a local-only evaluation record a clone
+does not contain, retains the same proof on the reference copy: a package projected from the
+version the second client edited, verified by this code and by the verifier at 90edb49, checked
+against four loader declarations, and the same snapshot projected without the extension by this
+code and by the 90edb49 projector, byte-identical in every file including the signature.
 
 ## Environment-instances extension 1.0
 

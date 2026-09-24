@@ -79,7 +79,7 @@ fallback, complete provenance, reachable destinations, invalid attachment reject
 rejection, preview isolation, stale-proposal rejection, protected structural rejection, regional
 scope, immutable apply/rollback history, and unknown-profile fallback.
 
-The architectural evidence and follow-up gates are in
-[atlas-world-research.md](../atlas-world-research.md).
+The architectural evidence and follow-up gates are in the Atlas world research account of
+2026-08-30, an operator record that `.gitignore` holds out of this repository.
 The implemented persistence and API contract is in
 [world-style-backend.md](../world-style-backend.md).

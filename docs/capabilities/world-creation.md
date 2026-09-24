@@ -24,8 +24,8 @@ Reviewed appearance controls and bounded language-driven appearance proposals
 have preview/apply/rollback contracts. Source snapshots, alternate versions,
 authored object add/move/remove/undo, bounded motion and reload/conflict recovery
 have code and synthetic browser checks. See the
-[object contract](../world-objects-contract.md) and
-[saved-world evaluation](../evaluation/2026-09-12-world-browser.json).
+[object contract](../world-objects-contract.md) and the saved-world evaluation
+(`2026-09-12-world-browser`, a local-only evaluation record a clone does not contain).
 These checks do not prove the complete personal-world journey or visual quality.
 The bounded Flatiron implementation, its admitted source data, and the line between source facts
 and renderer completion are specified in

@@ -203,7 +203,7 @@ new admission route: `artifact_pkey` collides when another workspace already hol
 `artifact_id_for` derives a global ID from a key without workspace identity, while artifact lookup
 is workspace-scoped. The first-place workspace and bytes were preserved. This is an additional
 release blocker, not a successful acceptance run. The digest-bound attempt is recorded in
-[evaluation/2026-09-11-personal-path.json](evaluation/2026-09-11-personal-path.json).
+`2026-09-11-personal-path`, a local-only evaluation record a clone does not contain.
 The integration coordinator owns the deferred single full-backend suite and document index update.
 
 ## Historical isolated command and evidence

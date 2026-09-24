@@ -18,8 +18,9 @@ This contract develops [product-direction.md](product-direction.md), which owns
 product priority. It supersedes a reconstruction-only or separate-map reading of
 prior product plans. Existing API/schema/package contracts describe the supported
 surface; this document does not silently extend them. Implementation evidence is retained in scoped evaluation records, including the
-[experience integration](evaluation/2026-09-12-experience-integration.json) and
-[Earth scope correction](evaluation/2026-09-12-earth-experience-correction.json).
+experience integration (`2026-09-12-experience-integration`) and Earth scope correction
+(`2026-09-12-earth-experience-correction`) records, which are local-only: a clone does not contain
+them.
 
 The personal world model is the system's representation and behavior across memory,
 creation and interaction. It is not a claim that one trained neural network

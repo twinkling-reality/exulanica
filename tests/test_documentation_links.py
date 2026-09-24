@@ -32,8 +32,10 @@ the ``captures`` and ``predecessor_record`` paths, which are the ones carrying d
 look at paths named in prose, and those are exactly as unmovable. Without this rule, a future
 reorganisation strands them silently and the strand cannot be repaired afterwards.
 
-**Rule 3, relative links between documents.** The same rot as rule 1, in the form the documentation
-actually uses most.
+**Rule 3, relative links.** The same rot as rule 1, in the form the documentation actually uses
+most, read for every kind of file rule 1 reads and for links that climb with ``../``. A public
+document that links a record a clone does not hold sends every reader of the published repository
+to a missing page.
 
 **Rule 4, code named in backticks.** A document names code the way a reader types it, as
 ``exulanica/...`` in backticks, and a file that moves leaves that name behind. Rules 1 and 3 read
@@ -181,13 +183,23 @@ _TEXT_SUFFIXES = {
 #: A path inside a URL belongs to somebody else's repository. MEASURED: without this, the external
 #: `deep-person-reid` model zoo link in evaluation-methodology.md reads as a local dangling path.
 _URL = re.compile(r"https?://\S+")
+#: What a document may name under ``docs/`` or link to by a relative path. One list for both
+#: rules, so a record a document links to relatively is held to what a record named in full is.
+_DOC_SUFFIXES = ("md", "jsonl", "json", "patch", "txt", "png", "py")
 #: The suffix must end the path. Without the lookahead, `runs/gates.jsonl` was read as
 #: `runs/gates.json`, a file nobody wrote: MEASURED 2026-09-23, fourteen `.jsonl` artifacts a world
 #: scale record names, all tracked, reported as missing.
 _DOC_PATH = re.compile(
-    r"docs/[A-Za-z0-9][A-Za-z0-9/._-]*\.(?:md|jsonl|json|patch|txt|png|py)(?![A-Za-z0-9_])"
+    r"docs/[A-Za-z0-9][A-Za-z0-9/._-]*\.(?:" + "|".join(_DOC_SUFFIXES) + r")(?![A-Za-z0-9_])"
 )
-_MD_LINK = re.compile(r"\]\(([A-Za-z0-9][A-Za-z0-9/._-]*\.md)(?:#[^)]*)?\)")
+#: A relative link, including one that climbs before it names anything. A pattern that required
+#: the link to start with a name skipped every ``../`` link: MEASURED 2026-09-23 at 20ee5741, 119
+#: links under ``docs/`` that rule 3 never read, three of them unresolved.
+_RELATIVE_LINK = re.compile(
+    r"\]\(((?:\.\./)*[A-Za-z0-9][A-Za-z0-9/._-]*\.(?:"
+    + "|".join(_DOC_SUFFIXES)
+    + r"))(?:#[^)]*)?\)"
+)
 
 
 #: The environment variable that chooses which files the guard reads, and its choices.
@@ -279,7 +291,7 @@ def _relative_link_origin(path: Path, brief_origins: dict[bytes, Path]) -> Path:
 
 
 def _relative_references() -> list[tuple[str, str, str]]:
-    """Every relative markdown link between tracked documents, as (document, link, target).
+    """Every relative link a tracked document makes, as (document, link, target).
 
     The target is repo relative and is computed rather than resolved on disk, for the reason in
     rule 0. A link that climbs out of the repository keeps its written form as the target, which
@@ -299,7 +311,7 @@ def _relative_references() -> list[tuple[str, str, str]]:
     for rel in documents:
         path = ROOT / rel
         base = _relative_link_origin(path, brief_origins).relative_to(ROOT).as_posix()
-        for link in _MD_LINK.findall(path.read_text(encoding="utf-8", errors="replace")):
+        for link in _RELATIVE_LINK.findall(path.read_text(encoding="utf-8", errors="replace")):
             target = os.path.normpath(os.path.join(base, link))
             found.append((rel, link, link if target.startswith("..") else target))
     return found
@@ -477,6 +489,21 @@ def test_frozen_brief_link_context_requires_exact_source_bytes(
     frozen.write_bytes(content[:-1] if newline_removed else content)
     origin = _relative_link_origin(frozen, {source.read_bytes(): source.parent})
     assert (origin / "wave.md").exists() is uses_source
+
+
+def test_a_relative_link_to_a_record_is_read_like_one_to_a_document():
+    """Positive control for rule 3: a relative link to a record names it as surely as a
+    ``docs/`` path does, and one that climbs, first or midway, is kept as written."""
+    text = (
+        "[a record](evaluation/x.json), [a page](other.md#part), [up](sub/../y.png) "
+        "and [out](../../z.json)"
+    )
+    assert _RELATIVE_LINK.findall(text) == [
+        "evaluation/x.json",
+        "other.md",
+        "sub/../y.png",
+        "../../z.json",
+    ]
 
 
 def test_relative_links_between_documents_resolve():

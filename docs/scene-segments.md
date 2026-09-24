@@ -210,10 +210,10 @@ It is stable once published: fields may be added, and no field may be renamed, r
 
 On the volcanic scene, on a frozen copy of `exulanica_inspect_test` with a hardlinked copy of the
 reference store, on an Apple M3 Pro with 18 GiB, MPS. The retained database and store were not
-written. The digest-bound record is
-[2026-09-11-scene-segments-backend.json](evaluation/2026-09-11-scene-segments-backend.json), with the
-harness, the measurement, the mutation controls and both backend suite logs beside it under
-`docs/evaluation/artifacts/2026-09-11-scene-segments-backend/`.
+written. The digest-bound record is `2026-09-11-scene-segments-backend`, with the harness, the
+measurement, the mutation controls and both backend suite logs beside it under
+`docs/evaluation/artifacts/2026-09-11-scene-segments-backend/`. The record and those artifacts are
+local-only: a clone does not contain them.
 
 The subject turned out to be a volcanic rock photographed on a white turntable, 210 photographs of
 it from around the turntable. The workspace carries no hosted vision observations on the copy, so
@@ -306,8 +306,8 @@ depth model's points along that silhouette. Neither is corrected here; both are 
 The production branch starts at `d13b01d`. The worker switch and publication hook, including the
 late-mask sweep and their tests, already exist at that base. This follow-up supplies projection
 reuse for later lifts and detector-only naming occurrences. The measurement record is
-[2026-09-11-scene-segments-production.json](evaluation/2026-09-11-scene-segments-production.json),
-with the backend record as predecessor. No migration, hosted inference, merge or push occurred.
+`2026-09-11-scene-segments-production`, with the backend record as predecessor; both are local-only
+evaluation records a clone does not contain. No migration, hosted inference, merge or push occurred.
 
 The first comparison used the same three completed volcanic masks on both paths: 47.59 s with
 placement validation, 4.49 s with projection reuse, byte-identical artifacts. Placement alone

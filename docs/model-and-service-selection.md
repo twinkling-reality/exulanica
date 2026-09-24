@@ -57,15 +57,15 @@ runtime limits. No model family, parameter count, vendor benchmark or successful
 an absolute best stack. A candidate that materially improves the task is worth additional compute
 when it fits the demonstrated hardware and interaction budget; cheapest is not the selection rule.
 
-The [September 9 comparison](evaluation/2026-09-09-companion-memory.json) recorded median Nano
-latency 3627 ms versus Lightning 18617 ms at the selected ceiling, with zero Nano validator
-rejections in 24 calls. Its answer-quality measurement is explicitly null. The
-[September 12 Companion record](evaluation/2026-09-12-companion-quality.json) prepares retrieval
-checks and an evaluation corpus; live answers and human quality judgments remain pending. The
-[segmentation record](evaluation/2026-09-11-scene-segments-production.json) records masks but no
-positive first-place person lift because pose was absent. The
-[GPU record](evaluation/2026-09-12-place-compute-readiness.json) establishes generated CUDA
-execution and cleanup. None proves an optimal model set.
+The September 9 comparison recorded median Nano latency 3627 ms versus Lightning 18617 ms at the
+selected ceiling, with zero Nano validator rejections in 24 calls. Its answer-quality measurement is
+explicitly null. The September 12 Companion record prepares retrieval checks and an evaluation
+corpus; live answers and human quality judgments remain pending. The segmentation record records
+masks but no positive first-place person lift because pose was absent. The GPU record establishes
+generated CUDA execution and cleanup. None proves an optimal model set. These four are local-only
+evaluation records a clone does not contain: `2026-09-09-companion-memory`,
+`2026-09-12-companion-quality`, `2026-09-11-scene-segments-production` and
+`2026-09-12-place-compute-readiness`.
 
 The [September 22 outcome](evaluation/2026-09-22-model-selection-outcome.json) answers the
 criteria [pre-registered](evaluation/2026-09-22-model-selection-preregistration.json) before any

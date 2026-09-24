@@ -614,8 +614,8 @@ The earlier JPEG memory measurements do not measure HEIC conversion's peak memor
 
 The retained fixture is original synthetic four-quadrant artwork, converted with macOS `sips`;
 no encoder package was installed. It contains no personal photographs. See the
-[fixture manifest](../tests/fixtures/personal-heic/manifest.json) and
-[decoder inspection](evaluation/artifacts/2026-09-11-heic-source-lineage/decoder-inspection.json).
+[fixture manifest](../tests/fixtures/personal-heic/manifest.json) and the decoder inspection in the
+`2026-09-11-heic-source-lineage` campaign, a local-only evaluation record a clone does not contain.
 Conversion lineage is separate from privacy masking. Migration 0045 requires a current
 normalized predecessor and, when consent requires it, a current mask of that predecessor.
 
