@@ -194,8 +194,11 @@ made with no `VITE_` variable in its environment and served by `vite preview`, s
 the workspace token, which is in the run directory's `token` file; without it, the Vite development
 server runs with the token built in. `--model` passes `NEBIUS_API_KEY`,
 `EXULANICA_EGRESS_ALLOWLIST` and `EXULANICA_BUDGET_USD` from the environment to the API and refuses
-without any of them. Run state and records stay in the system temporary directory, `down` stops
-only what `up` started, and every refusal prints `refused (<name>)` and exits 2.
+without any of them. `--society-playback` makes the API play the run's own workspace
+(`EXULANICA_SOCIETY_CONTROL_WORKSPACES` names it alone) at the declared base wait, or at
+`--society-tick-interval-ms`, and `up` refuses unless readiness reports that workspace played. Run
+state and records stay in the system temporary directory, `down` stops only what `up` started, and
+every refusal prints `refused (<name>)` and exits 2.
 
 **Reading the result.** The run directory holds `result.json`, described by
 `scripts/rehearsal/result.schema.json`, a `summary.txt` table, one screenshot per observed moment
