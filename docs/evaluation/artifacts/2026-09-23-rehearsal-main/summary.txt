@@ -1,0 +1,45 @@
+STEP                                         STATUS          REASON
+clean-start                                  passed          
+access-gate                                  passed          
+enter-owned-starter                          passed          
+name-world                                   passed          
+explore-walk                                 passed          
+place-reviewed-object                        passed          
+move-object                                  passed          
+inspect-object                               passed          
+give-bounded-motion                          passed          
+trigger-stop-reset                           passed          
+refuse-unsupported-behaviour                 passed          
+creation-survives-reload                     passed          
+undo-last-change                             passed          
+change-appearance                            passed          
+appearance-survives-reload                   passed          
+restore-original-appearance                  passed          
+open-close-photo-intake                      passed          
+upload-synthetic-photographs                 passed          
+authorize-admission-in-app                   passed          
+grant-model-rights-in-app                    not_available   The photo drawer's only model-right control is the depth estimate ('Estimate 3D shape from these photos'); nothing in the application grants the vision, embeddi
+grant-model-rights-by-route                  passed          
+confirm-proposed-place                       passed          
+ask-grounded-question                        passed          
+open-cited-photograph                        passed          
+unanswerable-question-abstains               passed          
+companion-proposes-appearance-change         failed          did not hold: proposal-drafted, proposal-offered, proposal-ready-in-customize
+developer-client-walkthrough                 passed          
+returning-user-reopens                       passed          
+reconstruct-scene-geometry                   not_available   No control in the application produces scene geometry from admitted photographs. Multi-view reconstruction runs as a scheduled job on GPU compute outside this r
+observe-a-person-and-footage                 not_available   A person's use of the experience and the demonstration footage are observed and recorded by a person; this rehearsal keeps a screenshot of each step as its own 
+
+GATE                                         STATUS          FIRST FAILURE (OWNER AREA)
+milestone:World entry                        passed          
+milestone:Durable creation                   passed          
+milestone:Inspection                         passed          
+milestone:Bounded interaction                passed          
+milestone:Companion interaction              failed          companion-proposes-appearance-change (Companion appearance proposals: POST /selection/appearance (exulanica/api/routes/selection.py, exulanica/selection/proposal.py) and web/packages/app/src/composition/appearance.ts)
+milestone:Developer proof                    passed          
+milestone:Personal-media path                not_available   
+delivery:Usable environment                  passed          
+delivery:Meaningful action                   failed          companion-proposes-appearance-change (Companion appearance proposals: POST /selection/appearance (exulanica/api/routes/selection.py, exulanica/selection/proposal.py) and web/packages/app/src/composition/appearance.ts)
+delivery:Persistence                         passed          
+delivery:Independent use                     passed          
+delivery:Release rehearsal                   not_available   

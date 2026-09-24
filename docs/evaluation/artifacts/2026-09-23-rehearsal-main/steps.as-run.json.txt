@@ -1,0 +1,547 @@
+{
+  "profile": "exulanica.rehearsal-steps/v1",
+  "version": 1,
+  "about": "The first demonstration, as a person does it in the application, one step per action. Each step names the gates of docs/product-direction.md it serves, the results that must be observable after it, and the owner area a failure routes to. scripts/rehearsal/rehearse.py runs it; tests/test_rehearsal_steps.py holds it to the gates that document states.",
+  "gate_sources": [
+    {"key": "milestone", "document": "docs/product-direction.md", "heading": "First milestone", "form": "table"},
+    {"key": "delivery", "document": "docs/product-direction.md", "heading": "Delivery gates for the first demonstration", "form": "numbered"}
+  ],
+  "spend": {
+    "bound_usd": "1.00",
+    "ask_before_usd": "0.50",
+    "reason": "Hosted model calls are made only by the steps marked hosted_model, through the product's configured client and its policy boundary. A run stops starting them once the spend the product reports reaches bound_usd, and a step list whose estimates add up to more than ask_before_usd is not well formed, because that run needs a decision first."
+  },
+  "sessions": [
+    {"id": "setup", "runner": "orchestrator", "purpose": "The clean start: a fresh synthetic workspace, a production build and the API behind it, checked before any page opens."},
+    {"id": "arrival", "runner": "browser", "budget_seconds": 180, "budget_reason": "Measured 17.6 s for this session on main 7364a21d (2026-09-23, load average 28 to 30); about ten times that.", "purpose": "A person with no saved world opens the application, enters, names the world and walks."},
+    {"id": "creation", "runner": "browser", "budget_seconds": 180, "budget_reason": "Measured 12.8 s for this session on main 7364a21d (2026-09-23, load average 28 to 30); more than ten times that.", "purpose": "The creative extension: one reviewed object, a move, its inspection, its bounded motion, a refusal, a reload and an undo."},
+    {"id": "appearance", "runner": "browser", "budget_seconds": 120, "budget_reason": "Measured 9.8 s for this session on main 7364a21d (2026-09-23, load average 28 to 30); about ten times that.", "purpose": "One supported appearance change, accepted, kept across a reload and restored."},
+    {
+      "id": "photos",
+      "runner": "browser",
+      "budget_seconds": 600,
+      "budget_reason": "Measured 35.8 s for this session on main 7364a21d (2026-09-23); the allowance covers the rights step's own wait for its derivative jobs (job_wait_seconds) with room for the uploads and the admission.",
+      "purpose": "Media intake inside the workspace, the admission of synthetic photographs with the model rights the Companion needs, and the person confirming the place they show.",
+      "prepare": "synthetic-photographs",
+      "inputs": {
+        "photographs": [
+          {"stem": "mireland-01-nameplate", "kind": "nameplate", "arm": "positive", "text": "MIRELAND HALL", "scene_index": 100, "captured": "2026:08:14 11:20:00", "utc_offset": "+01:00"},
+          {"stem": "mireland-02-nameplate-tree", "kind": "nameplate_tree_beside", "arm": "positive", "text": "MIRELAND HALL", "scene_index": 101, "captured": "2026:08:16 15:05:00", "utc_offset": "+01:00"},
+          {"stem": "mireland-04-no-text", "kind": "no_text", "arm": "negative", "text": "", "scene_index": 103, "captured": "2026:08:17 17:30:00", "utc_offset": "+01:00"}
+        ],
+        "photographs_reason": "Drawings of scripts/make_place_proposal_d_photographs.py at the indices the places and Companion lanes' end-to-end runs proposed MIRELAND HALL from, plus the drawing with no text as the control. No personal photograph."
+      }
+    },
+    {"id": "companion", "runner": "browser", "budget_seconds": 720, "budget_reason": "Measured 62.8 s for this session on main 7364a21d (2026-09-23). The page allows an answer 180 s and one answer on the lane tree reached that limit on 2026-09-23, so the allowance covers three questions at the limit and the appearance request.", "purpose": "The memory interaction through the actual Companion and model path."},
+    {"id": "developer-client", "runner": "orchestrator", "purpose": "The independent client reads and edits the same saved world through the authenticated API."},
+    {"id": "return", "runner": "browser", "budget_seconds": 120, "budget_reason": "Measured 4.2 s for this session on main 7364a21d (2026-09-23, load average 28 to 30); the allowance leaves room for a slow first page load.", "purpose": "A returning person opens the saved world in a new browser session."}
+  ],
+  "steps": [
+    {
+      "id": "clean-start",
+      "session": "setup",
+      "action": "Start from nothing: a fresh synthetic workspace minted for this run, the application built for production, and the API it talks to.",
+      "gates": ["delivery:Release rehearsal"],
+      "owner_area": "rehearsal runtime: the acceptance launcher and the production build of web/packages/app",
+      "expect": {
+        "api": [
+          {"id": "no-saved-world-yet", "says": "GET /world-entries answers 200 with no saved world before any page has opened."},
+          {"id": "runtime-ready", "says": "The API answers /readyz 200 and the production preview proxies /api/healthz to it with 200."}
+        ],
+        "page": [
+          {"id": "production-build-served", "says": "The page the preview serves is byte for byte the index.html this run's production build wrote."}
+        ]
+      }
+    },
+    {
+      "id": "access-gate",
+      "session": "arrival",
+      "action": "Open the application, try an access token this instance does not hold, then enter the run's own.",
+      "gates": ["delivery:Release rehearsal"],
+      "requires": ["clean-start"],
+      "owner_area": "access: web/packages/app/src/main.ts (askForAccess) and the API's bearer authentication",
+      "expect": {
+        "page": [
+          {"id": "gate-shown", "says": "The production build shows its credential gate with an access-token field; account sign-in is offered but disabled because this runtime configures none."},
+          {"id": "wrong-token-refused", "says": "A token the instance does not hold is refused at the gate with a stated reason, and no world opens."},
+          {"id": "token-opens-world", "says": "The run's token opens the world: the world title field appears and the shell stops booting."}
+        ]
+      }
+    },
+    {
+      "id": "enter-owned-starter",
+      "session": "arrival",
+      "action": "Arrive with an empty account: the application creates and opens the person's own starter space.",
+      "gates": ["milestone:World entry", "delivery:Usable environment"],
+      "requires": ["access-gate"],
+      "owner_area": "saved-world entry: web/packages/app/src/composition/session-and-geometry.ts and exulanica/api/routes/world_entries.py",
+      "expect": {
+        "page": [
+          {"id": "starter-opens", "says": "The world canvas opens directly with the world title field, the World menu, Add object and Add photos; there is no introductory form."},
+          {"id": "first-use-card", "says": "The first-use card says the world is empty and offers Start building."},
+          {"id": "renderer-mounted", "says": "The canvas reports its engine and at least one mounted world module."}
+        ],
+        "api": [
+          {"id": "one-authored-starter", "says": "GET /world-entries lists exactly one saved world: an authored starter, available, with no source attachments."}
+        ],
+        "reload": [
+          {"id": "same-world-after-reload", "says": "After a reload and the access gate, the same entry, authored version and state open, and no second starter is created."}
+        ]
+      }
+    },
+    {
+      "id": "name-world",
+      "session": "arrival",
+      "action": "Rename the world in its title field and save it.",
+      "gates": ["milestone:World entry", "delivery:Persistence"],
+      "requires": ["enter-owned-starter"],
+      "parameters": {"title": "Rehearsal garden"},
+      "owner_area": "saved-world entry: web/packages/app/src/ui/world-identity.ts and PUT /world-entries/{entry_id}",
+      "expect": {
+        "page": [
+          {"id": "title-saved-shown", "says": "The title status says Saved and the field holds the new title."}
+        ],
+        "api": [
+          {"id": "title-held", "says": "GET /world-entries/{entry_id} holds the new title at a later revision."}
+        ],
+        "reload": [
+          {"id": "title-after-reload", "says": "After a reload the title field holds the new title."}
+        ]
+      }
+    },
+    {
+      "id": "explore-walk",
+      "session": "arrival",
+      "action": "Take the controls by clicking the world, then walk forward with the keyboard and let go.",
+      "gates": ["delivery:Usable environment"],
+      "requires": ["enter-owned-starter"],
+      "parameters": {"hold_milliseconds": 1500, "hold_reason": "Long enough to cover several metres at the walking speed the controls declare, short enough to stay in the first view of the ground."},
+      "owner_area": "movement: web/packages/atlas-react/src/playcanvas/controls.ts and web/packages/app/src/composition/renderer.ts",
+      "expect": {
+        "page": [
+          {"id": "canvas-takes-keys", "says": "Clicking the world gives the world canvas the keyboard."},
+          {"id": "moves-while-held", "says": "The shell reports moving while the forward key is held."},
+          {"id": "stops-when-released", "says": "The shell reports not moving once the key is released."}
+        ]
+      }
+    },
+    {
+      "id": "place-reviewed-object",
+      "session": "creation",
+      "action": "Open Add object, choose the first reviewed object, say it was invented for this world, place it before me and confirm.",
+      "gates": ["milestone:Durable creation", "delivery:Meaningful action"],
+      "requires": ["enter-owned-starter"],
+      "parameters": {"origin_role": "fictional"},
+      "owner_area": "world objects and composition: web/packages/app/src/composition/objects.ts and exulanica/api/routes/world_compositions.py",
+      "expect": {
+        "page": [
+          {"id": "confirm-before-write", "says": "Before anything is written a confirmation says what will be added and that the change is reversible, and Confirm is offered only once the world's check is ready."},
+          {"id": "object-listed", "says": "The object is listed in the objects panel as added, with no motion."}
+        ],
+        "api": [
+          {"id": "object-in-version", "says": "The saved version holds one object made from the chosen reviewed asset, authored and fictional, with a region-local transform, and the saved world resumes at that version's state."}
+        ]
+      }
+    },
+    {
+      "id": "move-object",
+      "session": "creation",
+      "action": "Select the placed object, nudge it with the arrow keys and save the new position.",
+      "gates": ["milestone:Durable creation"],
+      "requires": ["place-reviewed-object"],
+      "parameters": {"presses": 3, "key": "ArrowRight", "presses_reason": "Three nudges, a movement visible at a glance; the step reads the saved transform rather than assuming a nudge's size."},
+      "owner_area": "world objects: web/packages/app/src/composition/objects.ts and POST /world/versions/{version_id}/objects/{object_id}/move",
+      "expect": {
+        "page": [
+          {"id": "move-confirmed", "says": "Saving the position asks for confirmation and then reports the move saved."}
+        ],
+        "api": [
+          {"id": "transform-changed", "says": "The object's saved transform differs from where it was placed, and the newest edit is a move of that object."}
+        ]
+      }
+    },
+    {
+      "id": "inspect-object",
+      "session": "creation",
+      "action": "Open Place & view, unfold World to data and select the placed object.",
+      "gates": ["milestone:Inspection", "delivery:Usable environment"],
+      "requires": ["place-reviewed-object"],
+      "owner_area": "world to data inspection: web/packages/app/src/ui/representation-availability.ts and the representation inspector",
+      "expect": {
+        "page": [
+          {"id": "inspector-shown", "says": "The World to data inspector is visible beside the world."},
+          {"id": "subject-selectable", "says": "The placed object is offered as a subject to inspect."},
+          {"id": "geometry-and-origin", "says": "For that subject the inspector shows its rendered and point geometry and its origin: the reviewed catalog asset and its digest."},
+          {"id": "missing-explicit", "says": "Every representation the object does not have is listed as unavailable with a reason."}
+        ]
+      }
+    },
+    {
+      "id": "give-bounded-motion",
+      "session": "creation",
+      "action": "Give the object motion with the editor's own settings, save it and confirm.",
+      "gates": ["milestone:Bounded interaction"],
+      "requires": ["place-reviewed-object"],
+      "owner_area": "object behaviours: web/packages/app/src/composition/objects.ts and POST /world/versions/{version_id}/objects/{object_id}/behaviour",
+      "expect": {
+        "page": [
+          {"id": "motion-confirmed", "says": "Saving the motion asks for confirmation describing it, then the object reads as still, where it was placed."}
+        ],
+        "api": [
+          {"id": "behaviour-held", "says": "The saved object carries a behaviour the server lists as reviewed, with parameters inside the reviewed bounds."}
+        ]
+      }
+    },
+    {
+      "id": "trigger-stop-reset",
+      "session": "creation",
+      "action": "Start the motion, stop it part-way, then reset it.",
+      "gates": ["milestone:Bounded interaction"],
+      "requires": ["give-bounded-motion"],
+      "owner_area": "object behaviours at runtime: web/packages/atlas-react/src/playcanvas/scene-objects.ts and web/packages/app/src/composition/objects.ts",
+      "expect": {
+        "page": [
+          {"id": "travelling", "says": "Start makes the object read as travelling."},
+          {"id": "stopped-part-way", "says": "Stop holds it part-way."},
+          {"id": "reset-to-rest", "says": "Reset returns it to rest where it was placed."}
+        ],
+        "api": [
+          {"id": "no-write", "says": "Starting, stopping and resetting write nothing: the saved version state is the same before and after."}
+        ]
+      }
+    },
+    {
+      "id": "refuse-unsupported-behaviour",
+      "session": "creation",
+      "action": "Ask the world for a behaviour version the server does not review, as a client would, and read the answer.",
+      "gates": ["milestone:Bounded interaction"],
+      "requires": ["give-bounded-motion"],
+      "owner_area": "object behaviours: exulanica/world/objects.py and exulanica/api/routes/world_objects.py",
+      "expect": {
+        "api": [
+          {"id": "refused-with-reason", "says": "The request is refused with 422 and a detail that names the behaviour as not reviewed."},
+          {"id": "nothing-written", "says": "The saved version state is unchanged by the refused request."}
+        ]
+      }
+    },
+    {
+      "id": "creation-survives-reload",
+      "session": "creation",
+      "action": "Reload the world.",
+      "gates": ["milestone:Durable creation", "milestone:Bounded interaction", "delivery:Persistence"],
+      "requires": ["give-bounded-motion"],
+      "owner_area": "world objects: exulanica/world/object_repository.py and web/packages/app/src/composition/objects.ts",
+      "expect": {
+        "reload": [
+          {"id": "same-version-state", "says": "The saved version's state and edit sequence are the same after the reload."},
+          {"id": "definition-kept", "says": "The object keeps its transform and its motion definition, and the panel lists it at rest with its motion."},
+          {"id": "object-drawn", "says": "The page fetches the object's reviewed bytes again after the reload."}
+        ]
+      }
+    },
+    {
+      "id": "undo-last-change",
+      "session": "creation",
+      "action": "Take back the last change, confirm, and reload.",
+      "gates": ["milestone:Durable creation", "delivery:Persistence"],
+      "requires": ["creation-survives-reload"],
+      "owner_area": "world objects: POST /world/versions/{version_id}/objects/undo and web/packages/app/src/composition/objects.ts",
+      "expect": {
+        "page": [
+          {"id": "undo-confirmed", "says": "Taking back asks for confirmation naming the change, then reports it taken back."}
+        ],
+        "api": [
+          {"id": "undo-is-an-edit", "says": "The undo is appended as a new edit that reverses the newest one, the motion, and the object remains without motion."}
+        ],
+        "reload": [
+          {"id": "undo-kept", "says": "After a reload the version state is the one the undo produced."}
+        ]
+      }
+    },
+    {
+      "id": "change-appearance",
+      "session": "appearance",
+      "action": "Open Customize world, move one design control, and apply the world design.",
+      "gates": ["delivery:Meaningful action"],
+      "requires": ["enter-owned-starter"],
+      "parameters": {"control": "Horizon softness", "value": "0.8", "control_reason": "A range control the reviewed profile exposes; the value only has to differ from the saved one."},
+      "owner_area": "world appearance: web/packages/app/src/ui/options.ts, web/packages/app/src/composition/appearance.ts and the style routes in exulanica/api/routes/world.py",
+      "expect": {
+        "page": [
+          {"id": "preview-validated", "says": "The preview is checked against the saved world and reported ready before it can be applied."},
+          {"id": "applied-as-new-revision", "says": "Applying reports a new immutable version and the history offers it beside the authored revision."}
+        ],
+        "api": [
+          {"id": "new-style-version", "says": "The current style version is new, holds the changed value, and the saved world points at it."}
+        ]
+      }
+    },
+    {
+      "id": "appearance-survives-reload",
+      "session": "appearance",
+      "action": "Reload the world and open Customize world again.",
+      "gates": ["delivery:Persistence"],
+      "requires": ["change-appearance"],
+      "owner_area": "world appearance: web/packages/app/src/composition/appearance.ts and GET /world/styles/current",
+      "expect": {
+        "reload": [
+          {"id": "style-kept", "says": "The saved world still points at the applied version and the control shows the applied value."}
+        ]
+      }
+    },
+    {
+      "id": "restore-original-appearance",
+      "session": "appearance",
+      "action": "In the version history, select the authored revision and restore it; reload.",
+      "gates": ["delivery:Persistence"],
+      "requires": ["change-appearance"],
+      "owner_area": "world appearance: POST /world/styles/rollback and web/packages/app/src/ui/options.ts",
+      "expect": {
+        "page": [
+          {"id": "restored-shown", "says": "The page reports the restore as a new revision and the control returns to the authored value."}
+        ],
+        "api": [
+          {"id": "restored-values", "says": "The current style version is a new rollback version whose values equal the authored revision's."},
+          {"id": "history-kept", "says": "The applied version is still in the history: restoring appended, it did not rewrite."}
+        ],
+        "reload": [
+          {"id": "restore-kept", "says": "After a reload the control shows the authored value."}
+        ]
+      }
+    },
+    {
+      "id": "open-close-photo-intake",
+      "session": "photos",
+      "action": "Open Add photos beside the world, then return to the world.",
+      "gates": ["milestone:World entry"],
+      "requires": ["enter-owned-starter"],
+      "owner_area": "personal photo intake: web/packages/app/src/ui/personal-intake.ts",
+      "expect": {
+        "page": [
+          {"id": "drawer-beside-world", "says": "The photo drawer opens inside the workspace with its upload control."},
+          {"id": "world-kept", "says": "Returning closes the drawer and the same world is open with its title."}
+        ]
+      }
+    },
+    {
+      "id": "upload-synthetic-photographs",
+      "session": "photos",
+      "action": "Upload the run's synthetic photographs as originals from the photo drawer.",
+      "gates": ["milestone:Personal-media path", "milestone:Companion interaction"],
+      "requires": ["open-close-photo-intake"],
+      "owner_area": "personal photo intake: web/packages/app/src/composition/personal-intake.ts and exulanica/api/routes/intake.py",
+      "expect": {
+        "page": [
+          {"id": "originals-listed", "says": "Every uploaded photograph is listed in the drawer for inclusion."}
+        ],
+        "api": [
+          {"id": "captures-accepted", "says": "The intake accepted every photograph with a capture id and the SHA-256 of the bytes drawn for this run."}
+        ]
+      }
+    },
+    {
+      "id": "authorize-admission-in-app",
+      "session": "photos",
+      "action": "In the drawer, state the purpose and authority and authorize personal admission for detection.",
+      "gates": ["milestone:Personal-media path"],
+      "requires": ["upload-synthetic-photographs"],
+      "parameters": {"purpose": "Rehearsal of the first demonstration on synthetic drawings", "authority_basis": "Synthetic drawings made by the rehearsal; no personal photograph", "valid_days": 1},
+      "owner_area": "personal admission: web/packages/app/src/composition/personal-intake.ts and exulanica/api/routes/personal_admission.py",
+      "expect": {
+        "page": [
+          {"id": "receipts-recorded", "says": "The drawer reports the admission receipts recorded."}
+        ],
+        "api": [
+          {"id": "admitted-for-detection", "says": "The admission holds a detection authorization for every uploaded photograph."}
+        ]
+      }
+    },
+    {
+      "id": "grant-model-rights-in-app",
+      "action": "In the drawer, allow the vision, search and Companion models to read these photographs.",
+      "gates": ["milestone:Companion interaction", "milestone:Personal-media path"],
+      "owner_area": "personal admission and model rights UI: web/packages/app/src/ui/personal-intake.ts and web/packages/app/src/composition/personal-intake.ts",
+      "not_available": "The photo drawer's only model-right control is the depth estimate ('Estimate 3D shape from these photos'); nothing in the application grants the vision, embedding or composer rights a grounded answer needs, so the rehearsal grants them through POST /personal-admission in the next step.",
+      "expect": {
+        "page": [
+          {"id": "rights-control", "says": "The drawer offers the vision, embedding and composer model rights for the selected photographs, with their notice, and records them."}
+        ]
+      }
+    },
+    {
+      "id": "grant-model-rights-by-route",
+      "session": "photos",
+      "action": "As the synthetic account holder, grant the vision, embedding and composer rights for the uploaded photographs through POST /personal-admission, the route the drawer posts to, and wait for the work it starts.",
+      "gates": ["milestone:Companion interaction", "milestone:Personal-media path"],
+      "requires": ["upload-synthetic-photographs"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.02",
+      "spend_estimate_source": "The places lane's end-to-end chain on four of these drawings reported 0.00546584 USD for 11 vision and embedding calls (lane data, 2026-09-23); three photographs here, doubled for a second pass.",
+      "parameters": {"roles": ["vision", "embedding", "reasoning_cheap"], "purpose": "Rehearsal of the first demonstration: a place read from a sign in synthetic drawings, confirmed and asked about", "authority_basis": "Synthetic drawings made by the rehearsal from the place proposal experiment's scene generator; no personal photograph", "valid_days": 1, "job_wait_seconds": 420, "job_wait_reason": "Twice the slowest vision job measured on these drawings (58 s) for each of the two jobs, with room for a queue."},
+      "owner_area": "personal admission and the vision stage: exulanica/ingest/personal_admission.py, exulanica/ingest/stages/vision.py and exulanica/ingest/place_proposal.py",
+      "expect": {
+        "api": [
+          {"id": "rights-recorded", "says": "The admission receipts carry a current model right for every requested role on every photograph."},
+          {"id": "vision-ran", "says": "Every derivative job ends succeeded and the workspace's job metrics report model calls and their cost."},
+          {"id": "place-proposed", "says": "The graph holds a place occurrence for each photograph whose sign names the place, and none for the photograph with no text."}
+        ]
+      }
+    },
+    {
+      "id": "confirm-proposed-place",
+      "session": "photos",
+      "action": "Name the proposed place as the person knows it and confirm that the other photograph shows the same place, through the identity routes; then read the Library.",
+      "gates": ["milestone:Companion interaction"],
+      "requires": ["grant-model-rights-by-route"],
+      "parameters": {"display_name": "Mireland Hall"},
+      "owner_area": "place identity: exulanica/api/routes/identity.py; the Library: web/packages/app/src/ui (index)",
+      "expect": {
+        "api": [
+          {"id": "place-named", "says": "POST /identity/name makes a place entity with the person's name from the first place occurrence, and POST /identity/confirm links every other one."}
+        ],
+        "page": [
+          {"id": "library-lists-place", "says": "The Library lists the place under the person's name with every confirmed occurrence."}
+        ]
+      }
+    },
+    {
+      "id": "ask-grounded-question",
+      "session": "companion",
+      "action": "Open the Companion and ask, in words, what the sign says at the place.",
+      "gates": ["milestone:Companion interaction", "delivery:Meaningful action"],
+      "requires": ["confirm-proposed-place"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.01",
+      "spend_estimate_source": "The Companion place-link record reports 0.00282130 USD for three answered questions in the browser (docs/evaluation/2026-09-23-companion-place-link-outcome.json, spend.reported_usd.browser_final); one question here, with the appearance classifier in front of it.",
+      "parameters": {"question": "What does the sign say at Mireland Hall?", "expected_words": ["MIRELAND", "HALL"]},
+      "owner_area": "Companion answers: exulanica/selection/question.py, web/packages/app/src/composition/companion.ts and web/packages/app/src/ui/companion-speech.ts",
+      "expect": {
+        "page": [
+          {"id": "answer-shown", "says": "The Companion shows an answer, not a failure, whose own sentences state what the sign says."},
+          {"id": "names-restored", "says": "The answer names the place as the person saved it; no placeholder such as [place A] is shown."},
+          {"id": "executed-model-shown", "says": "The answer says which model answered and how long it took."},
+          {"id": "citation-offered", "says": "The answer offers the photograph it rests on."}
+        ],
+        "api": [
+          {"id": "grounded-execution", "says": "POST /selection/ask answered with at least one clause citing evidence; its execution block names the model that composed the answer, and every call's role, requested model and cost."}
+        ]
+      }
+    },
+    {
+      "id": "open-cited-photograph",
+      "session": "companion",
+      "action": "Open the photograph the answer cites.",
+      "gates": ["milestone:Companion interaction"],
+      "requires": ["ask-grounded-question"],
+      "owner_area": "Companion evidence: web/packages/app/src/composition/companion.ts and GET /evidence/{span_id}/masked",
+      "expect": {
+        "page": [
+          {"id": "photograph-shown", "says": "The cited photograph is drawn inside the Companion."}
+        ],
+        "api": [
+          {"id": "evidence-served", "says": "The evidence route the citation reaches answers 200 with an image."}
+        ]
+      }
+    },
+    {
+      "id": "unanswerable-question-abstains",
+      "session": "companion",
+      "action": "Ask about a place no photograph shows.",
+      "gates": ["milestone:Companion interaction"],
+      "requires": ["ask-grounded-question"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.01",
+      "spend_estimate_source": "As for ask-grounded-question: the planner and classifier calls of one question, and at most one composer call.",
+      "parameters": {"question": "What does the sign say at Harbour Station?", "absent_words": ["HARBOUR"]},
+      "owner_area": "Companion answers: exulanica/selection/question.py and exulanica/selection/answer.py",
+      "expect": {
+        "page": [
+          {"id": "missing-said", "says": "The Companion says it has no evidence for that, or answers without claiming anything about the absent place."}
+        ],
+        "api": [
+          {"id": "nothing-cited-for-absent-place", "says": "No clause of the answer cites a photograph as showing the absent place."}
+        ]
+      }
+    },
+    {
+      "id": "companion-proposes-appearance-change",
+      "session": "companion",
+      "action": "Ask the Companion, in words, to change how the world looks, then open Customize world to review the proposal.",
+      "gates": ["milestone:Companion interaction", "delivery:Meaningful action"],
+      "requires": ["enter-owned-starter"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.01",
+      "spend_estimate_source": "One classifier and at most two drafting calls of the structured-extraction role; the places lane's classifier call reported 0.00011780 USD (lane data, 2026-09-23).",
+      "parameters": {"utterance": "Make the horizon softer and the colours warmer"},
+      "owner_area": "Companion appearance proposals: POST /selection/appearance (exulanica/api/routes/selection.py, exulanica/selection/proposal.py) and web/packages/app/src/composition/appearance.ts",
+      "expect": {
+        "page": [
+          {"id": "proposal-offered", "says": "The Companion answers with a proposed change and says nothing has changed yet."},
+          {"id": "proposal-ready-in-customize", "says": "Customize world holds the Companion's proposal, validated and ready to apply."}
+        ],
+        "api": [
+          {"id": "proposal-drafted", "says": "POST /selection/appearance classified the request as an appearance change and returned a proposal with its execution block."}
+        ]
+      }
+    },
+    {
+      "id": "developer-client-walkthrough",
+      "session": "developer-client",
+      "action": "Run the standard-library developer client against the same API: discover what the server supports, read the person's saved world, place a reviewed object with bounded motion, and ask for a behaviour the server does not list.",
+      "gates": ["milestone:Developer proof", "delivery:Independent use"],
+      "requires": ["enter-owned-starter"],
+      "parameters": {"place_mm": "0,0,0", "place_reason": "The region origin, where the recorded developer-client run placed its object and the application drew it in its first view.", "object_id": "rehearsal:developer-client", "origin_role": "fictional"},
+      "owner_area": "developer client and World API: clients/python/exulanica_client and the world routes",
+      "expect": {
+        "api": [
+          {"id": "discovers-capabilities", "says": "The client finds placing an object and setting a behaviour among the edits the server documents."},
+          {"id": "reads-the-saved-version", "says": "The client reads the person's saved world at the version and state the application saved."},
+          {"id": "unsupported-edit-refused", "says": "The unlisted behaviour is refused with 422 and the server's reason."},
+          {"id": "accepted-edit-confirmed", "says": "The client's placement and motion are accepted, and every check its fresh read makes holds."}
+        ]
+      }
+    },
+    {
+      "id": "returning-user-reopens",
+      "session": "return",
+      "action": "Open the application again in a new browser session and enter.",
+      "gates": ["milestone:World entry", "milestone:Developer proof", "delivery:Persistence"],
+      "requires": ["name-world"],
+      "owner_area": "saved-world entry and reopening: web/packages/app/src/composition/session-and-geometry.ts",
+      "expect": {
+        "page": [
+          {"id": "saved-world-opens", "says": "The saved world opens with its saved title; no second starter is created."},
+          {"id": "objects-as-saved", "says": "The objects panel lists exactly the objects the saved version holds, the developer client's among them when that step placed one."},
+          {"id": "appearance-as-saved", "says": "Customize world shows the style version the saved world points at."}
+        ],
+        "api": [
+          {"id": "resume-point-current", "says": "The saved world's resume point is its version's current state."}
+        ]
+      }
+    },
+    {
+      "id": "reconstruct-scene-geometry",
+      "action": "Turn the admitted photographs into scene geometry, inspect its coverage and open it inside the world with the authored changes kept.",
+      "gates": ["milestone:Personal-media path"],
+      "owner_area": "scene reconstruction: docs/capabilities/scene-reconstruction.md and the scene jobs",
+      "not_available": "No control in the application produces scene geometry from admitted photographs. Multi-view reconstruction runs as a scheduled job on GPU compute outside this runtime, and a photograph's point map is placed only through the World API; both also need a person's review of each photograph, which a rehearsal cannot truthfully give.",
+      "expect": {
+        "page": [
+          {"id": "geometry-opens", "says": "The reconstructed geometry opens in the world beside the authored changes, with its actual coverage shown."}
+        ]
+      }
+    },
+    {
+      "id": "observe-a-person-and-footage",
+      "action": "Watch a person use the experience from a clean start and record the demonstration footage.",
+      "gates": ["delivery:Release rehearsal"],
+      "owner_area": "the operator's release rehearsal",
+      "not_available": "A person's use of the experience and the demonstration footage are observed and recorded by a person; this rehearsal keeps a screenshot of each step as its own record.",
+      "expect": {
+        "page": [
+          {"id": "person-completes-journey", "says": "A person completes the journey unaided and the footage shows each gate's step."}
+        ]
+      }
+    }
+  ]
+}
