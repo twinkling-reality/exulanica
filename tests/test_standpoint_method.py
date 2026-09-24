@@ -14,8 +14,18 @@ import math
 import uuid
 from typing import ClassVar
 
-import numpy as np
 import pytest
+
+#: numpy and scipy arrive with the `reconstruction` extra, which a plain `uv sync` does not install,
+#: and the join and its fixtures import both; unguarded, one import stops the whole collection.
+pytest.importorskip(
+    "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+)
+pytest.importorskip(
+    "scipy", reason="scipy is absent; install it with `uv sync --extra reconstruction`"
+)
+
+import numpy as np
 from exulanica.canonical import sha256_of_canonical
 from exulanica.ingest.stages import stage
 from exulanica.reconstruction.standpoint import (
