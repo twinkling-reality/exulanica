@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 from model_fakes import FakeTransport
 from test_companion_saved_names import named
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -42,6 +43,8 @@ AUTH = {"Authorization": f"Bearer {OWNER}"}
 class Site:
     http: TestClient
     transport: FakeTransport
+    #: The world the Companion is asked in.
+    world_id: str
 
 
 @pytest.fixture
@@ -53,6 +56,7 @@ def site(named, spine_schema, tmp_path, monkeypatch) -> Iterator[Site]:
     """
     repository, store, session, _ = named
     provision_workspace(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
     monkeypatch.setenv(
         "EXULANICA_API_TOKENS",
         json.dumps(
@@ -76,7 +80,7 @@ def site(named, spine_schema, tmp_path, monkeypatch) -> Iterator[Site]:
         model_client=ModelClient(api_key="test-key-not-real", transport=transport),
     )
     with TestClient(create_app(services, verify=False), raise_server_exceptions=False) as http:
-        yield Site(http, transport)
+        yield Site(http, transport, world_id)
 
 
 def test_a_request_the_account_holders_rules_refuse_as_it_leaves_is_a_named_conflict(
@@ -97,7 +101,7 @@ def test_a_request_the_account_holders_rules_refuse_as_it_leaves_is_a_named_conf
     plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query="running club")
 
     response = site.http.post(
-        "/selection/ask",
+        f"/selection/ask?world_id={site.world_id}",
         headers=AUTH,
         json={
             "question": "Where does the running club meet?",

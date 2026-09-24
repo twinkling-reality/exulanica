@@ -5,12 +5,15 @@ has its base URL, authentication and timeout policy configured::
 
     outcome = read_experiment_result(
         http,
+        world_id=world_id,
         version_id=version_id,
         experiment_id=experiment_id,
         attempt_id=attempt_id,
     )
 
-The client performs two identity-encoded GET requests. It never prepares, reserves, executes or
+``world_id`` is the world the version belongs to, which both requests name, as every world route
+requires, and which the definition must name too. The client performs two identity-encoded GET
+requests. It never prepares, reserves, executes or
 finalizes work and never fetches checkpoint or execution evidence. A ``valid`` outcome contains
 exact raw metric numerators and denominators, not an interpretation of benefit or statistical
 significance. The byte ceiling applies when the supplied client and transport preserve lazy
@@ -23,6 +26,7 @@ import hashlib
 import json
 import re
 import uuid
+from urllib.parse import quote
 from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager
 from copy import deepcopy
@@ -213,7 +217,7 @@ def _canonical_sha256(value: dict[str, Any]) -> str:
 
 
 def _validate_definition(
-    body: dict[str, Any], version_id: uuid.UUID, experiment_id: uuid.UUID
+    body: dict[str, Any], world_id: str, version_id: uuid.UUID, experiment_id: uuid.UUID
 ) -> tuple[str, int, int]:
     _fields(
         body,
@@ -244,8 +248,8 @@ def _validate_definition(
         _identifier(body["source_society_id"], "source_society_id")
     except ValueError as exc:
         raise MalformedExperimentResponse("definition source_society_id is not a UUID") from exc
-    if not isinstance(body["world_id"], str) or not body["world_id"]:
-        raise MalformedExperimentResponse("definition world_id is empty")
+    if body["world_id"] != world_id:
+        raise MalformedExperimentResponse("definition world_id does not match the requested world")
     definition_sha256 = _digest(body["definition_sha256"], "definition_sha256")
     baseline_seq = _strict_int(body["baseline_input_seq"], "baseline_input_seq", positive=True)
     treatment_seq = _strict_int(body["treatment_input_seq"], "treatment_input_seq", positive=True)
@@ -522,25 +526,31 @@ def _validate_result(
 def read_experiment_result(
     http: HTTPClient,
     *,
+    world_id: str,
     version_id: uuid.UUID | str,
     experiment_id: uuid.UUID | str,
     attempt_id: uuid.UUID | str,
 ) -> ExperimentOutcome:
     """Read, bind and validate one compact attempt without interpreting its causal meaning."""
+    if not isinstance(world_id, str) or not world_id:
+        raise ValueError("world_id must name the world the version belongs to")
     version = _identifier(version_id, "version_id")
     experiment = _identifier(experiment_id, "experiment_id")
     attempt = _identifier(attempt_id, "attempt_id")
     root = f"/world/versions/{version}/society/experiments/{experiment}"
-    definition_body, available = _get(http, root, limit=DEFINITION_LIMIT)
+    in_world = f"?world_id={quote(world_id, safe='')}"
+    definition_body, available = _get(http, root + in_world, limit=DEFINITION_LIMIT)
     if not available:
         return ExperimentOutcome(
             "unavailable", version, experiment, attempt, problem=_freeze(definition_body)
         )
     definition_sha256, expected_population, expected_followup_ticks = _validate_definition(
-        definition_body, version, experiment
+        definition_body, world_id, version, experiment
     )
 
-    attempt_body, available = _get(http, f"{root}/attempts/{attempt}", limit=ATTEMPT_LIMIT)
+    attempt_body, available = _get(
+        http, f"{root}/attempts/{attempt}{in_world}", limit=ATTEMPT_LIMIT
+    )
     if not available:
         return ExperimentOutcome(
             "unavailable",

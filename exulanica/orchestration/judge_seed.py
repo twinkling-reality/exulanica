@@ -1306,16 +1306,23 @@ def prepare_sandbox_world(
     actor: uuid.UUID,
     title: str = "Judge sandbox",
 ) -> dict[str, Any]:
-    """Open the sandbox through the same source-preserving path as the product route."""
+    """Open the sandbox through the same source-preserving path as the product route.
+
+    The sandbox branches from the seeded workspace's personal-source world, which the registry
+    names; a seed whose workspace holds none, or several, is refused by name.
+    """
     from exulanica.world.bootstrap import bootstrap_world
     from exulanica.world.repository import WorldStyleRepository
+    from exulanica.world.worlds import resolve_personal_source_world
 
+    world_id = resolve_personal_source_world(connection, workspace_id)
     return bootstrap_world(
         connection,
         workspace_id=workspace_id,
         actor=actor,
         title=title,
+        world_id=world_id,
         base_topology_digest=WorldStyleRepository(
-            connection, workspace_id
+            connection, workspace_id, world_id=world_id
         ).current_topology_digest(),
     )

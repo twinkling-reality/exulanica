@@ -268,11 +268,11 @@ export function mountEnvironmentSelection(
   const districtAbort = new AbortController();
   const districtClient = deps.societyDistrictClient ?? new SocietyDistrictClient({ ...deps.credentials, signal: districtAbort.signal });
   const controlAbort = new AbortController();
-  // A saved world's playback lives in that world, so its requests name it.
+  // Every society request names the open world. The preview has none, and sends none.
   const mountedEntry = deps.env.preview ? null : deps.state.activeWorldEntry;
+  const openWorldId = mountedEntry?.worldId ?? null;
   const controlClient = deps.societyControlClient ?? new SocietyControlClient({
-    ...deps.credentials, signal: controlAbort.signal,
-    ...(mountedEntry?.authoredScene == null ? {} : { worldId: mountedEntry.worldId }),
+    ...deps.credentials, signal: controlAbort.signal, worldId: openWorldId,
   });
   let districtView: SocietyDistrictView | null = null;
   let districtEpoch = 0;
@@ -394,7 +394,7 @@ export function mountEnvironmentSelection(
     // Existing destination buttons already open this inspector. When the place declares a
     // visit/rest affordance, mount the directed-action control that posts to record_action.
     if (destination && !deps.env.preview) {
-      const actionClient = deps.societyClient ?? new SocietyClient(deps.credentials);
+      const actionClient = deps.societyClient ?? new SocietyClient({ ...deps.credentials, worldId: openWorldId });
       directedAction = buildSocietyDirectedAction({
         client: actionClient,
         getSnapshot: () => society,
@@ -1551,7 +1551,7 @@ export function mountEnvironmentSelection(
         await refreshDistrict();
         if ((phase as string) === 'disposed') return;
         liveSociety = createLiveSociety({
-          preview: false, credentials: deps.credentials, versionId: current.versionId,
+          preview: false, credentials: deps.credentials, worldId: current.worldId, versionId: current.versionId,
           placeId: catalog.placeId, regionId: String(deps.scene.islands[0]!.islandId),
           ...(deps.societyClient ? { client: deps.societyClient } : {}),
           onChange: reflectLiveSociety,

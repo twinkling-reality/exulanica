@@ -29,21 +29,27 @@ def _urn(kind: str, value: object) -> str:
     return f"urn:exulanica:wmp:{kind}:{hashlib.sha256(f'{kind}:{value}'.encode()).hexdigest()}"
 
 
-def _export(repository, output: Path, *, extensions=(), store=None):
+def _export(repository, output: Path, *, world_id: str, extensions=(), store=None):
     return project_world_package(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         output=output,
         private_key=Ed25519PrivateKey.generate(),
+        world_id=world_id,
         extensions=extensions,
         store=store,
     )
 
 
 def test_authored_world_1_0_without_environments_still_verifies(repository, tmp_path: Path):
-    _one_version_one_object(repository, tmp_path)
-    result = _export(repository, tmp_path / "authored.wmp", extensions=[authored.EXTENSION_KEY])
+    objects, _snapshot, _version = _one_version_one_object(repository, tmp_path)
+    result = _export(
+        repository,
+        tmp_path / "authored.wmp",
+        extensions=[authored.EXTENSION_KEY],
+        world_id=objects.world_id,
+    )
     report = verify_package(result.output)
     [finding] = report.extensions
     assert finding.extension == authored.EXTENSION_NAME
@@ -60,6 +66,7 @@ def test_environment_instance_round_trips_through_a_signed_package(repository, t
         tmp_path / "environment.wmp",
         extensions=[environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     report = verify_package(result.output)
     [finding] = report.extensions
@@ -108,6 +115,7 @@ def test_undone_environment_addition_is_omitted_from_the_exported_delta(
         tmp_path / "undone-environment.wmp",
         extensions=[environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     world = verify_package(result.output).extensions[0].environment_instances
     packaged = next(item for item in world.versions if item["title"] == "Environment study")
@@ -127,6 +135,7 @@ def test_withdrawn_instances_are_exported_with_honest_availability(repository, t
         tmp_path / "withdrawn.wmp",
         extensions=[environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     [packaged] = verify_package(result.output).extensions[0].environment_instances.versions
     assert packaged["environment_availability"] == [
@@ -146,6 +155,7 @@ def test_unavailable_bytes_are_exported_without_substitute_geometry(repository, 
         tmp_path / "unavailable.wmp",
         extensions=[environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     [packaged] = verify_package(result.output).extensions[0].environment_instances.versions
     assert packaged["environment_availability"] == [
@@ -160,7 +170,12 @@ def test_authored_world_1_0_alone_refuses_a_version_that_has_environments(
     composed = _composed_over(repository, tmp_path, structural_candidate())
     _add(composed, composed.placement("environment:plaza"))
     with pytest.raises(PackageError, match="cannot export versions whose state includes"):
-        _export(repository, tmp_path / "pretend.wmp", extensions=[authored.EXTENSION_KEY])
+        _export(
+            repository,
+            tmp_path / "pretend.wmp",
+            extensions=[authored.EXTENSION_KEY],
+            world_id=composed.worlds.world_id,
+        )
 
 
 def test_dual_export_keeps_schema_v1_in_authored_world_and_environments_in_the_other(
@@ -168,7 +183,7 @@ def test_dual_export_keeps_schema_v1_in_authored_world_and_environments_in_the_o
 ):
     composed = _composed_over(repository, tmp_path, structural_candidate())
     env_version = _add(composed, composed.placement("environment:plaza"))
-    objects = _reviewed_objects(repository, tmp_path)
+    objects = _reviewed_objects(repository, tmp_path, world_id=composed.worlds.world_id)
     object_version = objects.create_version(
         source_snapshot_id=env_version.source_snapshot_id,
         title="Lantern only",
@@ -191,6 +206,7 @@ def test_dual_export_keeps_schema_v1_in_authored_world_and_environments_in_the_o
         tmp_path / "dual.wmp",
         extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     report = verify_package(result.output)
     by_name = {finding.extension: finding for finding in report.extensions}
@@ -255,6 +271,7 @@ def test_dual_export_of_an_authored_parent_and_environment_child_verifies(
         tmp_path / "parent-child-dual.wmp",
         extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     report = verify_package(result.output)
     by_name = {finding.extension: finding for finding in report.extensions}
@@ -300,6 +317,7 @@ def test_dual_export_closes_a_multi_hop_schema_v1_ancestor_chain(repository, tmp
         tmp_path / "multi-hop-dual.wmp",
         extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     report = verify_package(result.output)
     by_name = {finding.extension: finding for finding in report.extensions}
@@ -338,6 +356,7 @@ def test_an_incapable_loader_omits_a_parent_child_dual_rather_than_inferring_aut
         tmp_path / "parent-child-omit.wmp",
         extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     report = verify_package(result.output)
     by_name = {finding.extension: finding for finding in report.extensions}
@@ -387,6 +406,7 @@ def test_environment_only_export_includes_the_authored_parent_the_child_names(
         tmp_path / "parent-child-env.wmp",
         extensions=[environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     assert not (result.output / authored.EXTENSION_DIR).exists()
     world = verify_package(result.output).extensions[0].environment_instances
@@ -418,7 +438,7 @@ def test_dual_export_of_a_child_whose_parent_stayed_environment_bearing_after_un
         title="Lantern only",
         created_by=uuid.uuid4(),
     )
-    lantern = _reviewed_objects(repository, tmp_path).add_object(
+    lantern = _reviewed_objects(repository, tmp_path, world_id=composed.worlds.world_id).add_object(
         lantern.version_id,
         AuthoredObject(
             object_id="object:lantern",
@@ -435,6 +455,7 @@ def test_dual_export_of_a_child_whose_parent_stayed_environment_bearing_after_un
         tmp_path / "undone-parent-child.wmp",
         extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     report = verify_package(result.output)
     by_name = {finding.extension: finding for finding in report.extensions}
@@ -469,6 +490,7 @@ def test_dual_export_omits_authored_world_when_every_kept_version_is_environment
         tmp_path / "all-env-dual.wmp",
         extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     assert not (result.output / authored.EXTENSION_DIR).exists()
     assert authored.EXTENSION_KEY not in result.extensions
@@ -484,12 +506,13 @@ def test_a_1_0_package_payload_is_unchanged_when_only_the_environment_extension_
 ):
     composed = _composed_over(repository, tmp_path, structural_candidate())
     _add(composed, composed.placement("environment:plaza"))
-    plain = _export(repository, tmp_path / "plain.wmp")
+    plain = _export(repository, tmp_path / "plain.wmp", world_id=composed.worlds.world_id)
     extended = _export(
         repository,
         tmp_path / "extended.wmp",
         extensions=[environments.EXTENSION_KEY],
         store=composed.store,
+        world_id=composed.worlds.world_id,
     )
     for path in sorted(plain.output.rglob("*.json")):
         relative = str(path.relative_to(plain.output))

@@ -19,6 +19,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlencode
 
 import pytest
 from exulanica.api.app import create_app
@@ -30,6 +31,7 @@ from fastapi.testclient import TestClient
 
 from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -77,10 +79,16 @@ class Chain:
     workspace_id: uuid.UUID
     inbox: Path
     snapshot_id: uuid.UUID
+    #: The registered world the snapshot belongs to, which every world route is told.
+    world_id: str
 
     @property
     def headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {TOKEN}"}
+
+    def in_world(self, path: str) -> str:
+        """``path`` naming this chain's world, as a world route requires."""
+        return f"{path}{'&' if '?' in path else '?'}{urlencode({'world_id': self.world_id})}"
 
     def post(self, path: str, body: dict) -> object:
         return self.client.post(path, json=body, headers=self.headers)
@@ -98,7 +106,10 @@ class Chain:
 def chain(repository, spine_schema, tmp_path, monkeypatch):
     _psycopg, scratch = spine_schema
     actor = uuid.uuid4()
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     preview = structures.preview(structural_candidate(), proposed_by=actor)
     snapshot = structures.apply(
         preview.preview_id,
@@ -135,7 +146,7 @@ def chain(repository, spine_schema, tmp_path, monkeypatch):
         environment_admission_root=inbox_root,
     )
     with TestClient(create_app(services, verify=False)) as client:
-        yield Chain(client, repository.workspace_id, inbox, snapshot.snapshot_id)
+        yield Chain(client, repository.workspace_id, inbox, snapshot.snapshot_id, world_id)
 
 
 def declare_place(chain: Chain) -> dict:
@@ -293,7 +304,7 @@ def test_the_scene_addressed_place_read_says_the_frame_was_declared(chain, admit
     ``tests/test_world_read_route.py`` holds unchanged.
     """
     place, _admission_id, _render, _catalog = admitted
-    response = chain.get(f"/world-read/places/{place['place_id']}")
+    response = chain.get(chain.in_world(f"/world-read/places/{place['place_id']}"))
     assert response.status_code == 424, response.text
     assert response.json()["code"] == "place_frame_is_declared"
     assert "recovered scene frames only" in response.json()["detail"]
@@ -304,7 +315,8 @@ def test_an_admitted_environment_composes_into_an_authored_version(chain, admitt
     feature = catalog["features"][0]
 
     created = chain.post(
-        "/world/versions", {"title": "District study", "source_snapshot_id": str(chain.snapshot_id)}
+        chain.in_world("/world/versions"),
+        {"title": "District study", "source_snapshot_id": str(chain.snapshot_id)},
     )
     assert created.status_code == 201, created.text
     version = created.json()
@@ -343,7 +355,8 @@ def test_an_admitted_environment_composes_into_an_authored_version(chain, admitt
         },
     }
 
-    previewed = chain.post(f"/world/versions/{version['version_id']}/compositions/preview", body)
+    path = f"/world/versions/{version['version_id']}"
+    previewed = chain.post(chain.in_world(f"{path}/compositions/preview"), body)
     assert previewed.status_code == 200, previewed.text
     verdict = previewed.json()
     assert verdict["availability"] == "ready", verdict
@@ -354,9 +367,9 @@ def test_an_admitted_environment_composes_into_an_authored_version(chain, admitt
     assert document["source"]["place_id"] == place["place_id"]
     assert document["source"]["frame"]["name"] == FRAME_NAME
 
-    applied = chain.post(f"/world/versions/{version['version_id']}/compositions/apply", body)
+    applied = chain.post(chain.in_world(f"{path}/compositions/apply"), body)
     assert applied.status_code == 201, applied.text
-    stored = chain.get(f"/world/versions/{version['version_id']}")
+    stored = chain.get(chain.in_world(path))
     assert stored.status_code == 200
     instances = stored.json()["environment_instances"]
     assert [instance["instance_id"] for instance in instances] == ["environment:corner-block"]
@@ -389,7 +402,7 @@ def test_the_same_place_answers_a_cross_content_selection(chain, admitted, repos
     assert bridged.status_code == 201, bridged.text
 
     selected = chain.post(
-        "/selection",
+        chain.in_world("/selection"),
         {
             "intent": "content",
             "place": {"ids": [str(entity_id)]},

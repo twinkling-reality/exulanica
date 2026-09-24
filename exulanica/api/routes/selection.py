@@ -33,6 +33,7 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
 )
+from exulanica.api.world_scope import WorldId
 from exulanica.environment import (
     EnvironmentOperationDenied,
     EnvironmentResourceWithdrawn,
@@ -76,6 +77,7 @@ from exulanica.world import (
     WorldNotConfigured,
     WorldStyleRepository,
 )
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/selection", tags=["selection"])
 
@@ -310,12 +312,15 @@ def resolve_selection(
     request: Request,
     connection: ReadOnlyConnection,
     session: CurrentSession,
+    world_id: WorldId,
 ) -> SelectionView:
+    require_world(connection, session.workspace_id, world_id)
     validated = validate(connection, plan, session)
     return _view(
         execute(
             connection,
             validated,
+            world_id=world_id,
             store=get_services(request).store,
             society_authorizer=_society_authorizer(request, connection, session),
         )
@@ -405,7 +410,9 @@ def ask(
     request: Request,
     connection: ReadOnlyConnection,
     session: CurrentSession,
+    world_id: WorldId,
 ) -> AnswerView:
+    require_world(connection, session.workspace_id, world_id)
     plan = body.plan
     city_clause: AnswerClause | None = None
     if body.city_context is not None:
@@ -440,6 +447,7 @@ def ask(
         client,
         body.question,
         session,
+        world_id=world_id,
         plan=plan,
         store=get_services(request).store,
         society_authorizer=_society_authorizer(request, connection, session),
@@ -495,7 +503,11 @@ def _city_selection(
 
 @router.post("/packet", summary="The evidence a Selection would offer, without composing text.")
 def packet(
-    plan: SelectionPlan, request: Request, connection: ReadOnlyConnection, session: CurrentSession
+    plan: SelectionPlan,
+    request: Request,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: WorldId,
 ) -> dict[str, Any]:
     """The deterministic half of the answer path, exposed on its own.
 
@@ -503,10 +515,12 @@ def packet(
     and useful to an evaluation run, which needs the retrieval measured separately from the
     composition.
     """
+    require_world(connection, session.workspace_id, world_id)
     validated = validate(connection, plan, session)
     result = execute(
         connection,
         validated,
+        world_id=world_id,
         store=get_services(request).store,
         society_authorizer=_society_authorizer(request, connection, session),
     )
@@ -785,18 +799,32 @@ def appearance(
     request: Request,
     connection: ReadOnlyConnection,
     session: CurrentSession,
+    world_id: WorldId,
 ) -> AppearanceView:
     client = _require_model(request, connection, session)
+    require_world(connection, session.workspace_id, world_id)
     current: StyleReference | None = None
     try:
-        current = WorldStyleRepository(connection, session.workspace_id).current().global_style
+        current = (
+            WorldStyleRepository(connection, session.workspace_id, world_id=world_id)
+            .current()
+            .global_style
+        )
     except WorldNotConfigured:
         # Left as None and refused inside `propose_appearance`, rather than raised as a 409.
         # A person who asked for a warmer world on a workspace with no reviewed world is owed a
         # sentence, and `world_not_configured` on a route they did not know they were calling
         # is not one. The classifier still runs, so the answer path still gets its utterance.
         current = None
-    outcome = propose_appearance(connection, client, body.utterance, session, current=current)
+    outcome = propose_appearance(
+        connection,
+        client,
+        body.utterance,
+        session,
+        current=current,
+        world_id=world_id,
+        store=get_services(request).store,
+    )
     return AppearanceView(
         classification=outcome.kind.value,
         proposal=(

@@ -83,7 +83,6 @@ from exulanica.world.interaction import (
 )
 from exulanica.world.interaction_repository import WorldInteractionPolicyRepository
 from exulanica.world.models import (
-    DEFAULT_WORLD_ID,
     ProposalOrigin,
     ProposalProvenance,
     SourceMediaState,
@@ -166,7 +165,6 @@ from exulanica.world.style_structure import (
 __all__ = [
     "CC0_LICENCE_ID",
     "CC0_LICENCE_TEXT",
-    "DEFAULT_WORLD_ID",
     "ENVIRONMENT_INSTANCE_ID_PATTERN",
     "GLB_MEDIA_TYPE",
     "INTERACTION_POLICY_REGISTRY",

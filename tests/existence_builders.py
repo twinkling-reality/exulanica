@@ -43,7 +43,6 @@ from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepository
 from exulanica.world.assets import reviewed_assets
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society_experiments import DEVELOPMENT_SEEDS
 
 from conftest import (
@@ -57,8 +56,12 @@ from social_society_fixtures import social_input
 from society_fixtures import SEED
 from society_living_fixtures import grid_input
 from test_material_recipes import _small
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 ROOT = Path(__file__).resolve().parents[1]
+#: The owner's world. The stranger's workspace holds a world by the same id, so a world route a
+#: stranger is sent to reaches its own lookup rather than stopping at a world the stranger lacks.
+WORLD = FIXTURE_WORLD_ID
 #: The topology the owner's world is composed over, with one source slot so a source id exists.
 TOPOLOGY = "existence-topology"
 #: The region every authored thing in the owner's world is placed in.
@@ -72,6 +75,11 @@ LIVING = "exulanica-society/v4"
 def _ok(response, *expected: int) -> Any:
     assert response.status_code in expected, (response.status_code, response.text)
     return response.json() if response.content else None
+
+
+def in_world(owner, method: str, path: str, **kwargs):
+    """A request to a world route with the owner's token, in the owner's world (API)."""
+    return owner.request(method, path, params={"world_id": WORLD}, **kwargs)
 
 
 # -- the photograph and what ingest makes of it -----------------------------------------------
@@ -140,7 +148,10 @@ def world(owner) -> dict[str, Any]:
     """The owner's composed world: a topology with one source slot, bootstrapped (API)."""
     if "world" not in owner.memo:
         source_id = uuid.uuid4()
-        WorldStyleRepository(owner.repository.connection, owner.workspace_id).register_topology(
+        registered_world(owner.repository.connection, owner.workspace_id, WORLD, actor=owner.actor)
+        WorldStyleRepository(
+            owner.repository.connection, owner.workspace_id, world_id=WORLD
+        ).register_topology(
             TopologyContract(
                 TOPOLOGY,
                 (REGION,),
@@ -153,11 +164,12 @@ def world(owner) -> dict[str, Any]:
                         missing_reason="no evidence was recorded",
                     ),
                 ),
+                world_id=WORLD,
             )
         )
         booted = _ok(
-            owner.request(
-                "POST", "/world/versions/bootstrap", json={"base_topology_digest": TOPOLOGY}
+            in_world(
+                owner, "POST", "/world/versions/bootstrap", json={"base_topology_digest": TOPOLOGY}
             ),
             200,
         )
@@ -177,7 +189,8 @@ def _version_with_society(owner, profile: str, document) -> dict[str, Any]:
     """A new version of the owner's world holding a society of ``profile`` (API)."""
     snapshot = world(owner)["snapshot_id"]
     version = _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             "/world/versions",
             json={"title": f"existence {profile}", "source_snapshot_id": snapshot},
@@ -187,7 +200,8 @@ def _version_with_society(owner, profile: str, document) -> dict[str, Any]:
     version_id = uuid.UUID(version["version_id"])
     owner.society_inputs[version_id] = document(version_id)
     society = _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             f"/world/versions/{version_id}/society",
             json={
@@ -205,7 +219,8 @@ def _version_with_society(owner, profile: str, document) -> dict[str, Any]:
 def _plain_version(owner) -> uuid.UUID:
     """A new version of the owner's world with no society in it (API)."""
     version = _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             "/world/versions",
             json={"title": "existence", "source_snapshot_id": world(owner)["snapshot_id"]},
@@ -236,10 +251,10 @@ def avatar(owner) -> uuid.UUID:
 
     version_id = owner.real("/world/versions/{version_id}")
     _ok(
-        owner.request(
+        in_world(
+            owner,
             "PUT",
             f"/world/versions/{version_id}/characters/avatar/{owner.actor}/appearance",
-            params={"world_id": DEFAULT_WORLD_ID},
             json={"base_revision": 0, "recipe": recipe().model_dump(mode="json")},
         ),
         200,
@@ -261,10 +276,11 @@ def world_object(owner) -> dict[str, Any]:
     edit is an edit.
     """
     version_id = _plain_version(owner)
-    current = _ok(owner.request("GET", f"/world/versions/{version_id}"), 200)
+    current = _ok(in_world(owner, "GET", f"/world/versions/{version_id}"), 200)
     object_id = "object:existence"
     _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             f"/world/versions/{version_id}/objects",
             json={
@@ -430,11 +446,12 @@ def declared_place(owner) -> str:
 def environment_instance(owner) -> dict[str, Any]:
     """An admitted render placed whole in a version of its own, with no society (API)."""
     version_id = _plain_version(owner)
-    current = _ok(owner.request("GET", f"/world/versions/{version_id}"), 200)
+    current = _ok(in_world(owner, "GET", f"/world/versions/{version_id}"), 200)
     admitted = environment(owner)
     instance_id = "environment:existence"
     _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             f"/world/versions/{version_id}/environment-instances",
             json={
@@ -472,8 +489,11 @@ def invented_environment_instance() -> str:
 def interaction_preview_request(caller, proposal_id: str) -> dict[str, Any]:
     """A request previewing a field-of-view choice under ``proposal_id``, made against the
     caller's own current interaction policy and structural world."""
-    base = _ok(caller.request("GET", "/world/interactions/current"), 200)
+    base = _ok(
+        caller.request("GET", "/world/interactions/current", params={"world_id": WORLD}), 200
+    )
     return {
+        "params": {"world_id": WORLD},
         "json": {
             "proposal_id": proposal_id,
             "origin": "settings",
@@ -484,7 +504,7 @@ def interaction_preview_request(caller, proposal_id: str) -> dict[str, Any]:
             "capability_patch": {"comfort.field-of-view-degrees": 82},
             "proposal_input": {"control_ids": ["fieldOfView"]},
             "explanation": "Apply the field-of-view choice made in Settings.",
-        }
+        },
     }
 
 
@@ -518,8 +538,9 @@ def interaction_proposal(owner) -> str:
 def style_preview_request(caller, proposal_id: str) -> dict[str, Any]:
     """A request previewing a style under ``proposal_id``, made against the caller's own
     current style and topology."""
-    current = _ok(caller.request("GET", "/world/styles/current"), 200)
+    current = _ok(caller.request("GET", "/world/styles/current", params={"world_id": WORLD}), 200)
     return {
+        "params": {"world_id": WORLD},
         "json": {
             "proposal_id": proposal_id,
             "origin": "settings",
@@ -532,7 +553,7 @@ def style_preview_request(caller, proposal_id: str) -> dict[str, Any]:
                 "profile_version": 1,
                 "parameters": {"vitality": 0.25},
             },
-        }
+        },
     }
 
 
@@ -568,7 +589,8 @@ def action_request(owner) -> dict[str, Any]:
     targets = owner.society_inputs[version_id]["targets"]
     target = next(row for row in targets if row["affordance"] == "rest")
     action = _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             f"/world/versions/{version_id}/society/actions",
             json={
@@ -600,7 +622,8 @@ def decision_request(owner) -> dict[str, Any]:
     version_id, state = made["version_id"], made["society"]
     key = str(uuid.uuid4())
     _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             f"/world/versions/{version_id}/society/decisions",
             json={
@@ -624,7 +647,8 @@ def experiment(owner) -> str:
     version_id = owner.real("/world/versions/{version_id}")
     experiment_id = str(uuid.uuid4())
     _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             f"/world/versions/{version_id}/society/experiments",
             json={
@@ -648,7 +672,8 @@ def experiment_attempt(owner) -> str:
     experiment_id = owner.real("/world/versions/{version_id}/society/experiments/{experiment_id}")
     attempt_id = str(uuid.uuid4())
     _ok(
-        owner.request(
+        in_world(
+            owner,
             "POST",
             f"/world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
             json={"attempt_id": attempt_id, "seed_sha256": DEVELOPMENT_SEEDS[0]},
@@ -837,7 +862,7 @@ def district_version(owner) -> uuid.UUID:
     base = ROOT / "assets/owned-world/flatiron/flatiron-owned-district.json"
     reading = ROOT / "assets/owned-world/flatiron-interpretation-v1/district-interpretation.json"
     version_id = _plain_version(owner)
-    version = _ok(owner.request("GET", f"/world/versions/{version_id}"), 200)
+    version = _ok(in_world(owner, "GET", f"/world/versions/{version_id}"), 200)
     place = _place(owner)
     admissions = EnvironmentRepository(owner.repository.connection, owner.workspace_id, owner.store)
     sources = []
@@ -929,10 +954,11 @@ def entry_update_request(owner) -> dict[str, Any]:
 def style_apply_request(owner) -> dict[str, Any]:
     """The owner's style preview applied over the style and topology it was made against."""
     style_preview(owner)
-    current = _ok(owner.request("GET", "/world/styles/current"), 200)
+    current = _ok(in_world(owner, "GET", "/world/styles/current"), 200)
     return {
+        "params": {"world_id": WORLD},
         "json": {
             "base_style_version_id": current["current"]["version_id"],
             "base_topology_digest": current["current_topology_digest"],
-        }
+        },
     }

@@ -21,6 +21,7 @@ from psycopg.rows import dict_row
 from exulanica.epistemics.vocabulary import RECONSTRUCTION_SCENE_RUNG_PREDICATE
 from exulanica.graph.entities import NAME_PREDICATE, _withdrawn_entity_ids
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.worlds import workspace_world
 from exulanica.world_package.extension_formats import FORMATS, format_for_key
 from exulanica.world_package.extension_projection import project_extensions
 from exulanica.world_package.package import (
@@ -38,7 +39,6 @@ from exulanica.world_package.package import (
 from exulanica.world_package.pseudonyms import optional_urn as _optional_urn
 from exulanica.world_package.pseudonyms import urn as _urn
 
-DEFAULT_WORLD_ID: Final = "atlas:default"
 _EXPORT_POLICY: Final = {
     "external_media_references": "digest-only; authorized resolver required",
     "included": [
@@ -95,7 +95,7 @@ def project_world_package(
     actor: uuid.UUID,
     output: Path,
     private_key: Ed25519PrivateKey,
-    world_id: str = DEFAULT_WORLD_ID,
+    world_id: str,
     parent_merkle_root_sha256: str | None = None,
     evaluation_reports: Sequence[Path] = (),
     after_snapshot_hook: Callable[[], None] | None = None,
@@ -140,6 +140,8 @@ def project_world_package(
             connection.execute(
                 "select set_config('exulanica.workspace_id', %s, true)", (workspace,)
             )
+            if workspace_world(connection, workspace_id, world_id) is None:
+                raise PackageError(f"{world_id!r} is not a world this workspace holds")
             with connection.cursor(row_factory=dict_row) as cursor:
                 pointers = _current_pointers(cursor, world_id)
                 if after_snapshot_hook is not None:

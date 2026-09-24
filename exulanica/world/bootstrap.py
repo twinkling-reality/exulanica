@@ -10,7 +10,6 @@ import psycopg
 from exulanica.canonical import sha256_of_canonical
 from exulanica.world.composed import composed_candidate
 from exulanica.world.errors import InvalidatedSourceVersion
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.structure_repository import WorldStructureRepository
@@ -29,7 +28,7 @@ def bootstrap_world(
     actor: uuid.UUID,
     base_topology_digest: str,
     title: str = "My alternate world",
-    world_id: str = DEFAULT_WORLD_ID,
+    world_id: str,
 ) -> dict[str, Any]:
     """CAS the composed contract and atomically reuse or create the two first versions."""
     with connection.transaction():

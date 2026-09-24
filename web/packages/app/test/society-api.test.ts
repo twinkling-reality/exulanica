@@ -57,38 +57,48 @@ import { SocietyClient, parseSocietyEvents } from '../src/society-api.js';
 const responseRow = () => ({society_id:'society',version_id:'branch',place_id:'place',population_size:100,current_tick:4,state_sha256:'a'.repeat(64),state:{tick:4,inhabitants:Array.from({length:100},(_,i)=>({id:`person-${i}`,synthetic:true,position_mm:[i,0]}))}});
 const persistedEvent = () => ({event_id:'event',subject_id:'person-0',tick:4,event_kind:'departed',document_sha256:'b'.repeat(64),document:{synthetic:true,summary:'Departed on the simulated schedule.'}});
 const jsonResponse = (value: unknown, status = 200) => new Response(JSON.stringify(value), {status, headers:{'content-type':'application/json'}});
+/** The open world every request here names, as a minted id with a colon in it. */
+const WORLD = 'world:personal:society';
+const IN_WORLD = `?world_id=${encodeURIComponent(WORLD)}`;
 
 describe('society authenticated transport', () => {
   it('reads an existing branch without creating or advancing it', async () => {
-    const fetch = vi.fn(async () => jsonResponse(responseRow())); const client = new SocietyClient({baseUrl:'https://api.test/',token:'scoped-test-token',fetch});
+    const fetch = vi.fn(async () => jsonResponse(responseRow())); const client = new SocietyClient({baseUrl:'https://api.test/',token:'scoped-test-token',worldId:WORLD,fetch});
     await client.connect('branch','place','region');
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch.mock.calls[0]).toEqual(['https://api.test/world/versions/branch/society',expect.objectContaining({method:'GET',headers:{authorization:'Bearer scoped-test-token'}})]);
+    expect(fetch.mock.calls[0]).toEqual([`https://api.test/world/versions/branch/society${IN_WORLD}`,expect.objectContaining({method:'GET',headers:{authorization:'Bearer scoped-test-token'}})]);
   });
   it('explicitly creates v2 only after missing society and sends no authoritative geometry', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(jsonResponse({code:'unknown_society',detail:'unavailable'},404)).mockResolvedValueOnce(jsonResponse(responseRow()));
-    const client = new SocietyClient({baseUrl:'https://api.test',token:'test',fetch}); await client.connect('branch','place','region');
+    const client = new SocietyClient({baseUrl:'https://api.test',token:'test',worldId:WORLD,fetch}); await client.connect('branch','place','region');
     const init = fetch.mock.calls[1]![1]!;
     expect(JSON.parse(String(init.body))).toEqual({place_id:'place',region_id:'region',seed:'7a'.repeat(32),profile:'exulanica-society/v2'});
   });
   it.each([401,403,409,424,500])('does not create on read error %s', async status => {
     const fetch = vi.fn(async () => jsonResponse({code:'unavailable',detail:'unavailable'},status));
-    const client = new SocietyClient({baseUrl:'https://api.test',token:'test',fetch});
+    const client = new SocietyClient({baseUrl:'https://api.test',token:'test',worldId:WORLD,fetch});
     await expect(client.connect('branch','place','region')).rejects.toThrow(); expect(fetch).toHaveBeenCalledTimes(1);
   });
   it('uses only canonical tick and digest for advance and limits event reads', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(jsonResponse(responseRow())).mockResolvedValueOnce(jsonResponse({events:[persistedEvent()]}));
-    const client = new SocietyClient({baseUrl:'https://api.test',token:'test',fetch}); const snapshot = parseSociety(responseRow());
+    const client = new SocietyClient({baseUrl:'https://api.test',token:'test',worldId:WORLD,fetch}); const snapshot = parseSociety(responseRow());
     await client.advance(snapshot); await client.events(snapshot);
     expect(JSON.parse(String(fetch.mock.calls[0]![1]!.body))).toEqual({base_tick:4,base_state_sha256:'a'.repeat(64)});
-    expect(fetch.mock.calls[1]![0]).toBe('https://api.test/world/versions/branch/society/events?limit=256');
+    expect(fetch.mock.calls[1]![0]).toBe(`https://api.test/world/versions/branch/society/events${IN_WORLD}&limit=256`);
+  });
+  it('sends nothing where no world is open, so no request names the wrong one', async () => {
+    const fetch = vi.fn(async () => jsonResponse(responseRow()));
+    const client = new SocietyClient({baseUrl:'https://api.test',token:'test',worldId:null,fetch});
+    await expect(client.read('branch')).rejects.toMatchObject({code:'no_open_world'});
+    await expect(client.connect('branch','place','region')).rejects.toMatchObject({code:'no_open_world'});
+    expect(fetch).not.toHaveBeenCalled();
   });
   it('rejects responses from another branch for read, create and advance', async () => {
     for (const action of ['read','connect','advance']) {
       const fetch = vi.fn<typeof globalThis.fetch>();
       if (action === 'connect') fetch.mockResolvedValueOnce(jsonResponse({code:'unknown_society',detail:'missing'},404));
       fetch.mockResolvedValueOnce(jsonResponse({...responseRow(),version_id:'other'}));
-      const client = new SocietyClient({baseUrl:'https://api.test',token:'test',fetch});
+      const client = new SocietyClient({baseUrl:'https://api.test',token:'test',worldId:WORLD,fetch});
       await expect(action === 'advance' ? client.advance(parseSociety(responseRow())) : action === 'connect' ? client.connect('branch','place','region') : client.read('branch')).rejects.toThrow(/another branch/);
     }
   });

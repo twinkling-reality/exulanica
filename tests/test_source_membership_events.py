@@ -69,7 +69,13 @@ def api(objects_api, repository, spine_schema):
         model_client=None,
     )
     with TestClient(create_app(services, verify=False)) as client:
-        yield ObjectsApi(client, objects_api.snapshot_id, objects_api.actor, objects_api.store)
+        yield ObjectsApi(
+            client,
+            objects_api.snapshot_id,
+            objects_api.actor,
+            objects_api.store,
+            objects_api.world_id,
+        )
 
 
 @pytest.fixture

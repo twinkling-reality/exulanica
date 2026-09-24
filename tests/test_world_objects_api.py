@@ -11,6 +11,7 @@ import itertools
 import json
 import uuid
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 import pytest
 from exulanica.api.app import create_app
@@ -23,6 +24,7 @@ from fastapi.testclient import TestClient
 
 from tests_support_api import EVERY_PERMISSION
 from world_structure_fixtures import structural_candidate
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -59,10 +61,20 @@ class ObjectsApi:
     snapshot_id: uuid.UUID
     actor: uuid.UUID
     store: LocalContentAddressedStore
+    #: The registered world the fixture's snapshot and every version it creates belong to.
+    world_id: str = FIXTURE_WORLD_ID
+    #: The workspace ``STRANGER_TOKEN`` belongs to. The fixture registers no world in it.
+    stranger_workspace_id: uuid.UUID | None = None
 
     @property
     def headers(self):
         return {"Authorization": f"Bearer {TOKEN}"}
+
+    def in_world(self, path, world_id=None):
+        """``path`` naming a world, this fixture's unless another is given, as world routes
+        require. ``get`` and ``post`` send exactly the path they are given."""
+        query = urlencode({"world_id": world_id or self.world_id})
+        return f"{path}{'&' if '?' in path else '?'}{query}"
 
     def get(self, path):
         return self.client.get(path, headers=self.headers)
@@ -80,12 +92,15 @@ class ObjectsApi:
 
     def version(self, title="Lantern study"):
         response = self.post(
-            "/world/versions", {"title": title, "source_snapshot_id": str(self.snapshot_id)}
+            self.in_world("/world/versions"),
+            {"title": title, "source_snapshot_id": str(self.snapshot_id)},
         )
         assert response.status_code == 201, response.text
         return response.json()
 
     def add(self, version, **overrides):
+        """Add an object to ``version``, in the world the version document names (this
+        fixture's world for a document that names none)."""
         body = {
             "base_state_sha256": version["state_sha256"],
             "object_id": "object:lantern",
@@ -95,7 +110,8 @@ class ObjectsApi:
             "origin_role": "fictional",
         }
         body.update(overrides)
-        return self.post(f"/world/versions/{version['version_id']}/objects", body)
+        path = f"/world/versions/{version['version_id']}/objects"
+        return self.post(self.in_world(path, version.get("world_id")), body)
 
 
 @pytest.fixture
@@ -103,7 +119,10 @@ def objects_api(repository, spine_schema, tmp_path, monkeypatch):
     _psycopg, scratch = spine_schema
     actor, stranger = uuid.uuid4(), uuid.uuid4()
 
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     preview = structures.preview(structural_candidate(), proposed_by=actor)
     snapshot = structures.apply(
         preview.preview_id,
@@ -146,7 +165,7 @@ def objects_api(repository, spine_schema, tmp_path, monkeypatch):
         model_client=None,
     )
     with TestClient(create_app(services, verify=False)) as client:
-        yield ObjectsApi(client, snapshot.snapshot_id, actor, store)
+        yield ObjectsApi(client, snapshot.snapshot_id, actor, store, world_id, stranger)
 
 
 # -- the reviewed asset registry ------------------------------------------------------------
@@ -253,11 +272,11 @@ def test_a_version_is_created_read_and_listed(objects_api):
     assert created["source_invalidated"] is False
     assert created["created_by"] == str(objects_api.actor)
 
-    read = objects_api.get(f"/world/versions/{created['version_id']}")
+    read = objects_api.get(objects_api.in_world(f"/world/versions/{created['version_id']}"))
     assert read.status_code == 200
     assert read.json() == created
 
-    listed = objects_api.get("/world/versions")
+    listed = objects_api.get(objects_api.in_world("/world/versions"))
     assert listed.status_code == 200
     assert [v["version_id"] for v in listed.json()] == [created["version_id"]]
 
@@ -266,7 +285,8 @@ def test_a_version_can_branch_from_another_version(objects_api):
     parent = objects_api.version("Parent")
     parent = objects_api.add(parent).json()
     response = objects_api.post(
-        "/world/versions", {"title": "Child", "parent_version_id": parent["version_id"]}
+        objects_api.in_world("/world/versions"),
+        {"title": "Child", "parent_version_id": parent["version_id"]},
     )
     assert response.status_code == 201
     child = response.json()
@@ -276,14 +296,15 @@ def test_a_version_can_branch_from_another_version(objects_api):
 
 
 def test_a_version_naming_no_source_is_refused(objects_api):
-    response = objects_api.post("/world/versions", {"title": "Nowhere"})
+    response = objects_api.post(objects_api.in_world("/world/versions"), {"title": "Nowhere"})
     assert response.status_code == 422
     assert response.json()["code"] == "invalid_object_data"
 
 
 def test_an_unknown_source_snapshot_is_an_unknown_reference(objects_api):
     response = objects_api.post(
-        "/world/versions", {"title": "Nowhere", "source_snapshot_id": str(uuid.uuid4())}
+        objects_api.in_world("/world/versions"),
+        {"title": "Nowhere", "source_snapshot_id": str(uuid.uuid4())},
     )
     assert response.status_code == 404
     assert response.json()["code"] == "unknown_reference"
@@ -323,7 +344,9 @@ def test_the_whole_authored_object_cycle_over_http(objects_api):
     assert obj["asset"]["licence_id"] == "CC0-1.0"
 
     moved = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/object:lantern/move",
+        objects_api.in_world(
+            f"/world/versions/{version['version_id']}/objects/object:lantern/move"
+        ),
         {"base_state_sha256": version["state_sha256"], "transform": transform(x_mm=2_400)},
     )
     assert moved.status_code == 200, moved.text
@@ -333,7 +356,9 @@ def test_the_whole_authored_object_cycle_over_http(objects_api):
     placed = version["state_sha256"]
 
     removed = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/object:lantern/remove",
+        objects_api.in_world(
+            f"/world/versions/{version['version_id']}/objects/object:lantern/remove"
+        ),
         {"base_state_sha256": version["state_sha256"]},
     )
     assert removed.status_code == 200, removed.text
@@ -342,7 +367,7 @@ def test_the_whole_authored_object_cycle_over_http(objects_api):
     assert version["edit_seq"] == 3
 
     undone = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/undo",
+        objects_api.in_world(f"/world/versions/{version['version_id']}/objects/undo"),
         {"base_state_sha256": version["state_sha256"]},
     )
     assert undone.status_code == 200, undone.text
@@ -363,8 +388,8 @@ def test_the_whole_authored_object_cycle_over_http(objects_api):
         assert later["actor"] == str(objects_api.actor)
 
     # And it survives a fresh read, which is what "operates on persisted state" means.
-    reread = objects_api.get(f"/world/versions/{version['version_id']}").json()
-    assert reread == version
+    reread = objects_api.get(objects_api.in_world(f"/world/versions/{version['version_id']}"))
+    assert reread.json() == version
 
 
 # -- problem codes ------------------------------------------------------------------------------
@@ -379,14 +404,14 @@ def test_an_edit_against_a_stale_base_is_a_named_conflict(objects_api):
     )
     assert response.status_code == 409
     assert response.json()["code"] == "stale_object_base"
-    current = objects_api.get(f"/world/versions/{version['version_id']}").json()
-    assert [o["object_id"] for o in current["objects"]] == ["object:lantern"]
+    current = objects_api.get(objects_api.in_world(f"/world/versions/{version['version_id']}"))
+    assert [o["object_id"] for o in current.json()["objects"]] == ["object:lantern"]
 
 
 def test_undoing_nothing_is_an_invalid_state(objects_api):
     version = objects_api.version()
     response = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/undo",
+        objects_api.in_world(f"/world/versions/{version['version_id']}/objects/undo"),
         {"base_state_sha256": version["state_sha256"]},
     )
     assert response.status_code == 409
@@ -448,10 +473,8 @@ def test_an_unchosen_origin_role_is_refused(objects_api):
         "region_id": "region-a",
         "transform": transform(),
     }
-    assert (
-        objects_api.post(f"/world/versions/{version['version_id']}/objects", body).status_code
-        == 422
-    )
+    path = objects_api.in_world(f"/world/versions/{version['version_id']}/objects")
+    assert objects_api.post(path, body).status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -484,7 +507,7 @@ def test_an_unknown_field_in_a_body_is_refused(objects_api):
 def test_an_unknown_version_or_object_is_an_unknown_reference(objects_api):
     version = objects_api.version()
     missing = objects_api.post(
-        f"/world/versions/{uuid.uuid4()}/objects/undo",
+        objects_api.in_world(f"/world/versions/{uuid.uuid4()}/objects/undo"),
         {"base_state_sha256": version["state_sha256"]},
     )
     assert missing.status_code == 404
@@ -492,7 +515,7 @@ def test_an_unknown_version_or_object_is_an_unknown_reference(objects_api):
 
     version = objects_api.add(version).json()
     response = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/object:absent/move",
+        objects_api.in_world(f"/world/versions/{version['version_id']}/objects/object:absent/move"),
         {"base_state_sha256": version["state_sha256"], "transform": transform()},
     )
     assert response.status_code == 404
@@ -503,7 +526,7 @@ def test_an_unknown_style_version_is_a_404_and_not_a_500(objects_api):
     """The composite foreign key already refuses it, but as a ForeignKeyViolation that no
     handler catches. An id the caller supplied is an input, and a bad input is a 404."""
     response = objects_api.post(
-        "/world/versions",
+        objects_api.in_world("/world/versions"),
         {
             "title": "Borrowed appearance",
             "source_snapshot_id": str(objects_api.snapshot_id),
@@ -518,9 +541,11 @@ def test_a_known_style_version_is_accepted_as_the_appearance_reference(objects_a
     """The negative control for the test above: the field does work when it names a real one."""
     from exulanica.world import WorldStyleRepository
 
-    current = WorldStyleRepository(repository.connection, repository.workspace_id).current()
+    current = WorldStyleRepository(
+        repository.connection, repository.workspace_id, world_id=objects_api.world_id
+    ).current()
     response = objects_api.post(
-        "/world/versions",
+        objects_api.in_world("/world/versions"),
         {
             "title": "Styled",
             "source_snapshot_id": str(objects_api.snapshot_id),
@@ -539,7 +564,7 @@ def test_a_deleted_source_refuses_further_edits_over_http(objects_api, repositor
     )
     repository.connection.commit()
 
-    read = objects_api.get(f"/world/versions/{version['version_id']}")
+    read = objects_api.get(objects_api.in_world(f"/world/versions/{version['version_id']}"))
     assert read.status_code == 200
     body = read.json()
     assert body["source_invalidated"] is True
@@ -547,7 +572,9 @@ def test_a_deleted_source_refuses_further_edits_over_http(objects_api, repositor
     assert [o["object_id"] for o in body["objects"]] == ["object:lantern"]
 
     response = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/object:lantern/move",
+        objects_api.in_world(
+            f"/world/versions/{version['version_id']}/objects/object:lantern/move"
+        ),
         {"base_state_sha256": body["state_sha256"], "transform": transform(x_mm=99)},
     )
     assert response.status_code == 409, response.text
@@ -560,12 +587,12 @@ def test_a_deleted_source_refuses_further_edits_over_http(objects_api, repositor
 def test_every_route_requires_a_bearer_token(objects_api):
     version = objects_api.version()
     unauthenticated = [
-        objects_api.client.get("/world/versions"),
+        objects_api.client.get(objects_api.in_world("/world/versions")),
         objects_api.client.get("/world/assets"),
         objects_api.client.get("/world/assets/cc0.marker-cube/bytes"),
-        objects_api.client.post("/world/versions", json={"title": "x"}),
+        objects_api.client.post(objects_api.in_world("/world/versions"), json={"title": "x"}),
         objects_api.client.post(
-            f"/world/versions/{version['version_id']}/objects/undo",
+            objects_api.in_world(f"/world/versions/{version['version_id']}/objects/undo"),
             json={"base_state_sha256": version["state_sha256"]},
         ),
     ]
@@ -573,25 +600,35 @@ def test_every_route_requires_a_bearer_token(objects_api):
         assert response.status_code in {401, 403}, response.request.url
 
 
-def test_another_workspace_cannot_see_or_edit_a_version(objects_api):
+def test_another_workspace_cannot_see_or_edit_a_version(objects_api, repository):
     version = objects_api.add(objects_api.version()).json()
+    at = objects_api.in_world(f"/world/versions/{version['version_id']}")
 
-    assert objects_api.stranger_get("/world/versions").json() == []
-    read = objects_api.stranger_get(f"/world/versions/{version['version_id']}")
+    # The owner's world is not the stranger's to name, and the refusal is the one a world nobody
+    # registered gets, so nothing leaks by comparison.
+    listed = objects_api.stranger_get(objects_api.in_world("/world/versions"))
+    assert (listed.status_code, listed.json()["code"]) == (404, "unknown_reference")
+    nobody = objects_api.in_world("/world/versions", "world:nobody")
+    assert objects_api.stranger_get(nobody).json() == listed.json()
+
+    # A world of the same id in the stranger's own workspace holds none of the owner's versions.
+    registered_world(repository.connection, objects_api.stranger_workspace_id)
+    assert objects_api.stranger_get(objects_api.in_world("/world/versions")).json() == []
+    read = objects_api.stranger_get(at)
     assert read.status_code == 404
     assert read.json()["code"] == "unknown_reference"
     # Identical to a version that never existed, so nothing leaks by comparison.
-    assert objects_api.stranger_get(f"/world/versions/{uuid.uuid4()}").json() == read.json()
+    missing = objects_api.in_world(f"/world/versions/{uuid.uuid4()}")
+    assert objects_api.stranger_get(missing).json() == read.json()
 
     written = objects_api.stranger_post(
-        f"/world/versions/{version['version_id']}/objects/object:lantern/remove",
+        objects_api.in_world(
+            f"/world/versions/{version['version_id']}/objects/object:lantern/remove"
+        ),
         {"base_state_sha256": version["state_sha256"]},
     )
     assert written.status_code == 404
-    assert (
-        objects_api.get(f"/world/versions/{version['version_id']}").json()["objects"][0]["removed"]
-        is False
-    )
+    assert objects_api.get(at).json()["objects"][0]["removed"] is False
 
 
 def test_the_reviewed_catalog_is_shared_because_it_is_not_tenant_data(objects_api):
@@ -608,8 +645,9 @@ MOTION = {"behaviour_key": "motion.bounded-path", "behaviour_version": 1, "param
 
 
 def set_behaviour(objects_api, version, behaviour, object_id="object:lantern"):
+    path = f"/world/versions/{version['version_id']}/objects/{object_id}/behaviour"
     return objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/{object_id}/behaviour",
+        objects_api.in_world(path, version.get("world_id")),
         {"base_state_sha256": version["state_sha256"], "behaviour": behaviour},
     )
 
@@ -632,14 +670,14 @@ def test_a_behaviour_is_given_taken_away_and_restored_over_http(objects_api):
     assert cleared["objects"][0]["behaviour"] is None
 
     restored = objects_api.post(
-        f"/world/versions/{cleared['version_id']}/objects/undo",
+        objects_api.in_world(f"/world/versions/{cleared['version_id']}/objects/undo"),
         {"base_state_sha256": cleared["state_sha256"]},
     ).json()
     assert restored["objects"][0]["behaviour"] == MOTION, "parameters included"
     assert restored["state_sha256"] == given["state_sha256"]
 
     before_motion = objects_api.post(
-        f"/world/versions/{restored['version_id']}/objects/undo",
+        objects_api.in_world(f"/world/versions/{restored['version_id']}/objects/undo"),
         {"base_state_sha256": restored["state_sha256"]},
     ).json()
     assert before_motion["objects"] == placed["objects"], "the object is as it was placed"
@@ -651,8 +689,8 @@ def test_a_behaviour_is_given_taken_away_and_restored_over_http(objects_api):
         "undo",
         "undo",
     ]
-    reread = objects_api.get(f"/world/versions/{placed['version_id']}").json()
-    assert reread == before_motion
+    reread = objects_api.get(objects_api.in_world(f"/world/versions/{placed['version_id']}"))
+    assert reread.json() == before_motion
 
 
 @pytest.mark.parametrize(
@@ -680,21 +718,21 @@ def test_an_unsupported_behaviour_given_later_is_refused_with_the_reason(
     assert response.status_code == 422, response.text
     assert response.json()["code"] == "invalid_object_data"
     assert reason in response.json()["detail"]
-    current = objects_api.get(f"/world/versions/{placed['version_id']}").json()
-    assert current == placed, "nothing was written"
+    current = objects_api.get(objects_api.in_world(f"/world/versions/{placed['version_id']}"))
+    assert current.json() == placed, "nothing was written"
 
 
 def test_a_behaviour_edit_against_a_stale_base_is_a_named_conflict(objects_api):
     placed = objects_api.add(objects_api.version()).json()
     moved = objects_api.post(
-        f"/world/versions/{placed['version_id']}/objects/object:lantern/move",
+        objects_api.in_world(f"/world/versions/{placed['version_id']}/objects/object:lantern/move"),
         {"base_state_sha256": placed["state_sha256"], "transform": transform(x_mm=2_400)},
     ).json()
     response = set_behaviour(objects_api, placed, MOTION)
     assert response.status_code == 409
     assert response.json()["code"] == "stale_object_base"
-    current = objects_api.get(f"/world/versions/{placed['version_id']}").json()
-    assert current == moved
+    current = objects_api.get(objects_api.in_world(f"/world/versions/{placed['version_id']}"))
+    assert current.json() == moved
 
 
 def test_a_behaviour_edit_on_nothing_or_on_a_removed_object_is_refused(objects_api):
@@ -704,19 +742,25 @@ def test_a_behaviour_edit_on_nothing_or_on_a_removed_object_is_refused(objects_a
     unchanged = set_behaviour(objects_api, placed, None)
     assert (unchanged.status_code, unchanged.json()["code"]) == (409, "invalid_object_state")
     removed = objects_api.post(
-        f"/world/versions/{placed['version_id']}/objects/object:lantern/remove",
+        objects_api.in_world(
+            f"/world/versions/{placed['version_id']}/objects/object:lantern/remove"
+        ),
         {"base_state_sha256": placed["state_sha256"]},
     ).json()
     refused = set_behaviour(objects_api, removed, MOTION)
     assert (refused.status_code, refused.json()["code"]) == (409, "invalid_object_state")
+    behaviour_path = objects_api.in_world(
+        f"/world/versions/{placed['version_id']}/objects/object:lantern/behaviour"
+    )
     omitted = objects_api.post(
-        f"/world/versions/{placed['version_id']}/objects/object:lantern/behaviour",
+        behaviour_path,
         {"base_state_sha256": removed["state_sha256"]},
     )
     assert omitted.status_code == 422, "a body that does not say what it sets is not a clear"
     stranger = objects_api.stranger_post(
-        f"/world/versions/{placed['version_id']}/objects/object:lantern/behaviour",
+        behaviour_path,
         {"base_state_sha256": removed["state_sha256"], "behaviour": MOTION},
     )
     assert stranger.status_code == 404
-    assert objects_api.get(f"/world/versions/{placed['version_id']}").json() == removed
+    reread = objects_api.get(objects_api.in_world(f"/world/versions/{placed['version_id']}"))
+    assert reread.json() == removed

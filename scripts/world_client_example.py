@@ -13,6 +13,9 @@ comes from the HTTP contract in ``docs/world-objects-contract.md`` sections 5 to
 
 **What it does, in order.**
 
+0.  Learns which world it is editing: the one ``--world`` names, or else the one world
+    ``GET /worlds`` lists. A workspace can hold several worlds and every world route requires
+    ``world_id``, so a client that finds more than one stops and asks to be told.
 1.  Reads the named alternate version and its objects. The ``state_sha256`` it gets back is
     the base every edit must name.
 2.  Reads the reviewed asset registry and refuses to place an asset whose bytes the server
@@ -40,6 +43,7 @@ import secrets
 import sys
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -137,17 +141,37 @@ def summarise(version: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def resolve_version(client: WorldClient, version_id: str | None, title: str | None) -> dict[str, Any]:
+def resolve_world(client: WorldClient, world_id: str | None) -> str:
+    """The world named by ``--world``, or the only world the workspace holds."""
+    if world_id:
+        return world_id
+    worlds = client.get("worlds", "/worlds")["worlds"]
+    if len(worlds) != 1:
+        raise ClientStop(
+            f"this workspace holds {len(worlds)} worlds; name one by --world. Known: "
+            + ", ".join(f"{w['world_id']} ({w['kind']})" for w in worlds)
+        )
+    return worlds[0]["world_id"]
+
+
+def in_world(path: str, world_id: str) -> str:
+    """A world route's path with the ``world_id`` every world route requires."""
+    return f"{path}{'&' if '?' in path else '?'}world_id={quote(world_id, safe='')}"
+
+
+def resolve_version(
+    client: WorldClient, world_id: str, version_id: str | None, title: str | None
+) -> dict[str, Any]:
     if version_id:
-        return client.get("read", f"/world/versions/{version_id}")
-    versions = client.get("list", "/world/versions")
+        return client.get("read", in_world(f"/world/versions/{version_id}", world_id))
+    versions = client.get("list", in_world("/world/versions", world_id))
     named = [version for version in versions if version["title"] == title]
     if len(named) != 1:
         raise ClientStop(
             f"{len(named)} versions are titled {title!r}; name one by --version. Known: "
             + ", ".join(f"{v['version_id']} {v['title']!r}" for v in versions)
         )
-    return client.get("read", f"/world/versions/{named[0]['version_id']}")
+    return client.get("read", in_world(f"/world/versions/{named[0]['version_id']}", world_id))
 
 
 def choose_asset(client: WorldClient, asset_key: str) -> dict[str, Any]:
@@ -160,10 +184,12 @@ def choose_asset(client: WorldClient, asset_key: str) -> dict[str, Any]:
                     "there is nothing a renderer could draw. Not placing it."
                 )
             return asset
-    raise ClientStop(f"{asset_key} is not in the reviewed registry: {[a['asset_key'] for a in catalog]}")
+    raise ClientStop(f"{asset_key} is not a reviewed asset a person may place: {[a['asset_key'] for a in catalog]}")
 
 
-def choose_region(client: WorldClient, version: dict[str, Any], region: str | None) -> str:
+def choose_region(
+    client: WorldClient, world_id: str, version: dict[str, Any], region: str | None
+) -> str:
     """An explicit region, else one an object already uses, else a protected source region.
 
     The version body does not list its source snapshot's regions, so a client that has placed
@@ -174,7 +200,7 @@ def choose_region(client: WorldClient, version: dict[str, Any], region: str | No
         return region
     for obj in version["objects"]:
         return obj["region_id"]
-    for slot in client.get("regions", "/world/source-media"):
+    for slot in client.get("regions", in_world("/world/source-media", world_id)):
         if slot["region_id"]:
             return slot["region_id"]
     raise ClientStop("no region is known; pass --region")
@@ -274,6 +300,9 @@ def main(argv: list[str] | None = None, *, http: httpx.Client | None = None) -> 
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
     parser.add_argument("--base-url", default=os.environ.get("EXULANICA_API_URL", "http://127.0.0.1:8000"))
     parser.add_argument("--token-env", default="EXULANICA_TOKEN", help="environment variable holding the bearer token")
+    parser.add_argument(
+        "--world", help="the world to edit; without it, the one world GET /worlds lists"
+    )
     named = parser.add_mutually_exclusive_group(required=True)
     named.add_argument("--version", help="the alternate version id to edit")
     named.add_argument("--title", help="the alternate version title, which must be unique")
@@ -302,8 +331,9 @@ def main(argv: list[str] | None = None, *, http: httpx.Client | None = None) -> 
     client = WorldClient(http, token, transcript)
     outcome: dict[str, Any] = {"transcript": transcript.entries}
     try:
-        before = resolve_version(client, args.version, args.title)
-        version_path = f"/world/versions/{before['version_id']}"
+        world_id = resolve_world(client, args.world)
+        before = resolve_version(client, world_id, args.version, args.title)
+        version_path = in_world(f"/world/versions/{before['version_id']}", world_id)
         print(
             f"         version {before['version_id']} {before['title']!r}: "
             f"{len(before['objects'])} object(s), edit_seq {before['edit_seq']}, "
@@ -312,7 +342,7 @@ def main(argv: list[str] | None = None, *, http: httpx.Client | None = None) -> 
         if before["source_invalidated"]:
             raise ClientStop("the version's source was deleted; branch from a live snapshot instead")
         asset = choose_asset(client, args.asset_key)
-        region = choose_region(client, before, args.region)
+        region = choose_region(client, world_id, before, args.region)
         x, y, z = (int(value) for value in args.place.split(","))
         dx, dy, dz = (int(value) for value in args.move_by.split(","))
         placed = {"scale_milli": 1000, "x_mm": x, "y_mm": y, "yaw_microradians": 0, "z_mm": z}
@@ -334,7 +364,7 @@ def main(argv: list[str] | None = None, *, http: httpx.Client | None = None) -> 
         added, add_base = edit(
             client,
             "add",
-            f"{version_path}/objects",
+            in_world(f"/world/versions/{before['version_id']}/objects", world_id),
             add_body,
             version_path=version_path,
             last_seen_state=before["state_sha256"],
@@ -349,7 +379,9 @@ def main(argv: list[str] | None = None, *, http: httpx.Client | None = None) -> 
         moved, move_accepted_base = edit(
             client,
             "move",
-            f"{version_path}/objects/{args.object_id}/move",
+            in_world(
+                f"/world/versions/{before['version_id']}/objects/{args.object_id}/move", world_id
+            ),
             {"base_state_sha256": move_base, "transform": destination},
             version_path=version_path,
             last_seen_state=added["state_sha256"],

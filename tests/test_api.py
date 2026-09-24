@@ -50,6 +50,7 @@ from conftest import (
 from model_fakes import chat_body
 from route_probes import ACCOUNT_ROUTES, ROUTE_PROBES, fill
 from tests_support_api import EVERY_PERMISSION
+from world_support import registered_world
 
 
 # Cookie-only endpoints have a separate disabled-provider and signed-login suite.
@@ -79,7 +80,9 @@ class Deployment:
         entity_id,
         batch_id,
         artifact_id,
+        repository=None,
     ) -> None:
+        self._repository = repository
         self.client = client
         self.store = store
         self.owner = owner
@@ -99,6 +102,15 @@ class Deployment:
 
     def as_stranger(self, method: str, path: str, **kwargs):
         return self._request(_STRANGER_TOKEN, method, path, **kwargs)
+
+    def in_world(self, path: str) -> str:
+        """``path`` asked in the owner's world, which is registered the first time one is asked.
+
+        The fixture registers no world of its own, because files that import it give the owner
+        worlds of their own and the count policy bounds how many one workspace may hold.
+        """
+        world = registered_world(self._repository.connection, self.owner)
+        return f"{path}{'&' if '?' in path else '?'}world_id={world}"
 
     def fill(self, path: str) -> str:
         """The route's URL: this fixture's real ids where it has them, fresh ones elsewhere."""
@@ -210,6 +222,7 @@ def deployment(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
             named.entity_id,
             batch.batch_id,
             artifact_id,
+            repository=repository,
         )
 
 
@@ -412,7 +425,9 @@ def test_an_unsatisfiable_range_is_refused_with_the_total(deployment, header):
 
 def test_a_permalink_from_another_workspace_is_not_readable(deployment):
     """A permalink names a blob by hash, so the workspace check cannot come from a row id."""
-    listed = deployment.as_owner("POST", "/selection/packet", json={"intent": "captures"}).json()
+    listed = deployment.as_owner(
+        "POST", deployment.in_world("/selection/packet"), json={"intent": "captures"}
+    ).json()
     uri = listed["items"][0]["uri"]
     assert deployment.as_owner("GET", "/evidence", params={"uri": uri}).status_code == 200
     assert deployment.as_stranger("GET", "/evidence", params={"uri": uri}).status_code == 404
@@ -422,7 +437,9 @@ def test_a_permalink_from_another_workspace_is_not_readable(deployment):
 
 
 def test_a_selection_resolves_over_http(deployment):
-    response = deployment.as_owner("POST", "/selection", json={"intent": "captures"})
+    response = deployment.as_owner(
+        "POST", deployment.in_world("/selection"), json={"intent": "captures"}
+    )
     assert response.status_code == 200
     body = response.json()
     assert body["total_matched"] == 1
@@ -431,12 +448,14 @@ def test_a_selection_resolves_over_http(deployment):
 
 
 def test_a_malformed_plan_is_a_400_and_an_unknown_id_is_a_404(deployment):
-    malformed = deployment.as_owner("POST", "/selection", json={"intent": "nonsense"})
+    malformed = deployment.as_owner(
+        "POST", deployment.in_world("/selection"), json={"intent": "nonsense"}
+    )
     assert malformed.status_code == 422, "FastAPI rejects the body before the route runs"
 
     unknown = deployment.as_owner(
         "POST",
-        "/selection",
+        deployment.in_world("/selection"),
         json={"intent": "captures", "entities": {"ids": [str(uuid.uuid4())], "mode": "any"}},
     )
     assert unknown.status_code == 404
@@ -444,7 +463,7 @@ def test_a_malformed_plan_is_a_400_and_an_unknown_id_is_a_404(deployment):
 
 
 def test_the_endpoints_that_need_a_model_say_so_rather_than_guessing(deployment):
-    for path in ("/selection/plan", "/selection/ask"):
+    for path in ("/selection/plan", deployment.in_world("/selection/ask")):
         response = deployment.as_owner("POST", path, json={"question": "where was I?"})
         assert response.status_code == 503
         assert "model credential" in response.json()["detail"]
@@ -511,7 +530,7 @@ def test_an_answers_citations_open_the_evidence_they_name_and_only_for_its_owner
     transport = _with_model(deployment, [_refused_answer_body(), _refused_answer_body()])
     response = deployment.as_owner(
         "POST",
-        "/selection/ask",
+        deployment.in_world("/selection/ask"),
         json={"question": "which photographs?", "plan": {"intent": "captures"}},
     )
     assert response.status_code == 200, response.text
@@ -545,7 +564,7 @@ def test_an_unanswerable_question_refuses_over_http_without_calling_the_model(de
     transport = _with_model(deployment, [_refused_answer_body()])
     response = deployment.as_owner(
         "POST",
-        "/selection/ask",
+        deployment.in_world("/selection/ask"),
         json={
             "question": "was I ever in Antarctica?",
             "plan": {
@@ -603,7 +622,7 @@ def test_the_answer_says_which_model_answered_it_and_what_that_cost(deployment):
     _with_model(deployment, [HttpResponse(status_code=200, text=body)])
     response = deployment.as_owner(
         "POST",
-        "/selection/ask",
+        deployment.in_world("/selection/ask"),
         json={"question": "which photographs?", "plan": {"intent": "captures"}},
     )
     assert response.status_code == 200, response.text
@@ -633,7 +652,7 @@ def test_the_execution_block_is_additive_and_changes_nothing_above_it(deployment
     _with_model(deployment, [_refused_answer_body(), _refused_answer_body()])
     response = deployment.as_owner(
         "POST",
-        "/selection/ask",
+        deployment.in_world("/selection/ask"),
         json={"question": "which photographs?", "plan": {"intent": "captures"}},
     )
     body = response.json()
@@ -673,7 +692,7 @@ def test_an_abstention_on_a_SUPPLIED_plan_reports_no_model_call_at_all(deploymen
     transport = _with_model(deployment, [_refused_answer_body()])
     response = deployment.as_owner(
         "POST",
-        "/selection/ask",
+        deployment.in_world("/selection/ask"),
         json={
             "question": "was I ever in Antarctica?",
             "plan": {
@@ -726,7 +745,9 @@ def test_an_abstention_asked_IN_WORDS_still_lists_the_planner_it_paid_for(deploy
     )
     transport = _with_model(deployment, [planner, _refused_answer_body()])
     response = deployment.as_owner(
-        "POST", "/selection/ask", json={"question": "was I ever in Antarctica?"}
+        "POST",
+        deployment.in_world("/selection/ask"),
+        json={"question": "was I ever in Antarctica?"},
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -782,7 +803,9 @@ def test_a_question_the_planner_cannot_express_abstains_rather_than_failing(depl
     transport = _with_model(deployment, [reply, reply])
 
     response = deployment.as_owner(
-        "POST", "/selection/ask", json={"question": "what is the exchange rate for the pound?"}
+        "POST",
+        deployment.in_world("/selection/ask"),
+        json={"question": "what is the exchange rate for the pound?"},
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -825,7 +848,7 @@ def test_a_model_invented_entity_id_abstains_instead_of_reporting_a_missing_one(
     _with_model(deployment, [_planner_reply(invented)])
 
     response = deployment.as_owner(
-        "POST", "/selection/ask", json={"question": "who was with me there?"}
+        "POST", deployment.in_world("/selection/ask"), json={"question": "who was with me there?"}
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -849,7 +872,7 @@ def test_a_caller_supplied_id_still_gets_the_404_that_is_not_an_existence_oracle
     _with_model(deployment, [_refused_answer_body()])
     response = deployment.as_owner(
         "POST",
-        "/selection/ask",
+        deployment.in_world("/selection/ask"),
         json={
             "question": "who is this?",
             "plan": {"intent": "entities", "entities": {"ids": [str(uuid.uuid4())], "mode": "any"}},

@@ -31,6 +31,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
     scenario = PreviewScenario()
     add, remove, restore = scenario.edit_ticks
     binding = w["binding"]
+    scope = {"world_id": binding.world_id}
     version_route = f"/world/versions/{binding.version_id}"
     route = version_route + "/society"
     owner = helpers.OWNER_HEADERS
@@ -47,6 +48,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
         response = client.post(
             route,
             headers=owner,
+            params=scope,
             json={
                 "place_id": str(binding.place_id),
                 "region_id": binding.region_id,
@@ -69,6 +71,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
                 response = client.post(
                     version_route + "/objects",
                     headers=owner,
+                    params=scope,
                     json={
                         "base_state_sha256": object_digest,
                         "object_id": scenario.object_id,
@@ -91,6 +94,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
                 response = client.post(
                     version_route + "/objects" + suffix,
                     headers=owner,
+                    params=scope,
                     json={"base_state_sha256": object_digest},
                 )
                 assert response.status_code == 200, response.text
@@ -99,6 +103,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
             response = client.post(
                 route + "/steps",
                 headers=owner,
+                params=scope,
                 json={
                     "base_tick": snapshot["current_tick"],
                     "base_state_sha256": snapshot["state_sha256"],
@@ -118,7 +123,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
             controls.append(control)
             if tick < add:
                 assert expected == control
-            response = client.get(route + "/events", headers=owner)
+            response = client.get(route + "/events", headers=owner, params=scope)
             assert response.status_code == 200, response.text
             http_events.update({e["event_id"]: e for e in response.json()["events"]})
             if tick == remove:
@@ -127,6 +132,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
                     client.post(
                         route + "/steps",
                         headers=owner,
+                        params=scope,
                         json={
                             "base_tick": old_snapshot["current_tick"],
                             "base_state_sha256": old_snapshot["state_sha256"],
@@ -212,8 +218,8 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
             != next(p for p in c["inhabitants"] if p["id"] == witness)["position_mm"]
             for s, c in zip(snapshots, controls, strict=True)
         )
-        saved_events = client.get(route + "/events", headers=owner).json()
-        response = client.get(route + "/replay", headers=owner)
+        saved_events = client.get(route + "/events", headers=owner, params=scope).json()
+        response = client.get(route + "/replay", headers=owner, params=scope)
         assert response.status_code == 200, response.text
         replay = response.json()
         assert replay["replay_verified"] and replay["state_sha256"] == snapshot["state_sha256"]
@@ -225,11 +231,12 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
             ("/events", saved_events),
             ("/replay", replay),
         ):
-            response = reloaded.get(route + suffix, headers=owner)
+            response = reloaded.get(route + suffix, headers=owner, params=scope)
             assert response.status_code == 200, response.text
             assert response.json() == expected_result
-            assert reloaded.get(route + suffix, headers=helpers.STRANGER_HEADERS).status_code == 404
-            assert reloaded.get(route + suffix).status_code == 401
+            stranger = reloaded.get(route + suffix, headers=helpers.STRANGER_HEADERS, params=scope)
+            assert stranger.status_code == 404
+            assert reloaded.get(route + suffix, params=scope).status_code == 401
         # The interrupted/complete explanations are durable event documents, not new narration.
         restored_rows = (
             w["connection"]

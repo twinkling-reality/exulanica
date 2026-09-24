@@ -65,7 +65,7 @@ def social(objects_api, repository, spine_schema):
     api.client.app.state.society_input_authorizer = lambda _conn, _session, doc: authorize(doc)
     route = f"/world/versions/{version}/society"
     response = api.post(
-        route,
+        api.in_world(route),
         {
             "place_id": str(place),
             "region_id": "region-a",
@@ -75,7 +75,10 @@ def social(objects_api, repository, spine_schema):
     )
     assert response.status_code == 200, response.text
     repo = SocietyRepository(
-        repository.connection, repository.workspace_id, input_authorizer=authorize
+        repository.connection,
+        repository.workspace_id,
+        world_id=api.world_id,
+        input_authorizer=authorize,
     )
     changed = add_social_marker(initial)
     repo.record_input(version, changed)
@@ -114,21 +117,23 @@ def test_authenticated_recorded_model_choice_retry_reload_replay(
     api, repo, _version, route, _, _, body = social
     adapter = provider_for(client, transport, manifest)
     api.client.app.state.society_decision_provider = adapter
-    response = api.post(route + "/decisions", body)
+    response = api.post(api.in_world(route + "/decisions"), body)
     assert response.status_code == 200, response.text
     result = response.json()
     assert result["decision"]["status"] == "accepted"
     assert result["request"]["context"]["own_beliefs"][0]["origin"] == "communication"
     assert result["request"]["context"]["own_observations"] == []
-    assert api.post(route + "/decisions", body).json() == result
+    assert api.post(api.in_world(route + "/decisions"), body).json() == result
     assert len(transport.requests) == 1
-    lookup = route + "/decisions/" + body["idempotency_key"]
+    lookup = api.in_world(route + "/decisions/" + body["idempotency_key"])
     assert api.get(lookup).json() == result
     assert api.stranger_get(lookup).status_code == 404
-    assert api.stranger_post(route + "/decisions", body).status_code == 404
-    assert api.client.post(route + "/decisions", json=body).status_code == 401
+    assert api.stranger_post(api.in_world(route + "/decisions"), body).status_code == 404
+    assert api.client.post(api.in_world(route + "/decisions"), json=body).status_code == 401
     assert (
-        api.post(route + "/decisions", body | {"idempotency_key": str(uuid.uuid4())}).status_code
+        api.post(
+            api.in_world(route + "/decisions"), body | {"idempotency_key": str(uuid.uuid4())}
+        ).status_code
         == 409
     )
     chosen = step(api, route)
@@ -137,8 +142,8 @@ def test_authenticated_recorded_model_choice_retry_reload_replay(
     assert person["target"]["target_id"] == "authored:new-marker:visit"
     completed = step(api, route)
     api.client.app.state.society_decision_provider = None
-    assert api.get(route).json() == completed
-    replay = api.get(route + "/replay")
+    assert api.get(api.in_world(route)).json() == completed
+    replay = api.get(api.in_world(route + "/replay"))
     assert replay.status_code == 200, replay.text
     assert replay.json()["replay_verified"]
     assert replay.json()["state_sha256"] == completed["state_sha256"]
@@ -148,7 +153,7 @@ def test_authenticated_recorded_model_choice_retry_reload_replay(
         (uuid.UUID(completed["society_id"]),),
     ).fetchall()
     assert bindings == [{"tick": 5, "disposition": "applied"}]
-    events = api.get(route + "/events?limit=256").json()["events"]
+    events = api.get(api.in_world(route + "/events?limit=256")).json()["events"]
     assert any(e["event_kind"] == "decision_applied" for e in events)
     assert len(completed["state"]["inhabitants"]) == 128
 
@@ -176,7 +181,7 @@ def test_reservation_commits_before_inference_retry_pending_and_edit_makes_resul
                     "and version_id=%s for update nowait",
                     (repo.workspace_id, version),
                 ).fetchone()
-            pending = api.post(route + "/decisions", body)
+            pending = api.post(api.in_world(route + "/decisions"), body)
             assert pending.status_code == 200, pending.text
             assert pending.json()["status"] == "in_progress"
             assert pending.json()["decision"] is None
@@ -188,7 +193,7 @@ def test_reservation_commits_before_inference_retry_pending_and_edit_makes_resul
             return adapter.propose(context)
 
     api.client.app.state.society_decision_provider = DuringInference()
-    response = api.post(route + "/decisions", body)
+    response = api.post(api.in_world(route + "/decisions"), body)
     assert response.status_code == 200, response.text
     result = response.json()
     assert len(calls) == len(transport.requests) == 1
@@ -196,8 +201,8 @@ def test_reservation_commits_before_inference_retry_pending_and_edit_makes_resul
     assert result["decision"]["reason"] == "decision_context_changed"
     state = step(api, route)
     assert state["state"]["social"]["last_decision_seq"] == 1
-    assert api.get(route + "/replay").json()["replay_verified"]
-    assert api.post(route + "/decisions", body).json() == result
+    assert api.get(api.in_world(route + "/replay")).json()["replay_verified"]
+    assert api.post(api.in_world(route + "/decisions"), body).json() == result
 
 
 def test_withdrawal_during_inference_records_unavailable_without_returning_context(
@@ -214,10 +219,10 @@ def test_withdrawal_during_inference_records_unavailable_without_returning_conte
             return adapter.propose(context)
 
     api.client.app.state.society_decision_provider = WithdrawingProvider()
-    response = api.post(route + "/decisions", body)
+    response = api.post(api.in_world(route + "/decisions"), body)
     assert response.status_code == 424, response.text
     assert "own_beliefs" not in response.text
-    assert api.get(route + "/decisions/" + body["idempotency_key"]).status_code == 424
+    assert api.get(api.in_world(route + "/decisions/" + body["idempotency_key"])).status_code == 424
     receipt = repo.connection.execute(
         "select document from world_society_decision where request_id=%s",
         (uuid.UUID(body["idempotency_key"]),),
@@ -229,25 +234,26 @@ def test_withdrawal_during_inference_records_unavailable_without_returning_conte
     repo.record_input(version, seal(unavailable))
     repo.connection.commit()
     response = api.post(
-        route + "/steps", {key: body[key] for key in ("base_tick", "base_state_sha256")}
+        api.in_world(route + "/steps"),
+        {key: body[key] for key in ("base_tick", "base_state_sha256")},
     )
     assert response.status_code == 200, response.text
     assert all(
         not agent["beliefs"] and not agent["observations"]
         for agent in response.json()["state"]["social"]["agents"].values()
     )
-    assert api.get(route).status_code == 200
-    assert api.get(route + "/replay").status_code == 424
+    assert api.get(api.in_world(route)).status_code == 200
+    assert api.get(api.in_world(route + "/replay")).status_code == 424
 
 
 def test_unavailable_provider_durable_pending_and_branch_scoped_requests(social):
     api, repo, version, route, _, _, body = social
     api.client.app.state.society_decision_provider = None
-    response = api.post(route + "/decisions", body)
+    response = api.post(api.in_world(route + "/decisions"), body)
     assert response.status_code == 200, response.text
     assert response.json()["decision"]["reason"] == "provider_not_configured"
     step(api, route)
-    state = api.get(route).json()
+    state = api.get(api.in_world(route)).json()
     pending_id = uuid.uuid4()
     with repo.connection.transaction():
         prepared, fresh = SocietyDecisionRepository(repo).prepare(
@@ -264,12 +270,12 @@ def test_unavailable_provider_durable_pending_and_branch_scoped_requests(social)
         "base_tick": state["current_tick"],
         "base_state_sha256": state["state_sha256"],
     }
-    assert api.post(route + "/decisions", retry).json() == prepared
+    assert api.post(api.in_world(route + "/decisions"), retry).json() == prepared
     other_version = api.version("Separate branch")
     other_route = f"/world/versions/{other_version['version_id']}/society"
-    assert api.get(other_route + "/decisions/" + str(pending_id)).status_code == 404
-    assert api.post(route + "/decisions", retry | {"base_tick": 0}).status_code == 409
-    assert api.get(route + "/replay").json()["replay_verified"]
+    assert api.get(api.in_world(other_route + "/decisions/" + str(pending_id))).status_code == 404
+    assert api.post(api.in_world(route + "/decisions"), retry | {"base_tick": 0}).status_code == 409
+    assert api.get(api.in_world(route + "/replay")).json()["replay_verified"]
 
 
 def test_unknown_model_target_is_recorded_rejected_and_state_change_during_call_is_stale(
@@ -293,7 +299,7 @@ def test_unknown_model_target_is_recorded_rejected_and_state_change_during_call_
     )
     adapter = SocietyDecisionProvider(client, Role.REASONING_CHEAP, "a" * 64)
     api.client.app.state.society_decision_provider = adapter
-    result = api.post(route + "/decisions", body).json()
+    result = api.post(api.in_world(route + "/decisions"), body).json()
     assert result["decision"]["status"] == "rejected"
     assert result["decision"]["reason"] == "target_not_known_to_agent"
     state = step(api, route)
@@ -312,9 +318,9 @@ def test_unknown_model_target_is_recorded_rejected_and_state_change_during_call_
             return adapter.propose(context)
 
     api.client.app.state.society_decision_provider = AdvancingProvider()
-    result = api.post(route + "/decisions", next_body)
+    result = api.post(api.in_world(route + "/decisions"), next_body)
     assert result.status_code == 200, result.text
     assert result.json()["decision"]["status"] == "stale"
     state = step(api, route)
     assert state["state"]["social"]["last_decision_seq"] == 2
-    assert api.get(route + "/replay").json()["replay_verified"]
+    assert api.get(api.in_world(route + "/replay")).json()["replay_verified"]

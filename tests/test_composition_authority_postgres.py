@@ -14,6 +14,7 @@ import json
 import threading
 import time
 import uuid
+from urllib.parse import urlencode
 
 import pytest
 from exulanica.api.app import create_app
@@ -62,6 +63,7 @@ from test_world_objects_api import objects_api as imported_objects_api  # noqa: 
 from test_world_objects_postgres import another_connection
 from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -102,22 +104,25 @@ def reviewed(version, *, asset_key="cc0.marker-cube", place=None, base=None, **e
     }
 
 
-def world_query(world_id):
-    return "" if world_id is None else f"?world_id={world_id}"
+def world_query(api, world_id=None):
+    """The query naming the world a request addresses: ``world_id``, else ``api``'s own."""
+    return "?" + urlencode({"world_id": world_id or api.world_id})
 
 
 def preview(api, version_id, body, world_id=None):
     return api.post(
-        f"/world/versions/{version_id}/compositions/preview{world_query(world_id)}", body
+        f"/world/versions/{version_id}/compositions/preview{world_query(api, world_id)}", body
     )
 
 
 def apply(api, version_id, body, world_id=None):
-    return api.post(f"/world/versions/{version_id}/compositions/apply{world_query(world_id)}", body)
+    return api.post(
+        f"/world/versions/{version_id}/compositions/apply{world_query(api, world_id)}", body
+    )
 
 
 def read(api, version_id, world_id=None):
-    response = api.get(f"/world/versions/{version_id}{world_query(world_id)}")
+    response = api.get(f"/world/versions/{version_id}{world_query(api, world_id)}")
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -206,7 +211,7 @@ def test_a_starter_world_composes_reopens_and_undoes_through_its_saved_entry(obj
     before = read(objects_api, version_id, world_id)
     body = reviewed(before, place=placement(region_id="region:starter"))
 
-    # Without the world, the starter's version is another world's version: not found.
+    # In the fixture's world, the starter's version is another world's version: not found.
     missing = preview(objects_api, version_id, body)
     assert missing.status_code == 404
     assert missing.json()["code"] == "unknown_reference"
@@ -232,7 +237,7 @@ def test_a_starter_world_composes_reopens_and_undoes_through_its_saved_entry(obj
     assert [o["object_id"] for o in reopened["objects"]] == ["object:lantern"]
 
     undone = objects_api.post(
-        f"/world/versions/{version_id}/objects/undo?world_id={world_id}",
+        f"/world/versions/{version_id}/objects/undo{world_query(objects_api, world_id)}",
         {
             "base_state_sha256": placed["state_sha256"],
             "saved_entry": {
@@ -390,15 +395,17 @@ def test_a_preview_without_placement_reports_the_source_first(objects_api):
 # -- identity of the addressed version -------------------------------------------------------
 
 
-def test_absent_foreign_and_other_world_versions_answer_the_same_bytes(objects_api):
+def test_absent_foreign_and_other_world_versions_answer_the_same_bytes(objects_api, repository):
     version = objects_api.version()
     body = reviewed(version)
+    # The stranger holds a world of the same id, so its request reaches the version it names.
+    registered_world(repository.connection, objects_api.stranger_workspace_id)
     for route in (preview, apply):
         absent = route(objects_api, uuid.uuid4(), body)
         other_world = route(objects_api, version["version_id"], body, "world:authored:elsewhere")
         foreign = objects_api.client.post(
             f"/world/versions/{version['version_id']}/compositions/"
-            f"{'preview' if route is preview else 'apply'}",
+            f"{'preview' if route is preview else 'apply'}{world_query(objects_api)}",
             headers={"Authorization": f"Bearer {STRANGER_TOKEN}"},
             json=body,
         )
@@ -504,23 +511,30 @@ def test_an_object_whose_bytes_went_missing_can_still_be_moved_removed_and_undon
     version = objects_api.add(objects_api.version()).json()
     remove_blob(objects_api.store, CUBE)
     path = f"/world/versions/{version['version_id']}/objects"
+    world = world_query(objects_api)
     moved = objects_api.post(
-        f"{path}/object:lantern/move",
+        f"{path}/object:lantern/move{world}",
         {"base_state_sha256": version["state_sha256"], "transform": transform(x_mm=99)},
     )
     assert moved.status_code == 200, moved.text
     removed = objects_api.post(
-        f"{path}/object:lantern/remove", {"base_state_sha256": moved.json()["state_sha256"]}
+        f"{path}/object:lantern/remove{world}",
+        {"base_state_sha256": moved.json()["state_sha256"]},
     )
     assert removed.status_code == 200, removed.text
-    undone = objects_api.post(f"{path}/undo", {"base_state_sha256": removed.json()["state_sha256"]})
+    undone = objects_api.post(
+        f"{path}/undo{world}", {"base_state_sha256": removed.json()["state_sha256"]}
+    )
     assert undone.status_code == 200, undone.text
     assert undone.json()["objects"][0]["removed"] is False
     assert undone.json()["objects"][0]["asset"]["availability"] == "unavailable_asset"
 
 
 def test_a_repository_without_a_store_refuses_to_add_an_object(repository, tmp_path):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     preview_candidate = structures.preview(structural_candidate(), proposed_by=uuid.uuid4())
     snapshot = structures.apply(
         preview_candidate.preview_id,
@@ -529,7 +543,7 @@ def test_a_repository_without_a_store_refuses_to_add_an_object(repository, tmp_p
         base_reconstruction_sha256=preview_candidate.base_reconstruction_sha256,
         committed_by=uuid.uuid4(),
     )
-    blind = WorldObjectRepository(repository.connection, repository.workspace_id)
+    blind = WorldObjectRepository(repository.connection, repository.workspace_id, world_id=world_id)
     version = blind.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="No store", created_by=uuid.uuid4()
     )
@@ -554,7 +568,9 @@ def test_a_repository_without_a_store_refuses_to_add_an_object(repository, tmp_p
 
     store = LocalContentAddressedStore(tmp_path / "seeded")
     seed_reviewed_assets(store)
-    seeing = WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
+    seeing = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id, store=store
+    )
     added = seeing.add_object(
         version.version_id, lantern, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
     )
@@ -585,10 +601,11 @@ def test_a_version_whose_style_is_no_longer_live_composes_like_the_object_route(
     objects_api, repository
 ):
     """No style gate: the durable object route has none, so composition must not invent one."""
-    initial = objects_api.get("/world/styles/current").json()
+    world = world_query(objects_api)
+    initial = objects_api.get(f"/world/styles/current{world}").json()
     historical = initial["current"]["version_id"]
     pinned = objects_api.post(
-        "/world/versions",
+        f"/world/versions{world}",
         {
             "title": "Pinned appearance",
             "source_snapshot_id": str(objects_api.snapshot_id),
@@ -598,14 +615,14 @@ def test_a_version_whose_style_is_no_longer_live_composes_like_the_object_route(
     moved = _appearance_preview(objects_api, initial, vitality=0.25)
     assert moved.status_code == 201, moved.text
     applied_style = objects_api.post(
-        f"/world/styles/previews/{moved.json()['preview_id']}/apply",
+        f"/world/styles/previews/{moved.json()['preview_id']}/apply{world}",
         {
             "base_style_version_id": initial["current"]["version_id"],
             "base_topology_digest": initial["current_topology_digest"],
         },
     )
     assert applied_style.status_code in {200, 201}, applied_style.text
-    live = objects_api.get("/world/styles/current").json()["current"]["version_id"]
+    live = objects_api.get(f"/world/styles/current{world}").json()["current"]["version_id"]
     assert live != historical
 
     assert (
@@ -616,7 +633,7 @@ def test_a_version_whose_style_is_no_longer_live_composes_like_the_object_route(
     assert composed_result.status_code == 201, composed_result.text
     assert composed_result.json()["style_version_id"] == historical
     twin = objects_api.post(
-        "/world/versions",
+        f"/world/versions{world}",
         {
             "title": "Pinned twin",
             "source_snapshot_id": str(objects_api.snapshot_id),
@@ -729,6 +746,8 @@ def environment_api(composed, spine_schema, monkeypatch):
     with TestClient(create_app(services, verify=False)) as client:
 
         class Api:
+            world_id = composed.worlds.world_id
+
             def post(self, path, body):
                 return client.post(path, headers=headers, json=body)
 
@@ -1097,8 +1116,12 @@ def test_two_concurrent_applies_on_one_base_leave_one_winner(objects_api, reposi
     b = another_connection(spine_schema, repository.workspace_id)
     watcher = another_connection(spine_schema, repository.workspace_id)
     try:
-        repo_a = WorldObjectRepository(a, repository.workspace_id, store=objects_api.store)
-        repo_b = WorldObjectRepository(b, repository.workspace_id, store=objects_api.store)
+        repo_a = WorldObjectRepository(
+            a, repository.workspace_id, world_id=objects_api.world_id, store=objects_api.store
+        )
+        repo_b = WorldObjectRepository(
+            b, repository.workspace_id, world_id=objects_api.world_id, store=objects_api.store
+        )
 
         def request(subject):
             return CompositionRequest(
@@ -1204,8 +1227,12 @@ def test_preview_names_one_snapshot_while_a_writer_commits_between_its_reads(
     reader = another_connection(spine_schema, repository.workspace_id)
     writer = another_connection(spine_schema, repository.workspace_id)
     try:
-        repo = WorldObjectRepository(reader, repository.workspace_id, store=objects_api.store)
-        other = WorldObjectRepository(writer, repository.workspace_id, store=objects_api.store)
+        repo = WorldObjectRepository(
+            reader, repository.workspace_id, world_id=objects_api.world_id, store=objects_api.store
+        )
+        other = WorldObjectRepository(
+            writer, repository.workspace_id, world_id=objects_api.world_id, store=objects_api.store
+        )
         original = WorldObjectRepository.validate_object_placement
         raced = []
 
@@ -1302,7 +1329,12 @@ def test_environment_preview_runs_in_read_only_transactions(composed, spine_sche
     composed.worlds.connection.commit()
     connection = _read_only(spine_schema, composed.worlds.workspace_id)
     try:
-        repo = WorldObjectRepository(connection, composed.worlds.workspace_id, store=composed.store)
+        repo = WorldObjectRepository(
+            connection,
+            composed.worlds.workspace_id,
+            world_id=composed.worlds.world_id,
+            store=composed.store,
+        )
         for feature in (False, True):
             request = CompositionRequest(
                 base_state_sha256=composed.version.state_sha256,
@@ -1485,6 +1517,7 @@ def test_a_real_society_runtime_refusal_rolls_apply_back(runtime_world):
     objects = WorldObjectRepository(
         w["connection"],
         w["workspace"],
+        world_id=w["binding"].world_id,
         store=w["store"],
         on_edit=lambda vid: missing.authored_edit(w["connection"], w["session"], vid),
     )
@@ -1509,7 +1542,9 @@ def test_a_real_society_runtime_refusal_rolls_apply_back(runtime_world):
 def test_a_purposeful_society_without_an_adapter_refuses_apply(runtime_world):
     w = runtime_world
     create_society(w)
-    direct = WorldObjectRepository(w["connection"], w["workspace"], store=w["store"])
+    direct = WorldObjectRepository(
+        w["connection"], w["workspace"], world_id=w["binding"].world_id, store=w["store"]
+    )
     version = direct.version(w["binding"].version_id)
     request = CompositionRequest(
         base_state_sha256=version.state_sha256,

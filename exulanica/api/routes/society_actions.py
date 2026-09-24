@@ -11,15 +11,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection
-from exulanica.world.models import DEFAULT_WORLD_ID
+from exulanica.api.world_scope import WorldId
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_action_repository import SocietyActionRepository
 from exulanica.world.society_actions import ActionIntent
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/actions", tags=["society"])
-
-#: Which saved world the authored version belongs to; see ``routes/society.py``.
-WorldId = Annotated[str, Query(min_length=1, max_length=200)]
 
 
 class GoToIntent(BaseModel):
@@ -46,8 +44,9 @@ def repository(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: str = DEFAULT_WORLD_ID,
+    world_id: str,
 ) -> SocietyActionRepository:
+    require_world(connection, session.workspace_id, world_id)
     authorizer = getattr(request.app.state, "society_input_authorizer", None)
     return SocietyActionRepository(
         connection,
@@ -79,7 +78,7 @@ def record_action(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     intent = ActionIntent(**body.intent.model_dump())
     return call(
@@ -101,7 +100,7 @@ def action_events(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
     limit: Annotated[int, Query(ge=1, le=128)] = 64,
 ) -> Any:
     return call(
@@ -120,7 +119,7 @@ def read_action(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     return call(
         lambda: repository(connection, session, request, world_id).read(version_id, request_id)

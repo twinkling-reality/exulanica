@@ -84,6 +84,7 @@ def input_history(world):
 def test_real_runtime_http_edit_undo_advance_reload_replay_and_scope(runtime_app):
     w, make_app = runtime_app
     binding = w["binding"]
+    scope = {"world_id": binding.world_id}
     version_route = f"/world/versions/{binding.version_id}"
     route = version_route + "/society"
     create_body = {
@@ -93,8 +94,8 @@ def test_real_runtime_http_edit_undo_advance_reload_replay_and_scope(runtime_app
         "profile": "exulanica-society/v2",
     }
     with TestClient(make_app()) as client:
-        assert client.post(route, json=create_body).status_code == 401
-        response = client.post(route, headers=OWNER_HEADERS, json=create_body)
+        assert client.post(route, params=scope, json=create_body).status_code == 401
+        response = client.post(route, headers=OWNER_HEADERS, params=scope, json=create_body)
         assert response.status_code == 200, response.text
         first = response.json()
         assert first["profile"] == "exulanica-society/v2"
@@ -109,6 +110,7 @@ def test_real_runtime_http_edit_undo_advance_reload_replay_and_scope(runtime_app
         response = client.post(
             version_route + "/objects",
             headers=OWNER_HEADERS,
+            params=scope,
             json={
                 "base_state_sha256": w["version"].state_sha256,
                 "object_id": "object:http-rest-pad",
@@ -136,6 +138,7 @@ def test_real_runtime_http_edit_undo_advance_reload_replay_and_scope(runtime_app
         response = client.post(
             version_route + "/objects/undo",
             headers=OWNER_HEADERS,
+            params=scope,
             json={"base_state_sha256": added["state_sha256"]},
         )
         assert response.status_code == 200, response.text
@@ -147,30 +150,33 @@ def test_real_runtime_http_edit_undo_advance_reload_replay_and_scope(runtime_app
         response = client.post(
             route + "/steps",
             headers=OWNER_HEADERS,
+            params=scope,
             json={"base_tick": first["current_tick"], "base_state_sha256": first["state_sha256"]},
         )
         assert response.status_code == 200, response.text
         advanced = response.json()
         assert advanced["current_tick"] == 1 and advanced["input_seq"] == 3
-        response = client.get(route + "/events", headers=OWNER_HEADERS)
+        response = client.get(route + "/events", headers=OWNER_HEADERS, params=scope)
         assert response.status_code == 200, response.text
         events = response.json()
         assert events["events"]
-        response = client.get(route + "/replay", headers=OWNER_HEADERS)
+        response = client.get(route + "/replay", headers=OWNER_HEADERS, params=scope)
         assert response.status_code == 200, response.text
         replay = response.json()
         assert replay["replay_verified"] and replay["state_sha256"] == advanced["state_sha256"]
 
     with TestClient(make_app()) as reloaded:
         for suffix, expected in (("", advanced), ("/events", events), ("/replay", replay)):
-            response = reloaded.get(route + suffix, headers=OWNER_HEADERS)
+            response = reloaded.get(route + suffix, headers=OWNER_HEADERS, params=scope)
             assert response.status_code == 200, response.text
             assert response.json() == expected
-            assert reloaded.get(route + suffix, headers=STRANGER_HEADERS).status_code == 404
+            stranger = reloaded.get(route + suffix, headers=STRANGER_HEADERS, params=scope)
+            assert stranger.status_code == 404
         assert (
             reloaded.post(
                 route + "/steps",
                 headers=STRANGER_HEADERS,
+                params=scope,
                 json={
                     "base_tick": advanced["current_tick"],
                     "base_state_sha256": advanced["state_sha256"],
@@ -182,6 +188,7 @@ def test_real_runtime_http_edit_undo_advance_reload_replay_and_scope(runtime_app
             reloaded.post(
                 version_route + "/objects/undo",
                 headers=STRANGER_HEADERS,
+                params=scope,
                 json={"base_state_sha256": w["version"].state_sha256},
             ).status_code
             == 404

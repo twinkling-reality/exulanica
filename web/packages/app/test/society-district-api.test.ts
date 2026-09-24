@@ -22,7 +22,8 @@ describe('authorized society district frame',()=>{
   it('authenticates the exact version route',async()=>{
     const fetch=vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(response())));
     await new SocietyDistrictClient({baseUrl:'https://api.test',token:'test',fetch}).read(scope);
-    expect(fetch).toHaveBeenCalledWith('https://api.test/world/versions/version/society/district',expect.objectContaining({headers:{authorization:'Bearer test'}}));
+    // Read in the scope's own world, which the registration it answers with must also name.
+    expect(fetch).toHaveBeenCalledWith(`https://api.test/world/versions/version/society/district?world_id=${encodeURIComponent(scope.worldId)}`,expect.objectContaining({headers:{authorization:'Bearer test'}}));
   });
   it('rejects artifact tampering, including whitespace changes despite identical parsed objects',async()=>{
     for(const change of [{base_json:baseJson+'\n'},{interpretation_json:interpretationJson+' '},{base_artifact_sha256:'a'.repeat(64)}]) {

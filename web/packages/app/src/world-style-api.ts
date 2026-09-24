@@ -22,6 +22,7 @@ import {
   worldStyleRecipe,
   type WorldStyleRegistryDocument,
 } from '@exulanica/presentation';
+import { worldPath } from './world-scope.js';
 
 export type WorldStyleOrigin = 'user' | 'settings' | 'companion';
 export type WorldStyleScope =
@@ -188,7 +189,7 @@ function savedEntryBody(
 export class WorldStyleClient {
   readonly #transport: Transport;
   readonly #ids: IdFactory;
-  readonly #worldId: string | undefined;
+  readonly #worldId: string;
   readonly #savedEntry: (() => SavedStyleEntryBinding) | undefined;
   readonly #onSavedEntryAdvanced:
     | ((version: WorldStyleVersionRecord, base: SavedStyleEntryBinding) => void)
@@ -202,7 +203,8 @@ export class WorldStyleClient {
 
   constructor(options: TransportOptions & {
     readonly ids?: IdFactory;
-    readonly worldId?: string;
+    /** The world whose appearance this client reads and changes. */
+    readonly worldId: string;
     readonly savedEntry?: () => SavedStyleEntryBinding;
     readonly onSavedEntryAdvanced?: (
       version: WorldStyleVersionRecord,
@@ -230,7 +232,8 @@ export class WorldStyleClient {
 
   async connect(selectedVersionId?: string): Promise<WorldStyleConnection> {
     const [catalog, state, versions] = await Promise.all([
-      this.#transport.getJson<unknown>(this.#path('/world/styles/catalog')),
+      // The reviewed catalog is the same for every world, so this read names none.
+      this.#transport.getJson<unknown>('/world/styles/catalog'),
       this.#transport.getJson<unknown>(this.#path('/world/styles/current')),
       this.#transport.getJson<unknown>(this.#path('/world/styles/versions')),
     ]);
@@ -495,8 +498,7 @@ export class WorldStyleClient {
   }
 
   #path(path: string): string {
-    if (this.#worldId === undefined) return path;
-    return `${path}${path.includes('?') ? '&' : '?'}world_id=${encodeURIComponent(this.#worldId)}`;
+    return worldPath(path, this.#worldId);
   }
 }
 

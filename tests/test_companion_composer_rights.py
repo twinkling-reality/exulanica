@@ -170,6 +170,7 @@ def _ask(observed, client: ModelClient):
         client,
         "What does the sign say?",
         Session(workspace_id=observed.repository.workspace_id, actor=ACCOUNT),
+        world_id=None,
         plan=SelectionPlan(intent=Intent.CAPTURES, semantic_query="gullfoss"),
         store=observed.store,
         before_compose=composer_rights_check(
@@ -213,6 +214,7 @@ def test_answering_without_a_right_check_is_refused_outright(observed):
             client,
             "What does the sign say?",
             Session(workspace_id=observed.repository.workspace_id, actor=ACCOUNT),
+            world_id=None,
             plan=SelectionPlan(intent=Intent.CAPTURES, semantic_query="gullfoss"),
             before_compose=None,
         )

@@ -34,6 +34,7 @@ from exulanica.world_package.projector import (
 )
 
 from conftest import iso, write_photo
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -101,12 +102,17 @@ def people(repository, photo_dir, tmp_path):
 
 
 def _export(repository, output: Path):
+    """The package of the fixture world, registered first because a package names its world.
+
+    The people are in the workspace's memory graph, which every world's package carries.
+    """
     return project_world_package(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         output=output,
         private_key=Ed25519PrivateKey.generate(),
+        world_id=registered_world(repository.connection, repository.workspace_id),
     )
 
 

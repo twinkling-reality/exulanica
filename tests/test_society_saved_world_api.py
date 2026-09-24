@@ -30,6 +30,7 @@ from fastapi.testclient import TestClient
 
 import test_society_authored_world_postgres as helpers
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import registered_world
 
 saved_world = helpers.saved_world
 pytestmark = pytest.mark.postgres
@@ -217,12 +218,15 @@ def test_one_request_brings_inhabitants_in_and_asking_again_changes_nothing(worl
         assert places["clearance_mm"] == 450
 
         assert client.get(society_route, headers=STRANGER, params=scope).status_code == 404
-        # Without the saved world named, the version is not in the default world: a missing
-        # version, and still nothing written.
+        # Named in another world this workspace holds, the fixture's, the version is not in it: a
+        # missing version, and still nothing written.
+        elsewhere = {"world_id": registered_world(world["connection"], world["workspace"])}
+        world["connection"].commit()
         assert (
             client.post(
                 society_route,
                 headers=OWNER,
+                params=elsewhere,
                 json={"region_id": world["binding"].region_id, "seed": "8b" * 32, "profile": V2},
             ).status_code
             == 404
@@ -368,8 +372,8 @@ def test_one_claim_per_round_across_worlds_and_it_runs_only_in_its_own(saved_wor
         controls(connection, world, runtime, world_id).configure(
             version_id, actor=world["session"].actor, base_revision=0, mode="playing", speed=1
         )
-    # The second world has waited longer, so it is claimed first, whatever world the claiming
-    # repository was built for.
+    # The second world has waited longer, so it is claimed first. The claim is the workspace's,
+    # not any one world's, and names the world it was taken in.
     for world_id, seconds in ((world["world_id"], 5), (second_id, 50)):
         connection.execute(
             "update world_society_control c set next_due_at=clock_timestamp()"
@@ -379,13 +383,17 @@ def test_one_claim_per_round_across_worlds_and_it_runs_only_in_its_own(saved_wor
         )
     connection.commit()
     claiming = controls(connection, world, runtime, world["world_id"])
-    first = claiming.claim()
+    first = SocietyControlRepository.claim_in_workspace(
+        connection, world["workspace"], input_authorizer=claiming.input_authorizer
+    )
     assert (first.world_id, first.version_id) == (second_id, second_version)
     with pytest.raises(LeaseLost, match="another world"):
         claiming.execute(first)
     executed = controls(connection, world, runtime, second_id).execute(first)
     assert executed["receipt"]["kind"] == "advanced"
-    second = claiming.claim()
+    second = SocietyControlRepository.claim_in_workspace(
+        connection, world["workspace"], input_authorizer=claiming.input_authorizer
+    )
     assert (second.world_id, second.version_id) == (world["world_id"], world["binding"].version_id)
     assert claiming.execute(second)["receipt"]["kind"] == "advanced"
 

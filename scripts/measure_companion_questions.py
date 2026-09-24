@@ -174,7 +174,7 @@ def packet_for(connection, plan: dict[str, Any], session: Session):
     a differently-configured second system.
     """
     parsed = SelectionPlan.model_validate(plan)
-    result = execute(connection, validate(connection, parsed, session))
+    result = execute(connection, validate(connection, parsed, session), world_id=None)
     return build_packet(connection, result, workspace_id=session.workspace_id), result
 
 

@@ -14,7 +14,9 @@ def test_observer_sees_every_authored_state_before_next_tick(objects_api):
     seen = []
 
     def observe(connection, session, version_id):
-        version = WorldObjectRepository(connection, session.workspace_id).version(version_id)
+        version = WorldObjectRepository(
+            connection, session.workspace_id, world_id=api.world_id
+        ).version(version_id)
         seen.append(
             (version.edit_seq, version.state_sha256, tuple(o.object_id for o in version.objects))
         )
@@ -25,7 +27,7 @@ def test_observer_sees_every_authored_state_before_next_tick(objects_api):
     assert added.status_code == 201, added.text
     held = added.json()
     undo = api.post(
-        f"/world/versions/{held['version_id']}/objects/undo",
+        api.in_world(f"/world/versions/{held['version_id']}/objects/undo"),
         {
             "base_state_sha256": held["state_sha256"],
         },
@@ -43,7 +45,9 @@ def test_observer_failure_rolls_back_object_and_edit_history(objects_api):
     version = api.version()
 
     def refuse(connection, session, version_id):
-        current = WorldObjectRepository(connection, session.workspace_id).version(version_id)
+        current = WorldObjectRepository(
+            connection, session.workspace_id, world_id=api.world_id
+        ).version(version_id)
         assert current.edit_seq == 1
         assert len(current.objects) == 1
         raise InvalidObjectState("society input could not be recorded")
@@ -51,7 +55,7 @@ def test_observer_failure_rolls_back_object_and_edit_history(objects_api):
     api.client.app.state.society_authored_edit = refuse
     response = api.add(version)
     assert response.status_code == 409, response.text
-    reloaded = api.get(f"/world/versions/{version['version_id']}").json()
+    reloaded = api.get(api.in_world(f"/world/versions/{version['version_id']}")).json()
     assert reloaded["state_sha256"] == version["state_sha256"]
     assert reloaded["edit_seq"] == 0
     assert reloaded["objects"] == []

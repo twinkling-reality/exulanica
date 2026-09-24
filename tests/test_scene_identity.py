@@ -60,6 +60,7 @@ from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world_package import diff_packages, project_world_package
 
 from conftest import CountingVisionModel, iso, write_photo, write_point_map
+from world_support import registered_world
 
 #: Suffixed, because a role is a CLUSTER object and the harness's "the database name must contain
 #: test" guard does not reach one. See the same comment in ``tests/test_purge.py``.
@@ -143,13 +144,18 @@ class SceneWorkspace:
         return Database(url=url)
 
     def export(self, output: Path, *, parent: str | None = None):
-        """Project a package the way the command line does, one consistent snapshot."""
+        """Project a package the way the command line does, one consistent snapshot.
+
+        The package is the fixture world's, registered first because a package names its
+        world. Scenes, captures and artifacts are workspace facts every world's package carries.
+        """
         return project_world_package(
             self.repository.connection,
             workspace_id=self.workspace_id,
             actor=uuid.uuid4(),
             output=output,
             private_key=Ed25519PrivateKey.generate(),
+            world_id=registered_world(self.repository.connection, self.workspace_id),
             parent_merkle_root_sha256=parent,
         )
 

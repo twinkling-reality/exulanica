@@ -51,6 +51,7 @@ from exulanica.world import WorldStyleRepository as Styles
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS, write_photo
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 
 def _structured_extraction() -> tuple[str, str]:
@@ -241,6 +242,8 @@ def test_the_whole_path_classifies_then_drafts_and_asks_for_nothing_else(
     outcome = propose_appearance(
         repository.connection, client, "make the horizon softer", session,
         current=current_reference(),
+        world_id=WORLD,
+        store=None,
     )
 
     assert outcome.kind is RequestKind.APPEARANCE
@@ -502,6 +505,8 @@ def test_a_question_is_classified_as_one_and_produces_no_proposal_and_no_refusal
     outcome = propose_appearance(
         repository.connection, client, "who is in these photographs?", session,
         current=current_reference(),
+        world_id=WORLD,
+        store=None,
     )
 
     assert outcome.kind is RequestKind.QUESTION
@@ -556,7 +561,9 @@ def test_the_catalogue_is_the_current_topologys_bound_evidence_and_is_bounded(
     repository, tmp_path, photo_dir
 ):
     _seed_world(repository, tmp_path, photo_dir, slots=MAX_REFERENCE_CATALOGUE + 6)
-    choices = source_catalogue(repository.connection, repository.workspace_id)
+    choices = source_catalogue(
+        repository.connection, repository.workspace_id, world_id=WORLD, store=None
+    )
 
     assert len(choices) == MAX_REFERENCE_CATALOGUE
     assert all(choice.evidence_span_id is not None for choice in choices)
@@ -564,7 +571,7 @@ def test_the_catalogue_is_the_current_topologys_bound_evidence_and_is_bounded(
 
 def test_a_slot_whose_evidence_is_recorded_as_missing_is_not_offered_as_a_reference(repository):
     """The topology stores a reason instead of a span for those, and a reference names something."""
-    styles = Styles(repository.connection, repository.workspace_id)
+    styles = _styles(repository)
     styles.register_topology(
         TopologyContract(
             "proposal-topology",
@@ -578,10 +585,14 @@ def test_a_slot_whose_evidence_is_recorded_as_missing_is_not_offered_as_a_refere
                     missing_reason="no evidence was recorded for this slot",
                 ),
             ),
+            world_id=WORLD,
         )
     )
 
-    assert source_catalogue(repository.connection, repository.workspace_id) == ()
+    assert (
+        source_catalogue(repository.connection, repository.workspace_id, world_id=WORLD, store=None)
+        == ()
+    )
 
 
 def test_a_world_with_no_bound_evidence_refuses_before_it_asks_the_drafter(repository):
@@ -592,12 +603,18 @@ def test_a_world_with_no_bound_evidence_refuses_before_it_asks_the_drafter(repos
     """
     client, transport = scripted(reply({"kind": "appearance"}), reply(draft()))
     session = Session(workspace_id=repository.workspace_id, actor=uuid.uuid4())
-    Styles(repository.connection, repository.workspace_id).register_topology(
-        TopologyContract("proposal-topology", ("region-a",))
+    _styles(repository).register_topology(
+        TopologyContract("proposal-topology", ("region-a",), world_id=WORLD)
     )
 
     outcome = propose_appearance(
-        repository.connection, client, "softer please", session, current=current_reference()
+        repository.connection,
+        client,
+        "softer please",
+        session,
+        current=current_reference(),
+        world_id=WORLD,
+        store=None,
     )
 
     assert isinstance(outcome.refusal, ProposalRefusal)
@@ -610,7 +627,13 @@ def test_a_workspace_with_no_reviewed_world_is_told_so_rather_than_given_a_confl
     session = Session(workspace_id=repository.workspace_id, actor=uuid.uuid4())
 
     outcome = propose_appearance(
-        repository.connection, client, "softer please", session, current=None
+        repository.connection,
+        client,
+        "softer please",
+        session,
+        current=None,
+        world_id=WORLD,
+        store=None,
     )
 
     assert isinstance(outcome.refusal, ProposalRefusal)
@@ -631,12 +654,30 @@ def test_a_draft_the_model_cannot_fill_twice_becomes_a_refusal_rather_than_an_ex
     _seed_world(repository, tmp_path, photo_dir)
 
     outcome = propose_appearance(
-        repository.connection, client, "softer please", session, current=current_reference()
+        repository.connection,
+        client,
+        "softer please",
+        session,
+        current=current_reference(),
+        world_id=WORLD,
+        store=None,
     )
 
     assert isinstance(outcome.refusal, ProposalRefusal)
     assert outcome.refusal.code is RefusalCode.NOT_DRAFTED
     assert transport.call_count == 3
+
+
+#: The world these proposals are drafted against, registered before its topology is.
+WORLD = FIXTURE_WORLD_ID
+
+
+def _styles(repository) -> Styles:
+    return Styles(
+        repository.connection,
+        repository.workspace_id,
+        world_id=registered_world(repository.connection, repository.workspace_id, WORLD),
+    )
 
 
 def _seed_world(repository, tmp_path, photo_dir, *, slots: int = 3) -> tuple[uuid.UUID, ...]:
@@ -660,7 +701,7 @@ def _seed_world(repository, tmp_path, photo_dir, *, slots: int = 3) -> tuple[uui
         ).fetchall()
     ]
     assert spans, "the ingest recorded no evidence span to bind a source slot to"
-    Styles(repository.connection, repository.workspace_id).register_topology(
+    _styles(repository).register_topology(
         TopologyContract(
             "proposal-topology",
             ("region-a",),
@@ -674,6 +715,7 @@ def _seed_world(repository, tmp_path, photo_dir, *, slots: int = 3) -> tuple[uui
                 )
                 for index in range(slots)
             ),
+            world_id=WORLD,
         )
     )
     return tuple(spans)
@@ -849,11 +891,13 @@ def test_the_evidence_catalogue_offers_only_the_current_topologys_slots(
     spans = _seed_world(repository, tmp_path, photo_dir, slots=2)
     offered = lambda: {  # noqa: E731
         choice.slot_key
-        for choice in source_catalogue(repository.connection, repository.workspace_id)
+        for choice in source_catalogue(
+            repository.connection, repository.workspace_id, world_id=WORLD, store=None
+        )
     }
     before = offered()
 
-    Styles(repository.connection, repository.workspace_id).register_topology(
+    _styles(repository).register_topology(
         TopologyContract(
             "later-topology",
             ("region-a",),
@@ -866,6 +910,7 @@ def test_the_evidence_catalogue_offers_only_the_current_topologys_slots(
                     missing_reason=None,
                 ),
             ),
+            world_id=WORLD,
         )
     )
     after = offered()

@@ -53,6 +53,7 @@ export class SourceMediaClient {
   readonly #revokeObjectUrl: (url: string) => void;
 
   constructor(options: TransportOptions & {
+    /** The world whose source topology `load` reads; the inventory alone needs none. */
     readonly worldId?: string;
     readonly topologyDigest?: string;
     readonly sourceSnapshotId?: string;
@@ -74,15 +75,20 @@ export class SourceMediaClient {
     accent: string,
     options: { readonly includeWorldTopology?: boolean } = {},
   ): Promise<SourceMediaSession> {
+    const includeWorldTopology = options.includeWorldTopology !== false;
+    if (includeWorldTopology && this.#worldId === undefined) {
+      // The workspace inventory is every world's; a world's topology is one world's, and there is
+      // no default world to read it from.
+      throw new TypeError('Reading a world\'s source topology needs the id of that world.');
+    }
     const inventory = parseInventory(await this.#transport.getJson<unknown>('/graph/sources'));
     let topology: readonly SourceMediaWire[] = [];
-    if (options.includeWorldTopology !== false) {
+    if (includeWorldTopology && this.#worldId !== undefined) {
       try {
         topology = parseSourceList(await this.#transport.getJson<unknown>(
           '/world/source-media',
-          this.#worldId === undefined && this.#topologyDigest === undefined
-            && this.#sourceSnapshotId === undefined ? undefined : {
-            ...(this.#worldId === undefined ? {} : { world_id: this.#worldId }),
+          {
+            world_id: this.#worldId,
             ...(this.#topologyDigest === undefined
               ? {} : { topology_digest: this.#topologyDigest }),
             ...(this.#sourceSnapshotId === undefined

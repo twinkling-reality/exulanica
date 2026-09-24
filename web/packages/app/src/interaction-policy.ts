@@ -7,6 +7,7 @@
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { AtlasPreferences } from './preferences.js';
+import { worldPath } from './world-scope.js';
 
 export type InteractionValue = boolean | number | string;
 
@@ -109,15 +110,18 @@ export function preferencesFromInteractionPolicy(
 export class InteractionPolicyClient {
   readonly #transport: Transport;
   readonly #ids: IdFactory;
+  readonly #worldId: string;
   #sequence: Promise<void> = Promise.resolve();
 
-  constructor(options: TransportOptions & { readonly ids?: IdFactory }) {
+  /** `worldId` is the world whose interaction policy this client reads and changes. */
+  constructor(options: TransportOptions & { readonly ids?: IdFactory; readonly worldId: string }) {
     this.#transport = new Transport(options);
     this.#ids = options.ids ?? (() => globalThis.crypto.randomUUID());
+    this.#worldId = options.worldId;
   }
 
   current(): Promise<InteractionPolicyState> {
-    return this.#transport.getJson('/world/interactions/current');
+    return this.#transport.getJson(worldPath('/world/interactions/current', this.#worldId));
   }
 
   /** Queue settings writes so a fast pair of choices cannot share a stale base. */
@@ -216,7 +220,7 @@ export class InteractionPolicyClient {
     if (Object.keys(patch).length === 0) return null;
     const proposalId = this.#ids();
     const preview = await this.#transport.postJson<InteractionPreviewWire>(
-      '/world/interactions/previews',
+      worldPath('/world/interactions/previews', this.#worldId),
       {
         proposal_id: proposalId,
         origin: input.origin,
@@ -243,7 +247,10 @@ export class InteractionPolicyClient {
 
   async #applyPreview(review: InteractionPolicyReview): Promise<void> {
     await this.#transport.postJson(
-      `/world/interactions/previews/${encodeURIComponent(review.previewId)}/apply`,
+      worldPath(
+        `/world/interactions/previews/${encodeURIComponent(review.previewId)}/apply`,
+        this.#worldId,
+      ),
       {
         base_policy_version_id: review.basePolicyVersionId,
         base_structure_snapshot_id: review.baseStructureSnapshotId,

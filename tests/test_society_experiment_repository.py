@@ -113,7 +113,9 @@ def experiment_case(objects_api, repository, ingest_spine):
         if not rights["available"] and document["availability"] == "available":
             raise UnavailableSocietyInput("fixture source authorization withdrawn")
 
-    societies = SocietyRepository(connection, workspace, input_authorizer=authorize)
+    societies = SocietyRepository(
+        connection, workspace, world_id=version["world_id"], input_authorizer=authorize
+    )
     created = societies.create(
         version_id,
         place_id=place_id,
@@ -150,6 +152,7 @@ def experiment_case(objects_api, repository, ingest_spine):
         "workspace": workspace,
         "actor": objects_api.actor,
         "source_society_id": created["society_id"],
+        "world_id": version["world_id"],
         "version_id": version_id,
         "baseline": baseline,
         "treatment": treatment,
@@ -290,7 +293,9 @@ def test_local_runner_completes_reserved_attempt_and_terminal_retry_is_observati
     assert runner.run_reserved(session, attempt_id) == receipt
     assert len(calls) >= 4
     assert {status for _attempt_id, status in calls} == {"IDLE", "INTRANS"}
-    summary = case["repo"].attempt_summary(case["version_id"], experiment_id, attempt_id)
+    summary = case["repo"].attempt_summary(
+        case["version_id"], experiment_id, attempt_id, world_id=case["world_id"]
+    )
     assert summary["outcome"]["result_sha256"] == receipt.result_sha256
     after = case["connection"].execute(
         "select current_tick,state_sha256 from world_society where workspace_id=%s "
@@ -552,7 +557,9 @@ def test_local_runner_maps_actual_evidence_free_invalid_pair_to_terminal_failure
     monkeypatch.setattr(experiments, "execute_pair", execute_invalid_pair)
     receipt = runner.run_reserved(session, attempt_id)
     assert receipt.status == "failed" and receipt.result_sha256 is None
-    summary = case["repo"].attempt_summary(case["version_id"], experiment_id, attempt_id)
+    summary = case["repo"].attempt_summary(
+        case["version_id"], experiment_id, attempt_id, world_id=case["world_id"]
+    )
     assert summary["outcome"]["failure"]["code"] == "execution_refused"
     assert summary["outcome"]["failure"]["detail"].startswith("intervention_unreachable:")
 
@@ -882,3 +889,35 @@ def test_nonowner_role_cannot_discover_another_workspaces_experiment(
             (experiment_id,),
         ).fetchone()["n"]
     assert mine == 1 and theirs == 0
+
+
+def test_an_experiment_is_read_only_in_the_world_its_definition_binds(experiment_case):
+    """A version-addressed read in another world refuses exactly as a missing experiment does."""
+    case = experiment_case
+    repo, version_id = case["repo"], case["version_id"]
+    experiment_id, attempt_id = _reserve(case)
+    assert repo.definition_for_version(version_id, experiment_id, world_id=case["world_id"])
+    assert repo.attempt_summary(version_id, experiment_id, attempt_id, world_id=case["world_id"])
+    elsewhere = f"{case['world_id']}:elsewhere"
+    for read in (
+        lambda: repo.definition_for_version(version_id, experiment_id, world_id=elsewhere),
+        lambda: repo.attempt_summary(version_id, experiment_id, attempt_id, world_id=elsewhere),
+        lambda: repo.definition_for_version(version_id, uuid.uuid4(), world_id=case["world_id"]),
+    ):
+        with pytest.raises(UnknownExperiment, match="unavailable"):
+            read()
+    # Nor can a definition be prepared over the version's society from another world.
+    with pytest.raises(UnknownExperiment, match="experiment source is unavailable"):
+        repo.prepare_definition(
+            version_id,
+            uuid.uuid4(),
+            world_id=elsewhere,
+            baseline_input_seq=1,
+            treatment_input_seq=1,
+            intervention="noop",
+            target_id=None,
+            population=3,
+            warmup_ticks=2,
+            followup_ticks=3,
+            actor=case["actor"],
+        )

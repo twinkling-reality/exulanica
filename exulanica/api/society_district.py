@@ -33,8 +33,13 @@ def society_district_view(
     connection: psycopg.Connection,
     session: Session,
     version_id: uuid.UUID,
+    *,
+    world_id: str,
 ) -> SocietyDistrictView:
     """One locked read, using the same frame/version/source checks as society decisions.
+
+    ``world_id`` is the world the caller named. A version of another world is refused exactly as
+    a version with no registered district is, so the answer says nothing about other worlds.
 
     Strings preserve exact UTF-8 blob bytes, including whitespace and terminal newlines. The
     client verifies their artifact hashes before parsing; a parsed/re-serialized model would not
@@ -44,6 +49,8 @@ def society_district_view(
         binding = runtime._binding(session, version_id)
     except UnavailableSocietyInput as exc:
         raise UnknownWorldResource("no registered society district for this version") from exc
+    if binding.world_id != world_id:
+        raise UnknownWorldResource("no registered society district for this version")
     with connection.transaction():
         connection.execute("set transaction read only")
         runtime._lock(connection, session)

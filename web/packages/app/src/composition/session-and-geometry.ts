@@ -125,11 +125,24 @@ export async function openAppSession(
     }
   }
 
-  state.interactionPolicies = new InteractionPolicyClient(state.credentials);
-  const startupNotices: string[] = [];
+}
+
+/**
+ * Read the interaction settings the open world holds, and keep a client for writing them.
+ *
+ * Interaction policy belongs to a world, like its appearance, so it is read when a world opens
+ * rather than once at start-up: a world chosen later from the list gets its own settings, and no
+ * request is made for a world nobody opened. A failure keeps the device's own copy and says so.
+ */
+async function connectInteractionPolicy(
+  state: SessionState,
+  credentials: Credentials,
+  worldId: string,
+): Promise<string[]> {
+  state.interactionPolicies = new InteractionPolicyClient({ ...credentials, worldId });
   try {
     const interactionState = await new InteractionPolicyClient({
-      ...state.credentials, signal: AbortSignal.timeout(15_000),
+      ...credentials, worldId, signal: AbortSignal.timeout(15_000),
     }).current();
     if (interactionState.current !== null) {
       state.preferences = preferencesFromInteractionPolicy(
@@ -141,14 +154,11 @@ export async function openAppSession(
         // The durable server copy is authoritative; private browsing may reject its local cache.
       }
     }
+    return [];
   } catch (error) {
     state.interactionPolicies = null;
-    startupNotices.push(`Saved interaction settings unavailable: ${error instanceof Error ? error.message : 'the request failed'}`);
+    return [`Saved interaction settings unavailable: ${error instanceof Error ? error.message : 'the request failed'}`];
   }
-  state.sourceMediaNotices = Object.freeze([
-    ...startupNotices,
-    ...state.sourceMediaNotices,
-  ]);
 }
 
 /** Connect the exact world and appearance versions named by a chosen durable entry. */
@@ -221,9 +231,10 @@ export async function openWorldEntryContext(
   }
   state.sourceMediaSession?.dispose();
   state.sourceMediaSession = null;
+  const settingsNotices = await connectInteractionPolicy(state, state.credentials, entry.worldId);
   if (entry.sourceKind === 'authored') {
     state.previewSourceMedia = new Map();
-    state.sourceMediaNotices = Object.freeze([]);
+    state.sourceMediaNotices = Object.freeze(settingsNotices);
     return;
   }
   try {
@@ -241,6 +252,7 @@ export async function openWorldEntryContext(
     );
     state.previewSourceMedia = state.sourceMediaSession.catalog;
     state.sourceMediaNotices = Object.freeze([
+      ...settingsNotices,
       'Your saved changes and appearance reopen exactly. The surrounding memory layout reflects '
         + 'the latest source material you are allowed to view.',
       ...state.sourceMediaSession.issues.map((issue) => {
@@ -257,6 +269,7 @@ export async function openWorldEntryContext(
   } catch (error) {
     state.previewSourceMedia = new Map();
     state.sourceMediaNotices = Object.freeze([
+      ...settingsNotices,
       `Source media unavailable: ${error instanceof Error ? error.message : 'the request failed'}`,
     ]);
   }

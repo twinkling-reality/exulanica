@@ -34,6 +34,7 @@ from exulanica.world_package.package import MANIFEST_PATH, SIGNATURE_PATH, impor
 
 from conftest import write_photo
 from world_structure_fixtures import structural_candidate
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -61,27 +62,35 @@ def _apply(structures: WorldStructureRepository, candidate) -> object:
     )
 
 
-def _export(repository, output: Path, *, extensions=()):
+def _export(repository, output: Path, *, extensions=(), world_id: str = FIXTURE_WORLD_ID):
+    """The package of ``world_id``: the fixture world, where ``_one_version_one_object`` writes,
+    unless a test names another."""
     return project_world_package(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         output=output,
         private_key=Ed25519PrivateKey.generate(),
+        world_id=world_id,
         extensions=extensions,
     )
 
 
-def _reviewed_objects(repository, tmp_path: Path) -> WorldObjectRepository:
+def _reviewed_objects(repository, tmp_path: Path, *, world_id: str) -> WorldObjectRepository:
     store = LocalContentAddressedStore(tmp_path / "reviewed-assets")
     seed_reviewed_assets(store)
-    return WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
+    return WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id, store=store
+    )
 
 
 def _one_version_one_object(repository, tmp_path: Path):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     snapshot = _apply(structures, structural_candidate())
-    objects = _reviewed_objects(repository, tmp_path)
+    objects = _reviewed_objects(repository, tmp_path, world_id=world_id)
     version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Evening study", created_by=uuid.uuid4()
     )
@@ -111,8 +120,13 @@ def _one_version_one_object(repository, tmp_path: Path):
 
 def test_one_version_one_object_round_trips_through_a_signed_package(repository, tmp_path: Path):
     objects, snapshot, version = _one_version_one_object(repository, tmp_path)
-    plain = _export(repository, tmp_path / "plain.wmp")
-    extended = _export(repository, tmp_path / "extended.wmp", extensions=[authored.EXTENSION_KEY])
+    plain = _export(repository, tmp_path / "plain.wmp", world_id=objects.world_id)
+    extended = _export(
+        repository,
+        tmp_path / "extended.wmp",
+        extensions=[authored.EXTENSION_KEY],
+        world_id=objects.world_id,
+    )
 
     # The 1.0 payloads are the same bytes with and without the extension.
     for path in sorted(plain.output.rglob("*.json")):
@@ -199,9 +213,12 @@ def test_one_version_one_object_round_trips_through_a_signed_package(repository,
 
 
 def test_undone_addition_is_history_without_canonical_or_exported_object(repository, tmp_path):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     snapshot = _apply(structures, structural_candidate())
-    objects = _reviewed_objects(repository, tmp_path)
+    objects = _reviewed_objects(repository, tmp_path, world_id=world_id)
     version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Empty again", created_by=uuid.uuid4()
     )
@@ -223,7 +240,12 @@ def test_undone_addition_is_history_without_canonical_or_exported_object(reposit
     )
     assert version.objects == () and version.state_sha256 == empty
 
-    result = _export(repository, tmp_path / "undone-add.wmp", extensions=[authored.EXTENSION_KEY])
+    result = _export(
+        repository,
+        tmp_path / "undone-add.wmp",
+        extensions=[authored.EXTENSION_KEY],
+        world_id=world_id,
+    )
     world = verify_package(result.output).extensions[0].authored_world
     packaged = next(item for item in world.versions if item["title"] == "Empty again")
     assert packaged["delta"]["objects"] == []
@@ -232,9 +254,14 @@ def test_undone_addition_is_history_without_canonical_or_exported_object(reposit
 
 
 def test_undone_override_is_history_without_canonical_or_exported_override(repository, tmp_path):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     snapshot = _apply(structures, structural_candidate())
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id,
         title="Unchanged structure",
@@ -256,6 +283,7 @@ def test_undone_override_is_history_without_canonical_or_exported_override(repos
         repository,
         tmp_path / "undone-override.wmp",
         extensions=[authored.EXTENSION_KEY],
+        world_id=world_id,
     )
     world = verify_package(result.output).extensions[0].authored_world
     packaged = next(item for item in world.versions if item["title"] == "Unchanged structure")
@@ -275,7 +303,12 @@ def test_a_branch_and_a_source_override_resolve_inside_the_package(repository, t
         base_state_sha256=child.state_sha256,
         actor=uuid.uuid4(),
     )
-    result = _export(repository, tmp_path / "branch.wmp", extensions=[authored.EXTENSION_KEY])
+    result = _export(
+        repository,
+        tmp_path / "branch.wmp",
+        extensions=[authored.EXTENSION_KEY],
+        world_id=objects.world_id,
+    )
     world = verify_package(result.output).extensions[0].authored_world
     by_id = {v["version_id"]: v for v in world.versions}
     packaged = by_id[_urn("alternate-version", child.version_id)]
@@ -290,7 +323,10 @@ def test_a_version_whose_source_was_deleted_is_withheld_and_counted(
     repository, tmp_path: Path, photo_dir
 ):
     """The decision section 8 of the objects contract left open: withheld, counted, unnamed."""
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     store = LocalContentAddressedStore(tmp_path / "blobs")
     outcome = PhotoIngestPipeline(repository, store, vision=None).ingest_file(
         write_photo(photo_dir, "authored-source.jpg")
@@ -306,12 +342,19 @@ def test_a_version_whose_source_was_deleted_is_withheld_and_counted(
         structures,
         structural_candidate(graph="graph-with-source", evidence_span_id=evidence["span_id"]),
     )
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     version = objects.create_version(
         source_snapshot_id=dependent.snapshot_id, title="Doomed", created_by=uuid.uuid4()
     )
 
-    before = _export(repository, tmp_path / "before.wmp", extensions=[authored.EXTENSION_KEY])
+    before = _export(
+        repository,
+        tmp_path / "before.wmp",
+        extensions=[authored.EXTENSION_KEY],
+        world_id=world_id,
+    )
     assert verify_package(before.output).extensions[0].authored_world.withheld_versions == 0
 
     repository.insert_tombstone(
@@ -321,7 +364,12 @@ def test_a_version_whose_source_was_deleted_is_withheld_and_counted(
         reason="the source scene was deleted",
     )
     assert objects.version(version.version_id).source_invalidated is True
-    after = _export(repository, tmp_path / "after.wmp", extensions=[authored.EXTENSION_KEY])
+    after = _export(
+        repository,
+        tmp_path / "after.wmp",
+        extensions=[authored.EXTENSION_KEY],
+        world_id=world_id,
+    )
     world = verify_package(after.output).extensions[0].authored_world
     assert world.versions == ()
     assert world.withheld_versions == 1

@@ -10,7 +10,7 @@ restates no bound. Who may call the route is the generated permission sweep's bu
 from __future__ import annotations
 
 import pytest
-from exulanica.world import WorldObjectRepository
+from exulanica.world.reviewed_catalog import ReviewedCatalog
 
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
 
@@ -30,9 +30,8 @@ def _served(objects_api) -> list[dict]:
 
 def test_the_registry_is_served_as_the_table_holds_it(objects_api, repository):
     served = _served(objects_api)
-    table = WorldObjectRepository(
-        repository.connection, repository.workspace_id
-    ).behaviour_registry()
+    # The registry is the same for every world, so it is read with no world named.
+    table = ReviewedCatalog(repository.connection).behaviours()
     assert {
         (row["behaviour_key"], row["behaviour_version"]): row["parameters"] for row in served
     } == {key: dict(parameters) for key, parameters in table.items()}

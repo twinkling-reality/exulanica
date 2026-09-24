@@ -188,7 +188,7 @@ def main() -> None:
         if not arguments.skip_candidates and status == 200 and plan:
             with database.session(session.workspace_id) as connection:
                 parsed = SelectionPlan.model_validate(plan)
-                result = execute(connection, validate(connection, parsed, session))
+                result = execute(connection, validate(connection, parsed, session), world_id=None)
                 packet = build_packet(connection, result, workspace_id=session.workspace_id)
             entry["packet"] = {
                 "items": len(packet.items),

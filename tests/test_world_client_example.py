@@ -20,6 +20,7 @@ import httpx
 import pytest
 
 from tests_support_api import EVERY_PERMISSION
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "world_client_example.py"
@@ -97,7 +98,21 @@ def _version(state: str, objects: list[dict[str, Any]], edits: int) -> dict[str,
         "style_version_id": None,
         "title": "Scripted",
         "version_id": VERSION,
-        "world_id": "atlas:default",
+        "world_id": FIXTURE_WORLD_ID,
+    }
+
+
+def _worlds() -> dict[str, Any]:
+    """The one world the scripted workspace holds, which the client finds by ``GET /worlds``."""
+    return {
+        "worlds": [
+            {
+                "created_at": "2026-09-11T09:00:00+00:00",
+                "created_by": str(uuid.uuid4()),
+                "kind": "personal-source",
+                "world_id": FIXTURE_WORLD_ID,
+            }
+        ]
     }
 
 
@@ -130,6 +145,8 @@ class ScriptedServer:
         self.authorised &= request.headers.get("Authorization") == f"Bearer {TOKEN}"
         path = request.url.path
         base = f"/world/versions/{VERSION}"
+        if request.method == "GET" and path == "/worlds":
+            return httpx.Response(200, json=_worlds())
         if request.method == "GET" and path == "/world/assets":
             return httpx.Response(
                 200,
@@ -250,7 +267,11 @@ def test_the_client_makes_an_accepted_change_through_the_real_api(
 
     _psycopg, scratch = spine_schema
     actor = uuid.uuid4()
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    # The workspace's one world; the client finds it by GET /worlds, as it does without --world.
+    world_id = registered_world(repository.connection, repository.workspace_id, actor=actor)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     preview = structures.preview(structural_candidate(), proposed_by=actor)
     snapshot = structures.apply(
         preview.preview_id,
@@ -259,7 +280,9 @@ def test_the_client_makes_an_accepted_change_through_the_real_api(
         base_reconstruction_sha256=preview.base_reconstruction_sha256,
         committed_by=actor,
     )
-    version = WorldObjectRepository(repository.connection, repository.workspace_id).create_version(
+    version = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    ).create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Second client", created_by=actor
     )
     repository.connection.commit()
@@ -312,9 +335,9 @@ def test_the_client_makes_an_accepted_change_through_the_real_api(
     refused = next(e for e in recorded["transcript"] if e["status"] == 409)
     assert refused["problem"]["code"] == "stale_object_base"
 
-    stored = WorldObjectRepository(repository.connection, repository.workspace_id).version(
-        version.version_id
-    )
+    stored = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    ).version(version.version_id)
     [obj] = stored.objects
     assert (obj.object_id, obj.transform.x_mm, obj.transform.z_mm) == (
         "second-client:marker",

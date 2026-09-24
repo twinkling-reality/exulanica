@@ -33,6 +33,7 @@ def test_reference_source_topology_is_stable_and_uses_only_existing_live_evidenc
         "region_id": "existing-region",
         "captures": selected,
         "source_manifest_sha256": "ab" * 32,
+        "actor": uuid.uuid4(),
     }
     first = compose_reference_sources(repository, **options)
     assert compose_reference_sources(repository, **options) == first
@@ -40,9 +41,9 @@ def test_reference_source_topology_is_stable_and_uses_only_existing_live_evidenc
         repository.connection.execute("select count(*) as n from evidence_span").fetchone()["n"]
         == before
     )
-    [source] = WorldStyleRepository(repository.connection, repository.workspace_id).source_media(
-        store
-    )
+    [source] = WorldStyleRepository(
+        repository.connection, repository.workspace_id, world_id=first["world_id"]
+    ).source_media(store)
     assert source.capture_ids == (capture["capture_id"],)
     assert str(source.source_id) == first["record"]["source_slots"][0]["source_id"]
     for replacement in (

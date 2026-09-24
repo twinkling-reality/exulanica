@@ -7,6 +7,7 @@ import {
 } from '../src/society-experiment-api.js';
 
 const binding: SocietyExperimentBinding = {
+  worldId: 'fixture-world',
   versionId: '11111111-1111-4111-8111-111111111111',
   experimentId: '22222222-2222-4222-8222-222222222222',
   attemptId: '33333333-3333-4333-8333-333333333333',
@@ -68,8 +69,8 @@ describe('society experiment read client', () => {
     expect(read.attempt.status).toBe('incomplete');
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
-      `https://fixture.test/api/world/versions/${binding.versionId}/society/experiments/${binding.experimentId}`,
-      `https://fixture.test/api/world/versions/${binding.versionId}/society/experiments/${binding.experimentId}/attempts/${binding.attemptId}`,
+      `https://fixture.test/api/world/versions/${binding.versionId}/society/experiments/${binding.experimentId}?world_id=fixture-world`,
+      `https://fixture.test/api/world/versions/${binding.versionId}/society/experiments/${binding.experimentId}/attempts/${binding.attemptId}?world_id=fixture-world`,
     ]);
     for (const [, init] of fetch.mock.calls) {
       expect(init).toMatchObject({ method: 'GET', credentials: 'include', headers: { authorization: 'Bearer secret' } });

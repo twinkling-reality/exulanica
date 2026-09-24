@@ -19,7 +19,7 @@ function setup() {
   const views: LiveSocietyView[] = [];
   const client = { connect: vi.fn(async () => snapshot()), read: vi.fn(async () => snapshot(1)),
     advance: vi.fn(async () => snapshot(1)), events: vi.fn(async (): Promise<readonly SocietyEvent[]> => [event]) };
-  const options = { preview: false, credentials: { baseUrl: 'https://example.test', token: 'test' }, versionId: 'branch', placeId: 'place', regionId: 'region',
+  const options = { preview: false, credentials: { baseUrl: 'https://example.test', token: 'test' }, worldId: 'world:test', versionId: 'branch', placeId: 'place', regionId: 'region',
     onChange: (view: LiveSocietyView) => views.push(view), client };
   return { client, views, options, live: createLiveSociety(options) };
 }

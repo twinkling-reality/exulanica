@@ -12,7 +12,6 @@ import psycopg
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
 from exulanica.selection.validation import Session
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import LeaseLost, validate_settings
 
@@ -74,6 +73,13 @@ class SocietyControlWorker:
             self._current_workspaces = resolved
         return tuple(sorted(resolved, key=str))
 
+    def _authorizer(
+        self, connection: psycopg.Connection, workspace: uuid.UUID
+    ) -> Callable[[uuid.UUID, dict], None]:
+        return lambda actor, doc: self.runtime.authorize(
+            connection, Session(workspace_id=workspace, actor=actor), doc
+        )
+
     def _repository(
         self,
         connection: psycopg.Connection,
@@ -85,9 +91,7 @@ class SocietyControlWorker:
             workspace,
             world_id=world_id,
             base_tick_interval_ms=self.base_tick_interval_ms,
-            input_authorizer=lambda actor, doc: self.runtime.authorize(
-                connection, Session(workspace_id=workspace, actor=actor), doc
-            ),
+            input_authorizer=self._authorizer(connection, workspace),
         )
 
     def run_once(self, workspace: uuid.UUID) -> dict | None:
@@ -101,11 +105,15 @@ class SocietyControlWorker:
 
     def _run_authorized_once(self, workspace: uuid.UUID) -> dict | None:
         """Run after the caller captured one fresh, immutable round snapshot."""
-        # The claim considers every world in the workspace, a person's saved worlds as well as
-        # the default one, whatever world the claiming repository is scoped to, and names the
-        # world it was taken in. It runs only in that world.
+        # The claim considers every world the workspace holds and names the world it was taken
+        # in. It runs only in that world.
         with self.database.session(workspace) as connection:
-            claim = self._repository(connection, workspace, DEFAULT_WORLD_ID).claim()
+            claim = SocietyControlRepository.claim_in_workspace(
+                connection,
+                workspace,
+                input_authorizer=self._authorizer(connection, workspace),
+                base_tick_interval_ms=self.base_tick_interval_ms,
+            )
         if claim is None:
             return None
         # Committed lease survives process death. No connection is retained between phases.

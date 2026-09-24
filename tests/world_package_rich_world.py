@@ -53,7 +53,6 @@ from exulanica.world import (
     WorldStructureRepository,
 )
 from exulanica.world.interaction import InteractionProposal
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world_package.package import MANIFEST_PATH, REQUIRED_PAYLOAD_PATHS, SIGNATURE_PATH
 
 from conftest import iso, write_photo
@@ -61,6 +60,7 @@ from test_world_environment_composition_postgres import _bounds, _frame, _rights
 from test_world_package_extension_postgres import CUBE, MOTION
 from test_world_package_withdrawal_postgres import EARLIER, KEPT, WITHDRAWN, _named
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 #: A second reviewed behaviour value, so a behaviour edit changes something a person can see.
 SLOWER = ObjectBehaviour(
@@ -275,8 +275,10 @@ def _people(repository, store, photo_dir: Path) -> None:
     )
 
 
-def _interaction_policy(repository, snapshot) -> None:
-    policies = WorldInteractionPolicyRepository(repository.connection, repository.workspace_id)
+def _interaction_policy(repository, snapshot, world_id: str) -> None:
+    policies = WorldInteractionPolicyRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     proposal = InteractionProposal(
         uuid.uuid4(),
         ProposalProvenance(ProposalOrigin.USER, uuid.uuid4()),
@@ -318,7 +320,10 @@ def build_rich_world(repository, placed, photo_dir: Path, tmp_path: Path) -> Ric
     ).fetchone()
 
     # -- the default world: a source a deletion will invalidate, then the current one -----------
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    default_world = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=default_world
+    )
     dependent = _apply(
         structures,
         structural_candidate(
@@ -326,12 +331,12 @@ def build_rich_world(repository, placed, photo_dir: Path, tmp_path: Path) -> Ric
         ),
     )
     worlds = WorldObjectRepository(
-        repository.connection, repository.workspace_id, world_id=DEFAULT_WORLD_ID, store=store
+        repository.connection, repository.workspace_id, world_id=default_world, store=store
     )
     default = _Versions(worlds, made)
     default.create("Doomed", source=dependent.snapshot_id)
     current = _apply(structures, structural_candidate(graph="graph-final"))
-    _interaction_policy(repository, current)
+    _interaction_policy(repository, current, default_world)
     source = current.snapshot_id
 
     default.create("Evening study", source=source)
@@ -455,7 +460,7 @@ def build_rich_world(repository, placed, photo_dir: Path, tmp_path: Path) -> Ric
     return RichWorld(
         repository=repository,
         store=store,
-        default_world=DEFAULT_WORLD_ID,
+        default_world=default_world,
         starter_world=placed.entry["world_id"],
         evaluation_report=report,
         versions=made,

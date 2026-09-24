@@ -53,9 +53,10 @@ Creation has one source-independent first-world path and two explicit personal-s
 
 1. `POST /world-entries/starter` creates an authored starter with no personal source dependency.
 2. Choose an existing authored version and an appearance version from the same named world.
-3. Choose **Create from current personal sources**, which calls the protected bootstrap with the
-   reviewed topology digest, receives the exact authored version it opened, and saves that version
-   together with the exact style version read before bootstrap.
+3. Choose **Create from current personal sources**, which reads the workspace's personal-source
+   world from `GET /worlds`, calls the protected bootstrap in that world with the reviewed topology
+   digest, receives the exact authored version it opened, and saves that version together with the
+   exact style version read before bootstrap.
 
 The starter route takes the workspace structural lock and commits one immutable structural
 snapshot, its matching default style, one authored alternate, and the saved entry in one
@@ -178,6 +179,57 @@ has nothing to compare.
 The development demonstration remains a separate, identified preview. It is never saved as an
 owned entry. Opening an entry omits the bundled Flatiron demonstration district.
 
+## The worlds a workspace holds
+
+Every world is registered before any world table names it. `world_identity`
+(`exulanica/migrations/0099_a_world_is_registered_before_it_holds_anything.sql`) holds one row per
+world: its id, its kind, the workspace that owns it, how it came to exist and when. Every table
+with a `world_id` column has a foreign key to that row, so no write brings a world into existence
+as a side effect. The export ledger `world_package_export` is the one table with rows that name no
+world: a training dataset export keeps its dataset package id in `world_id`
+([world-memory-package.md](world-memory-package.md)), so that table's key reads the stored
+generated column `named_world_id`, which is `world_id` on a row that exports a world and null on a
+dataset export. Worlds that existed before the registry were registered by the migration, each
+with the kind its stored rows state; no dataset package was registered as a world.
+
+| Kind | What it is | Created by |
+| --- | --- | --- |
+| `personal-source` | A world composed from the workspace's own photographs and other personal sources | Composing personal sources into a region; a frontier build manifest |
+| `authored-starter` | A source-independent authored world that starts empty | `POST /world-entries/starter` |
+
+**One personal-source world per account.** `exulanica/world/world-count-policy.v1.json` states,
+for each kind, the most worlds one workspace may hold. Version 1 allows one personal-source world
+and sets no count for authored starters, whose route creates one only for a workspace with no saved
+world. Sign-in gives each account one owned workspace, so the limit is one per account. The server
+checks the policy when a world is created (`register_world` in `exulanica/world/worlds.py`, under
+the workspace lock every world writer takes), and refuses a creation past it with
+`WorldLimitReached` (`world_limit_reached`), which names the kind, the limit and the policy
+version. A policy never removes a world that exists.
+
+Every route that reads or changes a world's content requires `world_id`: style, source media,
+versions, objects, environments, compositions, interaction settings, the World Read bundles,
+societies and their playback, actions, decisions, experiments and district, and the Companion's
+selection, answer, evidence packet, appearance and environment routes. An id the workspace has not
+registered answers `404 unknown_reference`, the same answer another workspace's world gets. The
+reviewed asset and behaviour registries are the same for every world and take none. `GET /worlds`
+lists the workspace's worlds with their kinds and the count policy. Code that means "the world
+composed from this workspace's own sources" asks `resolve_personal_source_world`, which answers
+from the registry and refuses by name when there is none or more than one; it never answers with a
+fixed id. The browser resolves that world from `GET /worlds` the same way, in
+`personalSourceWorld` (`web/packages/app/src/world-entry-api.ts`).
+
+**Allowing several.** Raising the personal-source limit is another version of the policy and nothing
+else on the server: storage keys every world table by workspace and world, and
+`tests/test_two_worlds_stay_apart.py` raises the limit to two and checks that objects, appearance,
+character appearance, interaction settings, societies, the evidence a Companion proposal may cite,
+World Read regions, package export and every world route stay inside the world they name.
+`tests/test_companion_reads_one_world.py` asks the Companion in each of two worlds that stand over
+one place, through the real routes, and no answer, evidence packet or content page names the other
+world. What several worlds also need is a choice: a world picker, and the chosen `world_id` passed
+wherever `resolve_personal_source_world` or `personalSourceWorld` is asked, since with two worlds
+both refuse rather than choose. `tests/test_world_identity_inventory.py` lists every place code
+could still assume one world and fails when another appears.
+
 ## Mutation and reopen
 
 `PUT /world-entries/{entry_id}` carries `base_revision` and the exact authored digest/edit cursor
@@ -211,8 +263,10 @@ edits are refused with an instruction to restore the visible saved appearance fi
 rollback uses the live authority base to append that restoration; edits never apply to an unseen
 newer appearance.
 
-The browser passes `world_id` to style, source-media, bootstrap, object, and reviewed-object reads.
-Source-media reads also carry the entry’s exact `source_snapshot_id`, preserving its source
+The browser names the open world on every world request: style, source-media, bootstrap, object,
+environment, interaction, society and Companion requests. A client built where no world is open,
+as in the preview, refuses its requests instead of sending one that names none. Source-media reads
+also carry the entry’s exact `source_snapshot_id`, preserving its source
 context after the global topology pointer moves. Historical style display uses the selected
 style’s topology while reconciliation and writes retain the live authority base.
 Authored object composition receives `authored_version_id` explicitly. The entry surface never
@@ -449,12 +503,22 @@ cannot be restored over them; recovery is a restore from backup.
 | `POST` | `/world-entries` | Save a personal authored branch cursor and exact style version |
 | `POST` | `/world-entries/starter` | Atomically create or exactly reuse the source-independent authored starter |
 | `GET` | `/world-entries/{entry_id}` | One entry, with cross-workspace IDs answered as absent |
+| `GET` | `/worlds` | The workspace's worlds with their kinds, and the count policy |
 | `PUT` | `/world-entries/{entry_id}` | Compare and advance the exact version references |
 | `POST` | `/world-entries/{entry_id}/source-attachments` | Attach reviewed reference photographs while preserving the world cursor |
 | `POST` | `/world-entries/{entry_id}/source-detachments` | Remove references from the current collection; no row or media is deleted |
 | `POST` | `/world-entries/{entry_id}/source-rebinds` | Add removed references back under a new human review, as new membership rows |
 
 ## Verification
+
+`tests/test_worlds.py` covers the count policy and its file, the kinds and their CHECK, the
+foreign key from every world table, the export ledger's key refusing an unregistered world's export
+and admitting a dataset export, append-only registration, each named refusal, two concurrent
+creations of the personal-source world, `GET /worlds`, and a registered world of another workspace
+answering exactly as an invented one. `tests/test_world_registry_backfill.py` applies 0099 to a
+populated schema as a superuser and as a table owner without superuser or `BYPASSRLS`, and requires
+every world to be registered with the kind its rows state, no dataset package to be registered, and
+FORCE row-level security to end as it began.
 
 `tests/test_authored_starter_scene.py` pins the exact bytes each ground module version commits,
 version 1's taken from the tree that created the worlds already holding it, and checks that a

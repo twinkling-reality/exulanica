@@ -7,6 +7,7 @@
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
+import { worldPath } from './world-scope.js';
 import { districtCanonicalJson, parseDistrictInterpretation, parseOwnedDistrict,
   type DistrictInterpretation, type OwnedDistrict } from '@exulanica/atlas-core';
 
@@ -85,8 +86,10 @@ export async function parseSocietyDistrict(value: unknown, scope: SocietyDistric
 export class SocietyDistrictClient {
   private readonly transport: Transport;
   constructor(options: TransportOptions) { this.transport = new Transport(options); }
-  read(scope: SocietyDistrictScope): Promise<SocietyDistrictView> {
-    return this.transport.getJson<unknown>(`/world/versions/${encodeURIComponent(scope.versionId)}/society/district`)
+  /** The district of the scope's version, read in the scope's own world. */
+  async read(scope: SocietyDistrictScope): Promise<SocietyDistrictView> {
+    const path = `/world/versions/${encodeURIComponent(scope.versionId)}/society/district`;
+    return this.transport.getJson<unknown>(worldPath(path, scope.worldId))
       .then(value => parseSocietyDistrict(value, scope));
   }
 }

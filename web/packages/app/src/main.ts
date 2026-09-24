@@ -99,6 +99,7 @@ import {
   StarterWorldOpeningError,
 } from './composition/session-and-geometry.js';
 import { createAppEnvironment, createSessionState } from './composition/session-state.js';
+import { EnvironmentSelectionClient } from './environment-selection-api.js';
 import {
   WorldObjectsClient,
   type AlternateVersion,
@@ -559,7 +560,9 @@ async function mount(): Promise<void> {
   //
   // `askQuestion` is the read half: free text the parser cannot turn into a change is a question
   // about the library, and this is the only place holding the credential it takes to ask one.
-  const companionAsk = new CompanionAskClient(currentCredentials);
+  const companionAsk = new CompanionAskClient({
+    ...currentCredentials, worldId: state.activeWorldEntry?.worldId ?? null,
+  });
   // Where a place's name may go: read and decided on the two surfaces that show a place's name,
   // the detail pane and a Companion answer. Not in the preview, which has no decisions to read.
   const placeNames = preview ? undefined : new PlaceNameRightsClient(currentCredentials);
@@ -570,7 +573,11 @@ async function mount(): Promise<void> {
   // style authority is what turns one into a preview, and the person's own Apply is what commits
   // it. Constructed here for the same reason as the two clients around it: this file holds the
   // credential and nothing under it does.
-  const companionPropose = new CompanionProposalClient(currentCredentials);
+  const companionPropose = state.activeWorldEntry === null
+    ? null
+    : new CompanionProposalClient({
+      ...currentCredentials, worldId: state.activeWorldEntry.worldId,
+    });
 
   // The durable half of the same conversation. Read once per mount, because a reload used to be
   // amnesia: interaction-model.md 4.3 and 5.5 both say the Companion may never speak "within 7
@@ -601,7 +608,9 @@ async function mount(): Promise<void> {
     engine: currentCompanion,
     evidence: currentEvidence,
     ask: (question) => companionAsk.ask(question, companionCityContext),
-    proposeAppearance: (utterance) => companionPropose.propose(utterance),
+    ...(companionPropose === null
+      ? {}
+      : { proposeAppearance: (utterance: string) => companionPropose.propose(utterance) }),
     persistedMemory,
     rememberAnswer: async (answer) => {
       await companionMemory.rememberAnswer(answerToRemember(answer));
@@ -690,6 +699,11 @@ async function mount(): Promise<void> {
         defaultVersionId: state.activeWorldEntry.authoredVersionId,
         savedEntry: activeEntryWriteBinding,
         onSavedEntryAdvanced: recordAuthoredEntryAdvance,
+      }),
+      // Placements go to the open world's versions, which is the world the version names.
+      environmentClient: new EnvironmentSelectionClient({
+        ...currentCredentials,
+        worldId: state.activeWorldEntry.worldId,
       }),
     }),
     scene: built.scene,
@@ -897,6 +911,7 @@ async function mount(): Promise<void> {
     onCommand: handleAtlasCommand,
   });
   const societyExperiment = state.activeWorldEntry === null ? null : mountSocietyExperimentResult({
+    getWorldId: () => state.activeWorldEntry?.worldId ?? null,
     getVersionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
     credentials: currentCredentials,
     onClose: () => dispatchShell({ type: 'toggle-experiment' }),

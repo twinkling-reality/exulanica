@@ -173,11 +173,18 @@ def execute(
     connection: psycopg.Connection,
     validated: ValidatedPlan,
     *,
+    world_id: str | None,
     query_embedding: QueryEmbedding | None = None,
     store: ContentAddressedStore | None = None,
     society_authorizer: Callable[[dict[str, Any]], None] | None = None,
 ) -> SelectionResult:
-    """Run a validated plan. The only function in this package that touches data."""
+    """Run a validated plan. The only function in this package that touches data.
+
+    ``world_id`` is the world whose authored and simulated content a content Selection may
+    return: its environment instances, synthetic inhabitants and simulation events. Another world
+    of the same workspace contributes nothing, and ``None`` returns no world's content at all.
+    Photographs and admitted environment sources belong to the workspace, not to a world.
+    """
     plan = validated.plan
     with connection.transaction():
         connection.execute(
@@ -186,7 +193,7 @@ def execute(
         connection.execute("set local transaction read only")
         if plan.intent is Intent.CONTENT:
             content, total, next_page = _matching_content(
-                connection, validated, store, society_authorizer
+                connection, validated, world_id, store, society_authorizer
             )
             captures: tuple[SelectedCapture, ...] = ()
             entities: tuple[SelectedEntity, ...] = ()
@@ -347,7 +354,8 @@ select 'authored_environment_instance','authored','environment_instance',i.origi
     on p.workspace_id=i.workspace_id and p.publication_id=i.publication_id
   left join derived_environment_asset idx
     on idx.workspace_id=p.workspace_id and idx.asset_id=p.index_asset_id
- where i.workspace_id=%(workspace)s and not i.removed and not i.addition_undone
+ where i.workspace_id=%(workspace)s and i.world_id=%(world)s
+   and not i.removed and not i.addition_undone
    and s.withdrawn_at is null and render.withdrawn_at is null
    and s.place_id=i.source_place_id
    and s.source_sha256=i.source_sha256 and s.receipt_sha256=i.source_receipt_sha256
@@ -396,7 +404,7 @@ select 'synthetic_inhabitant','simulated','inhabitant',null::text,
   from world_society s
   join selected_places selected on selected.place_id=s.place_id
   cross join lateral jsonb_array_elements(s.state->'inhabitants') inhabitant
- where s.workspace_id=%(workspace)s
+ where s.workspace_id=%(workspace)s and s.world_id=%(world)s
    and (s.engine_version=any(%(legacy_engines)s::text[])
         or s.society_id=any(%(authorized_societies)s::uuid[]))
 union all
@@ -416,7 +424,7 @@ select 'simulation_event','simulated','event',null::text,
   join world_society s
     on s.workspace_id=e.workspace_id and s.society_id=e.society_id
   join selected_places selected on selected.place_id=e.place_id
- where e.workspace_id=%(workspace)s
+ where e.workspace_id=%(workspace)s and s.world_id=%(world)s
    and (s.engine_version=any(%(legacy_engines)s::text[])
         or s.society_id=any(%(authorized_societies)s::uuid[]))
 """
@@ -426,10 +434,15 @@ select 'simulation_event','simulated','event',null::text,
 def _authorized_societies(
     connection: psycopg.Connection,
     validated: ValidatedPlan,
+    world_id: str | None,
     authorize: Callable[[dict[str, Any]], None] | None,
 ) -> list[uuid.UUID]:
-    """Gate input-driven societies before counts/pagination; events need all input history."""
-    if authorize is None:
+    """Gate input-driven societies before counts/pagination; events need all input history.
+
+    Only the named world's societies are asked about, so no other world's inputs reach the
+    authorizer while this world is being answered for.
+    """
+    if authorize is None or world_id is None:
         return []
     connection.execute(
         "select pg_advisory_xact_lock(hashtextextended(%s,880024))",
@@ -439,9 +452,9 @@ def _authorized_societies(
         "select distinct s.society_id,s.world_id,s.version_id from world_society s "
         "join confirmed_place_entity_bridge b "
         "on b.workspace_id=s.workspace_id and b.place_id=s.place_id "
-        "where s.workspace_id=%s and b.entity_id=any(%s::uuid[]) "
+        "where s.workspace_id=%s and s.world_id=%s and b.entity_id=any(%s::uuid[]) "
         "and s.engine_version=any(%s::text[])",
-        (validated.workspace_id, list(validated.place_ids), list(INPUT_ENGINES)),
+        (validated.workspace_id, world_id, list(validated.place_ids), list(INPUT_ENGINES)),
     ).fetchall()
     allowed = []
     for society in societies:
@@ -478,6 +491,7 @@ def _authorized_societies(
 def _matching_content(
     connection: psycopg.Connection,
     validated: ValidatedPlan,
+    world_id: str | None,
     store: ContentAddressedStore | None,
     society_authorizer: Callable[[dict[str, Any]], None] | None,
 ) -> tuple[tuple[SelectedContent, ...], int, ContentPageCursor | None]:
@@ -490,12 +504,13 @@ def _matching_content(
     )
     parameters: dict[str, object] = {
         "workspace": validated.workspace_id,
+        "world": world_id,
         "place_ids": list(validated.place_ids),
         # Engines that read no input are visible without input authorisation; the engine table
         # says which, so this query never restates a list of engines.
         "legacy_engines": list(LEGACY_ENGINES),
         "authorized_societies": (
-            _authorized_societies(connection, validated, society_authorizer)
+            _authorized_societies(connection, validated, world_id, society_authorizer)
             if plan.content.scope is not ContentScope.MEMORIES_ONLY
             else []
         ),

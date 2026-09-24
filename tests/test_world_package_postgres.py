@@ -18,6 +18,7 @@ from exulanica.world.interaction import InteractionProposal
 from exulanica.world_package import diff_packages, project_world_package, verify_package
 
 from world_structure_fixtures import structural_candidate, with_topology
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -33,20 +34,24 @@ def _capture(repository, value: bytes):
     return repository.insert_capture(blob, device_id=None, started_at=None)
 
 
-def _export(repository, output: Path, *, hook=None, parent=None):
+def _export(repository, output: Path, *, world_id: str, hook=None, parent=None):
     return project_world_package(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         output=output,
         private_key=Ed25519PrivateKey.generate(),
+        world_id=world_id,
         parent_merkle_root_sha256=parent,
         after_snapshot_hook=hook,
     )
 
 
 def test_projector_archives_current_structure_and_append_only_receipt(repository, tmp_path: Path):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     candidate = structural_candidate()
     preview = structures.preview(candidate, proposed_by=uuid.uuid4())
     snapshot = structures.apply(
@@ -56,7 +61,9 @@ def test_projector_archives_current_structure_and_append_only_receipt(repository
         base_reconstruction_sha256=None,
         committed_by=uuid.uuid4(),
     )
-    policies = WorldInteractionPolicyRepository(repository.connection, repository.workspace_id)
+    policies = WorldInteractionPolicyRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     policy_proposal = InteractionProposal(
         uuid.uuid4(),
         ProposalProvenance(ProposalOrigin.USER, uuid.uuid4()),
@@ -77,7 +84,7 @@ def test_projector_archives_current_structure_and_append_only_receipt(repository
         applied_by=uuid.uuid4(),
     )
 
-    result = _export(repository, tmp_path / "world.wmp")
+    result = _export(repository, tmp_path / "world.wmp", world_id=world_id)
     verified = verify_package(result.output)
     assert verified.merkle_root_sha256 == result.merkle_root_sha256
     assert json.loads((result.output / "world/topology.json").read_text()) == candidate.topology
@@ -120,13 +127,16 @@ def test_repeatable_read_excludes_a_capture_committed_during_projection(
     ingest_spine, tmp_path: Path
 ):
     repository, open_another = ingest_spine
+    world_id = registered_world(repository.connection, repository.workspace_id)
     first = _capture(repository, b"first-photo")
     other = open_another()
 
     def mutate_after_snapshot() -> None:
         _capture(other, b"concurrent-photo")
 
-    result = _export(repository, tmp_path / "concurrent.wmp", hook=mutate_after_snapshot)
+    result = _export(
+        repository, tmp_path / "concurrent.wmp", world_id=world_id, hook=mutate_after_snapshot
+    )
     graph = json.loads((result.output / "memory/graph.json").read_text())
     assert len(graph["captures"]) == 1
     assert graph["captures"][0]["content_sha256"] == BlobId.of_bytes(b"first-photo").hex
@@ -138,7 +148,10 @@ def test_export_during_topology_commit_keeps_one_protected_snapshot(
     ingest_spine, tmp_path: Path
 ):
     repository, open_another = ingest_spine
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     initial_candidate = structural_candidate(region_b_x_mm=10_000)
     initial_preview = structures.preview(initial_candidate, proposed_by=uuid.uuid4())
     initial = structures.apply(
@@ -149,7 +162,9 @@ def test_export_during_topology_commit_keeps_one_protected_snapshot(
         committed_by=uuid.uuid4(),
     )
     other = open_another()
-    other_structures = WorldStructureRepository(other.connection, other.workspace_id)
+    other_structures = WorldStructureRepository(
+        other.connection, other.workspace_id, world_id=world_id
+    )
     replacement_topology = json.loads(json.dumps(initial_candidate.topology))
     replacement_topology["navigation"]["agent_radius_mm"] = 350
     replacement_preview = other_structures.preview(
@@ -165,7 +180,9 @@ def test_export_during_topology_commit_keeps_one_protected_snapshot(
             committed_by=uuid.uuid4(),
         )
 
-    result = _export(repository, tmp_path / "topology-race.wmp", hook=commit_replacement)
+    result = _export(
+        repository, tmp_path / "topology-race.wmp", world_id=world_id, hook=commit_replacement
+    )
     topology = json.loads((result.output / "world/topology.json").read_text())
     placement = json.loads((result.output / "world/placement.json").read_text())
     region_b = next(
@@ -178,8 +195,9 @@ def test_export_during_topology_commit_keeps_one_protected_snapshot(
 
 
 def test_deletion_reexport_changes_root_and_semantic_diff(repository, tmp_path: Path):
+    world_id = registered_world(repository.connection, repository.workspace_id)
     capture = _capture(repository, b"photo-to-delete")
-    before = _export(repository, tmp_path / "before.wmp")
+    before = _export(repository, tmp_path / "before.wmp", world_id=world_id)
     repository.insert_tombstone(
         scope="capture",
         requested_by=uuid.uuid4(),
@@ -189,6 +207,7 @@ def test_deletion_reexport_changes_root_and_semantic_diff(repository, tmp_path: 
     after = _export(
         repository,
         tmp_path / "after.wmp",
+        world_id=world_id,
         parent=before.merkle_root_sha256,
     )
     difference = diff_packages(before.output, after.output)
@@ -205,9 +224,10 @@ def test_deletion_reexport_changes_root_and_semantic_diff(repository, tmp_path: 
 def test_unchanged_snapshot_and_same_lineage_reuses_the_exact_package_root(
     repository, tmp_path: Path
 ):
+    world_id = registered_world(repository.connection, repository.workspace_id)
     _capture(repository, b"stable-photo")
-    first = _export(repository, tmp_path / "first.wmp")
-    second = _export(repository, tmp_path / "second.wmp")
+    first = _export(repository, tmp_path / "first.wmp", world_id=world_id)
+    second = _export(repository, tmp_path / "second.wmp", world_id=world_id)
     assert first.merkle_root_sha256 == second.merkle_root_sha256
     assert first.manifest_sha256 == second.manifest_sha256
     assert first.export_id != second.export_id

@@ -23,6 +23,7 @@ from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.structure_repository import WorldStructureRepository
 
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,7 +42,8 @@ def runtime_world(repository, tmp_path, request):
     )
     store = LocalContentAddressedStore(tmp_path / "blobs")
     seed_reviewed_assets(store)
-    structs = WorldStructureRepository(connection, workspace)
+    world_id = registered_world(connection, workspace)
+    structs = WorldStructureRepository(connection, workspace, world_id=world_id)
     preview = structs.preview(structural_candidate(), proposed_by=session.actor)
     snapshot = structs.apply(
         preview.preview_id,
@@ -50,7 +52,7 @@ def runtime_world(repository, tmp_path, request):
         base_reconstruction_sha256=preview.base_reconstruction_sha256,
         committed_by=session.actor,
     )
-    objects = WorldObjectRepository(connection, workspace, store=store)
+    objects = WorldObjectRepository(connection, workspace, world_id=world_id, store=store)
     version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id,
         title="Explicit authored fixture",
@@ -118,6 +120,7 @@ def runtime_world(repository, tmp_path, request):
     objects = WorldObjectRepository(
         connection,
         workspace,
+        world_id=world_id,
         store=store,
         on_edit=lambda version_id: runtime.authored_edit(connection, session, version_id),
     )
@@ -147,6 +150,7 @@ def society(world):
     return SocietyRepository(
         world["connection"],
         world["workspace"],
+        world_id=world["version"].world_id,
         input_authorizer=lambda doc: world["runtime"].authorize(
             world["connection"], world["session"], doc
         ),
@@ -339,6 +343,7 @@ def test_failed_edit_observer_rolls_back_authored_edit_and_input_together(runtim
     w["objects"] = WorldObjectRepository(
         w["connection"],
         w["workspace"],
+        world_id=w["version"].world_id,
         store=w["store"],
         on_edit=lambda version_id: missing.authored_edit(w["connection"], w["session"], version_id),
     )

@@ -10,7 +10,6 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from exulanica.world import society_authored_ground
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import (
     SOCIETY_ENGINE_VERSION,
     SOCIETY_POPULATION,
@@ -98,7 +97,7 @@ class SocietyRepository:
         connection: psycopg.Connection,
         workspace_id: uuid.UUID,
         *,
-        world_id: str = DEFAULT_WORLD_ID,
+        world_id: str,
         input_authorizer: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.connection = connection
@@ -527,8 +526,15 @@ class SocietyRepository:
         digest = society_state_sha256(state)
         self.connection.execute(
             "update world_society set current_tick=%s,state=%s,state_sha256=%s "
-            "where workspace_id=%s and society_id=%s",
-            (state["tick"], Jsonb(state), digest, self.workspace_id, row["society_id"]),
+            "where workspace_id=%s and world_id=%s and society_id=%s",
+            (
+                state["tick"],
+                Jsonb(state),
+                digest,
+                self.workspace_id,
+                self.world_id,
+                row["society_id"],
+            ),
         )
         for event in events:
             self.connection.execute(

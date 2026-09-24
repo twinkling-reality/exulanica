@@ -8,11 +8,14 @@
  */
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
+import { worldPath } from './world-scope.js';
 
 const DIGEST = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export interface SocietyExperimentBinding {
+  /** The world the version belongs to, which every read names. */
+  readonly worldId: string;
   readonly versionId: string;
   readonly experimentId: string;
   readonly attemptId: string;
@@ -311,6 +314,9 @@ function parseDefinition(value: unknown, binding: SocietyExperimentBinding): Exp
     'definition_sha256', 'baseline_input_seq', 'baseline_input_sha256', 'treatment_input_seq',
     'treatment_input_sha256', 'intervention', 'population', 'warmup_ticks', 'followup_ticks', 'created_at'], 'definition');
   if (definition['record_status'] !== 'recorded') throw new SocietyExperimentContractError('definition is not recorded');
+  if (definition['world_id'] !== binding.worldId) {
+    throw new SocietyExperimentContractError('definition world_id does not match the requested world');
+  }
   const intervention = row(definition['intervention'], 'intervention');
   exact(intervention, ['kind', 'target_id'], 'intervention');
   const kind = intervention['kind'];
@@ -478,7 +484,7 @@ async function parseAttempt(value: unknown, binding: SocietyExperimentBinding, d
 }
 
 function checkedBinding(binding: SocietyExperimentBinding): SocietyExperimentBinding {
-  return Object.freeze({ versionId: uuid(binding.versionId, 'version_id'),
+  return Object.freeze({ worldId: text(binding.worldId, 'world_id'), versionId: uuid(binding.versionId, 'version_id'),
     experimentId: uuid(binding.experimentId, 'experiment_id'), attemptId: uuid(binding.attemptId, 'attempt_id') });
 }
 
@@ -501,9 +507,10 @@ export class SocietyExperimentClient implements SocietyExperimentReadPort {
     const combined = parent && signal ? AbortSignal.any([parent, signal]) : (signal ?? parent);
     const transport = new Transport({ ...this.#options, ...(combined === undefined ? {} : { signal: combined }) });
     const root = `/world/versions/${encodeURIComponent(binding.versionId)}/society/experiments/${encodeURIComponent(binding.experimentId)}`;
+    const inWorld = (path: string): string => worldPath(path, binding.worldId);
     let definition: ExperimentDefinition;
     try {
-      definition = parseDefinition(await transport.getJson<unknown>(root), binding);
+      definition = parseDefinition(await transport.getJson<unknown>(inWorld(root)), binding);
     } catch (error) {
       const issue = unavailable(error);
       if (issue) return Object.freeze({ status: 'unavailable', binding, definition: null, problem: issue });
@@ -511,7 +518,7 @@ export class SocietyExperimentClient implements SocietyExperimentReadPort {
     }
     try {
       const attempt = await parseAttempt(await transport.getJson<unknown>(
-        `${root}/attempts/${encodeURIComponent(binding.attemptId)}`,
+        inWorld(`${root}/attempts/${encodeURIComponent(binding.attemptId)}`),
       ), binding, definition);
       return Object.freeze({ status: 'available', binding, definition, attempt });
     } catch (error) {

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 import pytest
 from exulanica.api.app import create_app
@@ -18,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from conftest import write_photo
 from tests_support_api import EVERY_PERMISSION
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -30,22 +32,35 @@ class WorldApi:
     client: TestClient
     actor: uuid.UUID
     source_id: uuid.UUID
+    #: The world every request here names, as the browser names the world it has open; a route
+    #: that takes no world ignores it. Both workspaces register this id, and each holds its own
+    #: rows under it.
+    world_id: str
 
     @property
     def headers(self):
         return {"Authorization": f"Bearer {TOKEN}"}
 
+    def in_world(self, path):
+        """``path`` with this world added to any query it already carries.
+
+        Not ``params=``: httpx replaces the query a path carries with those parameters.
+        """
+        return f"{path}{'&' if '?' in path else '?'}{urlencode({'world_id': self.world_id})}"
+
     def get(self, path):
-        return self.client.get(path, headers=self.headers)
+        return self.client.get(self.in_world(path), headers=self.headers)
 
     def stranger_get(self, path):
-        return self.client.get(path, headers={"Authorization": f"Bearer {STRANGER_TOKEN}"})
+        return self.client.get(
+            self.in_world(path), headers={"Authorization": f"Bearer {STRANGER_TOKEN}"}
+        )
 
     def post(self, path, body):
-        return self.client.post(path, headers=self.headers, json=body)
+        return self.client.post(self.in_world(path), headers=self.headers, json=body)
 
     def delete(self, path):
-        return self.client.delete(path, headers=self.headers)
+        return self.client.delete(self.in_world(path), headers=self.headers)
 
     def current(self):
         return self.get("/world/styles/current").json()
@@ -75,7 +90,8 @@ def world_api(repository, spine_schema, tmp_path, monkeypatch):
     actor = uuid.uuid4()
     stranger = uuid.uuid4()
     source_id = uuid.uuid4()
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id, world_id=world_id)
     styles.register_topology(
         TopologyContract(
             "api-topology",
@@ -89,6 +105,7 @@ def world_api(repository, spine_schema, tmp_path, monkeypatch):
                     missing_reason="no evidence was recorded",
                 ),
             ),
+            world_id=world_id,
         )
     )
     monkeypatch.setenv(
@@ -112,8 +129,9 @@ def world_api(repository, spine_schema, tmp_path, monkeypatch):
 
     database = scratch_database(scratch)
     with database.session(stranger) as connection:
-        WorldStyleRepository(connection, stranger).register_topology(
-            TopologyContract("stranger-topology", ("region-a",))
+        registered_world(connection, stranger, world_id)
+        WorldStyleRepository(connection, stranger, world_id=world_id).register_topology(
+            TopologyContract("stranger-topology", ("region-a",), world_id=world_id)
         )
     services = Services(
         database=database,
@@ -124,7 +142,7 @@ def world_api(repository, spine_schema, tmp_path, monkeypatch):
         model_client=None,
     )
     with TestClient(create_app(services, verify=False)) as client:
-        yield WorldApi(client, actor, source_id)
+        yield WorldApi(client, actor, source_id, world_id)
 
 
 def test_catalog_and_current_state_expose_references_not_renderer_programs(world_api):
@@ -441,6 +459,7 @@ def test_invalidated_snapshot_source_reads_are_explicit_for_list_and_single(
         workspace_id=repository.workspace_id,
         actor=world_api.actor,
         base_topology_digest="api-topology",
+        world_id=world_api.world_id,
     )
     tombstone = repository.connection.execute(
         "insert into tombstone (workspace_id,scope,requested_by,reason) "
@@ -495,10 +514,15 @@ def test_pending_mask_keeps_review_identity_without_a_byte_reference(
         (repository.workspace_id,),
     ).fetchone()["span_id"]
     source_id = uuid.uuid4()
-    WorldStyleRepository(repository.connection, repository.workspace_id).register_topology(
-        TopologyContract("manual-review-mask-pending", ("region-a",), (
-            TopologySourceSlot(source_id, "generated-review", "region-a", span_id, None),
-        ))
+    WorldStyleRepository(
+        repository.connection, repository.workspace_id, world_id=world_api.world_id
+    ).register_topology(
+        TopologyContract(
+            "manual-review-mask-pending",
+            ("region-a",),
+            (TopologySourceSlot(source_id, "generated-review", "region-a", span_id, None),),
+            world_id=world_api.world_id,
+        )
     )
     added = world_api.post(f"/person-regions/{capture_id}/edits", {"edits": [{
         "region_key": "ab" * 32, "action": "add", "shape": "box",

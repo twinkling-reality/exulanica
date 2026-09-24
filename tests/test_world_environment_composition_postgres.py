@@ -5,6 +5,7 @@ import hashlib
 import json
 import uuid
 from dataclasses import dataclass, replace
+from urllib.parse import urlencode
 
 import pytest
 from exulanica.api.app import create_app
@@ -78,6 +79,7 @@ from model_fakes import FakeTransport, chat_body
 from pg_harness import open_scratch_connection
 from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_structure_fixtures import structural_candidate
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -173,13 +175,20 @@ def unplaced_composed(repository, tmp_path) -> Composed:
         "unplaced-composition",
         ("region-a",),
         (TopologySourceSlot(uuid.uuid4(), "no-source", "region-a", None, "No source chosen"),),
+        world_id=FIXTURE_WORLD_ID,
     )
     return _composed_over(repository, tmp_path, composed_candidate(contract, "ab" * 32, "cd" * 32))
 
 
 def _composed_over(repository, tmp_path, candidate) -> Composed:
     actor = uuid.uuid4()
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    # The world the candidate's topology is written for, registered before anything names it.
+    world_id = registered_world(
+        repository.connection, repository.workspace_id, candidate.topology["world_id"]
+    )
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     preview = structures.preview(candidate, proposed_by=actor)
     snapshot = structures.apply(
         preview.preview_id,
@@ -250,13 +259,20 @@ def _composed_over(repository, tmp_path, candidate) -> Composed:
         actor=actor,
     )
     feature_id = publication.features[0]["id"]
-    worlds = WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
+    worlds = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id, store=store
+    )
     version = worlds.create_version(
         source_snapshot_id=snapshot.snapshot_id,
         title="Environment study",
         created_by=actor,
     )
     return Composed(environments, worlds, source, render, publication, feature_id, version, store)
+
+
+def _in_world(composed: Composed) -> str:
+    """The query naming the world ``composed`` was built in, which every world route requires."""
+    return "?" + urlencode({"world_id": composed.worlds.world_id})
 
 
 def _add(composed: Composed, placement: EnvironmentPlacement):
@@ -345,7 +361,10 @@ def test_runtime_role_undo_retains_environment_history_without_delete(
         repository.workspace_id
     ) as connection:
         runtime = WorldObjectRepository(
-            connection, repository.workspace_id, store=composed.store
+            connection,
+            repository.workspace_id,
+            world_id=composed.worlds.world_id,
+            store=composed.store,
         )
         assert connection.execute(
             "select has_table_privilege(current_user,'world_alternate_environment_instance',"
@@ -452,7 +471,10 @@ def test_two_clients_reject_the_stale_environment_base(composed, spine_schema) -
     connection = open_scratch_connection(psycopg_module, scratch)
     WorkspaceScope(connection, composed.worlds.workspace_id)
     competitor = WorldObjectRepository(
-        connection, composed.worlds.workspace_id, store=composed.store
+        connection,
+        composed.worlds.workspace_id,
+        world_id=composed.worlds.world_id,
+        store=composed.store,
     )
     try:
         base = composed.version.state_sha256
@@ -602,7 +624,9 @@ def test_cross_workspace_hides_environment_history(composed, spine_schema) -> No
     workspace_id = uuid.uuid4()
     WorkspaceScope(connection, workspace_id)
     try:
-        stranger = WorldObjectRepository(connection, workspace_id, store=composed.store)
+        stranger = WorldObjectRepository(
+            connection, workspace_id, world_id=composed.worlds.world_id, store=composed.store
+        )
         assert stranger.versions() == ()
         with pytest.raises(UnknownWorldResource):
             stranger.version(version.version_id)
@@ -691,6 +715,7 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
     )
     headers = {"Authorization": f"Bearer {token}"}
     path = f"/world/versions/{composed.version.version_id}/environment-instances"
+    world = _in_world(composed)
     body = {
         "base_state_sha256": composed.version.state_sha256,
         "instance_id": "environment:api",
@@ -714,8 +739,8 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
         "origin_role": "personal",
     }
     with TestClient(create_app(services, verify=False)) as client:
-        assert client.post(path, json=body).status_code in {401, 403}
-        response = client.post(path, json=body, headers=headers)
+        assert client.post(f"{path}{world}", json=body).status_code in {401, 403}
+        response = client.post(f"{path}{world}", json=body, headers=headers)
         assert response.status_code == 201, response.text
         version = response.json()
         assert version["schema_version"] == 2
@@ -724,7 +749,7 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
         source = version["environment_instances"][0]["source"]
 
         move = client.post(
-            f"{path}/environment:api/move",
+            f"{path}/environment:api/move{world}",
             headers=headers,
             json={
                 "base_state_sha256": version["state_sha256"],
@@ -736,10 +761,12 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
         assert version["environment_instances"][0]["source"] == source
         assert version["environment_instances"][0]["transform"]["x_mm"] == 2500
 
-        reread = client.get(f"/world/versions/{composed.version.version_id}", headers=headers)
+        reread = client.get(
+            f"/world/versions/{composed.version.version_id}{world}", headers=headers
+        )
         assert reread.json() == version
         remove = client.post(
-            f"{path}/environment:api/remove",
+            f"{path}/environment:api/remove{world}",
             headers=headers,
             json={"base_state_sha256": version["state_sha256"]},
         )
@@ -747,7 +774,7 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
         version = remove.json()
         assert version["environment_instances"][0]["removed"]
         undo = client.post(
-            f"{path}/undo",
+            f"{path}/undo{world}",
             headers=headers,
             json={"base_state_sha256": version["state_sha256"]},
         )
@@ -819,11 +846,13 @@ def test_environment_proposal_is_read_only_exact_and_workspace_scoped(
     }
     headers = {"Authorization": f"Bearer {token}"}
     stranger_headers = {"Authorization": f"Bearer {stranger_token}"}
+    world = _in_world(composed)
+    proposals = f"/selection/environment{world}"
     with TestClient(create_app(services, verify=False)) as client:
         before = client.get(
-            f"/world/versions/{composed.version.version_id}", headers=headers
+            f"/world/versions/{composed.version.version_id}{world}", headers=headers
         ).json()
-        response = client.post("/selection/environment", headers=headers, json=body)
+        response = client.post(proposals, headers=headers, json=body)
         assert response.status_code == 200, response.text
         proposal = response.json()["proposal"]
         assert proposal["operation"] == "place_selected_feature"
@@ -835,7 +864,9 @@ def test_environment_proposal_is_read_only_exact_and_workspace_scoped(
         assert proposal["render_batch_id"] == 7
         assert proposal["origin_role"] == "personal"
         assert (
-            client.get(f"/world/versions/{composed.version.version_id}", headers=headers).json()
+            client.get(
+                f"/world/versions/{composed.version.version_id}{world}", headers=headers
+            ).json()
             == before
         )
 
@@ -847,7 +878,7 @@ def test_environment_proposal_is_read_only_exact_and_workspace_scoped(
 
         with monkeypatch.context() as scoped:
             scoped.setattr(EnvironmentRepository, "read_features", non_nyc)
-            unsupported = client.post("/selection/environment", headers=headers, json=body)
+            unsupported = client.post(proposals, headers=headers, json=body)
         assert unsupported.status_code == 200
         assert unsupported.json()["refusal"]["code"] == "unsupported_source"
         assert transport.call_count == 1
@@ -859,13 +890,19 @@ def test_environment_proposal_is_read_only_exact_and_workspace_scoped(
 
         with monkeypatch.context() as scoped:
             scoped.setattr(EnvironmentRepository, "read_features", non_doitt)
-            unsupported_id = client.post("/selection/environment", headers=headers, json=body)
+            unsupported_id = client.post(proposals, headers=headers, json=body)
         assert unsupported_id.json()["refusal"]["code"] == "unsupported_source"
         assert transport.call_count == 1
 
-        foreign = client.post("/selection/environment", headers=stranger_headers, json=body)
+        # The owner's world is not the stranger's to name.
+        unnamed = client.post(proposals, headers=stranger_headers, json=body)
+        assert (unnamed.status_code, unnamed.json()["code"]) == (404, "unknown_reference")
+        # A world of the same id in the stranger's own workspace does not reach the owner's
+        # version, which answers as a version that does not exist.
+        registered_world(composed.worlds.connection, stranger, composed.worlds.world_id)
+        foreign = client.post(proposals, headers=stranger_headers, json=body)
         absent = client.post(
-            "/selection/environment",
+            proposals,
             headers=stranger_headers,
             json={**body, "version_id": str(uuid.uuid4())},
         )
@@ -932,27 +969,29 @@ def test_environment_proposal_refuses_missing_selection_and_stale_base_without_m
         "origin_role": "fictional",
     }
     headers = {"Authorization": f"Bearer {token}"}
+    world = _in_world(composed)
+    proposals = f"/selection/environment{world}"
     with TestClient(create_app(services, verify=False)) as client:
         before = client.get(
-            f"/world/versions/{composed.version.version_id}", headers=headers
+            f"/world/versions/{composed.version.version_id}{world}", headers=headers
         ).json()
         missing = client.post(
-            "/selection/environment",
+            proposals,
             headers=headers,
             json={**body, "selected_feature_id": None},
         )
         stale = client.post(
-            "/selection/environment",
+            proposals,
             headers=headers,
             json={**body, "base_state_sha256": "f" * 64},
         )
         invalid_region = client.post(
-            "/selection/environment",
+            proposals,
             headers=headers,
             json={**body, "region_id": "not-a-source-region"},
         )
         invalid_transform = client.post(
-            "/selection/environment",
+            proposals,
             headers=headers,
             json={
                 **body,
@@ -971,13 +1010,15 @@ def test_environment_proposal_refuses_missing_selection_and_stale_base_without_m
                     "validate_environment_placement",
                     lambda *_args, refused=failure, **_kwargs: (_ for _ in ()).throw(refused),
                 )
-                refused = client.post("/selection/environment", headers=headers, json=body)
+                refused = client.post(proposals, headers=headers, json=body)
             assert refused.status_code == expected_status
         render_digest = BlobId.from_hex(composed.render.expected_sha256)
         render_path = composed.store.root / composed.store.key_for(render_digest)
         render_path.unlink()
-        unavailable = client.post("/selection/environment", headers=headers, json=body)
-        after = client.get(f"/world/versions/{composed.version.version_id}", headers=headers).json()
+        unavailable = client.post(proposals, headers=headers, json=body)
+        after = client.get(
+            f"/world/versions/{composed.version.version_id}{world}", headers=headers
+        ).json()
     assert missing.json()["refusal"]["code"] == "no_selected_feature"
     assert stale.json()["refusal"]["code"] == "stale_version"
     assert invalid_region.status_code == 422
@@ -1018,6 +1059,7 @@ class MemoryPlace:
         return execute(
             self.composed.worlds.connection,
             validate(self.composed.worlds.connection, selected, self.session),
+            world_id=self.composed.worlds.world_id,
             store=self.composed.store,
         )
 
@@ -1351,8 +1393,9 @@ def test_authenticated_place_bridge_routes_create_list_and_revoke(
     }
     with TestClient(create_app(services, verify=False)) as client:
         assert client.post("/selection/place-bridges", json=body).status_code in {401, 403}
+        asked_in = f"?world_id={memory_place.composed.worlds.world_id}"
         unlinked = client.post(
-            "/selection/ask",
+            f"/selection/ask{asked_in}",
             json={
                 "question": "What building is this?",
                 "city_context": {
@@ -1371,7 +1414,7 @@ def test_authenticated_place_bridge_routes_create_list_and_revoke(
         assert created.status_code == 201, created.text
         decision = created.json()
         selected = client.post(
-            "/selection",
+            f"/selection{asked_in}",
             json={
                 "intent": "content",
                 "place": {"ids": [str(memory_place.entity_id)]},

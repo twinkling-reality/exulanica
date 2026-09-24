@@ -325,6 +325,7 @@ def test_evidence_changed_while_composing_cannot_support_final_answer(
         _UnusedModel(manifest),
         "What do they hold?",
         Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2)),
+        world_id=None,
         plan=SelectionPlan(intent="captures"),
         before_compose=_no_model_is_called,
     )
@@ -367,6 +368,7 @@ def test_fresh_packet_random_tokens_do_not_invalidate_unchanged_answer(
         _UnusedModel(manifest),
         "What do they hold?",
         Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2)),
+        world_id=None,
         plan=SelectionPlan(intent="captures"),
         before_compose=_no_model_is_called,
     )

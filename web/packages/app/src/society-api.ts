@@ -8,14 +8,14 @@
  * `requestAction` records a typed `go_to` or `perform` against a canonical target. This module
  * does not start playback or request a model decision.
  *
- * A saved world is named with `worldId`, and every request then carries it as `world_id`: the
- * server reads a version only in the world the request names, so without it a saved world's
- * version reads as missing rather than as somebody else's.
+ * Every request names the open world as `world_id`, because the server reads a version only in
+ * the world a request names and has no default world to fall back on.
  */
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import { DEFAULT_SOCIETY_ENGINE, societyEngine, type SocietyEngineProfile } from './society-engines.js';
+import { openWorldPath } from './world-scope.js';
 
 export interface SocietySnapshot {
   readonly societyId: string;
@@ -499,23 +499,23 @@ export function parseSocietyActionRecord(value: unknown, versionId: string): Soc
 }
 
 export interface SocietyClientOptions extends TransportOptions {
-  /** The saved world the versions belong to. Omitted, requests name no world: the default one. */
-  readonly worldId?: string;
+  /** The open world the versions belong to; null where none is open, which sends nothing. */
+  readonly worldId: string | null;
 }
 
 export class SocietyClient {
   private readonly transport: Transport;
-  private readonly worldId: string | undefined;
+  private readonly worldId: string | null;
 
   constructor(options: SocietyClientOptions) {
     this.transport = new Transport(options);
     this.worldId = options.worldId;
   }
 
-  /** A society route, with the saved world named when there is one. */
+  /** A society route in the open world. */
   private path(versionId: string, suffix = ''): string {
     const path = `/world/versions/${encodeURIComponent(versionId)}/society${suffix}`;
-    return this.worldId === undefined ? path : `${path}?world_id=${encodeURIComponent(this.worldId)}`;
+    return openWorldPath(path, this.worldId, 'society to read or change');
   }
 
   async connect(
@@ -536,7 +536,7 @@ export class SocietyClient {
    * Create this version's society, or read back the one already there. A null place asks the
    * server for a saved world's own, which it derives from the version; the client never makes one.
    */
-  create(
+  async create(
     versionId: string,
     placeId: string | null,
     regionId: string,
@@ -555,7 +555,7 @@ export class SocietyClient {
    * records the change as one simulated minute of history and answers with the new state; a
    * refusal names what stands in the way (`nobody_to_send_away`, `already_here`, ...).
    */
-  changePresence(snapshot: SocietySnapshot, presence: 'away' | 'here', idempotencyKey: string = crypto.randomUUID()): Promise<SocietySnapshot> {
+  async changePresence(snapshot: SocietySnapshot, presence: 'away' | 'here', idempotencyKey: string = crypto.randomUUID()): Promise<SocietySnapshot> {
     return this.transport.postJson<unknown>(this.path(snapshot.versionId, '/presence'), {
       idempotency_key: idempotencyKey,
       presence,
@@ -565,21 +565,21 @@ export class SocietyClient {
   }
 
   /** The current state; `places` also reads where inhabitants can go. */
-  read(versionId: string, options: { readonly places?: boolean } = {}): Promise<SocietySnapshot> {
+  async read(versionId: string, options: { readonly places?: boolean } = {}): Promise<SocietySnapshot> {
     return this.transport.getJson<unknown>(
       this.path(versionId),
       options.places === true ? { places: 'true' } : undefined,
     ).then(value => boundSnapshot(value, versionId));
   }
 
-  events(snapshot: SocietySnapshot): Promise<readonly SocietyEvent[]> {
+  async events(snapshot: SocietySnapshot): Promise<readonly SocietyEvent[]> {
     return this.transport.getJson<unknown>(
       this.path(snapshot.versionId, '/events'),
       { limit: '256' },
     ).then(value => parseSocietyEvents(value, snapshot));
   }
 
-  advance(snapshot: SocietySnapshot): Promise<SocietySnapshot> {
+  async advance(snapshot: SocietySnapshot): Promise<SocietySnapshot> {
     return this.transport.postJson<unknown>(
       this.path(snapshot.versionId, '/steps'),
       {
@@ -593,7 +593,7 @@ export class SocietyClient {
    * Record one typed directed action through `record_action` on the society actions route.
    * Returns the server envelope; does not advance simulation time.
    */
-  requestAction(
+  async requestAction(
     snapshot: SocietySnapshot,
     subjectId: string,
     intent: SocietyActionIntent,

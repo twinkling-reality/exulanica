@@ -33,6 +33,7 @@ def stub():
     )
     binding = SimpleNamespace(
         registration=lambda: registration,
+        world_id=registration["world_id"],
         place_id=uuid.uuid4(),
         base_artifact_sha256=hashlib.sha256(base).hexdigest(),
         interpretation_artifact_sha256=hashlib.sha256(interpreted).hexdigest(),
@@ -63,7 +64,9 @@ def stub():
 
 def test_exact_utf8_strings_and_registered_transform_survive_response(stub):
     runtime, c, s, v, base, interpreted, calls, binding = stub
-    result = society_district_view(runtime, c, s, v).model_dump(mode="json")
+    result = society_district_view(runtime, c, s, v, world_id=binding.world_id).model_dump(
+        mode="json"
+    )
     assert result["base_json"].encode() == base
     assert result["interpretation_json"].encode() == interpreted
     assert result["registration"] == binding.registration()
@@ -74,7 +77,7 @@ def test_exact_utf8_strings_and_registered_transform_survive_response(stub):
 
 @pytest.mark.parametrize("failure", ["binding", "version", "invalidated", "district", "utf8"])
 def test_boundary_distinguishes_missing_scope_from_unavailable_source(stub, failure):
-    runtime, c, s, v, *_ = stub
+    runtime, c, s, v, *_, binding = stub
 
     def missing_binding(*args):
         raise UnavailableSocietyInput("not configured")
@@ -101,4 +104,20 @@ def test_boundary_distinguishes_missing_scope_from_unavailable_source(stub, fail
     with pytest.raises(
         UnknownWorldResource if failure in ("binding", "version") else UnavailableSocietyInput
     ):
-        society_district_view(runtime, c, s, v)
+        society_district_view(runtime, c, s, v, world_id=binding.world_id)
+
+
+def test_a_version_of_another_world_is_refused_as_a_district_nobody_registered(stub):
+    """The same refusal as a missing binding, and nothing is read before it."""
+    runtime, c, s, v, *_, calls, binding = stub
+    with pytest.raises(UnknownWorldResource) as crossed:
+        society_district_view(runtime, c, s, v, world_id=f"{binding.world_id}:elsewhere")
+
+    def missing_binding(*args):
+        raise UnavailableSocietyInput("not configured")
+
+    runtime._binding = missing_binding
+    with pytest.raises(UnknownWorldResource) as missing:
+        society_district_view(runtime, c, s, v, world_id=binding.world_id)
+    assert str(crossed.value) == str(missing.value)
+    assert calls == []

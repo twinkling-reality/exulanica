@@ -90,7 +90,7 @@ def score_gold_questions(
                 record["stage_results"]["schema"] = True
                 cases["M8.plan_validity"].append(NamedCase(f"{question.question_id}:schema", True))
                 phase = "execution"
-                result = execute(connection, validated)
+                result = execute(connection, validated, world_id=None)
                 record["stage_results"]["execute"] = True
                 cases["M8.plan_validity"].append(NamedCase(f"{question.question_id}:execute", True))
                 record["plan"] = plan.model_dump(mode="json")

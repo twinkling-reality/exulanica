@@ -28,7 +28,7 @@ from exulanica.world.starter import create_starter_authorities
 
 from test_saved_world_entries_api import _attachment_body, _create_starter, _reviewed_source
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
-from test_world_style_postgres import proposal, topology
+from test_world_style_postgres import fixture_styles, proposal, topology
 
 FAMILY = "atlas-topology-v1"
 STYLE = uuid.UUID("00000000-0000-0000-0000-000000000001")
@@ -309,13 +309,14 @@ def test_starter_sourced_activation_and_unknown_snapshot_refuse():
 
 @pytest.mark.postgres
 def test_colliding_hex_across_planes_does_not_unify(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(bootstrappable_topology("composed-live"))
     opened = bootstrap_world(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         base_topology_digest="composed-live",
+        world_id=styles.world_id,
     )
     snapshot = repository.connection.execute(
         "select snapshot_id,topology_sha256 from world_structure_snapshot "
@@ -375,7 +376,7 @@ def test_starter_overlay_and_sourced_activation_refuse(repository):
 
 @pytest.mark.postgres
 def test_historical_style_write_refuses_and_rollback_uses_live_topology(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     initial = styles.register_topology(topology())
     preview = styles.preview(proposal(initial, parameters={"vitality": 0.4}))
     live = styles.apply(
@@ -432,7 +433,7 @@ def test_historical_style_write_refuses_and_rollback_uses_live_topology(reposito
 
 @pytest.mark.postgres
 def test_unknown_style_write_base_stores_unknown_reference(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     live = styles.register_topology(topology())
     rejected = replace(proposal(live), base_style_version_id=uuid.uuid4())
     with pytest.raises(UnknownWorldResource):
@@ -451,13 +452,14 @@ def test_unknown_style_write_base_stores_unknown_reference(repository):
 
 @pytest.mark.postgres
 def test_unknown_and_cross_world_snapshot_is_unknown_reference(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(bootstrappable_topology("topology-a"))
     opened = bootstrap_world(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         base_topology_digest="topology-a",
+        world_id=styles.world_id,
     )
     missing = styles.classify_structure_style_compatibility(
         intent=CompatibilityIntent.CLASSIFY,
@@ -485,13 +487,14 @@ def test_unknown_and_cross_world_snapshot_is_unknown_reference(repository):
 def test_bootstrap_reuse_keeps_snapshot_regions_and_creates_no_contracts(
     repository,
 ):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(bootstrappable_topology("composed-live", regions=("region-a",)))
     first = bootstrap_world(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         base_topology_digest="composed-live",
+        world_id=styles.world_id,
     )
     assert first["regions"] == ["region-a"]
     styles.register_topology(
@@ -506,6 +509,7 @@ def test_bootstrap_reuse_keeps_snapshot_regions_and_creates_no_contracts(
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         base_topology_digest="composed-later",
+        world_id=styles.world_id,
     )
     after = repository.connection.execute(
         "select count(*) as n from world_topology_contract where workspace_id=%s",
@@ -520,12 +524,13 @@ def test_bootstrap_reuse_keeps_snapshot_regions_and_creates_no_contracts(
 
 @pytest.mark.postgres
 def test_non_starter_sourced_register_is_composer_handoff(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(topology())
     sourced = TopologyContract(
         "sourced-handoff",
         ("region-a", "region-b"),
         (TopologySourceSlot(uuid.uuid4(), "photo-slot", "region-a", None, "no evidence recorded"),),
+        world_id=styles.world_id,
     )
     decision = styles.classify_structure_style_compatibility(
         intent=CompatibilityIntent.REGISTER_TOPOLOGY,
@@ -539,13 +544,14 @@ def test_non_starter_sourced_register_is_composer_handoff(repository):
 
 @pytest.mark.postgres
 def test_register_topology_refuses_before_history_insert(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(topology())
     live = styles.current()
     mismatched = TopologyContract(
         "family-mismatch",
         ("region-a", "region-b"),
         compatibility_key="other-family",
+        world_id=styles.world_id,
     )
     decision = styles.classify_structure_style_compatibility(
         intent=CompatibilityIntent.REGISTER_TOPOLOGY,
@@ -568,11 +574,12 @@ def test_register_topology_refuses_before_history_insert(repository):
 
 @pytest.mark.postgres
 def test_first_register_family_mismatch_inserts_no_contract(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     mismatched = TopologyContract(
         "first-family-mismatch",
         ("region-a", "region-b"),
         compatibility_key="other-family",
+        world_id=styles.world_id,
     )
     decision = styles.classify_structure_style_compatibility(
         intent=CompatibilityIntent.REGISTER_TOPOLOGY,
@@ -660,7 +667,7 @@ def test_attach_is_membership_only_and_compose_stays_latent(objects_api, reposit
 
 @pytest.mark.postgres
 def test_dual_source_addresses_still_refuse_through_the_classifier(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(topology())
     with pytest.raises(InvalidStyleData, match="conflicting plane addresses"):
         styles.source_media(

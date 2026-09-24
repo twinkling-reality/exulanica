@@ -24,7 +24,7 @@ from exulanica.canonical import canonical_json
 from exulanica.graph.observations import scene_observations
 from exulanica.graph.world_read import world_read_bundle
 from exulanica.store.local import LocalContentAddressedStore
-from exulanica.world import DEFAULT_WORLD_ID
+from exulanica.world.worlds import resolve_personal_source_world
 
 ROOT = Path(__file__).resolve().parents[1]
 DATABASE = "postgresql://localhost:5433/exulanica_spine_test"
@@ -55,7 +55,10 @@ def _scene_record(
     scene_id: uuid.UUID,
     store: LocalContentAddressedStore,
 ) -> dict[str, object]:
-    envelope = world_read_bundle(connection, workspace, scene_id, store, world_id=DEFAULT_WORLD_ID)
+    # The scenes recorded here are the workspace's own photographs, so the regions read are its
+    # personal-source world's.
+    world_id = resolve_personal_source_world(connection, workspace)
+    envelope = world_read_bundle(connection, workspace, scene_id, store, world_id=world_id)
     if envelope is None:
         return {"scene_id": str(scene_id), "readable": False}
     wire = json.loads(json.dumps(envelope))

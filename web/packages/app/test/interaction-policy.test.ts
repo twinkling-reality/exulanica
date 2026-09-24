@@ -5,6 +5,9 @@ import {
   preferencesFromInteractionPolicy,
 } from '../src/interaction-policy.js';
 
+/** The world these clients are opened for. */
+const TEST_WORLD = 'world:personal:test';
+
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
     status,
@@ -33,11 +36,12 @@ describe('reviewed interaction policy client', () => {
     const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       requests.push({ url, ...(init === undefined ? {} : { init }) });
-      if (url.endsWith('/current')) return json(emptyState);
-      if (url.endsWith('/previews')) return json({ preview_id: 'preview-1' }, 201);
+      if (new URL(url).pathname.endsWith('/current')) return json(emptyState);
+      if (new URL(url).pathname.endsWith('/previews')) return json({ preview_id: 'preview-1' }, 201);
       return json({ version_id: 'version-1' });
     });
     const client = new InteractionPolicyClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api',
       token: 'secret',
       fetch: fetch as typeof globalThis.fetch,
@@ -55,6 +59,9 @@ describe('reviewed interaction policy client', () => {
       '/api/world/interactions/previews',
       '/api/world/interactions/previews/preview-1/apply',
     ]);
+    // Interaction settings belong to a world, and every request names the one this client serves.
+    expect(requests.map(({ url }) => new URL(url).searchParams.get('world_id')))
+      .toEqual([TEST_WORLD, TEST_WORLD, TEST_WORLD]);
     const proposal = JSON.parse(String(requests[1]!.init!.body));
     expect(proposal).toMatchObject({
       proposal_id: 'proposal-1',
@@ -75,6 +82,7 @@ describe('reviewed interaction policy client', () => {
   it('does not write when a device-only setting changes or the server already has the value', async () => {
     const fetch = vi.fn(async () => json(emptyState));
     const client = new InteractionPolicyClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 'secret',
       fetch: fetch as typeof globalThis.fetch,
     });
@@ -95,14 +103,15 @@ describe('reviewed interaction policy client', () => {
     const bodies: unknown[] = [];
     const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith('/current')) return json(emptyState);
-      if (url.endsWith('/previews')) {
+      if (new URL(url).pathname.endsWith('/current')) return json(emptyState);
+      if (new URL(url).pathname.endsWith('/previews')) {
         bodies.push(JSON.parse(String(init!.body)));
         return json({ preview_id: 'preview-c' }, 201);
       }
       return json({ version_id: 'version-c' });
     });
     const client = new InteractionPolicyClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 'secret',
       fetch: fetch as typeof globalThis.fetch, ids: () => 'proposal-c',
     });

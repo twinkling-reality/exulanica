@@ -29,7 +29,7 @@ from exulanica.world.interaction import (
     InteractionRecommendation,
     default_interaction_state,
 )
-from exulanica.world.models import DEFAULT_WORLD_ID, ProposalOrigin, ProposalProvenance
+from exulanica.world.models import ProposalOrigin, ProposalProvenance
 
 __all__ = ["WorldInteractionPolicyRepository"]
 
@@ -48,7 +48,7 @@ class WorldInteractionPolicyRepository:
         workspace_id: uuid.UUID,
         *,
         registry: InteractionPolicyRegistry = INTERACTION_POLICY_REGISTRY,
-        world_id: str = DEFAULT_WORLD_ID,
+        world_id: str,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id

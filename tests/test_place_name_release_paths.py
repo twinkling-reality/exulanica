@@ -83,6 +83,7 @@ from test_companion_saved_names import PERSON, PLACE, TEXT, _vector_reply, named
 from test_hosted_boundary import HOSTED_CALL_PATHS
 from test_selection_proposal import _seed_world, current_reference, draft
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -254,6 +255,12 @@ class Instance:
     def place(self) -> uuid.UUID:
         return self.entities["place"]
 
+    @property
+    def asking(self) -> str:
+        """``POST /selection/ask`` in this workspace's world, registered the first time asked."""
+        world = registered_world(self.repository.connection, self.workspace_id)
+        return f"/selection/ask?world_id={world}"
+
     def client(
         self, manifest: Manifest = MANIFEST, **recorder: Any
     ) -> tuple[ModelClient, Recorder]:
@@ -343,7 +350,7 @@ class Instance:
         """``POST /selection/ask`` with a plan the caller supplies, its query as given."""
         plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query=query)
         response = http.post(
-            "/selection/ask",
+            self.asking,
             headers=AUTH,
             json={
                 "question": "Where does the running club meet?",
@@ -548,7 +555,7 @@ def test_a_place_allowed_for_the_embedding_use_reaches_no_other_roles_request(
 
     with instance.http(services) as http:
         response = http.post(
-            "/selection/ask",
+            instance.asking,
             headers=AUTH,
             json={"question": f"Is {PERSON} wearing the running club shirt outside {PLACE}?"},
         )
@@ -581,7 +588,7 @@ def test_a_question_asked_in_words_searches_without_the_name_even_while_it_is_al
 
     with instance.http(services) as http:
         response = http.post(
-            "/selection/ask",
+            instance.asking,
             headers=AUTH,
             json={"question": f"Photographs of the running club at {PLACE}"},
         )

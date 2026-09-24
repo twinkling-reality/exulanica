@@ -25,9 +25,9 @@ from exulanica.graph.world_read import (
 )
 from exulanica.ingest.repository import IngestRepository
 from exulanica.store.local import LocalContentAddressedStore
-from exulanica.world import DEFAULT_WORLD_ID
 
 from test_scene_reconstruction_pipeline import FakeColmap, _processor, _queued_scene
+from world_support import FIXTURE_WORLD_ID
 
 
 def _canonical(value: object) -> bytes:
@@ -74,7 +74,7 @@ def partly_registered(repository, tmp_path):
 def test_a_recipient_reproduces_the_digest_from_the_returned_bytes_alone(published, repository):
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     assert envelope["profile"] == WORLD_READ_PROFILE
@@ -92,7 +92,7 @@ def test_every_number_in_the_bundle_survives_canonical_json(published, repositor
     """No float reaches the digest input, at any depth, under any key."""
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
 
@@ -121,7 +121,7 @@ def test_every_number_in_the_bundle_survives_canonical_json(published, repositor
 def test_measured_numbers_are_decimal_strings_at_the_declared_precision(published, repository):
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     bundle = envelope["bundle"]
@@ -142,7 +142,7 @@ def test_changing_one_referenced_digest_changes_the_bundle_digest(published, rep
     """The bundle is bound to the artifacts it names, not merely accompanied by them."""
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
 
@@ -166,7 +166,7 @@ def test_no_geometry_entry_is_offered_as_evidence(published, repository):
     """
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
 
@@ -186,7 +186,7 @@ def test_recorded_and_displayed_rungs_stay_separate(partly_registered, repositor
     """
     store, _captures, scene_id = partly_registered
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     rungs = envelope["bundle"]["rungs"]
@@ -198,7 +198,7 @@ def test_recorded_and_displayed_rungs_stay_separate(partly_registered, repositor
         digest = BlobId.from_hex(entry["content_sha256"])
         (store.root / store.key_for(digest)).unlink(missing_ok=True)
     degraded = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert degraded is not None
     assert degraded["bundle"]["rungs"]["recorded"] == rungs["recorded"]
@@ -223,7 +223,7 @@ def test_a_scene_bundle_says_which_address_reached_it_and_what_still_has_none(
     """
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     addressing = envelope["bundle"]["addressing"]
@@ -244,7 +244,7 @@ def test_every_member_appears_as_a_view_even_when_it_did_not_register(
     """Counting the views must give the number of photographs, not the number that worked."""
     store, _captures, scene_id = partly_registered
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     bundle = envelope["bundle"]
@@ -271,7 +271,7 @@ def test_a_scene_in_another_workspace_is_not_readable(published, repository, ing
     assert elsewhere != repository.workspace_id
     other = IngestRepository(open_another().connection, elsewhere)
     assert (
-        world_read_bundle(other.connection, elsewhere, scene_id, store, world_id=DEFAULT_WORLD_ID)
+        world_read_bundle(other.connection, elsewhere, scene_id, store, world_id=FIXTURE_WORLD_ID)
         is None
     )
 
@@ -281,7 +281,7 @@ def test_an_unknown_scene_is_not_readable(published, repository):
     absent = uuid.uuid4()
     assert (
         world_read_bundle(
-            repository.connection, repository.workspace_id, absent, store, world_id=DEFAULT_WORLD_ID
+            repository.connection, repository.workspace_id, absent, store, world_id=FIXTURE_WORLD_ID
         )
         is None
     )
@@ -291,7 +291,7 @@ def test_consent_reports_the_screening_basis_and_refuses_to_infer_people(publish
     """An unscreened photograph says nobody looked, and never says nobody is there."""
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     consent = envelope["bundle"]["consent"]
@@ -322,7 +322,7 @@ def test_the_scene_consent_answer_is_the_weakest_of_its_photographs(published, r
     """
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     consent = envelope["bundle"]["consent"]
@@ -365,7 +365,7 @@ def test_the_release_state_is_internal_only_while_no_person_state_reaches_the_bu
     """
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     bundle = envelope["bundle"]
@@ -398,7 +398,7 @@ def test_the_release_counts_are_recomputable_from_the_bundles_own_per_capture_re
     """
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     received = json.loads(json.dumps(envelope))["bundle"]
@@ -446,7 +446,7 @@ def test_the_region_graph_says_unavailable_rather_than_empty(published, reposito
     """
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     region_graph = envelope["bundle"]["region_graph"]
@@ -459,7 +459,7 @@ def test_a_bundle_without_a_store_still_reports_honestly(published, repository):
     """With no store the receipts are unreadable, and the scene degrades rather than vanishing."""
     _store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, None, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, None, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     bundle = envelope["bundle"]
@@ -473,7 +473,7 @@ def test_two_reads_of_an_unchanged_scene_produce_the_same_digest(published, repo
     """Determinism, which is what makes the digest worth quoting to anybody."""
     store, _captures, scene_id = published
     first = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     reopened = LocalContentAddressedStore(tmp_path / "store")
     second = world_read_bundle(
@@ -481,7 +481,7 @@ def test_two_reads_of_an_unchanged_scene_produce_the_same_digest(published, repo
         repository.workspace_id,
         scene_id,
         reopened,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     assert first is not None and second is not None
     assert first["bundle_sha256"] == second["bundle_sha256"]
@@ -500,7 +500,7 @@ def test_a_recipient_reproduces_the_recorded_digest_from_the_keys_the_bundle_nam
     """
     store, _captures, scene_id = published
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     received = json.loads(json.dumps(envelope))["bundle"]
@@ -651,7 +651,7 @@ def test_a_receipt_the_database_refuses_is_not_reported_as_simply_eligible(publi
     superseded_id = _screen_again_under_the_superseded_policy(repository, refused_capture)
 
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     per_capture = envelope["bundle"]["consent"]["per_capture"]
@@ -725,10 +725,10 @@ def test_the_policy_currency_field_cannot_move_the_recorded_digest_on_a_timer(
     )
 
     first = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     second = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert first is not None and second is not None
     assert first["bundle"]["recorded_sha256"] == second["bundle"]["recorded_sha256"]

@@ -76,7 +76,7 @@ from test_companion_saved_names import (
     _vector_reply,
     named,
 )
-from test_selection_proposal import _seed_world, current_reference, draft
+from test_selection_proposal import WORLD, _seed_world, current_reference, draft
 from test_vision_contract import VALID as OBSERVATION
 
 pytestmark = pytest.mark.postgres
@@ -350,6 +350,7 @@ def run_ask(world: World) -> Witness:
         client,
         f"Is {PERSON} wearing the running club shirt outside {PLACE}?",
         world.session,
+        world_id=None,
         store=world.store,
         before_compose=composer_rights_check(world.connection, world.repository.workspace_id),
     )
@@ -366,6 +367,7 @@ def run_supplied_plan(world: World) -> Witness:
         client,
         "Where does the running club meet?",
         world.session,
+        world_id=None,
         plan=plan,
         store=world.store,
         before_compose=composer_rights_check(world.connection, world.repository.workspace_id),
@@ -388,6 +390,8 @@ def run_appearance(world: World) -> Witness:
         f"make the horizon softer where {PERSON} stands outside {PLACE}",
         world.session,
         current=current_reference(),
+        world_id=WORLD,
+        store=None,
     )
     return transport
 
@@ -554,6 +558,7 @@ def test_the_composer_is_refused_at_the_boundary_when_the_call_sites_check_is_mi
             client,
             "What does the sign say?",
             world.session,
+            world_id=None,
             plan=plan,
             store=world.store,
             before_compose=lambda captures, handoff: None,

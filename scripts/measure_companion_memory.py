@@ -1012,7 +1012,7 @@ def packets_from_the_database(scene: str) -> tuple[dict[str, EvidencePacket], st
     with Database(READONLY).session(uuid.UUID(workspace_id)) as connection:
         for key, _question, _why in QUESTIONS:
             plan = SelectionPlan.model_validate(RECORDED_PLANS[key])
-            result = execute(connection, validate(connection, plan, session))
+            result = execute(connection, validate(connection, plan, session), world_id=None)
             packets[key] = build_packet(
                 connection, result, workspace_id=session.workspace_id
             )

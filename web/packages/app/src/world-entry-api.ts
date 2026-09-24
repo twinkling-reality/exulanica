@@ -1,6 +1,64 @@
-/** Exact, durable workspace entries into personal authored worlds. */
+/** Exact, durable workspace entries into personal authored worlds, and the worlds they name. */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
+import { worldPath } from './world-scope.js';
+
+/**
+ * The kind the server gives a world composed from the workspace's own photographs and other
+ * personal sources. The server's registry states the kinds (`exulanica/world/worlds.py`);
+ * `world-entry-api.test.ts` holds this spelling to the count policy the server reads.
+ */
+export const PERSONAL_SOURCE_WORLD_KIND = 'personal-source';
+
+/** How many worlds of each kind one workspace may hold; null where the policy sets no limit. */
+export interface WorldCountPolicy {
+  readonly policyId: string;
+  readonly version: number;
+  readonly sha256: string;
+  readonly limits: Readonly<Record<string, number | null>>;
+}
+
+/** One world the workspace holds, as `GET /worlds` lists it. */
+export interface WorkspaceWorld {
+  readonly worldId: string;
+  readonly kind: string;
+  readonly createdAt: string;
+}
+
+/** Every world the workspace holds, oldest first, with the policy that bounds how many. */
+export interface WorkspaceWorlds {
+  readonly policy: WorldCountPolicy;
+  readonly worlds: readonly WorkspaceWorld[];
+}
+
+/** There is no single personal-source world to act on: none exists, or several do. */
+export class PersonalSourceWorldUnresolved extends Error {
+  constructor(
+    readonly code: 'no_personal_source_world' | 'several_personal_source_worlds',
+    readonly worldIds: readonly string[],
+  ) {
+    super(code === 'no_personal_source_world'
+      ? 'This workspace has no world built from its own photographs yet.'
+      : 'This workspace has more than one world built from its own photographs; choose one.');
+    this.name = 'PersonalSourceWorldUnresolved';
+  }
+}
+
+/**
+ * The workspace's one personal-source world, read from the server's list rather than assumed.
+ *
+ * With the count policy at one there is at most one, and this is it. A list holding several is
+ * refused rather than resolved by position or recency: which of them is meant is the person's
+ * choice, and a caller that has it passes the world id itself.
+ */
+export function personalSourceWorld(worlds: WorkspaceWorlds): string {
+  const personal = worlds.worlds.filter((world) => world.kind === PERSONAL_SOURCE_WORLD_KIND);
+  if (personal.length === 1) return personal[0]!.worldId;
+  throw new PersonalSourceWorldUnresolved(
+    personal.length === 0 ? 'no_personal_source_world' : 'several_personal_source_worlds',
+    personal.map((world) => world.worldId),
+  );
+}
 
 export interface SavedWorldEntry {
   readonly entryId: string;
@@ -217,6 +275,11 @@ export class WorldEntryClient {
     this.#transport = new Transport(options);
   }
 
+  /** Every world this workspace holds, and how many of each kind it may hold. */
+  async worlds(): Promise<WorkspaceWorlds> {
+    return parseWorlds(await this.#transport.getJson<unknown>('/worlds'));
+  }
+
   async entries(): Promise<readonly SavedWorldEntry[]> {
     const body = await this.#transport.getJson<unknown>('/world-entries');
     if (!Array.isArray(body)) throw new TypeError('The server returned an invalid world entry list.');
@@ -274,24 +337,26 @@ export class WorldEntryClient {
     }));
   }
 
-  /** Explicitly open the first authored version from the current personal-source topology. */
-  async createFromPersonalSources(
-    title: string,
-    worldId = 'atlas:default',
-  ): Promise<SavedWorldEntry> {
-    const query = `?world_id=${encodeURIComponent(worldId)}`;
+  /**
+   * Explicitly open the first authored version from a personal-source world's current topology.
+   *
+   * `worldId` names the world; without it, the workspace's one personal-source world is read from
+   * `GET /worlds`, and a workspace with none or with several is refused by name.
+   */
+  async createFromPersonalSources(title: string, worldId?: string): Promise<SavedWorldEntry> {
+    const world = worldId ?? personalSourceWorld(await this.worlds());
     const state = record(
-      await this.#transport.getJson<unknown>(`/world/styles/current${query}`),
+      await this.#transport.getJson<unknown>(worldPath('/world/styles/current', world)),
       'world style state',
     );
     const style = record(state['current'], 'current world style');
     const topologyDigest = text(state['current_topology_digest'], 'topology digest');
     const authored = record(await this.#transport.postJson<unknown>(
-      `/world/versions/bootstrap${query}`,
+      worldPath('/world/versions/bootstrap', world),
       { base_topology_digest: topologyDigest, title },
     ), 'bootstrapped authored world');
     return this.create({
-      worldId,
+      worldId: world,
       title,
       authoredVersionId: text(authored['version_id'], 'authored version ID'),
       styleVersionId: text(style['version_id'], 'style version ID'),
@@ -421,6 +486,32 @@ function cursorBody(request: MembershipCursor): Record<string, unknown> {
     authored_edit_seq: request.authoredEditSeq,
     style_version_id: request.styleVersionId,
   };
+}
+
+function parseWorlds(value: unknown): WorkspaceWorlds {
+  const body = record(value, 'world list');
+  const policy = record(body['policy'], 'world count policy');
+  const limits = record(policy['limits'], 'world count limits');
+  const worlds = body['worlds'];
+  if (!Array.isArray(worlds)) throw new TypeError('The server returned an invalid world list.');
+  return Object.freeze({
+    policy: Object.freeze({
+      policyId: text(policy['policy_id'], 'policy ID'),
+      version: positiveInteger(policy['version'], 'policy version'),
+      sha256: sha256(policy['sha256'], 'policy digest'),
+      limits: Object.freeze(Object.fromEntries(Object.entries(limits).map(([kind, limit]) => [
+        kind, limit === null ? null : positiveInteger(limit, `${kind} limit`),
+      ]))),
+    }),
+    worlds: Object.freeze(worlds.map((item) => {
+      const world = record(item, 'world');
+      return Object.freeze({
+        worldId: text(world['world_id'], 'world ID'),
+        kind: text(world['kind'], 'world kind'),
+        createdAt: text(world['created_at'], 'world creation time'),
+      });
+    })),
+  });
 }
 
 function parseEntry(value: unknown): SavedWorldEntry {

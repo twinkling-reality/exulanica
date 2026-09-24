@@ -64,7 +64,9 @@ def control_api(runtime_world, spine_schema, monkeypatch):
         model_client=None,
     )
     with TestClient(create_app(services, verify=False)) as client:
-        yield ObjectsApi(client, w["binding"].source_snapshot_id, actor, w["store"])
+        yield ObjectsApi(
+            client, w["binding"].source_snapshot_id, actor, w["store"], w["version"].world_id
+        )
     with database.session(uuid.uuid4()) as connection:
         assert connection.execute("select * from world_society_control").fetchall() == []
         assert connection.execute("select * from world_society_control_event").fetchall() == []
@@ -76,7 +78,8 @@ def test_authenticated_controls_reload_cas_and_manual_step(runtime_world, contro
     w["connection"].commit()
     app = api.client.app
     app.state.society_input_authorizer = w["runtime"].authorize
-    path = f"/world/versions/{w['binding'].version_id}/society/control"
+    route = f"/world/versions/{w['binding'].version_id}/society/control"
+    path, steps = api.in_world(route), api.in_world(route + "/steps")
     assert api.client.get(path).status_code == 401
     assert api.stranger_get(path).status_code == 404
     before = api.get(path).json()
@@ -88,19 +91,19 @@ def test_authenticated_controls_reload_cas_and_manual_step(runtime_world, contro
     assert saved.json()["tick_interval_ms"] == 500
     assert api.client.put(path, headers=api.headers, json=body).status_code == 409
     step = dict(base_revision=1, base_tick=0, base_state_sha256=before["state_sha256"])
-    assert api.post(path + "/steps", step).json()["detail"] == "pause_before_manual_step"
+    assert api.post(steps, step).json()["detail"] == "pause_before_manual_step"
     paused = api.client.put(
         path, headers=api.headers, json=dict(base_revision=1, mode="paused", speed=4)
     )
     assert paused.status_code == 200
     step["base_revision"] = 2
-    after = api.post(path + "/steps", step)
+    after = api.post(steps, step)
     assert after.status_code == 200, after.text
     assert after.json()["society"]["current_tick"] == 1
     assert api.get(path).json()["current_tick"] == 1
-    assert api.post(path + "/steps", step).status_code == 409
-    events = api.get(path + "/events").json()["events"]
+    assert api.post(steps, step).status_code == 409
+    events = api.get(api.in_world(route + "/events")).json()["events"]
     assert events[0]["kind"] == "manual_step" and events[0]["requested_by"] == str(api.actor)
     for invalid in ({**body, "base_revision": True}, {**body, "speed": True}, {**body, "extra": 1}):
         assert api.client.put(path, headers=api.headers, json=invalid).status_code == 422
-    assert api.stranger_get(path + "/events").status_code == 404
+    assert api.stranger_get(api.in_world(route + "/events")).status_code == 404

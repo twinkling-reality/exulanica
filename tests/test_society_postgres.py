@@ -21,27 +21,28 @@ def test_legacy_authenticated_reload_cas_branch_isolation(objects_api, repositor
     repository.connection.commit()
     version = api.version()
     route = f"/world/versions/{version['version_id']}/society"
-    response = api.post(route, {"place_id": str(place), "region_id": "region-a", "seed": "7a" * 32})
+    path, steps = api.in_world(route), api.in_world(route + "/steps")
+    response = api.post(path, {"place_id": str(place), "region_id": "region-a", "seed": "7a" * 32})
     assert response.status_code == 200, response.text
     original = response.json()
     body = {"base_tick": 0, "base_state_sha256": original["state_sha256"]}
-    stepped = api.post(route + "/steps", body)
+    stepped = api.post(steps, body)
     assert stepped.status_code == 200, stepped.text
-    assert api.get(route).json() == stepped.json()
-    assert api.post(route + "/steps", body).status_code == 409
-    assert api.get(route + "/replay").json()["replay_verified"]
-    assert api.stranger_get(route).status_code == 404
-    assert api.stranger_post(route + "/steps", body).status_code == 404
-    assert api.client.get(route).status_code == 401
+    assert api.get(path).json() == stepped.json()
+    assert api.post(steps, body).status_code == 409
+    assert api.get(api.in_world(route + "/replay")).json()["replay_verified"]
+    assert api.stranger_get(path).status_code == 404
+    assert api.stranger_post(steps, body).status_code == 404
+    assert api.client.get(path).status_code == 401
     other_version = api.version("Other society branch")
-    other_route = f"/world/versions/{other_version['version_id']}/society"
+    other_route = api.in_world(f"/world/versions/{other_version['version_id']}/society")
     other = api.post(
         other_route, {"place_id": str(place), "region_id": "region-a", "seed": "7a" * 32}
     )
     assert other.status_code == 200, other.text
     assert other.json()["society_id"] != original["society_id"]
     assert other.json()["current_tick"] == 0
-    assert api.get(route).json()["current_tick"] == 1
+    assert api.get(path).json()["current_tick"] == 1
 
 
 def test_replay_rejects_extra_persisted_event_even_when_state_digest_matches(
@@ -60,10 +61,10 @@ def test_replay_rejects_extra_persisted_event_even_when_state_digest_matches(
     version = api.version()
     route = f"/world/versions/{version['version_id']}/society"
     state = api.post(
-        route, {"place_id": str(place), "region_id": "region-a", "seed": "7a" * 32}
+        api.in_world(route), {"place_id": str(place), "region_id": "region-a", "seed": "7a" * 32}
     ).json()
     state = api.post(
-        route + "/steps", {"base_tick": 0, "base_state_sha256": state["state_sha256"]}
+        api.in_world(route + "/steps"), {"base_tick": 0, "base_state_sha256": state["state_sha256"]}
     ).json()
     repository.connection.execute(
         "insert into world_society_event(workspace_id,society_id,event_id,tick,event_kind,"
@@ -80,7 +81,7 @@ def test_replay_rejects_extra_persisted_event_even_when_state_digest_matches(
         ),
     )
     with pytest.raises(ValueError, match="events do not match"):
-        SocietyRepository(repository.connection, repository.workspace_id).replay(
-            uuid.UUID(version["version_id"])
-        )
+        SocietyRepository(
+            repository.connection, repository.workspace_id, world_id=api.world_id
+        ).replay(uuid.UUID(version["version_id"]))
     repository.connection.rollback()

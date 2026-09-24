@@ -11,15 +11,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection
+from exulanica.api.world_scope import WorldId
 from exulanica.selection.validation import Session
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_control_repository import SocietyControlRepository
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/control", tags=["society"])
-
-#: Which saved world the authored version belongs to; see ``routes/society.py``.
-WorldId = Annotated[str, Query(min_length=1, max_length=200)]
 
 
 class ConfigureBody(BaseModel):
@@ -40,8 +38,9 @@ def repository(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: str = DEFAULT_WORLD_ID,
+    world_id: str,
 ) -> SocietyControlRepository:
+    require_world(connection, session.workspace_id, world_id)
     authorizer = getattr(request.app.state, "society_input_authorizer", None)
     return SocietyControlRepository(
         connection,
@@ -75,7 +74,7 @@ def read_control(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     return call(lambda: repository(connection, session, request, world_id).read(version_id))
 
@@ -87,7 +86,7 @@ def configure_control(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     return call(
         lambda: repository(connection, session, request, world_id).configure(
@@ -103,7 +102,7 @@ def manual_step(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     return call(
         lambda: repository(connection, session, request, world_id).manual_step(
@@ -118,7 +117,7 @@ def control_events(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
     limit: Annotated[int, Query(ge=1, le=128)] = 64,
 ) -> Any:
     return call(

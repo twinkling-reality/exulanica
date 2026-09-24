@@ -349,6 +349,7 @@ def answer_question(
     question: str,
     session: Session,
     *,
+    world_id: str | None,
     plan: SelectionPlan | None = None,
     now: dt.datetime | None = None,
     store: ContentAddressedStore | None = None,
@@ -356,6 +357,10 @@ def answer_question(
     before_compose: Callable[[Iterable[uuid.UUID], ModelHandoff], None],
 ) -> AnsweredQuestion:
     """The whole path, once. Pass ``plan`` to answer from a Selection the user already approved.
+
+    ``world_id`` is the world the question is asked in: a content answer cites that world's
+    authored and simulated content and no other world's
+    (:func:`~exulanica.selection.executor.execute`).
 
     ``before_compose`` is required, and it is the personal model right check. It is called with
     every capture the packet cites and the composer role's whole chain, immediately before the
@@ -447,6 +452,7 @@ def answer_question(
     result = execute(
         connection,
         validated,
+        world_id=world_id,
         query_embedding=query_vector,
         store=store,
         society_authorizer=society_authorizer,
@@ -525,6 +531,7 @@ def answer_question(
         current_result = execute(
             connection,
             validate(connection, plan, session),
+            world_id=world_id,
             query_embedding=query_vector,
             store=store,
             society_authorizer=society_authorizer,

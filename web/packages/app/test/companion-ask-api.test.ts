@@ -17,7 +17,10 @@ import { say } from '../src/ui/copy.js';
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-const WHERE = { baseUrl: 'https://exulanica.test/api', token: 'not-a-real-token' };
+/** The open world every question here is asked in, as a minted id with a colon in it. */
+const WORLD = 'world:personal:companion-ask';
+const WHERE = { baseUrl: 'https://exulanica.test/api', token: 'not-a-real-token', worldId: WORLD };
+const IN_WORLD = `?world_id=${encodeURIComponent(WORLD)}`;
 
 const URI_A = 'exulanica://blob/ni:///sha-256;aaaa';
 const URI_B = 'exulanica://blob/ni:///sha-256;bbbb';
@@ -99,9 +102,10 @@ describe('asking the library a question', () => {
     );
     const answer = await new CompanionAskClient({ ...WHERE, fetch }).ask('where was I?');
 
+    // Both are asked in the open world, so the packet resolves the answer's own Selection there.
     expect(seen.map((request) => request.url)).toEqual([
-      'https://exulanica.test/api/selection/ask',
-      'https://exulanica.test/api/selection/packet',
+      `https://exulanica.test/api/selection/ask${IN_WORLD}`,
+      `https://exulanica.test/api/selection/packet${IN_WORLD}`,
     ]);
     expect(seen[0]!.body).toEqual({ question: 'where was I?' });
     // The plan the answer reported, posted back verbatim, so the packet resolves the same
@@ -110,6 +114,19 @@ describe('asking the library a question', () => {
     expect(answer.evidence).toHaveLength(1);
     expect(answer.evidence[0]!.token).toBe('TOKENAAAA1');
     expect(answer.evidence[0]!.handle).toBe(SPAN_A);
+  });
+
+  it('names no world where none is open, as in the preview, and still locates the evidence', async () => {
+    const { fetch, seen } = transport(
+      json(answerBody()),
+      json(packetBody([packetItem('DIFFERENT1', URI_A, SPAN_A)])),
+    );
+    await new CompanionAskClient({ ...WHERE, worldId: null, fetch }).ask('where was I?');
+
+    expect(seen.map((request) => request.url)).toEqual([
+      'https://exulanica.test/api/selection/ask',
+      'https://exulanica.test/api/selection/packet',
+    ]);
   });
 
   it('orders the evidence by first mention rather than by packet order', async () => {
@@ -493,7 +510,7 @@ describe('asking the library a question', () => {
     );
 
     expect(seen).toHaveLength(1);
-    expect(seen[0]?.url.endsWith('/selection/ask')).toBe(true);
+    expect(seen[0]?.url.endsWith(`/selection/ask${IN_WORLD}`)).toBe(true);
     // The browser names the admitted feature and nothing else; the server resolves the place.
     expect((seen[0]?.body as { city_context?: unknown }).city_context).toEqual({
       admission_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',

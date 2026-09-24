@@ -21,6 +21,9 @@ import {
   worldStyleProposalOutcomes,
 } from '../src/world-style-proposals.js';
 
+/** The world these clients are opened for. */
+const TEST_WORLD = 'world:personal:test';
+
 /**
  * A sentence somebody typed, turned into a change nobody has agreed to yet.
  *
@@ -150,6 +153,7 @@ describe('the appearance proposal client', () => {
   it('reads a proposal with the model that drew it and the prompt it was drawn under', async () => {
     const fetch = vi.fn(async () => json(wireProposal())) as unknown as typeof globalThis.fetch;
     const client = new CompanionProposalClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api',
       token: 'secret',
       fetch,
@@ -182,6 +186,7 @@ describe('the appearance proposal client', () => {
       ),
     ) as unknown as typeof globalThis.fetch;
     const client = new CompanionProposalClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api',
       token: 'secret',
       fetch,
@@ -201,6 +206,7 @@ describe('the appearance proposal client', () => {
       json(wireProposal({ proposal: null, refusal: { code: 'invented_later', detail: 'x' } })),
     ) as unknown as typeof globalThis.fetch;
     const client = new CompanionProposalClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api',
       token: 'secret',
       fetch,
@@ -220,6 +226,7 @@ describe('the appearance proposal client', () => {
     ];
     for (const fetch of failures) {
       const client = new CompanionProposalClient({
+      worldId: TEST_WORLD,
         baseUrl: 'https://exulanica.test/api',
         token: 'secret',
         fetch: fetch as unknown as typeof globalThis.fetch,
@@ -237,6 +244,7 @@ describe('the appearance proposal client', () => {
       json({ classification: 'question', proposal: null, refusal: null, execution: null }),
     ) as unknown as typeof globalThis.fetch;
     const client = new CompanionProposalClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api',
       token: 'secret',
       fetch,
@@ -333,6 +341,7 @@ async function harness(over: { previewStatus?: number; previewBody?: unknown } =
   }) as unknown as typeof globalThis.fetch;
 
   const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
     baseUrl: 'https://exulanica.test/api',
     token: 'secret',
     fetch,

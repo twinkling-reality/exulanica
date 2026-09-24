@@ -453,10 +453,13 @@ source it was placed against, and it simply cannot be extended against a source 
 
 ## 6. HTTP surface
 
-All routes require a bearer token. Bodies are snake_case only. The `/world/styles` routes accept
-frontend camelCase aliases because they adapt an existing client recipe; this surface has no such
-prior client, so it does not invent a second casing. `web/packages/graph-client` fixtures are
-snake_case, and this fixture matches them.
+All routes require a bearer token. Every `/world/versions` route also requires the world as a
+`world_id` query parameter: a version belongs to one world, and one of another world, or of a
+world the workspace does not hold, answers `404 unknown_reference`. The `/world/assets` and
+`/world/behaviours` registries are the same for every world and take none. Bodies are snake_case
+only. The `/world/styles` routes accept frontend camelCase aliases because they adapt an existing
+client recipe; this surface has no such prior client, so it does not invent a second casing.
+`web/packages/graph-client` fixtures are snake_case, and this fixture matches them.
 
 | Method | Route | Result |
 | --- | --- | --- |
@@ -528,9 +531,13 @@ created_at            RFC 3339
 objects[]             object_id, asset{...}, region_id, transform{...},
                       origin{kind,role}, behaviour or null, removed
 element_overrides[]   element_id, suppressed, transform or null
-edits[]               edit_id, edit_seq, kind, object_id, element_id, undone_edit_id,
+edits[]               edit_id, edit_seq, kind, object_id, element_id,
+                      environment_instance_id, point_map_instance_id, undone_edit_id,
                       base_state_sha256, result_state_sha256, actor, recorded_at
 ```
+
+An edit names its subject in exactly one of `object_id`, `element_id`, `environment_instance_id`
+and `point_map_instance_id`, one per subject the edit-kind registry names, and the others are null.
 
 Those sixteen names are the top level of the body. They are not nested under a `version` key, and
 an object carries no `created_edit_id` or `last_edit_id`: those two are columns the repository

@@ -22,7 +22,7 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated, Final, Literal, Protocol
 
-from fastapi import Depends, Query, Request, Response
+from fastapi import Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictInt, model_validator
 
@@ -33,9 +33,9 @@ from exulanica.api.dependencies import (
     get_services,
 )
 from exulanica.api.services import Services
+from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView, rendered_version
 from exulanica.world import (
-    DEFAULT_WORLD_ID,
     MAX_SCALE_MILLI,
     MAX_YAW_MICRORADIANS,
     AlternateVersion,
@@ -60,6 +60,7 @@ from exulanica.world import (
     WorldObjectRepository,
 )
 from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.worlds import require_world
 
 
 class SavedEntryAdvanceBody(BaseModel):
@@ -148,8 +149,9 @@ def object_read_repository(
     connection: ReadOnlyConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
-    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> WorldObjectRepository:
+    require_world(connection, session.workspace_id, world_id)
     return WorldObjectRepository(
         connection, session.workspace_id, world_id=world_id, store=services.store
     )
@@ -160,8 +162,9 @@ def object_write_repository(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
     request: Request,
-    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> WorldObjectRepository:
+    require_world(connection, session.workspace_id, world_id)
     observer = getattr(request.app.state, "society_authored_edit", None)
     return WorldObjectRepository(
         connection,

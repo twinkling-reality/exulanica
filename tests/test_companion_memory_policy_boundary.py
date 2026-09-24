@@ -41,6 +41,8 @@ from exulanica.world.interaction_repository import (
 )
 from exulanica.world.models import ProposalOrigin, ProposalProvenance
 
+from world_support import registered_world
+
 _ROOT = Path(__file__).resolve().parents[1]
 
 #: The two files this branch adds that can see stored conversation text.
@@ -134,7 +136,11 @@ def test_a_stored_question_is_still_refused_as_durable_policy_input(repository):
         )
     )
 
-    policy = WorldInteractionPolicyRepository(repository.connection, repository.workspace_id)
+    policy = WorldInteractionPolicyRepository(
+        repository.connection,
+        repository.workspace_id,
+        world_id=registered_world(repository.connection, repository.workspace_id),
+    )
     for key in sorted(_PRIVATE_INPUT_KEYS):
         proposal = InteractionProposal(
             proposal_id=uuid.uuid4(),

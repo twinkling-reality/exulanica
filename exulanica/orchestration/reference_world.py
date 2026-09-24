@@ -8,6 +8,7 @@ from typing import Any
 from exulanica.canonical import sha256_of_canonical
 from exulanica.ingest.repository import IngestRepository
 from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepository
+from exulanica.world.worlds import ensure_personal_source_world
 
 SOURCE_NAMESPACE = uuid.UUID("d3f0565b-c4b2-4d19-8ea9-a3f79bbb5649")
 
@@ -18,11 +19,16 @@ def compose_reference_sources(
     region_id: str,
     captures: list[tuple[uuid.UUID, str, str]],
     source_manifest_sha256: str,
+    actor: uuid.UUID,
 ) -> dict[str, Any]:
     """Bind user-selected photographs to a region through the protected topology writer.
 
     Slot membership is an authored source-gallery choice, never a new temporal,
     metric, reconstruction or semantic assertion about the photographs.
+
+    The photographs are composed into the workspace's personal-source world, created here by
+    ``actor`` when the workspace has none and refused by name when the world count policy allows
+    no more.
     """
     if not region_id or not captures or len({row[0] for row in captures}) != len(captures):
         raise ValueError("source composition needs a region and unique selected captures")
@@ -66,11 +72,18 @@ def compose_reference_sources(
         "interpretation": "authored gallery membership only; no new reconstruction or evidence",
     }
     digest = sha256_of_canonical(record).hex()
+    world_id = ensure_personal_source_world(
+        repository.connection,
+        repository.workspace_id,
+        created_by=actor,
+        reason="reference photographs composed into a region",
+    )
     version = WorldStyleRepository(
-        repository.connection, repository.workspace_id
-    ).register_topology(TopologyContract(digest, (region_id,), tuple(slots)))
+        repository.connection, repository.workspace_id, world_id=world_id
+    ).register_topology(TopologyContract(digest, (region_id,), tuple(slots), world_id=world_id))
     return {
         "record": record,
+        "world_id": world_id,
         "topology_digest": digest,
         "style_version_id": str(version.version_id),
     }

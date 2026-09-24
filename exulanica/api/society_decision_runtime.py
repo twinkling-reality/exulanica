@@ -11,7 +11,6 @@ from fastapi import Request
 from exulanica.api.dependencies import get_services
 from exulanica.epistemics.hosted_requests import no_place_released
 from exulanica.selection.validation import Session
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_decisions import SocietyDecisionProvider
@@ -23,7 +22,7 @@ def request_decision(
     session: Session,
     version_id: uuid.UUID,
     *,
-    world_id: str = DEFAULT_WORLD_ID,
+    world_id: str,
     request_id: uuid.UUID,
     subject_id: uuid.UUID,
     base_tick: int,

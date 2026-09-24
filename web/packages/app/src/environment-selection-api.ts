@@ -1,4 +1,5 @@
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
+import { worldPath } from './world-scope.js';
 import type { NYCSemanticFeature, SemanticFootprint } from '@exulanica/atlas-react/playcanvas';
 import {
   parseVersion,
@@ -162,10 +163,23 @@ export function parseEnvironmentCatalog(value: unknown): EnvironmentCatalog {
 
 export class EnvironmentSelectionClient {
   private readonly transport: Transport;
+  private readonly worldId: string | undefined;
   private queue: Promise<void> = Promise.resolve();
 
-  constructor(options: TransportOptions) {
+  /**
+   * `worldId` is the world whose versions this client places environment features in. Reading an
+   * admitted catalog needs no world; without one, every placement refuses by name.
+   */
+  constructor(options: TransportOptions & { readonly worldId?: string }) {
     this.transport = new Transport(options);
+    this.worldId = options.worldId;
+  }
+
+  private inWorld(path: string): string {
+    if (this.worldId === undefined) {
+      throw new Error('No world is open, so there is no world to place this in.');
+    }
+    return worldPath(path, this.worldId);
   }
 
   async catalog(admissionId: string): Promise<EnvironmentCatalog> {
@@ -246,7 +260,8 @@ export class EnvironmentSelectionClient {
     request: EnvironmentPlacementRequest,
     utterance: string,
   ): Promise<EnvironmentProposalResult> {
-    const response = record(await this.transport.postJson<unknown>('/selection/environment', {
+    const response = record(await this.transport.postJson<unknown>(
+      this.inWorld('/selection/environment'), {
       utterance,
       version_id: base.versionId,
       base_state_sha256: base.stateSha256,
@@ -338,7 +353,7 @@ export class EnvironmentSelectionClient {
   ): Promise<ObjectWriteResult> {
     const run = async (): Promise<ObjectWriteResult> => {
       try {
-        const version = parseVersion(await this.transport.postJson(path, {
+        const version = parseVersion(await this.transport.postJson(this.inWorld(path), {
           ...body,
           base_state_sha256: baseStateSha256,
         }));
@@ -347,7 +362,7 @@ export class EnvironmentSelectionClient {
         if (error instanceof ApiError &&
           (error.code === 'stale_structural_base' || error.code === 'stale_object_base')) {
           const current = parseVersion(await this.transport.getJson(
-            `/world/versions/${encodeURIComponent(versionId)}`,
+            this.inWorld(`/world/versions/${encodeURIComponent(versionId)}`),
           ));
           return Object.freeze({ kind: 'stale' as const, current });
         }

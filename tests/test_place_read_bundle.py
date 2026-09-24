@@ -23,7 +23,6 @@ from exulanica.graph.world_read import place_read_bundle, world_read_bundle
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.scenes import run_scene_grouping
 from exulanica.reconstruction.place_alignment import PLACE_ALIGNMENT_POLICY
-from exulanica.world import DEFAULT_WORLD_ID
 
 from conftest import CountingVisionModel, write_photo, write_point_map
 from test_scene_reconstruction_pipeline import (
@@ -32,6 +31,7 @@ from test_scene_reconstruction_pipeline import (
     _processor,
 )
 from test_world_read_bundle import _canonical, _published_scene
+from world_support import FIXTURE_WORLD_ID
 
 #: The two capture occasions this file photographs the same fixture "place" on. They are a month
 #: apart because that is the case the place plane exists for, and every time assertion below is
@@ -231,7 +231,7 @@ def _bundle(repository, place_id, store, at=None):
         place_id,
         store,
         at=at,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
 
 
@@ -331,7 +331,7 @@ def test_a_place_whose_anchor_is_withdrawn_is_not_served(repository, place):
             repository.workspace_id,
             place.candidate,
             place.store,
-            world_id=DEFAULT_WORLD_ID,
+            world_id=FIXTURE_WORLD_ID,
         )
         is not None
     )
@@ -483,7 +483,7 @@ def test_a_refused_alignment_is_readable_as_a_refusal(repository, two_scenes):
     # places; it does not withdraw a capture.
     assert (
         world_read_bundle(
-            repository.connection, repository.workspace_id, second, store, world_id=DEFAULT_WORLD_ID
+            repository.connection, repository.workspace_id, second, store, world_id=FIXTURE_WORLD_ID
         )
         is not None
     )
@@ -501,14 +501,14 @@ def test_a_scene_address_still_answers_with_the_same_scene_after_it_joins_a_plac
     """
     store, first, second = two_scenes
     before = world_read_bundle(
-        repository.connection, repository.workspace_id, first, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, first, store, world_id=FIXTURE_WORLD_ID
     )
     assert before is not None
     assert before["bundle"]["addressing"]["place"]["state"] == "none"
 
     place = _bind(repository, store, first, second)
     after = world_read_bundle(
-        repository.connection, repository.workspace_id, first, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, first, store, world_id=FIXTURE_WORLD_ID
     )
     assert after is not None
 
@@ -554,7 +554,7 @@ def test_the_recorded_digest_moves_with_the_addressing_block_and_recomputes_from
         repository.workspace_id,
         place.candidate,
         place.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     assert scene is not None
     assert scene["bundle"]["scene"] == received["scene"]
@@ -573,7 +573,7 @@ def test_the_bundle_names_what_it_can_and_cannot_be_addressed_by(repository, pla
         repository.workspace_id,
         place.anchor,
         place.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     envelope = _bundle(repository, place.place_id, place.store)
     assert scene is not None and envelope is not None
@@ -607,7 +607,7 @@ def test_a_place_in_another_workspace_is_not_readable(repository, place, ingest_
     other = IngestRepository(open_another().connection, elsewhere)
     assert (
         place_read_bundle(
-            other.connection, elsewhere, place.place_id, place.store, world_id=DEFAULT_WORLD_ID
+            other.connection, elsewhere, place.place_id, place.store, world_id=FIXTURE_WORLD_ID
         )
         is None
     )

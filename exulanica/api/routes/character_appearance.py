@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from pydantic import Field, StrictInt
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.world_scope import WorldId
 from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.character_appearance import (
@@ -60,7 +61,6 @@ router = APIRouter(prefix="/world", tags=["character-appearance"])
 _PATH = "/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
 _HEADERS = {"Cache-Control": "private, no-store"}
 Kind = Literal["avatar", "synthetic-inhabitant"]
-WorldId = Annotated[str, Query(min_length=1, max_length=200)]
 
 
 def _repo(

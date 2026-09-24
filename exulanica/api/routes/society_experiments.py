@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection
+from exulanica.api.world_scope import WorldId
 from exulanica.world import society_experiments as experiments
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_experiment_repository import (
@@ -20,6 +21,7 @@ from exulanica.world.society_experiment_repository import (
     SocietyExperimentRepository,
     UnknownExperiment,
 )
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/experiments", tags=["society"])
 
@@ -206,8 +208,10 @@ class AttemptResponse(BaseModel):
 
 
 def _repository(
-    connection: ScopedConnection, session: CurrentSession, request: Request
+    connection: ScopedConnection, session: CurrentSession, request: Request, world_id: str
 ) -> SocietyExperimentRepository:
+    """The workspace's experiments, read beneath a world the workspace holds."""
+    require_world(connection, session.workspace_id, world_id)
     authorizer = getattr(request.app.state, "society_input_authorizer", None)
     return SocietyExperimentRepository(
         connection,
@@ -305,13 +309,15 @@ def prepare_experiment(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
 ) -> Any:
     intervention = body.intervention
     return _call(
         lambda: _definition_response(
-            _repository(connection, session, request).prepare_definition(
+            _repository(connection, session, request, world_id).prepare_definition(
                 version_id,
                 body.experiment_id,
+                world_id=world_id,
                 baseline_input_seq=body.baseline_input_seq,
                 treatment_input_seq=body.treatment_input_seq,
                 intervention=intervention.kind,
@@ -336,11 +342,12 @@ def read_experiment(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
 ) -> Any:
     return _call(
         lambda: _definition_response(
-            _repository(connection, session, request).definition_for_version(
-                version_id, experiment_id
+            _repository(connection, session, request, world_id).definition_for_version(
+                version_id, experiment_id, world_id=world_id
             )
         )
     )
@@ -358,8 +365,9 @@ def reserve_attempt(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
 ) -> Any:
-    repo = _repository(connection, session, request)
+    repo = _repository(connection, session, request, world_id)
 
     def reserve() -> dict[str, Any]:
         repo.start_attempt_for_version(
@@ -367,9 +375,12 @@ def reserve_attempt(
             experiment_id,
             body.attempt_id,
             body.seed_sha256,
+            world_id=world_id,
             actor=session.actor,
         )
-        return _attempt_response(repo.attempt_summary(version_id, experiment_id, body.attempt_id))
+        return _attempt_response(
+            repo.attempt_summary(version_id, experiment_id, body.attempt_id, world_id=world_id)
+        )
 
     return _call(reserve)
 
@@ -386,11 +397,12 @@ def read_attempt(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
 ) -> Any:
     return _call(
         lambda: _attempt_response(
-            _repository(connection, session, request).attempt_summary(
-                version_id, experiment_id, attempt_id
+            _repository(connection, session, request, world_id).attempt_summary(
+                version_id, experiment_id, attempt_id, world_id=world_id
             )
         )
     )

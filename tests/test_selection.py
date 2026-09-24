@@ -99,7 +99,7 @@ class Library:
 
     def run(self, plan: SelectionPlan):
         validated = validate(self.repository.connection, plan, self.session)
-        return execute(self.repository.connection, validated)
+        return execute(self.repository.connection, validated, world_id=None)
 
     def matched(self, plan: SelectionPlan) -> set[str]:
         by_id = {capture_id: name for name, capture_id in self.captures.items()}
@@ -653,10 +653,16 @@ def test_fused_candidates_cannot_escape_entity_filters(library, client, monkeypa
         (EntityMode.TOGETHER, {"together"}),
         (EntityMode.ALL, set(library.captures)),
     ):
-        plan = _plan(semantic_query="winter clothing", entities=EntitySelector(
-            ids=[library.entities["A"], library.entities["B"]], mode=mode))
-        result = execute(connection, validate(connection, plan, library.session),
-                         query_embedding=query)
+        plan = _plan(
+            semantic_query="winter clothing",
+            entities=EntitySelector(ids=[library.entities["A"], library.entities["B"]], mode=mode),
+        )
+        result = execute(
+            connection,
+            validate(connection, plan, library.session),
+            world_id=None,
+            query_embedding=query,
+        )
         allowed = {library.captures[name] for name in expected}
         assert {capture.capture_id for capture in result.captures} == allowed
         packet = build_packet(connection, result, workspace_id=workspace)

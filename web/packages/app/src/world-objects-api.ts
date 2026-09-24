@@ -36,6 +36,7 @@
  */
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
+import { worldPath } from './world-scope.js';
 
 // -- the read model ------------------------------------------------------------------------------
 
@@ -122,6 +123,7 @@ export interface VersionEdit {
   readonly objectId: string | null;
   readonly elementId: string | null;
   readonly environmentInstanceId?: string | null;
+  readonly pointMapInstanceId?: string | null;
   readonly undoneEditId: string | null;
   readonly baseStateSha256: string;
   readonly resultStateSha256: string;
@@ -318,6 +320,10 @@ export class WorldObjectsClient {
   #queue: Promise<void> = Promise.resolve();
 
   constructor(options: TransportOptions & {
+    /**
+     * The world every world request of this client reads or changes. Without one, each world
+     * request refuses by name: there is no default world to send it to.
+     */
     readonly worldId?: string;
     readonly defaultVersionId?: string;
     readonly onVersionChange?: (version: AlternateVersion) => Promise<void>;
@@ -350,7 +356,8 @@ export class WorldObjectsClient {
   }
 
   async reviewedAssets(): Promise<readonly ReviewedAsset[]> {
-    const body = await this.#transport.getJson<unknown>(this.#path('/world/assets'));
+    // The reviewed catalog is the same for every world, so this read names none.
+    const body = await this.#transport.getJson<unknown>('/world/assets');
     this.#assets = Object.freeze(array(body, 'reviewed asset list').map(parseAsset));
     return this.#assets;
   }
@@ -546,14 +553,14 @@ export class WorldObjectsClient {
    */
   async assetBytes(asset: ReviewedAsset, signal?: AbortSignal): Promise<ArrayBuffer> {
     void signal;
-    const response = await this.#transport.getBytes(this.#path(assetBytesPath(asset.assetKey)));
+    const response = await this.#transport.getBytes(assetBytesPath(asset.assetKey));
     return response.arrayBuffer();
   }
 
   /** The licence text those bytes are published under. */
   async assetLicence(asset: ReviewedAsset): Promise<string> {
     const response = await this.#transport.getBytes(
-      this.#path(`${assetPath(asset.assetKey)}/licence`),
+      `${assetPath(asset.assetKey)}/licence`,
     );
     return response.text();
   }
@@ -614,13 +621,31 @@ export class WorldObjectsClient {
   }
 
   #path(path: string): string {
-    if (this.#worldId === undefined) return path;
-    return `${path}${path.includes('?') ? '&' : '?'}world_id=${encodeURIComponent(this.#worldId)}`;
+    return worldPath(path, this.#openWorld());
   }
 
-  /** The configured world, or the world the version itself names when none was configured. */
+  /**
+   * A write addressed to a version names the version's own world: the one the server returned it
+   * with. A client given a world refuses a version of any other.
+   */
   #versionWorldPath(path: string, base: AlternateVersion): string {
-    return `${path}?world_id=${encodeURIComponent(this.#worldId ?? base.worldId)}`;
+    if (this.#worldId !== undefined && base.worldId !== this.#worldId) {
+      throw new WorldObjectsContractError(
+        'world_mismatch',
+        'This version belongs to another world than the one this surface has open.',
+      );
+    }
+    return worldPath(path, base.worldId);
+  }
+
+  #openWorld(): string {
+    if (this.#worldId === undefined) {
+      throw new WorldObjectsContractError(
+        'no_open_world',
+        'No world is open, so there is no world to read or change.',
+      );
+    }
+    return this.#worldId;
   }
 }
 
@@ -792,6 +817,9 @@ function parseEdit(value: unknown): VersionEdit {
     elementId: optionalText(row['element_id'], 'version edit element'),
     environmentInstanceId: optionalText(
       row['environment_instance_id'], 'version edit environment instance',
+    ),
+    pointMapInstanceId: optionalText(
+      row['point_map_instance_id'], 'version edit point map instance',
     ),
     undoneEditId: optionalText(row['undone_edit_id'], 'version edit undone id'),
     baseStateSha256: digest(row['base_state_sha256'], 'version edit base hash'),

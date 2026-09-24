@@ -643,10 +643,11 @@ Existing authenticated society create/read/step/events/replay routes remain. Cre
 selects `profile: exulanica-society/v2` or `exulanica-society/v3`; omission keeps v1. Step bodies still contain only
 `base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected.
 
-Every society, action and playback route takes the saved world as a `world_id` query parameter,
-defaulting to the default world, exactly as the world object routes do. The repositories scope
-their reads to workspace, world and version together, so a version that does not belong to the
-named world reads as an unavailable version rather than reaching another world's society.
+Every society, action, playback, decision, experiment and district route requires the world as a
+`world_id` query parameter, as every world route does, and a world the workspace does not hold
+answers `404 unknown_reference`. The repositories scope their reads to workspace, world and version
+together, so a version that does not belong to the named world reads as an unavailable version
+rather than reaching another world's society.
 
 `GET /world/versions/{id}/society?places=true` adds `places` to a society with inputs: the input
 sequence and digest the current state consumed, its availability and reason, the walkable area and
@@ -869,8 +870,9 @@ controls. A subsequent user configuration adopts the host's current base. Render
 between committed positions, but must not fabricate future goals, actions or positions as evidence.
 
 A worker claims one due society per configured workspace per round, ordered by oldest due time
-then stable society identity, across every world the workspace holds: the default world and each
-saved world compete for the same claim. The claim names the world it was taken in, and it is
+then stable society identity, across every world the workspace holds, which all compete for the
+same claim. The claim itself names no world
+(`SocietyControlRepository.claim_in_workspace`); it names the world it was taken in, and it is
 executed only by a repository scoped to that world. Claims skip a workspace whose edit lock is busy. PostgreSQL
 `clock_timestamp()` is authoritative; clients cannot supply deadlines. Claiming commits a random
 lease token, the control revision, initiating actor and a 30-second expiry before work starts on a

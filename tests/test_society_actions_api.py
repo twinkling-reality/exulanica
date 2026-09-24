@@ -19,7 +19,8 @@ def test_typed_action_http_authentication_reload_and_rejection(runtime_world, co
     snapshot = create(world, "exulanica-society/v3")
     world["connection"].commit()
     api.client.app.state.society_input_authorizer = world["runtime"].authorize
-    path = f"/world/versions/{world['binding'].version_id}/society/actions"
+    route = f"/world/versions/{world['binding'].version_id}/society/actions"
+    path = api.in_world(route)
     target = next(
         target for target in runtime_helpers.initial(world)["targets"] if target["enabled"]
     )
@@ -37,7 +38,7 @@ def test_typed_action_http_authentication_reload_and_rejection(runtime_world, co
     assert saved.status_code == 200, saved.text
     assert saved.json()["status"] == "pending"
     stepped = api.post(
-        f"/world/versions/{world['binding'].version_id}/society/steps",
+        api.in_world(f"/world/versions/{world['binding'].version_id}/society/steps"),
         {
             "base_tick": snapshot["current_tick"],
             "base_state_sha256": snapshot["state_sha256"],
@@ -46,11 +47,11 @@ def test_typed_action_http_authentication_reload_and_rejection(runtime_world, co
     assert stepped.status_code == 200, stepped.text
     assert stepped.json()["state"]["inhabitants"][0]["goal"]["target_id"] == target["target_id"]
     request_id = saved.json()["request"]["request_id"]
-    consumed = api.get(path + "/" + request_id)
+    consumed = api.get(api.in_world(route + "/" + request_id))
     assert consumed.status_code == 200 and consumed.json()["status"] == "consumed"
     assert api.get(path).json()["events"] == [consumed.json()]
     assert api.post(path, body).json() == consumed.json()
-    replay = api.get(f"/world/versions/{world['binding'].version_id}/society/replay")
+    replay = api.get(api.in_world(f"/world/versions/{world['binding'].version_id}/society/replay"))
     assert replay.status_code == 200 and replay.json()["replay_verified"]
     for invalid in (
         {**body, "position_mm": [20, 40]},

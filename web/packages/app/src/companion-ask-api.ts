@@ -34,6 +34,7 @@
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { EvidenceHandle } from '@exulanica/graph-client';
 import { parseContentSurface, type CompanionContentSurface } from './companion-content.js';
+import { worldPath } from './world-scope.js';
 
 /** Long enough for the reasoning core, which has been measured at tens of seconds on a packet. */
 const ASK_TIMEOUT_MS = 180_000;
@@ -260,6 +261,12 @@ const ABSTENTIONS: readonly string[] = [
 ];
 
 export interface CompanionAskOptions extends TransportOptions {
+  /**
+   * The open world, which a question is asked in: an answer may cite that world's authored and
+   * simulated content and no other world's. Null only where no world is open, as in the preview,
+   * whose development server answers without one; the server refuses a question naming none.
+   */
+  readonly worldId: string | null;
   /** Injectable so a test drives the whole path without a server and without a global. */
   readonly now?: () => number;
 }
@@ -304,10 +311,18 @@ function namesOf(body: WireAnswer): Record<string, string> {
 }
 
 export class CompanionAskClient {
-  readonly #where: CompanionAskOptions;
+  readonly #where: Omit<CompanionAskOptions, 'worldId'>;
+  readonly #worldId: string | null;
 
   constructor(options: CompanionAskOptions) {
-    this.#where = options;
+    const { worldId, ...where } = options;
+    this.#where = where;
+    this.#worldId = worldId;
+  }
+
+  /** `path` asked in the open world, or unchanged where no world is open. */
+  #inWorld(path: string): string {
+    return this.#worldId === null ? path : worldPath(path, this.#worldId);
   }
 
   /**
@@ -338,7 +353,7 @@ export class CompanionAskClient {
   async ask(question: string, cityContext: CompanionCityContext | null = null): Promise<CompanionAnswer> {
     let body: WireAnswer;
     try {
-      body = await this.#transport(ASK_TIMEOUT_MS).postJson<WireAnswer>('/selection/ask', {
+      const asked = {
         question,
         ...(cityContext === null ? {} : {
           city_context: {
@@ -346,7 +361,11 @@ export class CompanionAskClient {
             feature_id: cityContext.featureId,
           },
         }),
-      });
+      };
+      body = await this.#transport(ASK_TIMEOUT_MS).postJson<WireAnswer>(
+        this.#inWorld('/selection/ask'),
+        asked,
+      );
     } catch (error) {
       // A confirmed place's CONTENT is answered by the server without a model, so a no-model
       // failure here is a question that needed one: there is nothing to fall back to.
@@ -455,7 +474,7 @@ export class CompanionAskClient {
     if (plan === null || typeof plan !== 'object') return located;
     try {
       const packet = await this.#transport(PACKET_TIMEOUT_MS).postJson<WirePacket>(
-        '/selection/packet',
+        this.#inWorld('/selection/packet'),
         plan,
       );
       for (const item of packet.items ?? []) {
@@ -693,9 +712,13 @@ export function proposalWasRefused(outcome: CompanionProposal): outcome is Compa
 
 export class CompanionProposalClient {
   readonly #where: TransportOptions;
+  readonly #worldId: string;
 
-  constructor(options: TransportOptions) {
-    this.#where = options;
+  /** `worldId` is the world whose appearance a proposal is drafted against. */
+  constructor(options: TransportOptions & { readonly worldId: string }) {
+    const { worldId, ...where } = options;
+    this.#where = where;
+    this.#worldId = worldId;
   }
 
   /**
@@ -711,7 +734,7 @@ export class CompanionProposalClient {
       body = await new Transport({
         ...this.#where,
         signal: AbortSignal.timeout(PROPOSE_TIMEOUT_MS),
-      }).postJson<WireProposal>('/selection/appearance', { utterance });
+      }).postJson<WireProposal>(worldPath('/selection/appearance', this.#worldId), { utterance });
     } catch {
       return asQuestion(utterance);
     }

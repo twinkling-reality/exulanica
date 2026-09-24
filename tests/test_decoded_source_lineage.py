@@ -32,7 +32,6 @@ from exulanica.reconstruction.source_lineage import (
     decoded_receipt,
     verify_decoded_training_files,
 )
-from exulanica.world import DEFAULT_WORLD_ID
 from PIL import Image
 
 from test_intake_upload import _TOKEN
@@ -41,6 +40,7 @@ from test_personal_admission_route import post
 from test_personal_heic import FIXTURE
 from test_scene_reconstruction_pipeline import FakeColmap, _processor
 from test_segmentation_stage import ScriptedSegmenter
+from world_support import FIXTURE_WORLD_ID
 
 #: The checkpoints this file's doubles stand in for: the plane depth model and the scripted
 #: segmenter with its detector, each pinned as ``ScriptedSegmenter.identity`` pins it.
@@ -244,7 +244,7 @@ def test_depth_segmentation_and_pose_share_exact_persisted_pixels(upload, tmp_pa
         upload.repository.workspace_id,
         claim.scene_id,
         upload.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     assert envelope is not None
     points = envelope["bundle"]["recipient_evidence"]["record"]["point_maps"]

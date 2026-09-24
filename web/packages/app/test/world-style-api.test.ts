@@ -11,6 +11,9 @@ import {
   validateLocalReference,
 } from '../src/world-style-api.js';
 
+/** The world these clients are opened for. */
+const TEST_WORLD = 'world:personal:test';
+
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), {
   status,
   headers: { 'content-type': 'application/json' },
@@ -134,6 +137,7 @@ describe('world style API boundary', () => {
     };
     const onSavedEntryAdvanced = vi.fn();
     const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 'private', fetch,
       ids: () => '11111111-1111-4111-8111-111111111111',
       savedEntry: () => savedEntry,
@@ -199,7 +203,13 @@ describe('world style API boundary', () => {
     expect(bodies).toEqual([expect.objectContaining({
       targetVersionId: 'v1', baseStyleVersionId: 'v2',
     })]);
-    expect(urls.every((url) => url.searchParams.get('world_id') === 'world:family-garden')).toBe(true);
+    // The reviewed catalog is the same for every world and names none; every other read and write
+    // names the saved world.
+    const catalog = urls.filter((url) => url.pathname.endsWith('/world/styles/catalog'));
+    const world = urls.filter((url) => !url.pathname.endsWith('/world/styles/catalog'));
+    expect(catalog.map((url) => url.searchParams.get('world_id'))).toEqual([null]);
+    expect(world.length).toBeGreaterThan(0);
+    expect(world.every((url) => url.searchParams.get('world_id') === 'world:family-garden')).toBe(true);
   });
   it('joins the exact reviewed catalog and completes a preview/apply/discard lifecycle', async () => {
     const bodies: Record<string, unknown>[] = [];
@@ -221,6 +231,7 @@ describe('world style API boundary', () => {
     });
     const ids = ['proposal-1', 'proposal-2'];
     const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 'secret', fetch,
       ids: () => ids.shift()!,
     });
@@ -269,7 +280,7 @@ describe('world style API boundary', () => {
     ]) {
       const fetch = connectedFetch((url) =>
         url.pathname.endsWith('/world/styles/catalog') ? json(broken) : undefined);
-      const client = new WorldStyleClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch });
+      const client = new WorldStyleClient({ worldId: TEST_WORLD, baseUrl: 'https://exulanica.test/api', token: 't', fetch });
       await expect(client.connect()).rejects.toBeInstanceOf(WorldStyleContractError);
     }
     expect(() => validateLocalReference({
@@ -288,6 +299,7 @@ describe('world style API boundary', () => {
       return json(value);
     });
     await expect(new WorldStyleClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't', fetch: unknownCurrent,
     }).connect()).rejects.toMatchObject({ code: 'unknown_profile_version' });
   });
@@ -296,7 +308,7 @@ describe('world style API boundary', () => {
     const refused = async (broken: unknown, code: string) => {
       const fetch = connectedFetch((url) =>
         url.pathname.endsWith('/world/styles/catalog') ? json(broken) : undefined);
-      await expect(new WorldStyleClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch })
+      await expect(new WorldStyleClient({ worldId: TEST_WORLD, baseUrl: 'https://exulanica.test/api', token: 't', fetch })
         .connect()).rejects.toMatchObject({ code });
     };
     // The drift measured on 2026-09-16: the browser described Aeroheart in its own words while
@@ -339,6 +351,7 @@ describe('world style API boundary', () => {
     });
     const ids = ['proposal-stale', 'proposal-rebased'];
     const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => ids.shift()!,
     });
     await client.connect();
@@ -375,6 +388,7 @@ describe('world style API boundary', () => {
     });
     const ids = ['proposal-1', 'proposal-2'];
     const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => ids.shift()!,
     });
     await client.connect();
@@ -399,6 +413,7 @@ describe('world style API boundary', () => {
       return undefined;
     });
     const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => 'proposal-refined',
     });
     await client.connect();
@@ -436,12 +451,13 @@ describe('world style API boundary', () => {
       }
       return undefined;
     });
-    const client = new WorldStyleClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch });
+    const client = new WorldStyleClient({ worldId: TEST_WORLD, baseUrl: 'https://exulanica.test/api', token: 't', fetch });
     await client.connect();
     expect((await client.rollback('v0')).kind).toBe('stale');
     expect(client.state()?.current.versionId).toBe('v1');
 
     const offline = new WorldStyleClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't',
       fetch: vi.fn(async () => { throw new TypeError('network offline'); }),
     });
@@ -456,7 +472,7 @@ describe('world style API boundary', () => {
       }
       return undefined;
     });
-    const client = new WorldStyleClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch });
+    const client = new WorldStyleClient({ worldId: TEST_WORLD, baseUrl: 'https://exulanica.test/api', token: 't', fetch });
     await client.connect();
     await client.previewSettings({ profileId: 'origin-landscape', profileVersion: 1 })
       .catch((error: ApiError) => expect(error.code).toBe('protected_topology_conflict'));
@@ -482,7 +498,7 @@ describe('reviewed historical recipe bindings', () => {
       if (url.pathname.endsWith('/previews')) return json({ ...preview('p', 'proposal'), candidate: saved }, 201);
       return undefined;
     });
-    const client = new WorldStyleClient({baseUrl:'https://exulanica.test',token:'fixture',fetch});
+    const client = new WorldStyleClient({ worldId: TEST_WORLD,baseUrl:'https://exulanica.test',token:'fixture',fetch});
     const connected = await client.connect();
     expect(connected.state.current.recipeBinding.modules).toEqual(saved.recipe_binding.modules);
     expect(connected.state.current.globalStyle.parameters['source-hue']).toBe(0.6);
@@ -494,6 +510,6 @@ describe('reviewed historical recipe bindings', () => {
     saved.recipe_binding.modules.pop();
     const fetch = connectedFetch(url => url.pathname.endsWith('/current')
       ? json({current_topology_digest:'topology-a',current:saved}) : undefined);
-    await expect(new WorldStyleClient({baseUrl:'https://exulanica.test',token:'fixture',fetch}).connect()).rejects.toThrow('not executable');
+    await expect(new WorldStyleClient({ worldId: TEST_WORLD,baseUrl:'https://exulanica.test',token:'fixture',fetch}).connect()).rejects.toThrow('not executable');
   });
 });

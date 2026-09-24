@@ -11,7 +11,6 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from exulanica.db.session import set_workspace
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import (
     StaleSocietyState,
     UnavailableSocietyInput,
@@ -44,7 +43,7 @@ class SocietyControlRepository:
         connection: psycopg.Connection,
         workspace_id: uuid.UUID,
         *,
-        world_id: str = DEFAULT_WORLD_ID,
+        world_id: str,
         input_authorizer: Callable[[uuid.UUID, dict], None] | None = None,
         base_tick_interval_ms: int = 1000,
     ) -> None:
@@ -302,45 +301,49 @@ class SocietyControlRepository:
             )
             return {"control": self.read(version_id), "society": after, "receipt": receipt}
 
-    def _in_world(self, world_id: str) -> SocietyControlRepository:
-        """This repository's connection and authority, scoped to another world of the workspace."""
-        if world_id == self.world_id:
-            return self
-        return SocietyControlRepository(
-            self.connection,
-            self.workspace_id,
-            world_id=world_id,
-            input_authorizer=self.input_authorizer,
-            base_tick_interval_ms=self.base_tick_interval_ms,
-        )
-
-    def claim(self) -> ControlClaim | None:
+    @classmethod
+    def claim_in_workspace(
+        cls,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        *,
+        input_authorizer: Callable[[uuid.UUID, dict], None] | None = None,
+        base_tick_interval_ms: int = 1000,
+    ) -> ControlClaim | None:
         """Lease the oldest due playing society in this workspace, whichever world holds it.
 
-        Playback is fair across a workspace, not across one of its worlds: the default world and
-        every saved world a person made compete for the same one claim per round, by due time
-        and then society identity. The claim names the world it was taken in, and ``execute``
-        runs it only there.
+        Playback is fair across a workspace, not across one of its worlds: every world the
+        workspace holds competes for the same one claim per round, by due time and then society
+        identity. So the claim names no world. It names the world it was taken in, and
+        ``execute`` on that world's repository runs it only there.
         """
-        with self.connection.transaction():
-            locked = self.connection.execute(
+        connection.row_factory = dict_row
+        set_workspace(connection, workspace_id)
+        with connection.transaction():
+            locked = connection.execute(
                 "select pg_try_advisory_xact_lock(hashtextextended(%s,880024)) as held",
-                (str(self.workspace_id),),
+                (str(workspace_id),),
             ).fetchone()["held"]
             if not locked:
                 return None
-            row = self.connection.execute(
+            row = connection.execute(
                 "select c.*,s.version_id,s.world_id from world_society_control c join "
                 "world_society s using(workspace_id,society_id) "
                 "where c.workspace_id=%s and "
                 "c.mode='playing' and c.next_due_at<=clock_timestamp() "
                 "and (c.lease_token is null or c.lease_expires_at<=clock_timestamp()) "
                 "order by c.next_due_at,c.society_id for update of c skip locked limit 1",
-                (self.workspace_id,),
+                (workspace_id,),
             ).fetchone()
             if row is None:
                 return None
-            scoped = self._in_world(row["world_id"])
+            scoped = cls(
+                connection,
+                workspace_id,
+                world_id=row["world_id"],
+                input_authorizer=input_authorizer,
+                base_tick_interval_ms=base_tick_interval_ms,
+            )
             society = scoped._scope(row["version_id"])
             if row["claim_attempts"] >= MAX_CLAIM_ATTEMPTS:
                 scoped._pause_error(
@@ -351,8 +354,8 @@ class SocietyControlRepository:
                 )
                 return None
             token = uuid.uuid4()
-            now = self._now()
-            self.connection.execute(
+            now = scoped._now()
+            scoped.connection.execute(
                 "update world_society_control set lease_token=%s,"
                 "claimed_at=%s,lease_expires_at=%s,"
                 "claim_attempts=claim_attempts+1 where workspace_id=%s and "
@@ -361,11 +364,11 @@ class SocietyControlRepository:
                     token,
                     now,
                     now + dt.timedelta(seconds=LEASE_SECONDS),
-                    self.workspace_id,
+                    workspace_id,
                     row["society_id"],
                 ),
             )
-            self._event(
+            scoped._event(
                 society,
                 "claimed" if row["lease_token"] is None else "reclaimed",
                 {
@@ -379,7 +382,7 @@ class SocietyControlRepository:
                 },
             )
             return ControlClaim(
-                workspace_id=self.workspace_id,
+                workspace_id=workspace_id,
                 world_id=row["world_id"],
                 society_id=row["society_id"],
                 version_id=row["version_id"],

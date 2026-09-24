@@ -61,6 +61,7 @@ from exulanica.world import (
     WorldStyleRepository,
 )
 from exulanica.world.structure import validate_candidate
+from exulanica.world.worlds import PERSONAL_SOURCE, register_world
 from exulanica.world_package import diff_packages, project_world_package
 
 __all__ = ["FrontierDemonstrationError", "run_frontier_demonstration"]
@@ -597,6 +598,7 @@ def _semantic_and_supported_answer(
             plan,
             Session(workspace_id=manifest.workspace_id, actor=manifest.actor_id),
         ),
+        world_id=manifest.world_id,
     )
     packet = build_packet(connection, selected, workspace_id=manifest.workspace_id)
     answer = validate_answer(render_deterministic_answer(packet), packet)
@@ -791,6 +793,17 @@ def _apply_world(
 ) -> dict[str, Any]:
     candidate = _candidate_for(connection, manifest, sources)
     digests = validate_candidate(candidate)
+    # The manifest names the world it builds, and that world is composed from the photographs the
+    # manifest lists, so it is registered as the workspace's personal-source world, under the same
+    # count policy as any other. A rerun returns the registration it already made.
+    register_world(
+        connection,
+        manifest.workspace_id,
+        world_id=manifest.world_id,
+        kind=PERSONAL_SOURCE,
+        created_by=manifest.actor_id,
+        reason="frontier demonstration manifest",
+    )
     repository = WorldStructureRepository(
         connection, manifest.workspace_id, world_id=manifest.world_id
     )

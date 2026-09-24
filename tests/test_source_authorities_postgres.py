@@ -275,7 +275,9 @@ def _environment_refusal(composed, case):
             composed.source.admission_id, uuid.uuid4(), None, EnvironmentSelection("whole_asset")
         )
     if case == "no store":
-        storeless = WorldObjectRepository(worlds.connection, worlds.workspace_id, store=None)
+        storeless = WorldObjectRepository(
+            worlds.connection, worlds.workspace_id, world_id=worlds.world_id, store=None
+        )
         return lambda: storeless.validate_environment_source(
             whole.admission_id, whole.render_asset_id, None, whole.selection
         )

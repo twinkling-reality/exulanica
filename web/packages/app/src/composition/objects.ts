@@ -218,7 +218,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   let disposed = false;
   const definition = BEHAVIOUR_REGISTRY.resolve(BOUNDED_PATH_KEY, BOUNDED_PATH_VERSION);
 
-  const client = deps.client ?? (env.preview ? null : new WorldObjectsClient(deps.credentials));
+  // A client exists only for a world that is open; without one nothing can be written.
+  const client = deps.client ?? null;
 
   let assets: readonly ReviewedAsset[] = Object.freeze([]);
   let version: AlternateVersion | null = null;

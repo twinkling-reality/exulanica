@@ -290,7 +290,8 @@ def score_capture_time_windows(
             plan,
             Session(workspace_id=workspace, actor=uuid.UUID(int=0), may_include_proposals=False),
         )
-        result = execute(connection, validated)
+        # Retrieval over the corpus's photographs, which belong to no world.
+        result = execute(connection, validated, world_id=None)
         got = {capture.blob_id.hex for capture in result.captures}
         # A SET, because the windows overlap by construction: a trip's two halves tile its whole,
         # so a capture outside the corpus is returned by three of them. Summing the per-window

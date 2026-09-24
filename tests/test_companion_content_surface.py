@@ -50,6 +50,7 @@ from fastapi.testclient import TestClient
 
 from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import registered_world
 
 UUID_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 TOKEN = "companion-content-surface-owner-token"
@@ -120,6 +121,7 @@ def test_only_a_supplied_content_plan_answers_without_a_model() -> None:
             None,
             "What is here?",
             Session(uuid.uuid4(), uuid.uuid4()),
+            world_id=None,
             before_compose=_not_reached,
         )
     with pytest.raises(ValueError, match="model client is required"):
@@ -128,6 +130,7 @@ def test_only_a_supplied_content_plan_answers_without_a_model() -> None:
             None,
             "Show me",
             Session(uuid.uuid4(), uuid.uuid4()),
+            world_id=None,
             plan=capture,
             before_compose=_not_reached,
         )
@@ -263,6 +266,8 @@ def place_content(repository, tmp_path, photo_dir, spine_schema, monkeypatch):
         display_name="Synthetic Hall",
         actor=actor,
     )
+    # The world the Companion is asked in; its content here is the workspace's own.
+    world_id = registered_world(connection, repository.workspace_id)
     connection.commit()
 
     monkeypatch.setenv(
@@ -300,12 +305,15 @@ def place_content(repository, tmp_path, photo_dir, spine_schema, monkeypatch):
         },
         "capture_id": str(outcome.capture_id),
         "entity_id": str(named.entity_id),
+        "world_id": world_id,
     }
 
 
-def _ask(client: TestClient, body: dict) -> dict:
+def _ask(client: TestClient, body: dict, world_id: str) -> dict:
     response = client.post(
-        "/selection/ask", json=body, headers={"Authorization": f"Bearer {TOKEN}"}
+        f"/selection/ask?world_id={world_id}",
+        json=body,
+        headers={"Authorization": f"Bearer {TOKEN}"},
     )
     return {"status": response.status_code, "body": response.json()}
 
@@ -315,7 +323,9 @@ def test_a_confirmed_place_answers_with_its_content_and_no_model(place_content) 
     headers = {"Authorization": f"Bearer {TOKEN}"}
     with TestClient(create_app(place_content["services"], verify=False)) as client:
         refused = _ask(
-            client, {"question": "What is here?", "city_context": place_content["city_context"]}
+            client,
+            {"question": "What is here?", "city_context": place_content["city_context"]},
+            place_content["world_id"],
         )
         assert refused["status"] == 200, refused
         assert refused["body"]["plan"] is None and refused["body"]["selection"] is None
@@ -327,7 +337,9 @@ def test_a_confirmed_place_answers_with_its_content_and_no_model(place_content) 
         assert created.status_code == 201, created.text
 
         answered = _ask(
-            client, {"question": "What is here?", "city_context": place_content["city_context"]}
+            client,
+            {"question": "What is here?", "city_context": place_content["city_context"]},
+            place_content["world_id"],
         )
 
     assert answered["status"] == 200, answered
@@ -369,7 +381,9 @@ def test_a_supplied_content_plan_answers_without_a_model(place_content) -> None:
             ).status_code
             == 201
         )
-        answered = _ask(client, {"question": "My photographs here", "plan": plan})
+        answered = _ask(
+            client, {"question": "My photographs here", "plan": plan}, place_content["world_id"]
+        )
 
     assert answered["status"] == 200, answered
     assert answered["body"]["deterministic"] is True
@@ -381,8 +395,12 @@ def test_a_supplied_content_plan_answers_without_a_model(place_content) -> None:
 @pytest.mark.postgres
 def test_questions_that_need_a_model_still_answer_503_without_one(place_content) -> None:
     with TestClient(create_app(place_content["services"], verify=False)) as client:
-        in_words = _ask(client, {"question": "What is in this place?"})
-        capture_plan = _ask(client, {"question": "Photos", "plan": {"intent": "captures"}})
+        in_words = _ask(client, {"question": "What is in this place?"}, place_content["world_id"])
+        capture_plan = _ask(
+            client,
+            {"question": "Photos", "plan": {"intent": "captures"}},
+            place_content["world_id"],
+        )
 
     for refused in (in_words, capture_plan):
         assert refused["status"] == 503, refused

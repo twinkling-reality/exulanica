@@ -28,6 +28,7 @@ def opt_in(w):
     w["objects"] = WorldObjectRepository(
         w["connection"],
         w["workspace"],
+        world_id=w["version"].world_id,
         store=w["store"],
         on_edit=lambda vid: w["runtime"].authored_edit(w["connection"], w["session"], vid),
     )

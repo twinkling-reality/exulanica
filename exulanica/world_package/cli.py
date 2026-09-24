@@ -34,7 +34,11 @@ def _parser() -> argparse.ArgumentParser:
     project.add_argument("--actor", type=uuid.UUID, required=True)
     project.add_argument("--output", type=Path, required=True)
     project.add_argument("--private-key", type=Path, required=True)
-    project.add_argument("--world", default="atlas:default")
+    project.add_argument(
+        "--world",
+        required=True,
+        help="the world to package; GET /worlds lists the workspace's worlds",
+    )
     project.add_argument("--parent-root")
     project.add_argument("--evaluation-report", action="append", default=[], type=Path)
     project.add_argument(

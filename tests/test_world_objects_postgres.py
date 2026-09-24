@@ -40,6 +40,7 @@ from exulanica.world import (
 from conftest import scratch_role_database, write_photo
 from pg_harness import open_scratch_connection
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -109,11 +110,16 @@ def apply_candidate(structures, candidate, *, actor=None):
 @pytest.fixture
 def world(repository, tmp_path):
     """One committed structural snapshot and an object repository over the same connection."""
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     snapshot = apply_candidate(structures, structural_candidate())
     store = LocalContentAddressedStore(tmp_path / "world-objects-store")
     seed_reviewed_assets(store)
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
+    objects = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id, store=store
+    )
     return objects, snapshot, structures
 
 
@@ -279,7 +285,7 @@ def test_two_writers_racing_one_base_leave_exactly_one_winner(world, spine_schem
     base = version.state_sha256
     other = another_connection(spine_schema, objects.workspace_id)
     try:
-        competitor = WorldObjectRepository(other, objects.workspace_id)
+        competitor = WorldObjectRepository(other, objects.workspace_id, world_id=objects.world_id)
         add(objects, version, authored("object:first"))
         with pytest.raises(StaleObjectBase):
             competitor.add_object(
@@ -379,7 +385,9 @@ def test_runtime_role_undo_retains_history_without_delete_privilege(
     with scratch_role_database(spine_schema[1], RUNTIME_ROLE).session(
         repository.workspace_id
     ) as connection:
-        runtime = WorldObjectRepository(connection, repository.workspace_id, store=objects.store)
+        runtime = WorldObjectRepository(
+            connection, repository.workspace_id, world_id=objects.world_id, store=objects.store
+        )
         assert connection.execute(
             "select has_table_privilege(current_user,'world_alternate_object','DELETE') as allowed"
         ).fetchone()["allowed"] is False
@@ -449,7 +457,9 @@ def test_runtime_role_undo_retains_element_override_projection_without_delete(
     with scratch_role_database(spine_schema[1], RUNTIME_ROLE).session(
         repository.workspace_id
     ) as connection:
-        runtime = WorldObjectRepository(connection, repository.workspace_id)
+        runtime = WorldObjectRepository(
+            connection, repository.workspace_id, world_id=objects.world_id
+        )
         assert connection.execute(
             "select has_table_privilege(current_user,'world_alternate_element_override',"
             "'DELETE') as allowed"
@@ -704,9 +714,9 @@ def test_a_version_reopens_on_a_new_connection_with_its_behaviour_still_attached
 
     reopened_connection = another_connection(spine_schema, objects.workspace_id)
     try:
-        reopened = WorldObjectRepository(reopened_connection, objects.workspace_id).version(
-            version.version_id
-        )
+        reopened = WorldObjectRepository(
+            reopened_connection, objects.workspace_id, world_id=objects.world_id
+        ).version(version.version_id)
     finally:
         reopened_connection.close()
 
@@ -733,7 +743,9 @@ def test_a_version_is_invisible_and_unwritable_from_another_workspace(world, spi
     stranger_workspace = uuid.uuid4()
     stranger_connection = another_connection(spine_schema, stranger_workspace)
     try:
-        stranger = WorldObjectRepository(stranger_connection, stranger_workspace)
+        stranger = WorldObjectRepository(
+            stranger_connection, stranger_workspace, world_id=objects.world_id
+        )
         # Absent and cross-workspace are the identical answer, so nothing leaks by comparison.
         assert stranger.versions() == ()
         with pytest.raises(UnknownWorldResource):
@@ -761,7 +773,9 @@ def test_a_version_cannot_be_branched_from_another_workspaces_snapshot(world, sp
     stranger_workspace = uuid.uuid4()
     stranger_connection = another_connection(spine_schema, stranger_workspace)
     try:
-        stranger = WorldObjectRepository(stranger_connection, stranger_workspace)
+        stranger = WorldObjectRepository(
+            stranger_connection, stranger_workspace, world_id=objects.world_id
+        )
         with pytest.raises(UnknownWorldResource):
             stranger.create_version(
                 source_snapshot_id=snapshot.snapshot_id,
@@ -780,7 +794,10 @@ def test_deleting_the_source_scene_invalidates_every_dependent_version(
 ):
     """No invalidation code on this side. The structural tombstone trigger writes the row and
     this plane reads it, so a deleted source reaches every version derived from it."""
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     apply_candidate(structures, structural_candidate())
 
     store = LocalContentAddressedStore(tmp_path / "blobs")
@@ -800,7 +817,9 @@ def test_deleting_the_source_scene_invalidates_every_dependent_version(
     )
 
     seed_reviewed_assets(store)
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
+    objects = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id, store=store
+    )
     first = objects.create_version(
         source_snapshot_id=dependent.snapshot_id, title="One", created_by=uuid.uuid4()
     )
@@ -847,7 +866,9 @@ def test_appearance_and_authored_objects_coexist_over_one_structural_version(wor
     )
     version = add(objects, version)
 
-    styles = WorldStyleRepository(objects.connection, objects.workspace_id)
+    styles = WorldStyleRepository(
+        objects.connection, objects.workspace_id, world_id=objects.world_id
+    )
     original_style = styles.current()
     topology_digest = styles.current_topology_digest()
     assert topology_digest == snapshot.digests.topology_sha256
@@ -1320,7 +1341,9 @@ def test_runtime_role_gives_clears_and_restores_a_behaviour(world, repository, s
     with scratch_role_database(spine_schema[1], RUNTIME_ROLE).session(
         repository.workspace_id
     ) as connection:
-        runtime = WorldObjectRepository(connection, repository.workspace_id, store=objects.store)
+        runtime = WorldObjectRepository(
+            connection, repository.workspace_id, world_id=objects.world_id, store=objects.store
+        )
         given = set_behaviour(runtime, placed, MOTION)
         cleared = set_behaviour(runtime, given, None)
         restored = undo(runtime, cleared)
@@ -1338,9 +1361,9 @@ def test_a_behaviour_given_later_reopens_on_a_new_connection(world, spine_schema
 
     reopened_connection = another_connection(spine_schema, objects.workspace_id)
     try:
-        reopened = WorldObjectRepository(reopened_connection, objects.workspace_id).version(
-            version.version_id
-        )
+        reopened = WorldObjectRepository(
+            reopened_connection, objects.workspace_id, world_id=objects.world_id
+        ).version(version.version_id)
     finally:
         reopened_connection.close()
     assert reopened.state_sha256 == version.state_sha256

@@ -82,6 +82,12 @@ _STAND_INS = (
     "null::boolean as removed,null::boolean as addition_undone,null::uuid as created_edit_id,"
     "null::uuid as last_edit_id where false",
     "alter table world_alternate_version_edit add column point_map_instance_id text",
+    # The world registry 0099 adds, which the current starter creation writes before any world
+    # row. It is dropped with the others, and 0099's backfill, run below with every later
+    # migration, registers the same starter worlds again from the rows they hold.
+    "create table world_identity (workspace_id uuid not null, world_id text not null, "
+    "kind text not null, provenance jsonb not null, created_by uuid, "
+    "created_at timestamptz not null default now(), primary key (workspace_id, world_id))",
 )
 
 
@@ -363,6 +369,7 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
             admin.execute(
                 "alter table world_alternate_version_edit drop column point_map_instance_id"
             )
+            admin.execute("drop table world_identity")
             admin.commit()
             _as_owner(admin, owned)
             admin.execute(by_version["0090"].sql)
@@ -417,6 +424,14 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
             provision_runtime_role(admin)
             admin.commit()
             assert _counts(admin) == counts
+            # 0099 registered each workspace's starter from its rows, as an authored starter by
+            # its stored structural composer, with no creator it could not know.
+            registered = admin.execute(
+                "select workspace_id, kind, provenance->>'origin', created_by from world_identity"
+            ).fetchall()
+            assert sorted(registered) == sorted(
+                (workspace, "authored-starter", "backfill", None) for workspace in workspaces
+            )
 
             with TestClient(create_app(services, verify=False)) as client:
                 after = read_all(client)

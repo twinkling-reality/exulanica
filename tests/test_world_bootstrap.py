@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import replace
+from urllib.parse import urlencode
 
 import pytest
 from exulanica.api.app import create_app
@@ -25,17 +26,20 @@ from exulanica.world import (
 from exulanica.world.bootstrap import bootstrap_world
 from exulanica.world.composed import UNPLACED_REASON, composed_candidate
 from exulanica.world.structure import validate_candidate
+from exulanica.world.worlds import AUTHORED_STARTER
 from fastapi.testclient import TestClient
 
 from conftest import write_photo
 from test_world_objects_api import CUBE, TOKEN, transform
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 pytestmark = pytest.mark.postgres
 
 
 @pytest.fixture
 def composed(repository, photo_dir, tmp_path):
+    """The store, the composition's inputs, and the personal-source world it composed into."""
     store = LocalContentAddressedStore(tmp_path / "blobs")
     pipeline = PhotoIngestPipeline(repository, store, vision=None)
     for index in range(3):
@@ -53,9 +57,10 @@ def composed(repository, photo_dir, tmp_path):
         captures=[
             (r["capture_id"], bytes(r["blob_sha256"]).hex(), str(i)) for i, r in enumerate(rows)
         ],
+        actor=uuid.uuid4(),
     )
-    compose_reference_sources(repository, **options)
-    return store, options
+    world_id = compose_reference_sources(repository, **options)["world_id"]
+    return store, options, world_id
 
 
 @pytest.fixture
@@ -88,6 +93,11 @@ def bootstrap_api(repository, composed, spine_schema, monkeypatch):
         yield client
 
 
+def in_world(path: str, world_id: str) -> str:
+    """``path`` naming ``world_id``, as every world route requires."""
+    return f"{path}{'&' if '?' in path else '?'}{urlencode({'world_id': world_id})}"
+
+
 def counts(repository):
     return {
         table: repository.connection.execute(f"select count(*) as n from {table}").fetchone()["n"]
@@ -107,34 +117,42 @@ def test_bootstrap_keeps_every_source_and_object_survives_recompose(
     repository, composed, bootstrap_api
 ):
     client = bootstrap_api
-    before = client.get("/world/source-media").json()
+    world_id = composed[2]
+    before = client.get(in_world("/world/source-media", world_id)).json()
     assert len(before) == 3
-    styles_before = client.get("/world/styles/current").json()
+    styles_before = client.get(in_world("/world/styles/current", world_id)).json()
     state_before = repository.connection.execute("select * from world_style_state").fetchall()
     style_count = counts(repository)["world_style_version"]
     digest = styles_before["current_topology_digest"]
-    first = client.post("/world/versions/bootstrap", json={"base_topology_digest": digest})
+    first = client.post(
+        in_world("/world/versions/bootstrap", world_id), json={"base_topology_digest": digest}
+    )
     assert first.status_code == 200, first.text
     opened = first.json()
     assert opened["snapshot"] == "applied"
     assert opened["version"] == "created"
-    assert client.get("/world/styles/current").json() == styles_before
+    assert client.get(in_world("/world/styles/current", world_id)).json() == styles_before
     assert (
         repository.connection.execute("select * from world_style_state").fetchall() == state_before
     )
     assert counts(repository)["world_style_version"] == style_count
-    assert client.get("/world/source-media").json() == before
-    assert client.get("/world/styles/current").json()["current_topology_digest"] == digest
-    snapshot = WorldStructureRepository(repository.connection, repository.workspace_id).current()
+    assert client.get(in_world("/world/source-media", world_id)).json() == before
+    assert (
+        client.get(in_world("/world/styles/current", world_id)).json()["current_topology_digest"]
+        == digest
+    )
+    snapshot = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    ).current()
     elements = snapshot.candidate.topology["elements"]
     contract = WorldStyleRepository(
-        repository.connection, repository.workspace_id
+        repository.connection, repository.workspace_id, world_id=world_id
     ).current_topology_contract()
     assert {(e["lineage"]["slot_key"], e["evidence"]["span_id"]) for e in elements} == {
         (s.slot_key, str(s.evidence_span_id)) for s in contract.source_slots
     }
     version = client.post(
-        f"/world/versions/{opened['version_id']}/objects",
+        in_world(f"/world/versions/{opened['version_id']}/objects", world_id),
         json={
             "base_state_sha256": opened["state_sha256"],
             "object_id": "object:bootstrap-marker",
@@ -145,23 +163,31 @@ def test_bootstrap_keeps_every_source_and_object_survives_recompose(
         },
     )
     assert version.status_code == 201, version.text
-    compose_reference_sources(repository, **{**composed[1], "source_manifest_sha256": "cd" * 32})
+    recomposed = compose_reference_sources(
+        repository, **{**composed[1], "source_manifest_sha256": "cd" * 32}
+    )
+    assert recomposed["world_id"] == world_id, "the recomposition must reach the same world"
     repository.connection.commit()
-    assert client.get("/world/source-media").json() == before
-    assert client.get(f"/world/versions/{opened['version_id']}").json() == version.json()
+    assert client.get(in_world("/world/source-media", world_id)).json() == before
+    assert (
+        client.get(in_world(f"/world/versions/{opened['version_id']}", world_id)).json()
+        == version.json()
+    )
     assert version.json()["objects"][0]["removed"] is False
 
 
-def test_second_bootstrap_and_seed_are_noops(repository, bootstrap_api):
+def test_second_bootstrap_and_seed_are_noops(repository, composed, bootstrap_api):
     client = bootstrap_api
+    world_id = composed[2]
     body = {
-        "base_topology_digest": client.get("/world/styles/current").json()[
+        "base_topology_digest": client.get(in_world("/world/styles/current", world_id)).json()[
             "current_topology_digest"
         ]
     }
-    first = client.post("/world/versions/bootstrap", json=body).json()
+    bootstrap = in_world("/world/versions/bootstrap", world_id)
+    first = client.post(bootstrap, json=body).json()
     before = counts(repository)
-    second = client.post("/world/versions/bootstrap", json={**body, "title": "Ignored retry"})
+    second = client.post(bootstrap, json={**body, "title": "Ignored retry"})
     assert second.status_code == 200, second.text
     assert second.json() == {**first, "snapshot": "reused", "version": "reused"}
     assert counts(repository) == before
@@ -172,27 +198,28 @@ def test_second_bootstrap_and_seed_are_noops(repository, bootstrap_api):
     assert counts(repository) == before
 
 
-def test_stale_digest_refuses_before_and_after_snapshot(repository, bootstrap_api):
+def test_stale_digest_refuses_before_and_after_snapshot(repository, composed, bootstrap_api):
     client = bootstrap_api
+    world_id = composed[2]
+    bootstrap = in_world("/world/versions/bootstrap", world_id)
     for _ in range(2):
         before = counts(repository)
-        refused = client.post("/world/versions/bootstrap", json={"base_topology_digest": "stale"})
+        refused = client.post(bootstrap, json={"base_topology_digest": "stale"})
         assert refused.status_code == 409, refused.text
         assert refused.json()["code"] == "protected_topology_conflict"
         assert counts(repository) == before
-        digest = client.get("/world/styles/current").json()["current_topology_digest"]
-        assert (
-            client.post(
-                "/world/versions/bootstrap", json={"base_topology_digest": digest}
-            ).status_code
-            == 200
-        )
+        digest = client.get(in_world("/world/styles/current", world_id)).json()[
+            "current_topology_digest"
+        ]
+        assert client.post(bootstrap, json={"base_topology_digest": digest}).status_code == 200
 
 
 def test_missing_and_world_owned_slots_and_historical_topologies_are_preserved(
     repository, composed
 ):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = WorldStyleRepository(
+        repository.connection, repository.workspace_id, world_id=composed[2]
+    )
     original = styles.current_topology_contract()
     contract = replace(
         original,
@@ -214,7 +241,9 @@ def test_missing_and_world_owned_slots_and_historical_topologies_are_preserved(
         contract, source_slots=tuple(sorted(contract.source_slots, key=lambda s: s.source_id))
     )
     assert styles.source_media(composed[0]) == before
-    snapshot = WorldStructureRepository(repository.connection, repository.workspace_id).current()
+    snapshot = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=composed[2]
+    ).current()
     assert len(snapshot.candidate.topology["elements"]) == 5
 
 
@@ -258,10 +287,13 @@ def _dropped_last_source(candidate):
 def test_preservation_path_refuses_changed_candidate(repository, composed, alter):
     # Coincident zeros is a valid structural candidate, and it is still refused: a position
     # nobody authored is not the composed sources, even when every coordinate is the same.
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    world_id = composed[2]
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id, world_id=world_id)
     contract = styles.current_topology_contract()
     altered = alter(composed_candidate(contract, "ab" * 32, "cd" * 32))
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     preview = structures.preview(altered, proposed_by=uuid.uuid4())
     with pytest.raises(InvalidStructuralData, match="exact composed sources"):
         structures.apply(
@@ -277,14 +309,18 @@ def test_preservation_path_refuses_changed_candidate(repository, composed, alter
 
 
 def test_bootstrap_writes_every_source_and_destination_as_explicitly_unplaced(repository, composed):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    world_id = composed[2]
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id, world_id=world_id)
     bootstrap_world(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         base_topology_digest=styles.current_topology_digest(),
+        world_id=world_id,
     )
-    snapshot = WorldStructureRepository(repository.connection, repository.workspace_id).current()
+    snapshot = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    ).current()
     topology = snapshot.candidate.topology
     placement = snapshot.candidate.placement
     assert placement["elements"] == []
@@ -315,6 +351,7 @@ def _regions_contract(*regions):
             TopologySourceSlot(uuid.uuid4(), f"slot-{region}", region, None, "No source chosen")
             for region in regions
         ),
+        world_id=FIXTURE_WORLD_ID,
     )
 
 
@@ -404,8 +441,9 @@ def test_a_collision_body_cannot_be_unplaced():
 
 
 def test_failed_version_creation_rolls_back_snapshot(repository, composed):
+    world_id = composed[2]
     digest = WorldStyleRepository(
-        repository.connection, repository.workspace_id
+        repository.connection, repository.workspace_id, world_id=world_id
     ).current_topology_digest()
     before = counts(repository)
     from exulanica.world import InvalidObjectData
@@ -417,21 +455,31 @@ def test_failed_version_creation_rolls_back_snapshot(repository, composed):
             actor=uuid.uuid4(),
             base_topology_digest=digest,
             title=" ",
+            world_id=world_id,
         )
     assert counts(repository) == before
-    assert WorldObjectRepository(repository.connection, repository.workspace_id).versions() == ()
+    assert (
+        WorldObjectRepository(
+            repository.connection, repository.workspace_id, world_id=world_id
+        ).versions()
+        == ()
+    )
 
 
 def test_existing_multiple_versions_returns_latest_without_writes(repository, composed):
     actor = uuid.uuid4()
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    world_id = composed[2]
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id, world_id=world_id)
     args = dict(
         workspace_id=repository.workspace_id,
         actor=actor,
         base_topology_digest=styles.current_topology_digest(),
+        world_id=world_id,
     )
     first = bootstrap_world(repository.connection, **args)
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     latest = objects.create_version(
         source_snapshot_id=uuid.UUID(first["snapshot_id"]),
         title="Newest alternate",
@@ -451,8 +499,9 @@ def test_concurrent_bootstrap_serializes_to_one_snapshot_and_version(
 
     from test_world_objects_postgres import another_connection
 
+    world_id = composed[2]
     digest = WorldStyleRepository(
-        repository.connection, repository.workspace_id
+        repository.connection, repository.workspace_id, world_id=world_id
     ).current_topology_digest()
     repository.connection.commit()
     ready = Barrier(2)
@@ -465,6 +514,7 @@ def test_concurrent_bootstrap_serializes_to_one_snapshot_and_version(
                 workspace_id=repository.workspace_id,
                 actor=uuid.uuid4(),
                 base_topology_digest=digest,
+                world_id=world_id,
             )
             connection.commit()
             return result
@@ -483,9 +533,13 @@ def test_deleted_source_cannot_bootstrap_or_extend_an_existing_snapshot(
     repository, composed, bootstrap_api
 ):
     client = bootstrap_api
-    digest = client.get("/world/styles/current").json()["current_topology_digest"]
+    world_id = composed[2]
+    digest = client.get(in_world("/world/styles/current", world_id)).json()[
+        "current_topology_digest"
+    ]
     body = {"base_topology_digest": digest}
-    assert client.post("/world/versions/bootstrap", json=body).status_code == 200
+    bootstrap = in_world("/world/versions/bootstrap", world_id)
+    assert client.post(bootstrap, json=body).status_code == 200
     repository.insert_tombstone(
         scope="capture",
         capture_id=composed[1]["captures"][0][0],
@@ -494,7 +548,7 @@ def test_deleted_source_cannot_bootstrap_or_extend_an_existing_snapshot(
     )
     repository.connection.commit()
     before = counts(repository)
-    refused = client.post("/world/versions/bootstrap", json=body)
+    refused = client.post(bootstrap, json=body)
     assert refused.status_code == 409, refused.text
     assert refused.json()["code"] == "invalidated_source_version"
     assert counts(repository) == before
@@ -504,13 +558,15 @@ def test_invalidated_oldest_version_does_not_hide_latest_live_version(repository
     from exulanica.world import PlacementMigration
 
     actor = uuid.uuid4()
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    world_id = composed[2]
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id, world_id=world_id)
     contract = styles.current_topology_contract()
     first = bootstrap_world(
         repository.connection,
         workspace_id=repository.workspace_id,
         actor=actor,
         base_topology_digest=contract.topology_digest,
+        world_id=world_id,
     )
     withdrawn = composed[1]["captures"][0][0]
     span = repository.connection.execute(
@@ -531,7 +587,9 @@ def test_invalidated_oldest_version_does_not_hide_latest_live_version(repository
             PlacementMigration(uuid.uuid4(), "region-a", "Remove withdrawn source"),
         ),
     )
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     preview = structures.preview(candidate, proposed_by=actor)
     snapshot = structures.apply(
         preview.preview_id,
@@ -540,7 +598,9 @@ def test_invalidated_oldest_version_does_not_hide_latest_live_version(repository
         base_reconstruction_sha256=preview.base_reconstruction_sha256,
         committed_by=actor,
     )
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     latest = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Live alternate", created_by=actor
     )
@@ -551,6 +611,7 @@ def test_invalidated_oldest_version_does_not_hide_latest_live_version(repository
         workspace_id=repository.workspace_id,
         actor=actor,
         base_topology_digest=styles.current_topology_digest(),
+        world_id=world_id,
     )
     assert result["version_id"] == str(latest.version_id)
     assert counts(repository) == before
@@ -558,9 +619,12 @@ def test_invalidated_oldest_version_does_not_hide_latest_live_version(repository
 
 def test_existing_snapshot_opens_only_the_first_alternate(repository, composed):
     actor = uuid.uuid4()
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    world_id = composed[2]
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id, world_id=world_id)
     contract = styles.current_topology_contract()
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     preview = structures.preview(
         composed_candidate(contract, "ab" * 32, "cd" * 32), proposed_by=actor
     )
@@ -578,6 +642,7 @@ def test_existing_snapshot_opens_only_the_first_alternate(repository, composed):
         workspace_id=repository.workspace_id,
         actor=actor,
         base_topology_digest=contract.topology_digest,
+        world_id=world_id,
     )
     assert result["snapshot"] == "reused"
     assert result["snapshot_id"] == str(snapshot.snapshot_id)
@@ -585,16 +650,20 @@ def test_existing_snapshot_opens_only_the_first_alternate(repository, composed):
     assert counts(repository) == {**before, "world_alternate_version": 1}
 
 
-def test_bootstrap_requires_authentication_and_refuses_caller_topology(repository, bootstrap_api):
+def test_bootstrap_requires_authentication_and_refuses_caller_topology(
+    repository, composed, bootstrap_api
+):
+    # Each request names the composed world, so the refusal is for the reason named.
+    bootstrap = in_world("/world/versions/bootstrap", composed[2])
     before = counts(repository)
     unauthorized = bootstrap_api.post(
-        "/world/versions/bootstrap",
+        bootstrap,
         headers={"Authorization": "Bearer unknown"},
         json={"base_topology_digest": "anything"},
     )
     assert unauthorized.status_code == 401
     forbidden_shape = bootstrap_api.post(
-        "/world/versions/bootstrap",
+        bootstrap,
         json={
             "base_topology_digest": "anything",
             "source_slots": [],
@@ -607,15 +676,21 @@ def test_bootstrap_requires_authentication_and_refuses_caller_topology(repositor
 def test_bootstrap_ignores_other_worlds_and_historical_regions(repository, composed):
     from exulanica.world import TopologyContract
 
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    world_id = composed[2]
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id, world_id=world_id)
     current = styles.current_topology_contract()
     historical = replace(
         current, topology_digest="historical", region_ids=("historical-region",), source_slots=()
     )
     styles.register_topology(historical)
     styles.register_topology(current)
+    # The composition holds the one personal-source world policy version 1 allows, so the
+    # workspace's second world is an authored starter.
+    other_world = registered_world(
+        repository.connection, repository.workspace_id, "other-world", kind=AUTHORED_STARTER
+    )
     other = WorldStyleRepository(
-        repository.connection, repository.workspace_id, world_id="other-world"
+        repository.connection, repository.workspace_id, world_id=other_world
     )
     other.register_topology(
         TopologyContract(
@@ -630,7 +705,7 @@ def test_bootstrap_ignores_other_worlds_and_historical_regions(repository, compo
                     None,
                 ),
             ),
-            world_id="other-world",
+            world_id=other_world,
         )
     )
     opened = bootstrap_world(
@@ -638,15 +713,18 @@ def test_bootstrap_ignores_other_worlds_and_historical_regions(repository, compo
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         base_topology_digest=current.topology_digest,
+        world_id=world_id,
     )
     assert opened["regions"] == ["region-a"]
-    snapshot = WorldStructureRepository(repository.connection, repository.workspace_id).current()
+    snapshot = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    ).current()
     assert len(snapshot.candidate.topology["elements"]) == 3
     assert styles.current_topology_contract() == current
     assert other.current_topology_digest() == "other"
     assert (
         WorldStructureRepository(
-            repository.connection, repository.workspace_id, world_id="other-world"
+            repository.connection, repository.workspace_id, world_id=other_world
         ).current()
         is None
     )

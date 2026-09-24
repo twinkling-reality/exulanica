@@ -71,6 +71,7 @@ def run(repository, query, embedding=None, **kwargs):
     return execute(
         repository.connection,
         validate(repository.connection, plan, session),
+        world_id=None,
         query_embedding=embedding,
     )
 
@@ -204,6 +205,7 @@ def test_permission_filter_excluded_photo_cannot_be_cited(repository, corpus, cl
             SelectionPlan(intent=Intent.CAPTURES, semantic_query="people"),
             other,
         ),
+        world_id=None,
         query_embedding=embedding,
     )
     assert result.is_empty
@@ -257,6 +259,7 @@ def test_ask_records_query_vector_cost_before_composition(
         client,
         "Which photos show winter clothing?",
         Session(workspace_id=repository.workspace_id, actor=uuid.uuid4()),
+        world_id=None,
         plan=SelectionPlan(intent=Intent.CAPTURES, semantic_query="winter clothing"),
         before_compose=composer_rights_check(repository.connection, repository.workspace_id),
     )

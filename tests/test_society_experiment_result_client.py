@@ -11,6 +11,7 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -55,6 +56,9 @@ def test_consumer_imports_only_standard_library_and_httpx():
 
 
 class RecordingHTTP:
+    """The caller's configured client. It supplies the token, and records each request exactly as
+    the consumer made it."""
+
     def __init__(self, client, token=READER_TOKEN):
         self.client = client
         self.token = token
@@ -68,12 +72,14 @@ class RecordingHTTP:
 def _prepare_completed(case):
     client = case["client"]
     version_id = case["world"]["binding"].version_id
+    scope = {"world_id": case["world"]["binding"].world_id}
     route = f"/world/versions/{version_id}/society/experiments"
     experiment_id, attempt_id = uuid.uuid4(), uuid.uuid4()
     assert (
         client.post(
             route,
             headers=_headers(),
+            params=scope,
             json=_definition_body(case, experiment_id),
         ).status_code
         == 200
@@ -83,6 +89,7 @@ def _prepare_completed(case):
         client.post(
             f"{route}/{experiment_id}/attempts",
             headers=_headers(),
+            params=scope,
             json={"attempt_id": str(attempt_id), "seed_sha256": seed},
         ).status_code
         == 200
@@ -110,20 +117,23 @@ def test_private_http_completed_fixture_matches_independent_raw_counts_and_uses_
 ):
     case = experiment_api
     version_id, experiment_id, attempt_id, result, evidence = _prepare_completed(case)
+    world_id = case["world"]["binding"].world_id
     http = RecordingHTTP(case["client"])
     outcome = _consumer().read_experiment_result(
         http,
+        world_id=world_id,
         version_id=version_id,
         experiment_id=experiment_id,
         attempt_id=attempt_id,
     )
     assert outcome.status == "valid"
+    in_world = f"?world_id={quote(world_id, safe='')}"
     assert http.calls == [
-        ("GET", f"/world/versions/{version_id}/society/experiments/{experiment_id}"),
+        ("GET", f"/world/versions/{version_id}/society/experiments/{experiment_id}{in_world}"),
         (
             "GET",
             f"/world/versions/{version_id}/society/experiments/{experiment_id}/attempts/"
-            f"{attempt_id}",
+            f"{attempt_id}{in_world}",
         ),
     ]
     threshold = 500
@@ -146,11 +156,13 @@ def test_private_http_incomplete_failed_denied_and_withdrawn_outcomes(experiment
     case = experiment_api
     client = case["client"]
     version_id = case["world"]["binding"].version_id
+    world_id = case["world"]["binding"].world_id
+    scope = {"world_id": world_id}
     route = f"/world/versions/{version_id}/society/experiments"
     experiment_id, attempt_id = uuid.uuid4(), uuid.uuid4()
     assert (
         client.post(
-            route, headers=_headers(), json=_definition_body(case, experiment_id)
+            route, headers=_headers(), params=scope, json=_definition_body(case, experiment_id)
         ).status_code
         == 200
     )
@@ -158,6 +170,7 @@ def test_private_http_incomplete_failed_denied_and_withdrawn_outcomes(experiment
         client.post(
             f"{route}/{experiment_id}/attempts",
             headers=_headers(),
+            params=scope,
             json={
                 "attempt_id": str(attempt_id),
                 "seed_sha256": experiments.DEVELOPMENT_SEEDS[5],
@@ -168,6 +181,7 @@ def test_private_http_incomplete_failed_denied_and_withdrawn_outcomes(experiment
     consumer = _consumer()
     incomplete = consumer.read_experiment_result(
         RecordingHTTP(client),
+        world_id=world_id,
         version_id=version_id,
         experiment_id=experiment_id,
         attempt_id=attempt_id,
@@ -184,6 +198,7 @@ def test_private_http_incomplete_failed_denied_and_withdrawn_outcomes(experiment
     repo.fail_attempt(attempt_id, code="operator_aborted", detail="independent consumer fixture")
     failed = consumer.read_experiment_result(
         RecordingHTTP(client),
+        world_id=world_id,
         version_id=version_id,
         experiment_id=experiment_id,
         attempt_id=attempt_id,
@@ -193,6 +208,7 @@ def test_private_http_incomplete_failed_denied_and_withdrawn_outcomes(experiment
 
     denied = consumer.read_experiment_result(
         RecordingHTTP(client, WRITE_ONLY_TOKEN),
+        world_id=world_id,
         version_id=version_id,
         experiment_id=experiment_id,
         attempt_id=attempt_id,
@@ -203,6 +219,7 @@ def test_private_http_incomplete_failed_denied_and_withdrawn_outcomes(experiment
     case["world"]["admissions"].withdraw("source", source.admission_id)
     withdrawn = consumer.read_experiment_result(
         RecordingHTTP(client),
+        world_id=world_id,
         version_id=version_id,
         experiment_id=experiment_id,
         attempt_id=attempt_id,
@@ -223,6 +240,8 @@ def _sha(document: dict[str, Any]) -> str:
     ).hexdigest()
 
 
+#: The world the scripted definition binds, which each scripted read names.
+WORLD_ID = "world:personal:experiment-reader"
 VERSION_ID = uuid.UUID("0199a6f0-0000-7000-8000-000000000001")
 EXPERIMENT_ID = uuid.UUID("0199a6f0-0000-7000-8000-000000000002")
 ATTEMPT_ID = uuid.UUID("0199a6f0-0000-7000-8000-000000000003")
@@ -237,7 +256,7 @@ def _definition() -> dict[str, Any]:
         "record_status": "recorded",
         "experiment_id": str(EXPERIMENT_ID),
         "source_society_id": "0199a6f0-0000-7000-8000-000000000004",
-        "world_id": "atlas:default",
+        "world_id": WORLD_ID,
         "version_id": str(VERSION_ID),
         "definition_sha256": DEFINITION_SHA,
         "baseline_input_seq": 1,
@@ -360,6 +379,7 @@ def test_scripted_invalid_pair_and_zero_or_absent_denominators_remain_unavailabl
     with _scripted(_definition(), _attempt(invalid)) as http:
         outcome = consumer.read_experiment_result(
             http,
+            world_id=WORLD_ID,
             version_id=VERSION_ID,
             experiment_id=EXPERIMENT_ID,
             attempt_id=ATTEMPT_ID,
@@ -379,6 +399,7 @@ def test_scripted_invalid_pair_and_zero_or_absent_denominators_remain_unavailabl
     with _scripted(_definition(), _attempt(result)) as http:
         outcome = consumer.read_experiment_result(
             http,
+            world_id=WORLD_ID,
             version_id=VERSION_ID,
             experiment_id=EXPERIMENT_ID,
             attempt_id=ATTEMPT_ID,
@@ -399,7 +420,7 @@ def test_scripted_invalid_pair_and_zero_or_absent_denominators_remain_unavailabl
     }
 
 
-@pytest.mark.parametrize("mutation", ["identity", "digest", "negative", "direction"])
+@pytest.mark.parametrize("mutation", ["identity", "world", "digest", "negative", "direction"])
 def test_mismatched_or_malformed_success_responses_refuse(mutation):
     consumer = _consumer()
     definition = _definition()
@@ -407,6 +428,9 @@ def test_mismatched_or_malformed_success_responses_refuse(mutation):
     attempt = _attempt(result)
     if mutation == "identity":
         definition["experiment_id"] = str(uuid.uuid4())
+    elif mutation == "world":
+        # A definition of another world is not the one asked for, whatever its other identities.
+        definition["world_id"] = "world:personal:another"
     elif mutation == "digest":
         result["arms"]["baseline"]["all_rest_occupancy"]["numerator"] += 1
     elif mutation == "negative":
@@ -427,6 +451,7 @@ def test_mismatched_or_malformed_success_responses_refuse(mutation):
     ):
         consumer.read_experiment_result(
             http,
+            world_id=WORLD_ID,
             version_id=VERSION_ID,
             experiment_id=EXPERIMENT_ID,
             attempt_id=ATTEMPT_ID,
@@ -462,6 +487,7 @@ def test_streaming_limit_stops_before_buffering_the_rest_and_closes_response():
     ):
         consumer.read_experiment_result(
             http,
+            world_id=WORLD_ID,
             version_id=VERSION_ID,
             experiment_id=EXPERIMENT_ID,
             attempt_id=ATTEMPT_ID,
@@ -494,6 +520,7 @@ def test_compressed_lazy_response_is_closed_without_consuming_body_chunks():
     ):
         consumer.read_experiment_result(
             http,
+            world_id=WORLD_ID,
             version_id=VERSION_ID,
             experiment_id=EXPERIMENT_ID,
             attempt_id=ATTEMPT_ID,

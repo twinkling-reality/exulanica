@@ -16,6 +16,9 @@ import type {
   AlternateVersion, AuthoredObject, ReviewedAsset,
 } from '../src/world-objects-api.js';
 
+/** The world these clients are opened for. */
+const TEST_WORLD = 'world:personal:test';
+
 /**
  * The authored-object surface, against a scripted authority.
  *
@@ -1769,7 +1772,7 @@ describe('opening the first alternate through confirmation', () => {
     }));
     const placeObject = vi.fn();
     const fetcher = vi.fn<typeof fetch>();
-    const client = new WorldObjectsClient({ baseUrl: 'https://exulanica.test', token: 'token', fetch: fetcher });
+    const client = new WorldObjectsClient({ worldId: TEST_WORLD, baseUrl: 'https://exulanica.test', token: 'token', fetch: fetcher });
     client.connect = connect;
     client.place = placeObject;
     return { ...harness({ client }), connect, placeObject, fetcher };
@@ -1784,7 +1787,8 @@ describe('opening the first alternate through confirmation', () => {
     await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(false));
     expect(h.mounted.confirm.root.textContent).toContain('Open an alternate version');
     expect(h.fetcher).toHaveBeenCalledTimes(1);
-    expect(h.fetcher.mock.calls[0]![0]).toBe('https://exulanica.test/world/styles/current');
+    expect(h.fetcher.mock.calls[0]![0])
+      .toBe(`https://exulanica.test/world/styles/current?world_id=${encodeURIComponent(TEST_WORLD)}`);
     expect(h.fetcher.mock.calls[0]![1]?.method).toBe('GET');
     expect(h.placeObject).not.toHaveBeenCalled();
     button(h.mounted.confirm.root, 'Cancel').click();
@@ -1807,7 +1811,8 @@ describe('opening the first alternate through confirmation', () => {
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(h.connect).toHaveBeenLastCalledWith(returnedId));
     const [url, request] = h.fetcher.mock.calls[1]!;
-    expect(url).toBe('https://exulanica.test/world/versions/bootstrap');
+    expect(url)
+      .toBe(`https://exulanica.test/world/versions/bootstrap?world_id=${encodeURIComponent(TEST_WORLD)}`);
     expect(request?.method).toBe('POST');
     expect(JSON.parse(String(request?.body))).toEqual({ base_topology_digest: STATE });
     expect(new Headers(request?.headers).get('authorization')).toBe('Bearer token');

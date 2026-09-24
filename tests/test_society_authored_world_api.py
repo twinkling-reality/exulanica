@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 import test_society_authored_world_postgres as helpers
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import registered_world
 
 saved_world = helpers.saved_world
 pytestmark = pytest.mark.postgres
@@ -113,9 +114,12 @@ def test_a_person_furnishes_their_own_world_and_somebody_rests_in_it(saved_world
             "seed": "7a" * 32,
             "profile": "exulanica-society/v2",
         }
-        # Without the saved world named, the routes look in the default world, where this
-        # version does not exist. That is a missing version, not another world's society.
-        assert client.post(society_route, headers=OWNER, json=create_body).status_code == 404
+        # Named in another world this workspace holds, the fixture's, the routes look there, where
+        # this version does not exist. That is a missing version, not another world's society.
+        elsewhere = {"world_id": registered_world(world["connection"], world["workspace"])}
+        world["connection"].commit()
+        response = client.post(society_route, headers=OWNER, params=elsewhere, json=create_body)
+        assert response.status_code == 404
         response = client.post(society_route, headers=OWNER, params=scope, json=create_body)
         assert response.status_code == 200, response.text
         society = response.json()

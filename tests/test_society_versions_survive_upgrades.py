@@ -164,7 +164,7 @@ def test_a_catalog_version_bump_leaves_a_stored_living_society_advancing(
     result = living_postgres.step(api, route)
     assert result["current_tick"] == 3
     assert result["state"]["routine"]["catalog_versions"]["society-need"] == 1
-    replay = api.get(route + "/replay")
+    replay = api.get(api.in_world(route + "/replay"))
     assert replay.status_code == 200, replay.text
     assert replay.json()["replay_verified"]
 

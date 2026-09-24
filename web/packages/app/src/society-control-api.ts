@@ -3,12 +3,13 @@
  *
  * Speaks `/world/versions/{id}/society/control` (`exulanica/api/routes/society_control.py`).
  * Importing this client never starts a worker. `configure` writes mode and speed;
- * `step` advances one leased tick bound to the displayed snapshot. A saved world is named with
- * `worldId` and every request carries it, as the society client's do.
+ * `step` advances one leased tick bound to the displayed snapshot. Every request names the open
+ * world, as the society client's do.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
 import { parseSociety, type SocietySnapshot } from './society-api.js';
+import { openWorldPath } from './world-scope.js';
 
 export type SocietyPlaybackMode = 'paused' | 'playing';
 export type SocietyPlaybackSpeed = 1 | 2 | 4;
@@ -65,24 +66,24 @@ export function parseSocietyControl(value: unknown, versionId: string): SocietyP
 }
 
 export interface SocietyControlClientOptions extends TransportOptions {
-  /** The saved world the versions belong to. Omitted, requests name no world: the default one. */
-  readonly worldId?: string;
+  /** The open world the versions belong to; null where none is open, which sends nothing. */
+  readonly worldId: string | null;
 }
 
 export class SocietyControlClient {
   readonly #transport: Transport;
-  readonly #worldId: string | undefined;
+  readonly #worldId: string | null;
   constructor(options: SocietyControlClientOptions) {
     this.#transport = new Transport(options);
     this.#worldId = options.worldId;
   }
 
-  read(versionId: string): Promise<SocietyPlaybackControl> {
+  async read(versionId: string): Promise<SocietyPlaybackControl> {
     return this.#transport.getJson<unknown>(this.#path(versionId))
       .then(value => parseSocietyControl(value, versionId));
   }
 
-  configure(
+  async configure(
     control: SocietyPlaybackControl, mode: SocietyPlaybackMode, speed: SocietyPlaybackSpeed,
   ): Promise<SocietyPlaybackControl> {
     return this.#transport.putJson<unknown>(this.#path(control.versionId), {
@@ -90,7 +91,7 @@ export class SocietyControlClient {
     }).then(value => parseSocietyControl(value, control.versionId));
   }
 
-  step(control: SocietyPlaybackControl, snapshot: SocietySnapshot): Promise<{
+  async step(control: SocietyPlaybackControl, snapshot: SocietySnapshot): Promise<{
     readonly control: SocietyPlaybackControl; readonly society: SocietySnapshot;
   }> {
     if (snapshot.versionId !== control.versionId || snapshot.societyId !== control.societyId) {
@@ -110,6 +111,6 @@ export class SocietyControlClient {
 
   #path(versionId: string, suffix = ''): string {
     const path = `/world/versions/${encodeURIComponent(versionId)}/society/control${suffix}`;
-    return this.#worldId === undefined ? path : `${path}?world_id=${encodeURIComponent(this.#worldId)}`;
+    return openWorldPath(path, this.#worldId, 'society playback to read or change');
   }
 }

@@ -15,6 +15,12 @@ from exulanica.orchestration.reference_world import compose_reference_sources
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=uuid.UUID, required=True)
+    parser.add_argument(
+        "--actor",
+        type=uuid.UUID,
+        required=True,
+        help="Who composes; recorded as the creator of the personal-source world if this makes it",
+    )
     parser.add_argument("--scene", required=True)
     parser.add_argument("--directory", type=Path, help="Prepared inputs/intake output directory")
     parser.add_argument("--region", help="Required when the live graph has more than one region")
@@ -43,9 +49,13 @@ def main():
                 for item in manifest["record"]["files"]
             ],
             source_manifest_sha256=manifest["record_sha256"],
+            actor=args.actor,
         )
     (root / "world-composition.json").write_text(json.dumps(record, indent=2) + "\n")
-    print(f"Registered {len(record['record']['source_slots'])} exact source slots in {region}.")
+    print(
+        f"Registered {len(record['record']['source_slots'])} exact source slots in {region} "
+        f"of world {record['world_id']}."
+    )
 
 
 if __name__ == "__main__":

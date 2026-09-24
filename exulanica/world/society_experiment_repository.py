@@ -183,11 +183,11 @@ class SocietyExperimentRepository:
         }
         return dict(source), baseline, treatment, version
 
-    def _source_society_for_version(self, version_id: uuid.UUID) -> uuid.UUID:
+    def _source_society_for_version(self, version_id: uuid.UUID, world_id: str) -> uuid.UUID:
         rows = self.connection.execute(
-            "select society_id from world_society where workspace_id=%s and version_id=%s "
-            "and engine_version=any(%s) order by society_id limit 2",
-            (self.workspace_id, version_id, list(EXPERIMENT_ENGINES)),
+            "select society_id from world_society where workspace_id=%s and world_id=%s "
+            "and version_id=%s and engine_version=any(%s) order by society_id limit 2",
+            (self.workspace_id, world_id, version_id, list(EXPERIMENT_ENGINES)),
         ).fetchall()
         if len(rows) != 1:
             raise UnknownExperiment("experiment source is unavailable")
@@ -320,6 +320,7 @@ class SocietyExperimentRepository:
         version_id: uuid.UUID,
         experiment_id: uuid.UUID,
         *,
+        world_id: str,
         baseline_input_seq: int,
         treatment_input_seq: int,
         intervention: str,
@@ -349,7 +350,7 @@ class SocietyExperimentRepository:
                 )
         else:
             raise experiments.ExperimentIntegrityError("unsupported experiment intervention")
-        source_society_id = self._source_society_for_version(version_id)
+        source_society_id = self._source_society_for_version(version_id, world_id)
         _source, baseline, treatment, _version = self._source(
             source_society_id, baseline_input_seq, treatment_input_seq
         )
@@ -377,13 +378,20 @@ class SocietyExperimentRepository:
         self._validated_definition_source(row)
         return deepcopy(row)
 
-    def definition_for_version(
-        self, version_id: uuid.UUID, experiment_id: uuid.UUID
+    def _definition_in(
+        self, world_id: str, version_id: uuid.UUID, experiment_id: uuid.UUID, refusal: str
     ) -> dict[str, Any]:
-        """Read only when the definition belongs to the exact version in the route."""
+        """The definition, only when it belongs to the exact world and version its caller named."""
         row = self._definition_row(experiment_id)
-        if row["authored_version_id"] != version_id:
-            raise UnknownExperiment("experiment is unavailable")
+        if (row["world_id"], row["authored_version_id"]) != (world_id, version_id):
+            raise UnknownExperiment(refusal)
+        return row
+
+    def definition_for_version(
+        self, version_id: uuid.UUID, experiment_id: uuid.UUID, *, world_id: str
+    ) -> dict[str, Any]:
+        """Read only when the definition belongs to the exact world and version in the route."""
+        row = self._definition_in(world_id, version_id, experiment_id, "experiment is unavailable")
         self._validated_definition_source(row)
         return deepcopy(row)
 
@@ -430,14 +438,15 @@ class SocietyExperimentRepository:
         attempt_id: uuid.UUID,
         seed_sha256: str,
         *,
+        world_id: str,
         actor: uuid.UUID,
     ) -> dict[str, Any]:
-        """Reserve only beneath the exact version and experiment named by the route."""
+        """Reserve only beneath the exact world, version and experiment named by the route."""
         if seed_sha256 not in experiments.DEVELOPMENT_SEEDS:
             raise experiments.ExperimentIntegrityError(
                 "only a seed committed to the development split can be started"
             )
-        self.definition_for_version(version_id, experiment_id)
+        self.definition_for_version(version_id, experiment_id, world_id=world_id)
         return self.start_attempt(experiment_id, attempt_id, seed_sha256, actor=actor)
 
     def save_checkpoint(self, attempt_id: uuid.UUID, checkpoint: dict[str, Any]) -> dict[str, Any]:
@@ -690,14 +699,16 @@ class SocietyExperimentRepository:
         version_id: uuid.UUID,
         experiment_id: uuid.UUID,
         attempt_id: uuid.UUID,
+        *,
+        world_id: str,
     ) -> dict[str, Any]:
         """Return a compact authorized record without loading stored execution evidence."""
         attempt = self._attempt_row(attempt_id)
         if attempt["experiment_id"] != experiment_id:
             raise UnknownExperiment("experiment attempt is unavailable")
-        definition = self._definition_row(experiment_id)
-        if definition["authored_version_id"] != version_id:
-            raise UnknownExperiment("experiment attempt is unavailable")
+        definition = self._definition_in(
+            world_id, version_id, experiment_id, "experiment attempt is unavailable"
+        )
         self._validated_definition_source(definition)
         checkpoint = self.connection.execute(
             "select document_sha256,recorded_at from society_experiment_checkpoint "

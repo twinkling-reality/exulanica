@@ -22,7 +22,6 @@ from exulanica.selection.validation import Session
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import BLOB_NAMESPACE
 from exulanica.world.assets import reviewed_assets, seed_reviewed_assets
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject, ObjectOrigin, Transform
 from exulanica.world.repository import WorldStyleRepository
@@ -43,8 +42,10 @@ from exulanica.world.starter import (
     create_starter_authorities,
 )
 from exulanica.world.structure_repository import WorldStructureRepository
+from exulanica.world.worlds import AUTHORED_STARTER
 
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 SEED = "7a" * 32
@@ -67,6 +68,7 @@ def make_starter(connection, workspace, actor, world_id, module_version):
             world_id=world_id,
         )
         return snapshot_id, version_id
+    registered_world(connection, workspace, world_id, kind=AUTHORED_STARTER, actor=actor)
     structures = WorldStructureRepository(connection, workspace, world_id=world_id)
     preview = structures.preview(
         _authored_starter_candidate(
@@ -395,7 +397,10 @@ def test_another_place_another_workspace_and_a_composed_snapshot_are_refused(sav
             world["binding"].region_id,
         )
     # A world composed some other way has a ground this profile has not been shown how to read.
-    structures = WorldStructureRepository(world["connection"], world["workspace"])
+    composed_world = registered_world(world["connection"], world["workspace"])
+    structures = WorldStructureRepository(
+        world["connection"], world["workspace"], world_id=composed_world
+    )
     preview = structures.preview(structural_candidate(), proposed_by=world["session"].actor)
     composed = structures.apply(
         preview.preview_id,
@@ -405,7 +410,7 @@ def test_another_place_another_workspace_and_a_composed_snapshot_are_refused(sav
         committed_by=world["session"].actor,
     )
     version = WorldObjectRepository(
-        world["connection"], world["workspace"], store=world["store"]
+        world["connection"], world["workspace"], world_id=composed_world, store=world["store"]
     ).create_version(
         source_snapshot_id=composed.snapshot_id,
         title="Not a starter",
@@ -417,7 +422,7 @@ def test_another_place_another_workspace_and_a_composed_snapshot_are_refused(sav
             world["binding"].model_copy(
                 update={
                     "binding_id": "composed-world",
-                    "world_id": DEFAULT_WORLD_ID,
+                    "world_id": composed_world,
                     "version_id": version.version_id,
                     "source_snapshot_id": composed.snapshot_id,
                 }

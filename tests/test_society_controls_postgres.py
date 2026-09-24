@@ -22,14 +22,27 @@ runtime_world = helpers.runtime_world
 pytestmark = pytest.mark.postgres
 
 
+def authorizer(w, connection):
+    return lambda actor, doc: w["runtime"].authorize(
+        connection, replace(w["session"], actor=actor), doc
+    )
+
+
 def controls(w, connection=None):
     connection = connection or w["connection"]
     return SocietyControlRepository(
         connection,
         w["workspace"],
-        input_authorizer=lambda actor, doc: w["runtime"].authorize(
-            connection, replace(w["session"], actor=actor), doc
-        ),
+        world_id=w["version"].world_id,
+        input_authorizer=authorizer(w, connection),
+    )
+
+
+def take_claim(w, connection=None):
+    """The workspace's next due claim, whichever world holds it, with ``controls``' authority."""
+    connection = connection or w["connection"]
+    return SocietyControlRepository.claim_in_workspace(
+        connection, w["workspace"], input_authorizer=authorizer(w, connection)
     )
 
 
@@ -87,7 +100,7 @@ def test_saved_controls_bounded_worker_local_failure_and_replay(
     repo = controls(w)
     default = repo.read(vid)
     assert default["revision"] == 0 and not default["persisted"] and default["mode"] == "paused"
-    assert repo.claim() is None
+    assert take_claim(w) is None
     settings = save(w, speed=4)
     assert settings["tick_interval_ms"] == 250 and settings["simulated_seconds_per_tick"] == 60
     add_far(w)  # One unsupported destination must not pause a healthy district.
@@ -116,7 +129,7 @@ def test_saved_controls_bounded_worker_local_failure_and_replay(
     with pytest.raises(StaleSocietyState):
         save(w, revision=0, mode="paused")
     paused = save(w, revision=1, mode="paused")
-    assert paused["revision"] == 2 and repo.claim() is None
+    assert paused["revision"] == 2 and take_claim(w) is None
     with pytest.raises(StaleSocietyState):
         repo.manual_step(
             vid,
@@ -150,7 +163,7 @@ def test_committed_claim_exclusion_pause_fence_and_workspace_scope(runtime_world
 
     def claim_once():
         with database.session(w["workspace"]) as connection:
-            return controls(w, connection).claim()
+            return take_claim(w, connection)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         claims = list(pool.map(lambda _: claim_once(), range(2)))
@@ -162,8 +175,8 @@ def test_committed_claim_exclusion_pause_fence_and_workspace_scope(runtime_world
     assert helpers.society(w).snapshot(w["binding"].version_id) == initial
     stranger = uuid.uuid4()
     with database.session(stranger) as connection:
-        foreign = SocietyControlRepository(connection, stranger)
-        assert foreign.claim() is None
+        foreign = SocietyControlRepository(connection, stranger, world_id=w["version"].world_id)
+        assert SocietyControlRepository.claim_in_workspace(connection, stranger) is None
         with pytest.raises(UnknownSociety):
             foreign.read(w["binding"].version_id)
         with pytest.raises(LeaseLost):
@@ -176,21 +189,20 @@ def test_crash_reclaim_stale_token_and_recovery_limit(runtime_world):
     save(w)
     overdue(w)
     repo = controls(w)
-    original = (
-        repo.claim()
-    )  # Deliberately abandon a committed lease, equivalent durable crash state.
-    assert repo.claim() is None
+    # Deliberately abandon a committed lease, equivalent durable crash state.
+    original = take_claim(w)
+    assert take_claim(w) is None
     expire(w)
-    recovered = repo.claim()
+    recovered = take_claim(w)
     assert recovered.token != original.token
     with pytest.raises(LeaseLost):
         repo.execute(original)
     assert repo.execute(recovered)["receipt"]["executed_ticks"] == 3
     overdue(w)
     for _ in range(3):
-        assert repo.claim() is not None
+        assert take_claim(w) is not None
         expire(w)
-    assert repo.claim() is None
+    assert take_claim(w) is None
     state = repo.read(w["binding"].version_id)
     assert state["mode"] == "paused" and state["reason"] == "lease_recovery_limit"
     assert state["current_tick"] == 3 and state["revision"] == 2
@@ -204,7 +216,7 @@ def test_failure_rolls_back_batch_and_source_withdrawal_pauses(runtime_world, mo
     save(w)
     overdue(w)
     repo = controls(w)
-    claim = repo.claim()
+    claim = take_claim(w)
     original_ready = repo._ready
 
     def crash_after_first_tick(society, actor):
@@ -218,9 +230,9 @@ def test_failure_rolls_back_batch_and_source_withdrawal_pauses(runtime_world, mo
     with pytest.raises(RuntimeError):
         repo.execute(claim)
     assert helpers.society(w).snapshot(w["binding"].version_id) == before
-    assert repo.claim() is None  # Failure did not erase committed lease.
+    assert take_claim(w) is None  # Failure did not erase committed lease.
     expire(w)
-    claim = repo.claim()
+    claim = take_claim(w)
     monkeypatch.setattr(repo, "_ready", original_ready)
     w["admissions"].withdraw("source", w["binding"].sources[0].admission_id)
     result = repo.execute(claim)
@@ -239,7 +251,7 @@ def test_expiry_during_execution_rolls_back_ticks(runtime_world, monkeypatch):
     save(w)
     overdue(w)
     repo = controls(w)
-    claim = repo.claim()
+    claim = take_claim(w)
     # Shorten the persisted deadline in this isolated fixture, then really cross DB clock time.
     w["connection"].execute(
         "update world_society_control set lease_expires_at="
@@ -257,7 +269,7 @@ def test_expiry_during_execution_rolls_back_ticks(runtime_world, monkeypatch):
     with pytest.raises(LeaseLost):
         repo.execute(claim)
     assert helpers.society(w).snapshot(w["binding"].version_id) == before
-    assert repo.claim().token != claim.token
+    assert take_claim(w).token != claim.token
 
 
 def test_legacy_is_manually_steppable_but_not_playable(runtime_world):
@@ -298,7 +310,7 @@ def test_other_authored_branch_keeps_independent_controls(runtime_world):
     save(w)
     overdue(w)
     repo = controls(w)
-    claim = repo.claim()
+    claim = take_claim(w)
     assert claim.version_id == w["binding"].version_id
     repo.execute(claim)
     untouched = repo.read(other.version_id)
@@ -348,7 +360,7 @@ def test_source_failure_after_one_tick_rolls_back_whole_batch(runtime_world, mon
     save(w)
     overdue(w)
     repo = controls(w)
-    claim = repo.claim()
+    claim = take_claim(w)
     original = SocietyRepository.advance
     advances = []
 
@@ -376,7 +388,7 @@ def test_pause_acknowledgement_follows_running_batch(runtime_world, spine_schema
     save(w)
     overdue(w)
     database = scratch_database(spine_schema[1])
-    claim = controls(w).claim()
+    claim = take_claim(w)
     entered, release = threading.Event(), threading.Event()
 
     def execute():
@@ -412,6 +424,6 @@ def test_pause_acknowledgement_follows_running_batch(runtime_world, spine_schema
         assert advancing.result(timeout=10)["receipt"]["executed_ticks"] == 3
         assert pausing.result(timeout=10)["mode"] == "paused"
     assert controls(w).read(w["binding"].version_id)["current_tick"] == 3
-    assert controls(w).claim() is None
+    assert take_claim(w) is None
     with pytest.raises(LeaseLost):
         controls(w).execute(claim)

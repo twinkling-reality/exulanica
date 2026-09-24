@@ -60,7 +60,9 @@ def test_direct_edit_without_adapter_rolls_back_object_and_all_history(
     helpers.add_plate(w)
     state = create_society(w, profile)
     w["connection"].commit()
-    direct = WorldObjectRepository(w["connection"], w["workspace"], store=w["store"])
+    direct = WorldObjectRepository(
+        w["connection"], w["workspace"], world_id=w["version"].world_id, store=w["store"]
+    )
     version = direct.version(w["binding"].version_id)
     before = recorded_rows(w)
     kwargs = {"base_state_sha256": version.state_sha256, "actor": w["session"].actor}
@@ -90,7 +92,9 @@ def test_legacy_v1_still_allows_direct_edits_without_society_inputs(runtime_worl
     helpers.add_plate(w)
     state = create_society(w, "exulanica-society/v1")
     w["connection"].commit()
-    direct = WorldObjectRepository(w["connection"], w["workspace"], store=w["store"])
+    direct = WorldObjectRepository(
+        w["connection"], w["workspace"], world_id=w["version"].world_id, store=w["store"]
+    )
     version = direct.version(w["binding"].version_id)
     before = recorded_rows(w)
     moved = direct.move_object(

@@ -37,7 +37,7 @@ def purposeful(objects_api, repository):
     api.client.app.state.society_input_authorizer = lambda _conn, _session, value: authorize(value)
     route = f"/world/versions/{version_id}/society"
     response = api.post(
-        route,
+        api.in_world(route),
         {
             "place_id": str(place),
             "region_id": "region-a",
@@ -47,15 +47,18 @@ def purposeful(objects_api, repository):
     )
     assert response.status_code == 200, response.text
     repo = SocietyRepository(
-        repository.connection, repository.workspace_id, input_authorizer=authorize
+        repository.connection,
+        repository.workspace_id,
+        world_id=api.world_id,
+        input_authorizer=authorize,
     )
     return api, repo, version_id, route, doc, rights
 
 
 def step(api, route):
-    before = api.get(route).json()
+    before = api.get(api.in_world(route)).json()
     response = api.post(
-        route + "/steps",
+        api.in_world(route + "/steps"),
         {"base_tick": before["current_tick"], "base_state_sha256": before["state_sha256"]},
     )
     assert response.status_code == 200, response.text
@@ -65,7 +68,7 @@ def step(api, route):
 def test_v2_changed_inputs_ordered_events_authenticated_reload_and_replay(purposeful):
     api, repo, version, route, doc, _ = purposeful
     first = step(api, route)
-    before_events = api.get(route + "/events").json()
+    before_events = api.get(api.in_world(route + "/events")).json()
     moved = edited(doc)
     moved["targets"][0]["node_id"] = "a"
     seal(moved)
@@ -81,21 +84,23 @@ def test_v2_changed_inputs_ordered_events_authenticated_reload_and_replay(purpos
     result = step(api, route)
     assert result["input_seq"] == 4
     assert result["current_tick"] == 2
-    assert api.get(route).json() == result  # Each HTTP call gets a fresh scoped DB connection.
+    path = api.in_world(route)
+    assert api.get(path).json() == result  # Each HTTP call gets a fresh scoped DB connection.
     assert (
         api.post(
-            route + "/steps", {"base_tick": 1, "base_state_sha256": first["state_sha256"]}
+            api.in_world(route + "/steps"),
+            {"base_tick": 1, "base_state_sha256": first["state_sha256"]},
         ).status_code
         == 409
     )
-    response = api.get(route + "/replay")
+    response = api.get(api.in_world(route + "/replay"))
     assert response.status_code == 200, response.text
     assert response.json()["replay_verified"]
     assert response.json()["state_sha256"] == result["state_sha256"]
-    assert api.stranger_get(route).status_code == 404
-    assert api.stranger_get(route + "/events").status_code == 404
-    assert api.stranger_get(route + "/replay").status_code == 404
-    assert api.client.get(route).status_code == 401
+    assert api.stranger_get(path).status_code == 404
+    assert api.stranger_get(api.in_world(route + "/events")).status_code == 404
+    assert api.stranger_get(api.in_world(route + "/replay")).status_code == 404
+    assert api.client.get(path).status_code == 401
     assert len(result["state"]["inhabitants"]) == 128
     transition = repo.connection.execute(
         "select * from world_society_transition where society_id=%s and tick=2",
@@ -112,55 +117,56 @@ def test_v2_changed_inputs_ordered_events_authenticated_reload_and_replay(purpos
     assert before_events["events"]
     with pytest.raises(StaleSocietyState):
         repo.record_input(version, moved)
-    assert api.get(route + "/replay").json()["replay_verified"]
+    assert api.get(api.in_world(route + "/replay")).json()["replay_verified"]
 
 
 def test_withdrawal_blocks_historical_reads_but_unavailable_input_can_record_pause(purposeful):
     api, repo, version, route, doc, rights = purposeful
     state = step(api, route)
     rights["withdrawn"] = True
-    assert api.get(route).status_code == 424
-    assert api.get(route + "/replay").status_code == 424
+    replay = api.in_world(route + "/replay")
+    assert api.get(api.in_world(route)).status_code == 424
+    assert api.get(replay).status_code == 424
     unavailable = edited(doc)
     unavailable.update(availability="unavailable", unavailable_reason="source_withdrawn")
     seal(unavailable)
     repo.record_input(version, unavailable)
     repo.connection.commit()
     response = api.post(
-        route + "/steps",
+        api.in_world(route + "/steps"),
         {"base_tick": state["current_tick"], "base_state_sha256": state["state_sha256"]},
     )
     assert response.status_code == 200, response.text
     paused = response.json()
     assert all(p["action"]["reason"] == "source_withdrawn" for p in paused["state"]["inhabitants"])
     # Historical replay still cannot resurrect withdrawn geometry.
-    assert api.get(route + "/replay").status_code == 424
+    assert api.get(replay).status_code == 424
     restored = edited(unavailable)
     restored["authored_state"]["delta_sha256"] = doc["authored_state"]["delta_sha256"]
     seal(restored)
     repo.record_input(version, restored)
     repo.connection.commit()
-    assert api.get(route + "/replay").status_code == 424
+    assert api.get(replay).status_code == 424
 
 
 def test_missing_adapter_and_forged_input_json_fail_closed(objects_api, repository):
     api = objects_api
     version = api.version()
-    route = f"/world/versions/{version['version_id']}/society"
+    path = api.in_world(f"/world/versions/{version['version_id']}/society")
     body = {
         "place_id": str(uuid.uuid4()),
         "region_id": "region-a",
         "seed": SEED,
         "profile": "exulanica-society/v2",
     }
-    assert api.post(route, body).status_code == 424
-    assert api.post(route, body | {"initial_input": society_input()}).status_code == 422
+    assert api.post(path, body).status_code == 424
+    assert api.post(path, body | {"initial_input": society_input()}).status_code == 422
 
 
 def test_replay_rejects_event_forgery_with_unchanged_snapshot(purposeful):
     api, repo, version, route, _doc, _ = purposeful
     state = step(api, route)
-    event = api.get(route + "/events").json()["events"][0]
+    event = api.get(api.in_world(route + "/events")).json()["events"][0]
     document = deepcopy(event["document"])
     document["order"] = 99999
     document["summary"] = "Forged event inconsistent with deterministic history."
@@ -214,4 +220,4 @@ def test_v2_branch_isolation_and_legacy_upgrade_refusal(purposeful):
             actor=api.actor,
         )
     repo.connection.commit()
-    assert api.get(route).json() == original
+    assert api.get(api.in_world(route)).json() == original

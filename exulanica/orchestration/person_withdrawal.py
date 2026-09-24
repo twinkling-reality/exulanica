@@ -37,6 +37,7 @@ from exulanica.graph.reconstruction_scenes import reconstruction_scene_rows
 from exulanica.identity import IdentityRepository, name_occurrence, occurrence_identity_key
 from exulanica.ingest.repository import IngestRepository
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.world.worlds import resolve_personal_source_world
 from exulanica.world_package import project_world_package
 
 __all__ = [
@@ -560,6 +561,9 @@ def _project_package(
         actor=spec.actor_id,
         output=output,
         private_key=key,
+        # The exercise withdraws a person from the workspace's own photographs, so the package
+        # is the personal-source world's.
+        world_id=resolve_personal_source_world(connection, spec.workspace_id),
         parent_merkle_root_sha256=parent,
     )
     reconstruction = json.loads((output / "reconstruction/artifacts.json").read_bytes())

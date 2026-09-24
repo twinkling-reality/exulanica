@@ -16,6 +16,7 @@ from psycopg.types.json import Jsonb
 
 from society_fixtures import SEED, edited, seal, society_input
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -25,7 +26,8 @@ def action_world(repository):
     connection = repository.connection
     workspace = repository.workspace_id
     actor = uuid.uuid4()
-    structures = WorldStructureRepository(connection, workspace)
+    world_id = registered_world(connection, workspace)
+    structures = WorldStructureRepository(connection, workspace, world_id=world_id)
     preview = structures.preview(structural_candidate(), proposed_by=actor)
     snapshot = structures.apply(
         preview.preview_id,
@@ -34,7 +36,7 @@ def action_world(repository):
         base_reconstruction_sha256=preview.base_reconstruction_sha256,
         committed_by=actor,
     )
-    version = WorldObjectRepository(connection, workspace).create_version(
+    version = WorldObjectRepository(connection, workspace, world_id=world_id).create_version(
         source_snapshot_id=snapshot.snapshot_id,
         title="Synthetic society action fixture",
         created_by=actor,
@@ -60,7 +62,10 @@ def action_world(repository):
 
 def society_repository(world):
     return SocietyRepository(
-        world["connection"], world["workspace"], input_authorizer=world["authorize"]
+        world["connection"],
+        world["workspace"],
+        world_id=world["version"].world_id,
+        input_authorizer=world["authorize"],
     )
 
 
@@ -68,6 +73,7 @@ def action_repository(world, workspace=None):
     return SocietyActionRepository(
         world["connection"],
         workspace or world["workspace"],
+        world_id=world["version"].world_id,
         input_authorizer=world["authorize"],
     )
 

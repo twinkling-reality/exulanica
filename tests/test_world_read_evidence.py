@@ -16,11 +16,11 @@ from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.graph.world_read import world_read_bundle
 from exulanica.graph.world_read_verification import EvidenceError, verify
 from exulanica.ingest.person_review import create_subject, record_consent, record_region_edits
-from exulanica.world import DEFAULT_WORLD_ID
 
 from test_api import deployment as deployment
 from test_screening_currency import ACTOR, KEY, OUTLINE
-from test_world_read_route import _place_in, _scene_in
+from test_world_read_route import IN_WORLD, _place_in, _scene_in, _stranger_world
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 AT = "2026-09-08T00:00:00Z"
 
@@ -76,7 +76,7 @@ def _person(repository, capture):
 
 def test_recipient_route_canonical_clean_process(deployment, repository, tmp_path):
     scene = _scene_in(deployment, repository, tmp_path)
-    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}", params=IN_WORLD)
     assert response.status_code == 200, response.text
     envelope = response.json()
     path = tmp_path / "bundle.json"
@@ -101,7 +101,8 @@ def test_recipient_route_canonical_clean_process(deployment, repository, tmp_pat
     assert evaluation["release"] == "internal_only"
     _save("route-bundle.json", envelope)
     _save("clean-process-evaluation.json", evaluation)
-    foreign = deployment.as_stranger("GET", f"/world-read/scenes/{scene}")
+    _stranger_world(deployment)
+    foreign = deployment.as_stranger("GET", f"/world-read/scenes/{scene}", params=IN_WORLD)
     assert foreign.status_code == 404
     _save("foreign-response.json", foreign.json())
 
@@ -151,7 +152,7 @@ def test_recipient_consent_expiry_and_record_movement(deployment, repository, tm
         scene = _scene_in(deployment, repository, tmp_path)
     path = f"/world-read/scenes/{scene}"
     capture, subject = configured["capture"], configured["subject"]
-    first = deployment.as_owner("GET", path)
+    first = deployment.as_owner("GET", path, params=IN_WORLD)
     assert first.status_code == 200, first.text
     first = first.json()
     tampered = copy.deepcopy(first)
@@ -164,14 +165,14 @@ def test_recipient_consent_expiry_and_record_movement(deployment, repository, tm
     with pytest.raises(EvidenceError, match="consent_digest_mismatch"):
         _verify(_reseal(tampered))
     time.sleep(max(0, (boundary - dt.datetime.now(dt.UTC)).total_seconds()) + 0.02)
-    response = deployment.as_owner("GET", path)
+    response = deployment.as_owner("GET", path, params=IN_WORLD)
     assert response.status_code == 404, response.text
     second = world_read_bundle(
         repository.connection,
         repository.workspace_id,
         scene,
         deployment.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     assert first["bundle"]["recorded_sha256"] == second["bundle"]["recorded_sha256"]
     key = str(capture)
@@ -199,11 +200,11 @@ def test_recipient_consent_expiry_and_record_movement(deployment, repository, tm
         repository.workspace_id,
         scene,
         deployment.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     assert withdrawn["bundle"]["recorded_sha256"] != second["bundle"]["recorded_sha256"]
     assert _verify(withdrawn)["people"][key][0]["withdrawn"] is True
-    assert deployment.as_owner("GET", path).status_code == 404
+    assert deployment.as_owner("GET", path, params=IN_WORLD).status_code == 404
     assert (
         _verify(first, (boundary + dt.timedelta(days=1)).isoformat())["people"][key][0]["withdrawn"]
         is False
@@ -213,7 +214,7 @@ def test_recipient_consent_expiry_and_record_movement(deployment, repository, tm
 
 def test_recipient_rejects_omission_and_output_mismatch(deployment, repository, tmp_path):
     scene = _scene_in(deployment, repository, tmp_path)
-    envelope = deployment.as_owner("GET", f"/world-read/scenes/{scene}").json()
+    envelope = deployment.as_owner("GET", f"/world-read/scenes/{scene}", params=IN_WORLD).json()
     omitted = copy.deepcopy(envelope)
     omitted["bundle"]["recipient_evidence"]["record"]["point_maps"].pop()
     with pytest.raises(EvidenceError, match="geometry_lineage_missing"):
@@ -235,9 +236,11 @@ def test_recipient_rejects_omission_and_output_mismatch(deployment, repository, 
 
 def test_recipient_scene_place_compatibility(deployment, repository, tmp_path):
     scene, _, place = _place_in(deployment, repository, tmp_path)
-    scene_bundle = deployment.as_owner("GET", f"/world-read/scenes/{scene}").json()
+    scene_bundle = deployment.as_owner("GET", f"/world-read/scenes/{scene}", params=IN_WORLD).json()
     response = deployment.as_owner(
-        "GET", f"/world-read/places/{place.place_id}", params={"at": "2026-09-16T00:00:00Z"}
+        "GET",
+        f"/world-read/places/{place.place_id}",
+        params={"at": "2026-09-16T00:00:00Z", **IN_WORLD},
     )
     assert response.status_code == 200, response.text
     placed = response.json()
@@ -246,7 +249,9 @@ def test_recipient_scene_place_compatibility(deployment, repository, tmp_path):
     assert _verify(placed)["release"] == "internal_only"
     _save("place-bundle.json", placed)
     unresolved = deployment.as_owner(
-        "GET", f"/world-read/places/{place.place_id}", params={"at": "2000-01-01T00:00:00Z"}
+        "GET",
+        f"/world-read/places/{place.place_id}",
+        params={"at": "2000-01-01T00:00:00Z", **IN_WORLD},
     )
     assert unresolved.status_code == 200, unresolved.text
     assert _verify(unresolved.json())["reason"] == "no_version_at_that_time"
@@ -265,7 +270,8 @@ def test_recipient_trained_publication_and_source_controls(deployment, repositor
     for blob in store.iter_blob_ids():
         deployment.store.put_bytes(store.get(blob))
     scene = materials[0]["provenance"]["scene_id"]
-    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+    registered_world(repository.connection, repository.workspace_id)
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}", params=IN_WORLD)
     assert response.status_code == 200, response.text
     envelope = response.json()
     assert any(g["kind"] == "trained_geometry" for g in envelope["bundle"]["geometry"])
@@ -367,7 +373,7 @@ def _masked_scene(deployment, repository, tmp_path):
 
 def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_path):
     scene, configured = _masked_scene(deployment, repository, tmp_path)
-    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}", params=IN_WORLD)
     assert response.status_code == 200, response.text
     envelope = response.json()
     record = envelope["bundle"]["recipient_evidence"]["record"]
@@ -444,11 +450,12 @@ def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_
         repository.workspace_id,
         scene,
         deployment.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     with pytest.raises(EvidenceError, match="stale_derivative_lineage"):
         _verify(stale)
-    assert deployment.as_owner("GET", f"/world-read/scenes/{scene}").status_code == 404
+    route = f"/world-read/scenes/{scene}"
+    assert deployment.as_owner("GET", route, params=IN_WORLD).status_code == 404
     _save("stale-mask-recorded-bundle.json", stale)
 
 
@@ -462,7 +469,7 @@ def test_recipient_route_handles_unsupported_manifest_candidates(
 
     scene, configured = _masked_scene(deployment, repository, tmp_path)
     route = f"/world-read/scenes/{scene}"
-    original = deployment.as_owner("GET", route)
+    original = deployment.as_owner("GET", route, params=IN_WORLD)
     assert original.status_code == 200, original.text
     record = original.json()["bundle"]["recipient_evidence"]["record"]
     point = next(p for p in record["point_maps"] if p["lineage"].get("mode") == "masked")
@@ -507,7 +514,7 @@ def test_recipient_route_handles_unsupported_manifest_candidates(
     )
     # Both artifacts are genuine persisted rows and store objects. An unrelated unsupported
     # candidate must not poison the exact supported manifest or disclose its private payload.
-    response = deployment.as_owner("GET", route)
+    response = deployment.as_owner("GET", route, params=IN_WORLD)
     assert response.status_code == 200, response.text
     assert "PRIVATE_SENTINEL" not in response.text
     assert _verify(response.json())["point_lineage"][point["artifact_id"]]["state"] == "available"
@@ -516,7 +523,7 @@ def test_recipient_route_handles_unsupported_manifest_candidates(
     # has its retained mask and snapshot; evidence must now explain why its manifest is absent.
     good_id = BlobId.from_hex(good["sha256"])
     (deployment.store.root / deployment.store.key_for(good_id)).unlink()
-    response = deployment.as_owner("GET", route)
+    response = deployment.as_owner("GET", route, params=IN_WORLD)
     assert response.status_code == 200, response.text
     envelope = response.json()
     points = envelope["bundle"]["recipient_evidence"]["record"]["point_maps"]
@@ -625,7 +632,7 @@ def test_recipient_route_withholds_unsupported_trained_receipts(
         byte_size=stored.byte_size,
         produced_by_event=None,
     )
-    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}", params=IN_WORLD)
     assert response.status_code == 200, response.text
     publications = response.json()["bundle"]["recipient_evidence"]["record"]["trained_publications"]
     assert publications == [

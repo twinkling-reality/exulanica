@@ -180,7 +180,22 @@ def refuse_without_a_stated_ceiling(args) -> None:
         raise SystemExit("NEBIUS_API_KEY is not set, so there is nothing to measure.")
 
 
-def utter(client: httpx.Client, utterance: str) -> tuple[int, dict[str, Any], int]:
+def personal_source_world(client: httpx.Client) -> str:
+    """The workspace's one personal-source world, as ``GET /worlds`` lists it.
+
+    Every route this measures names its world. The measurement is of the world composed from the
+    workspace's own photographs, so it takes that world from the server's list and stops when the
+    list holds none or several rather than choosing one.
+    """
+    response = client.get("/worlds")
+    response.raise_for_status()
+    worlds = [w["world_id"] for w in response.json()["worlds"] if w["kind"] == "personal-source"]
+    if len(worlds) != 1:
+        raise SystemExit(f"expected one personal-source world, the server lists {worlds}")
+    return worlds[0]
+
+
+def utter(client: httpx.Client, utterance: str, world_id: str) -> tuple[int, dict[str, Any], int]:
     """One utterance through the real route. Returns the status, the body and the wall clock.
 
     A non-200 is recorded rather than raised. A harness that raised on a refusal would report a
@@ -191,7 +206,9 @@ def utter(client: httpx.Client, utterance: str) -> tuple[int, dict[str, Any], in
     waited, which also contains the SQL that built the evidence catalogue.
     """
     started = time.monotonic()
-    response = client.post("/selection/appearance", json={"utterance": utterance})
+    response = client.post(
+        "/selection/appearance", params={"world_id": world_id}, json={"utterance": utterance}
+    )
     elapsed_ms = round((time.monotonic() - started) * 1000)
     try:
         body = response.json()
@@ -281,13 +298,16 @@ def measure() -> int:
         # The world this would be proposed against, read first and always. It spends nothing and
         # it is what says the measurement had a base at all: a refusal with `no_world` on a
         # workspace with no reviewed design would otherwise read as a model failure.
-        before = http.get("/world/styles/current")
+        world_id = personal_source_world(http)
+        before = http.get("/world/styles/current", params={"world_id": world_id})
         before.raise_for_status()
         (args.out / "world-before.json").write_text(json.dumps(before.json(), indent=2) + "\n")
 
         if args.skip_live:
             unpaid = http.post(
-                "/selection/appearance", json={"utterance": UTTERANCES[0][1]}
+                "/selection/appearance",
+                params={"world_id": world_id},
+                json={"utterance": UTTERANCES[0][1]},
             )
             (args.out / "appearance-without-a-model.response.json").write_text(
                 json.dumps({"status_code": unpaid.status_code, "body": unpaid.json()}, indent=2)
@@ -295,7 +315,7 @@ def measure() -> int:
             )
         else:
             for key, utterance, expected, why in UTTERANCES:
-                status, body, wall = utter(http, utterance)
+                status, body, wall = utter(http, utterance, world_id)
                 (args.out / f"{key}.response.json").write_text(
                     json.dumps({"status_code": status, "body": body}, indent=2) + "\n"
                 )
@@ -303,7 +323,7 @@ def measure() -> int:
                     summarise(key, utterance, expected, why, status, body, wall, manifest)
                 )
 
-        after = http.get("/world/styles/current")
+        after = http.get("/world/styles/current", params={"world_id": world_id})
         after.raise_for_status()
         (args.out / "world-after.json").write_text(json.dumps(after.json(), indent=2) + "\n")
         unchanged = before.json() == after.json()
@@ -319,7 +339,7 @@ def measure() -> int:
     with httpx.Client(
         base_url=args.api, headers={"authorization": f"Bearer {token}"}, timeout=60.0
     ) as probe_client:
-        sources = probe_client.get("/world/source-media")
+        sources = probe_client.get("/world/source-media", params={"world_id": world_id})
         (args.out / "source-media.json").write_text(
             json.dumps(
                 {

@@ -18,8 +18,17 @@ from exulanica.world import (
 from exulanica.world.interaction import InteractionProposal
 
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
+
+
+def fixture_policies(repository) -> WorldInteractionPolicyRepository:
+    """The interaction policy of the registered fixture world the structural candidates name."""
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    return WorldInteractionPolicyRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
 
 
 def proposal(
@@ -85,7 +94,7 @@ def test_migration_registry_and_runtime_registry_are_exact(repository):
 
 
 def test_same_candidate_is_deterministic_discard_is_neutral_and_apply_is_immutable(repository):
-    policies = WorldInteractionPolicyRepository(repository.connection, repository.workspace_id)
+    policies = fixture_policies(repository)
     before = policies.state()
     assert before.current is None
     first = policies.preview(proposal(policies, {"comfort.vignette": "strong"}))
@@ -120,7 +129,7 @@ def test_same_candidate_is_deterministic_discard_is_neutral_and_apply_is_immutab
 def test_settings_and_companion_share_lifecycle_with_model_refinement_and_rejection_audit(
     repository,
 ):
-    policies = WorldInteractionPolicyRepository(repository.connection, repository.workspace_id)
+    policies = fixture_policies(repository)
     settings = apply_patch(policies, {"navigation.turn-mode": "snap"})
     companion_proposal = proposal(
         policies,
@@ -168,7 +177,7 @@ def test_settings_and_companion_share_lifecycle_with_model_refinement_and_reject
 
 
 def test_stale_policy_and_structural_bases_fail_without_touching_world_structure(repository):
-    policies = WorldInteractionPolicyRepository(repository.connection, repository.workspace_id)
+    policies = fixture_policies(repository)
     first = policies.preview(proposal(policies, {"comfort.vignette": "strong"}))
     stale = policies.preview(proposal(policies, {"navigation.turn-mode": "snap"}))
     applied = policies.apply(
@@ -188,7 +197,9 @@ def test_stale_policy_and_structural_bases_fail_without_touching_world_structure
         )
     assert policies.state().current.version_id == applied.version_id
 
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=policies.world_id
+    )
     structure_preview = structures.preview(structural_candidate(), proposed_by=uuid.uuid4())
     structure = structures.apply(
         structure_preview.preview_id,
@@ -223,7 +234,7 @@ def test_stale_policy_and_structural_bases_fail_without_touching_world_structure
 
 
 def test_rollback_appends_and_recommendations_never_write(repository):
-    policies = WorldInteractionPolicyRepository(repository.connection, repository.workspace_id)
+    policies = fixture_policies(repository)
     strong_one = apply_patch(policies, {"comfort.vignette": "strong"})
     off = apply_patch(policies, {"comfort.vignette": "off"})
     strong_two = apply_patch(policies, {"comfort.vignette": "strong"})
@@ -255,7 +266,7 @@ def test_rollback_appends_and_recommendations_never_write(repository):
 
 
 def test_private_conversation_content_cannot_enter_durable_policy_input(repository):
-    policies = WorldInteractionPolicyRepository(repository.connection, repository.workspace_id)
+    policies = fixture_policies(repository)
     value = proposal(policies, {"comfort.vignette": "strong"})
     value = InteractionProposal(
         value.proposal_id,

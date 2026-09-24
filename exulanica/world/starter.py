@@ -21,6 +21,7 @@ from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.structure import SpatialCandidate
 from exulanica.world.structure_repository import WorldStructureRepository
+from exulanica.world.worlds import AUTHORED_STARTER, register_world
 
 AUTHORED_STARTER_COMPOSER: Final = "authored-starter-world"
 AUTHORED_STARTER_COMPOSER_VERSION: Final = 1
@@ -301,8 +302,20 @@ def create_starter_authorities(
     title: str,
     world_id: str,
 ) -> tuple[uuid.UUID, StyleVersion, uuid.UUID]:
-    """Create snapshot, style and authored version inside the caller's transaction."""
+    """Register the world, then create snapshot, style and authored version.
 
+    All inside the caller's transaction. The registration comes first because every world table
+    names a registered world.
+    """
+
+    register_world(
+        connection,
+        workspace_id,
+        world_id=world_id,
+        kind=AUTHORED_STARTER,
+        created_by=actor,
+        reason="authored starter for a workspace with no saved world",
+    )
     structures = WorldStructureRepository(connection, workspace_id, world_id=world_id)
     candidate = authored_starter_candidate(world_id)
     preview = structures.preview(candidate, proposed_by=actor)

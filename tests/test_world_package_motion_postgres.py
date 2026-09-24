@@ -50,6 +50,7 @@ from test_world_package_extension_postgres import (
     _urn,
 )
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -239,11 +240,14 @@ def _a_version_on_a_deleted_source(repository, tmp_path: Path, photo_dir: Path):
         "where s.workspace_id=%s limit 1",
         (repository.workspace_id,),
     ).fetchone()
+    world_id = registered_world(repository.connection, repository.workspace_id)
     dependent = _apply(
-        WorldStructureRepository(repository.connection, repository.workspace_id),
+        WorldStructureRepository(repository.connection, repository.workspace_id, world_id=world_id),
         structural_candidate(graph="graph-with-source", evidence_span_id=evidence["span_id"]),
     )
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     version = objects.create_version(
         source_snapshot_id=dependent.snapshot_id, title="Doomed", created_by=uuid.uuid4()
     )

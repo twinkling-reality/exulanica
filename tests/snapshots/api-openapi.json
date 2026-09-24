@@ -499,6 +499,17 @@
     "operationId": "resolve_selection_selection_post",
     "parameters": [
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -850,6 +861,17 @@
     "operationId": "ask_selection_ask_post",
     "parameters": [
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -909,6 +931,17 @@
     "description": "The deterministic half of the answer path, exposed on its own.\n\nUseful to the interface, which can show what a question found without spending a model call,\nand useful to an evaluation run, which needs the retrieval measured separately from the\ncomposition.",
     "operationId": "packet_selection_packet_post",
     "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
      {
       "name": "authorization",
       "in": "header",
@@ -971,6 +1004,17 @@
     "operationId": "appearance_selection_appearance_post",
     "parameters": [
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -1029,6 +1073,17 @@
     "summary": "Propose one typed NYC environment edit without changing world state.",
     "operationId": "environment_proposal_selection_environment_post",
     "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
      {
       "name": "authorization",
       "in": "header",
@@ -1101,12 +1156,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1181,12 +1235,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1262,12 +1315,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1353,12 +1405,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1424,12 +1475,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1506,12 +1556,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1587,12 +1636,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1670,12 +1718,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1741,12 +1788,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1820,12 +1866,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1913,12 +1958,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -1984,12 +2028,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -2053,12 +2096,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -2134,12 +2176,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -2215,12 +2256,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -2296,6 +2336,17 @@
       }
      },
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -2352,6 +2403,17 @@
        "type": "string",
        "format": "uuid",
        "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
       }
      },
      {
@@ -2434,6 +2496,17 @@
       }
      },
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -2500,6 +2573,17 @@
        "type": "string",
        "format": "uuid",
        "title": "Experiment Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
       }
      },
      {
@@ -2589,6 +2673,17 @@
        "type": "string",
        "format": "uuid",
        "title": "Attempt Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
       }
      },
      {
@@ -7046,12 +7141,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7107,12 +7201,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7172,12 +7265,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7253,12 +7345,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7324,12 +7415,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7405,12 +7495,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7459,12 +7548,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7565,12 +7653,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7675,12 +7762,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -7733,18 +7819,6 @@
     "summary": "The reviewed assets a person may place as objects, with real byte availability.",
     "operationId": "reviewed_asset_catalog_world_assets_get",
     "parameters": [
-     {
-      "name": "world_id",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "string",
-       "minLength": 1,
-       "maxLength": 200,
-       "default": "atlas:default",
-       "title": "World Id"
-      }
-     },
      {
       "name": "authorization",
       "in": "header",
@@ -7809,18 +7883,6 @@
       }
      },
      {
-      "name": "world_id",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "string",
-       "minLength": 1,
-       "maxLength": 200,
-       "default": "atlas:default",
-       "title": "World Id"
-      }
-     },
-     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -7880,18 +7942,6 @@
       }
      },
      {
-      "name": "world_id",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "string",
-       "minLength": 1,
-       "maxLength": 200,
-       "default": "atlas:default",
-       "title": "World Id"
-      }
-     },
-     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -7947,18 +7997,6 @@
        "type": "string",
        "maxLength": 200,
        "title": "Asset Key"
-      }
-     },
-     {
-      "name": "world_id",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "string",
-       "minLength": 1,
-       "maxLength": 200,
-       "default": "atlas:default",
-       "title": "World Id"
       }
      },
      {
@@ -8065,12 +8103,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8128,12 +8165,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8199,12 +8235,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8280,12 +8315,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8351,12 +8385,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8442,12 +8475,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8533,12 +8565,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8614,12 +8645,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8695,12 +8725,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8786,12 +8815,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8877,12 +8905,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -8968,12 +8995,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -9049,12 +9075,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -9130,12 +9155,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -9213,12 +9237,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -9294,12 +9317,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -9377,12 +9399,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
-       "default": "atlas:default",
        "title": "World Id"
       }
      },
@@ -10052,6 +10073,17 @@
     "operationId": "current_world_interactions_current_get",
     "parameters": [
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -10100,6 +10132,17 @@
     "summary": "Versions",
     "operationId": "versions_world_interactions_versions_get",
     "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
      {
       "name": "authorization",
       "in": "header",
@@ -10164,6 +10207,17 @@
       }
      },
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -10212,6 +10266,17 @@
     "summary": "Recommendations",
     "operationId": "recommendations_world_interactions_recommendations_get",
     "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
      {
       "name": "authorization",
       "in": "header",
@@ -10265,6 +10330,17 @@
     "summary": "Preview",
     "operationId": "preview_world_interactions_previews_post",
     "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
      {
       "name": "authorization",
       "in": "header",
@@ -10332,6 +10408,17 @@
        "type": "string",
        "format": "uuid",
        "title": "Preview Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
       }
      },
      {
@@ -10404,6 +10491,17 @@
       }
      },
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -10445,6 +10543,17 @@
     "summary": "Rollback",
     "operationId": "rollback_world_interactions_rollback_post",
     "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
      {
       "name": "authorization",
       "in": "header",
@@ -10515,6 +10624,17 @@
       }
      },
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -10570,6 +10690,17 @@
        "type": "string",
        "format": "uuid",
        "title": "Place Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
       }
      },
      {
@@ -10926,6 +11057,17 @@
       }
      },
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -11071,6 +11213,55 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/GeneratedWorldView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Every world this workspace holds, with its kind, and how many of each it may hold.",
+    "operationId": "worlds_worlds_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WorldsView"
         }
        }
       }
@@ -22736,6 +22927,17 @@
       ],
       "title": "Environment Instance Id"
      },
+     "point_map_instance_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Point Map Instance Id"
+     },
      "undone_edit_id": {
       "anyOf": [
        {
@@ -22775,6 +22977,7 @@
      "object_id",
      "element_id",
      "environment_instance_id",
+     "point_map_instance_id",
      "undone_edit_id",
      "base_state_sha256",
      "result_state_sha256",
@@ -22782,6 +22985,112 @@
      "recorded_at"
     ],
     "title": "VersionEditView"
+   },
+   "WorldCountPolicyView": {
+    "properties": {
+     "policy_id": {
+      "type": "string",
+      "title": "Policy Id"
+     },
+     "version": {
+      "type": "integer",
+      "title": "Version"
+     },
+     "sha256": {
+      "type": "string",
+      "title": "Sha256"
+     },
+     "limits": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Limits"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "policy_id",
+     "version",
+     "sha256",
+     "limits"
+    ],
+    "title": "WorldCountPolicyView"
+   },
+   "WorldView": {
+    "properties": {
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "created_by": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By"
+     },
+     "provenance": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/JsonValue"
+      },
+      "type": "object",
+      "title": "Provenance"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "world_id",
+     "kind",
+     "created_at",
+     "created_by",
+     "provenance"
+    ],
+    "title": "WorldView"
+   },
+   "WorldsView": {
+    "properties": {
+     "policy": {
+      "$ref": "#/components/schemas/WorldCountPolicyView"
+     },
+     "worlds": {
+      "items": {
+       "$ref": "#/components/schemas/WorldView"
+      },
+      "type": "array",
+      "title": "Worlds"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "policy",
+     "worlds"
+    ],
+    "title": "WorldsView"
    },
    "exulanica__api__routes__companion__AnswerView": {
     "properties": {

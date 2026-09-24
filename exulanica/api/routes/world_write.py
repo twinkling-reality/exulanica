@@ -31,6 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
+from exulanica.api.world_scope import WorldId
 from exulanica.errors import CanonicalisationError, EpistemicViolation
 from exulanica.graph.world_read import world_read_bundle
 from exulanica.ingest.generated_scene import record_generated_scene
@@ -42,7 +43,7 @@ from exulanica.reconstruction.generated import (
     GeneratedSceneReceipt,
     GenerationModel,
 )
-from exulanica.world import DEFAULT_WORLD_ID
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world-write", tags=["world-write"])
 
@@ -123,15 +124,18 @@ def record_generation(
     connection: ScopedConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
+    world_id: WorldId,
 ) -> JSONResponse:
+    require_world(connection, session.workspace_id, world_id)
     try:
         envelope = world_read_bundle(
             connection,
             session.workspace_id,
             scene_id,
             services.store,
-            # Photographs are placed in the regions of the personal-source world.
-            world_id=DEFAULT_WORLD_ID,
+            # The recorded digest a generation is checked against covers the region graph, so
+            # the generation names the world whose bundle it conditioned on.
+            world_id=world_id,
         )
     except CanonicalisationError as error:
         # No generation may be filed against a scene whose own conditioning digest cannot be

@@ -19,14 +19,14 @@ from exulanica.db.roles import provision_runtime_role
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.world_read_verification import EvidenceError, verify_downloads
 from exulanica.ingest.person_review import record_region_edits
-from exulanica.world import DEFAULT_WORLD_ID
 
 from conftest import photo_bytes, scratch_role_database, write_photo
 from test_api import deployment as deployment
 from test_place_read_bundle import _bind, _second_scene
 from test_screening_currency import ACTOR, KEY, OUTLINE
 from test_world_read_evidence import AT, _masked_scene, _reseal
-from test_world_read_route import _scene_in
+from test_world_read_route import IN_WORLD, _scene_in
+from world_support import FIXTURE_WORLD_ID
 
 
 @pytest.fixture(autouse=True)
@@ -81,7 +81,7 @@ def readonly(deployment, repository, spine_schema, monkeypatch, request):
 
 
 def bundle(deployment, scene):
-    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}", params=IN_WORLD)
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -183,7 +183,8 @@ def test_scene_place_downloads_and_clean_offline_verification(deployment, reposi
     _, second = _second_scene(repository, deployment.store, tmp_path)
     place = _bind(repository, deployment.store, scene, second)
     response = deployment.as_owner(
-        "GET", f"/world-read/places/{place.place_id}?at=2026-09-08T00:00:00Z"
+        "GET",
+        f"/world-read/places/{place.place_id}?at=2026-09-08T00:00:00Z&world_id={FIXTURE_WORLD_ID}",
     )
     assert response.status_code == 200, response.text
     placed = response.json()
@@ -495,7 +496,7 @@ def test_expiry_exact_boundary_preserves_recorded_identity(
         repository.workspace_id,
         scene,
         deployment.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     assert first["bundle"]["recorded_sha256"] == second["bundle"]["recorded_sha256"]
     assert first["bundle_sha256"] != second["bundle_sha256"]
@@ -598,9 +599,9 @@ def test_unregistered_members_and_legacy_bindings_remain_unavailable(
         repository.workspace_id,
         scene,
         deployment.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
-    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}", params=IN_WORLD)
     assert response.status_code == 200, response.text
     assert response.json() == envelope
     assert len(envelope["bundle"]["views"]) == 3
@@ -717,7 +718,7 @@ def test_rebuilt_selected_mask_never_rebinds_old_pose(
         repository.workspace_id,
         scene,
         deployment.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     unavailable = next(
         v["photo_bytes"]
@@ -728,7 +729,8 @@ def test_rebuilt_selected_mask_never_rebinds_old_pose(
     assert unavailable["reason"] == "viewer_pose_transform_unrecorded"
     assert unavailable["pose_input_sha256"] == desc["sha256"]
     assert unavailable["selected_sha256"] == replacement["digest"]
-    assert deployment.as_owner("GET", f"/world-read/scenes/{scene}").status_code == 404
+    route = f"/world-read/scenes/{scene}"
+    assert deployment.as_owner("GET", route, params=IN_WORLD).status_code == 404
     if target := os.environ.get("WORLD_READ_VIEW_ARTIFACTS"):
         folder = Path(target) / f"replacement-mask-{during}"
         folder.mkdir(parents=True, exist_ok=True)
@@ -788,4 +790,5 @@ def test_absent_legacy_screening_binding_refuses_actual_routes(deployment, repos
     )
     response = deployment.as_owner("GET", view["photo_bytes"]["fetch"])
     assert response.status_code == 409, response.text
-    assert deployment.as_owner("GET", f"/world-read/scenes/{scene}").status_code == 404
+    route = f"/world-read/scenes/{scene}"
+    assert deployment.as_owner("GET", route, params=IN_WORLD).status_code == 404

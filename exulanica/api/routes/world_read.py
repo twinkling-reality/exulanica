@@ -34,6 +34,7 @@ from fastapi.responses import JSONResponse
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.api.services import Services
+from exulanica.api.world_scope import WorldId
 from exulanica.errors import CanonicalisationError
 from exulanica.graph.asset_read_policy import (
     bundle_scene_ids,
@@ -53,7 +54,7 @@ from exulanica.graph.observations import (
 )
 from exulanica.graph.world_read import place_read_bundle, world_read_bundle
 from exulanica.graph.world_read_views import views_current
-from exulanica.world import DEFAULT_WORLD_ID
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world-read", tags=["world-read"])
 
@@ -113,17 +114,19 @@ def scene_bundle(
     connection: ReadOnlyConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
+    world_id: WorldId,
 ) -> JSONResponse:
     with connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
+        require_world(connection, session.workspace_id, world_id)
         try:
             bundle = world_read_bundle(
                 connection,
                 session.workspace_id,
                 scene_id,
                 services.store,
-                # Photographs are placed in the regions of the personal-source world.
-                world_id=DEFAULT_WORLD_ID,
+                # The regions the scene's photographs occupy are the named world's.
+                world_id=world_id,
             )
         except CanonicalisationError as error:
             # A coordinate this reader cannot encode is a degenerate receipt, not a missing scene.
@@ -165,6 +168,7 @@ def place_bundle(
     connection: ReadOnlyConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
+    world_id: WorldId,
     at: Annotated[
         dt.datetime | None,
         Query(description="Resolve the version of this place in force at this instant."),
@@ -200,13 +204,14 @@ def place_bundle(
         )
     with connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
+        require_world(connection, session.workspace_id, world_id)
         try:
             bundle = place_read_bundle(
                 connection,
                 session.workspace_id,
                 place_id,
                 services.store,
-                world_id=DEFAULT_WORLD_ID,
+                world_id=world_id,
                 at=at,
             )
         except CanonicalisationError as error:

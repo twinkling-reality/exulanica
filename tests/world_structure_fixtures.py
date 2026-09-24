@@ -12,6 +12,8 @@ from dataclasses import replace
 
 from exulanica.world import PlacementMigration, SpatialCandidate
 
+from world_support import FIXTURE_WORLD_ID
+
 
 def digest(label: str) -> str:
     return hashlib.sha256(label.encode()).hexdigest()
@@ -24,6 +26,7 @@ def structural_candidate(
     region_b_x_mm: int = 10_000,
     evidence_span_id: uuid.UUID | None = None,
     migrations: tuple[PlacementMigration, ...] = (),
+    world_id: str = FIXTURE_WORLD_ID,
 ) -> SpatialCandidate:
     evidence_a = (
         {"kind": "span", "span_id": str(evidence_span_id)}
@@ -32,7 +35,7 @@ def structural_candidate(
     )
     topology = {
         "schema_version": 1,
-        "world_id": "atlas:default",
+        "world_id": world_id,
         "regions": [{"region_id": "region-a"}, {"region_id": "region-b"}],
         "elements": [
             {

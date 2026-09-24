@@ -274,6 +274,7 @@ describe('the wire', () => {
     const received = await new CompanionAskClient({
       baseUrl: 'https://exulanica.test/api',
       token: 'not-a-real-token',
+      worldId: 'world:test',
       fetch: fetch as unknown as typeof globalThis.fetch,
     }).ask('what is it called?');
 

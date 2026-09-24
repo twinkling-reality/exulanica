@@ -13,6 +13,8 @@ import { el } from '../ui/dom.js';
 import { createModalFocus } from '../ui/modal-focus.js';
 
 export interface SocietyExperimentResultOptions {
+  /** The open world, which a recorded result is read in. */
+  readonly getWorldId: () => string | null;
   readonly getVersionId: () => string | null;
   readonly credentials?: TransportOptions;
   readonly client?: SocietyExperimentReadPort;
@@ -137,12 +139,14 @@ export function mountSocietyExperimentResult(
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const versionId = currentVersion();
-    if (versionId === null) {
+    const worldId = options.getWorldId();
+    if (versionId === null || worldId === null) {
       formStatus.textContent = 'Return to an available saved world before opening a recorded result.';
       formStatus.hidden = false;
       return;
     }
     const binding: SocietyExperimentBinding = {
+      worldId,
       versionId,
       experimentId: experimentId.value.trim(),
       attemptId: attemptId.value.trim(),

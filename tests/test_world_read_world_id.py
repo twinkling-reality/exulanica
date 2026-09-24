@@ -12,9 +12,10 @@ import uuid
 
 import pytest
 from exulanica.graph.world_read import place_read_bundle, world_read_bundle
-from exulanica.world import DEFAULT_WORLD_ID, SavedWorldEntryRepository
+from exulanica.world import SavedWorldEntryRepository
 
 from test_world_read_bundle import published as imported_published  # noqa: F401
+from world_support import registered_world
 
 
 @pytest.fixture(name="published")
@@ -31,10 +32,13 @@ def test_the_world_is_a_required_keyword(read):
 
 def test_the_region_graph_comes_from_the_world_asked_for(published, repository):
     store, _captures, scene_id = published
+    # The world the photographs belong to, registered beside the starter so the workspace holds
+    # two worlds and the read has to be told which.
+    personal = registered_world(repository.connection, repository.workspace_id)
     starter = SavedWorldEntryRepository(
         repository.connection, repository.workspace_id, store
     ).create_starter(title="Starter", created_by=uuid.uuid4())
-    assert starter.world_id != DEFAULT_WORLD_ID
+    assert starter.world_id != personal
 
     def region_graph(world_id):
         envelope = world_read_bundle(
@@ -47,5 +51,5 @@ def test_the_region_graph_comes_from_the_world_asked_for(published, repository):
     # The starter's regions were built from no photograph, so none of them holds this scene.
     assert in_starter["regions"]
     assert not any(region["holds_this_scene"] for region in in_starter["regions"])
-    in_personal = region_graph(DEFAULT_WORLD_ID)
-    assert (in_personal["state"], in_personal["world_id"]) == ("unavailable", DEFAULT_WORLD_ID)
+    in_personal = region_graph(personal)
+    assert (in_personal["state"], in_personal["world_id"]) == ("unavailable", personal)

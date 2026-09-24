@@ -83,11 +83,13 @@ def body(version, *, asset_key, subject_id="object:placed"):
 
 
 def compose(api, version, step, request):
-    return api.post(f"/world/versions/{version['version_id']}/compositions/{step}", request)
+    return api.post(
+        api.in_world(f"/world/versions/{version['version_id']}/compositions/{step}"), request
+    )
 
 
 def read(api, version):
-    response = api.get(f"/world/versions/{version['version_id']}")
+    response = api.get(api.in_world(f"/world/versions/{version['version_id']}"))
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -275,7 +277,7 @@ def test_a_version_that_already_holds_a_component_keeps_it_and_keeps_editing(
 
         path = f"/world/versions/{version['version_id']}/objects/object:held"
         moved = objects_api.post(
-            f"{path}/move",
+            objects_api.in_world(f"{path}/move"),
             {
                 "base_state_sha256": added.json()["state_sha256"],
                 "transform": helpers.transform(x_mm=99),
@@ -283,11 +285,12 @@ def test_a_version_that_already_holds_a_component_keeps_it_and_keeps_editing(
         )
         assert moved.status_code == 200, moved.text
         removed = objects_api.post(
-            f"{path}/remove", {"base_state_sha256": moved.json()["state_sha256"]}
+            objects_api.in_world(f"{path}/remove"),
+            {"base_state_sha256": moved.json()["state_sha256"]},
         )
         assert removed.status_code == 200, removed.text
         undone = objects_api.post(
-            f"/world/versions/{version['version_id']}/objects/undo",
+            objects_api.in_world(f"/world/versions/{version['version_id']}/objects/undo"),
             {"base_state_sha256": removed.json()["state_sha256"]},
         )
         assert undone.status_code == 200, undone.text

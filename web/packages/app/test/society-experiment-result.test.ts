@@ -10,6 +10,7 @@ import type {
   SocietyExperimentReadPort,
 } from '../src/society-experiment-api.js';
 
+const worldId = 'world:personal:experiment';
 const versionId = '11111111-1111-4111-8111-111111111111';
 const experimentId = '22222222-2222-4222-8222-222222222222';
 const attemptId = '33333333-3333-4333-8333-333333333333';
@@ -36,6 +37,7 @@ describe('saved-world society experiment result entry', () => {
       problem: { code: 'unknown_reference', detail: 'No accessible record has that exact identity.' },
     }));
     const mounted = mountSocietyExperimentResult({
+      getWorldId: () => worldId,
       getVersionId: () => versionId,
       client: { read },
       onClose: vi.fn(),
@@ -50,13 +52,14 @@ describe('saved-world society experiment result entry', () => {
     submit(mounted);
     await vi.waitFor(() => expect(read).toHaveBeenCalledOnce());
 
-    expect(read).toHaveBeenCalledWith({ versionId, experimentId, attemptId }, expect.any(AbortSignal));
+    expect(read).toHaveBeenCalledWith({ worldId, versionId, experimentId, attemptId }, expect.any(AbortSignal));
     await vi.waitFor(() => expect(mounted.root.textContent).toContain('No accessible record'));
   });
 
   it('refuses malformed receipt identities without issuing a read', () => {
     const read = vi.fn();
     const mounted = mountSocietyExperimentResult({
+      getWorldId: () => worldId,
       getVersionId: () => versionId,
       client: { read },
       onClose: vi.fn(),
@@ -80,6 +83,7 @@ describe('saved-world society experiment result entry', () => {
     };
     let mounted!: MountedSocietyExperimentResult;
     mounted = mountSocietyExperimentResult({
+      getWorldId: () => worldId,
       getVersionId: () => versionId,
       client: port,
       onClose: () => mounted.setVisible(false),
@@ -108,6 +112,7 @@ describe('saved-world society experiment result entry', () => {
       problem: { code: 'unknown_reference', detail: 'Fixture unavailable.' },
     }));
     const mounted = mountSocietyExperimentResult({
+      getWorldId: () => worldId,
       getVersionId: () => activeVersion,
       client: { read },
       onClose: vi.fn(),
@@ -125,7 +130,7 @@ describe('saved-world society experiment result entry', () => {
     submit(mounted);
     await vi.waitFor(() => expect(read).toHaveBeenCalledOnce());
     expect(read).toHaveBeenCalledWith(
-      { versionId: newerVersion, experimentId, attemptId },
+      { worldId, versionId: newerVersion, experimentId, attemptId },
       expect.any(AbortSignal),
     );
   });

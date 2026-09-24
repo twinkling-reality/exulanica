@@ -6,6 +6,9 @@ import {
 } from '../src/environment-selection-api.js';
 import { parseVersion } from '../src/world-objects-api.js';
 
+/** The world these clients are opened for. */
+const TEST_WORLD = 'world:personal:test';
+
 const VERSION = JSON.parse(readFileSync(
   new URL('../../graph-client/test/fixtures/world-objects.json', import.meta.url),
   'utf8',
@@ -59,6 +62,7 @@ function subject(responses: Response[]) {
   return {
     calls,
     client: new EnvironmentSelectionClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://example.test',
       token: 'token',
       fetch: fetch as unknown as typeof globalThis.fetch,
@@ -166,6 +170,7 @@ describe('NYC environment selection API', () => {
         : Promise.resolve(new Response(JSON.stringify(VERSION), { status: 200 }));
     });
     const client = new EnvironmentSelectionClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://example.test',
       token: 'token',
       fetch: fetch as unknown as typeof globalThis.fetch,

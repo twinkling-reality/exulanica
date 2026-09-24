@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SourceMediaClient } from '../src/source-media-api.js';
 
+/** The world these clients are opened for. */
+const TEST_WORLD = 'world:personal:test';
+
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), {
   status,
   headers: { 'content-type': 'application/json' },
@@ -91,6 +94,7 @@ describe('production source media boundary', () => {
       return json({ code: 'not_authenticated', detail: 'token expired' }, 401);
     });
     const session = await new SourceMediaClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't', fetch,
       createObjectURL: () => 'never', revokeObjectURL: vi.fn(),
     }).load('#7c71b5');
@@ -111,6 +115,7 @@ describe('production source media boundary', () => {
       },
     })]));
     const session = await new SourceMediaClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't', fetch,
       createObjectURL: () => 'never', revokeObjectURL: vi.fn(),
     }).load('#7c71b5');
@@ -121,6 +126,7 @@ describe('production source media boundary', () => {
 
   it('surfaces list loading failures instead of fabricating an empty successful catalog', async () => {
     const client = new SourceMediaClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't',
       fetch: vi.fn(async () => { throw new TypeError('network offline'); }),
     });
@@ -129,6 +135,7 @@ describe('production source media boundary', () => {
 
   it('refuses two competing topology addresses', () => {
     expect(() => new SourceMediaClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test/api', token: 't', fetch: vi.fn(),
       topologyDigest: 'topology-a', sourceSnapshotId: 'snapshot-a',
     })).toThrow('one topology address');
@@ -167,6 +174,14 @@ describe('admitted sources before composition', () => {
     session.dispose();
   });
 
+  it('refuses to read a world topology without the id of its world, and asks for nothing', async () => {
+    const fetch = vi.fn(async () => json([]));
+    await expect(new SourceMediaClient({
+      baseUrl: 'https://example.test/api', token: 'review-token', fetch,
+    }).load('blue')).rejects.toThrow('needs the id of that world');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('loads authenticated inventory without a world and clears every URL at session disposal', async () => {
     const row = await admitted();
     const revoke = vi.fn();
@@ -178,7 +193,7 @@ describe('admitted sources before composition', () => {
       expect(path).toBe('/api/evidence/span-1/masked');
       return new Response(imageBytes, { headers: { 'content-type': 'image/jpeg' } });
     });
-    const session = await new SourceMediaClient({ baseUrl: 'https://example.test/api', token: 'review-token', fetch,
+    const session = await new SourceMediaClient({ worldId: TEST_WORLD, baseUrl: 'https://example.test/api', token: 'review-token', fetch,
       createObjectURL: () => 'blob:admitted', revokeObjectURL: revoke }).load('blue');
     expect(session.catalog.get('capture-1')).toMatchObject({ regionId: null, captureIds: ['capture-1'], available: true });
     session.dispose();
@@ -197,7 +212,7 @@ describe('admitted sources before composition', () => {
       return new Response(imageBytes, { headers: { 'content-type': 'image/jpeg' } });
     });
     const create = vi.fn(() => 'blob:shared');
-    const session = await new SourceMediaClient({ baseUrl: 'https://example.test', token: 't', fetch,
+    const session = await new SourceMediaClient({ worldId: TEST_WORLD, baseUrl: 'https://example.test', token: 't', fetch,
       createObjectURL: create, revokeObjectURL: vi.fn() }).load('blue');
     expect(create).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledTimes(3);
@@ -217,7 +232,7 @@ describe('admitted sources before composition', () => {
       if (condition === 'cross-workspace') return json({ code: 'not_found', detail: 'No evidence' }, 404);
       return new Response(new Uint8Array([0]), { headers: { 'content-type': 'image/jpeg' } });
     });
-    const session = await new SourceMediaClient({ baseUrl: 'https://example.test', token: 't', fetch,
+    const session = await new SourceMediaClient({ worldId: TEST_WORLD, baseUrl: 'https://example.test', token: 't', fetch,
       createObjectURL: create, revokeObjectURL: vi.fn() }).load('blue');
     expect(create).not.toHaveBeenCalled();
     expect([...session.catalog.values()].every((entry) => !entry.available)).toBe(true);

@@ -61,8 +61,10 @@ from exulanica.models.manifest import Role
 from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.request_names import RequestNames
 from exulanica.selection.validation import Session
+from exulanica.store.base import ContentAddressedStore
 from exulanica.world import STYLE_REGISTRY, InvalidStyleData, StyleReference, StyleRegistry
 from exulanica.world.registry import ParameterDefinition, ProfileDefinition
+from exulanica.world.saved_entries import SavedWorldEntryRepository
 
 __all__ = [
     "MAX_REFERENCE_CATALOGUE",
@@ -185,10 +187,12 @@ class RefusalCode(StrEnum):
 class SourceChoice:
     """One evidence reference the drafter may name, by id.
 
-    A source slot belongs to the protected topology, which is what the world's appearance is
-    drawn over. So the evidence that can motivate an appearance change is exactly the evidence
-    the world is already made of, and this list is the whole of it: the drafter is never given a
-    span the topology does not bind, and never given bytes, a caption, or a filename.
+    Either a source slot of the world's protected topology, which is what the world's appearance
+    is drawn over, or a reviewed photograph the person attached to the world as a reference,
+    which is how a world built from nothing comes to hold evidence at all. So the evidence that
+    can motivate an appearance change is exactly the evidence the world holds, and this list is
+    the whole of it: the drafter is never given a span the world does not hold, and never given
+    bytes, a caption, or a filename.
     """
 
     source_id: uuid.UUID
@@ -262,17 +266,23 @@ def source_catalogue(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
     *,
-    world_id: str = "atlas:default",
+    world_id: str,
+    store: ContentAddressedStore | None,
     limit: int = MAX_REFERENCE_CATALOGUE,
 ) -> tuple[SourceChoice, ...]:
-    """The evidence references this session may name, from the CURRENT protected topology.
+    """The evidence references this session may name: the world's topology, then its references.
 
-    Joined against ``world_style_state`` rather than taking the newest topology, because a
-    proposal is made against the topology that is current, and a reference to a slot from a
-    superseded one would name evidence this world is no longer drawn over.
+    Topology slots come from the CURRENT protected topology. Joined against ``world_style_state``
+    rather than taking the newest topology, because a proposal is made against the topology that
+    is current, and a reference to a slot from a superseded one would name evidence this world is
+    no longer drawn over. Slots whose evidence is recorded as missing are excluded. The topology
+    stores a reason instead of a span for those, and a reference has to name something.
 
-    Slots whose evidence is recorded as missing are excluded. The topology stores a reason
-    instead of a span for those, and a reference has to name something.
+    Then the reviewed photographs attached to the world, as its saved entry's current collection
+    reports them now (:meth:`SavedWorldEntryRepository.citable_references`): a detached, expired,
+    withdrawn or unviewable photograph is not offered. Each is named by its attachment id and has
+    no region. ``store`` is where a reference's viewer bytes must be for it to count as available;
+    without one, no attached photograph is offered.
     """
     rows = connection.execute(
         "select s.source_id, s.evidence_span_id, s.region_id, s.slot_key "
@@ -287,7 +297,7 @@ def source_catalogue(
         "order by s.slot_key, s.source_id limit %s",
         (workspace_id, world_id, limit),
     ).fetchall()
-    return tuple(
+    slots = tuple(
         SourceChoice(
             source_id=row["source_id"],
             evidence_span_id=row["evidence_span_id"],
@@ -296,6 +306,18 @@ def source_catalogue(
         )
         for row in rows
     )
+    references = tuple(
+        SourceChoice(
+            source_id=reference.attachment_id,
+            evidence_span_id=reference.evidence_span_id,
+            region_id=None,
+            slot_key=f"reference:{reference.attachment_id}",
+        )
+        for reference in SavedWorldEntryRepository(
+            connection, workspace_id, store
+        ).citable_references(world_id)
+    )
+    return (slots + references)[:limit]
 
 
 _CLASSIFIER_SYSTEM: Final = """You read one sentence somebody typed to a companion inside an \
@@ -510,12 +532,16 @@ def propose_appearance(
     *,
     registry: StyleRegistry = STYLE_REGISTRY,
     current: StyleReference | None = None,
+    world_id: str,
+    store: ContentAddressedStore | None,
 ) -> AppearanceOutcome:
     """The whole path, once. Classify, and draft only what is a request to change the world.
 
-    ``current`` is the world's current global style. It is a parameter rather than a read here
-    because the route already holds the repository that owns it, and because a proposal is made
-    against a version the caller has to name anyway when it posts the preview.
+    ``current`` is the named world's current global style. It is a parameter rather than a read
+    here because the route already holds the repository that owns it, and because a proposal is
+    made against a version the caller has to name anyway when it posts the preview. ``world_id``
+    names the world whose evidence references the draft may cite, and ``store`` is where an
+    attached reference photograph's viewer bytes must be for it to be citable.
     """
     log = CallLog()
     # The classifier and the drafter are sent the utterance with every name no right can release
@@ -552,16 +578,17 @@ def propose_appearance(
             classified_by=classified_by,
             calls=log.calls,
         )
-    catalogue = source_catalogue(connection, session.workspace_id)
+    catalogue = source_catalogue(connection, session.workspace_id, world_id=world_id, store=store)
     if not catalogue:
         # A companion proposal without a reference id is refused by the world repository, so a
-        # world with no bound evidence cannot produce one at all. Said here rather than
-        # discovered as a 422 three calls later.
+        # world with no evidence cannot produce one at all. Said here rather than discovered as
+        # a 422 three calls later, with the one thing that changes it.
         return AppearanceOutcome(
             kind=kind,
             refusal=ProposalRefusal(
                 RefusalCode.UNSUPPORTED_REFERENCE,
-                "the current protected topology binds no evidence a proposal could name",
+                "this world holds no evidence a proposal could cite; attach a reviewed "
+                "photograph to it, and a proposal can cite that photograph",
             ),
             classified_by=classified_by,
             calls=log.calls,

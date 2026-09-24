@@ -25,6 +25,12 @@ from test_scene_reconstruction_pipeline import (
     FakeColmap,
     _numeric_point_map,
 )
+from world_support import FIXTURE_WORLD_ID, registered_world
+
+#: The query naming the world a scene or place read here is in. The route refuses a world the
+#: caller's workspace has not registered, with the 404 code an absent scene also gets, so every read
+#: here names a registered one. Passed as ``params``, which replaces any query already in the path.
+IN_WORLD = {"world_id": FIXTURE_WORLD_ID}
 
 
 def _canonical(value: object) -> bytes:
@@ -33,12 +39,25 @@ def _canonical(value: object) -> bytes:
     ).encode("utf-8")
 
 
+def _stranger_world(deployment) -> None:
+    """Register the same world id in the stranger's own workspace.
+
+    A stranger's probe then names a world it holds and is answered by the scene or place lookup.
+    Without it the probe stops at the world check, which answers the same 404 for a real id and an
+    invented one whatever the lookup behind it would have done.
+    """
+    services = deployment.client.app.state.services
+    with services.database.session(deployment.stranger) as connection:
+        registered_world(connection, deployment.stranger)
+
+
 def _scene_in(deployment, repository, tmp_path):
     """Publish one scene into the deployment's own store, so the route can read it.
 
     The deployment fixture already ingested one photograph. Three more, a grouping run and one
     processor pass give a scene whose receipts and point maps live in the same store the running
-    application holds.
+    application holds. The route reads a scene in the world its caller names, so the fixture world
+    is registered in the owner's workspace too.
     """
     from exulanica.evidence.blob import BlobId
     from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -77,6 +96,7 @@ def _scene_in(deployment, repository, tmp_path):
     )
     outcome = processor.process(claimed)
     assert outcome.scene_id is not None, outcome.message
+    registered_world(repository.connection, repository.workspace_id)
     return outcome.scene_id
 
 
@@ -84,7 +104,7 @@ def test_the_owner_receives_a_bundle_whose_digest_verifies_over_the_wire(
     deployment, repository, tmp_path
 ):
     scene_id = _scene_in(deployment, repository, tmp_path)
-    response = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}")
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}", params=IN_WORLD)
     assert response.status_code == 200, response.text
     envelope = response.json()
     assert envelope["profile"] == WORLD_READ_PROFILE
@@ -95,16 +115,24 @@ def test_the_owner_receives_a_bundle_whose_digest_verifies_over_the_wire(
 def test_a_stranger_and_an_unknown_scene_are_indistinguishable(deployment, repository, tmp_path):
     """M10: 404, never 403, so the surface is not an existence oracle."""
     scene_id = _scene_in(deployment, repository, tmp_path)
-    real_to_a_stranger = deployment.as_stranger("GET", f"/world-read/scenes/{scene_id}")
-    invented = deployment.as_stranger("GET", f"/world-read/scenes/{uuid.uuid4()}")
+    _stranger_world(deployment)
+    real_to_a_stranger = deployment.as_stranger(
+        "GET", f"/world-read/scenes/{scene_id}", params=IN_WORLD
+    )
+    invented = deployment.as_stranger("GET", f"/world-read/scenes/{uuid.uuid4()}", params=IN_WORLD)
     assert real_to_a_stranger.status_code == 404
     assert real_to_a_stranger.json() == invented.json()
+    # The scene lookup answered, not the world check in front of it.
+    assert real_to_a_stranger.json()["detail"] == "no such scene"
 
 
-def test_an_absent_scene_in_your_own_workspace_is_also_404(deployment):
-    response = deployment.as_owner("GET", f"/world-read/scenes/{uuid.uuid4()}")
+def test_an_absent_scene_in_your_own_workspace_is_also_404(deployment, repository):
+    registered_world(repository.connection, repository.workspace_id)
+    response = deployment.as_owner("GET", f"/world-read/scenes/{uuid.uuid4()}", params=IN_WORLD)
     assert response.status_code == 404
     assert response.json()["code"] == "unknown_reference"
+    # An unregistered world is refused with the same code, so the detail says which refusal it was.
+    assert response.json()["detail"] == "no such scene"
 
 
 def test_a_withdrawn_scene_answers_410_rather_than_pretending_it_never_existed(
@@ -112,7 +140,8 @@ def test_a_withdrawn_scene_answers_410_rather_than_pretending_it_never_existed(
 ):
     """A caller holding an earlier bundle is entitled to learn that the user deleted the thing."""
     scene_id = _scene_in(deployment, repository, tmp_path)
-    assert deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").status_code == 200
+    route = f"/world-read/scenes/{scene_id}"
+    assert deployment.as_owner("GET", route, params=IN_WORLD).status_code == 200
 
     member = repository.connection.execute(
         "select capture_id from reconstruction_scene_member "
@@ -126,7 +155,7 @@ def test_a_withdrawn_scene_answers_410_rather_than_pretending_it_never_existed(
         reason="world-read withdrawal test",
     )
 
-    response = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}")
+    response = deployment.as_owner("GET", route, params=IN_WORLD)
     assert response.status_code == 410, response.text
     assert response.json()["code"] == "tombstoned"
 
@@ -163,8 +192,8 @@ def test_two_requests_for_an_unchanged_scene_return_the_same_digest(
     is a fact about the constructor and not about the route. This asks the route twice.
     """
     scene_id = _scene_in(deployment, repository, tmp_path)
-    first = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
-    second = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
+    first = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}", params=IN_WORLD).json()
+    second = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}", params=IN_WORLD).json()
     assert first["bundle_sha256"] == second["bundle_sha256"]
     assert first == second
 
@@ -176,7 +205,7 @@ def test_a_scene_whose_geometry_bytes_vanish_returns_a_different_digest(
     from exulanica.evidence.blob import BlobId
 
     scene_id = _scene_in(deployment, repository, tmp_path)
-    before = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
+    before = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}", params=IN_WORLD).json()
     entries = before["bundle"]["geometry"]
     assert entries, "the fixture publishes geometry; without it this test cannot fire"
     for entry in entries:
@@ -185,7 +214,7 @@ def test_a_scene_whose_geometry_bytes_vanish_returns_a_different_digest(
         )
         path.unlink(missing_ok=True)
 
-    after = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
+    after = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}", params=IN_WORLD).json()
     assert after["bundle_sha256"] != before["bundle_sha256"]
     assert after["bundle"]["scene"]["placement_state"] != "available"
 
@@ -209,7 +238,7 @@ def test_a_place_addressed_between_two_captures_serves_the_earlier_one_over_the_
     first, _second, place = _place_in(deployment, repository, tmp_path)
     between = (FIRST + dt.timedelta(days=10)).isoformat()
     response = deployment.as_owner(
-        "GET", f"/world-read/places/{place.place_id}", params={"at": between}
+        "GET", f"/world-read/places/{place.place_id}", params={"at": between, **IN_WORLD}
     )
     assert response.status_code == 200, response.text
     envelope = response.json()
@@ -230,7 +259,7 @@ def test_a_place_addressed_before_its_first_capture_is_200_rather_than_404(
     _first, _second, place = _place_in(deployment, repository, tmp_path)
     early = (FIRST - dt.timedelta(days=30)).isoformat()
     response = deployment.as_owner(
-        "GET", f"/world-read/places/{place.place_id}", params={"at": early}
+        "GET", f"/world-read/places/{place.place_id}", params={"at": early, **IN_WORLD}
     )
     assert response.status_code == 200, response.text
     bundle = response.json()["bundle"]
@@ -247,11 +276,12 @@ def test_a_place_with_no_anchor_is_neither_missing_nor_deleted(deployment, repos
     this place yet, versus somebody deleted the photographs its frame came from. 404 for either
     would deny a place the caller can see in their own library.
     """
+    registered_world(repository.connection, repository.workspace_id)
     place_id = repository.connection.execute(
         "insert into place (workspace_id) values (%s) returning place_id",
         (repository.workspace_id,),
     ).fetchone()["place_id"]
-    response = deployment.as_owner("GET", f"/world-read/places/{place_id}")
+    response = deployment.as_owner("GET", f"/world-read/places/{place_id}", params=IN_WORLD)
     assert response.status_code == 424, response.text
     assert response.json()["code"] == "place_without_anchor"
 
@@ -261,7 +291,8 @@ def test_a_withdrawn_anchor_answers_410_rather_than_pretending_the_place_never_e
 ):
     """A caller holding an earlier place bundle is entitled to learn that the user deleted it."""
     first, _second, place = _place_in(deployment, repository, tmp_path)
-    assert deployment.as_owner("GET", f"/world-read/places/{place.place_id}").status_code == 200
+    route = f"/world-read/places/{place.place_id}"
+    assert deployment.as_owner("GET", route, params=IN_WORLD).status_code == 200
     member = repository.connection.execute(
         "select capture_id from reconstruction_scene_member "
         "where workspace_id=%s and scene_id=%s order by ordinal limit 1",
@@ -273,7 +304,7 @@ def test_a_withdrawn_anchor_answers_410_rather_than_pretending_the_place_never_e
         requested_by=uuid.uuid4(),
         reason="place route withdrawal test",
     )
-    response = deployment.as_owner("GET", f"/world-read/places/{place.place_id}")
+    response = deployment.as_owner("GET", route, params=IN_WORLD)
     assert response.status_code == 410, response.text
     assert response.json()["code"] == "tombstoned"
 
@@ -281,10 +312,15 @@ def test_a_withdrawn_anchor_answers_410_rather_than_pretending_the_place_never_e
 def test_a_stranger_and_an_unknown_place_are_indistinguishable(deployment, repository, tmp_path):
     """M10 again, on the new address. A 403 here would confirm the place belongs to somebody."""
     _first, _second, place = _place_in(deployment, repository, tmp_path)
-    real_to_a_stranger = deployment.as_stranger("GET", f"/world-read/places/{place.place_id}")
-    invented = deployment.as_stranger("GET", f"/world-read/places/{uuid.uuid4()}")
+    _stranger_world(deployment)
+    real_to_a_stranger = deployment.as_stranger(
+        "GET", f"/world-read/places/{place.place_id}", params=IN_WORLD
+    )
+    invented = deployment.as_stranger("GET", f"/world-read/places/{uuid.uuid4()}", params=IN_WORLD)
     assert real_to_a_stranger.status_code == 404
     assert real_to_a_stranger.json() == invented.json()
+    # The place lookup answered, not the world check in front of it.
+    assert real_to_a_stranger.json()["detail"] == "no such place"
 
 
 def test_a_time_with_no_zone_is_refused_rather_than_read_as_utc(deployment, repository, tmp_path):
@@ -296,7 +332,9 @@ def test_a_time_with_no_zone_is_refused_rather_than_read_as_utc(deployment, repo
     """
     _first, _second, place = _place_in(deployment, repository, tmp_path)
     response = deployment.as_owner(
-        "GET", f"/world-read/places/{place.place_id}", params={"at": "2026-09-20T12:00:00"}
+        "GET",
+        f"/world-read/places/{place.place_id}",
+        params={"at": "2026-09-20T12:00:00", **IN_WORLD},
     )
     assert response.status_code == 422, response.text
     assert response.json()["code"] == "unzoned_time"

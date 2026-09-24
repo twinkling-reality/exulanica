@@ -205,7 +205,7 @@ def test_synthetic_subject_uses_existing_population_and_never_rewrites_society(a
     repo.connection.execute(
         "insert into place(workspace_id,place_id) values(%s,%s)", (repo.workspace_id, place)
     )
-    society = SocietyRepository(repo.connection, repo.workspace_id)
+    society = SocietyRepository(repo.connection, repo.workspace_id, world_id=repo.world_id)
     original = society.create(
         version, place_id=place, region_id="region-a", seed="7a" * 32, actor=repo.actor
     )
@@ -353,8 +353,12 @@ def test_source_tombstone_denies_subject_without_erasing_history(repository, tmp
     from conftest import write_photo
     from test_world_objects_postgres import apply_candidate
     from world_structure_fixtures import structural_candidate
+    from world_support import registered_world
 
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    structures = WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     apply_candidate(structures, structural_candidate())
     outcome = PhotoIngestPipeline(
         repository, LocalContentAddressedStore(tmp_path / "sources"), vision=None
@@ -371,7 +375,9 @@ def test_source_tombstone_denies_subject_without_erasing_history(repository, tmp
         structural_candidate(graph="appearance-source", evidence_span_id=evidence["span_id"]),
     )
     actor = uuid.uuid4()
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = WorldObjectRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
     version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Source-bound avatar", created_by=actor
     )
@@ -454,7 +460,9 @@ def test_current_v2_source_authority_is_required_for_every_subject_operation(app
         if not current["allowed"]:
             raise UnavailableSocietyInput("test source withdrawn")
 
-    societies = SocietyRepository(repo.connection, repo.workspace_id, input_authorizer=authorize)
+    societies = SocietyRepository(
+        repo.connection, repo.workspace_id, world_id=repo.world_id, input_authorizer=authorize
+    )
     snapshot = societies.create(
         version,
         place_id=place,

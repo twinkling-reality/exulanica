@@ -13,6 +13,7 @@ import json
 import os
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
@@ -82,42 +83,56 @@ def run():
                         for table in TABLES
                     }
 
+            # The world composed from this workspace's own photographs, as the server lists it.
+            [world_id] = [
+                w["world_id"]
+                for w in client.get("/worlds").json()["worlds"]
+                if w["kind"] == "personal-source"
+            ]
+
+            def in_world(path: str, world_id: str = world_id) -> str:
+                return f"{path}?world_id={quote(world_id, safe='')}"
+
             def sources():
-                response = client.get("/world/source-media")
+                response = client.get(in_world("/world/source-media"))
                 response.raise_for_status()
                 return response.json()
 
             before_sources = sources()
-            original_digest = client.get("/world/styles/current").json()["current_topology_digest"]
+            original_digest = client.get(in_world("/world/styles/current")).json()[
+                "current_topology_digest"
+            ]
             before_counts = counts()
             body = {"base_topology_digest": original_digest, "title": "My alternate world"}
-            first = client.post("/world/versions/bootstrap", json=body)
+            first = client.post(in_world("/world/versions/bootstrap"), json=body)
             first.raise_for_status()
             opened = first.json()
             after_counts = counts()
             assert sources() == before_sources
             assert (
-                client.get("/world/styles/current").json()["current_topology_digest"]
+                client.get(in_world("/world/styles/current")).json()["current_topology_digest"]
                 == original_digest
             )
-            second = client.post("/world/versions/bootstrap", json=body)
+            second = client.post(in_world("/world/versions/bootstrap"), json=body)
             second.raise_for_status()
             assert second.json() == {**opened, "snapshot": "reused", "version": "reused"}
             assert counts() == after_counts
             stale = client.post(
-                "/world/versions/bootstrap", json={"base_topology_digest": "stale-evaluation-base"}
+                in_world("/world/versions/bootstrap"),
+                json={"base_topology_digest": "stale-evaluation-base"},
             )
             assert (
                 stale.status_code == 409 and stale.json()["code"] == "protected_topology_conflict"
             )
             assert counts() == after_counts
             version_path = f"/world/versions/{opened['version_id']}"
+            version_read = in_world(version_path)
             object_id = f"bootstrap-proof:{uuid.uuid4()}"
             asset = next(
                 a for a in client.get("/world/assets").json() if a["asset_key"] == "cc0.marker-cube"
             )
             added = client.post(
-                f"{version_path}/objects",
+                in_world(f"{version_path}/objects"),
                 json={
                     "base_state_sha256": opened["state_sha256"],
                     "object_id": object_id,
@@ -136,7 +151,7 @@ def run():
                     connection.execute("select current_user as role").fetchone()["role"]
                     == "exulanica_app"
                 )
-                styles = WorldStyleRepository(connection, workspace)
+                styles = WorldStyleRepository(connection, workspace, world_id=world_id)
                 original = styles.current_topology_contract()
                 assert len(original.region_ids) == 1
                 captures = connection.execute(
@@ -158,18 +173,20 @@ def run():
                     region_id=original.region_ids[0],
                     captures=capture_inputs,
                     source_manifest_sha256=digest([[str(c), sha] for c, sha, _ in capture_inputs]),
+                    actor=uuid.UUID(access["actor"]),
                 )
-                reread = WorldObjectRepository(connection, workspace).version(
+                assert recomposed["world_id"] == world_id
+                reread = WorldObjectRepository(connection, workspace, world_id=world_id).version(
                     uuid.UUID(opened["version_id"])
                 )
                 assert reread.state_sha256 == added_state["state_sha256"]
                 assert any(o.object_id == object_id and not o.removed for o in reread.objects)
                 assert not reread.source_invalidated
                 styles.register_topology(original)
-            assert client.get(version_path).json() == added_state
+            assert client.get(version_read).json() == added_state
             assert sources() == before_sources
             removed = client.post(
-                f"{version_path}/objects/{object_id}/remove",
+                in_world(f"{version_path}/objects/{object_id}/remove"),
                 json={"base_state_sha256": added_state["state_sha256"]},
             )
             removed.raise_for_status()

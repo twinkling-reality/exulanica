@@ -15,6 +15,9 @@ import {
   type AlternateVersion,
 } from '../src/world-objects-api.js';
 
+/** The world these clients are opened for. */
+const TEST_WORLD = 'world:personal:test';
+
 /**
  * The authored-object client, against the published contract fixture.
  *
@@ -67,6 +70,7 @@ function client(responses: Readonly<Record<string, unknown>>) {
     calls,
     fetchImpl,
     subject: new WorldObjectsClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test',
       token: 'token',
       fetch: fetchImpl as unknown as typeof globalThis.fetch,
@@ -150,6 +154,14 @@ describe('the published version body, as the fixture publishes it', () => {
     expect(undo.undoneEditId).toBe(removal.editId);
     // The removal was taken back, so the object it named is present and not removed.
     expect(version.objects.find((o) => o.objectId === undo.objectId)?.removed).toBe(false);
+  });
+
+  it('reads which placed point map an edit changed, and none where the history names none', () => {
+    const value = clone(FIXTURE) as { edits: Record<string, unknown>[] };
+    value.edits[0]!['point_map_instance_id'] = 'point-map:kitchen';
+    const [first, second] = parseVersion(value).edits;
+    expect(first!.pointMapInstanceId).toBe('point-map:kitchen');
+    expect(second!.pointMapInstanceId).toBeNull();
   });
 
   it('leaves the next undoable edit computable: the newest no undo already names', () => {
@@ -239,8 +251,11 @@ describe('named saved-world binding', () => {
       worldId: 'world:family-garden', defaultVersionId: VERSION_ID,
     });
     expect((await subject.connect()).version?.versionId).toBe(VERSION_ID);
-    expect(urls.map((url) => url.searchParams.get('world_id')))
-      .toEqual(['world:family-garden', 'world:family-garden']);
+    // The reviewed catalog is the same for every world, so only the version read names one.
+    expect(urls.map((url) => [url.pathname, url.searchParams.get('world_id')])).toEqual([
+      ['/world/assets', null],
+      [`/world/versions/${VERSION_ID}`, 'world:family-garden'],
+    ]);
     expect(urls.some((url) => url.pathname === '/world/versions')).toBe(false);
   });
 });
@@ -363,6 +378,7 @@ describe('the client reads both routes and writes through one queue', () => {
     const { fetchImpl } = transport({ [ASSETS]: registryRows(), [VERSIONS]: [FIXTURE], [ADD]: moved });
     const onVersionChange = vi.fn(async () => undefined);
     const subject = new WorldObjectsClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
       onVersionChange,
     });
@@ -390,6 +406,7 @@ describe('the client reads both routes and writes through one queue', () => {
     };
     const onSavedEntryAdvanced = vi.fn(async () => undefined);
     const subject = new WorldObjectsClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
       savedEntry: () => binding,
       onSavedEntryAdvanced,
@@ -435,6 +452,7 @@ describe('the client reads both routes and writes through one queue', () => {
       authoredEditSeq: Number(FIXTURE['edit_seq']),
     };
     const subject = new WorldObjectsClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
       defaultVersionId: VERSION_ID, savedEntry: () => binding,
     });
@@ -467,6 +485,7 @@ describe('the client reads both routes and writes through one queue', () => {
     };
     const { fetchImpl } = transport({ [ASSETS]: registryRows(), [VERSION]: returned });
     const subject = new WorldObjectsClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
       defaultVersionId: VERSION_ID, savedEntry: () => binding,
     });
@@ -624,6 +643,7 @@ describe('the client reads both routes and writes through one queue', () => {
       return new Response(JSON.stringify(FIXTURE), { status: 200 });
     });
     const subject = new WorldObjectsClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test', token: 'token',
       fetch: fetchSlow as unknown as typeof globalThis.fetch,
     });
@@ -657,6 +677,7 @@ describe('the client reads both routes and writes through one queue', () => {
       return new Response(JSON.stringify(FIXTURE), { status: 200 });
     });
     const subject = new WorldObjectsClient({
+      worldId: TEST_WORLD,
       baseUrl: 'https://exulanica.test', token: 'token',
       fetch: fetchImpl as unknown as typeof globalThis.fetch,
     });
@@ -709,7 +730,7 @@ describe('a refusal reaches the surface in words', () => {
 describe('alternate version bootstrap transport', () => {
   it('reads a base before confirmation and submits only that base', async () => {
     const calls: { path: string; method: string; body: unknown; authorization: string | null }[] = [];
-    const client = new WorldObjectsClient({ baseUrl: 'https://fixture.test', token: 'fixture',
+    const client = new WorldObjectsClient({ worldId: TEST_WORLD, baseUrl: 'https://fixture.test', token: 'fixture',
       fetch: async (input, init) => {
         const path = new URL(String(input)).pathname;
         calls.push({ path, method: init?.method ?? 'GET',

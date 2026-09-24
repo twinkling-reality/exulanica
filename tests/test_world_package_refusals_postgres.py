@@ -26,7 +26,6 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exulanica.world.authored_delta import DELTA_SECTIONS, DeltaSection
 from exulanica.world.edit_kinds import EDIT_KINDS, EditSubject
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world_package import (
     authored,
     environments,
@@ -43,6 +42,7 @@ from test_world_package_extension_postgres import _one_version_one_object
 from test_world_package_withdrawal_postgres import WITHDRAWN
 from test_world_package_withdrawal_postgres import people as imported_people  # noqa: F401
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -64,15 +64,20 @@ class Refusal:
 
 
 def _project(repository, output: Path, **overrides):
-    """A projection of the world a reach wrote into, or of the default world when it wrote none."""
+    """A projection of the world a reach wrote into, or of a registered world when it wrote none.
+
+    A reach that writes no world still names a registered one, so it ends in its own refusal
+    rather than in the one for a world this workspace does not hold.
+    """
     arguments = {
         "workspace_id": repository.workspace_id,
         "actor": uuid.uuid4(),
         "output": output,
         "private_key": Ed25519PrivateKey.generate(),
-        "world_id": DEFAULT_WORLD_ID,
     }
     arguments.update(overrides)
+    if "world_id" not in arguments:
+        arguments["world_id"] = registered_world(repository.connection, repository.workspace_id)
     return project_world_package(repository.connection, **arguments)
 
 
@@ -107,6 +112,14 @@ def _existing_output(repository, tmp_path, **_):
 
 def _bad_parent_root(repository, tmp_path, **_):
     return {"parent_merkle_root_sha256": "A" * 64}
+
+
+def _a_world_another_workspace_holds(repository, tmp_path, **_):
+    elsewhere = registered_world(repository.connection, uuid.uuid4(), "world:personal:elsewhere")
+    return {
+        "world_id": elsewhere,
+        "expected": "'world:personal:elsewhere' is not a world this workspace holds",
+    }
 
 
 def _environment_under_authored_alone(repository, tmp_path, **_):
@@ -234,6 +247,7 @@ REFUSALS: dict[str, Refusal] = {
     "parent Merkle root must be a lowercase SHA-256 digest": Refusal(
         _bad_parent_root, "parent Merkle root must be a lowercase SHA-256 digest"
     ),
+    "{} is not a world this workspace holds": Refusal(_a_world_another_workspace_holds),
     "{} cannot export versions whose state includes environment instances or environment "
     "edits; request {} rather than omit them or emit schema version 2 under the {} extension "
     "name": Refusal(

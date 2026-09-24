@@ -16,6 +16,7 @@ import pathlib
 import re
 
 import pytest
+from exulanica.api.world_version_document import VersionEditView
 from exulanica.world import VersionEdit, WorldObjectRepository
 from exulanica.world.edit_kinds import (
     EDIT_KINDS,
@@ -220,6 +221,13 @@ def test_history_and_the_log_writer_name_every_subject_column():
     columns = {subject.column for subject in EditSubject}
     history = {field.name for field in dataclasses.fields(VersionEdit)}
     assert {name for name in history if name.endswith("_id")} - {
+        "edit_id",
+        "undone_edit_id",
+    } == columns
+    # The history a client is served names every subject too, so an edit it lists is never one
+    # it cannot say what it changed.
+    served = set(VersionEditView.model_fields)
+    assert {name for name in served if name.endswith("_id")} - {
         "edit_id",
         "undone_edit_id",
     } == columns

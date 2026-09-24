@@ -38,6 +38,7 @@ def experiment_api(runtime_world, spine_schema, monkeypatch):
     societies = SocietyRepository(
         world["connection"],
         world["workspace"],
+        world_id=world["version"].world_id,
         input_authorizer=lambda document: world["runtime"].authorize(
             world["connection"], world["session"], document
         ),
@@ -135,6 +136,7 @@ def test_prepare_reserve_reload_and_compact_completed_result(experiment_api, mon
     case = experiment_api
     client = case["client"]
     version_id = case["world"]["binding"].version_id
+    scope = {"world_id": case["world"]["binding"].world_id}
     route = f"/world/versions/{version_id}/society/experiments"
     experiment_id, attempt_id = uuid.uuid4(), uuid.uuid4()
 
@@ -150,8 +152,13 @@ def test_prepare_reserve_reload_and_compact_completed_result(experiment_api, mon
         "execute_pair",
         lambda *_args, **_kwargs: pytest.fail("HTTP preparation entered execution"),
     )
-    assert client.post(route, json=_definition_body(case, experiment_id)).status_code == 401
-    prepared = client.post(route, headers=_headers(), json=_definition_body(case, experiment_id))
+    assert (
+        client.post(route, params=scope, json=_definition_body(case, experiment_id)).status_code
+        == 401
+    )
+    prepared = client.post(
+        route, headers=_headers(), params=scope, json=_definition_body(case, experiment_id)
+    )
     assert prepared.status_code == 200, prepared.text
     definition_view = prepared.json()
     assert definition_view["record_status"] == "recorded"
@@ -159,7 +166,7 @@ def test_prepare_reserve_reload_and_compact_completed_result(experiment_api, mon
     assert definition_view["treatment_input_sha256"] == case["treatment"]["document_sha256"]
     assert definition_view["source_society_id"] == str(case["source_society_id"])
     assert (
-        client.get(f"{route}/{experiment_id}", headers=_headers(READER_TOKEN)).json()
+        client.get(f"{route}/{experiment_id}", headers=_headers(READER_TOKEN), params=scope).json()
         == definition_view
     )
 
@@ -167,6 +174,7 @@ def test_prepare_reserve_reload_and_compact_completed_result(experiment_api, mon
     reserved = client.post(
         f"{route}/{experiment_id}/attempts",
         headers=_headers(),
+        params=scope,
         json={"attempt_id": str(attempt_id), "seed_sha256": seed},
     )
     assert reserved.status_code == 200, reserved.text
@@ -189,7 +197,9 @@ def test_prepare_reserve_reload_and_compact_completed_result(experiment_api, mon
     assert receipt.status == "completed"
 
     completed = client.get(
-        f"{route}/{experiment_id}/attempts/{attempt_id}", headers=_headers(READER_TOKEN)
+        f"{route}/{experiment_id}/attempts/{attempt_id}",
+        headers=_headers(READER_TOKEN),
+        params=scope,
     )
     assert completed.status_code == 200, completed.text
     payload = completed.json()
@@ -206,48 +216,72 @@ def test_permissions_nesting_idempotency_and_bounded_request_refusals(experiment
     case = experiment_api
     client = case["client"]
     version_id = case["world"]["binding"].version_id
+    scope = {"world_id": case["world"]["binding"].world_id}
     route = f"/world/versions/{version_id}/society/experiments"
     experiment_id, attempt_id = uuid.uuid4(), uuid.uuid4()
     body = _definition_body(case, experiment_id)
-    assert client.post(route, headers=_headers(READ_ONLY_TOKEN), json=body).status_code == 404
-    created = client.post(route, headers=_headers(), json=body)
+    assert (
+        client.post(route, headers=_headers(READ_ONLY_TOKEN), params=scope, json=body).status_code
+        == 404
+    )
+    created = client.post(route, headers=_headers(), params=scope, json=body)
     assert created.status_code == 200, created.text
-    assert client.post(route, headers=_headers(), json=body).json() == created.json()
+    assert client.post(route, headers=_headers(), params=scope, json=body).json() == created.json()
     conflict = client.post(
         route,
         headers=_headers(),
+        params=scope,
         json=_definition_body(case, experiment_id, followup_ticks=4),
     )
     assert conflict.status_code == 409
     assert conflict.json()["code"] == "experiment_conflict"
     assert (
-        client.get(f"{route}/{experiment_id}", headers=_headers(WRITE_ONLY_TOKEN)).status_code
+        client.get(
+            f"{route}/{experiment_id}", headers=_headers(WRITE_ONLY_TOKEN), params=scope
+        ).status_code
         == 404
     )
 
     seed = experiments.DEVELOPMENT_SEEDS[1]
     attempt_route = f"{route}/{experiment_id}/attempts"
     reserve_body = {"attempt_id": str(attempt_id), "seed_sha256": seed}
-    assert client.post(attempt_route, headers=_headers(), json=reserve_body).status_code == 200
-    assert client.post(attempt_route, headers=_headers(), json=reserve_body).status_code == 200
-    conflicting_seed = {**reserve_body, "seed_sha256": experiments.DEVELOPMENT_SEEDS[2]}
-    assert client.post(attempt_route, headers=_headers(), json=conflicting_seed).status_code == 409
     assert (
-        client.get(f"{route}/{uuid.uuid4()}/attempts/{attempt_id}", headers=_headers()).status_code
+        client.post(attempt_route, headers=_headers(), params=scope, json=reserve_body).status_code
+        == 200
+    )
+    assert (
+        client.post(attempt_route, headers=_headers(), params=scope, json=reserve_body).status_code
+        == 200
+    )
+    conflicting_seed = {**reserve_body, "seed_sha256": experiments.DEVELOPMENT_SEEDS[2]}
+    assert (
+        client.post(
+            attempt_route, headers=_headers(), params=scope, json=conflicting_seed
+        ).status_code
+        == 409
+    )
+    assert (
+        client.get(
+            f"{route}/{uuid.uuid4()}/attempts/{attempt_id}", headers=_headers(), params=scope
+        ).status_code
         == 404
     )
     assert (
-        client.get(f"{route}/{experiment_id}", headers=_headers(FOREIGN_TOKEN)).status_code == 404
+        client.get(
+            f"{route}/{experiment_id}", headers=_headers(FOREIGN_TOKEN), params=scope
+        ).status_code
+        == 404
     )
     assert (
         client.get(
             f"{route}/{experiment_id}/attempts/{attempt_id}",
             headers=_headers(FOREIGN_TOKEN),
+            params=scope,
         ).status_code
         == 404
     )
     wrong_version = f"/world/versions/{uuid.uuid4()}/society/experiments/{experiment_id}"
-    assert client.get(wrong_version, headers=_headers()).status_code == 404
+    assert client.get(wrong_version, headers=_headers(), params=scope).status_code == 404
 
     before = (
         case["world"]["connection"]
@@ -258,12 +292,12 @@ def test_permissions_nesting_idempotency_and_bounded_request_refusals(experiment
         .fetchone()["n"]
     )
     invalid = _definition_body(case, uuid.uuid4(), population=257)
-    assert client.post(route, headers=_headers(), json=invalid).status_code == 422
+    assert client.post(route, headers=_headers(), params=scope, json=invalid).status_code == 422
     arbitrary = _definition_body(case, uuid.uuid4()) | {"evidence": {"invented": True}}
-    assert client.post(route, headers=_headers(), json=arbitrary).status_code == 422
+    assert client.post(route, headers=_headers(), params=scope, json=arbitrary).status_code == 422
     unsupported = _definition_body(case, uuid.uuid4())
     unsupported["intervention"] = {"kind": "replace_everything"}
-    assert client.post(route, headers=_headers(), json=unsupported).status_code == 422
+    assert client.post(route, headers=_headers(), params=scope, json=unsupported).status_code == 422
     after = (
         case["world"]["connection"]
         .execute(
@@ -281,13 +315,13 @@ def test_permissions_nesting_idempotency_and_bounded_request_refusals(experiment
         treatment_input_seq=1,
         intervention={"kind": "noop"},
     )
-    noop_response = client.post(route, headers=_headers(), json=noop)
+    noop_response = client.post(route, headers=_headers(), params=scope, json=noop)
     assert noop_response.status_code == 200, noop_response.text
     assert noop_response.json()["intervention"] == {"kind": "noop", "target_id": None}
 
     authorizer = client.app.state.society_input_authorizer
     del client.app.state.society_input_authorizer
-    assert client.get(f"{route}/{noop_id}", headers=_headers()).status_code == 424
+    assert client.get(f"{route}/{noop_id}", headers=_headers(), params=scope).status_code == 424
     client.app.state.society_input_authorizer = authorizer
 
 
@@ -295,12 +329,14 @@ def test_current_runtime_withdrawal_gates_definition_and_attempt_reads(experimen
     case = experiment_api
     client = case["client"]
     version_id = case["world"]["binding"].version_id
+    scope = {"world_id": case["world"]["binding"].world_id}
     route = f"/world/versions/{version_id}/society/experiments"
     experiment_id, attempt_id = uuid.uuid4(), uuid.uuid4()
     assert (
         client.post(
             route,
             headers=_headers(),
+            params=scope,
             json=_definition_body(case, experiment_id),
         ).status_code
         == 200
@@ -309,6 +345,7 @@ def test_current_runtime_withdrawal_gates_definition_and_attempt_reads(experimen
         client.post(
             f"{route}/{experiment_id}/attempts",
             headers=_headers(),
+            params=scope,
             json={
                 "attempt_id": str(attempt_id),
                 "seed_sha256": experiments.DEVELOPMENT_SEEDS[3],
@@ -318,8 +355,12 @@ def test_current_runtime_withdrawal_gates_definition_and_attempt_reads(experimen
     )
     source = case["world"]["binding"].sources[0]
     case["world"]["admissions"].withdraw("source", source.admission_id)
-    assert client.get(f"{route}/{experiment_id}", headers=_headers()).status_code == 424
     assert (
-        client.get(f"{route}/{experiment_id}/attempts/{attempt_id}", headers=_headers()).status_code
+        client.get(f"{route}/{experiment_id}", headers=_headers(), params=scope).status_code == 424
+    )
+    assert (
+        client.get(
+            f"{route}/{experiment_id}/attempts/{attempt_id}", headers=_headers(), params=scope
+        ).status_code
         == 424
     )

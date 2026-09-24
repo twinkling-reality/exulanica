@@ -19,6 +19,7 @@ from pydantic import (
 )
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, ScopedConnection
+from exulanica.api.world_scope import WorldId
 from exulanica.world import (
     INTERACTION_POLICY_REGISTRY,
     InteractionPolicyVersion,
@@ -30,6 +31,7 @@ from exulanica.world import (
     StaleInteractionPolicy,
     WorldInteractionPolicyRepository,
 )
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/interactions", tags=["world"])
 
@@ -150,15 +152,17 @@ class InteractionRecommendationView(BaseModel):
 
 
 def read_repository(
-    connection: ReadOnlyConnection, session: CurrentSession
+    connection: ReadOnlyConnection, session: CurrentSession, world_id: WorldId
 ) -> WorldInteractionPolicyRepository:
-    return WorldInteractionPolicyRepository(connection, session.workspace_id)
+    require_world(connection, session.workspace_id, world_id)
+    return WorldInteractionPolicyRepository(connection, session.workspace_id, world_id=world_id)
 
 
 def write_repository(
-    connection: ScopedConnection, session: CurrentSession
+    connection: ScopedConnection, session: CurrentSession, world_id: WorldId
 ) -> WorldInteractionPolicyRepository:
-    return WorldInteractionPolicyRepository(connection, session.workspace_id)
+    require_world(connection, session.workspace_id, world_id)
+    return WorldInteractionPolicyRepository(connection, session.workspace_id, world_id=world_id)
 
 
 ReadInteraction = Annotated[WorldInteractionPolicyRepository, Depends(read_repository)]

@@ -12,21 +12,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.society_decision_runtime import request_decision
-from exulanica.world.models import DEFAULT_WORLD_ID
+from exulanica.api.world_scope import WorldId
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import DEFAULT_ENGINE, ENGINES, society_engine
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["society"])
 #: The profiles a society can be created with: the engine table's, in its order.
 EngineProfile = Literal[tuple(engine.engine for engine in ENGINES)]  # type: ignore[valid-type]
-
-#: Which saved world the authored version belongs to. A person's own world is not the default
-#: one, and the repository refuses a version that does not belong to the world named here, so a
-#: wrong or absent value reads as an unavailable version rather than reaching another world.
-WorldId = Annotated[str, Query(min_length=1, max_length=200)]
 
 
 class CreateSocietyBody(BaseModel):
@@ -62,8 +58,11 @@ def _repository(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: str = DEFAULT_WORLD_ID,
+    world_id: str,
 ) -> SocietyRepository:
+    """The named world's societies. A world the workspace does not hold is an unknown resource,
+    and the repository refuses a version that does not belong to the world named here."""
+    require_world(connection, session.workspace_id, world_id)
     authorizer = getattr(request.app.state, "society_input_authorizer", None)
     return SocietyRepository(
         connection,
@@ -96,7 +95,7 @@ def create_society(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     def create() -> dict:
         repo = _repository(connection, session, request, world_id)
@@ -138,7 +137,7 @@ def propose_decision(
     body: DecisionBody,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     return _call(
         lambda: request_decision(
@@ -162,7 +161,7 @@ def read_decision(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     with connection.transaction():
         return _call(
@@ -179,7 +178,7 @@ def society(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
     places: Annotated[bool, Query()] = False,
 ) -> Any:
     """The current state. ``places`` adds where inhabitants can go, as its consumed input says."""
@@ -198,7 +197,7 @@ def advance_society(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     return _call(
         lambda: _repository(connection, session, request, world_id).advance(
@@ -215,7 +214,7 @@ def change_society_presence(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     """One recorded minute in which everyone leaves, or the same people arrive again.
 
@@ -247,7 +246,7 @@ def society_events(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
     limit: Annotated[int, Query(ge=1, le=256)] = 256,
 ) -> Any:
     return _call(
@@ -266,7 +265,7 @@ def replay_society(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: WorldId = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Any:
     return _call(
         lambda: _repository(connection, session, request, world_id).replay(version_id),

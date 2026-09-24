@@ -21,12 +21,12 @@ from exulanica.graph.world_read_verification import EvidenceError, verify
 from exulanica.ingest import person_review
 from exulanica.ingest.person_review import create_subject, record_consent, record_region_edits
 from exulanica.ingest.privacy import authorize_personal_capture, record_human_screening
-from exulanica.world import DEFAULT_WORLD_ID
 
 from conftest import write_point_map
 from test_api import deployment as deployment
 from test_screening_currency import ACTOR, KEY, OUTLINE
-from test_world_read_route import _scene_in
+from test_world_read_route import IN_WORLD, _scene_in, _stranger_world
+from world_support import FIXTURE_WORLD_ID
 
 FIRST = dt.datetime(2020, 1, 1, tzinfo=dt.UTC)
 
@@ -205,7 +205,7 @@ def test_default_time_writer_to_authenticated_recipient(deployment, repository, 
     with patch("test_world_read_route.write_point_map", with_person):
         scene = _scene_in(deployment, repository, tmp_path)
     route = f"/world-read/scenes/{scene}"
-    response = deployment.as_owner("GET", route)
+    response = deployment.as_owner("GET", route, params=IN_WORLD)
     assert response.status_code == 200, response.text
     envelope = response.json()
     _save("route-bundle.json", envelope)
@@ -253,7 +253,8 @@ def test_default_time_writer_to_authenticated_recipient(deployment, repository, 
         assert person["scopes"]["likeness"] is True
         assert person["scopes"]["naming"] is naming
         _save(label + "-evaluation.json", evaluation)
-    assert deployment.as_stranger("GET", route).status_code == 404
+    _stranger_world(deployment)
+    assert deployment.as_stranger("GET", route, params=IN_WORLD).status_code == 404
     record_consent(
         repository,
         subject_id=configured["subject"],
@@ -267,13 +268,13 @@ def test_default_time_writer_to_authenticated_recipient(deployment, repository, 
         repository.workspace_id,
         scene,
         deployment.store,
-        world_id=DEFAULT_WORLD_ID,
+        world_id=FIXTURE_WORLD_ID,
     )
     evaluation = verify(
         withdrawn, at="2026-09-08T00:00:00Z", expected_bundle_sha256=withdrawn["bundle_sha256"]
     )
     assert evaluation["people"][str(configured["capture"])][0]["withdrawn"] is True
-    assert deployment.as_owner("GET", route).status_code == 404
+    assert deployment.as_owner("GET", route, params=IN_WORLD).status_code == 404
     _save("withdrawn-bundle.json", withdrawn)
     _save("withdrawn-evaluation.json", evaluation)
     # Read-only inspection of disagreement policy: no historical row is rewritten.

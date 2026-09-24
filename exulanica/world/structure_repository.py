@@ -18,7 +18,7 @@ from exulanica.world.errors import (
     StaleStructuralBase,
     UnknownWorldResource,
 )
-from exulanica.world.models import DEFAULT_WORLD_ID, TopologyContract, TopologySourceSlot
+from exulanica.world.models import TopologyContract, TopologySourceSlot
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.structure import (
     SpatialCandidate,
@@ -44,7 +44,7 @@ class WorldStructureRepository:
         connection: psycopg.Connection,
         workspace_id: uuid.UUID,
         *,
-        world_id: str = DEFAULT_WORLD_ID,
+        world_id: str,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id

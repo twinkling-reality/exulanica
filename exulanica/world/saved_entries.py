@@ -37,6 +37,7 @@ from exulanica.world.style_structure import (
     StyleVersionRef,
     raise_for_incompatible_structure_style,
 )
+from exulanica.world.worlds import AUTHORED_STARTER, new_world_id
 
 __all__ = [
     "SavedWorldCandidate",
@@ -209,6 +210,27 @@ class SavedWorldEntryRepository:
             for row in rows
         )
 
+    def citable_references(self, world_id: str) -> tuple[SavedWorldSourceAttachment, ...]:
+        """The reference photographs a world uses now and may show, each available right now.
+
+        The world's saved entry's current collection, every membership evaluated at this
+        statement under the authorization and screening it pinned, exactly as an entry read
+        reports it. A detached photograph, one whose pinned review or authorization expired, one
+        whose source was deleted or withdrawn, and one with no viewer bytes in ``store`` are not
+        among them. A world with no saved entry has none.
+        """
+        row = self.connection.execute(
+            "select entry_id from saved_world_entry where workspace_id=%s and world_id=%s",
+            (self.workspace_id, world_id),
+        ).fetchone()
+        if row is None:
+            return ()
+        return tuple(
+            attachment
+            for attachment in self._attachments(row["entry_id"])
+            if attachment.availability == "available"
+        )
+
     def entry(self, entry_id: uuid.UUID) -> SavedWorldEntry:
         row = self.connection.execute(
             self._select() + " and e.entry_id=%s",
@@ -292,7 +314,7 @@ class SavedWorldEntryRepository:
 
             from exulanica.world.starter import create_starter_authorities
 
-            world_id = f"world:authored:{uuid.uuid4()}"
+            world_id = new_world_id(AUTHORED_STARTER)
             _, style, authored_version_id = create_starter_authorities(
                 self.connection,
                 workspace_id=self.workspace_id,

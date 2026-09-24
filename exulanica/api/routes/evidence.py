@@ -64,7 +64,6 @@ from exulanica.graph.world_read_views import ViewError, current_binding, image_f
 from exulanica.ingest.resolve import resolve_region_image
 from exulanica.selection.validation import Session
 from exulanica.store.resolve import address_from_span_row, resolve_original_bytes
-from exulanica.world import DEFAULT_WORLD_ID
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
 
@@ -130,8 +129,8 @@ def masked(
                 session.workspace_id,
                 view_scene,
                 store,
-                # Photographs are placed in the regions of the personal-source world.
-                world_id=DEFAULT_WORLD_ID,
+                # A view binding covers the view and not the region graph, so no world is read.
+                world_id=None,
             )
             if envelope is None:
                 raise HTTPException(404, "no such posed view")

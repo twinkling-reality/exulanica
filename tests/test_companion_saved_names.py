@@ -54,6 +54,7 @@ from conftest import (
 )
 from model_fakes import FakeTransport, chat_body
 from test_selection_proposal import current_reference, reply, scripted
+from world_support import FIXTURE_WORLD_ID
 
 PERSON = "Maria Estrada"
 PLACE = "Lantern House"
@@ -157,6 +158,7 @@ def _ask(repository, store, session, question: str, search: str) -> tuple[object
         client,
         question,
         session,
+        world_id=None,
         store=store,
         before_compose=composer_rights_check(repository.connection, repository.workspace_id),
     )
@@ -235,7 +237,13 @@ def test_no_saved_name_is_sent_to_the_request_classifier(named):
     client, transport = _client(repository, [reply({"kind": "question"})])
 
     propose_appearance(
-        repository.connection, client, utterance, session, current=current_reference()
+        repository.connection,
+        client,
+        utterance,
+        session,
+        current=current_reference(),
+        world_id=FIXTURE_WORLD_ID,
+        store=None,
     )
 
     (classifier,) = [json.dumps(request["payload"]) for request in transport.requests]
@@ -244,7 +252,13 @@ def test_no_saved_name_is_sent_to_the_request_classifier(named):
     # The call site's half, read before any boundary: the person replaced, the place as saved.
     recorded, recording = scripted(reply({"kind": "question"}))
     propose_appearance(
-        repository.connection, recorded, utterance, session, current=current_reference()
+        repository.connection,
+        recorded,
+        utterance,
+        session,
+        current=current_reference(),
+        world_id=FIXTURE_WORLD_ID,
+        store=None,
     )
     (built,) = [json.dumps(request["payload"]) for request in recording.requests]
     assert "where [person A] stands outside Lantern House" in built
@@ -358,6 +372,7 @@ def test_no_saved_name_reaches_the_query_embedding_of_a_supplied_plan(named):
         client,
         "Where does the running club meet?",
         session,
+        world_id=None,
         plan=plan,
         store=store,
         before_compose=composer_rights_check(repository.connection, repository.workspace_id),

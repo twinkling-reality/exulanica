@@ -22,6 +22,10 @@ Every candidate is derived deterministically from the current complete parameter
 validated patch. Canonical JSON contains no floats; sensitivity is stored in integer thousandths.
 The policy SHA-256 therefore has one language-independent input representation.
 
+Interaction policy belongs to a world: every `/world/interactions` route except the catalog
+requires `world_id`, and the browser reads and writes the policy of the world it has open, when
+that world opens. Settings saved in one world are not read in another.
+
 ## One lifecycle, two origins
 
 Settings and Companion both create the same durable proposal and isolated preview records.

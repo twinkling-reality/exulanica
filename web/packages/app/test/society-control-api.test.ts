@@ -25,9 +25,12 @@ describe('society playback client', () => {
     const fetcher = vi.fn(async (_url, _init) => new Response(JSON.stringify({
       ...control, revision: 3, mode: 'playing', speed: 4,
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
-    const client = new SocietyControlClient({ baseUrl: 'https://example.test', token: 'token', fetch: fetcher as typeof fetch });
+    const client = new SocietyControlClient({
+      baseUrl: 'https://example.test', token: 'token', worldId: 'world:personal:control', fetch: fetcher as typeof fetch,
+    });
     await client.configure(parseSocietyControl(control, version), 'playing', 4);
     expect(fetcher.mock.calls[0]![1]?.method).toBe('PUT');
+    expect(String(fetcher.mock.calls[0]![0])).toContain(`world_id=${encodeURIComponent('world:personal:control')}`);
     expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).toEqual({ base_revision: 2, mode: 'playing', speed: 4 });
   });
 });

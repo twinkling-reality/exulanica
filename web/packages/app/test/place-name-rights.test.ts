@@ -346,7 +346,8 @@ describe('a Companion answer', () => {
       execution: { prompt_version: 'selection-5', calls: [] },
       names: { '[place A]': PLACE, '[person A]': PERSON },
     }));
-    const answer = await new CompanionAskClient({ baseUrl: BASE, token: 't', fetch }).ask('What does the sign say?');
+    const answer = await new CompanionAskClient({ baseUrl: BASE, token: 't', worldId: 'world:test', fetch })
+      .ask('What does the sign say?');
     expect(answer.places).toEqual([PLACE, other]);
   });
 

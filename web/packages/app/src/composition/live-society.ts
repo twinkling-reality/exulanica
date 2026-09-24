@@ -25,8 +25,8 @@ export interface LiveSocietyOptions {
   /** Preview composition must never construct this authenticated adapter. */
   readonly preview: boolean;
   readonly credentials: TransportOptions;
-  /** The saved world the version belongs to; omitted for the default world. */
-  readonly worldId?: string;
+  /** The open world the version belongs to, which every request names. */
+  readonly worldId: string;
   readonly versionId: string;
   /** Null asks the server for a saved world's own place, which it derives from the version. */
   readonly placeId: string | null;
@@ -77,7 +77,7 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
   const client = options.client ?? new SocietyClient({
     ...options.credentials,
     signal: abort.signal,
-    ...(options.worldId === undefined ? {} : { worldId: options.worldId }),
+    worldId: options.worldId,
   });
   const profile = options.profile ?? 'exulanica-society/v4';
   const createOnConnect = options.createOnConnect ?? true;

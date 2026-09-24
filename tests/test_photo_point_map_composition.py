@@ -787,15 +787,16 @@ def test_every_other_kind_still_composes_with_world_write_alone(placed, grants):
 def test_an_environment_still_composes_with_world_write_alone(composed, spine_schema):
     composed.worlds.connection.commit()
     version_id = composed.version.version_id
+    world = f"?world_id={composed.worlds.world_id}"
     with _narrow_application(spine_schema, composed.worlds.workspace_id, composed.store) as narrow:
-        version = narrow.get("world_writer", f"/world/versions/{version_id}").json()
+        version = narrow.get("world_writer", f"/world/versions/{version_id}{world}").json()
         body = environment_body(composed, version)
         ready = narrow.post(
-            "world_writer", f"/world/versions/{version_id}/compositions/preview", body
+            "world_writer", f"/world/versions/{version_id}/compositions/preview{world}", body
         )
         assert ready.json()["availability"] == "ready", ready.text
         applied = narrow.post(
-            "world_writer", f"/world/versions/{version_id}/compositions/apply", body
+            "world_writer", f"/world/versions/{version_id}/compositions/apply{world}", body
         )
         assert applied.status_code == 201, applied.text
 

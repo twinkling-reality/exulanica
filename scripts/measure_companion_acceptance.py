@@ -234,7 +234,7 @@ def compare_retrieval(connection, session, plan, *, query_embedding):
     validated = validate(connection, plan, session)
     observations = {}
     for arm, vector in (("lexical", None), ("fused", query_embedding)):
-        result = execute(connection, validated, query_embedding=vector)
+        result = execute(connection, validated, world_id=None, query_embedding=vector)
         packet = build_packet(connection, result, workspace_id=session.workspace_id)
         observations[arm] = {
             "capture_ids": [str(c.capture_id) for c in result.captures],

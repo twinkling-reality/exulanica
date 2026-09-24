@@ -66,6 +66,7 @@ from exulanica.world_package import project_world_package
 from PIL import Image
 
 from conftest import CountingVisionModel, write_photo, write_point_map
+from world_support import registered_world
 
 _CODE_REVISION = "a" * 40
 _EXECUTION_IMAGE = "registry.example/exulanica-pose@sha256:" + "b" * 64
@@ -516,6 +517,7 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
         actor=uuid.uuid4(),
         output=tmp_path / "rebuilt-package",
         private_key=Ed25519PrivateKey.generate(),
+        world_id=registered_world(repository.connection, repository.workspace_id),
     )
     reconstruction = json.loads(
         (package.output / "reconstruction/artifacts.json").read_text(encoding="utf-8")
@@ -572,6 +574,7 @@ def test_object_store_failure_keeps_a_prepared_scene_private_and_retryable(
         actor=uuid.uuid4(),
         output=tmp_path / "prepared-package",
         private_key=Ed25519PrivateKey.generate(),
+        world_id=registered_world(repository.connection, repository.workspace_id),
     )
     reconstruction = json.loads(
         (package.output / "reconstruction/artifacts.json").read_text(encoding="utf-8")

@@ -23,7 +23,9 @@ from route_probes import (
     default_probe,
     derive_probes,
     fill,
+    requires_world,
 )
+from world_support import FIXTURE_WORLD_ID
 
 APP = routing_only_application()
 SWEPT = routable_paths(APP)
@@ -100,8 +102,33 @@ def test_a_route_is_probed_by_being_declared():
     key = ("POST", "/world/versions/{version_id}/objects/undo")
     reduced = {route: probe for route, probe in PROBE_OVERRIDES.items() if route_key(route) != key}
     probes = derive_probes(OPERATIONS, reduced)
-    assert probes[key] == {"json": {}}
+    assert probes[key] == {"json": {}, "params": {"world_id": FIXTURE_WORLD_ID}}
     assert set(probes) == set(authenticated_routes())
+
+
+def _probed_without_their_world(probes) -> list[str]:
+    """Each route that requires a world and whose probe does not name the fixture world."""
+    return sorted(
+        f"{method} {path}"
+        for (method, path), probe in probes.items()
+        if requires_world(OPERATIONS[path][method.lower()])
+        and probe.get("params", {}).get("world_id") != FIXTURE_WORLD_ID
+    )
+
+
+def test_every_route_that_requires_a_world_is_probed_in_one():
+    """A world route probed without its world stops at request validation, which "never 403"
+    cannot tell from an answer, and the existence sweep's stranger would never reach its lookup.
+    The default names the world; an override has to say it too."""
+    assert sum(requires_world(OPERATIONS[path][method.lower()]) for method, path in ROUTE_PROBES)
+    assert _probed_without_their_world(ROUTE_PROBES) == []
+
+
+def test_an_override_that_forgets_its_world_is_named():
+    """Positive control for the check above, on an override of a route that requires a world."""
+    route = "POST /world/versions"
+    forgetful = {**PROBE_OVERRIDES, route: {"json": PROBE_OVERRIDES[route]["json"]}}
+    assert _probed_without_their_world(derive_probes(OPERATIONS, forgetful)) == [route]
 
 
 @pytest.mark.parametrize(("method", "path"), sorted(ROUTE_PROBES))

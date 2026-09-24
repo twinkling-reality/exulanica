@@ -14,7 +14,7 @@ import uuid
 from exulanica.graph import read_snapshot
 
 from test_api import deployment as deployment
-from test_world_read_route import _scene_in
+from test_world_read_route import IN_WORLD, _scene_in, _stranger_world
 
 _SEAM = "The shelf continues past the last photograph; everything beyond it is imagined."
 
@@ -38,7 +38,7 @@ def _body(bundle_sha256: str, **overrides) -> dict:
 
 
 def _recorded(deployment, scene_id) -> str:
-    read = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}")
+    read = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}", params=IN_WORLD)
     assert read.status_code == 200, read.text
     return read.json()["bundle"]["recorded_sha256"]
 
@@ -48,7 +48,10 @@ def test_a_generation_is_filed_and_appears_in_the_graph(deployment, repository, 
     recorded = _recorded(deployment, scene_id)
 
     response = deployment.as_owner(
-        "POST", f"/world-write/scenes/{scene_id}/generated", json=_body(recorded)
+        "POST",
+        f"/world-write/scenes/{scene_id}/generated",
+        json=_body(recorded),
+        params=IN_WORLD,
     )
     assert response.status_code == 201, response.text
     filed = response.json()
@@ -69,8 +72,9 @@ def test_filing_the_identical_receipt_twice_answers_200_and_writes_once(
 ):
     scene_id = _scene_in(deployment, repository, tmp_path)
     body = _body(_recorded(deployment, scene_id))
-    first = deployment.as_owner("POST", f"/world-write/scenes/{scene_id}/generated", json=body)
-    second = deployment.as_owner("POST", f"/world-write/scenes/{scene_id}/generated", json=body)
+    route = f"/world-write/scenes/{scene_id}/generated"
+    first = deployment.as_owner("POST", route, json=body, params=IN_WORLD)
+    second = deployment.as_owner("POST", route, json=body, params=IN_WORLD)
     assert first.status_code == 201 and second.status_code == 200
     assert second.json()["already_recorded"] is True
     assert first.json()["artifact_id"] == second.json()["artifact_id"]
@@ -87,7 +91,10 @@ def test_a_generation_naming_the_wrong_conditioning_is_refused(deployment, repos
     assert invented != _recorded(deployment, scene_id)
 
     response = deployment.as_owner(
-        "POST", f"/world-write/scenes/{scene_id}/generated", json=_body(invented)
+        "POST",
+        f"/world-write/scenes/{scene_id}/generated",
+        json=_body(invented),
+        params=IN_WORLD,
     )
     assert response.status_code == 409, response.text
     assert response.json()["code"] == "conditioning_does_not_verify"
@@ -106,6 +113,7 @@ def test_a_receipt_without_a_seam_is_refused_before_anything_is_written(
         "POST",
         f"/world-write/scenes/{scene_id}/generated",
         json=_body(recorded, seam="looks fine"),
+        params=IN_WORLD,
     )
     assert response.status_code == 422, response.text
     assert response.json()["code"] == "invalid_generation"
@@ -124,6 +132,7 @@ def test_an_oversized_receipt_is_refused_by_the_body_schema(deployment, reposito
         "POST",
         f"/world-write/scenes/{scene_id}/generated",
         json=_body(recorded, seam="x" * 5_000),
+        params=IN_WORLD,
     )
     assert long_seam.status_code == 422
 
@@ -135,6 +144,7 @@ def test_an_oversized_receipt_is_refused_by_the_body_schema(deployment, reposito
             conditioning=[{"role": "world-read-bundle", "sha256": recorded}]
             + [{"role": "point_map", "sha256": _sha(str(index))} for index in range(600)],
         ),
+        params=IN_WORLD,
     )
     assert many_digests.status_code == 422
 
@@ -143,15 +153,21 @@ def test_a_stranger_cannot_write_and_learns_nothing_from_trying(deployment, repo
     """Same 404 the read gives, for the same reason: the surface is not an existence oracle."""
     scene_id = _scene_in(deployment, repository, tmp_path)
     recorded = _recorded(deployment, scene_id)
+    _stranger_world(deployment)
 
     real = deployment.as_stranger(
-        "POST", f"/world-write/scenes/{scene_id}/generated", json=_body(recorded)
+        "POST", f"/world-write/scenes/{scene_id}/generated", json=_body(recorded), params=IN_WORLD
     )
     invented = deployment.as_stranger(
-        "POST", f"/world-write/scenes/{uuid.uuid4()}/generated", json=_body(recorded)
+        "POST",
+        f"/world-write/scenes/{uuid.uuid4()}/generated",
+        json=_body(recorded),
+        params=IN_WORLD,
     )
     assert real.status_code == 404
     assert real.json() == invented.json()
+    # The scene lookup answered, not the world check in front of it.
+    assert real.json()["detail"] == "no such scene"
 
     snapshot = read_snapshot(repository.connection, repository.workspace_id, deployment.store)
     scene = next(s for s in snapshot.reconstruction_scenes if str(s.scene_id) == str(scene_id))

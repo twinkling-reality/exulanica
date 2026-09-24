@@ -11,17 +11,17 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Path, Query, Request, Response
+from fastapi import APIRouter, Path, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.world_edit import ReadObjects, WriteObjects, object_problem
+from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import (
     AlternateVersionView,
     alternate_version_view,
     rendered_version,
 )
-from exulanica.world import DEFAULT_WORLD_ID
 from exulanica.world.bootstrap import bootstrap_world
 
 router = APIRouter(prefix="/world", tags=["world"])
@@ -100,7 +100,7 @@ def bootstrap_alternate_version(
     body: BootstrapWorldBody,
     connection: ScopedConnection,
     session: CurrentSession,
-    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> Response | BootstrapWorldView:
     try:
         return BootstrapWorldView(

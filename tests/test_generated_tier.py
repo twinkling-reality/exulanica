@@ -32,9 +32,9 @@ from exulanica.reconstruction.scene_gate import (
     SceneReceipt,
     validate_scene_gate_decision,
 )
-from exulanica.world import DEFAULT_WORLD_ID
 
 from test_world_read_bundle import _published_scene
+from world_support import FIXTURE_WORLD_ID
 
 _SEAM = "The counter continues past the last photograph; everything beyond it is imagined."
 
@@ -64,7 +64,7 @@ def generated(repository, tmp_path):
     """One real scene, and one generation recorded against its current bundle."""
     store, _captures, scene_id = _published_scene(repository, tmp_path, registered=3, spacing=5)
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     receipt = _receipt(envelope["bundle"]["recorded_sha256"])
@@ -155,7 +155,7 @@ def test_a_generation_naming_the_wrong_bundle_is_refused(repository, tmp_path):
     """The one refusal that makes the conditioning claim checkable rather than asserted."""
     store, _captures, scene_id = _published_scene(repository, tmp_path, registered=3, spacing=5)
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     invented = _sha("a bundle nobody ever produced")
@@ -173,7 +173,7 @@ def test_a_generation_naming_the_wrong_bundle_is_refused(repository, tmp_path):
 def test_recording_the_same_generation_twice_is_idempotent(repository, tmp_path, generated):
     store, scene_id, receipt, record = generated
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     again = record_generated_scene(
@@ -284,7 +284,7 @@ def test_recording_a_generation_does_not_move_the_recorded_rung(repository, tmp_
     scene_before = next(s for s in before.reconstruction_scenes if s.scene_id == scene_id)
 
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     record_generated_scene(
@@ -348,7 +348,7 @@ def test_the_graph_keeps_generated_geometry_out_of_trained_geometry(repository, 
 def test_the_read_bundle_keeps_generated_out_of_the_recorded_geometry_list(repository, generated):
     store, scene_id, _receipt, record = generated
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     bundle = envelope["bundle"]
@@ -417,7 +417,7 @@ def test_filing_a_generation_leaves_the_recorded_digest_untouched(repository, tm
     """
     store, _captures, scene_id = _published_scene(repository, tmp_path, registered=3, spacing=5)
     before = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert before is not None
     recorded = before["bundle"]["recorded_sha256"]
@@ -431,7 +431,7 @@ def test_filing_a_generation_leaves_the_recorded_digest_untouched(repository, tm
     )
 
     after = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert after is not None
     assert after["bundle"]["recorded_sha256"] == recorded
@@ -450,7 +450,7 @@ def test_two_generations_for_one_scene_are_both_visible(repository, tmp_path):
     """
     store, _captures, scene_id = _published_scene(repository, tmp_path, registered=3, spacing=5)
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     recorded = envelope["bundle"]["recorded_sha256"]
@@ -498,7 +498,7 @@ def test_a_superseded_generation_is_withdrawn_from_the_graph(repository, generat
     """
     store, scene_id, _receipt, first = generated
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     second = record_generated_scene(
@@ -550,7 +550,7 @@ def test_generated_receipt_retry_preserves_historical_id(repository, tmp_path, m
 
     store, _, scene_id = _published_scene(repository, tmp_path, registered=3, spacing=5)
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene_id, store, world_id=DEFAULT_WORLD_ID
+        repository.connection, repository.workspace_id, scene_id, store, world_id=FIXTURE_WORLD_ID
     )
     assert envelope is not None
     bundle_digest = envelope["bundle"]["recorded_sha256"]

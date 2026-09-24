@@ -42,6 +42,7 @@ from fastapi.testclient import TestClient
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS, write_photo
 from model_fakes import FakeTransport, chat_body
 from tests_support_api import EVERY_PERMISSION
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -49,6 +50,8 @@ TOKEN = "proposal-owner-token-long-enough-for-tests"
 STRANGER_TOKEN = "proposal-stranger-token-long-enough-for-tests"
 DRAFTER = "Qwen/Qwen3-235B-A22B-Instruct-2507"
 TOPOLOGY = "proposal-route-topology"
+#: The world both workspaces' topologies are registered in; each workspace holds its own.
+WORLD = FIXTURE_WORLD_ID
 
 
 def reply(payload: dict, *, model: str = DRAFTER) -> HttpResponse:
@@ -71,10 +74,10 @@ class ProposalApi:
         return {"Authorization": f"Bearer {TOKEN}"}
 
     def get(self, path):
-        return self.client.get(path, headers=self.headers)
+        return self.client.get(path, headers=self.headers, params={"world_id": WORLD})
 
     def post(self, path, body):
-        return self.client.post(path, headers=self.headers, json=body)
+        return self.client.post(path, headers=self.headers, json=body, params={"world_id": WORLD})
 
     def current(self):
         return self.get("/world/styles/current").json()
@@ -152,7 +155,10 @@ def proposal_api(repository, spine_schema, tmp_path, photo_dir, monkeypatch):
     ]
     assert spans
     source_ids = tuple(uuid.UUID(int=index + 1) for index in range(3))
-    WorldStyleRepository(repository.connection, repository.workspace_id).register_topology(
+    registered_world(repository.connection, repository.workspace_id, WORLD)
+    WorldStyleRepository(
+        repository.connection, repository.workspace_id, world_id=WORLD
+    ).register_topology(
         TopologyContract(
             TOPOLOGY,
             ("region-a",),
@@ -166,6 +172,7 @@ def proposal_api(repository, spine_schema, tmp_path, photo_dir, monkeypatch):
                 )
                 for index, source_id in enumerate(source_ids)
             ),
+            world_id=WORLD,
         )
     )
 
@@ -202,7 +209,8 @@ def proposal_api(repository, spine_schema, tmp_path, photo_dir, monkeypatch):
             "select span_id from evidence_span where workspace_id=%s order by span_id limit 1",
             (stranger,),
         ).fetchone()["span_id"]
-        WorldStyleRepository(connection, stranger).register_topology(
+        registered_world(connection, stranger, WORLD)
+        WorldStyleRepository(connection, stranger, world_id=WORLD).register_topology(
             TopologyContract(
                 "stranger-topology",
                 ("region-a",),
@@ -215,6 +223,7 @@ def proposal_api(repository, spine_schema, tmp_path, photo_dir, monkeypatch):
                         missing_reason=None,
                     ),
                 ),
+                world_id=WORLD,
             )
         )
     transport = FakeTransport()
@@ -478,6 +487,7 @@ def test_an_instance_with_no_model_credential_says_so_rather_than_guessing(
         response = client.post(
             "/selection/appearance",
             headers={"Authorization": f"Bearer {TOKEN}"},
+            params={"world_id": WORLD},
             json={"utterance": "softer horizon"},
         )
 

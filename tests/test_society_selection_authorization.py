@@ -21,7 +21,12 @@ def test_society_rights_gate_counts_pagination_and_historical_events(memory_plac
     conn = world.worlds.connection
     version = world.version.version_id
     doc = society_input(version)
-    society = SocietyRepository(conn, world.worlds.workspace_id, input_authorizer=lambda _: None)
+    society = SocietyRepository(
+        conn,
+        world.worlds.workspace_id,
+        world_id=world.worlds.world_id,
+        input_authorizer=lambda _: None,
+    )
     society.create(
         version,
         place_id=world.source.place_id,
@@ -43,6 +48,7 @@ def test_society_rights_gate_counts_pagination_and_historical_events(memory_plac
         return execute(
             conn,
             validate(conn, memory.plan(limit=limit, after=after), memory.session),
+            world_id=world.worlds.world_id,
             store=world.store,
             society_authorizer=authorizer,
         )

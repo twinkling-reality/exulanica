@@ -281,26 +281,35 @@ def _region_graph(
     workspace: uuid.UUID,
     capture_ids: set[uuid.UUID],
     *,
-    world_id: str,
+    world_id: str | None,
 ) -> dict[str, Any]:
-    """The slice of the durable region graph this scene's photographs occupy.
+    """The slice of one world's durable region graph this scene's photographs occupy.
 
     Regions are a real server concept, held by the structural authority in
     ``exulanica.world.structure_repository`` as an immutable snapshot with its own digests. The
     slice is derived by joining topology source slots to captures through their evidence spans,
     which is the same authority the world itself composes from.
 
-    When no structure has been committed, this returns an explicit ``unavailable`` state rather
-    than an empty region list. An empty list would read as "this scene belongs to no region", which
-    is a claim; "no structural snapshot exists in this workspace" is the fact.
+    When the named world has committed no structure, this returns an explicit ``unavailable``
+    state rather than an empty region list. An empty list would read as "this scene belongs to no
+    region", which is a claim; "no structural snapshot exists in this world" is the fact, and it
+    says nothing about the workspace's other worlds. ``world_id=None`` is a read that names no
+    world, and its region graph says so rather than choosing one.
     """
+    if world_id is None:
+        return {
+            "state": "unavailable",
+            "reason": "this read names no world, so it reads no world's regions",
+            "world_id": None,
+            "regions": [],
+        }
     repository = WorldStructureRepository(connection, workspace, world_id=world_id)
     snapshot = repository.effective_current()
     if snapshot is None:
         return {
             "state": "unavailable",
             "reason": (
-                "no current structural snapshot exists in this workspace, so no region owns "
+                "no current structural snapshot exists in this world, so no region owns "
                 "these photographs yet"
             ),
             "world_id": world_id,
@@ -552,7 +561,7 @@ def world_read_bundle(
     scene_id: uuid.UUID,
     store: ContentAddressedStore | None,
     *,
-    world_id: str,
+    world_id: str | None,
 ) -> dict[str, Any] | None:
     """Assemble the digest-bound read bundle for one scene, or ``None`` if it is not readable.
 
@@ -561,7 +570,9 @@ def world_read_bundle(
 
     ``world_id`` names the world whose structural snapshot places the scene's photographs in
     regions. It has no default: a workspace can hold several worlds, and a read that assumed one
-    would answer about the wrong world's regions without saying so.
+    would answer about the wrong world's regions without saying so. ``None`` names no world: the
+    bundle's region graph says it read none, for a caller that uses no part of the bundle a world
+    decides.
     """
     scenes = reconstruction_scene_rows(connection, workspace, store, scene_id=scene_id)
     if not scenes:
@@ -728,7 +739,7 @@ def _assemble(
     addressing: dict[str, Any],
     place: dict[str, Any] | None,
     *,
-    world_id: str,
+    world_id: str | None,
 ) -> dict[str, Any]:
     """One scene's bundle under whichever address reached it.
 

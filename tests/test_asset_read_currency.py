@@ -11,6 +11,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlencode
 
 import psycopg
 import pytest
@@ -26,6 +27,7 @@ from fastapi.testclient import TestClient
 from conftest import scratch_role_database
 from test_screening_currency import ACTOR, Case
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import registered_world
 
 TOKEN = "asset-read-generated-owner-token"
 FOREIGN = "asset-read-generated-foreign-token"
@@ -339,30 +341,35 @@ def test_source_metadata_review_and_mask_bytes_agree(delivery):
     c = d.case
     span = uuid.UUID(d.path.rsplit("/", 1)[1])
     source = uuid.uuid4()
-    WorldStyleRepository(c.repo.connection, c.repo.workspace_id).register_topology(
+    world_id = registered_world(c.repo.connection, c.repo.workspace_id)
+    WorldStyleRepository(
+        c.repo.connection, c.repo.workspace_id, world_id=world_id
+    ).register_topology(
         TopologyContract(
             "currency-source",
             ("region-a",),
             (TopologySourceSlot(source, "generated", "region-a", span, None),),
+            world_id=world_id,
         )
     )
-    [row] = d.get("/world/source-media").json()
+    media = "/world/source-media?" + urlencode({"world_id": world_id})
+    [row] = d.get(media).json()
     assert row["evidence_path"] == d.path + "/masked"
     c.edit()
     c.build()
-    [row] = d.get("/world/source-media").json()
+    [row] = d.get(media).json()
     assert row["state"] == "available" and d.get(row["evidence_path"]).status_code == 200
     c.edit("confirm", outline=Silhouette(((0, 0), (900000, 0), (900000, 500000), (0, 500000))))
-    [row] = d.get("/world/source-media").json()
+    [row] = d.get(media).json()
     assert row["state"] == "unavailable_asset" and row["asset_reference"] is None
     assert row["capture_ids"] == [str(c.capture)]
     assert d.get().status_code == 409
     assert d.get("/person-regions/" + str(c.capture)).status_code == 200
     c.build()
-    [row] = d.get("/world/source-media").json()
+    [row] = d.get(media).json()
     assert row["state"] == "available"
     (c.store.root / c.store.key_for(BlobId(c.mask().content_sha256))).unlink()
-    [row] = d.get("/world/source-media").json()
+    [row] = d.get(media).json()
     assert row["state"] == "unavailable_asset" and row["capture_ids"] == [str(c.capture)]
     assert d.get("/person-regions/" + str(c.capture)).status_code == 200
 
@@ -467,12 +474,14 @@ def test_trained_and_embedded_geometry_require_recorded_current_inputs(delivery,
     capture = uuid.UUID(materials[0]["capture_id"])
     # The inspector's two reads carry the same recorded inputs as the graph they summarise, so
     # they must refuse with it, including the resolve, which projects through those inputs.
+    world = urlencode({"world_id": registered_world(c.repo.connection, c.repo.workspace_id)})
+    bundle = "/world-read/scenes/" + scene + "?" + world
     observations = "/world-read/scenes/" + scene + "/observations"
     inspector_reads = (
         observations + "/summary",
         observations + f"/resolve?capture_id={capture}&u=80&v=50",
     )
-    for route in ("/world-read/scenes/" + scene, observations, *inspector_reads):
+    for route in (bundle, observations, *inspector_reads):
         assert d.get(route).status_code == 200, route
     # Add a region to one real recorded source. The scene's persisted original frames
     # cannot become masked frames merely because a current mask is subsequently built.
@@ -494,7 +503,7 @@ def test_trained_and_embedded_geometry_require_recorded_current_inputs(delivery,
         ],
     )
     assert d.get(path).status_code == 404
-    assert d.get("/world-read/scenes/" + scene).status_code == 404
+    assert d.get(bundle).status_code == 404
     assert d.get("/world-read/scenes/" + scene + "/observations").status_code == 404
     for route in inspector_reads:
         assert d.get(route).status_code == 404, route

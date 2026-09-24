@@ -2,7 +2,7 @@
 
 Read-only. Every asset is a reviewed CC0 container named by content digest, and each answer says
 whether its bytes are present in this instance's store, because a client must not offer to place an
-asset nothing could draw.
+asset nothing could draw. The registry is the same for every world, so these routes take no world.
 
 The list answers what a person may place, so it holds only assets whose declared kind is placeable
 (:mod:`exulanica.world.asset_kinds`). The one-key reads serve every reviewed asset, because the
@@ -14,15 +14,22 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Request, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
 
-from exulanica.api.dependencies import get_services
-from exulanica.api.world_edit import ReadObjects
+from exulanica.api.dependencies import ReadOnlyConnection, get_services
 from exulanica.api.world_version_document import ReviewedAssetView, asset_view
 from exulanica.evidence.blob import BlobId
 from exulanica.world import GLB_MEDIA_TYPE, UnavailableAsset
+from exulanica.world.reviewed_catalog import ReviewedCatalog
 
 router = APIRouter(prefix="/world", tags=["world"])
+
+
+def reviewed_catalog(connection: ReadOnlyConnection) -> ReviewedCatalog:
+    return ReviewedCatalog(connection)
+
+
+ReadCatalog = Annotated[ReviewedCatalog, Depends(reviewed_catalog)]
 
 
 @router.get(
@@ -30,9 +37,9 @@ router = APIRouter(prefix="/world", tags=["world"])
     response_model=list[ReviewedAssetView],
     summary="The reviewed assets a person may place as objects, with real byte availability.",
 )
-def reviewed_asset_catalog(repository: ReadObjects, request: Request) -> list[ReviewedAssetView]:
+def reviewed_asset_catalog(catalog: ReadCatalog, request: Request) -> list[ReviewedAssetView]:
     store = get_services(request).store
-    return [asset_view(asset) for asset in repository.placeable_assets(store)]
+    return [asset_view(asset) for asset in catalog.placeable_assets(store)]
 
 
 @router.get(
@@ -42,10 +49,10 @@ def reviewed_asset_catalog(repository: ReadObjects, request: Request) -> list[Re
 )
 def reviewed_asset(
     asset_key: Annotated[str, Path(max_length=200)],
-    repository: ReadObjects,
+    catalog: ReadCatalog,
     request: Request,
 ) -> ReviewedAssetView:
-    return asset_view(repository.reviewed_asset(asset_key, get_services(request).store))
+    return asset_view(catalog.asset(asset_key, get_services(request).store))
 
 
 @router.get(
@@ -55,11 +62,11 @@ def reviewed_asset(
 )
 def reviewed_asset_bytes(
     asset_key: Annotated[str, Path(max_length=200)],
-    repository: ReadObjects,
+    catalog: ReadCatalog,
     request: Request,
 ) -> Response:
     store = get_services(request).store
-    asset = repository.reviewed_asset(asset_key, store)
+    asset = catalog.asset(asset_key, store)
     if asset.availability != "available":
         # The same code and the same honesty as `/world/source-media`, reached through the same
         # application handler rather than a second 424 written out here: the row survived and the
@@ -94,11 +101,11 @@ def reviewed_asset_bytes(
 )
 def reviewed_asset_licence(
     asset_key: Annotated[str, Path(max_length=200)],
-    repository: ReadObjects,
+    catalog: ReadCatalog,
     request: Request,
 ) -> Response:
     store = get_services(request).store
-    asset = repository.reviewed_asset(asset_key, store)
+    asset = catalog.asset(asset_key, store)
     licence = BlobId.from_hex(asset.licence_sha256)
     if not store.exists(licence):
         raise UnavailableAsset("the licence text for this asset is not in the store")

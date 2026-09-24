@@ -6,8 +6,9 @@ reserves development attempts. Preparing or reserving a record does not run a si
 
 ## HTTP surface
 
-All routes are scoped by the authenticated session's workspace and by the authored version in the
-path.
+All routes are scoped by the authenticated session's workspace, by the world the authored version
+belongs to, which each request names as a `world_id` query parameter, and by the authored version in
+the path. A definition is read only in the world it binds.
 
 | Method and path | Permission | Result |
 | --- | --- | --- |
@@ -71,19 +72,20 @@ response identifies a persisted artifact but does not by itself provide an expor
 [`scripts/society_experiment_result_client.py`](../scripts/society_experiment_result_client.py)
 is a small consumer of the two GET routes. It imports no Exulanica implementation. Its caller
 provides an HTTP client that already owns base URL, authentication, timeout and transport policy,
-then supplies the three explicit resource identifiers:
+then supplies the world the version belongs to and the three explicit resource identifiers:
 
 ```python
 outcome = read_experiment_result(
     http,
+    world_id=world_id,
     version_id=version_id,
     experiment_id=experiment_id,
     attempt_id=attempt_id,
 )
 ```
 
-The consumer requests the definition projection first and the nested attempt second. It validates
-the path identities, lifecycle combination, digest syntax and cross-response bindings before
+The consumer requests the definition projection first and the nested attempt second, each in the
+named world. It validates the definition's world, the path identities, lifecycle combination, digest syntax and cross-response bindings before
 exposing metrics. For a completed result it independently checks the supported result profile and
 canonical result digest. The compact definition digest is only an identity binding because the GET
 response does not contain the full canonical definition document.

@@ -114,7 +114,7 @@ class Answered:
     def packet(self, plan: SelectionPlan | None = None, **kwargs):
         plan = plan or SelectionPlan(intent=Intent.CAPTURES, **kwargs)
         validated = validate(self.repository.connection, plan, self.session)
-        result = execute(self.repository.connection, validated)
+        result = execute(self.repository.connection, validated, world_id=None)
         return build_packet(
             self.repository.connection, result, workspace_id=self.session.workspace_id
         )
@@ -402,6 +402,7 @@ def test_an_empty_selection_never_reaches_the_model(answered):
         client,
         "was I ever in Antarctica?",
         answered.session,
+        world_id=None,
         plan=SelectionPlan(intent=Intent.CAPTURES, semantic_query="antarctica penguins"),
         before_compose=composer_rights_check(
             answered.repository.connection, answered.session.workspace_id
@@ -557,6 +558,7 @@ def test_the_plan_is_kept_with_the_answer(answered):
         client,
         "where was I?",
         answered.session,
+        world_id=None,
         plan=plan,
         now=dt.datetime(2026, 8, 28, tzinfo=dt.UTC),
         before_compose=composer_rights_check(
@@ -832,6 +834,7 @@ def test_both_calls_are_listed_in_the_order_the_question_made_them(answered):
     )
     outcome = answer_question(
         answered.repository.connection, client, "which photographs?", answered.session,
+        world_id=None,
         before_compose=composer_rights_check(
             answered.repository.connection, answered.session.workspace_id
         ),
@@ -862,7 +865,12 @@ def test_an_abstention_records_no_model_call_at_all(answered):
     unused = Answer(clauses=[AnswerClause(text="Nothing.", type=ClauseType.META)])
     client = answered.client([_answer_body(unused)])
     outcome = answer_question(
-        answered.repository.connection, client, "was I in Antarctica?", answered.session, plan=plan,
+        answered.repository.connection,
+        client,
+        "was I in Antarctica?",
+        answered.session,
+        world_id=None,
+        plan=plan,
         before_compose=composer_rights_check(
             answered.repository.connection, answered.session.workspace_id
         ),
@@ -1342,6 +1350,7 @@ def test_every_factual_clause_cites_a_token_that_resolves_to_a_stored_span_diges
         client,
         "which photographs?",
         answered.session,
+        world_id=None,
         plan=SelectionPlan(intent=Intent.CAPTURES),
         before_compose=composer_rights_check(connection, answered.session.workspace_id),
     )
@@ -1379,6 +1388,7 @@ def test_a_citation_permalink_parses_back_to_the_same_digest(answered):
         client,
         "which photographs?",
         answered.session,
+        world_id=None,
         plan=SelectionPlan(intent=Intent.CAPTURES),
         before_compose=composer_rights_check(connection, answered.session.workspace_id),
     )
@@ -1414,6 +1424,7 @@ def test_a_plan_that_matched_photographs_is_answered_rather_than_refused(answere
         client,
         "which photographs have been looked at?",
         answered.session,
+        world_id=None,
         plan=plan,
         before_compose=composer_rights_check(
             answered.repository.connection, answered.session.workspace_id
@@ -1460,6 +1471,7 @@ def test_answering_a_question_persists_no_biometric_template(answered):
         client,
         "which photographs?",
         answered.session,
+        world_id=None,
         plan=SelectionPlan(intent=Intent.CAPTURES),
         before_compose=composer_rights_check(connection, answered.session.workspace_id),
     )
@@ -1512,11 +1524,16 @@ def test_answer_rechecks_database_after_composition(answered, monkeypatch, chang
             citations=[item.token],
         )]), False, ()
 
-    monkeypatch.setattr(question_module, 'compose_answer', compose_then_change)
-    outcome = answer_question(repository.connection, answered.client([]), 'What is visible?',
-                              answered.session, plan=plan,
-                              before_compose=composer_rights_check(
-                                  repository.connection, answered.session.workspace_id))
+    monkeypatch.setattr(question_module, "compose_answer", compose_then_change)
+    outcome = answer_question(
+        repository.connection,
+        answered.client([]),
+        "What is visible?",
+        answered.session,
+        world_id=None,
+        plan=plan,
+        before_compose=composer_rights_check(repository.connection, answered.session.workspace_id),
+    )
     assert outcome.abstention == Abstention.AMBIGUOUS
     assert outcome.packet is None and outcome.result is None
     assert outcome.rejections == ('evidence_changed_during_composition',)

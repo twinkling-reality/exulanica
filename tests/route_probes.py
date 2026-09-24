@@ -9,7 +9,8 @@ by a test that needs PostgreSQL.
 
 Here the probed set IS the authenticated part of ROUTE_RULES, so a route is swept the moment it is
 declared, and each probe's default request is read from the route's own OpenAPI operation: sent
-bare when it takes no body, with an empty JSON object when it takes one. :data:`PROBE_OVERRIDES`
+bare when it takes no body, with an empty JSON object when it takes one, and in the fixture world
+when it requires a world, as every override of such a route is too. :data:`PROBE_OVERRIDES`
 gives a realistic request where the default would stop at validation before the route's own
 lookup, because that lookup is where a stranger's answer is decided: without one, "never 403"
 would hold for the route by never reaching it. A route taking a body of any other kind has no
@@ -40,10 +41,10 @@ from exulanica.api.permissions import ROUTE_RULES, Authentication, Public, Requi
 from exulanica.api.surface import routing_only_application
 from exulanica.consent.place_names import load_place_name_uses
 from exulanica.models.manifest import load_manifest
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society_experiments import DEVELOPMENT_SEEDS
 
 import existence_builders as build
+from world_support import FIXTURE_WORLD_ID
 
 __all__ = [
     "ACCOUNT_ROUTES",
@@ -64,6 +65,7 @@ __all__ = [
     "fill",
     "id_addresses",
     "id_routes",
+    "requires_world",
 ]
 
 #: Routes that need no credential, by path, with the reason each gives. Derived, not restated.
@@ -107,7 +109,9 @@ _PLACEMENT: Final = {
     "transform": _TRANSFORM,
     "origin_role": "fictional",
 }
-_APPEARANCE: Final = {"params": {"world_id": DEFAULT_WORLD_ID}}
+#: The world a probe of a route that requires one is sent in. The sweeps' owners hold it, and so
+#: does the existence sweep's stranger, so a stranger's request reaches the route's own lookup.
+_IN_WORLD: Final = {"params": {"world_id": FIXTURE_WORLD_ID}}
 _PHOTO_POINT_MAP: Final = {
     "kind": "photo_point_map",
     "entry_id": str(uuid.uuid4()),
@@ -181,10 +185,13 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         "json": {"use": "embedding", "notice": _place_name_notice("embedding")}
     },
     "POST /place-name-rights/{entity_id}/withdrawals": {"json": {"use": "embedding"}},
-    "POST /selection": {"json": {"intent": "captures"}},
-    "POST /selection/appearance": {"json": {"utterance": "could it be softer in here?"}},
-    "POST /selection/ask": {"json": {"question": "where was I?"}},
-    "POST /selection/packet": {"json": {"intent": "captures"}},
+    "POST /selection": {**_IN_WORLD, "json": {"intent": "captures"}},
+    "POST /selection/appearance": {
+        **_IN_WORLD,
+        "json": {"utterance": "could it be softer in here?"},
+    },
+    "POST /selection/ask": {**_IN_WORLD, "json": {"question": "where was I?"}},
+    "POST /selection/packet": {**_IN_WORLD, "json": {"intent": "captures"}},
     "POST /selection/plan": {"json": {"question": "where was I?"}},
     "GET /tiles": {"params": {"city_seed": _ZERO_DIGEST}},
     # Enough of a specification to reach the permission floor, which is all this sweep asks of it.
@@ -226,6 +233,7 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         "params": {"capture_id": str(uuid.uuid4()), "u": "10", "v": "20"}
     },
     "POST /world-write/scenes/{scene_id}/generated": {
+        **_IN_WORLD,
         "json": {
             "model": {"provider": "p", "model_id": "m", "model_version": "v"},
             "prompt_sha256": _ZERO_DIGEST,
@@ -234,9 +242,10 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "content_sha256": "2" * 64,
             "byte_size": 1,
             "seam": "where the record stops and the imagining begins",
-        }
+        },
     },
     "POST /world/interactions/previews": {
+        **_IN_WORLD,
         "json": {
             "proposal_id": str(uuid.uuid4()),
             "origin": "settings",
@@ -247,25 +256,28 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "capability_patch": {"initiative.mode": "minimal"},
             "proposal_input": {"control": "initiative"},
             "explanation": "The user selected less initiative.",
-        }
+        },
     },
     "POST /world/interactions/previews/{preview_id}/apply": {
+        **_IN_WORLD,
         "json": {
             "base_policy_version_id": None,
             "base_structure_snapshot_id": None,
             "base_topology_sha256": None,
-        }
+        },
     },
     "POST /world/interactions/rollback": {
+        **_IN_WORLD,
         "json": {
             "target_version_id": str(uuid.uuid4()),
             "origin": "settings",
             "base_policy_version_id": str(uuid.uuid4()),
             "base_structure_snapshot_id": None,
             "base_topology_sha256": None,
-        }
+        },
     },
     "POST /world/styles/previews": {
+        **_IN_WORLD,
         "json": {
             "proposal_id": str(uuid.uuid4()),
             "origin": "user",
@@ -273,29 +285,31 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "base_style_version_id": str(uuid.uuid4()),
             "base_topology_digest": "probe-topology",
             "profile": {"profile_id": "origin-landscape", "profile_version": 1},
-        }
+        },
     },
     "POST /world/styles/previews/{preview_id}/apply": {
+        **_IN_WORLD,
         "json": {
             "base_style_version_id": str(uuid.uuid4()),
             "base_topology_digest": "probe-topology",
-        }
+        },
     },
     "POST /world/styles/rollback": {
+        **_IN_WORLD,
         "json": {
             "target_version_id": str(uuid.uuid4()),
             "base_style_version_id": str(uuid.uuid4()),
             "base_topology_digest": "probe-topology",
             "origin": "user",
-        }
+        },
     },
-    "POST /world/versions": {"json": {"title": "probe", "source_snapshot_id": str(uuid.uuid4())}},
-    "POST /world/versions/bootstrap": {"json": {"base_topology_digest": _ZERO_DIGEST}},
-    "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance": (
-        _APPEARANCE
-    ),
+    "POST /world/versions": {
+        **_IN_WORLD,
+        "json": {"title": "probe", "source_snapshot_id": str(uuid.uuid4())},
+    },
+    "POST /world/versions/bootstrap": {**_IN_WORLD, "json": {"base_topology_digest": _ZERO_DIGEST}},
     "PUT /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance": {
-        **_APPEARANCE,
+        **_IN_WORLD,
         "json": {
             "base_revision": 0,
             "recipe": {
@@ -306,37 +320,36 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             },
         },
     },
-    "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/families": (
-        _APPEARANCE
-    ),
-    "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/history": (
-        _APPEARANCE
-    ),
     "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset": {
-        **_APPEARANCE,
+        **_IN_WORLD,
         "json": {"base_revision": 0},
     },
     "POST /world/versions/{version_id}/compositions/apply": {
+        **_IN_WORLD,
         "json": {
             "base_state_sha256": _ZERO_DIGEST,
             "source": _REVIEWED_ASSET,
             "placement": _PLACEMENT,
-        }
+        },
     },
     "POST /world/versions/{version_id}/compositions/photo-point-maps/apply": {
+        **_IN_WORLD,
         "json": {
             "base_state_sha256": _ZERO_DIGEST,
             "source": _PHOTO_POINT_MAP,
             "placement": _PLACEMENT,
-        }
+        },
     },
     "POST /world/versions/{version_id}/compositions/photo-point-maps/preview": {
-        "json": {"base_state_sha256": _ZERO_DIGEST, "source": _PHOTO_POINT_MAP}
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "source": _PHOTO_POINT_MAP},
     },
     "POST /world/versions/{version_id}/compositions/preview": {
-        "json": {"base_state_sha256": _ZERO_DIGEST, "source": _REVIEWED_ASSET}
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "source": _REVIEWED_ASSET},
     },
     "POST /world/versions/{version_id}/environment-instances": {
+        **_IN_WORLD,
         "json": {
             "base_state_sha256": _ZERO_DIGEST,
             "instance_id": "environment:probe",
@@ -351,18 +364,22 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "region_id": "region-a",
             "transform": _TRANSFORM,
             "origin_role": "fictional",
-        }
+        },
     },
     "POST /world/versions/{version_id}/environment-instances/undo": {
-        "json": {"base_state_sha256": _ZERO_DIGEST}
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
     },
     "POST /world/versions/{version_id}/environment-instances/{instance_id}/move": {
-        "json": {"base_state_sha256": _ZERO_DIGEST, "transform": _TRANSFORM}
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "transform": _TRANSFORM},
     },
     "POST /world/versions/{version_id}/environment-instances/{instance_id}/remove": {
-        "json": {"base_state_sha256": _ZERO_DIGEST}
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
     },
     "POST /world/versions/{version_id}/objects": {
+        **_IN_WORLD,
         "json": {
             "base_state_sha256": _ZERO_DIGEST,
             "object_id": "object:probe",
@@ -370,10 +387,14 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "region_id": "region-a",
             "transform": _TRANSFORM,
             "origin_role": "fictional",
-        }
+        },
     },
-    "POST /world/versions/{version_id}/objects/undo": {"json": {"base_state_sha256": _ZERO_DIGEST}},
+    "POST /world/versions/{version_id}/objects/undo": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
     "POST /world/versions/{version_id}/objects/{object_id}/behaviour": {
+        **_IN_WORLD,
         "json": {
             "base_state_sha256": _ZERO_DIGEST,
             "behaviour": {
@@ -386,41 +407,49 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
                     "easing": "smooth",
                 },
             },
-        }
+        },
     },
     "POST /world/versions/{version_id}/objects/{object_id}/move": {
-        "json": {"base_state_sha256": _ZERO_DIGEST, "transform": _TRANSFORM}
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "transform": _TRANSFORM},
     },
     "POST /world/versions/{version_id}/objects/{object_id}/remove": {
-        "json": {"base_state_sha256": _ZERO_DIGEST}
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
     },
     "POST /world/versions/{version_id}/society": {
-        "json": {"place_id": str(uuid.uuid4()), "region_id": "region-a", "seed": "7a" * 32}
+        **_IN_WORLD,
+        "json": {"place_id": str(uuid.uuid4()), "region_id": "region-a", "seed": "7a" * 32},
     },
     "POST /world/versions/{version_id}/society/actions": {
+        **_IN_WORLD,
         "json": {
             "idempotency_key": str(uuid.uuid4()),
             "base_tick": 0,
             "base_state_sha256": _ZERO_DIGEST,
             "subject_id": str(uuid.uuid4()),
             "intent": {"kind": "go_to", "target_id": "fixture:target"},
-        }
+        },
     },
     "PUT /world/versions/{version_id}/society/control": {
-        "json": {"base_revision": 0, "mode": "paused", "speed": 1}
+        **_IN_WORLD,
+        "json": {"base_revision": 0, "mode": "paused", "speed": 1},
     },
     "POST /world/versions/{version_id}/society/control/steps": {
-        "json": {"base_revision": 0, "base_tick": 0, "base_state_sha256": _ZERO_DIGEST}
+        **_IN_WORLD,
+        "json": {"base_revision": 0, "base_tick": 0, "base_state_sha256": _ZERO_DIGEST},
     },
     "POST /world/versions/{version_id}/society/decisions": {
+        **_IN_WORLD,
         "json": {
             "idempotency_key": str(uuid.uuid4()),
             "subject_id": str(uuid.uuid4()),
             "base_tick": 0,
             "base_state_sha256": _ZERO_DIGEST,
-        }
+        },
     },
     "POST /world/versions/{version_id}/society/experiments": {
+        **_IN_WORLD,
         "json": {
             "experiment_id": str(uuid.uuid4()),
             "baseline_input_seq": 1,
@@ -429,21 +458,24 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "population": 3,
             "warmup_ticks": 2,
             "followup_ticks": 3,
-        }
+        },
     },
     "POST /world/versions/{version_id}/society/experiments/{experiment_id}/attempts": {
-        "json": {"attempt_id": str(uuid.uuid4()), "seed_sha256": DEVELOPMENT_SEEDS[0]}
+        **_IN_WORLD,
+        "json": {"attempt_id": str(uuid.uuid4()), "seed_sha256": DEVELOPMENT_SEEDS[0]},
     },
     "POST /world/versions/{version_id}/society/presence": {
+        **_IN_WORLD,
         "json": {
             "idempotency_key": str(uuid.uuid4()),
             "presence": "away",
             "base_tick": 0,
             "base_state_sha256": _ZERO_DIGEST,
-        }
+        },
     },
     "POST /world/versions/{version_id}/society/steps": {
-        "json": {"base_tick": 0, "base_state_sha256": _ZERO_DIGEST}
+        **_IN_WORLD,
+        "json": {"base_tick": 0, "base_state_sha256": _ZERO_DIGEST},
     },
 }
 
@@ -455,14 +487,30 @@ def authenticated_routes() -> list[tuple[str, str]]:
     )
 
 
+def requires_world(operation: Mapping[str, Any]) -> bool:
+    """Whether a route's OpenAPI operation requires the ``world_id`` query parameter."""
+    return any(
+        parameter.get("in") == "query"
+        and parameter.get("name") == "world_id"
+        and parameter.get("required", False)
+        for parameter in operation.get("parameters", ())
+    )
+
+
 def default_probe(operation: Mapping[str, Any]) -> dict[str, Any] | None:
-    """The request a route takes when nothing about it is special, or None when there is none."""
+    """The request a route takes when nothing about it is special, or None when there is none.
+
+    A route that requires a world is asked in the fixture world, so its probe is answered by the
+    route rather than by the validator refusing a request that names no world.
+    """
     body = operation.get("requestBody")
     if body is None:
-        return {}
-    if "application/json" in body.get("content", {}):
-        return {"json": {}}
-    return None
+        probe: dict[str, Any] = {}
+    elif "application/json" in body.get("content", {}):
+        probe = {"json": {}}
+    else:
+        return None
+    return {**probe, **_IN_WORLD} if requires_world(operation) else probe
 
 
 def derive_probes(

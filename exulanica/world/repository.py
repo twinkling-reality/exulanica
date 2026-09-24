@@ -31,7 +31,6 @@ from exulanica.world.errors import (
     WorldNotConfigured,
 )
 from exulanica.world.models import (
-    DEFAULT_WORLD_ID,
     ProposalOrigin,
     ProposalProvenance,
     SourceMediaState,
@@ -73,7 +72,7 @@ class WorldStyleRepository:
         workspace_id: uuid.UUID,
         *,
         registry: StyleRegistry = STYLE_REGISTRY,
-        world_id: str = DEFAULT_WORLD_ID,
+        world_id: str,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id

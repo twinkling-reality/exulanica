@@ -107,14 +107,14 @@ describe('society directed-action client', () => {
       status: 200, headers: { 'content-type': 'application/json' },
     }));
     const client = new SocietyClient({
-      baseUrl: 'https://example.test', token: 'token', fetch: fetcher as typeof fetch,
+      baseUrl: 'https://example.test', token: 'token', worldId: 'world:test', fetch: fetcher as typeof fetch,
     });
     const record = await client.requestAction(v2Snapshot(), subject, {
       kind: 'perform', targetId: 'district:marker:visit', affordance: 'visit',
     }, requestId);
     expect(record.status).toBe('pending');
     expect(fetcher.mock.calls[0]![0]).toBe(
-      `https://example.test/world/versions/${version}/society/actions`,
+      `https://example.test/world/versions/${version}/society/actions?world_id=world%3Atest`,
     );
     expect(fetcher.mock.calls[0]![1]?.method).toBe('POST');
     expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).toEqual({

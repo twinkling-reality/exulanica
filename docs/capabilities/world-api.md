@@ -8,12 +8,17 @@ changes from the interface.
 
 ## Routes
 
-Every route requires `Authorization: Bearer <token>`, and a token is bound to one workspace.
+Every route requires `Authorization: Bearer <token>`, and a token is bound to one workspace. A
+workspace can hold several worlds and the server has no default one, so every route that reads or
+changes a world's content also requires the world as a `world_id` query parameter. An id the
+workspace does not hold answers `404 unknown_reference`, the same answer another workspace's world
+gets. The reviewed asset and behaviour registries are the same for every world and take none.
 
 | Method and path | Responsibility |
 | --- | --- |
-| `GET /world-read/scenes/{scene_id}` | Read an authorized scene bundle |
-| `GET /world-read/places/{place_id}` | Read a place, optionally resolved at a requested time |
+| `GET /worlds` | The worlds the workspace holds, each with its kind, and how many of each it may hold |
+| `GET /world-read/scenes/{scene_id}` | Read an authorized scene bundle, placed in the regions of the named world |
+| `GET /world-read/places/{place_id}` | Read a place in the named world, optionally resolved at a requested time |
 | `POST /world-write/scenes/{scene_id}/generated` | Record a generated-scene receipt tied to its conditioning sources |
 | `GET /world/versions` | Every alternate world version in the workspace, newest first |
 | `POST /world/versions` | Create an alternate version from a structural snapshot or another version |

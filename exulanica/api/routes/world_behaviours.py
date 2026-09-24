@@ -16,7 +16,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection
-from exulanica.world import WorldObjectRepository
+from exulanica.world.reviewed_catalog import ReviewedCatalog
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -67,9 +67,9 @@ class ReviewedBehaviourView(BaseModel):
     summary="The reviewed behaviours an object may be given, with each parameter's bounds.",
 )
 def reviewed_behaviours(
-    connection: ReadOnlyConnection, session: CurrentSession
+    connection: ReadOnlyConnection, _session: CurrentSession
 ) -> list[ReviewedBehaviourView]:
-    registry = WorldObjectRepository(connection, session.workspace_id).behaviour_registry()
+    registry = ReviewedCatalog(connection).behaviours()
     return [
         ReviewedBehaviourView(
             behaviour_key=key, behaviour_version=version, parameters=dict(parameters)

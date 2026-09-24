@@ -100,6 +100,7 @@ class VersionEditView(BaseModel):
     object_id: str | None
     element_id: str | None
     environment_instance_id: str | None
+    point_map_instance_id: str | None
     undone_edit_id: uuid.UUID | None
     base_state_sha256: str
     result_state_sha256: str
@@ -238,6 +239,7 @@ def alternate_version_view(
                 object_id=edit.object_id,
                 element_id=edit.element_id,
                 environment_instance_id=edit.environment_instance_id,
+                point_map_instance_id=edit.point_map_instance_id,
                 undone_edit_id=edit.undone_edit_id,
                 base_state_sha256=edit.base_state_sha256,
                 result_state_sha256=edit.result_state_sha256,

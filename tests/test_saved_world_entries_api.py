@@ -41,7 +41,9 @@ def _objects_api_alias(request):
 
 
 def _create_entry(api: ObjectsApi, repository):
-    style = WorldStyleRepository(repository.connection, repository.workspace_id).current()
+    style = WorldStyleRepository(
+        repository.connection, repository.workspace_id, world_id=api.world_id
+    ).current()
     version = api.version("My source-backed world")
     response = api.post(
         "/world-entries",
@@ -55,6 +57,11 @@ def _create_entry(api: ObjectsApi, repository):
     )
     assert response.status_code == 201, response.text
     return response.json(), version, style
+
+
+def _version_path(api: ObjectsApi, version, suffix: str = "") -> str:
+    """``version``'s route (plus ``suffix``), naming the world the version document names."""
+    return api.in_world(f"/world/versions/{version['version_id']}{suffix}", version["world_id"])
 
 
 def _create_starter(api: ObjectsApi, title: str = "My world"):
@@ -733,7 +740,7 @@ def test_entry_refuses_to_adopt_a_branch_state_newer_than_the_one_observed(objec
     assert observed["current_authored_state_sha256"] == first["state_sha256"]
 
     second = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/object:lantern/move",
+        _version_path(objects_api, version, "/objects/object:lantern/move"),
         {
             "base_state_sha256": first["state_sha256"],
             "transform": {
@@ -781,7 +788,7 @@ def test_bound_object_write_advances_entry_atomically_and_conflict_rolls_back(
     assert advanced["authored_edit_seq"] == added.json()["edit_seq"]
 
     stale = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/object:lantern/move",
+        _version_path(objects_api, version, "/objects/object:lantern/move"),
         {
             "base_state_sha256": added.json()["state_sha256"],
             "transform": {
@@ -796,7 +803,7 @@ def test_bound_object_write_advances_entry_atomically_and_conflict_rolls_back(
     )
     assert stale.status_code == 409, stale.text
     assert stale.json()["code"] == "stale_saved_world_entry"
-    reread = objects_api.get(f"/world/versions/{version['version_id']}").json()
+    reread = objects_api.get(_version_path(objects_api, version)).json()
     assert reread["state_sha256"] == added.json()["state_sha256"]
     assert reread["objects"][0]["transform"]["x_mm"] == 1_200
 
@@ -829,7 +836,7 @@ def test_bound_behaviour_edit_advances_the_entry_and_a_stale_binding_writes_noth
             "easing": "linear",
         },
     }
-    path = f"/world/versions/{version['version_id']}/objects/object:lantern/behaviour"
+    path = _version_path(objects_api, version, "/objects/object:lantern/behaviour")
 
     given = objects_api.post(
         path,
@@ -855,7 +862,7 @@ def test_bound_behaviour_edit_advances_the_entry_and_a_stale_binding_writes_noth
     )
     assert stale.status_code == 409, stale.text
     assert stale.json()["code"] == "stale_saved_world_entry"
-    reread = objects_api.get(f"/world/versions/{version['version_id']}").json()
+    reread = objects_api.get(_version_path(objects_api, version)).json()
     assert reread["objects"][0]["behaviour"] == motion
     assert reread["state_sha256"] == given.json()["state_sha256"]
 
@@ -871,7 +878,7 @@ def test_bound_write_cannot_skip_reconciliation_after_an_unbound_branch_edit(
     assert drifted["unavailable_reason"] == "authored_version_changed"
 
     bypass = objects_api.post(
-        f"/world/versions/{version['version_id']}/objects/object:lantern/move",
+        _version_path(objects_api, version, "/objects/object:lantern/move"),
         {
             "base_state_sha256": branch["state_sha256"],
             "transform": {
@@ -892,7 +899,7 @@ def test_bound_write_cannot_skip_reconciliation_after_an_unbound_branch_edit(
     assert bypass.status_code == 409, bypass.text
     assert bypass.json()["code"] == "stale_saved_world_entry"
 
-    unchanged_branch = objects_api.get(f"/world/versions/{version['version_id']}").json()
+    unchanged_branch = objects_api.get(_version_path(objects_api, version)).json()
     unchanged_entry = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
     assert unchanged_branch["state_sha256"] == branch["state_sha256"]
     assert unchanged_branch["edit_seq"] == branch["edit_seq"] == 1
@@ -922,7 +929,7 @@ def test_two_bound_writers_race_on_the_entry_lock_and_only_one_edit_commits(
     assert refused.json()["code"] == "stale_saved_world_entry"
 
     saved = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
-    branch = objects_api.get(f"/world/versions/{version['version_id']}").json()
+    branch = objects_api.get(_version_path(objects_api, version)).json()
     assert saved["availability"] == "available"
     assert saved["authored_state_sha256"] == branch["state_sha256"]
     assert saved["authored_edit_seq"] == branch["edit_seq"] == 1
@@ -955,7 +962,9 @@ def test_bound_and_unbound_edits_take_workspace_before_branch_lock(
         with database.session(repository.workspace_id) as connection:
             backend_pids.put(connection.info.backend_pid)
             entries = SavedWorldEntryRepository(connection, repository.workspace_id)
-            objects = WorldObjectRepository(connection, repository.workspace_id)
+            objects = WorldObjectRepository(
+                connection, repository.workspace_id, world_id=saved["world_id"]
+            )
             try:
                 with connection.transaction():
                     entries.lock_authored_advance_base(
@@ -1011,7 +1020,7 @@ def test_bound_and_unbound_edits_take_workspace_before_branch_lock(
                 raise AssertionError("bound writer did not wait on the workspace advisory lock")
 
             unbound = WorldObjectRepository(
-                unbound_connection, repository.workspace_id
+                unbound_connection, repository.workspace_id, world_id=saved["world_id"]
             ).move_object(
                 uuid.UUID(base["version_id"]),
                 "object:lantern",
@@ -1022,7 +1031,7 @@ def test_bound_and_unbound_edits_take_workspace_before_branch_lock(
         future.result(timeout=5)
 
     assert outcomes.get(timeout=1) == "stale"
-    branch = objects_api.get(f"/world/versions/{version['version_id']}").json()
+    branch = objects_api.get(_version_path(objects_api, version)).json()
     drifted = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
     assert branch["state_sha256"] == unbound.state_sha256
     assert branch["objects"][0]["transform"]["x_mm"] == 2_400
@@ -1041,16 +1050,17 @@ def test_foreign_entry_binding_rolls_back_the_authored_edit(objects_api, reposit
         },
     )
     assert response.status_code == 404, response.text
-    reread = objects_api.get(f"/world/versions/{version['version_id']}").json()
+    reread = objects_api.get(_version_path(objects_api, version)).json()
     assert reread["state_sha256"] == version["state_sha256"]
     assert reread["objects"] == []
 
 
 def test_bound_style_write_and_entry_pointer_commit_or_rollback_together(objects_api, repository):
     entry, _version, _style = _create_entry(objects_api, repository)
-    initial = objects_api.get("/world/styles/current").json()
+    current = objects_api.in_world("/world/styles/current")
+    initial = objects_api.get(current).json()
     preview = objects_api.post(
-        "/world/styles/previews",
+        objects_api.in_world("/world/styles/previews"),
         {
             "proposal_id": str(uuid.uuid4()),
             "origin": "settings",
@@ -1074,7 +1084,7 @@ def test_bound_style_write_and_entry_pointer_commit_or_rollback_together(objects
         "style_version_id": entry["style_version_id"],
     }
     refused = objects_api.post(
-        f"/world/styles/previews/{preview.json()['preview_id']}/apply",
+        objects_api.in_world(f"/world/styles/previews/{preview.json()['preview_id']}/apply"),
         {
             "base_style_version_id": initial["current"]["version_id"],
             "base_topology_digest": initial["current_topology_digest"],
@@ -1083,11 +1093,11 @@ def test_bound_style_write_and_entry_pointer_commit_or_rollback_together(objects
     )
     assert refused.status_code == 409, refused.text
     assert refused.json()["code"] == "stale_saved_world_entry"
-    assert objects_api.get("/world/styles/current").json() == initial
+    assert objects_api.get(current).json() == initial
 
     binding["base_revision"] = entry["revision"]
     applied = objects_api.post(
-        f"/world/styles/previews/{preview.json()['preview_id']}/apply",
+        objects_api.in_world(f"/world/styles/previews/{preview.json()['preview_id']}/apply"),
         {
             "base_style_version_id": initial["current"]["version_id"],
             "base_topology_digest": initial["current_topology_digest"],
@@ -1102,7 +1112,7 @@ def test_bound_style_write_and_entry_pointer_commit_or_rollback_together(objects
 
 def _appearance_preview(objects_api, state: dict, *, vitality: float):
     return objects_api.post(
-        "/world/styles/previews",
+        objects_api.in_world("/world/styles/previews"),
         {
             "proposal_id": str(uuid.uuid4()),
             "origin": "settings",
@@ -1123,18 +1133,21 @@ def test_bound_appearance_edit_refuses_a_historical_saved_style_until_restore(
     objects_api, repository
 ):
     entry, _version, _style = _create_entry(objects_api, repository)
-    initial = objects_api.get("/world/styles/current").json()
+    current = objects_api.in_world("/world/styles/current")
+    initial = objects_api.get(current).json()
     drifted_preview = _appearance_preview(objects_api, initial, vitality=0.25)
     assert drifted_preview.status_code == 201, drifted_preview.text
     drifted = objects_api.post(
-        f"/world/styles/previews/{drifted_preview.json()['preview_id']}/apply",
+        objects_api.in_world(
+            f"/world/styles/previews/{drifted_preview.json()['preview_id']}/apply"
+        ),
         {
             "base_style_version_id": initial["current"]["version_id"],
             "base_topology_digest": initial["current_topology_digest"],
         },
     )
     assert drifted.status_code == 200, drifted.text
-    live = objects_api.get("/world/styles/current").json()
+    live = objects_api.get(current).json()
     assert live["current"]["version_id"] == drifted.json()["version_id"]
     assert live["current"]["version_id"] != entry["style_version_id"]
     saved = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
@@ -1151,7 +1164,7 @@ def test_bound_appearance_edit_refuses_a_historical_saved_style_until_restore(
         "style_version_id": entry["style_version_id"],
     }
     refused = objects_api.post(
-        f"/world/styles/previews/{later_preview.json()['preview_id']}/apply",
+        objects_api.in_world(f"/world/styles/previews/{later_preview.json()['preview_id']}/apply"),
         {
             "base_style_version_id": live["current"]["version_id"],
             "base_topology_digest": live["current_topology_digest"],
@@ -1163,15 +1176,15 @@ def test_bound_appearance_edit_refuses_a_historical_saved_style_until_restore(
     assert refused.json()["detail"] == (
         "restore the visible saved appearance before editing; another appearance is active"
     )
-    assert objects_api.get("/world/styles/current").json()["current"]["version_id"] == (
-        live["current"]["version_id"]
+    assert (
+        objects_api.get(current).json()["current"]["version_id"] == (live["current"]["version_id"])
     )
     untouched = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
     assert untouched["style_version_id"] == entry["style_version_id"]
     assert untouched["revision"] == entry["revision"]
 
     restored = objects_api.post(
-        "/world/styles/rollback",
+        objects_api.in_world("/world/styles/rollback"),
         {
             "target_version_id": entry["style_version_id"],
             "base_style_version_id": live["current"]["version_id"],
@@ -1186,15 +1199,17 @@ def test_bound_appearance_edit_refuses_a_historical_saved_style_until_restore(
     reopened = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
     assert reopened["style_version_id"] == restored.json()["version_id"]
     assert reopened["revision"] == entry["revision"] + 1
-    assert objects_api.get("/world/styles/current").json()["current"]["version_id"] == (
-        restored.json()["version_id"]
+    assert (
+        objects_api.get(current).json()["current"]["version_id"] == (restored.json()["version_id"])
     )
 
-    restored_state = objects_api.get("/world/styles/current").json()
+    restored_state = objects_api.get(current).json()
     editable_preview = _appearance_preview(objects_api, restored_state, vitality=0.75)
     assert editable_preview.status_code == 201, editable_preview.text
     edited = objects_api.post(
-        f"/world/styles/previews/{editable_preview.json()['preview_id']}/apply",
+        objects_api.in_world(
+            f"/world/styles/previews/{editable_preview.json()['preview_id']}/apply"
+        ),
         {
             "base_style_version_id": restored.json()["version_id"],
             "base_topology_digest": restored_state["current_topology_digest"],
@@ -1233,7 +1248,9 @@ def test_deleted_source_keeps_entry_but_blocks_opening(objects_api, repository):
 
 
 def test_entry_rejects_cross_world_and_cross_workspace_versions(objects_api, repository):
-    style = WorldStyleRepository(repository.connection, repository.workspace_id).current()
+    style = WorldStyleRepository(
+        repository.connection, repository.workspace_id, world_id=objects_api.world_id
+    ).current()
     version = objects_api.version("Existing in the default named world")
     response = objects_api.post(
         "/world-entries",
@@ -1252,7 +1269,7 @@ def test_entry_rejects_cross_world_and_cross_workspace_versions(objects_api, rep
         "/world-entries",
         headers={"Authorization": f"Bearer {STRANGER_TOKEN}"},
         json={
-            "world_id": "atlas:default",
+            "world_id": objects_api.world_id,
             "title": "Borrowed",
             "source_kind": "personal",
             "authored_version_id": version["version_id"],

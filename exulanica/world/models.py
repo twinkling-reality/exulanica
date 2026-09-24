@@ -10,7 +10,6 @@ from enum import StrEnum
 from typing import TypeAlias
 
 __all__ = [
-    "DEFAULT_WORLD_ID",
     "ProposalOrigin",
     "ProposalProvenance",
     "SourceMediaState",
@@ -25,8 +24,6 @@ __all__ = [
     "TopologySourceSlot",
     "WorldSourceMedia",
 ]
-
-DEFAULT_WORLD_ID = "atlas:default"
 
 StyleParameterValue: TypeAlias = bool | int | float | str
 
@@ -132,7 +129,9 @@ class TopologyContract:
     region_ids: tuple[str, ...]
     source_slots: tuple[TopologySourceSlot, ...] = ()
     compatibility_key: str = "atlas-topology-v1"
-    world_id: str = DEFAULT_WORLD_ID
+    #: The world this contract is registered in. Keyword-only and required: the style repository
+    #: refuses a contract for a world other than its own, so a contract has to say which.
+    world_id: str = field(kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)

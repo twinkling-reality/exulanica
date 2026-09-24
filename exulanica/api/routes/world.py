@@ -47,8 +47,8 @@ from exulanica.api.dependencies import (
 )
 from exulanica.api.services import Services
 from exulanica.api.world_edit import SavedEntryAdvanceBody
+from exulanica.api.world_scope import WorldId
 from exulanica.world import (
-    DEFAULT_WORLD_ID,
     STYLE_REGISTRY,
     InvalidatedSourceVersion,
     ProposalOrigin,
@@ -63,6 +63,7 @@ from exulanica.world import (
     WorldSourceMedia,
     WorldStyleRepository,
 )
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -320,16 +321,18 @@ class SourceMediaView(BaseModel):
 def read_repository(
     connection: ReadOnlyConnection,
     session: CurrentSession,
-    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> WorldStyleRepository:
+    require_world(connection, session.workspace_id, world_id)
     return WorldStyleRepository(connection, session.workspace_id, world_id=world_id)
 
 
 def write_repository(
     connection: ScopedConnection,
     session: CurrentSession,
-    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
+    world_id: WorldId,
 ) -> WorldStyleRepository:
+    require_world(connection, session.workspace_id, world_id)
     return WorldStyleRepository(connection, session.workspace_id, world_id=world_id)
 
 

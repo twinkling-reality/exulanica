@@ -80,19 +80,20 @@ def district_app(runtime_world, spine_schema, monkeypatch):
 def test_authenticated_bytes_scope_registration_reload_and_withdrawal(district_app):
     w, app = district_app
     binding = w["binding"]
+    scope = {"world_id": binding.world_id}
     route = f"/world/versions/{binding.version_id}/society/district"
     with TestClient(app) as client:
-        assert client.get(route).status_code == 401
-        foreign = client.get(route, headers={"Authorization": f"Bearer {FOREIGN}"})
+        assert client.get(route, params=scope).status_code == 401
+        foreign = client.get(route, headers={"Authorization": f"Bearer {FOREIGN}"}, params=scope)
         assert foreign.status_code == 404
         assert foreign.headers["cache-control"] == "private, no-store"
         assert (
             client.get(
-                f"/world/versions/{uuid.uuid4()}/society/district", headers=HEADERS
+                f"/world/versions/{uuid.uuid4()}/society/district", headers=HEADERS, params=scope
             ).status_code
             == 404
         )
-        response = client.get(route, headers=HEADERS)
+        response = client.get(route, headers=HEADERS, params=scope)
         assert response.status_code == 200, response.text
         assert response.headers["cache-control"] == "private, no-store"
         body = response.json()
@@ -116,7 +117,7 @@ def test_authenticated_bytes_scope_registration_reload_and_withdrawal(district_a
         app.state.services.society_runtime = SocietyRuntime(
             store=w["store"], bindings=[binding], reviewed_affordances=w["registry"]
         )
-        assert client.get(route, headers=HEADERS).json() == body
+        assert client.get(route, headers=HEADERS, params=scope).json() == body
         # Reading presentation must not create a society or advance its input/event stream.
         assert (
             w["connection"]
@@ -129,7 +130,7 @@ def test_authenticated_bytes_scope_registration_reload_and_withdrawal(district_a
         )
         w["admissions"].withdraw("source", binding.sources[0].admission_id)
         w["connection"].commit()
-        denied = client.get(route, headers=HEADERS)
+        denied = client.get(route, headers=HEADERS, params=scope)
         assert denied.status_code == 424
         assert denied.headers["cache-control"] == "private, no-store"
         assert "base_json" not in denied.json()
@@ -162,7 +163,11 @@ def test_unavailable_dependencies_do_not_return_district_json(district_app, repo
         w["connection"].commit()
         assert w["objects"].version(b.version_id).source_invalidated
     with TestClient(app) as client:
-        response = client.get(f"/world/versions/{b.version_id}/society/district", headers=HEADERS)
+        response = client.get(
+            f"/world/versions/{b.version_id}/society/district",
+            headers=HEADERS,
+            params={"world_id": b.world_id},
+        )
         assert response.status_code == 424, response.text
         assert response.headers["cache-control"] == "private, no-store"
         assert "interpretation_json" not in response.json()
@@ -173,7 +178,9 @@ def test_operation_rights_cannot_be_granted_by_presentation(district_app):
     w, app = district_app
     with TestClient(app) as client:
         response = client.get(
-            f"/world/versions/{w['binding'].version_id}/society/district", headers=HEADERS
+            f"/world/versions/{w['binding'].version_id}/society/district",
+            headers=HEADERS,
+            params={"world_id": w["binding"].world_id},
         )
         assert response.status_code == 424, response.text
 
@@ -186,7 +193,9 @@ def test_configured_but_nonexistent_version_is_not_found(district_app):
     )
     with TestClient(app) as client:
         response = client.get(
-            f"/world/versions/{missing.version_id}/society/district", headers=HEADERS
+            f"/world/versions/{missing.version_id}/society/district",
+            headers=HEADERS,
+            params={"world_id": missing.world_id},
         )
         assert response.status_code == 404
         assert response.headers["cache-control"] == "private, no-store"

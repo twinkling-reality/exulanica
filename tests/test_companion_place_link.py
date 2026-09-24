@@ -117,7 +117,7 @@ def confirmed(tmp_path, photo_dir, repository):
 
 def _packet(repository, store, session, plan: SelectionPlan):
     validated = validate(repository.connection, plan, session)
-    result = execute(repository.connection, validated, store=store)
+    result = execute(repository.connection, validated, world_id=None, store=store)
     return result, build_packet(repository.connection, result, workspace_id=repository.workspace_id)
 
 
@@ -253,6 +253,7 @@ def _answered(repository, store, session, question, replies, plan=None):
         client,
         question,
         session,
+        world_id=None,
         plan=plan,
         store=store,
         before_compose=composer_rights_check(repository.connection, repository.workspace_id),

@@ -30,12 +30,25 @@ from exulanica.world import (
 from exulanica.world.bootstrap import bootstrap_world
 
 from conftest import write_photo
+from world_support import FIXTURE_WORLD_ID, registered_world
 
 pytestmark = pytest.mark.postgres
 
 
-def topology(digest="topology-a", *, sources=(), regions=("region-a", "region-b")):
-    return TopologyContract(digest, tuple(regions), tuple(sources))
+def topology(
+    digest="topology-a",
+    *,
+    sources=(),
+    regions=("region-a", "region-b"),
+    world_id=FIXTURE_WORLD_ID,
+):
+    return TopologyContract(digest, tuple(regions), tuple(sources), world_id=world_id)
+
+
+def fixture_styles(repository) -> WorldStyleRepository:
+    """The style of the registered fixture world, the world ``topology()`` is written for."""
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    return WorldStyleRepository(repository.connection, repository.workspace_id, world_id=world_id)
 
 
 def proposal(
@@ -106,17 +119,19 @@ def test_migration_registry_matches_the_validated_runtime_registry(repository):
 
 
 def test_new_rows_cannot_opt_out_through_the_historical_provenance_version(repository):
+    world_id = registered_world(repository.connection, repository.workspace_id)
     with pytest.raises(psycopg.errors.IntegrityConstraintViolation, match="recipe provenance"):
         repository.connection.execute(
             "insert into world_style_proposal "
             "(proposal_id,workspace_id,world_id,origin,actor,scope_kind,"
             "base_style_version_id,base_topology_digest,profile_id,profile_version,parameters,"
             "status,provenance_schema_version) "
-            "values (%s,%s,'atlas:default','user',%s,'global',%s,'topology-a',"
+            "values (%s,%s,%s,'user',%s,'global',%s,'topology-a',"
             "'origin-landscape',1,'{}','rejected',0)",
             (
                 uuid.uuid4(),
                 repository.workspace_id,
+                world_id,
                 uuid.uuid4(),
                 uuid.uuid4(),
             ),
@@ -124,7 +139,7 @@ def test_new_rows_cannot_opt_out_through_the_historical_provenance_version(repos
 
 
 def test_preview_isolation_atomic_apply_discard_and_immutable_rollback(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     initial = styles.register_topology(topology())
 
     discarded = styles.preview(proposal(initial, parameters={"vitality": 0.15}))
@@ -187,7 +202,7 @@ def test_preview_isolation_atomic_apply_discard_and_immutable_rollback(repositor
 
 
 def test_two_previews_cannot_both_apply_from_one_base_version(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     initial = styles.register_topology(topology())
     first = styles.preview(proposal(initial, parameters={"vitality": 0.2}))
     second = styles.preview(proposal(initial, parameters={"vitality": 0.4}))
@@ -215,7 +230,7 @@ def test_two_previews_cannot_both_apply_from_one_base_version(repository):
 
 
 def test_a_topology_change_invalidates_but_does_not_mutate_an_open_preview(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     initial = styles.register_topology(topology())
     preview = styles.preview(proposal(initial))
     styles.register_topology(topology("topology-b"))
@@ -232,7 +247,7 @@ def test_a_topology_change_invalidates_but_does_not_mutate_an_open_preview(repos
 
 
 def test_a_new_topology_drops_removed_region_overrides_before_the_next_apply(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     initial = styles.register_topology(topology())
     preview = styles.preview(
         proposal(initial, scope=StyleScope("region", "region-b"), parameters={"vitality": 0.3})
@@ -260,7 +275,7 @@ def test_a_new_topology_drops_removed_region_overrides_before_the_next_apply(rep
 
 
 def test_user_settings_and_companion_proposals_keep_distinct_audit_provenance(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     initial = styles.register_topology(topology())
     for origin, reference in (
         (ProposalOrigin.USER, None),
@@ -282,7 +297,7 @@ def test_user_settings_and_companion_proposals_keep_distinct_audit_provenance(re
 
 
 def test_companion_recipe_refinement_persists_only_inert_binding_and_provenance(repository):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     initial = styles.register_topology(topology())
     with pytest.raises(InvalidStyleData, match="require model"):
         styles.preview(
@@ -339,7 +354,7 @@ def test_missing_source_evidence_is_a_state_and_requiring_it_is_an_asset_error(
         evidence_span_id=None,
         missing_reason="no source was recorded for this region",
     )
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(topology(sources=(source,)))
     store = LocalContentAddressedStore(tmp_path / "blobs")
 
@@ -356,7 +371,7 @@ def test_source_media_can_read_the_exact_saved_snapshot_after_the_global_pointer
 ):
     first_id = uuid.uuid4()
     second_id = uuid.uuid4()
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(
         topology(
             sources=(TopologySourceSlot(
@@ -373,6 +388,7 @@ def test_source_media_can_read_the_exact_saved_snapshot_after_the_global_pointer
         workspace_id=repository.workspace_id,
         actor=uuid.uuid4(),
         base_topology_digest="topology-a",
+        world_id=styles.world_id,
     )
     styles.register_topology(
         topology(
@@ -421,7 +437,7 @@ def test_available_source_metadata_comes_only_from_authorised_local_evidence(
         evidence_span_id=span_id,
         missing_reason=None,
     )
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = fixture_styles(repository)
     styles.register_topology(topology(sources=(source,)))
 
     metadata = styles.require_source_media(source_id, store)
@@ -512,7 +528,11 @@ def test_source_light_upgrade_preserves_prior_receipts_and_source_slots(monkeypa
         connection.execute(
             "select set_config('exulanica.workspace_id', %s, false)", (str(workspace),)
         )
-        previous = WorldStyleRepository(connection, workspace, registry=previous_registry)
+        # Migrated only up to 0046, a schema with no world registry (0099), so the world is
+        # named without being registered.
+        previous = WorldStyleRepository(
+            connection, workspace, registry=previous_registry, world_id=FIXTURE_WORLD_ID
+        )
         initial = previous.register_topology(
             topology(
                 sources=(
@@ -546,7 +566,7 @@ def test_source_light_upgrade_preserves_prior_receipts_and_source_slots(monkeypa
         before = contents()
         connection.execute(upgrade.sql)
         assert contents() == before
-        current = WorldStyleRepository(connection, workspace)
+        current = WorldStyleRepository(connection, workspace, world_id=FIXTURE_WORLD_ID)
         assert current.current().version_id == saved.version_id
         assert current.current().recipe_binding == saved.recipe_binding
         assert "source-light-v1" not in saved.recipe_binding["modules"]

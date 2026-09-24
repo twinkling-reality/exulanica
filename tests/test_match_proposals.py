@@ -449,11 +449,18 @@ def test_the_producer_widens_selection_without_making_a_citable_claim(corpus):
     assert "user_text" not in pending["basis"]["modalities"]
     counts = []
     for scope in (EpistemicScope.CONFIRMED, EpistemicScope.INCLUDE_PROPOSALS):
-        plan = SelectionPlan(intent=Intent.CAPTURES,
-                             entities=EntitySelector(ids=[entity_id]), epistemic=scope)
-        result = execute(repository.connection, validate(
-            repository.connection, plan, Session(workspace_id=repository.workspace_id, actor=actor)
-        ))
+        plan = SelectionPlan(
+            intent=Intent.CAPTURES, entities=EntitySelector(ids=[entity_id]), epistemic=scope
+        )
+        result = execute(
+            repository.connection,
+            validate(
+                repository.connection,
+                plan,
+                Session(workspace_id=repository.workspace_id, actor=actor),
+            ),
+            world_id=None,
+        )
         counts.append(result.total_matched)
         packet = build_packet(repository.connection, result, workspace_id=repository.workspace_id)
         if scope is EpistemicScope.INCLUDE_PROPOSALS:

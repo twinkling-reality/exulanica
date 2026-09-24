@@ -102,6 +102,7 @@ def main() -> None:
                     validate(
                         connection, plan, Session(workspace_id=workspace, actor=uuid.UUID(int=1))
                     ),
+                    world_id=None,
                 )
                 packet = build_packet(connection, result, workspace_id=workspace)
                 rows.append(

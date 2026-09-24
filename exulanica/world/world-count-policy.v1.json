@@ -1,0 +1,9 @@
+{
+  "policy_id": "exulanica.world-count",
+  "version": 1,
+  "scope": "workspace",
+  "limits": {
+    "authored-starter": null,
+    "personal-source": 1
+  }
+}

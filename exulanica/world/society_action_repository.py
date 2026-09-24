@@ -9,7 +9,6 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import (
     SocietyEvent,
     StaleSocietyState,
@@ -33,7 +32,7 @@ class SocietyActionRepository:
         connection: psycopg.Connection,
         workspace_id: uuid.UUID,
         *,
-        world_id: str = DEFAULT_WORLD_ID,
+        world_id: str,
         input_authorizer: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.connection = connection

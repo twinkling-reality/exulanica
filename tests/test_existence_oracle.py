@@ -86,6 +86,7 @@ from route_probes import (
 )
 from test_material_recipes import CATALOG
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import registered_world
 
 _OWNER_TOKEN = "existence-owner-token-long-enough-to-be-accepted"
 _STRANGER_TOKEN = "existence-stranger-token-long-enough-to-be-accepted"
@@ -236,9 +237,10 @@ def _provide_society_input(existence: Existence):
 def existence(tmp_path, photo_dir, repository, spine_schema):
     """An application over the test schema, connected as runtime roles, with two tokens.
 
-    The stranger's workspace owns nothing but a world topology of its own, because several world
-    routes decide the caller's own world before they look at an id, and a stranger with no world
-    would be refused there by every id alike without the id being looked up.
+    The stranger's workspace owns nothing but a world of its own, registered under the id the
+    owner's world has and holding a topology, because world routes decide the caller's world before
+    they look at an id, and a stranger with no such world would be refused there by every id alike
+    without the id being looked up.
     """
     _psycopg, scratch = spine_schema
     provision_runtime_role(repository.connection, role=_RUNTIME_ROLE)
@@ -263,8 +265,9 @@ def existence(tmp_path, photo_dir, repository, spine_schema):
         },
     }
     with scratch_database(scratch).session(stranger) as connection:
-        WorldStyleRepository(connection, stranger).register_topology(
-            TopologyContract("stranger-topology", ("region-a",))
+        world = registered_world(connection, stranger)
+        WorldStyleRepository(connection, stranger, world_id=world).register_topology(
+            TopologyContract("stranger-topology", ("region-a",), world_id=world)
         )
     store = LocalContentAddressedStore(tmp_path / "blobs")
     tiles = tile_store(tmp_path / "tiles")

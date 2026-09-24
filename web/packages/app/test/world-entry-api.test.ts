@@ -1,9 +1,37 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  PERSONAL_SOURCE_WORLD_KIND,
+  PersonalSourceWorldUnresolved,
   WorldEntryClient,
   automaticWorldEntry,
+  personalSourceWorld,
   requireMetadataOnlyEntryUpdate,
+  type WorkspaceWorlds,
 } from '../src/world-entry-api.js';
+
+/** The count policy the server checks world creation against, read from the server's own file. */
+const SERVER_POLICY = JSON.parse(readFileSync(
+  new URL('../../../../exulanica/world/world-count-policy.v1.json', import.meta.url), 'utf8',
+)) as { readonly limits: Readonly<Record<string, number | null>> };
+
+const worldsWire = (worlds: readonly { readonly world_id: string; readonly kind: string }[]) => ({
+  policy: {
+    policy_id: 'exulanica.world-count', version: 1, sha256: 'd'.repeat(64),
+    limits: { 'personal-source': 1, 'authored-starter': null },
+  },
+  worlds: worlds.map((world, index) => ({
+    ...world, created_at: `2026-09-2${index}T00:00:00Z`, created_by: null, provenance: {},
+  })),
+});
+
+const listed = (worlds: readonly { readonly world_id: string; readonly kind: string }[]) =>
+  ({
+    policy: { policyId: 'p', version: 1, sha256: 'd'.repeat(64), limits: {} },
+    worlds: worlds.map((world) => ({
+      worldId: world.world_id, kind: world.kind, createdAt: '2026-09-23T00:00:00Z',
+    })),
+  }) satisfies WorkspaceWorlds;
 
 const wire = (overrides: Record<string, unknown> = {}) => ({
   entry_id: '11111111-1111-4111-8111-111111111111',
@@ -93,21 +121,94 @@ describe('saved world entry client', () => {
         return Response.json({ version_id: '22222222-2222-4222-8222-222222222222' });
       }
       if (url.pathname === '/world-entries') return Response.json(wire(), { status: 201 });
+      if (url.pathname === '/worlds') {
+        return Response.json(worldsWire([
+          { world_id: 'world:authored:starter', kind: 'authored-starter' },
+          { world_id: 'world:personal:family', kind: 'personal-source' },
+        ]));
+      }
       throw new Error(`unexpected ${url.pathname}`);
     });
     await new WorldEntryClient({
       baseUrl: 'https://exulanica.test', token: 'private', fetch,
     }).createFromPersonalSources('Family garden');
-    expect(requests.slice(0, 2).map(({ url }) => url.searchParams.get('world_id')))
-      .toEqual(['atlas:default', 'atlas:default']);
-    expect(requests[1]?.body).toEqual({
+    // The world comes from the server's list, never from a name the browser carries.
+    expect(requests[0]?.url.pathname).toBe('/worlds');
+    expect(requests.slice(1, 3).map(({ url }) => url.searchParams.get('world_id')))
+      .toEqual(['world:personal:family', 'world:personal:family']);
+    expect(requests[2]?.body).toEqual({
       base_topology_digest: 'topology-personal', title: 'Family garden',
     });
-    expect(requests[2]?.body).toMatchObject({
+    expect(requests[3]?.body).toMatchObject({
+      world_id: 'world:personal:family',
       source_kind: 'personal',
       authored_version_id: '22222222-2222-4222-8222-222222222222',
       style_version_id: '33333333-3333-4333-8333-333333333333',
     });
+  });
+
+  it('opens a personal-source world a caller names without reading the list', async () => {
+    const paths: string[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      paths.push(`${url.pathname}?${url.searchParams.get('world_id') ?? ''}`);
+      if (url.pathname === '/world/styles/current') {
+        return Response.json({
+          current_topology_digest: 'topology-personal',
+          current: { version_id: '33333333-3333-4333-8333-333333333333' },
+        });
+      }
+      if (url.pathname === '/world/versions/bootstrap') {
+        return Response.json({ version_id: '22222222-2222-4222-8222-222222222222' });
+      }
+      return Response.json(wire(), { status: 201 });
+    });
+    await new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+    }).createFromPersonalSources('Second garden', 'world:personal:second');
+    expect(paths).toEqual([
+      '/world/styles/current?world:personal:second',
+      '/world/versions/bootstrap?world:personal:second',
+      '/world-entries?',
+    ]);
+  });
+
+  it('refuses by name when the workspace has no personal-source world, or several', async () => {
+    expect(personalSourceWorld(listed([
+      { world_id: 'world:authored:starter', kind: 'authored-starter' },
+      { world_id: 'world:personal:one', kind: PERSONAL_SOURCE_WORLD_KIND },
+    ]))).toBe('world:personal:one');
+    expect(() => personalSourceWorld(listed([
+      { world_id: 'world:authored:starter', kind: 'authored-starter' },
+    ]))).toThrow(expect.objectContaining({ code: 'no_personal_source_world', worldIds: [] }));
+    // Several is refused rather than resolved by position: which one is the person's choice.
+    const several = listed([
+      { world_id: 'world:personal:one', kind: PERSONAL_SOURCE_WORLD_KIND },
+      { world_id: 'world:personal:two', kind: PERSONAL_SOURCE_WORLD_KIND },
+    ]);
+    expect(() => personalSourceWorld(several)).toThrow(PersonalSourceWorldUnresolved);
+    expect(() => personalSourceWorld(several)).toThrow(expect.objectContaining({
+      code: 'several_personal_source_worlds',
+      worldIds: ['world:personal:one', 'world:personal:two'],
+    }));
+  });
+
+  it('reads the world list and its count policy exactly as the server sends them', async () => {
+    const fetch = vi.fn(async () => Response.json(worldsWire([
+      { world_id: 'world:personal:family', kind: 'personal-source' },
+    ])));
+    const worlds = await new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+    }).worlds();
+    expect(worlds.policy).toEqual({
+      policyId: 'exulanica.world-count', version: 1, sha256: 'd'.repeat(64),
+      limits: { 'personal-source': 1, 'authored-starter': null },
+    });
+    expect(worlds.worlds.map((world) => world.worldId)).toEqual(['world:personal:family']);
+  });
+
+  it('spells the personal-source kind the way the server policy does', () => {
+    expect(Object.keys(SERVER_POLICY.limits)).toContain(PERSONAL_SOURCE_WORLD_KIND);
   });
 
   it('creates or reuses the authored starter and parses its exact bounded scene', async () => {

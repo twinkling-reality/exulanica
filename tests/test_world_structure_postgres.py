@@ -25,8 +25,17 @@ from exulanica.world import (
 
 from conftest import write_photo
 from world_structure_fixtures import structural_candidate
+from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
+
+
+def fixture_structures(repository) -> WorldStructureRepository:
+    """The structure of the registered fixture world the synthetic candidates are written for."""
+    world_id = registered_world(repository.connection, repository.workspace_id)
+    return WorldStructureRepository(
+        repository.connection, repository.workspace_id, world_id=world_id
+    )
 
 
 def apply_candidate(
@@ -47,7 +56,7 @@ def apply_candidate(
 
 
 def test_preview_apply_writes_immutable_sections_lineage_and_package_projection(repository):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = fixture_structures(repository)
     preview = structures.preview(structural_candidate(), proposed_by=uuid.uuid4())
     assert preview.base_snapshot_id is None
     assert preview.validation_checks == {
@@ -94,7 +103,7 @@ def test_preview_apply_writes_immutable_sections_lineage_and_package_projection(
 
 
 def test_two_initial_or_stale_composers_cannot_both_become_current(repository):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = fixture_structures(repository)
     first = structures.preview(structural_candidate(), proposed_by=uuid.uuid4())
     second = structures.preview(structural_candidate(), proposed_by=uuid.uuid4())
     applied = structures.apply(
@@ -122,7 +131,7 @@ def test_two_initial_or_stale_composers_cannot_both_become_current(repository):
 
 
 def test_region_movement_requires_a_recorded_migration_and_owner_identity_is_stable(repository):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = fixture_structures(repository)
     first = apply_candidate(structures, structural_candidate())
 
     moved = structural_candidate(graph="graph-b", region_b_x_mm=14_000)
@@ -158,14 +167,16 @@ def test_region_movement_requires_a_recorded_migration_and_owner_identity_is_sta
 
 
 def test_appearance_apply_cannot_change_any_structural_pointer_or_digest(repository):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = fixture_structures(repository)
     snapshot = apply_candidate(structures, structural_candidate())
     before = repository.connection.execute(
         "select * from world_structure_state where workspace_id=%s",
         (repository.workspace_id,),
     ).fetchone()
 
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles = WorldStyleRepository(
+        repository.connection, repository.workspace_id, world_id=structures.world_id
+    )
     current = styles.current()
     style_preview = styles.preview(
         StyleProposal(
@@ -195,7 +206,7 @@ def test_appearance_apply_cannot_change_any_structural_pointer_or_digest(reposit
 def test_tombstone_invalidates_the_dependent_snapshot_and_selects_nearest_valid_fallback(
     repository, tmp_path, photo_dir
 ):
-    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    structures = fixture_structures(repository)
     fallback = apply_candidate(structures, structural_candidate())
 
     store = LocalContentAddressedStore(tmp_path / "blobs")
