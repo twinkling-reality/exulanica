@@ -15,6 +15,7 @@
         "exulanica/ingest/worker_command.py",
         "exulanica/selection/calls.py",
         "exulanica/selection/embeddings.py",
+        "exulanica/selection/question.py",
         "exulanica/world/society_decisions.py"
       ],
       "honoured_by": [
@@ -38,7 +39,8 @@
       "used_by": [
         "exulanica/selection/environment_proposal.py",
         "exulanica/selection/planner.py",
-        "exulanica/selection/proposal.py"
+        "exulanica/selection/proposal.py",
+        "exulanica/selection/question.py"
       ],
       "honoured_by": [
         "exulanica.selection.environment_proposal:draft_environment_operation",
