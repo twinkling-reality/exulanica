@@ -621,17 +621,91 @@ def standing_exclusions(document: dict[str, Any]) -> frozenset[str]:
     return frozenset(excluded)
 
 
-def held_nodes(people: list[dict], me: dict) -> set[str]:
-    """Where everybody else stands or is on the way to, as the minute has left them so far."""
+def input_graph(document: dict[str, Any]) -> tuple[dict, dict]:
+    """The nodes and edges an input's navigation states, keyed as the planner walks them."""
+    nodes, _, edges = _graph(document)
+    return nodes, edges
+
+
+def supports(graph: tuple[dict, dict], person: dict) -> bool:
+    """Whether a graph still has the node or edge a person stands on, where the person is."""
+    return _location_valid(person, *graph)
+
+
+def held_nodes(people: list[dict], me: dict, *, graph: tuple[dict, dict] | None = None) -> set[str]:
+    """Where everybody else stands or is on the way to, as the minute has left them so far.
+
+    Given the ``graph`` of the input a place is taken in, somebody that graph no longer supports
+    holds nothing: a position an edit left behind never keeps a place from anybody else.
+    """
     held = set()
     for other in people:
         if other is me:
+            continue
+        if graph is not None and not _location_valid(other, *graph):
             continue
         if other["goal"] is not None and other["route"] is not None:
             held.add(other["route"]["destination_node_id"])
         if other["location"]["edge"] is None:
             held.add(other["location"]["node_id"])
     return held
+
+
+def _step_aside(
+    person: dict,
+    people: list[dict],
+    graph: tuple[dict, dict, dict],
+    places: frozenset[str],
+    crowded: frozenset[str],
+) -> str | None:
+    """The lattice node a person steps to when an edit took away where it stood, or None.
+
+    The nearest node of the new graph to where the person is, by squared distance and then node
+    id, that is not a place, has an edge, and that nobody else stands at or is headed to; first
+    among the nodes nobody waiting would be in the way at, as a person making room waits, then
+    among the rest.
+    """
+    nodes, adjacent, edges = graph
+    held = held_nodes(people, person, graph=(nodes, edges))
+    x, z = person["position_mm"]
+    open_ground = [
+        ((node["position_mm"][0] - x) ** 2 + (node["position_mm"][1] - z) ** 2, node_id)
+        for node_id, node in nodes.items()
+        if node_id not in places and node_id not in held and adjacent[node_id]
+    ]
+    for pool in (
+        [pair for pair in open_ground if pair[1] not in crowded],
+        open_ground,
+    ):
+        if pool:
+            return min(pool)[1]
+    return None
+
+
+def _performing_at(person: dict, targets: dict[str, dict]) -> dict | None:
+    """The target a person performing at a place keeps performing at, or None.
+
+    Somebody part way through an activity at a place the new input still states, for the same
+    activity and duration, keeps going: an edit elsewhere in the world does not get them up.
+    """
+    action, location, held = person["action"], person["location"], person["target"]
+    if (
+        held is None
+        or location["edge"] is not None
+        or action["status"] != "active"
+        or action["kind"] not in DURATIONS
+    ):
+        return None
+    current = targets.get(held["target_id"])
+    if (
+        current is None
+        or not current["enabled"]
+        or current["affordance"] != held["affordance"]
+        or current["duration_ticks"] != held["duration_ticks"]
+        or location["node_id"] not in current.get("place_node_ids", ())
+    ):
+        return None
+    return current
 
 
 def _place_for(
@@ -769,18 +843,66 @@ def advance_purposeful_society(
     for person in result["inhabitants"]:
         person["motion_path_mm"] = [list(person["position_mm"])]
     # Validate every accepted edit, including a move followed by undo before any time passes.
-    for doc in inputs[1:]:
-        nodes, _, edges = _graph(doc)
+    for prior, doc in pairwise(inputs):
+        graph = _graph(doc)
+        nodes, _, edges = graph
         targets = {t["target_id"]: t for t in doc["targets"]}
         local_failures = {
             t["target_id"]: t["reason"] for t in doc.get("unavailable_affordances", [])
         }
+        available = (
+            doc["availability"] == "available" and not doc["navigation"]["unavailable_reason"]
+        )
+        # Over an input that states places, nobody is left standing where an edit took the
+        # ground away: whoever it no longer supports steps aside to open ground, and somebody
+        # part way through an activity at a place the edit left where it was keeps going.
+        places_here = doc["profile"] in PLACE_INPUTS and available
+        places: frozenset[str] = frozenset()
+        crowded: frozenset[str] = frozenset()
+        was_place: frozenset[str] = frozenset()
+        if places_here:
+            places = frozenset(n for t in doc["targets"] for n in t["place_node_ids"])
+            crowded = standing_exclusions(doc)
+            was_place = frozenset(n for t in prior["targets"] for n in t.get("place_node_ids", ()))
         for person in result["inhabitants"]:
             reason = None
-            if doc["availability"] != "available" or doc["navigation"]["unavailable_reason"]:
+            if not available:
                 reason = doc["unavailable_reason"] or doc["navigation"]["unavailable_reason"]
             elif not _location_valid(person, nodes, edges):
                 reason = "current_position_invalidated"
+                if places_here:
+                    loc = person["location"]
+                    stood = (
+                        {loc["node_id"]}
+                        if loc["edge"] is None
+                        else {loc["edge"]["from_node_id"], loc["edge"]["to_node_id"]}
+                    )
+                    aside = _step_aside(person, result["inhabitants"], graph, places, crowded)
+                    if aside is not None:
+                        why = "place_moved" if stood & was_place else "standing_node_removed"
+                        person["position_mm"] = list(nodes[aside]["position_mm"])
+                        if person["position_mm"] != person["motion_path_mm"][-1]:
+                            person["motion_path_mm"].append(list(person["position_mm"]))
+                        person["location"] = {"node_id": aside, "edge": None}
+                        person["action"] = {
+                            "kind": "idle",
+                            "status": "blocked",
+                            "target_id": person["target"]["target_id"]
+                            if person["target"]
+                            else None,
+                            "remaining_ticks": 0,
+                            "reason": why,
+                        }
+                        emit(person, "replanned", why, "stepped_aside", doc)
+                        person["goal"] = None
+                        person["target"] = None
+                        person["route"] = None
+                        continue
+            elif places_here and (kept := _performing_at(person, targets)) is not None:
+                person["target"] = deepcopy(kept)
+                person["route_geometry_sha256"] = society_state_sha256(doc["navigation"])
+                person["route"]["input_sha256"] = doc["document_sha256"]
+                continue
             elif person["target"] is not None:
                 target = targets.get(person["target"]["target_id"])
                 if target is None or not target["enabled"]:
@@ -865,7 +987,7 @@ def advance_purposeful_society(
             if places_mode:
                 # A person never takes up again, unasked, the activity whose place it is standing
                 # at, so somebody waiting gets a turn; an activity needs a place nobody else holds.
-                held = held_nodes(result["inhabitants"], person) | {
+                held = held_nodes(result["inhabitants"], person, graph=(nodes, edges)) | {
                     other["place_node_id"]
                     for subject, other in (goal_policy or {}).items()
                     if subject != person["id"] and "place_node_id" in other

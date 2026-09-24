@@ -411,12 +411,28 @@ Over such an input the v2 policy keeps room (`exulanica/world/society_planner.py
   standing spacing of a place (`goal: {kind: "make_room", target_id: null}`), and waits there;
 - nobody starts on, or next to, a destination;
 - a person sent somewhere by a directed request is promised its place before the minute, in
-  request order, and a request to a destination with no free place is refused `destination_full`.
+  request order, and a request to a destination with no free place is refused `destination_full`;
+- when an edit moves, turns, scales or removes an object, gives it motion, or crowds out one of its
+  places, whoever stood at a place that no longer stands where it did, or on a node or edge the new
+  input no longer has, steps aside as the minute consumes the edit, before its walk: to the nearest
+  lattice node, by distance and then node id, that is no place, has an edge, and is not where
+  anybody else stands or is headed, first among those where nobody waiting would be in the way.
+  The step leaves a `replanned` event (reason `place_moved`, or `standing_node_removed` off a
+  place; outcome `stepped_aside`), the activity ends unfinished, and the person may take it up
+  again at the object's new places;
+- a position an edit left behind holds no place against anybody, and a directed request reads
+  positions against the input its minute consumes;
+- somebody part way through an activity at a place an edit left where it was, for the same
+  activity and duration, keeps going to its end.
 
 Measured over three seeds and 240 minutes with eight people (`tests/test_society_destination_room.py`):
 no two people standing still are closer than 700 mm, a destination never holds more people than
 its places, and with one two-place plate every one of the eight rests, none more than twice as
 often as any other. An input that states no places takes exactly the path it always took.
+`tests/test_society_edits_under_people.py` rests two people at a two-place plate and then moves,
+turns, scales and removes it and gives it motion: both step aside with that event, nobody stands
+where the ground went in the thirty minutes after, and people rest at the moved, turned and scaled
+plate's new places. An edit elsewhere lets the two finish their rest.
 
 An object stands at whatever yaw the person placed it at, and placing one in front of yourself
 turns it to face you. Its centre and its reach do not turn with it. A blocking object's obstacle
@@ -490,10 +506,13 @@ authored edit cursors; the adapter must ensure no relevant accepted edit is omit
 cursors require equal delta digests; a rights-only input can retain the cursor.
 
 Moving, disabling or removing a current target invalidates its plan before action use. Changed
-navigation conservatively invalidates plans. New enabled reachable targets wake blocked inhabitants.
-If a changed graph no longer supports the inhabitant's current node/edge position, it stops there
-with `current_position_invalidated`; there is no nearest-node snap or teleport. If the same position
-becomes valid after a supported restoration, planning can resume. Disconnected or absent targets
+navigation conservatively invalidates plans, except that over an input that states places somebody
+performing an activity at a place the edit left where it was keeps going. New enabled reachable
+targets wake blocked inhabitants. Over an input that states no places, if a changed graph no longer
+supports the inhabitant's current node/edge position, it stops there with
+`current_position_invalidated`; there is no nearest-node snap or teleport. Over one that states
+places, it steps aside instead, as "Room at a destination" states. If the same position becomes
+valid after a supported restoration, planning can resume. Disconnected or absent targets
 produce `no_reachable_affordance` or `no_enabled_affordance`. Unavailable dependencies pause action
 with their recorded reason. Repeated unchanged blockage does not emit another event every tick.
 

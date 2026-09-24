@@ -84,6 +84,16 @@ begin
   then
     raise exception 'presence request is not bound to the minute it took' using errcode='23514';
   end if;
+  -- The minute is the change this request asked for: the state it left names this request, with
+  -- the presence it asked for, since this minute. An ordinary minute carries no such block, so a
+  -- presence row can never be attached to one and turn its replay into a change nobody asked for.
+  if held.state->'presence'->>'request_id' is distinct from new.request_id::text
+    or held.state->'presence'->>'request_sha256' is distinct from new.document_sha256
+    or held.state->'presence'->>'status' is distinct from new.presence
+    or held.state->'presence'->>'since_tick' is distinct from new.tick::text
+  then
+    raise exception 'presence request is not the change its minute recorded' using errcode='23514';
+  end if;
   return new;
 end $fn$;
 create trigger tg_world_society_presence_binding before insert on world_society_presence

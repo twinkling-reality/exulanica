@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import uuid
 
+import psycopg
 import pytest
-from exulanica.world.society import society_state_sha256
 from exulanica.world.society_planner import advance_purposeful_society, initial_purposeful_society
 from exulanica.world.society_presence import (
     AWAY,
@@ -23,6 +23,7 @@ from exulanica.world.society_presence import (
     presence_request,
 )
 from fastapi.testclient import TestClient
+from psycopg.types.json import Jsonb
 
 import test_society_authored_ground as authored
 import test_society_saved_world_api as api
@@ -228,10 +229,37 @@ def test_the_person_sends_everyone_away_and_brings_them_back_over_http(world_app
 
         refused = ask("here", society)
         assert refused.status_code == 409 and refused.json()["code"] == "already_here"
-        gone = ask("away", society)
+        # A minute passes. Asked against the minute before it, while everybody is still here, the
+        # request is stale: it is never taken against a state its maker did not see.
+        stepped = client.post(
+            society_route + "/steps",
+            headers=api.OWNER,
+            params=scope,
+            json={
+                "base_tick": society["current_tick"],
+                "base_state_sha256": society["state_sha256"],
+            },
+        )
+        assert stepped.status_code == 200, stepped.text
+        current = stepped.json()
+        early = ask("away", society)
+        assert early.status_code == 409 and early.json()["code"] == "stale_society_state"
+        key = uuid.uuid4()
+        gone = ask("away", current, key)
         assert gone.status_code == 200, gone.text
         assert gone.json()["state"]["inhabitants"] == []
-        assert ask("away", society).status_code == 409  # the state moved on: stale
+        # The same request again is answered with the society as it is; the same key asking for
+        # anything else is refused, never taken as a new request.
+        again = ask("away", current, key)
+        assert again.status_code == 200
+        assert again.json()["state_sha256"] == gone.json()["state_sha256"]
+        reused = ask("here", gone.json(), key)
+        assert reused.status_code == 409 and reused.json()["code"] == "stale_society_state"
+        assert "another request" in reused.json()["detail"]
+        # Asked against the minute before they left, the request is stale, not "nobody to send
+        # away": the state it names has moved on.
+        late = ask("away", current)
+        assert late.status_code == 409 and late.json()["code"] == "stale_society_state"
         nobody = ask("away", gone.json())
         assert nobody.status_code == 409 and nobody.json()["code"] == "nobody_to_send_away"
         read = client.get(society_route, headers=api.OWNER, params=scope).json()
@@ -279,4 +307,96 @@ def test_a_waiting_directed_request_holds_the_minute_for_itself(saved_world):  #
     with pytest.raises(PresenceRefused) as refused:
         _change(society_repository(world), version_id, society, AWAY, actor)
     assert refused.value.code == "a_request_is_waiting"
-    assert society_state_sha256(society["state"]) == society["state_sha256"]
+    # Nothing was written: read back from the database, the society is the one the request saw,
+    # and no presence row names it.
+    reread = society_repository(world).snapshot(version_id)
+    assert reread["state_sha256"] == society["state_sha256"]
+    assert reread["current_tick"] == society["current_tick"]
+    assert _presence_rows(world, society["society_id"]) == []
+
+
+def _presence_rows(world, society_id):
+    return (
+        world["connection"]
+        .execute(
+            "select tick,presence,document_sha256 from world_society_presence "
+            "where workspace_id=%s and society_id=%s order by tick",
+            (world["workspace"], society_id),
+        )
+        .fetchall()
+    )
+
+
+def _insert_presence(world, society_id, tick, document):
+    world["connection"].execute(
+        "insert into world_society_presence(workspace_id,society_id,tick,request_id,requested_by,"
+        "presence,document,document_sha256) values(%s,%s,%s,%s,%s,%s,%s,%s)",
+        (
+            world["workspace"],
+            society_id,
+            tick,
+            document["request_id"],
+            document["requested_by"],
+            document["presence"],
+            Jsonb(document),
+            document["document_sha256"],
+        ),
+    )
+
+
+@pytest.mark.postgres
+def test_a_presence_row_cannot_be_attached_to_an_ordinary_minute(saved_world):  # noqa: F811
+    world = saved_world
+    place_object(world, world["plate"], "object:cushion", 3_000, 5_000)
+    society, _ = create_society(world)
+    version_id, actor = world["binding"].version_id, world["session"].actor
+    stepped = _step(society_repository(world), version_id, society)
+    # Bound exactly as a real request for that minute would be, to the state it started from:
+    # only the minute itself, which asked for nothing, stands in the way.
+    document = presence_request(
+        society["state"], request_id=uuid.uuid4(), requested_by=actor, wanted=AWAY
+    )
+    with (
+        pytest.raises(psycopg.errors.CheckViolation, match="not the change its minute recorded"),
+        world["connection"].transaction(),
+    ):
+        _insert_presence(world, society["society_id"], stepped["current_tick"], document)
+    assert _presence_rows(world, society["society_id"]) == []
+
+
+@pytest.mark.postgres
+def test_a_society_whose_engine_keeps_its_people_takes_no_presence_row(saved_world):  # noqa: F811
+    world = saved_world
+    place_object(world, world["plate"], "object:cushion", 3_000, 5_000)
+    society, _ = create_society(world, profile="exulanica-society/v3")
+    version_id, actor = world["binding"].version_id, world["session"].actor
+    stepped = _step(society_repository(world), version_id, society)
+    document = presence_request(
+        society["state"], request_id=uuid.uuid4(), requested_by=actor, wanted=AWAY
+    )
+    with (
+        pytest.raises(psycopg.errors.CheckViolation, match="whose people can be sent away"),
+        world["connection"].transaction(),
+    ):
+        _insert_presence(world, society["society_id"], stepped["current_tick"], document)
+
+
+@pytest.mark.postgres
+def test_a_presence_row_is_never_changed_or_removed(saved_world):  # noqa: F811
+    world = saved_world
+    place_object(world, world["plate"], "object:cushion", 3_000, 5_000)
+    society, _ = create_society(world)
+    version_id, actor = world["binding"].version_id, world["session"].actor
+    _change(society_repository(world), version_id, society, AWAY, actor)
+    kept = _presence_rows(world, society["society_id"])
+    assert [row["presence"] for row in kept] == [AWAY]
+    for statement in (
+        "update world_society_presence set presence='here' where workspace_id=%s and society_id=%s",
+        "delete from world_society_presence where workspace_id=%s and society_id=%s",
+    ):
+        with (
+            pytest.raises(psycopg.errors.CheckViolation, match="append-only"),
+            world["connection"].transaction(),
+        ):
+            world["connection"].execute(statement, (world["workspace"], society["society_id"]))
+    assert _presence_rows(world, society["society_id"]) == kept

@@ -14,6 +14,8 @@ from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,
     held_nodes,
+    input_graph,
+    supports,
     validate_society_input,
 )
 
@@ -191,7 +193,8 @@ def _request_reason(
     if not _reachable(person, document, target):
         return "rejected", "target_unreachable"
     if document["profile"] in PLACE_INPUTS and all(
-        place in held_nodes(state["inhabitants"], person) for place in target["place_node_ids"]
+        place in held_nodes(state["inhabitants"], person, graph=input_graph(document))
+        for place in target["place_node_ids"]
     ):
         # Every place at the destination is taken by somebody else, so there is no room to send
         # this person to; the request says so rather than leaving it standing in a queue.
@@ -200,13 +203,25 @@ def _request_reason(
 
 
 def _promised_place(
-    state: dict[str, Any], person: dict[str, Any], target: dict[str, Any], promised: set[str]
+    state: dict[str, Any],
+    person: dict[str, Any],
+    target: dict[str, Any],
+    promised: set[str],
+    graph: tuple[dict, dict],
 ) -> str | None:
-    """The place a directed person takes: the one it stands at, else the first nobody holds."""
+    """The place a directed person takes: the one it stands at, else the first nobody holds.
+
+    Positions are read against ``graph``, the input the step consumes: somebody an edit left
+    standing where a place used to be stands at no place, and holds none against anybody else.
+    """
     location = person["location"]
-    if location["edge"] is None and location["node_id"] in target["place_node_ids"]:
+    if (
+        location["edge"] is None
+        and location["node_id"] in target["place_node_ids"]
+        and supports(graph, person)
+    ):
         return str(location["node_id"])
-    held = held_nodes(state["inhabitants"], person) | promised
+    held = held_nodes(state["inhabitants"], person, graph=graph) | promised
     return next((place for place in target["place_node_ids"] if place not in held), None)
 
 
@@ -269,6 +284,7 @@ def action_goal_policies(
     # choosing for themselves in the same minute, and two requests never share one place.
     promised: set[str] = set()
     people = _people(state)
+    graph = input_graph(document)
     for request in requests:
         validate_action_request(request)
         _require(request["branch_id"] == state["branch_id"], "action request branch mismatch")
@@ -278,7 +294,7 @@ def action_goal_policies(
             disposition, reason = "superseded", "subject_already_directed"
         place = None
         if disposition == "applied" and document["profile"] in PLACE_INPUTS:
-            place = _promised_place(state, people[subject], request["target"], promised)
+            place = _promised_place(state, people[subject], request["target"], promised, graph)
             if place is None:
                 disposition, reason = "rejected", "destination_full"
         if disposition == "applied":
