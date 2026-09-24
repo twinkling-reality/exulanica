@@ -61,6 +61,8 @@ def text_match_query(
     lexeme before assembling an OR query. Duplicate words cannot inflate minimum match.
     Semantic-only candidates must clear the cosine floor; unrelated queries may still abstain.
     The executor intersects these candidates with every other validated dimension before fusion.
+    A search entry a deletion or a stopped search right has targeted is not ranked from the moment
+    it is targeted, whether or not its purge has run (``tombstone_embedding_target``, 0044, 0104).
     """
     statement = sql.SQL(
         "with source as ("
@@ -79,7 +81,10 @@ def text_match_query(
             (select max(1 - (e.v <=> %s::halfvec)) from embedding e
              where e.workspace_id=%s and e.ref_type='span' and e.ref_id=source.span_id
                and e.family=%s || encode(digest(source.body, 'sha256'), 'hex')
-               and e.model_ref=%s and e.pipeline_version=%s) as cosine
+               and e.model_ref=%s and e.pipeline_version=%s
+               and not exists (select 1 from tombstone_embedding_target d
+                               where d.workspace_id=e.workspace_id
+                                 and d.embedding_id=e.embedding_id)) as cosine
           from source cross join q where cardinality(q.words) > 0
         )
         select capture_id, lexical, case when cosine >= %s then cosine end as cosine
@@ -110,7 +115,9 @@ def has_embeddings(
             "select 1 from source join embedding e on e.ref_id=source.span_id "
             "where e.workspace_id=%s and e.ref_type='span' "
             "and e.family=%s || encode(digest(source.body, 'sha256'), 'hex') "
-            "and e.model_ref=%s and e.pipeline_version=%s limit 1",
+            "and e.model_ref=%s and e.pipeline_version=%s "
+            "and not exists (select 1 from tombstone_embedding_target d "
+            "where d.workspace_id=e.workspace_id and d.embedding_id=e.embedding_id) limit 1",
             (
                 workspace_id,
                 list(SEARCHABLE_PREDICATES),

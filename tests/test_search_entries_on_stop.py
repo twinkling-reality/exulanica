@@ -34,6 +34,7 @@ from exulanica.ingest.personal_requests import admission_status
 from exulanica.ingest.privacy import authorize_personal_capture
 from exulanica.ingest.repository import IngestRepository
 from exulanica.models.manifest import Role
+from exulanica.selection.embeddings import QueryEmbedding, has_embeddings
 from fastapi.testclient import TestClient
 
 from test_companion_matching import run, script, unchecked, vector
@@ -47,6 +48,8 @@ ACCOUNT = uuid.UUID("0190a000-0000-7000-8000-0000000000aa")
 PURPOSE = "Find my own photographs by what they show."
 #: A word of the fixture photograph's own description, which the lexical search matches locally.
 DESCRIBED = "red"
+#: Words the fixture photograph's description does not hold, which the lexical search never matches.
+UNDESCRIBED = "zebra quartz"
 
 
 @dataclasses.dataclass
@@ -177,6 +180,24 @@ def test_stopping_the_search_right_queues_the_purge_and_the_purger_deletes_the_e
         queue.is_purge_complete(fixture.repository.connection, row["tombstone_id"])
         for row in tombstones
     )
+
+
+def test_a_stopped_entry_is_not_ranked_before_its_purge_runs(indexed, client):
+    """The stop takes effect at search time at once: the vector path skips a targeted entry."""
+    fixture = indexed.fixture
+    model = client.manifest[Role.EMBEDDING].primary.model_id
+    # The stored entry's own vector, asked with words its description does not hold, so only the
+    # vector path can match it.
+    query = QueryEmbedding(vector(), model, client.manifest.pipeline_version)
+    assert run(fixture.repository, UNDESCRIBED, embedding=query).total_matched == 1
+    assert has_embeddings(fixture.repository.connection, fixture.workspace_id, client)
+
+    for right in indexed.rights[Role.EMBEDDING]:
+        _stop(fixture, right.right_id)
+
+    assert _entries(fixture) == [indexed.embedding_id], "the purge must not have run yet"
+    assert run(fixture.repository, UNDESCRIBED, embedding=query).total_matched == 0
+    assert not has_embeddings(fixture.repository.connection, fixture.workspace_id, client)
 
 
 def test_the_photograph_survives_and_is_still_found_by_the_words_of_its_description(indexed):
