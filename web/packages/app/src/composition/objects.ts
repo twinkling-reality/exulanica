@@ -81,11 +81,25 @@ import {
 } from '@exulanica/atlas-react/playcanvas';
 
 import {
+  SMALL_SQUARE,
+  applyArrangement,
+  previewArrangement,
+  type ArrangementPreview,
+  type ArrangementRequest,
+  type ArrangementViewer,
+  type ArrangementWriteResult,
+} from '../arrangement-api.js';
+import {
   applyComposition,
   previewComposition,
   type CompositionApplyRequest,
   type CompositionPreview,
 } from '../composition-preview-api.js';
+import {
+  RECHECKABLE_ARRANGEMENT_REFUSALS,
+  explainArrangementFailure,
+  explainArrangementRefusal,
+} from '../ui/arrangement-refusals.js';
 import {
   buildCompositionVerdict,
   compositionDetails,
@@ -184,7 +198,7 @@ export interface MountedObjects {
 }
 
 interface Pending {
-  readonly kind: 'place' | 'move' | 'remove' | 'behaviour' | 'undo' | 'bootstrap';
+  readonly kind: 'place' | 'arrange' | 'move' | 'remove' | 'behaviour' | 'undo' | 'bootstrap';
   readonly describe: string;
   readonly reversible: boolean;
   /** The server's verdict on a placement. Confirm is held until it is ready. */
@@ -204,6 +218,12 @@ interface PlacementPlan {
   readonly behaviour: ObjectBehaviour | null;
   readonly district: DistrictObjectPlacement | null;
   readonly describe: string;
+}
+
+/** A small square as the person asked for it, kept so it can be checked again against a newer base. */
+interface ArrangementPlan {
+  readonly role: ObjectRole;
+  readonly viewer: ArrangementViewer;
 }
 
 /** Refusals a fresh check can clear: a newer base, or a new identity for the addition. */
@@ -267,6 +287,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   const panel = buildObjectPlacement({
     onPlace: (draft) => proposePlacement(draft),
+    onArrange: (role) => proposeArrangement(role),
     onSelect: (objectId) => select(objectId),
     onControl: (objectId, action) => control(objectId, action),
     onSetMotion: (objectId, motion) => proposeMotion(objectId, motion),
@@ -942,6 +963,177 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     panel.report(`${explanation.happened} ${explanation.next}`, 'failure');
   }
 
+  // -- a small square ------------------------------------------------------------------------------
+
+  /**
+   * Ask for the square in front of the person, facing them, with the role they chose for it.
+   *
+   * Only where they stand and which way they face is sent: where each object goes is the server's
+   * to work out from the world's own ground, and it refuses by name when the square would not fit.
+   */
+  function proposeArrangement(role: string): void {
+    if (!isObjectRole(role)) {
+      panel.report('Choose what these objects are to you before placing the square.', 'failure');
+      return;
+    }
+    if (version === null) {
+      void proposeBootstrap();
+      return;
+    }
+    if (version.sourceInvalidated) {
+      panel.report(
+        'The place this version was built on was deleted, so nothing more can be added to it.',
+        'failure',
+      );
+      return;
+    }
+    const region = placementRegion();
+    const binding = state.atlas?.binding;
+    if (region === null || binding === undefined) {
+      panel.report('The world is still forming. Try again in a moment.', 'failure');
+      return;
+    }
+    const pose = binding.playerPose();
+    // Where the person stands and faces, as a pose placed no distance ahead of them.
+    const standing = placementPoseBeforeVisitor(
+      region.placement, pose, 0, groundMmIn(region, region.sceneId, pose),
+    );
+    stageArrangement({
+      role,
+      viewer: Object.freeze({
+        xMm: standing.xMm,
+        zMm: standing.zMm,
+        yawMicroradians: standing.yawMicroradians,
+      }),
+    });
+  }
+
+  function stageArrangement(plan: ArrangementPlan): void {
+    if (client === null || version === null) {
+      panel.report(NO_AUTHORITY, 'failure');
+      return;
+    }
+    const base = version;
+    const request: ArrangementRequest = Object.freeze({
+      key: SMALL_SQUARE.key,
+      version: SMALL_SQUARE.version,
+      viewer: plan.viewer,
+      originRole: plan.role,
+    });
+    const verdict = buildCompositionVerdict();
+    verdict.checking();
+    stage({
+      kind: 'arrange',
+      describe: 'Place a small square in front of you, facing you, each of its objects its own change.',
+      reversible: true,
+      verdict,
+      run: async () => {
+        if (client === null) {
+          panel.report(NO_AUTHORITY, 'failure');
+          return;
+        }
+        return settleArrangement(await applyArrangement(client, base, request), plan);
+      },
+      failed: (error) => reportArrangementFailure(explainArrangementFailure(error, 'apply'), plan),
+    });
+    const check = placementCheck;
+    void checkArrangement(check, base, request, plan, verdict);
+  }
+
+  function arrangementIsCurrent(check: number): boolean {
+    return !disposed && check === placementCheck && pending?.kind === 'arrange';
+  }
+
+  /** The server's preview of the square, put in the confirmation surface. */
+  async function checkArrangement(
+    check: number,
+    base: AlternateVersion,
+    request: ArrangementRequest,
+    plan: ArrangementPlan,
+    verdict: CompositionVerdictView,
+  ): Promise<void> {
+    if (client === null) return;
+    const again = { label: 'Check again', run: () => stageArrangement(plan) };
+    let preview: ArrangementPreview;
+    try {
+      preview = await previewArrangement(client, base, request);
+    } catch (error) {
+      if (arrangementIsCurrent(check)) verdict.refused(explainArrangementFailure(error, 'preview'), again);
+      return;
+    }
+    if (!arrangementIsCurrent(check)) return;
+    if (preview.blockedReason !== null) {
+      if (preview.blockedReason === 'stale_base') {
+        await rereadVersion(base.versionId);
+        if (!arrangementIsCurrent(check)) return;
+      }
+      verdict.refused(
+        explainArrangementRefusal(preview.blockedReason, preview.blockedDetail),
+        RECHECKABLE_ARRANGEMENT_REFUSALS.has(preview.blockedReason) ? again : undefined,
+      );
+      return;
+    }
+    if (preview.arrangement === null
+      || preview.version.authoredVersionId !== base.versionId
+      || preview.version.worldId !== base.worldId
+      || preview.version.stateSha256 !== base.stateSha256) {
+      verdict.refused(Object.freeze({
+        happened: 'The world answered about a different change than the one shown here.',
+        next: 'Nothing was changed. Check again.',
+        code: null,
+        detail: `Answered for version ${preview.version.authoredVersionId} at ${preview.version.stateSha256}.`,
+        outcome: 'unchanged' as const,
+      }), again);
+      return;
+    }
+    placementReady = true;
+    verdict.ready(
+      `${preview.arrangement.title}: ${preview.arrangement.summary} It adds `
+      + `${objectCount(preview.wouldAdd.length)} in front of you, facing you, each its own change, so `
+      + '“Take back the last change” removes them one at a time, newest first. Confirm to place '
+      + 'it, or Cancel to leave the world as it is.',
+    );
+    confirm.setConfirmable(true);
+  }
+
+  /** An applied square, or the stale base it met, which is read again and offered back. */
+  async function settleArrangement(
+    result: ArrangementWriteResult,
+    plan: ArrangementPlan,
+  ): Promise<void | 'reported'> {
+    if (result.kind === 'recorded') {
+      const { arrangement, addedObjectIds } = result.applied;
+      await settle(
+        { kind: 'recorded', version: result.version },
+        `Placed “${arrangement.title}”: ${objectCount(addedObjectIds.length)}, each its own change. `
+          + '“Take back the last change” removes them one at a time, newest first.',
+      );
+      return;
+    }
+    if (disposed) return 'reported';
+    version = result.current;
+    await redrawAll();
+    reportArrangementFailure(explainArrangementRefusal('stale_base'), plan);
+    return 'reported';
+  }
+
+  function objectCount(count: number): string {
+    return count === 1 ? 'one object' : `${count} objects`;
+  }
+
+  function reportArrangementFailure(explanation: CompositionExplanation, plan: ArrangementPlan): void {
+    const recheck = explanation.outcome === 'unchanged'
+      && explanation.code !== null
+      && RECHECKABLE_ARRANGEMENT_REFUSALS.has(explanation.code);
+    confirm.reportFailure(explanation.happened, {
+      ...(explanation.outcome === 'unknown' ? { title: 'Not confirmed' } : {}),
+      next: explanation.next,
+      details: compositionDetails(explanation),
+      ...(recheck ? { retry: { label: 'Check again', run: () => stageArrangement(plan) } } : {}),
+    });
+    panel.report(`${explanation.happened} ${explanation.next}`, 'failure');
+  }
+
   function proposeMove(): void {
     const object = selectedRecord();
     if (object === null || nudged === null || version === null) return;
@@ -1088,8 +1280,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     if (next.kind !== 'place') clearPlacementLandingMark();
     confirm.show(`world-object-${issued}`, summaryFor(next), next.describe, {
       undoControlAvailable: client !== null && next.reversible
-        && (next.kind === 'place' || next.kind === 'move' || next.kind === 'remove'
-          || next.kind === 'behaviour'),
+        && (next.kind === 'place' || next.kind === 'arrange' || next.kind === 'move'
+          || next.kind === 'remove' || next.kind === 'behaviour'),
       ...(next.verdict === undefined ? {} : { verdict: next.verdict.root, confirmable: false }),
     });
   }
@@ -1097,8 +1289,9 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   async function commit(): Promise<void> {
     const running = pending;
     if (running === null) return;
-    // A placement is confirmable only on the server's ready verdict for exactly this request.
-    if (running.kind === 'place' && !placementReady) return;
+    // A placement, or a square, is confirmable only on the server's ready verdict for exactly
+    // this request.
+    if ((running.kind === 'place' || running.kind === 'arrange') && !placementReady) return;
     pending = null;
     placementReady = false;
     placementCheck += 1;
@@ -1354,6 +1547,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       assets.map((asset) => ({
         assetKey: asset.assetKey,
         label: asset.title,
+        summary: asset.summary,
         available: asset.availability === 'available',
         unavailableReason: asset.availability === 'available' ? null : asset.availability,
         licenceId: asset.licenceId,

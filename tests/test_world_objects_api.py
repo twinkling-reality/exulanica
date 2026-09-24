@@ -171,11 +171,13 @@ def objects_api(repository, spine_schema, tmp_path, monkeypatch):
 # -- the reviewed asset registry ------------------------------------------------------------
 
 
-def test_the_registry_lists_three_reviewed_cc0_assets_with_their_licence(objects_api):
+def test_the_registry_lists_every_reviewed_cc0_asset_with_its_licence(objects_api):
     response = objects_api.get("/world/assets")
     assert response.status_code == 200
     catalog = {asset["asset_key"]: asset for asset in response.json()}
-    assert set(catalog) == {"cc0.marker-cube", "cc0.marker-pillar", "cc0.marker-plate"}
+    assert set(catalog) == {asset.asset_key for asset in reviewed_assets()}
+    for generated in reviewed_assets():
+        assert catalog[generated.asset_key]["licence_sha256"] == generated.licence_sha256
     for asset in catalog.values():
         assert asset["licence_id"] == "CC0-1.0"
         assert asset["media_type"] == GLB_MEDIA_TYPE

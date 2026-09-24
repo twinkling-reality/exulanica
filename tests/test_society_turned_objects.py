@@ -84,11 +84,14 @@ def test_taking_turned_objects_changes_nothing_for_an_unturned_world(area, monke
     )
 
 
+#: Composed under the registry of every world object catalog kind. Under its three marker rows
+#: alone these are ab14b4b0... and d09bbf68..., the digests before the catalog held furniture, and
+#: tests/test_society_object_catalog.py holds that.
 @pytest.mark.parametrize(
     ("area", "digest"),
     [
-        (authored.ground(), "ab14b4b091cb2584692196601aa94ce0e690772173aa9dc31683274fb4e1fdb1"),
-        (authored.endless(), "d09bbf680089e03b625df491016a2a50d34d5e05f2aed7655220376426d8fb17"),
+        (authored.ground(), "205099b240299d9833241d67789e1524de051648f1afe1c9cb518595013c7956"),
+        (authored.endless(), "b496b4d0eb430ffbe9b9d6640230c97c050a1398513aca1990238831be48ea5a"),
     ],
     ids=["bounded", "endless"],
 )

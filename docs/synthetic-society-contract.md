@@ -389,6 +389,7 @@ Every activity in a second-profile input states the places its occupants stand a
 
 | An object that | Holds | Where |
 | --- | --- | --- |
+| names rows of places (a furniture kind of the world object catalog, like the bench) | as many people as each row names | along the side the row names, a navigation clearance and a standing radius out from it, centred on it |
 | a person can walk on (blocks nothing, like the Marker plate) | a row along its own x axis, one standing spacing apart, as many as have their centres on it | on the object |
 | blocks walking (the Marker cube and pillar) | one person in front of each face | a navigation clearance and a standing radius out from the face |
 
@@ -400,7 +401,22 @@ obstacle, at least a standing spacing from every place kept before it, and withi
 reviewed reach of a lattice node it can be walked to from in a straight clear line; it becomes a
 leaf node joined by one edge to the nearest such node. Validation refuses an input whose places
 stand closer than its stated spacing. A reviewed Marker plate holds two, a cube or a pillar four,
-fewer where a place does not fit.
+a bench three and the planter seat four, fewer where a place does not fit. The world object catalog
+derives a kind's places from the figures above, read where the society reads them
+(`exulanica/world/object_catalog.py`): each row stands a navigation clearance and a standing
+radius out from its side of the kind's footprint, its places a standing spacing and
+`TURNED_PLACE_MARGIN_MM` (2 mm) apart. Turning an object moves each coordinate of a place outward
+by less than a millimetre, so two places come less than the square root of two millimetres
+closer, and at the kind's own size or larger no yaw brings two of its places within a standing
+spacing. Measured at each kind's own size over every microradian of yaw, the closest two places
+come is 700.746 mm, the planter seat's; `tests/test_society_object_catalog.py` counts the places
+the society keeps at every 997th microradian at a kind's own size and at the largest scale an
+object takes. Smaller than its own size, a kind's places come together with it, and a row can
+hold fewer. A kind's footprint is the least rectangle about its origin that holds every part lower
+than the walker capsule the city grammar's nav envelope keeps clear (`capsule_clearance`, 1900 mm
+high), so a table top blocks walking and a tree's crown or a stall's awning does not. A kind nobody
+uses, like the lamp post, is an obstacle and nothing else: it blocks walking where it stands,
+offers no activity and leaves no record of one.
 
 Over such an input the v2 policy keeps room (`exulanica/world/society_planner.py`):
 
@@ -442,9 +458,12 @@ is its reviewed footprint turned about its centre by the yaw, the way the render
 object: its own x axis goes to (cos, -sin) and its z axis to (sin, cos) in the region's frame.
 Each turned corner coordinate is rounded outward, away from the centre, to the whole millimetre,
 so the obstacle grows by less than a millimetre on each axis and never opens a route through what
-the object covers; unturned, it is exactly the reviewed rectangle. For the reviewed catalog's
-blocking footprints no nonzero microradian yaw brings a turned corner within 1e-8 mm of a whole
-millimetre, so that rounding does not depend on a machine's arithmetic. The district projections
+the object covers; unturned, it is exactly the reviewed rectangle. For every blocking footprint the
+world object catalog states, no nonzero microradian yaw brings a turned corner within 1e-9 mm of a
+whole millimetre (the least is 4e-9 mm, for the planter seat, measured by
+`tests/test_society_object_catalog.py`), a thousand times more than one unit in the last place of a
+cosine and of a sine moves such a corner, so that rounding does not depend on a machine's
+arithmetic. The district projections
 keep refusing a turned object as `unsupported_object_transform`. So does an area smaller than the navigation clearance
 (`walkable_area_smaller_than_clearance`), a version whose snapshot is not the registered one
 (`authored_ground_snapshot_mismatch`), an invalidated source and a structural override. An
@@ -599,9 +618,19 @@ stored input against the registry the input names, read back and held to a regis
 against the registry it holds itself (`exulanica/api/society_runtime.py`, `_recorded_registry`).
 Reviewing another asset or changing the reach is a registry the stored inputs never named, and they
 keep authorising; an instance whose store never held an input's registry refuses it as unavailable,
-as it refuses missing asset bytes. A reviewed asset the society's footprint table does not state is
-left out of the registry, so an instance still starts, and a placed copy of it is refused by name;
-`test_every_reviewed_asset_has_a_society_assignment` fails until the table states it.
+as it refuses missing asset bytes.
+
+Every row of the registry is what the world object catalog states for one kind
+(`assets/catalogs/world-objects`, `reviewed_assignment` in `exulanica/world/society_composition.py`),
+under the digest the reviewed catalog generates for it. A marker's row is the six fields it has always
+had, so a world of markers composes to the bytes it did before the catalog held furniture, except
+for the registry's own digest, which every input records. A kind with rows of places adds the
+places the catalog derives as `places_mm`, `[x, z]` in the object's own frame, each coordinate at
+most `MAX_REACH_MM` (10,000 mm), the farthest reach a row may state. A kind nobody uses is an
+obstacle row: its footprint and whether it blocks, and no activity, duration or reach. A recorded
+registry is held to those three shapes. A reviewed asset the catalog does not state is left out of
+the registry, so an instance still starts, and a placed copy of it is refused by name as
+`unknown_active_asset`.
 
 ## Sending inhabitants away
 

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-arrangement",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "small_square",
+      "title": "A small square",
+      "summary": "A tree in a planter between two benches, with a market stall, a planter seat and a cafe table behind it and a lamp post at each front corner.",
+      "anchor": {
+        "distance_mm": 7500,
+        "source": "declared/anchor"
+      },
+      "placements": [
+        {
+          "kind": "planter_tree",
+          "x_mm": 0,
+          "y_mm": 0,
+          "quarter_turns": 0,
+          "source": "declared/layout"
+        },
+        {
+          "kind": "bench",
+          "x_mm": -4000,
+          "y_mm": 0,
+          "quarter_turns": 3,
+          "source": "declared/layout"
+        },
+        {
+          "kind": "bench",
+          "x_mm": 4000,
+          "y_mm": 0,
+          "quarter_turns": 1,
+          "source": "declared/layout"
+        },
+        {
+          "kind": "market_stall",
+          "x_mm": -4000,
+          "y_mm": -4000,
+          "quarter_turns": 0,
+          "source": "declared/layout"
+        },
+        {
+          "kind": "seating_planter",
+          "x_mm": 0,
+          "y_mm": -4000,
+          "quarter_turns": 0,
+          "source": "declared/layout"
+        },
+        {
+          "kind": "cafe_table",
+          "x_mm": 4000,
+          "y_mm": -4000,
+          "quarter_turns": 0,
+          "source": "declared/layout"
+        },
+        {
+          "kind": "lamp_post",
+          "x_mm": -4000,
+          "y_mm": 4000,
+          "quarter_turns": 0,
+          "source": "declared/layout"
+        },
+        {
+          "kind": "lamp_post",
+          "x_mm": 4000,
+          "y_mm": 4000,
+          "quarter_turns": 0,
+          "source": "declared/layout"
+        }
+      ],
+      "declared": {
+        "anchor": "The square's centre stands 7.5 m ahead of the person who asks for it. Its nearest objects, the lamp posts, stand 4 m in front of its centre and 75 mm across, and the centre then moves to the nearest lattice node, at most half the society's 2 m lattice spacing toward the person, so they still stand at least one lattice spacing clear of the lamp posts.",
+        "layout": "Each object stands on a node of a 4 m grid laid on the society's 2 m lattice: a tree in the middle with a bench on each side facing it, a market stall, a planter seat and a cafe table along the back facing the person, and a lamp post at each front corner, leaving the front open to walk in. On that grid each object covers one lattice node and every place it states lies within reach of a node it does not cover, which the loader and tests/test_world_arrangements.py check with the society's own rules."
+      },
+      "reason": "Somewhere to start that people use: rest at the benches, the planter seat and the cafe table, and a stop at the stall and the tree. It is placed as ordinary objects, one change each, and brings nobody in.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/capabilities/world-creation.md"
+      }
+    }
+  ]
+}

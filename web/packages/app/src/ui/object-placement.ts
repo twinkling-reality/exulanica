@@ -51,6 +51,8 @@ export interface ObjectRoleOption {
 export interface ObjectAssetOption {
   readonly assetKey: string;
   readonly label: string;
+  /** What the object is, in the reviewed catalog's words, shown under the choice. */
+  readonly summary: string;
   /** False when the reviewed bytes are not in storage. Listed anyway, and said so. */
   readonly available: boolean;
   /** The recorded state, when it is not `available`. Shown rather than smoothed over. */
@@ -107,6 +109,8 @@ export interface ObjectPlacementDraft extends MotionDraft {
 
 export interface ObjectPlacementHandlers {
   onPlace(draft: ObjectPlacementDraft): void;
+  /** Place the arrangement this panel offers, as its objects, with the role chosen. */
+  onArrange(role: string): void;
   onSelect(objectId: string): void;
   onControl(objectId: string, action: BehaviourControlKey): void;
   /** Give a placed object this motion, or replace the one it has. Confirmed before it is saved. */
@@ -196,6 +200,12 @@ export function buildObjectPlacement(
   const placeButton = el('button', {
     type: 'button', class: 'primary object-placement-place', text: 'Place before me',
   });
+  const assetSummary = el('p', { class: 'object-placement-summary' });
+  const arrangeButton = el('button', {
+    type: 'button', class: 'object-placement-arrange', text: 'Place a small square before me',
+  });
+  /** Each offered asset's summary, by key, for the line under the choice. */
+  let summaries = new Map<string, string>();
   const objectList = el('ul', { class: 'object-placement-list' });
   const status = el('p', { class: 'object-placement-status', role: 'status', 'aria-live': 'polite' });
   const undoButton = el('button', { type: 'button', class: 'ghost', text: 'Take back the last change' });
@@ -222,6 +232,7 @@ export function buildObjectPlacement(
   const reflectAsset = (): void => {
     const chosen = assetSelect.selectedOptions[0];
     placeButton.disabled = chosen === undefined || chosen.disabled;
+    assetSummary.textContent = chosen === undefined ? '' : summaries.get(chosen.value) ?? '';
   };
 
   motionToggle.addEventListener('change', reflectMotion);
@@ -242,6 +253,7 @@ export function buildObjectPlacement(
     const draft = currentDraft();
     if (draft !== null) handlers.onPlace(draft);
   });
+  arrangeButton.addEventListener('click', () => handlers.onArrange(roleSelect.value));
 
   replace(root, [
     el('h2', { id: 'object-placement-title', text: 'Objects you have added' }),
@@ -251,6 +263,7 @@ export function buildObjectPlacement(
     ]),
     el('div', { class: 'object-placement-form' }, [
       field('object-placement-asset', 'Object', assetSelect),
+      assetSummary,
       field('object-placement-role', 'What this is to you', roleSelect),
       el('label', { class: 'object-placement-check', for: 'object-placement-motion' }, [
         motionToggle,
@@ -258,6 +271,14 @@ export function buildObjectPlacement(
       ]),
       motionFields,
       placeButton,
+    ]),
+    el('div', { class: 'object-placement-arrangement' }, [
+      el('p', { class: 'object-placement-hint' }, [
+        'Or place a small square: several objects together in front of you, facing you, each its '
+          + 'own change, so “Take back the last change” removes them one at a time. It brings '
+          + 'nobody in.',
+      ]),
+      arrangeButton,
     ]),
     el('p', { class: 'object-placement-hint' }, [
       'Placed objects stand on the ground of the region you are in. With one selected, the arrow '
@@ -407,6 +428,7 @@ export function buildObjectPlacement(
     },
 
     showAssets(assets, roles) {
+      summaries = new Map(assets.map((asset) => [asset.assetKey, asset.summary]));
       replace(assetSelect, assets.map((asset) => {
         const option = el('option', {
           value: asset.assetKey,
@@ -462,6 +484,7 @@ export function buildObjectPlacement(
       busy = next;
       root.dataset['busy'] = next ? 'yes' : 'no';
       placeButton.disabled = next || currentDraft() === null;
+      arrangeButton.disabled = next;
       for (const button of objectList.querySelectorAll<HTMLButtonElement>('button')) {
         button.disabled = next || button.dataset[UNAVAILABLE] === 'yes';
       }

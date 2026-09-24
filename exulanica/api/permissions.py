@@ -527,6 +527,8 @@ _WORLD_WRITES: Final = _every(
     "POST /world/styles/rollback",
     "POST /world/versions",
     "POST /world/versions/bootstrap",
+    "POST /world/versions/{version_id}/arrangements/apply",
+    "POST /world/versions/{version_id}/arrangements/preview",
     "PUT /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance",
     "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset",
     "POST /world/versions/{version_id}/compositions/apply",

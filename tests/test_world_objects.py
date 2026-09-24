@@ -29,6 +29,7 @@ from exulanica.world import (
     reviewed_assets,
     validate_behaviour,
 )
+from exulanica.world.object_glb import embedded_texture_set
 from exulanica.world.objects import validate_object, validate_object_id, validate_transform
 
 #: The reviewed cube's content digest. Objects name an asset by its bytes, not by its key,
@@ -350,23 +351,20 @@ def test_an_unsupported_behaviour_fails_visibly():
 # -- reviewed assets ---------------------------------------------------------------------------
 
 
+#: The three markers migration 0042 pinned. Every other kind the catalog generates is pinned by
+#: migration 0105 and held there by tests/test_world_object_catalog.py.
+_MARKERS_0042: dict[str, tuple[str, int]] = {
+    "cc0.marker-cube": ("b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9", 780),
+    "cc0.marker-pillar": ("b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737", 784),
+    "cc0.marker-plate": ("19425a058c19d4009392093e770c7f115a68d020b67e0bdce83abdad4b5a2f6e", 684),
+}
+_MARKER_ASSETS = tuple(asset for asset in reviewed_assets() if asset.asset_key in _MARKERS_0042)
+
+
 def test_the_generated_assets_reproduce_the_digests_migration_0042_pinned():
     """If this fails, the migration is describing bytes this code no longer produces."""
-    pinned = {
-        "cc0.marker-cube": (
-            "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
-            780,
-        ),
-        "cc0.marker-pillar": (
-            "b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737",
-            784,
-        ),
-        "cc0.marker-plate": (
-            "19425a058c19d4009392093e770c7f115a68d020b67e0bdce83abdad4b5a2f6e",
-            684,
-        ),
-    }
-    catalog = {asset.asset_key: asset for asset in reviewed_assets()}
+    pinned = _MARKERS_0042
+    catalog = {asset.asset_key: asset for asset in _MARKER_ASSETS}
     assert set(catalog) == set(pinned)
     for key, (digest, size) in pinned.items():
         assert catalog[key].content_sha256 == digest
@@ -376,10 +374,14 @@ def test_the_generated_assets_reproduce_the_digests_migration_0042_pinned():
 
 
 def test_generation_is_deterministic():
-    assert [a.payload for a in reviewed_assets()] == [a.payload for a in reviewed_assets()]
+    # reviewed_assets() is cached per process, so a second call would compare a tuple with itself:
+    # the second generation starts from nothing, embedded texture maps included.
+    first = [a.payload for a in reviewed_assets()]
+    embedded_texture_set.cache_clear()
+    assert first == [a.payload for a in reviewed_assets.__wrapped__()]
 
 
-@pytest.mark.parametrize("asset", reviewed_assets(), ids=lambda a: a.asset_key)
+@pytest.mark.parametrize("asset", _MARKER_ASSETS, ids=lambda a: a.asset_key)
 def test_every_reviewed_asset_is_a_readable_gltf_binary(asset):
     payload = asset.payload
     magic, version, total = struct.unpack_from("<III", payload, 0)
@@ -430,7 +432,7 @@ def test_every_solid_face_is_wound_outward():
     def cross(u, v):
         return (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
 
-    for asset in reviewed_assets():
+    for asset in _MARKER_ASSETS:
         if asset.asset_key == "cc0.marker-plate":
             continue
         payload = asset.payload

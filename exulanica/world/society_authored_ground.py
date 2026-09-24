@@ -28,6 +28,7 @@ from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.objects import AuthoredObject, ElementOverride, Transform
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_composition import (
+    PLACES_FIELD,
     ComposedObject,
     Obstacle,
     Point,
@@ -38,6 +39,7 @@ from exulanica.world.society_composition import (
     composed_objects,
     footprint_ring,
     object_dependency_refs,
+    offers_activity,
     policy_dependency_refs,
     prune_navigation,
     turned_point,
@@ -514,7 +516,9 @@ def _objects_one_by_one(
     cannot tell whether a body passes under it, and offers no activity. Only an object whose
     footprint the society cannot state (an unreviewed asset, a behaviour with no rule on an object
     that blocks) or that the saved world does not validly hold (another region, an origin or a
-    transform no writer produces) makes the whole input unavailable, and the reason names it.
+    transform no writer produces) makes the whole input unavailable, and the reason names it. A
+    kind nobody uses (its registry row offers no activity) is only what it blocks: it is an
+    obstacle wherever it stands, and it has no activity to offer or to record as refused.
     """
     usable: list[_UsableObject] = []
     obstacles: list[Obstacle] = []
@@ -564,6 +568,8 @@ def _objects_one_by_one(
             refusal = OFF_GROUND
         if reviewed["blocks_navigation"]:
             obstacles.append((obj.object_id, ring))
+        if not offers_activity(reviewed):
+            continue
         if refusal is None:
             usable.append(_UsableObject(obj, reviewed, centre, half))
         else:
@@ -593,16 +599,25 @@ def destination_places(
 ) -> list[Point]:
     """Where the occupants of one object's activity stand, in the order they are filled.
 
-    An object a person can walk on (one that blocks nothing, like a plate) holds a row of people
-    along its own x axis, one standing spacing apart and centred on it, as many as have their
-    centres on it. An object that blocks walking holds one person in front of each face, a
-    navigation clearance and a standing radius out from it, so the whole body stands outside the
-    line no walker's centre crosses. The places turn and scale with the object.
+    A kind whose registry row states its places (``places_mm``, from the world object catalog)
+    holds one person at each, in the catalog's order: the catalog derived each from the same
+    clearance, radius and spacing, with the margin a turn can take from the gap between two
+    (``TURNED_PLACE_MARGIN_MM``). Otherwise an object a person can walk on (one that
+    blocks nothing, like a plate) holds a row of people along its own x axis, one standing
+    spacing apart and centred on it, as many as have their centres on it, and an object that
+    blocks walking holds one person in front of each face, a navigation clearance and a standing
+    radius out from it, so the whole body stands outside the line no walker's centre crosses. The
+    places turn and scale with the object.
     """
     hx, hz = usable.half_extents
-    if usable.reviewed["blocks_navigation"]:
+    stated = usable.reviewed.get(PLACES_FIELD)
+    offsets: list[tuple[float, float]]
+    if stated is not None:
+        scale = usable.obj.transform.scale_milli
+        offsets = [(dx * scale / 1000, dz * scale / 1000) for dx, dz in stated]
+    elif usable.reviewed["blocks_navigation"]:
         out = clearance_mm + standing.radius_mm
-        offsets: list[tuple[float, float]] = [
+        offsets = [
             (0, -(hz + out)),
             (hx + out, 0),
             (0, hz + out),
@@ -613,6 +628,25 @@ def destination_places(
         offsets = [((2 * k - count + 1) * standing.spacing_mm / 2, 0) for k in range(count)]
     yaw = usable.obj.transform.yaw_microradians
     return [turned_point(usable.centre, offset, yaw) for offset in offsets]
+
+
+def standing_places(
+    version: AlternateVersion,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    ground: SocietyGround,
+    standing: StandingPolicy,
+) -> dict[str, list[Point]]:
+    """Where people would stand to use each object of a version, by object id.
+
+    Every object the society offers an activity at, decided as the society decides it
+    (``_objects_one_by_one``), with its places as the society turns and scales them
+    (``destination_places``), before it keeps only those clear, spaced and reachable. A version
+    the society cannot compose at all has nobody standing anywhere.
+    """
+    usable, _, _, reason = _objects_one_by_one(version, reviewed_affordances, ground)
+    if reason is not None:
+        return {}
+    return {item.obj.object_id: destination_places(item, standing, CLEARANCE_MM) for item in usable}
 
 
 def _squared(a: Sequence[int], b: Sequence[int]) -> int:

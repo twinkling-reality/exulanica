@@ -178,9 +178,13 @@ of the source snapshot's topology, and the transform is **region-local**.
 Reviewed GLBs that declare no materials receive a renderer-owned matte material derived from the
 world's appearance palette. Appearance preview, apply and discard update this fallback; declared
 asset materials remain unchanged. This presentation rule does not rewrite asset bytes, digests or
-normals. Unaimed ground placement starts 3.5 metres ahead of the visitor so the reviewed marker's
-ground contact remains visible at the supported minimum field of view. Existing saved transforms
-stay fixed, and the browser's region bounds still constrain new placements.
+normals. The world object catalog's furniture declares glTF materials whose CC0 texture maps are
+embedded in its own container ([`exulanica/world/object_glb.py`](../exulanica/world/object_glb.py)),
+so it is drawn as declared, with no route and no renderer code of its own; a texture set dressing
+several kinds travels once in each kind's container. Unaimed ground placement starts 3.5 metres
+ahead of the visitor so the reviewed marker's ground contact remains visible at the supported
+minimum field of view. Existing saved transforms stay fixed, and the browser's region bounds still
+constrain new placements.
 
 That frame is a deliberate difference from the structural plane, and it is the one place this
 contract does not simply copy it. `world/placement.json` poses every element in a single shared
@@ -253,8 +257,9 @@ behaviour named by `add_object` exports with its object under either.
 
 ## 4. The reviewed asset registry
 
-`world_reviewed_asset` is a global reviewed catalog, not tenant data. It is seeded by migration
-0042 and is read-only to the runtime roles by grant, like every other registry in this schema.
+`world_reviewed_asset` is a global reviewed catalog, not tenant data. It is seeded by migrations
+0042 and 0105 and is read-only to the runtime roles by grant, like every other registry in this
+schema.
 
 Reviewed external CC0 assets can also be imported through the host administration command
 `scripts/import_reviewed_world_asset.py`. Its manifest pins the asset bytes, exact upstream
@@ -287,7 +292,8 @@ The registry holds every reviewed container a catalog publishes, and only an `ob
 says what each permits: an `object` is reviewed geometry a person places as an authored object; a
 `component` is a container another catalog composes and fetches by key, such as a character's
 body, a worn part or a material pack. The publisher declares the kind and nothing infers one from a
-key or a title: migration 0101 declares the three generated markers objects,
+key or a title: migration 0101 declares the three generated markers objects, migration 0105 adds
+the world object catalog's furniture as objects,
 `import_reviewed_asset` requires a kind, and the character catalog's publish step
 (`scripts/prepare_character_people.py --import`) declares every container it publishes a
 component. The schema's `world_reviewed_asset_kind_check` lists the same kinds as the registry.
@@ -320,11 +326,15 @@ declaration to a signed inventory of asset digests. This registry is neither of 
 why none exists; a reviewed CC0 mesh is global, carries no evidence and makes no claim about the
 source world.
 
-| Key | Geometry |
-| --- | --- |
-| `cc0.marker-cube` | A half-metre cube |
-| `cc0.marker-pillar` | A square pillar |
-| `cc0.marker-plate` | A flat square plate |
+The generated objects are the kinds of the
+[world object catalog](../assets/catalogs/world-objects/world-object.v1.json), in its order: the
+three grey markers `cc0.marker-cube`, `cc0.marker-pillar` and `cc0.marker-plate`, generated exactly
+as 0042 pinned them and drawn matte, and the furniture 0105 pins, `cc0.bench`, `cc0.cafe-table`,
+`cc0.planter-tree`, `cc0.lamp-post`, `cc0.market-stall` and `cc0.seating-planter`, generated from
+the city grammar's form parts and drawn in the texture sets each names. Every kind's digest is
+pinned, and tests regenerate each kind from source and compare it with its pin: the markers in
+`tests/test_world_objects.py`, the furniture in `tests/test_world_object_catalog.py`. The
+furniture's licence text covers its geometry and the texture maps it embeds.
 
 `seed_reviewed_assets(store)` writes the GLB and licence bytes into the content-addressed store.
 The registry row is the reviewed decision; the store holds the bytes; the two are separate because
@@ -619,7 +629,7 @@ reviewed asset registry including byte and licence delivery, and all six problem
 table above.
 
 `tests/test_reviewed_asset_placeability.py` publishes the committed character catalog through its
-own publish step and reads it back through the routes: the list holds only the three markers, every
+own publish step and reads it back through the routes: the list holds only the catalog's kinds, every
 container reads by key as not placeable, each stored kind matches the catalog that published it,
 the schema's kind check equals the registry, placing a component is refused by name on the object
 route and in composition, and a version that already holds one keeps reading, composing and

@@ -7,10 +7,11 @@ authored ran over fourteen ids while eighteen city catalogs shipped, and band.v1
 ground band on every frontage in the world with no reason at all. Two of the eighteen SCHEMAS did
 not declare the reason field either, so the loader never asked for one.
 
-Four families ship, in three shapes, and this file makes a substantive claim about each file it
+Five families ship, in three shapes, and this file makes a substantive claim about each file it
 finds rather than a claim about which test covers it:
 
-*   city and society catalogs, ``entries`` and ``schema_version``: every entry carries a reason.
+*   city, society and world object catalogs, ``entries`` and ``schema_version``: every entry
+    carries a reason.
 *   traffic catalogs, which add ``references``: every entry carries per-field ``sources``, each
     citing a listed reference or declaring a value; test_traffic_catalogs.py holds their content.
 *   lettering catalogs, ``glyphs``: provenance is the pinned ``source`` of the font the glyphs were
@@ -99,8 +100,9 @@ def discovered() -> dict[tuple[str, ...], list[Path]]:
 def test_the_discovery_finds_every_family_and_no_unknown_shape():
     found = discovered()
     assert set(found) == {ENTRY_SHAPE, CITED_SHAPE, GLYPH_SHAPE}, sorted(found)
-    # Counted from the tree, so adding a catalog to a family is visible here as a number.
-    assert len(found[ENTRY_SHAPE]) == 23
+    # Counted from the tree, so adding a catalog to a family is visible here as a number: eighteen
+    # city catalogs, five society catalogs, and the world object catalog with its arrangements.
+    assert len(found[ENTRY_SHAPE]) == 25
     assert len(found[CITED_SHAPE]) == 5
     assert len(found[GLYPH_SHAPE]) == 4
     # And the discovery is looking where the catalogs are: the city files are among what it found.

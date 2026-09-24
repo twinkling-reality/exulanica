@@ -545,6 +545,43 @@ export class WorldObjectsClient {
   }
 
   /**
+   * `POST .../arrangements/preview` for a body `arrangement-api.ts` built. Never writes.
+   *
+   * It carries the base this client read and never a saved-entry binding, as composition preview
+   * does, and names the version's own world.
+   */
+  async arrangementPreview(
+    base: AlternateVersion,
+    body: Readonly<Record<string, unknown>>,
+  ): Promise<unknown> {
+    return this.#transport.postJson<unknown>(
+      this.#versionWorldPath(`${arrangementsPath(base.versionId)}/preview`, base),
+      { ...body, base_state_sha256: base.stateSha256 },
+    );
+  }
+
+  /**
+   * `POST .../arrangements/apply`, through the same serialized write as every other edit.
+   *
+   * Its answer is the version and what was added, so `read` takes the version out of it and keeps
+   * the rest. A stale base comes back as `arrangement_refused` with the code `stale_base`, the same
+   * fact as `stale_object_base`, and is turned into a re-read.
+   */
+  arrangementApply(
+    base: AlternateVersion,
+    body: Readonly<Record<string, unknown>>,
+    read: (value: unknown) => AlternateVersion,
+  ): Promise<ObjectWriteResult> {
+    return this.#write(
+      base,
+      this.#versionWorldPath(`${arrangementsPath(base.versionId)}/apply`, base),
+      body,
+      (error) => error.code === 'arrangement_refused' && problemDetail(error) === 'stale_base',
+      read,
+    );
+  }
+
+  /**
    * Reviewed bytes, and the digest they must hash to.
    *
    * Returned together because they are useless apart: the digest comes from the registry row and
@@ -579,11 +616,12 @@ export class WorldObjectsClient {
     scopedPath: string,
     body: Readonly<Record<string, unknown>>,
     alsoStale: (error: ApiError) => boolean = () => false,
+    read: (value: unknown) => AlternateVersion = parseVersion,
   ): Promise<ObjectWriteResult> {
     const run = async (): Promise<ObjectWriteResult> => {
       const savedEntry = this.#savedEntry?.();
       try {
-        const version = parseVersion(await this.#transport.postJson<unknown>(scopedPath, {
+        const version = read(await this.#transport.postJson<unknown>(scopedPath, {
           ...body,
           base_state_sha256: base.stateSha256,
           ...(savedEntry === undefined ? {} : {
@@ -662,6 +700,9 @@ const objectsPath = (versionId: string): string =>
 
 const compositionsPath = (versionId: string): string =>
   `/world/versions/${encodeURIComponent(versionId)}/compositions`;
+
+const arrangementsPath = (versionId: string): string =>
+  `/world/versions/${encodeURIComponent(versionId)}/arrangements`;
 
 /**
  * Where a composition body is sent, read from the body itself so the two cannot disagree.

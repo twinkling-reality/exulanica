@@ -219,8 +219,10 @@ def test_an_advance_walks_at_the_budget_its_own_state_recorded(monkeypatch):
 
 #: Twelve ticks of the first saved-world composition over one reachable cushion, far enough for 24
 #: activities to complete: every v2 figure (the rest threshold, both reliefs, the durations and the
-#: budget) is inside these bytes. Produced by main e9dee3c2's own code, before places existed.
-V2_THROUGH_A_COMPLETED_REST = "faca5b8b6784b633b4626fc1f6f6a8dc13c99024497f620be727b53d79cd4190"
+#: budget) is inside these bytes. Produced by main e9dee3c2's own code, before places existed, as
+#: faca5b8b...; the registry holds every world object catalog kind since, and under its three
+#: marker rows alone the run still gives faca5b8b... (tests/test_society_object_catalog.py).
+V2_THROUGH_A_COMPLETED_REST = "190643017c890b36305a616b648e669346dd48f91fbfe37784590a922e135d40"
 
 
 def test_the_v2_policy_through_a_completed_rest_is_pinned():

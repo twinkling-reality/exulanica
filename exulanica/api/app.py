@@ -88,6 +88,7 @@ from exulanica.api.routes import (
     society_experiments,
     tiles,
     world,
+    world_arrangements,
     world_assets,
     world_behaviours,
     world_compositions,
@@ -272,13 +273,15 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(reconstruction_admission.router)
     app.include_router(world.router)
     # The authored world under /world, in matching order: reviewed assets and behaviours, versions,
-    # environment instances, objects, compositions. tests/snapshots/api-routes.json records it.
+    # environment instances, objects, compositions, arrangements. tests/snapshots/api-routes.json
+    # records it.
     app.include_router(world_assets.router)
     app.include_router(world_behaviours.router)
     app.include_router(world_versions.router)
     app.include_router(world_environments.router)
     app.include_router(world_objects.router)
     app.include_router(world_compositions.router)
+    app.include_router(world_arrangements.router)
     app.include_router(world_entries.router)
     app.include_router(interaction.router)
     app.include_router(world_read.router)

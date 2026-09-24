@@ -22,6 +22,7 @@ from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import society_catalogs, society_composition
 from exulanica.world.asset_kinds import AssetKind
 from exulanica.world.assets import ReviewedAsset, reviewed_assets, seed_reviewed_assets
+from exulanica.world.object_catalog import world_object_catalog
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, load_routine_model
 from exulanica.world.society_composition import (
@@ -170,27 +171,35 @@ def test_a_catalog_version_bump_leaves_a_stored_living_society_advancing(
 
 
 def test_every_reviewed_asset_has_a_society_assignment():
-    """A newly reviewed asset needs a footprint and an activity before anybody can place it.
+    """A reviewed asset needs a footprint and a use before anybody can place it.
 
-    The registry leaves such an asset out rather than failing to start, so this is where the gap
-    is found: at review, not at the first person who places one.
+    The world object catalog states both for every kind it generates, and the registry leaves an
+    asset it does not state out rather than failing to start, so this is where a gap is found: at
+    review, not at the first person who places one.
     """
-    assert {asset.asset_key for asset in reviewed_assets()} == set(society_composition._REVIEWED)
+    registry = reviewed_affordance_registry()
+    assert {row["asset_key"] for row in registry.values()} == {
+        asset.asset_key for asset in reviewed_assets()
+    }
 
 
 def with_bench(monkeypatch, *, assigned: bool):
     assets = (*reviewed_assets(), BENCH)
     monkeypatch.setattr(society_composition, "reviewed_assets", lambda: assets)
     if assigned:
-        monkeypatch.setitem(
-            society_composition._REVIEWED, BENCH.asset_key, ("rest", [600, 250], True)
+        catalog = world_object_catalog()
+        stated = dataclasses.replace(
+            catalog.by_key()["bench"], key="marker_bench", asset_key=BENCH.asset_key
         )
+        extended = dataclasses.replace(catalog, kinds=(*catalog.kinds, stated))
+        monkeypatch.setattr(society_composition, "world_object_catalog", lambda: extended)
 
 
 def test_a_newly_reviewed_asset_without_an_assignment_is_left_out_and_refused_by_name(monkeypatch):
     with_bench(monkeypatch, assigned=False)
     registry = reviewed_affordance_registry()
-    assert BENCH.content_sha256 not in registry and len(registry) == 3
+    assert BENCH.content_sha256 not in registry
+    assert len(registry) == len(world_object_catalog().kinds)
     placed = authored.placed("object:bench", BENCH, 3_000, 5_000)
     document = authored.compose(authored.ground(), authored.version(placed))
     assert document["unavailable_reason"] == "unknown_active_asset:object:bench"

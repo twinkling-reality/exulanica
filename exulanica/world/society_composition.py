@@ -17,6 +17,7 @@ from exulanica.canonical import canonical_json
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.assets import reviewed_assets
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
+from exulanica.world.object_catalog import NO_ACTIVITY, WorldObjectKind, world_object_catalog
 from exulanica.world.objects import object_document
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_input_policy import (
@@ -37,15 +38,11 @@ SegmentBlocked = Callable[[Point, Point, list[Point], int], bool]
 ComposedObject = tuple[Any, dict[str, Any], Point]
 #: One object's closed collision ring in composed millimetres.
 Obstacle = tuple[str, list[Point]]
-_REVIEWED = {
-    "cc0.marker-cube": ("visit", [250, 250], True),
-    "cc0.marker-pillar": ("visit", [125, 125], True),
-    "cc0.marker-plate": ("rest", [500, 500], False),
-}
 #: How far from an object's centre an inhabitant may stand and still use it: an arm's length
 #: plus a step, the same for all three reviewed markers because none of them is larger than the
-#: step. It is a reviewed figure rather than a fixed one, so a host may state its own within the
-#: bounds the registry validation already enforces.
+#: step. For a kind that states its places, it is how far a place may be from the lattice node it
+#: is joined to. It is a reviewed figure rather than a fixed one, so a host may state its own
+#: within the bounds the registry validation already enforces.
 REVIEWED_REACH_MM = 1_500
 
 
@@ -107,6 +104,105 @@ _ASSIGNMENT_FIELDS: Final = frozenset(
         "reach_mm",
     }
 )
+#: The field an assignment adds for a kind that states where its occupants stand: the places as
+#: ``[x, z]`` offsets in the object's own frame, one occupant to each. A marker states none, and
+#: the society derives its places from its footprint (``destination_places``).
+PLACES_FIELD: Final = "places_mm"
+#: The fields of the row for a kind inhabitants do nothing with: whether and where it blocks
+#: walking, and nothing about an activity it does not offer.
+_OBSTACLE_FIELDS: Final = frozenset(
+    {"asset_key", "affordance", "footprint_half_extents_mm", "blocks_navigation"}
+)
+#: The farthest reach a registry row may state, in millimetres, and so the farthest a stated place
+#: may stand from its object's centre on either axis: a person using a thing stands within reach
+#: of it. The world object catalog refuses a kind whose places would stand farther.
+MAX_REACH_MM: Final = 10_000
+#: What turning an object can take from the gap between two of its places, as a whole millimetre.
+#: ``turned_point`` moves each coordinate of a place outward, away from the object's centre, by
+#: less than a millimetre. Along an axis where two places lie on one side of the centre both move
+#: the same way, so their gap changes by less than a millimetre; where they lie on either side,
+#: they move apart. Their distance therefore shrinks by less than the square root of two, and two
+#: millimetres is the least whole millimetre above it. A kind whose places stand a standing spacing
+#: and this margin apart keeps every one at any yaw at its own size, and larger, since scaling up
+#: only moves them apart; smaller, they come together and a row may hold fewer.
+TURNED_PLACE_MARGIN_MM: Final = 2
+
+
+def reviewed_assignment(kind: WorldObjectKind, reach_mm: int) -> dict[str, Any]:
+    """The registry row the world object catalog states for one kind, at a reach.
+
+    A marker's row is exactly the six fields its assignment has always had. A kind that states
+    its places adds them; the catalog states a place as ``[x, y]`` in the kind's part frame, whose
+    ``+y`` is its front, and the society's frame is the region's ``x`` and ``z`` with that front
+    toward ``-z`` (``exulanica.world.object_glb``), so the place is ``[x, -y]``. A kind nobody uses
+    is an obstacle row: its footprint and whether it blocks, and no activity.
+    """
+    use = kind.use
+    footprint = list(use.footprint_half_extents_mm)
+    if use.affordance == NO_ACTIVITY:
+        return {
+            "asset_key": kind.asset_key,
+            "affordance": NO_ACTIVITY,
+            "footprint_half_extents_mm": footprint,
+            "blocks_navigation": use.blocks_navigation,
+        }
+    row: dict[str, Any] = {
+        "asset_key": kind.asset_key,
+        "affordance": use.affordance,
+        "duration_ticks": DURATIONS[use.affordance],
+        "footprint_half_extents_mm": footprint,
+        "blocks_navigation": use.blocks_navigation,
+        "reach_mm": reach_mm,
+    }
+    if use.places is not None:
+        row[PLACES_FIELD] = [[x, -y] for x, y in use.places]
+    return row
+
+
+def offers_activity(row: Mapping[str, Any]) -> bool:
+    """Whether a registry row's kind offers an activity, rather than only standing in the way."""
+    return row["affordance"] != NO_ACTIVITY
+
+
+def _footprint_is_valid(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) == 2
+        and all(type(v) is int and v >= 0 for v in value)
+    )
+
+
+def _places_are_valid(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) >= 1
+        and all(
+            isinstance(place, list)
+            and len(place) == 2
+            and all(type(v) is int and abs(v) <= MAX_REACH_MM for v in place)
+            for place in value
+        )
+    )
+
+
+def _recorded_row_is_valid(row: Any) -> bool:
+    if not isinstance(row, dict) or not isinstance(row.get("asset_key"), str):
+        return False
+    if not row["asset_key"] or type(row.get("blocks_navigation")) is not bool:
+        return False
+    if not _footprint_is_valid(row.get("footprint_half_extents_mm")):
+        return False
+    if row.get("affordance") == NO_ACTIVITY:
+        return set(row) == _OBSTACLE_FIELDS
+    return (
+        set(row) in (_ASSIGNMENT_FIELDS, _ASSIGNMENT_FIELDS | {PLACES_FIELD})
+        and row["affordance"] in DURATIONS
+        and type(row["duration_ticks"]) is int
+        and row["duration_ticks"] == DURATIONS[row["affordance"]]
+        and type(row["reach_mm"]) is int
+        and 1 <= row["reach_mm"] <= MAX_REACH_MM
+        and (PLACES_FIELD not in row or _places_are_valid(row[PLACES_FIELD]))
+    )
 
 
 def validate_recorded_registry(mapping: Any) -> None:
@@ -124,40 +220,30 @@ def validate_recorded_registry(mapping: Any) -> None:
             not isinstance(digest, str)
             or len(digest) != 64
             or any(c not in "0123456789abcdef" for c in digest)
-            or not isinstance(row, dict)
-            or set(row) != _ASSIGNMENT_FIELDS
-            or not isinstance(row["asset_key"], str)
-            or not row["asset_key"]
-            or row["affordance"] not in DURATIONS
-            or type(row["duration_ticks"]) is not int
-            or row["duration_ticks"] != DURATIONS[row["affordance"]]
-            or type(row["blocks_navigation"]) is not bool
-            or type(row["reach_mm"]) is not int
-            or not 1 <= row["reach_mm"] <= 10000
-            or not isinstance(row["footprint_half_extents_mm"], list)
-            or len(row["footprint_half_extents_mm"]) != 2
-            or any(type(v) is not int or v < 0 for v in row["footprint_half_extents_mm"])
+            or not _recorded_row_is_valid(row)
         ):
             raise ValueError("invalid recorded society affordance assignment")
 
 
 def validate_reviewed_affordances(mapping: Mapping[str, dict[str, Any]]) -> None:
+    """Refuse a registry row the world object catalog does not state for today's reviewed bytes.
+
+    Every row must be the one :func:`reviewed_assignment` derives from the catalog for its asset,
+    under the digest the reviewed catalog generates for it, at a reach within the registry's
+    bounds; a registry may hold fewer rows than the catalog has kinds, never another row.
+    """
     actual = {asset.asset_key: asset.content_sha256 for asset in reviewed_assets()}
+    kinds = world_object_catalog().by_asset_key()
     for digest, row in mapping.items():
-        if not isinstance(row, dict) or set(row) != _ASSIGNMENT_FIELDS:
+        if not isinstance(row, dict) or not isinstance(row.get("asset_key"), str):
             raise ValueError("invalid reviewed society affordance assignment")
-        expected = _REVIEWED.get(row["asset_key"])
+        kind = kinds.get(row["asset_key"])
+        reach = row.get("reach_mm")
         if (
-            expected is None
-            or actual[row["asset_key"]] != digest
-            or (row["affordance"], row["footprint_half_extents_mm"], row["blocks_navigation"])
-            != expected
-            or type(row["blocks_navigation"]) is not bool
-            or type(row["duration_ticks"]) is not int
-            or row["duration_ticks"] != DURATIONS[row["affordance"]]
-            or type(row["reach_mm"]) is not int
-            or not 1 <= row["reach_mm"] <= 10000
-            or any(type(v) is not int for v in row["footprint_half_extents_mm"])
+            kind is None
+            or actual.get(row["asset_key"]) != digest
+            or not _recorded_row_is_valid(row)
+            or row != reviewed_assignment(kind, reach if type(reach) is int else 0)
         ):
             raise ValueError("unreviewed society asset, footprint, action or reach")
 
@@ -311,9 +397,11 @@ def footprint_ring(
     it. A turned corner falls between whole millimetres; each coordinate is moved outward, away
     from the centre, so the ring only ever grows, by less than a millimetre on each axis, and
     never opens a route through what the object covers. Unturned, the ring is exactly the
-    reviewed rectangle. For the reviewed catalog's blocking footprints no nonzero microradian yaw
-    brings a turned corner within 1e-8 mm of a whole millimetre, so the outward step is decided
-    far above any difference between two machines' arithmetic.
+    reviewed rectangle. For every blocking footprint the world object catalog states, no nonzero
+    microradian yaw brings a turned corner within 1e-9 mm of a whole millimetre (the least is 4e-9
+    mm, measured by ``tests/test_society_object_catalog.py``), a thousand times more than one unit
+    in the last place of a cosine and of a sine moves such a corner, so the outward step does not
+    depend on a machine's arithmetic.
     """
     x, z = center
     hx, hz = half_extents
@@ -388,7 +476,9 @@ def composed_objects(
             break
         assert reviewed is not None
         center = (obj.transform.x_mm + tx, obj.transform.z_mm + tz)
-        objects.append((obj, reviewed, center))
+        # A kind nobody uses is only what it blocks: it offers no activity to bind.
+        if offers_activity(reviewed):
+            objects.append((obj, reviewed, center))
         if reviewed["blocks_navigation"]:
             obstacles.append(
                 (
@@ -595,23 +685,17 @@ def reviewed_affordance_registry(reach_mm: int = REVIEWED_REACH_MM) -> dict[str,
     """The reviewed catalog as an affordance registry, keyed by asset content digest.
 
     A host that has made no narrower choice registers this. It adds no asset and no activity:
-    every entry comes from the reviewed catalog and the reviewed footprint/action table above,
-    and the durations are the policy's own. A reviewed asset the table gives no footprint is
-    left out rather than guessed at, so an instance still starts when a new asset is reviewed;
-    a placed copy of it is then refused by name as ``unknown_active_asset``, and
-    ``test_every_reviewed_asset_has_a_society_assignment`` fails until the table states it.
+    every row is what the world object catalog states for a kind (:func:`reviewed_assignment`),
+    under the digest the reviewed catalog generates for it, and the durations are the policy's
+    own. A reviewed asset the catalog does not state is left out rather than guessed at, so an
+    instance still starts; a placed copy of it is then refused by name as
+    ``unknown_active_asset``.
     """
+    kinds = world_object_catalog().by_asset_key()
     registry = {
-        asset.content_sha256: {
-            "asset_key": asset.asset_key,
-            "affordance": _REVIEWED[asset.asset_key][0],
-            "duration_ticks": DURATIONS[_REVIEWED[asset.asset_key][0]],
-            "footprint_half_extents_mm": list(_REVIEWED[asset.asset_key][1]),
-            "blocks_navigation": _REVIEWED[asset.asset_key][2],
-            "reach_mm": reach_mm,
-        }
+        asset.content_sha256: reviewed_assignment(kinds[asset.asset_key], reach_mm)
         for asset in reviewed_assets()
-        if asset.asset_key in _REVIEWED
+        if asset.asset_key in kinds
     }
     validate_reviewed_affordances(registry)
     return registry

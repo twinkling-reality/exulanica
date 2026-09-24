@@ -4,15 +4,25 @@
 here: a committed ``.glb`` is bytes nobody in the review can read, and its licence claim is a
 sentence in a file next to it rather than a property of the thing. (``web/`` does commit binary
 fixtures. This is the backend rule, and it governs a digest a migration pins.) Every asset
-below is authored here as vertices and indices, packed into a minimal glTF 2.0 binary by
-:func:`_glb`, and dedicated to the public domain under CC0 1.0. That makes the licence a claim
-this project is actually in a position to make, and it makes the SHA-256 that migration 0042 pins
-reproducible from source on any machine.
+below is generated here from the world object catalog
+(``assets/catalogs/world-objects/world-object.v1.json``, read by
+:mod:`exulanica.world.object_catalog`), one asset per kind in the catalog's order, and dedicated to
+the public domain under CC0 1.0. That makes the licence a claim this project is actually in a
+position to make, and it makes the SHA-256 each migration pins reproducible from source on any
+machine: migration 0042 pins the three markers and migration 0105 every other kind.
+
+**Two writers, one per recipe profile.** A marker (``marker-v1``) is authored as vertices and
+indices and packed into a minimal glTF 2.0 binary by :func:`_glb`: no material, so the renderer
+draws it matte, exactly the bytes 0042 pinned. Every other kind (``parts-v1``) is its form parts'
+triangles (:mod:`exulanica.world.object_meshes`) packed with the CC0 texture sets its entry names
+(:mod:`exulanica.world.object_glb`), whose maps travel inside the container.
 
 Determinism is load-bearing and it is not accidental. The JSON chunk is emitted with sorted keys
-and no whitespace, every coordinate is a value that is exact in binary32, and the padding bytes
-are fixed. Re-running this module produces the same digest, which is what lets a migration name
-the bytes before an object store has ever seen them.
+and no whitespace, every coordinate is a binary32 value packed by ``struct``, the padding bytes are
+fixed, and every embedded image is written without a compressor. Re-running this module produces
+the same digests, which is what lets a migration name the bytes before an object store has ever
+seen them. The catalog is generated once per process, because the textured containers are
+megabytes and boot seeding and the tests ask for them often.
 
 Nothing here writes to the database. The registry row is the reviewed decision and lives in the
 migration; the bytes live in the content-addressed store; :func:`seed_reviewed_assets` is the one
@@ -21,21 +31,32 @@ function that puts the second where the first says it should be.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import struct
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.asset_kinds import AssetKind
+from exulanica.world.object_catalog import (
+    MarkerRecipe,
+    PartsRecipe,
+    WorldObjectKind,
+    world_object_catalog,
+)
+from exulanica.world.object_glb import embedded_texture_set, textured_glb
+from exulanica.world.object_meshes import form_triangles
 
 __all__ = [
     "CC0_LICENCE_ID",
     "CC0_LICENCE_TEXT",
+    "CC0_TEXTURED_LICENCE_TEXT",
     "GLB_MEDIA_TYPE",
     "ReviewedAsset",
+    "reviewed_asset_of",
     "reviewed_assets",
     "seed_reviewed_assets",
 ]
@@ -52,6 +73,23 @@ CC0_LICENCE_TEXT: Final = (
     "The geometry in this asset was authored for the Exulanica repository and is dedicated to\n"
     "the public domain. To the extent possible under law, the authors have waived all copyright\n"
     "and related or neighboring rights to it. The work is published from the repository that\n"
+    "generates it and may be copied, modified and distributed, including for commercial\n"
+    "purposes, without asking permission.\n"
+    "\n"
+    "The full text of the dedication is at https://creativecommons.org/publicdomain/zero/1.0/\n"
+)
+
+#: The dedication for a kind drawn with texture sets. Its maps come from the texture library
+#: (``assets/textures``), which was baked for this repository and is dedicated under CC0 1.0 in
+#: its own licence text, so the statement covers what this container holds: its geometry and those
+#: maps. The markers keep :data:`CC0_LICENCE_TEXT`, whose digest migration 0042 pins.
+CC0_TEXTURED_LICENCE_TEXT: Final = (
+    "CC0 1.0 Universal Public Domain Dedication\n"
+    "\n"
+    "The geometry in this asset was authored for the Exulanica repository, and the texture maps\n"
+    "it embeds were baked for the same repository's texture library. Both are dedicated to the\n"
+    "public domain. To the extent possible under law, the authors have waived all copyright and\n"
+    "related or neighboring rights to them. The work is published from the repository that\n"
     "generates it and may be copied, modified and distributed, including for commercial\n"
     "purposes, without asking permission.\n"
     "\n"
@@ -84,10 +122,16 @@ class ReviewedAsset:
     kind: AssetKind
     media_type: str = GLB_MEDIA_TYPE
     licence_id: str = CC0_LICENCE_ID
+    licence_text: str = CC0_LICENCE_TEXT
+    #: The payload's SHA-256, taken once: a textured payload is megabytes and read often.
+    _content_sha256: str = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_content_sha256", hashlib.sha256(self.payload).hexdigest())
 
     @property
     def content_sha256(self) -> str:
-        return hashlib.sha256(self.payload).hexdigest()
+        return self._content_sha256
 
     @property
     def byte_size(self) -> int:
@@ -95,7 +139,7 @@ class ReviewedAsset:
 
     @property
     def licence_bytes(self) -> bytes:
-        return CC0_LICENCE_TEXT.encode("utf-8")
+        return self.licence_text.encode("utf-8")
 
     @property
     def licence_sha256(self) -> str:
@@ -238,35 +282,62 @@ def _plate(size: float) -> bytes:
     return _glb("plate", vertices, _quads(((0, 1, 2, 3), (0, 3, 2, 1))))
 
 
-def reviewed_assets() -> tuple[ReviewedAsset, ...]:
-    """The generated reviewed catalog, in the order migration 0042 seeds it.
+def _marker_payload(recipe: MarkerRecipe) -> bytes:
+    """A marker's bytes, from the generators whose output migration 0042 pinned.
 
-    Every entry is an object a person places. The character catalog's containers reach the same
-    registry through :mod:`exulanica.world.asset_import` as components, and are not listed here.
+    The catalog's frame is ``z`` up and these generators' is ``y`` up, so a box's height is its
+    ``z`` size; a plate is square, one size across both axes.
     """
-    return (
-        ReviewedAsset(
-            asset_key="cc0.marker-cube",
-            title="Marker cube",
-            summary="A half-metre cube resting on the ground plane.",
-            payload=_box(0.5, 0.5, 0.5, base_at_origin=True),
-            kind=AssetKind.OBJECT,
-        ),
-        ReviewedAsset(
-            asset_key="cc0.marker-pillar",
-            title="Marker pillar",
-            summary="A two-metre square pillar resting on the ground plane.",
-            payload=_box(0.25, 2.0, 0.25, base_at_origin=True),
-            kind=AssetKind.OBJECT,
-        ),
-        ReviewedAsset(
-            asset_key="cc0.marker-plate",
-            title="Marker plate",
-            summary="A one-metre flat square lying on the ground plane.",
-            payload=_plate(1.0),
-            kind=AssetKind.OBJECT,
-        ),
+    millimetres = 1000
+    if recipe.solid == "box":
+        return _box(
+            recipe.size_x_mm / millimetres,
+            recipe.size_z_mm / millimetres,
+            recipe.size_y_mm / millimetres,
+            base_at_origin=True,
+        )
+    if recipe.solid == "plate" and recipe.size_x_mm == recipe.size_y_mm:
+        return _plate(recipe.size_x_mm / millimetres)
+    raise ValueError(f"a {recipe.solid} marker of {recipe} has no generator")
+
+
+def _parts_payload(kind: WorldObjectKind, recipe: PartsRecipe) -> bytes:
+    triangles = form_triangles(tuple(part.form for part in recipe.parts))
+    materials = {
+        role: embedded_texture_set(set_id, recipe.texels) for role, set_id in kind.materials.items()
+    }
+    return textured_glb(kind.key, triangles, materials)
+
+
+def reviewed_asset_of(kind: WorldObjectKind) -> ReviewedAsset:
+    """One catalog kind as the reviewed asset its migration row names."""
+    recipe = kind.recipe
+    if isinstance(recipe, MarkerRecipe):
+        payload, licence = _marker_payload(recipe), CC0_LICENCE_TEXT
+    elif isinstance(recipe, PartsRecipe):
+        payload, licence = _parts_payload(kind, recipe), CC0_TEXTURED_LICENCE_TEXT
+    else:
+        raise ValueError(f"{kind.key}: no writer makes a {type(recipe).__name__}")
+    return ReviewedAsset(
+        asset_key=kind.asset_key,
+        title=kind.title,
+        summary=kind.summary,
+        payload=payload,
+        kind=AssetKind.OBJECT,
+        licence_text=licence,
     )
+
+
+@functools.cache
+def reviewed_assets() -> tuple[ReviewedAsset, ...]:
+    """The generated reviewed catalog: every world object kind, in the catalog's order.
+
+    The three markers come first, in the order migration 0042 seeds them, and every other kind
+    follows in the order migration 0105 seeds it. Every entry is an object a person places. The
+    character catalog's containers reach the same registry through
+    :mod:`exulanica.world.asset_import` as components, and are not listed here.
+    """
+    return tuple(reviewed_asset_of(kind) for kind in world_object_catalog().kinds)
 
 
 def seed_reviewed_assets(store: ContentAddressedStore) -> tuple[ReviewedAsset, ...]:

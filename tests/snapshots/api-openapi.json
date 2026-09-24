@@ -9458,6 +9458,168 @@
     }
    }
   },
+  "/world/versions/{version_id}/arrangements/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Where an arrangement's objects would stand in one authored version. Writes nothing.",
+    "operationId": "arrangement_preview_route_world_versions__version_id__arrangements_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ArrangementPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Arrangement Preview Route World Versions  Version Id  Arrangements Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/arrangements/apply": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Add exactly the resolved objects as ordinary edits, or refuse with the reason.",
+    "operationId": "arrangement_apply_route_world_versions__version_id__arrangements_apply_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ArrangementApplyBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ArrangementApplyView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world-entries": {
    "get": {
     "tags": [
@@ -12225,6 +12387,153 @@
      "treatment"
     ],
     "title": "ArmPair"
+   },
+   "ArrangementApplyBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "arrangement_key": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Arrangement Key"
+     },
+     "arrangement_version": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Arrangement Version"
+     },
+     "viewer": {
+      "$ref": "#/components/schemas/ViewerBody"
+     },
+     "origin_role": {
+      "type": "string",
+      "enum": [
+       "fictional",
+       "personal"
+      ],
+      "title": "Origin Role"
+     },
+     "saved_entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SavedEntryAdvanceBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256",
+     "arrangement_key",
+     "arrangement_version",
+     "viewer",
+     "origin_role"
+    ],
+    "title": "ArrangementApplyBody"
+   },
+   "ArrangementApplyView": {
+    "properties": {
+     "arrangement": {
+      "$ref": "#/components/schemas/ArrangementView"
+     },
+     "added_object_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Added Object Ids"
+     },
+     "version": {
+      "$ref": "#/components/schemas/AlternateVersionView"
+     }
+    },
+    "type": "object",
+    "required": [
+     "arrangement",
+     "added_object_ids",
+     "version"
+    ],
+    "title": "ArrangementApplyView",
+    "description": "What apply added, named by the arrangement it came from, and the version it left."
+   },
+   "ArrangementPreviewBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "arrangement_key": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Arrangement Key"
+     },
+     "arrangement_version": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Arrangement Version"
+     },
+     "viewer": {
+      "$ref": "#/components/schemas/ViewerBody"
+     },
+     "origin_role": {
+      "type": "string",
+      "enum": [
+       "fictional",
+       "personal"
+      ],
+      "title": "Origin Role"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256",
+     "arrangement_key",
+     "arrangement_version",
+     "viewer",
+     "origin_role"
+    ],
+    "title": "ArrangementPreviewBody"
+   },
+   "ArrangementView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "version": {
+      "type": "integer",
+      "title": "Version"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "summary": {
+      "type": "string",
+      "title": "Summary"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "version",
+     "title",
+     "summary"
+    ],
+    "title": "ArrangementView"
    },
    "AssertionRow": {
     "properties": {
@@ -23716,6 +24025,37 @@
      "recorded_at"
     ],
     "title": "VersionEditView"
+   },
+   "ViewerBody": {
+    "properties": {
+     "x_mm": {
+      "type": "integer",
+      "maximum": 1000000000.0,
+      "minimum": -1000000000.0,
+      "title": "X Mm"
+     },
+     "z_mm": {
+      "type": "integer",
+      "maximum": 1000000000.0,
+      "minimum": -1000000000.0,
+      "title": "Z Mm"
+     },
+     "yaw_microradians": {
+      "type": "integer",
+      "maximum": 6283185.0,
+      "minimum": 0.0,
+      "title": "Yaw Microradians"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "x_mm",
+     "z_mm",
+     "yaw_microradians"
+    ],
+    "title": "ViewerBody",
+    "description": "Where the person stands in the world's authored region, and the yaw of their facing."
    },
    "WorldCountPolicyView": {
     "properties": {

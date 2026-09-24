@@ -86,7 +86,11 @@ class PreviewScenario:
 
 
 def _registry() -> dict[str, dict[str, Any]]:
-    """Explicit fixture assignments for the existing CC0 catalog, not live grants."""
+    """Explicit fixture assignments for the three CC0 markers, not live grants.
+
+    Only the declared markers are registered: the fixture states their assignments by hand, and a
+    kind it does not declare is left out rather than given one here.
+    """
     declarations = {
         "cc0.marker-cube": ("visit", 1, [250, 250], True),
         "cc0.marker-pillar": ("visit", 1, [125, 125], True),
@@ -102,6 +106,7 @@ def _registry() -> dict[str, dict[str, Any]]:
             "reach_mm": 6000,
         }
         for asset in reviewed_assets()
+        if asset.asset_key in declarations
     }
 
 

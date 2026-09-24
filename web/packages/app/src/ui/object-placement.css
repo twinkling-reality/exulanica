@@ -142,6 +142,24 @@
   color: var(--ink-faint);
 }
 
+/* What the chosen object is, in the reviewed catalog's words, under the choice. */
+.object-placement-summary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+/* The small square: its sentence, then its control, as wide as the one that places one object. */
+.object-placement-arrangement {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.object-placement-arrangement > button {
+  width: 100%;
+}
+
 .object-placement-list {
   list-style: none;
   margin: 0;
@@ -296,6 +314,7 @@
 
 [data-contrast='high'] .object-placement-note,
 [data-contrast='high'] .object-placement-hint,
+[data-contrast='high'] .object-placement-summary,
 [data-contrast='high'] .object-placement-where,
 [data-contrast='high'] .object-placement-motion,
 [data-contrast='high'] .object-placement-status {

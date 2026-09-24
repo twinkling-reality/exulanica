@@ -34,6 +34,7 @@ from exulanica.world import (
     WorldObjectRepository,
     WorldStructureRepository,
     WorldStyleRepository,
+    reviewed_assets,
     seed_reviewed_assets,
 )
 
@@ -983,7 +984,7 @@ def test_the_reviewed_catalogs_match_what_the_code_generates(world, tmp_path):
     objects, _, _ = world
     store = LocalContentAddressedStore(tmp_path / "blobs")
     catalog = {a.asset_key: a for a in objects.reviewed_assets(store)}
-    assert set(catalog) == {"cc0.marker-cube", "cc0.marker-pillar", "cc0.marker-plate"}
+    assert set(catalog) == {asset.asset_key for asset in reviewed_assets()}
     # Nothing has been seeded into the store yet, so nothing may claim to be available.
     assert {a.availability for a in catalog.values()} == {"unavailable_asset"}
 

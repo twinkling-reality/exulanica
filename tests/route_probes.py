@@ -122,6 +122,15 @@ _REVIEWED_ASSET: Final = {"kind": "reviewed_asset", "asset_key": "cc0.marker-cub
 #: A realistic request for each route whose default would stop at validation, sorted by path and
 #: then method. What a route does with a body it accepts belongs to that route's own tests; these
 #: bodies only have to get a stranger past validation to the route's own answer.
+#: An arrangement request the routes accept: the small square, asked for from the region's origin
+#: against a base nobody holds, so the route reaches its own lookup of the version.
+_ARRANGEMENT: Final = {
+    "base_state_sha256": _ZERO_DIGEST,
+    "arrangement_key": "small_square",
+    "arrangement_version": 1,
+    "viewer": {"x_mm": 0, "z_mm": 0, "yaw_microradians": 0},
+    "origin_role": "fictional",
+}
 PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /companion/memory/answers": {
         "json": {
@@ -308,6 +317,8 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         "json": {"title": "probe", "source_snapshot_id": str(uuid.uuid4())},
     },
     "POST /world/versions/bootstrap": {**_IN_WORLD, "json": {"base_topology_digest": _ZERO_DIGEST}},
+    "POST /world/versions/{version_id}/arrangements/apply": {**_IN_WORLD, "json": _ARRANGEMENT},
+    "POST /world/versions/{version_id}/arrangements/preview": {**_IN_WORLD, "json": _ARRANGEMENT},
     "PUT /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance": {
         **_IN_WORLD,
         "json": {
