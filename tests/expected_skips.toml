@@ -1,19 +1,33 @@
 # Every skip the backend suite runner accepts, with the reason pytest reports for it.
 #
 # scripts/run_backend_suite.py reads this before it starts, prints every skip a phase reports
-# with its reason, and fails a run that skipped a test no entry here names, or skipped a named
-# test for a reason other than the one written here. A skip is a test that did not run, and a
-# skip nobody decided on has hidden real failures behind a green run, so adding one is a line in
-# this file that a reviewer reads, not something a run absorbs.
+# with its reason, and fails a run that skipped a test nothing here accepts. Continuous
+# integration runs pytest itself and hands the junit file it wrote to the same check
+# (`run_backend_suite.py --check-skips`). A skip is a test that did not run, and a skip nobody
+# decided on has hidden real failures behind a green run, so adding one is a line in this file
+# that a reviewer reads, not something a run absorbs.
 #
-# An entry is allowed, not required: a tree that can run the test runs it. `only_without` names
-# a path, relative to the repository root, whose absence is the reason for the skip; in a tree
-# that holds the path, the skip is not accepted, because there the test has what it needs.
+# Two kinds of entry, and a skip is accepted by either:
 #
-# `test` is the pytest node id. `reason` is the skip message exactly as pytest reports it.
-# tests/test_backend_suite.py checks that every entry names a test pytest collects.
+# [[skip]] names one test. `test` is the pytest node id and `reason` the skip message exactly as
+# pytest reports it. `only_without`, when given, names a path relative to the repository root
+# whose absence is the reason; in a tree that holds the path the skip is not accepted, because
+# there the test has what it needs. tests/test_backend_suite.py checks that every entry names a
+# test pytest collects.
+#
+# [[cause]] names one reason, from whatever test reports it, and the absence it states:
+# `only_without`, a path as above, or `only_without_extra`, extras of pyproject.toml, one or a
+# list. The reason is accepted only where that absence is so: in a tree holding the path, or an
+# environment with every named extra installed, the same skip is refused. An absence of the
+# machine rather than the tree, which every machine running the backend runner has and only
+# continuous integration lacks, is `only_in_ci = true`: accepted only where GitHub Actions says it
+# is running. A reason that names a path inside the checkout writes the checkout as {checkout},
+# so it reads the same in every checkout. A cause always states an absence; a skip with nothing
+# to check it against is a [[skip]] of one named test.
+#
+# An entry is allowed, not required: a tree that can run the test runs it.
 
-profile = "exulanica.expected-skips/v1"
+profile = "exulanica.expected-skips/v2"
 
 # The synthetic evaluation corpus is generated on demand and is not part of any checkout.
 [[skip]]
@@ -79,3 +93,120 @@ only_without = ".exulanica/judge-words"
 test = "tests/test_visual_gate_judge_words.py::test_no_tracked_file_carries_the_judges_words"
 reason = "the judge's words are kept only on the machine they were given on, and this checkout has no private companion for any record"
 only_without = ".exulanica/judge-words"
+
+# -- Causes: what a checkout without this machine's retained data or the optional extras skips --
+#
+# Continuous integration installs no optional extra, checks out tracked files only and has no
+# retained evidence, so these are the reasons its tests skip. On a machine that holds what a
+# reason says is missing, the reason is refused.
+
+# The web workspace's packages are installed by `pnpm install` in web/, which the Python job does
+# not run.
+[[cause]]
+reason = "the web toolchain is not installed ({checkout}/web/node_modules/.bin/tsx is missing); run pnpm install in web/"
+only_without = "web/node_modules"
+
+[[cause]]
+reason = "the web toolchain is not installed ({checkout}/web/node_modules/.bin/tsc is missing); run pnpm install in web/"
+only_without = "web/node_modules"
+
+[[cause]]
+reason = "the real baker needs web/node_modules in this checkout (the tsx loader is not at {checkout}/web/node_modules/tsx/dist/loader.mjs); run `pnpm --dir web install` to exercise it"
+only_without = "web/node_modules"
+
+[[cause]]
+reason = "web/node_modules is not installed, so the tessellator cannot bake"
+only_without = "web/node_modules"
+
+# The operator's retained photographs and pose receipts, reached through the ignored
+# .exulanica/reference-baseline link a lane worktree carries. Two tests read receipts from a
+# scratch store at an absolute path on the operator's machine instead; a checkout without the
+# link is not on that machine, so its absence stands for both.
+[[cause]]
+reason = "the retained volcanic photographs are not reachable through .exulanica"
+only_without = ".exulanica/reference-baseline"
+
+[[cause]]
+reason = "the retained bowl photographs are not reachable through .exulanica"
+only_without = ".exulanica/reference-baseline"
+
+[[cause]]
+reason = "receipt f44362e2840e is not on this machine"
+only_without = ".exulanica/reference-baseline"
+
+[[cause]]
+reason = "receipt 8280728d5c8c is not on this machine"
+only_without = ".exulanica/reference-baseline"
+
+[[cause]]
+reason = "the retained six pose receipt is not on this machine"
+only_without = ".exulanica/reference-baseline"
+
+[[cause]]
+reason = "the retained twelve_wide pose receipt is not on this machine"
+only_without = ".exulanica/reference-baseline"
+
+# Evaluation records kept only on the operator's machine, which tests measure against when they
+# are present.
+[[cause]]
+reason = "the retained Companion evidence these measurements are frozen against is not in this tree: docs/evaluation/2026-09-11-companion-matching.json, docs/evaluation/2026-09-11-first-place.json, docs/evaluation/artifacts/2026-09-11-first-place/companion/ask-2.json. It is a local-only evaluation campaign over the operator's own photographs, held out of a public repository on purpose, so a clone cannot run these and is not missing a fixture it could fetch."
+only_without = "docs/evaluation/2026-09-11-companion-matching.json"
+
+[[cause]]
+reason = "docs/evaluation/2026-09-12-melbourne-c4-29-visual-feasibility.json is local-only retained evidence and is not in this checkout"
+only_without = "docs/evaluation/2026-09-12-melbourne-c4-29-visual-feasibility.json"
+
+[[cause]]
+reason = "docs/evaluation/2026-09-12-helsinki-visual-feasibility.json is local-only retained evidence and is not in this checkout"
+only_without = "docs/evaluation/2026-09-12-helsinki-visual-feasibility.json"
+
+[[cause]]
+reason = "docs/evaluation/2026-09-12-helsinki-terminal-lod-successor.json is local-only retained evidence and is not in this checkout"
+only_without = "docs/evaluation/2026-09-12-helsinki-terminal-lod-successor.json"
+
+# What continuous integration's machine lacks and every machine running the backend runner has.
+# The check workflow installs PostgreSQL 18's client and no server, so the tests that start
+# servers of their own skip there; under the runner they fail instead. The union-attr gate
+# measures with the mypy its baseline names, read from the uv cache, and uv.lock names no mypy,
+# so no workflow run caches one; on any other machine that skip is the loss of the checker, which
+# tests/test_type_gate.py says must fail loudly.
+[[cause]]
+reason = "no PostgreSQL 18 server binaries were found, and these tests start servers of their own"
+only_in_ci = true
+
+[[cause]]
+reason = "the union-attr gate cannot run on this machine: it holds no runnable mypy of the version the baseline names"
+only_in_ci = true
+
+# The optional extras, which pyproject.toml declares and a plain `uv sync` does not install.
+[[cause]]
+reason = "numpy is absent; install it with `uv sync --extra reconstruction`"
+only_without_extra = "reconstruction"
+
+[[cause]]
+reason = "torch is absent; install it with `uv sync --extra reconstruction`"
+only_without_extra = "reconstruction"
+
+[[cause]]
+reason = "the array reader returns a numpy array; install it with `uv sync --extra reconstruction`"
+only_without_extra = "reconstruction"
+
+[[cause]]
+reason = "the pose extra is not installed"
+only_without_extra = "pose"
+
+[[cause]]
+reason = "this rectification runs in a child process that needs pycolmap (`uv sync --extra pose`), numpy (`uv sync --extra reconstruction`)"
+only_without_extra = ["pose", "reconstruction"]
+
+[[cause]]
+reason = "the segmentation extra (torch, transformers, opencv) is not installed"
+only_without_extra = "segmentation"
+
+[[cause]]
+reason = "numpy is absent; install it with `uv sync --extra segmentation`"
+only_without_extra = "segmentation"
+
+[[cause]]
+reason = "huggingface_hub is absent; install it with `uv sync --extra segmentation`"
+only_without_extra = "segmentation"

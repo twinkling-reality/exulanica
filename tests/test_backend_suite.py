@@ -78,8 +78,8 @@ def test_the_plan_names_both_phases_and_gives_phase_two_its_own_record(capsys):
         f"against {runner.DEFAULT_COPY_URL}"
     )
     assert skips == (
-        f"skips: each phase's are checked against the {len(runner.expected_skips())} in "
-        f"{runner.EXPECTED_SKIPS}"
+        f"skips: each phase's are checked against the {len(runner.expected_skips())} tests and "
+        f"{len(runner.expected_causes())} causes in {runner.EXPECTED_SKIPS}"
     )
 
 
@@ -319,7 +319,11 @@ def test_a_named_test_skipped_for_another_reason_is_not_the_skip_that_was_accept
     accepted[body] = runner.ExpectedSkip(body, "the corpus has not been generated")
     refused = runner.refused_skips(skips, accepted, root)
     assert [(skip.test, why) for skip, why in refused] == [
-        (body, "its entry accepts another reason: the corpus has not been generated")
+        (
+            body,
+            "its entry accepts another reason: the corpus has not been generated, and no cause "
+            "names its reason",
+        )
     ]
 
 
@@ -335,7 +339,8 @@ def test_a_skip_accepted_only_without_a_path_is_refused_in_a_tree_that_has_it(
     refused = runner.refused_skips(skips, accepted, tmp_path)
     assert {skip.test for skip, _ in refused} == {test for test, _, _ in _PROBE_SKIPS}
     assert {why for _, why in refused} == {
-        "its entry accepts it only without private/words, which is here"
+        "its entry accepts it only without private/words, which is here, and no cause names "
+        "its reason"
     }
 
 
@@ -353,6 +358,7 @@ def test_the_run_checks_the_skips_of_the_phase_it_ran(probe, monkeypatch, tmp_pa
     accepted = _accepting(runner.junit_skips(junit))
     del accepted["test_probe.py::TestGrouped::test_inside_a_class"]
     monkeypatch.setattr(runner, "expected_skips", lambda: accepted)
+    monkeypatch.setattr(runner, "expected_causes", lambda: {})
     written = []
 
     def phase(arguments, environment):
@@ -382,6 +388,7 @@ def test_a_manifest_that_cannot_be_read_stops_the_run_before_any_phase(monkeypat
 
 _HEADER = f'profile = "{runner.EXPECTED_SKIPS_PROFILE}"\n'
 _ENTRY = '[[skip]]\ntest = "tests/test_a.py::test_b"\nreason = "why"\n'
+_CAUSE = '[[cause]]\nreason = "the thing is absent"\n'
 
 
 @pytest.mark.parametrize(
@@ -403,6 +410,146 @@ def test_a_manifest_this_runner_cannot_read_is_refused_by_name(tmp_path, text, r
     manifest.write_text(text)
     with pytest.raises(runner.ManifestRefused, match=refusal):
         runner.expected_skips(manifest)
+
+
+@pytest.mark.parametrize(
+    "text, refusal",
+    [
+        (_HEADER + _CAUSE, "states no absence to check"),
+        (_HEADER + _CAUSE + 'only_without = "/private"\n', "only_without must be a path inside"),
+        (_HEADER + _CAUSE + 'only_without_extra = "gpu"\n', "does not declare: gpu"),
+        (_HEADER + _CAUSE + "only_without_extra = [1]\n", "only_without_extra must name extras"),
+        (_HEADER + _CAUSE + 'only_without = "x"\nwhy = "y"\n', "fields this runner does not read"),
+        (
+            _HEADER + (_CAUSE + 'only_without = "x"\n') * 2,
+            "a reason an earlier cause names",
+        ),
+        (_HEADER + '[[cause]]\nonly_without = "x"\n', "gives no reason"),
+        (_HEADER + _CAUSE + 'only_in_ci = "yes"\n', "only_in_ci must be true or false"),
+        (_HEADER + _CAUSE + "only_in_ci = false\n", "states no absence to check"),
+    ],
+)
+def test_a_cause_this_runner_cannot_hold_to_an_absence_is_refused_by_name(tmp_path, text, refusal):
+    """A cause always names what must be absent: a path, extras pyproject declares, or
+    continuous integration's machine."""
+    manifest = tmp_path / "expected_skips.toml"
+    manifest.write_text(text)
+    with pytest.raises(runner.ManifestRefused, match=refusal):
+        runner.expected_causes(manifest)
+
+
+def test_a_cause_accepts_its_reason_from_any_test_where_the_path_it_names_is_absent(
+    probe, monkeypatch, tmp_path
+):
+    """No entry names these tests; one cause per reason accepts them all, and only in a tree
+    without the path, because in a tree that has it the tests had what they skipped for."""
+    root, junit = probe
+    monkeypatch.setattr(runner, "ROOT", root)
+    skips = runner.junit_skips(junit)
+    causes = {
+        skip.reason: runner.ExpectedCause(skip.reason, only_without="private/words")
+        for skip in skips
+    }
+    assert runner.refused_skips(skips, {}, tmp_path, causes) == []
+    (tmp_path / "private" / "words").mkdir(parents=True)
+    refused = runner.refused_skips(skips, {}, tmp_path, causes)
+    assert {skip.test for skip, _ in refused} == {test for test, _, _ in _PROBE_SKIPS}
+    assert {why for _, why in refused} == {
+        "its cause is accepted only without private/words, which is here"
+    }
+
+
+def test_a_cause_standing_for_an_extra_holds_only_where_the_extra_is_not_installed(
+    probe, monkeypatch
+):
+    """Read from pyproject.toml's own declaration and the installed distributions: an extra
+    whose requirement nothing installed is absent, one whose requirements are all installed is
+    not, and an environment marker that does not apply is not a requirement at all."""
+    root, junit = probe
+    monkeypatch.setattr(runner, "ROOT", root)
+    monkeypatch.setattr(
+        runner,
+        "declared_extras",
+        lambda: {
+            "absent": ["exulanica-no-such-distribution>=1"],
+            "present": ["pytest>=8", "exulanica-no-such-distribution; sys_platform == 'nowhere'"],
+        },
+    )
+    assert runner.extra_installed("present") and not runner.extra_installed("absent")
+    skips = runner.junit_skips(junit)
+    for extras, refused in (
+        (("absent",), 0),
+        (("present",), len(skips)),
+        (("absent", "present"), 0),
+    ):
+        causes = {
+            skip.reason: runner.ExpectedCause(skip.reason, only_without_extra=extras)
+            for skip in skips
+        }
+        assert len(runner.refused_skips(skips, {}, root, causes)) == refused, extras
+
+
+def test_a_cause_of_continuous_integrations_machine_holds_only_where_github_actions_runs(
+    probe, monkeypatch, tmp_path
+):
+    """A server binary or a cached checker is absent from the machine, not the tree, so the tree
+    cannot show it. Every machine that runs the runner has them, so such a reason is accepted
+    only where GitHub Actions says the run is its own, and refused anywhere else."""
+    manifest = tmp_path / "expected_skips.toml"
+    manifest.write_text(_HEADER + _CAUSE + "only_in_ci = true\n")
+    assert runner.expected_causes(manifest) == {
+        "the thing is absent": runner.ExpectedCause("the thing is absent", only_in_ci=True)
+    }
+    root, junit = probe
+    monkeypatch.setattr(runner, "ROOT", root)
+    skips = runner.junit_skips(junit)
+    causes = {skip.reason: runner.ExpectedCause(skip.reason, only_in_ci=True) for skip in skips}
+    monkeypatch.setenv(runner.CONTINUOUS_INTEGRATION, "true")
+    assert runner.refused_skips(skips, {}, root, causes) == []
+    for elsewhere in ("false", ""):
+        monkeypatch.setenv(runner.CONTINUOUS_INTEGRATION, elsewhere)
+        assert len(runner.refused_skips(skips, {}, root, causes)) == len(skips), elsewhere
+    monkeypatch.delenv(runner.CONTINUOUS_INTEGRATION)
+    refused = runner.refused_skips(skips, {}, root, causes)
+    assert {skip.test for skip, _ in refused} == {test for test, _, _ in _PROBE_SKIPS}
+    assert {why for _, why in refused} == {
+        "its cause is accepted only in continuous integration, and GITHUB_ACTIONS is not true here"
+    }
+
+
+def test_a_reason_naming_the_checkout_is_read_with_the_checkout_written_as_its_name(
+    tmp_path, monkeypatch
+):
+    """A skip naming a path inside the checkout reads the same in every checkout."""
+    reason = f"the web toolchain is not installed ({tmp_path}/web/node_modules/.bin)"
+    skip = runner.Skip(("tests.test_x", "test_y"), "tests/test_x.py::test_y", "skip", reason)
+    written = "the web toolchain is not installed ({checkout}/web/node_modules/.bin)"
+    assert runner.normalised(reason, tmp_path) == written
+    causes = {written: runner.ExpectedCause(written, only_without="web/node_modules")}
+    assert runner.refused_skips([skip], {}, tmp_path, causes) == []
+
+
+def test_check_skips_holds_a_run_it_did_not_start_to_the_manifest(probe, monkeypatch, capsys):
+    """The entry point continuous integration uses: no phase runs, and a skip neither an entry
+    nor a cause names fails the check with the exit a phase's check gives, naming the test."""
+    root, junit = probe
+    monkeypatch.setattr(runner, "ROOT", root)
+    monkeypatch.setattr(runner, "run", lambda *a: pytest.fail("a phase ran"))
+    skips = runner.junit_skips(junit)
+    accepted = _accepting(skips)
+    monkeypatch.setattr(runner, "expected_skips", lambda: accepted)
+    monkeypatch.setattr(runner, "expected_causes", lambda: {})
+    assert runner.main(["--check-skips", str(junit)]) == 0
+    assert "and tests/expected_skips.toml accepts every one" in capsys.readouterr().out
+
+    planted = "test_probe.py::test_skipped_in_the_body"
+    del accepted[planted]
+    assert runner.main(["--check-skips", str(junit)]) == runner.UNNAMED_SKIP
+    printed = capsys.readouterr().out
+    assert (
+        f"  {planted}: the body said so\n"
+        "    refused: no entry names this test, and no cause names its reason"
+    ) in printed
 
 
 def test_every_accepted_skip_names_a_test_pytest_collects():

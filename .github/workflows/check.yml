@@ -69,12 +69,18 @@ jobs:
       # phase 2 runs them there. tests/test_ci_workflow.py fails when this selection stops being
       # the runner's phase 1, in either direction.
       - name: pytest
-        run: uv run pytest -m "not reference_copy"
+        run: uv run pytest -m "not reference_copy" --junitxml="$RUNNER_TEMP/backend-suite.xml"
         env:
           EXULANICA_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/exulanica_spine_test
           # The whole reason this job exists. Without it a broken server silently skips the 19
           # tests that are the only executable proof of invariant 4.
           EXULANICA_REQUIRE_POSTGRES: "1"
+      # Every skip the run reported, held to tests/expected_skips.toml by the backend runner's own
+      # check, which fails on a skip nothing there accepts. The junit file is written outside the
+      # checkout so the check's header reads the tree as the commit left it. tests/test_ci_workflow.py
+      # fails when this step stops checking that file or could let the job pass without checking it.
+      - name: skips
+        run: uv run python scripts/run_backend_suite.py --check-skips "$RUNNER_TEMP/backend-suite.xml"
 
   web:
     runs-on: ubuntu-latest

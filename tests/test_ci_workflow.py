@@ -8,6 +8,13 @@ holds that selection to the runner's own in both directions: a workflow that run
 ``reference_copy`` test fails every push for a reason unrelated to the change, and one that leaves
 anything else out reports a pass for tests that never ran.
 
+The run's skips are held to ``tests/expected_skips.toml`` by the runner's own check. The pytest run
+writes a junit file and a later step hands it to ``run_backend_suite.py --check-skips``, which fails
+on a skip the manifest does not accept. A workflow that stops writing the file, stops checking it,
+checks another one or runs the check where its failure cannot fail the job would let every skip
+through unasked, so each is refused here, and the check the workflow names is run as it names it
+against pytest's own junit file for a planted skip nothing accepts, which it must fail.
+
 The workflow is read as text, as ``tests/test_deployment.py`` reads it and for the reason given
 there: the dev dependency closure has no YAML parser. The reader understands the shapes a ``run``
 command takes in a workflow, a plain or quoted scalar on the key's line or a block scalar below
@@ -21,8 +28,10 @@ import contextlib
 import functools
 import io
 import json
+import os
 import re
 import shlex
+import subprocess
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -48,6 +57,8 @@ _PYTEST = re.compile(r"\bpytest\b")
 _NAME = re.compile(r"^(- +)?name:")
 #: Shell control operators, each of which ends one simple command and begins the next.
 _OPERATORS = frozenset({"&&", "||", ";", "|", "&", ";;"})
+#: The backend runner, whose --check-skips holds a run's junit file to the expected-skips manifest.
+RUNNER_SCRIPT = "run_backend_suite.py"
 
 
 @dataclass(frozen=True)
@@ -131,30 +142,68 @@ def run_commands(text: str) -> list[Command]:
     return commands
 
 
+def _tokens(command: str) -> list[list[str]]:
+    """Each logical line of a shell command as the shell splits it, its operators included.
+
+    Raises ``ValueError`` for a command the shell's own quoting rules cannot split.
+    """
+    lines = []
+    for logical in re.sub(r"\\\n", " ", command).splitlines():
+        lexer = shlex.shlex(logical, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        lines.append(list(lexer))
+    return lines
+
+
+def _simple_commands(command: str) -> list[list[str]]:
+    """The words of each simple command in one shell command."""
+    simple: list[list[str]] = []
+    for tokens in _tokens(command):
+        simple.append([])
+        for token in tokens:
+            if token in _OPERATORS:
+                simple.append([])
+            else:
+                simple[-1].append(token)
+    return [words for words in simple if words]
+
+
 def pytest_arguments(command: str) -> list[list[str]]:
     """The arguments of every pytest run in one shell command, however pytest is started.
 
     Raises ``ValueError`` for a command the shell's own quoting rules cannot split.
     """
     found = []
-    for logical in re.sub(r"\\\n", " ", command).splitlines():
-        lexer = shlex.shlex(logical, posix=True, punctuation_chars=True)
-        lexer.whitespace_split = True
-        simple: list[list[str]] = [[]]
-        for token in lexer:
-            if token in _OPERATORS:
-                simple.append([])
-            else:
-                simple[-1].append(token)
-        for words in simple:
-            for position, word in enumerate(words):
-                if word == "pytest" or word.endswith("/pytest"):
-                    found.append(words[position + 1 :])
-                    break
-                if word == "-m" and words[position + 1 : position + 2] == ["pytest"]:
-                    found.append(words[position + 2 :])
-                    break
+    for words in _simple_commands(command):
+        for position, word in enumerate(words):
+            if word == "pytest" or word.endswith("/pytest"):
+                found.append(words[position + 1 :])
+                break
+            if word == "-m" and words[position + 1 : position + 2] == ["pytest"]:
+                found.append(words[position + 2 :])
+                break
     return found
+
+
+def runner_arguments(command: str) -> list[list[str]]:
+    """The arguments of every run of the backend runner in one shell command."""
+    found = []
+    for words in _simple_commands(command):
+        for position, word in enumerate(words):
+            if Path(word).name == RUNNER_SCRIPT:
+                found.append(words[position + 1 :])
+                break
+    return found
+
+
+def checked_junit(arguments: Sequence[str]) -> str | None:
+    """The junit file whose skips one run of the backend runner checks, or None."""
+    for position, argument in enumerate(arguments):
+        if argument == "--check-skips":
+            return arguments[position + 1] if position + 1 < len(arguments) else None
+        if argument.startswith("--check-skips="):
+            return argument.removeprefix("--check-skips=")
+    return None
 
 
 def _declared(step: Sequence[str], name: str) -> str | None:
@@ -226,7 +275,10 @@ def selection_problems(text: str) -> list[str]:
     expected = list(phase_one())
     required = phase_one_requirement()
     for command, arguments in invocations:
-        if arguments != expected:
+        # The junit file is where the skips are checked from, as it is in the runner, and selects
+        # nothing; skip_check_problems holds it to the step that reads it.
+        _, selection = runner._without_junit(arguments)
+        if selection != expected:
             problems.append(
                 f"line {command.line} runs pytest with {shlex.join(arguments)!r}; the runner's "
                 f"phase 1 selects with {shlex.join(expected)!r} and nothing else, so every test "
@@ -238,6 +290,70 @@ def selection_problems(text: str) -> list[str]:
                 f"the step running pytest on line {command.line} sets {REQUIRE_POSTGRES} to "
                 f"{declared!r}; the runner's phase 1 sets {required!r}, without which a missing "
                 "server skips every PostgreSQL test instead of failing"
+            )
+    return problems
+
+
+def skip_check_problems(text: str) -> list[str]:
+    """Every way a workflow lets its backend run's skips pass unchecked, as sentences.
+
+    The one pytest run writes a junit file, and one later step runs the backend runner's
+    --check-skips on that file, as the whole of its command and with neither a condition nor
+    continue-on-error, so the job fails whenever the check does. A check placed in another job
+    cannot read the file and fails the job, so it is not the silent case this looks for.
+    """
+    readable = []
+    for command in run_commands(text):
+        try:
+            readable.append(
+                (command, pytest_arguments(command.text), runner_arguments(command.text))
+            )
+        except ValueError:
+            continue  # selection_problems reports a command the shell could not split
+    runs = [(command, arguments) for command, found, _ in readable for arguments in found]
+    if len(runs) != 1:
+        return []  # selection_problems reports the count; there is no one run to hold to a check
+    run, arguments = runs[0]
+    junit, _ = runner._without_junit(arguments)
+    if junit is None:
+        return [
+            f"line {run.line} runs pytest without --junitxml, so no file records its skips and "
+            f"nothing holds them to {runner.EXPECTED_SKIPS}"
+        ]
+    checks = [
+        (command, checked)
+        for command, _, found in readable
+        for runner_run in found
+        if (checked := checked_junit(runner_run)) is not None
+    ]
+    if len(checks) != 1:
+        return [
+            f"{len(checks)} steps run {RUNNER_SCRIPT} --check-skips; one step after the run on "
+            f"line {run.line} checks the skips it writes to {junit}"
+        ]
+    check, checked = checks[0]
+    problems = []
+    if checked != junit:
+        problems.append(
+            f"line {check.line} checks the skips recorded in {checked}; the run on line "
+            f"{run.line} writes them to {junit}"
+        )
+    if check.line < run.line:
+        problems.append(
+            f"line {check.line} checks skips before the run on line {run.line} has written any"
+        )
+    tokens = [token for line in _tokens(check.text) for token in line]
+    if len(_simple_commands(check.text)) != 1 or _OPERATORS.intersection(tokens):
+        problems.append(
+            f"line {check.line} runs more than the check, {check.text!r}, so the step's exit "
+            "is not the check's"
+        )
+    for key in ("if", "continue-on-error"):
+        declared = _declared(check.step, key)
+        if declared is not None:
+            problems.append(
+                f"the step checking skips on line {check.line} declares {key}: {declared}, "
+                "which lets the job pass without the check passing"
             )
     return problems
 
@@ -254,7 +370,21 @@ def test_the_reader_finds_the_one_pytest_run_the_workflow_makes():
         for command in run_commands(WORKFLOW_TEXT)
         for arguments in pytest_arguments(command.text)
     ]
-    assert runs == [list(phase_one())]
+    assert [runner._without_junit(arguments)[1] for arguments in runs] == [list(phase_one())]
+
+
+def test_the_workflow_checks_the_skips_of_its_run_with_the_runner():
+    assert skip_check_problems(WORKFLOW_TEXT) == []
+
+
+def test_the_reader_finds_the_one_check_and_the_file_it_reads():
+    """The same guard for the skips: the check it found reads the file the run writes."""
+    commands = run_commands(WORKFLOW_TEXT)
+    (arguments,) = [found for c in commands for found in pytest_arguments(c.text)]
+    junit, _ = runner._without_junit(arguments)
+    checked = [checked_junit(found) for c in commands for found in runner_arguments(c.text)]
+    assert junit is not None
+    assert checked == [junit]
 
 
 def test_the_expected_selection_is_read_from_the_runner():
@@ -265,7 +395,10 @@ def test_the_expected_selection_is_read_from_the_runner():
     assert phase_one_requirement() == "1"
 
 
-_THE_RUN = 'run: uv run pytest -m "not reference_copy"'
+_JUNIT = '"$RUNNER_TEMP/backend-suite.xml"'
+_THE_RUN = f'run: uv run pytest -m "not reference_copy" --junitxml={_JUNIT}'
+_THE_CHECK = f"run: uv run python scripts/run_backend_suite.py --check-skips {_JUNIT}"
+_CHECK_STEP = f"      - name: skips\n        {_THE_CHECK}\n"
 
 
 @pytest.mark.parametrize(
@@ -337,13 +470,148 @@ def test_a_pytest_run_outside_a_run_command_is_refused():
 
 def test_a_block_scalar_run_is_read_like_a_one_line_run():
     """The reader is not limited to the shape the workflow has today."""
-    block = '        run: |\n          uv run pytest -m "not reference_copy"\n'
+    block = f'        run: |\n          uv run pytest -m "not reference_copy" --junitxml={_JUNIT}\n'
     changed = WORKFLOW_TEXT.replace(f"        {_THE_RUN}\n", block)
     assert changed != WORKFLOW_TEXT
     assert selection_problems(changed) == []
+    assert skip_check_problems(changed) == []
     wrong = changed.replace(block, "        run: |\n          uv run pytest\n")
     assert wrong != changed
     assert any("phase 1 selects" in problem for problem in selection_problems(wrong))
+
+
+def _check_before_the_run(text: str) -> str:
+    lint = "      - run: uv run lint-imports\n"
+    return text.replace(_CHECK_STEP, "").replace(lint, lint + _CHECK_STEP)
+
+
+@pytest.mark.parametrize(
+    ("edit", "refusal"),
+    [
+        pytest.param(
+            lambda text: text.replace(f" --junitxml={_JUNIT}", ""),
+            "runs pytest without --junitxml",
+            id="writes-no-junit",
+        ),
+        pytest.param(
+            lambda text: text.replace(_CHECK_STEP, ""), "0 steps run", id="checks-nothing"
+        ),
+        pytest.param(
+            lambda text: text.replace(_CHECK_STEP, _CHECK_STEP * 2),
+            "2 steps run",
+            id="checks-twice",
+        ),
+        pytest.param(
+            lambda text: text.replace(_THE_CHECK, _THE_CHECK.replace("backend-suite", "other")),
+            "checks the skips recorded in",
+            id="checks-another-file",
+        ),
+        pytest.param(_check_before_the_run, "before the run", id="checks-before-the-run"),
+        pytest.param(
+            lambda text: text.replace(_THE_CHECK, f"{_THE_CHECK} || true"),
+            "runs more than the check",
+            id="swallows-the-exit",
+        ),
+        pytest.param(
+            lambda text: text.replace(_THE_CHECK, f"{_THE_CHECK} &"),
+            "runs more than the check",
+            id="backgrounds-the-check",
+        ),
+        pytest.param(
+            lambda text: text.replace(
+                _CHECK_STEP, f"{_CHECK_STEP}        continue-on-error: true\n"
+            ),
+            "declares continue-on-error: true",
+            id="continues-on-error",
+        ),
+        pytest.param(
+            lambda text: text.replace(
+                _CHECK_STEP, _CHECK_STEP.replace("\n", "\n        if: false\n", 1)
+            ),
+            "declares if: false",
+            id="runs-on-a-condition",
+        ),
+    ],
+)
+def test_a_workflow_that_lets_its_skips_pass_unchecked_is_refused(edit, refusal):
+    """Positive controls: each way the check can stop holding the run's skips is caught by name."""
+    assert _THE_RUN in WORKFLOW_TEXT and _CHECK_STEP in WORKFLOW_TEXT, (
+        "the control edits lines the workflow no longer has"
+    )
+    changed = edit(WORKFLOW_TEXT)
+    assert changed != WORKFLOW_TEXT
+    problems = skip_check_problems(changed)
+    assert any(refusal in problem for problem in problems), problems
+
+
+def _write_junit(probe: Path, junit: Path) -> None:
+    """The junit file pytest itself writes for the probe, where the workflow's run writes it."""
+    finished = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            "no:cacheprovider",
+            f"--rootdir={probe}",
+            f"--junitxml={junit}",
+            "tests",
+        ],
+        cwd=probe,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert finished.returncode == 0, finished.stdout + finished.stderr
+
+
+def test_the_workflows_check_fails_a_planted_skip_nothing_accepts(tmp_path, monkeypatch, capsys):
+    """The check run as the workflow runs it, on the file the workflow's pytest run names.
+
+    The probe is a module at the path of a test the manifest accepts a skip of, reporting that
+    skip for the accepted reason, so the check passes it as it passes the real one; then a skip
+    planted beside it, which no entry and no cause names, must fail the check by name.
+    """
+    commands = run_commands(WORKFLOW_TEXT)
+    (arguments,) = [found for c in commands for found in pytest_arguments(c.text)]
+    (check,) = [
+        found for c in commands for found in runner_arguments(c.text) if checked_junit(found)
+    ]
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+    written, _ = runner._without_junit(arguments)
+    assert written is not None
+    junit = Path(os.path.expandvars(written))
+    expanded = [os.path.expandvars(argument) for argument in check]
+
+    plain = [
+        entry
+        for entry in runner.expected_skips().values()
+        if entry.only_without is None and entry.test.count("::") == 1 and "[" not in entry.test
+    ]
+    assert plain, (
+        f"{runner.EXPECTED_SKIPS} accepts no plain test's skip, so nothing is planted beside one"
+    )
+    module, name = plain[0].test.split("::")
+    probe = tmp_path / "probe"
+    (probe / module).parent.mkdir(parents=True)
+    accepted = f"import pytest\n\n\ndef {name}():\n    pytest.skip({plain[0].reason!r})\n"
+    (probe / module).write_text(accepted)
+    _write_junit(probe, junit)
+    assert runner.main(expanded) == 0
+    assert f"the run skipped 1 test, and {runner.EXPECTED_SKIPS} accepts every one" in (
+        capsys.readouterr().out
+    )
+
+    planted = "test_a_skip_nobody_decided_on"
+    (probe / module).write_text(
+        f"{accepted}\n\ndef {planted}():\n    pytest.skip('planted, and named by nothing')\n"
+    )
+    _write_junit(probe, junit)
+    assert runner.main(expanded) == runner.UNNAMED_SKIP
+    assert (
+        f"  {module}::{planted}: planted, and named by nothing\n"
+        "    refused: no entry names this test, and no cause names its reason"
+    ) in capsys.readouterr().out
 
 
 def test_the_web_job_installs_the_pnpm_its_workspace_declares():

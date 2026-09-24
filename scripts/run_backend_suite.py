@@ -34,12 +34,30 @@ five hours behind green runs, because a count of skips is a number nobody compar
 skips are read back from its junit file, matched against the entries by pytest's own junit naming,
 and a new skip is a line somebody adds to that file in a diff rather than a number that drifted.
 Without --junitxml the runner writes one to a temporary directory so the check still happens.
+
+A skip an environment causes rather than a test is accepted by its CAUSE: a reason the manifest
+names once, reported by any test, where the absence the reason states is observably so. Continuous
+integration installs none of the optional extras and holds none of this machine's retained evidence,
+so its tests skip for a few such reasons, and each cause says which repository path or which extra
+must be absent for it to be accepted; the same cause is refused in a tree that has what it says is
+missing. A reason naming a path inside the checkout is compared with the checkout written as
+{checkout}, so it reads the same in every checkout. Some absences belong to the machine rather than
+the tree, such as PostgreSQL's server binaries or the checker the union-attr gate runs, and every
+machine that runs this script has them; continuous integration installs neither. A cause for one of
+those is marked only_in_ci and accepted only where GitHub Actions says it is running, so the machine
+that loses one still fails.
+
+--check-skips JUNIT runs no phase: it holds the skips one junit file records to the same manifest
+and exits as a phase's check would, which is how continuous integration, which runs pytest itself
+against a database it was given, has its skips checked by this file rather than by a second copy of
+the rule.
 """
 
 from __future__ import annotations
 
 import argparse
 import ast
+import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -54,6 +72,7 @@ from pathlib import Path
 # pytest's own function for turning a node id into a junit classname and name. Imported rather than
 # restated, so the names this script matches are the names pytest wrote.
 from _pytest.junitxml import mangle_test_address
+from packaging.requirements import Requirement
 
 #: The tests that need the pinned endpoint, named by their own marker rather than by a list here.
 REFERENCE_MARKER = "reference_copy"
@@ -72,7 +91,12 @@ NAMED_DIFFERENCES = 3
 #: file says why.
 EXPECTED_SKIPS = "tests/expected_skips.toml"
 #: The one layout of that file this runner reads; any other is refused rather than guessed at.
-EXPECTED_SKIPS_PROFILE = "exulanica.expected-skips/v1"
+EXPECTED_SKIPS_PROFILE = "exulanica.expected-skips/v2"
+#: How a reason in the manifest writes the checkout it was reported from.
+CHECKOUT = "{checkout}"
+#: The variable GitHub Actions sets to "true" in every step it runs, which is how a cause accepted
+#: only in continuous integration is told where it is.
+CONTINUOUS_INTEGRATION = "GITHUB_ACTIONS"
 #: The message pytest's junit writer gives a module it skipped while collecting it.
 COLLECTION_SKIPPED = "collection skipped"
 
@@ -230,6 +254,22 @@ class ExpectedSkip:
 
 
 @dataclass(frozen=True)
+class ExpectedCause:
+    """A reason the runner accepts from any test, where the absence it states is so."""
+
+    reason: str
+    #: A repository-relative path whose absence the reason states. In a tree that holds it the
+    #: reason is not accepted.
+    only_without: str | None = None
+    #: Extras of pyproject.toml whose absence the reason states. Where every one of them is
+    #: installed the reason is not accepted.
+    only_without_extra: tuple[str, ...] = ()
+    #: True for an absence of the machine rather than the tree, which only continuous integration
+    #: is known to have. Anywhere GitHub Actions is not running the reason is not accepted.
+    only_in_ci: bool = False
+
+
+@dataclass(frozen=True)
 class Skip:
     """A skip one phase reported, as its junit file records it."""
 
@@ -248,8 +288,8 @@ def junit_identity(test: str) -> tuple[str, str]:
     return ".".join(names[:-1]), names[-1]
 
 
-def expected_skips(path: Path | None = None) -> dict[str, ExpectedSkip]:
-    """The accepted skips by node id, or a refusal that names what is wrong with the file."""
+def _manifest(path: Path | None) -> tuple[Path, dict]:
+    """The manifest's document, or a refusal that names what is wrong with the file."""
     path = ROOT / EXPECTED_SKIPS if path is None else path
     try:
         document = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -260,8 +300,91 @@ def expected_skips(path: Path | None = None) -> dict[str, ExpectedSkip]:
             f"{path} has profile {document.get('profile')!r}; this runner reads "
             f"{EXPECTED_SKIPS_PROFILE} and no other"
         )
-    if unknown := sorted(set(document) - {"profile", "skip"}):
+    if unknown := sorted(set(document) - {"profile", "skip", "cause"}):
         raise ManifestRefused(f"{path} has keys this runner does not read: {', '.join(unknown)}")
+    return path, document
+
+
+def _inside(value: object, where: str) -> str | None:
+    """An ``only_without`` value, which must be a path inside the repository, or None."""
+    if value is not None and (
+        not isinstance(value, str)
+        or not value
+        or Path(value).is_absolute()
+        or ".." in Path(value).parts
+    ):
+        raise ManifestRefused(
+            f"{where} only_without must be a path inside the repository, not {value!r}"
+        )
+    return value
+
+
+def declared_extras() -> dict[str, list[str]]:
+    """The extras pyproject.toml declares, each with its requirement strings."""
+    document = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    return document["project"]["optional-dependencies"]
+
+
+def extra_installed(extra: str) -> bool:
+    """Whether every distribution the extra requires is installed where this runs."""
+    for written in declared_extras()[extra]:
+        requirement = Requirement(written)
+        if requirement.marker is not None and not requirement.marker.evaluate({"extra": extra}):
+            continue
+        try:
+            importlib.metadata.distribution(requirement.name)
+        except importlib.metadata.PackageNotFoundError:
+            return False
+    return True
+
+
+def expected_causes(path: Path | None = None) -> dict[str, ExpectedCause]:
+    """The accepted causes by reason, or a refusal that names what is wrong with the file.
+
+    A cause names the absence it stands for, as a path, as extras or as continuous integration's
+    own, because a reason accepted everywhere with nothing to check it against is a test-level
+    decision without a test.
+    """
+    path, document = _manifest(path)
+    extras = set(declared_extras())
+    causes: dict[str, ExpectedCause] = {}
+    fields = {"reason", "only_without", "only_without_extra", "only_in_ci"}
+    for position, entry in enumerate(document.get("cause", []), start=1):
+        where = f"{path}, cause {position}"
+        if not isinstance(entry, dict):
+            raise ManifestRefused(f"{where} is not a table")
+        if unknown := sorted(set(entry) - fields):
+            raise ManifestRefused(f"{where} has fields this runner does not read: {unknown}")
+        reason = entry.get("reason")
+        if not isinstance(reason, str) or not reason:
+            raise ManifestRefused(f"{where} gives no reason")
+        only_without = _inside(entry.get("only_without"), where)
+        named = entry.get("only_without_extra", [])
+        written = [named] if isinstance(named, str) else named
+        if not isinstance(written, list) or not all(
+            isinstance(extra, str) and extra for extra in written
+        ):
+            raise ManifestRefused(f"{where} only_without_extra must name extras, not {named!r}")
+        if unknown := sorted(set(written) - extras):
+            raise ManifestRefused(
+                f"{where} names extras pyproject.toml does not declare: {', '.join(unknown)}"
+            )
+        only_in_ci = entry.get("only_in_ci", False)
+        if not isinstance(only_in_ci, bool):
+            raise ManifestRefused(f"{where} only_in_ci must be true or false, not {only_in_ci!r}")
+        if only_without is None and not written and not only_in_ci:
+            raise ManifestRefused(
+                f"{where} states no absence to check, so it would accept {reason!r} everywhere"
+            )
+        if reason in causes:
+            raise ManifestRefused(f"{where} names a reason an earlier cause names: {reason}")
+        causes[reason] = ExpectedCause(reason, only_without, tuple(written), only_in_ci)
+    return causes
+
+
+def expected_skips(path: Path | None = None) -> dict[str, ExpectedSkip]:
+    """The accepted skips by node id, or a refusal that names what is wrong with the file."""
+    path, document = _manifest(path)
     accepted: dict[str, ExpectedSkip] = {}
     for position, entry in enumerate(document.get("skip", []), start=1):
         where = f"{path}, skip {position}"
@@ -275,16 +398,7 @@ def expected_skips(path: Path | None = None) -> dict[str, ExpectedSkip]:
             raise ManifestRefused(f"{where} names no test node id")
         if not isinstance(reason, str) or not reason:
             raise ManifestRefused(f"{where} gives no reason for skipping {test}")
-        only_without = entry.get("only_without")
-        if only_without is not None and (
-            not isinstance(only_without, str)
-            or not only_without
-            or Path(only_without).is_absolute()
-            or ".." in Path(only_without).parts
-        ):
-            raise ManifestRefused(
-                f"{where} only_without must be a path inside the repository, not {only_without!r}"
-            )
+        only_without = _inside(entry.get("only_without"), where)
         if test in accepted:
             raise ManifestRefused(f"{where} names {test}, which an earlier entry names")
         accepted[test] = ExpectedSkip(test, reason, only_without)
@@ -335,22 +449,56 @@ def junit_skips(junit: Path) -> list[Skip]:
     return skips
 
 
+def normalised(reason: str, root: Path) -> str:
+    """The reason as the manifest writes it: the checkout's own path as {checkout}."""
+    return reason.replace(str(root), CHECKOUT)
+
+
+def _test_refusal(skip: Skip, entry: ExpectedSkip | None, root: Path) -> str | None:
+    """Why the entry naming this test does not accept it, or None when it does."""
+    if entry is None:
+        return "no entry names this test"
+    if entry.reason != normalised(skip.reason, root):
+        return f"its entry accepts another reason: {entry.reason}"
+    if entry.only_without is not None and (root / entry.only_without).exists():
+        return f"its entry accepts it only without {entry.only_without}, which is here"
+    return None
+
+
+def _cause_refusal(cause: ExpectedCause, root: Path) -> str | None:
+    """Why this tree does not accept the cause's reason, or None when it does."""
+    if cause.only_without is not None and (root / cause.only_without).exists():
+        return f"its cause is accepted only without {cause.only_without}, which is here"
+    if cause.only_without_extra and all(extra_installed(e) for e in cause.only_without_extra):
+        installed = ", ".join(cause.only_without_extra)
+        return f"its cause is accepted only without the {installed} extra, which is installed"
+    if cause.only_in_ci and os.environ.get(CONTINUOUS_INTEGRATION) != "true":
+        return (
+            "its cause is accepted only in continuous integration, and "
+            f"{CONTINUOUS_INTEGRATION} is not true here"
+        )
+    return None
+
+
 def refused_skips(
-    skips: Iterable[Skip], accepted: Mapping[str, ExpectedSkip], root: Path
+    skips: Iterable[Skip],
+    accepted: Mapping[str, ExpectedSkip],
+    root: Path,
+    causes: Mapping[str, ExpectedCause] | None = None,
 ) -> list[tuple[Skip, str]]:
-    """Each skip no entry accepts, with the reason it is refused."""
+    """Each skip neither an entry nor a cause accepts, with the reason it is refused."""
     by_identity = {junit_identity(entry.test): entry for entry in accepted.values()}
+    causes = causes or {}
     refused = []
     for skip in skips:
-        entry = by_identity.get(skip.identity)
-        if entry is None:
-            refused.append((skip, "no entry names this test"))
-        elif entry.reason != skip.reason:
-            refused.append((skip, f"its entry accepts another reason: {entry.reason}"))
-        elif entry.only_without is not None and (root / entry.only_without).exists():
-            refused.append(
-                (skip, f"its entry accepts it only without {entry.only_without}, which is here")
-            )
+        against_test = _test_refusal(skip, by_identity.get(skip.identity), root)
+        if against_test is None:
+            continue
+        cause = causes.get(normalised(skip.reason, root))
+        against_cause = None if cause is None else _cause_refusal(cause, root)
+        if cause is not None and against_cause is None:
+            continue
+        refused.append((skip, against_cause or f"{against_test}, and no cause names its reason"))
     return refused
 
 
@@ -359,7 +507,13 @@ def _shown(skip: Skip) -> str:
     return f"  {skip.test}{kind}: {skip.reason}"
 
 
-def check_skips(phase: str, junit: Path, accepted: Mapping[str, ExpectedSkip], code: int) -> int:
+def check_skips(
+    phase: str,
+    junit: Path,
+    accepted: Mapping[str, ExpectedSkip],
+    code: int,
+    causes: Mapping[str, ExpectedCause] | None = None,
+) -> int:
     """Print every skip a phase reported with its reason, and fail on one the manifest refuses.
 
     A failing exit code from pytest stays the exit code: a failure outranks a skip, and both are
@@ -375,7 +529,7 @@ def check_skips(phase: str, junit: Path, accepted: Mapping[str, ExpectedSkip], c
             flush=True,
         )
         return code or CANNOT_CHECK
-    refused = refused_skips(skips, accepted, ROOT)
+    refused = refused_skips(skips, accepted, ROOT, causes)
     if not skips:
         print(f"run_backend_suite: {phase} skipped no test", flush=True)
         return code
@@ -399,7 +553,8 @@ def check_skips(phase: str, junit: Path, accepted: Mapping[str, ExpectedSkip], c
         print(f"{_shown(skip)}\n    refused: {why}")
     print(
         f"run_backend_suite: a skip that is intended is an entry in {EXPECTED_SKIPS}, with the "
-        "reason pytest reports; any other is a finding",
+        "reason pytest reports, or a cause there naming that reason and the absence behind it; "
+        "any other is a finding",
         flush=True,
     )
     return code or UNNAMED_SKIP
@@ -425,13 +580,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="run phase 1 only, and say which gate goes unexercised",
     )
     parser.add_argument("--plan", action="store_true", help="print what each phase would run")
+    parser.add_argument(
+        "--check-skips",
+        metavar="JUNIT",
+        help="run no phase: hold the skips this junit file records to the manifest, and exit",
+    )
     known, extra = parser.parse_known_args(list(argv) if argv is not None else None)
     print(tree_identity(), flush=True)
     try:
         accepted = expected_skips()
+        causes = expected_causes()
     except ManifestRefused as refusal:
         print(f"run_backend_suite: no phase was run, because {refusal}", flush=True)
         return CANNOT_CHECK
+    if known.check_skips is not None:
+        return check_skips("the run", Path(known.check_skips), accepted, 0, causes)
     copy_url = known.reference_copy
     junit, _ = _without_junit(extra)
     if junit is None and not known.plan:
@@ -451,14 +614,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"phase 2: not run; tests marked {REFERENCE_MARKER} go unexercised")
         else:
             print(f"phase 2: pytest {' '.join(phase_two)} against {copy_url}")
-        print(f"skips: each phase's are checked against the {len(accepted)} in {EXPECTED_SKIPS}")
+        print(
+            f"skips: each phase's are checked against the {len(accepted)} tests and "
+            f"{len(causes)} causes in {EXPECTED_SKIPS}"
+        )
         return 0
     assert junit is not None
 
     print("run_backend_suite: phase 1 of 2, parallel, each worker on a private server", flush=True)
     first = run(phase_one, phase_environment(private_servers=True, copy_url=copy_url))
     print(f"run_backend_suite: phase 1 finished with exit {first}", flush=True)
-    first = check_skips("phase 1", Path(junit), accepted, first)
+    first = check_skips("phase 1", Path(junit), accepted, first, causes)
 
     if known.without_reference_copy:
         print(
@@ -482,7 +648,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "run_backend_suite: phase 2 selected no test, because this run was narrowed", flush=True
         )
         second = 0
-    second = check_skips("phase 2", reference_junit(junit), accepted, second)
+    second = check_skips("phase 2", reference_junit(junit), accepted, second, causes)
     after = schemas(copy_url)
     if after is None:
         print("run_backend_suite: could not re-read the copy after phase 2", flush=True)

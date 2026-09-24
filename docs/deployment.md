@@ -70,7 +70,10 @@ What exists in the repository, and is checked by `tests/test_deployment.py`:
 *   `compose.yaml`, a local composition against `pgvector/pgvector:0.8.6-pg18`, which is the
     documented target matched exactly.
 *   `.github/workflows/check.yml`, running ruff, the import contracts, pytest with
-    `EXULANICA_REQUIRE_POSTGRES=1`, the web workspace's `pnpm check`, and an image build.
+    `EXULANICA_REQUIRE_POSTGRES=1`, the web workspace's `pnpm check`, and an image build. The
+    backend run's skips are held to `tests/expected_skips.toml` by
+    `scripts/run_backend_suite.py --check-skips`, so a skip nothing there accepts fails the job
+    (`tests/test_ci_workflow.py` fails when the workflow stops checking them).
 
 **What is still open, and it is the part that needs a person.** No cloud account, no project, no
 region, no domain, no registry and no host. Every one of those is a decision rather than a task,
