@@ -154,24 +154,45 @@ step has no driver.
 **Running it.**
 
 ```bash
-python3 scripts/rehearsal/rehearse.py --worktree <worktree> --slot <n> --out <new directory> --model-env <environment file>
+python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <new directory> --launcher scripts/acceptance/launch.py --model-env <environment file>
 ```
 
-- `--worktree` is the tree whose application is rehearsed. It needs its own `.venv` and web
-  packages. The runtime comes from the acceptance launcher, a development tool kept on the
-  development machine outside the repository (`--launcher` names another copy): it starts that
-  tree's private database, a fresh synthetic workspace with its own token, and the API, on the
-  port block `--slot` chooses.
+- `--worktree` is the checkout whose application is rehearsed, a linked worktree or a plain clone.
+  It needs its own `.venv` and web packages. The runtime comes from the acceptance launcher that
+  `--launcher` names; from a clone that is the repository's own, `scripts/acceptance/launch.py`.
+  Without `--launcher` the rehearsal looks for `.exulanica/acceptance/launch.py` in the main
+  checkout, an ignored file a clone does not have. The launcher starts that checkout's disposable
+  test server, a fresh synthetic workspace with its own token, and the API, on the port block
+  `--slot` chooses.
 - The application is built for production into the run directory and served with `vite preview` on
   the slot's spare port. No development token is built in, so every page load passes the
   application's own access-token gate. Account sign-in is not exercised.
 - Each browser session is one headless Chrome with one page, driven over the DevTools protocol, and
   waits its turn behind the development machine's GPU slot where that machine provides one.
 - `--model-env` names the environment file that holds the hosted-model key. A child process reads
-  only `NEBIUS_API_KEY` from it and hands it to the launcher by environment. Without it, the steps
-  that call a hosted model are reported not reachable. They also stop starting once the spend the
-  product reports reaches the step list's `spend.bound_usd`, and a step list whose estimates exceed
-  `spend.ask_before_usd` is refused before anything runs.
+  only `NEBIUS_API_KEY` from it and hands it to the launcher by environment, together with the step
+  list's `spend.bound_usd` as `EXULANICA_BUDGET_USD`, so the API itself refuses a model call past
+  the run's bound. Without `--model-env`, the steps that call a hosted model are reported not
+  reachable. They also stop starting once the spend the product reports reaches that bound, and a
+  step list whose estimates exceed `spend.ask_before_usd` is refused before anything runs.
+
+**The launcher on its own.** `scripts/acceptance/launch.py` also runs the application for a
+person, without the rehearsal:
+
+```bash
+python3 scripts/acceptance/launch.py up --worktree <checkout> --slot <n> --production
+python3 scripts/acceptance/launch.py status --worktree <checkout>
+python3 scripts/acceptance/launch.py down --worktree <checkout>
+```
+
+Slot `n`, from 0 to 6, owns ports 19200 + 5n to 19204 + 5n: the database, the API, the application,
+a browser debugging port and a spare. With `--production` the application is a production build,
+made with no `VITE_` variable in its environment and served by `vite preview`, so the page asks for
+the workspace token, which is in the run directory's `token` file; without it, the Vite development
+server runs with the token built in. `--model` passes `NEBIUS_API_KEY`,
+`EXULANICA_EGRESS_ALLOWLIST` and `EXULANICA_BUDGET_USD` from the environment to the API and refuses
+without any of them. Run state and records stay in the system temporary directory, `down` stops
+only what `up` started, and every refusal prints `refused (<name>)` and exits 2.
 
 **Reading the result.** The run directory holds `result.json`, described by
 `scripts/rehearsal/result.schema.json`, a `summary.txt` table, one screenshot per observed moment

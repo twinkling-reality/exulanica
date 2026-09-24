@@ -12,6 +12,7 @@ this test's files.
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import io
 import json
@@ -25,7 +26,7 @@ import pytest
 from exulanica.api.services import READONLY_DATABASE_URL_ENV
 from exulanica.db.account_roles import ACCOUNT_ROLE
 from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV
-from exulanica.db.local import locations
+from exulanica.db.local import cluster, locations
 from exulanica.db.local.cli import CONNECTIONS, main
 from exulanica.db.local.cluster import OWNER_FILE
 from exulanica.db.local.database import LocalDatabase
@@ -178,6 +179,31 @@ def _mark_as_local_database(server) -> None:
 
 def test_the_test_tooling_names_the_directory_the_local_command_refuses(machine):
     assert _test_postgres_helper().base_directory() == base_for_test_servers()
+
+
+def test_the_test_servers_state_no_postgresql_location_or_locale_of_their_own():
+    """Where PostgreSQL is and the locale it runs in are stated once, in the product module.
+
+    ``scripts/test_postgres.py`` reads both from ``exulanica.db.local.cluster``, so a test server
+    and a person's local database cannot come to run different installations or orderings.
+    """
+    script = Path(__file__).resolve().parents[1] / "scripts" / "test_postgres.py"
+    tree = ast.parse(script.read_text(encoding="utf-8"))
+    imported = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module == "exulanica.db.local.cluster"
+        for alias in node.names
+    }
+    literals = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    stated_by_the_product = {cluster.LOCALE, *map(str, cluster.KNOWN_BINARY_DIRECTORIES)}
+
+    assert {"LOCALE", "binaries"} <= imported
+    assert not literals & stated_by_the_product
 
 
 def test_serve_and_start_refuse_a_data_directory_the_local_command_made(machine):

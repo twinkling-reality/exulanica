@@ -30,9 +30,11 @@ commands, and the application connects as the non-owner runtime role, never as t
     uv run python scripts/test_postgres.py stop
     uv run python scripts/test_postgres.py sweep    # remove test servers whose process has exited
 
-The binaries are PostgreSQL 18, found the way ``tests/test_restore_replay.py`` finds them:
-``EXULANICA_POSTGRES_BIN`` first, then the Homebrew and Debian locations, then ``PATH``. An
-older server is refused rather than used, because the schema needs ``uuidv7()``.
+Where the PostgreSQL 18 binaries are, which versions are accepted, the locale every cluster is
+initialised with and the environment the tools run in are stated once, in
+``exulanica.db.local.cluster``, and read from there: a test server and a person's local database
+run the same PostgreSQL the same way. An older server is refused rather than used, because the
+schema needs ``uuidv7()``.
 
 Every server here is disposable, and ``serve``, ``Server.start`` and ``sweep`` refuse a data
 directory ``exulanica-local-db`` made (``refuse_local_database``). A personal install's database
@@ -43,10 +45,8 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import functools
 import hashlib
 import os
-import re
 import secrets
 import shutil
 import socket
@@ -55,15 +55,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from exulanica.db.local.cluster import LOCALE
+from exulanica.db.local.cluster import binaries as located_binaries
+from exulanica.db.local.cluster import environment as postgres_environment
+
 ROOT = Path(__file__).resolve().parent.parent
 
 #: Created in ``public`` of every database this makes, as the bootstrap superuser, before any
 #: test or migration runs. pgvector is not a trusted extension, so a non-superuser could not.
 EXTENSIONS = ("vector", "pgcrypto", "pg_trgm", "btree_gist")
-
-#: Matches the shared 5433 server, so a result here means what it means there. The locale
-#: decides text ordering, and the collation of every database is fixed when initdb runs.
-LOCALE = "en_US.UTF-8"
 
 #: Server settings. The first two match 5433 explicitly rather than trusting initdb's probe.
 #: ``fsync`` and ``full_page_writes`` are durability against a machine crash, for a cluster that
@@ -79,7 +79,6 @@ SETTINGS = {
     "unix_socket_directories": "",
 }
 
-_MINIMUM_MAJOR = 18
 _OWNER_FILE = "owner.pid"
 
 
@@ -117,42 +116,9 @@ def refuse_local_database(server: Server) -> None:
         )
 
 
-@functools.cache
 def binaries() -> Path:
     """The directory holding PostgreSQL 18's ``initdb``, ``pg_ctl`` and ``postgres``."""
-    configured = os.environ.get("EXULANICA_POSTGRES_BIN")
-    candidates = [Path(configured)] if configured else []
-    candidates += [
-        Path("/opt/homebrew/opt/postgresql@18/bin"),
-        Path("/usr/local/opt/postgresql@18/bin"),
-        Path("/usr/lib/postgresql/18/bin"),
-    ]
-    located = shutil.which("postgres")
-    if located:
-        candidates.append(Path(located).parent)
-    seen = []
-    for directory in candidates:
-        if not (directory / "initdb").is_file() or not (directory / "pg_ctl").is_file():
-            continue
-        version = subprocess.run(
-            [str(directory / "postgres"), "--version"], capture_output=True, text=True, check=False
-        ).stdout
-        seen.append(f"{directory}: {version.strip() or 'unreadable'}")
-        found = re.search(r"\(PostgreSQL\) (\d+)", version)
-        if found and int(found.group(1)) >= _MINIMUM_MAJOR:
-            return directory
-    raise RuntimeError(
-        f"no PostgreSQL {_MINIMUM_MAJOR} server binaries found; set EXULANICA_POSTGRES_BIN. "
-        f"Checked: {'; '.join(seen) or 'nothing with initdb and pg_ctl'}"
-    )
-
-
-def _environment() -> dict[str, str]:
-    # A postmaster started without LC_ALL on macOS refuses with "postmaster became
-    # multithreaded during startup". The PG variables would redirect initdb or pg_ctl.
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("PG")}
-    environment["LC_ALL"] = LOCALE
-    return environment
+    return located_binaries().directory
 
 
 def _free_port() -> int:
@@ -205,7 +171,7 @@ class Server:
             capture_output=True,
             text=True,
             check=False,
-            env=_environment(),
+            env=postgres_environment(),
         )
 
     def initialise(self) -> None:
@@ -224,7 +190,7 @@ class Server:
             capture_output=True,
             text=True,
             check=False,
-            env=_environment(),
+            env=postgres_environment(),
         )
         if completed.returncode != 0:
             raise RuntimeError(f"initdb failed in {self.data}:\n{completed.stderr}")
@@ -321,7 +287,7 @@ def _watch_owner(server: Server, owner: int) -> None:
     # process to reap and no ResourceWarning joins the suite's warning summary.
     subprocess.run(
         ["/bin/sh", "-c", f"({watch}) </dev/null >/dev/null 2>&1 &"],
-        env=_environment(),
+        env=postgres_environment(),
         start_new_session=True,
         check=True,
     )

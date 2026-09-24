@@ -56,9 +56,10 @@ __all__ = [
 #: ``uuidv7()``, which the schema calls, is a PostgreSQL 18 built-in.
 MINIMUM_MAJOR: Final = 18
 
-#: The locale every cluster here is initialised with. It fixes the collation of every database,
-#: so text orders the same way it does on the test servers, which use the same one
-#: (``scripts/test_postgres.py`` LOCALE; a parity test holds the two together).
+#: The locale every cluster here and every test server is initialised with, the one the shared
+#: reference server on port 5433 uses, so a result on any of them means what it means on the others.
+#: It fixes the collation of every database, and with it text ordering. ``scripts/test_postgres.py``
+#: reads it from here.
 LOCALE: Final = "en_US.UTF-8"
 
 #: Where to find the binaries when they are in none of the usual places.

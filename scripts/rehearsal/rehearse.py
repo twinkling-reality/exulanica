@@ -264,7 +264,10 @@ class Run:
                 *command,
                 "--model",
             ]
-        completed = subprocess.run(command, capture_output=True, text=True, env=clean_environment())
+        environment = clean_environment()
+        if self.model_configured:  # the API itself then refuses a model call past the run's bound
+            environment["EXULANICA_BUDGET_USD"] = self.steps["spend"]["bound_usd"]
+        completed = subprocess.run(command, capture_output=True, text=True, env=environment)
         (self.out / "launcher-up.txt").write_text(
             scrub(f"exit {completed.returncode}\n{completed.stdout}\n{completed.stderr}")
         )

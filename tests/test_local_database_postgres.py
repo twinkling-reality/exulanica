@@ -201,12 +201,6 @@ def _only_backup(database: LocalDatabase, reason: str):
 # ---------------------------------------------------------------------------------------------
 
 
-def test_the_local_command_runs_the_postgresql_the_test_servers_run(module_machine):
-    helper = _test_postgres_helper()
-    assert cluster.binaries().directory == helper.binaries()
-    assert cluster.LOCALE == helper.LOCALE
-
-
 def test_a_backup_restores_to_the_row_counts_its_manifest_records(
     world, module_machine, servers, tmp_path
 ):
