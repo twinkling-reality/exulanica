@@ -174,6 +174,10 @@ python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <ne
   the run's bound. Without `--model-env`, the steps that call a hosted model are reported not
   reachable. They also stop starting once the spend the product reports reaches that bound, and a
   step list whose estimates exceed `spend.ask_before_usd` is refused before anything runs.
+- The launcher starts the API with no derivative worker of its own. The rehearsal starts the
+  production worker command the step list names, `exulanica-derivative-worker`, with the
+  environment the step list gives it (the depth model and its device), over the run's database and
+  workspace, and hands it the key the same way.
 
 **The launcher on its own.** `scripts/acceptance/launch.py` also runs the application for a
 person, without the rehearsal:
@@ -200,6 +204,7 @@ and each browser session's log. Every step appears once, in step-list order:
 | Status | Meaning |
 | --- | --- |
 | passed | Every observable the step list declares for it was checked and held. A runner that checks less, or something undeclared, fails the step. |
+| passed_on_stand_in | Gates only. Every step that serves it passed, and at least one rests on an action the rehearsal driver performed in place of a person; the gate carries the stand-in's qualification. |
 | failed | The observation, the screenshots, the API reads and the page's own requests are in the step's evidence. |
 | not_reachable | A step it requires did not pass, its browser session ended first, or no hosted model was configured. The reason says which. |
 | not_available | The step list declares that the product cannot attempt it, and says why. |
@@ -209,7 +214,13 @@ that step's owner area. The command exits 0 only when every step passed or is de
 available, and 3 when the run directory or the production build holds the workspace token.
 
 **What it does not do.** It does not observe a person or record demonstration footage, and it
-measures no frame time. The photo drawer grants only the depth right, so the rehearsal grants the
-vision, embedding and composer rights through `POST /personal-admission`, and it confirms the
-proposed place through the identity routes rather than through the application. Every photograph it
-uses is a synthetic drawing.
+measures no frame time. The human review of its photographs is given by the rehearsal driver
+through the photo drawer's own controls, as a stand-in the step list states once (`stand_ins` in
+`scripts/rehearsal/steps.json`): the reviewer name and purpose it records say so, every step resting
+on it carries that statement in the result, and a gate resting on it reports `passed_on_stand_in`
+rather than `passed`. It runs the production derivative worker with its depth model on the
+development machine's processor, and it does not run multi-view reconstruction: no scene group of
+its photographs holds the three photographs with point maps that pose recovery needs, and the scene
+worker requires the pose runtime image by digest as provenance, which the development machine does
+not build. It confirms the proposed place through the identity routes rather than through the
+application. Every photograph it uses is a synthetic drawing.
