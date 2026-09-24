@@ -100,6 +100,13 @@ then failed on reproducible, valid high-entropy frames with `broken data stream 
 file` before any model call. Version 2 makes the robust encoding choice deterministic and visible in
 the artifact identity. It does not retry the same input with a hidden alternative encoder setting.
 
+Rendition stage version 3 writes an empty JPEG comment, so a comment (COM marker) in the source
+photograph does not reach the rendition a model receives; the rendition already carries no EXIF
+([derivatives.py](../exulanica/ingest/derivatives.py)). For a source without a comment the encoded
+bytes equal version 2's, so the content hash, and every downstream key built from it, stays the
+same; only the rendition artifact is re-keyed. For a source with a comment the bytes differ, and
+the vision stage computes a new key from them.
+
 There are no indexing, publication, or reconstruction events. New stage names require a reviewed
 stage definition before the database accepts their events.
 

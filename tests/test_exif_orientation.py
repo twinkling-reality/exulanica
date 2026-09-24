@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import random
+from typing import Final
 
 import pytest
 from exulanica.evidence.region import MIRRORED_EXIF_ORIENTATIONS, rotation_for_exif_orientation
@@ -129,6 +130,47 @@ def test_the_rendition_carries_no_exif_at_all():
         assert dict(encoded.getexif()) == {}
 
 
+#: JPEG marker codes (ITU-T T.81, table B.1). COM holds free text; SOS ends the marker segments.
+_JPEG_COM: Final = 0xFE
+_JPEG_SOS: Final = 0xDA
+_JPEG_SOI_LENGTH: Final = 2
+
+
+def _jpeg_marker_segments(data: bytes) -> list[tuple[int, bytes]]:
+    """Every ``(marker, payload)`` before the scan, read from the bytes rather than from Pillow."""
+    segments: list[tuple[int, bytes]] = []
+    offset = _JPEG_SOI_LENGTH
+    while offset < len(data):
+        assert data[offset] == 0xFF, f"no marker at byte {offset}"
+        marker = data[offset + 1]
+        length = int.from_bytes(data[offset + 2 : offset + 4], "big")
+        segments.append((marker, data[offset + 4 : offset + 2 + length]))
+        if marker == _JPEG_SOS:
+            return segments
+        offset += 2 + length
+    raise AssertionError("the JPEG has no scan")
+
+
+def test_the_rendition_carries_no_jpeg_comment():
+    """A COM marker is free text outside EXIF; Pillow copies it forward unless told not to."""
+    text = b"Owner: Test Person, 12 Example Street"
+    with Image.open(io.BytesIO(photo_bytes(orientation=6))) as original:
+        original.load()
+        buffer = io.BytesIO()
+        original.save(buffer, format="JPEG", exif=original.info["exif"], comment=text)
+    source = buffer.getvalue()
+    # Positive control: the source really carries the comment, in a COM segment.
+    assert (_JPEG_COM, text) in _jpeg_marker_segments(source)
+
+    with Image.open(io.BytesIO(source)) as opened:
+        opened.load()
+        upright, _ = extract_exif_facts(opened)
+    rendition = render(upright, stage("rendition"))
+
+    assert [marker for marker, _ in _jpeg_marker_segments(rendition.data)].count(_JPEG_COM) == 0
+    assert text not in rendition.data
+
+
 def test_rendition_encodes_high_entropy_pixels_without_libjpeg_buffer_failure():
     """A valid photograph must not be refused because optional JPEG optimisation overflows.
 
@@ -140,7 +182,8 @@ def test_rendition_encodes_high_entropy_pixels_without_libjpeg_buffer_failure():
     image = Image.frombytes("RGB", (800, 600), rng.randbytes(800 * 600 * 3))
 
     spec = stage("rendition")
-    assert spec.version == 2
+    # Version 2 introduced ``optimize=False``; later versions keep it.
+    assert spec.version >= 2
     assert spec.params["optimize"] is False
 
     first = render(image, spec)

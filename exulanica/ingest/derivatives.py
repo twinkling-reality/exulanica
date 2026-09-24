@@ -17,6 +17,11 @@ information, and it invites a model to read detail that is not there.
     owner name live. Stripping it means the bytes that leave this machine for an inference
     endpoint contain the photograph and nothing else. The provider does not need the user's
     coordinates to describe a waterfall.
+
+**The rendition carries no comment either.** A JPEG comment (the COM marker) is free text that a
+camera, an editor or a sharing tool may write into the file, and Pillow copies the source's
+comment into a JPEG it writes unless it is told otherwise. It is metadata outside EXIF with the
+same exposure, so the encoder is given an empty one.
 """
 
 from __future__ import annotations
@@ -91,7 +96,9 @@ def render(upright: Image.Image, spec: StageSpec) -> Rendition:
         quality=int(params["quality"]),
         subsampling=_SUBSAMPLING[str(params["subsampling"])],
         optimize=optimize,
-        # exif is not passed, so none is written. See the module docstring.
+        # exif is not passed, so none is written. The comment is passed empty, because Pillow
+        # otherwise writes the source's ``info["comment"]``. See the module docstring.
+        comment=b"",
     )
     return Rendition(
         data=buffer.getvalue(),

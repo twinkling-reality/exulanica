@@ -274,7 +274,9 @@ STAGES: Final[dict[str, StageSpec]] = {
         # ``broken data stream when writing image file``.
         # This changes the encoded bytes, so it is a versioned output change rather than an
         # unrecorded implementation fallback.
-        version=2,
+        # Version 3 writes an empty JPEG comment. Version 2 let Pillow copy the source's COM
+        # marker into the rendition, so the bytes differ for every source that carries one.
+        version=3,
         output_kind="rendition",
         deterministic=True,
         params={
