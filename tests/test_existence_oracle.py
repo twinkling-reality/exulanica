@@ -31,6 +31,13 @@ How the question is asked, and why each part is there:
 
 A kind every workspace reads alike, such as a reviewed asset, is declared :class:`route_probes.
 Shared` with its reason, and held to it: the stranger must get exactly the owner's answer.
+
+The same question is asked of an id a caller CHOOSES in a create request's body
+(:data:`route_probes.CHOSEN_IDS`). A stranger naming the id the owner chose must be answered as a
+fresh id is, in status, problem code and body shape (a creation's own new ids differ between two
+creations, so values are not compared). A fresh id must be accepted, so the comparison is between
+two creations rather than two refusals, and the owner naming its own id again must be refused by
+name, which shows the id the stranger was given is a real one.
 """
 
 from __future__ import annotations
@@ -40,7 +47,7 @@ import copy
 import itertools
 import json
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
@@ -65,9 +72,11 @@ from character_appearance_fixtures import family
 from conftest import scratch_role_database
 from route_probes import (
     BUILDER_OVERRIDES,
+    CHOSEN_IDS,
     EXISTENCE_BUILDERS,
     EXISTENCE_REQUESTS,
     ROUTE_PROBES,
+    Chosen,
     IdAddress,
     Owned,
     Shared,
@@ -107,6 +116,29 @@ class Answer:
         return cls(response.status_code, media_type, text)
 
     @property
+    def code(self) -> str | None:
+        """The problem code of a JSON refusal, or None."""
+        if self.media_type != "application/json":
+            return None
+        document = json.loads(self.body)
+        return document.get("code") if isinstance(document, dict) else None
+
+    @property
+    def shape(self) -> object:
+        """The body's structure, every value replaced by the name of its type."""
+
+        def outline(value: object) -> object:
+            if isinstance(value, dict):
+                return {key: outline(item) for key, item in sorted(value.items())}
+            if isinstance(value, list):
+                return [outline(item) for item in value]
+            return type(value).__name__
+
+        if self.media_type != "application/json":
+            return self.media_type
+        return outline(json.loads(self.body))
+
+    @property
     def stopped_at_validation(self) -> bool:
         """FastAPI's request validation answered, so the route's own lookup never ran."""
         if self.status != 422 or self.media_type != "application/json":
@@ -116,6 +148,13 @@ class Answer:
     def __str__(self) -> str:
         body = self.body if len(self.body) <= _QUOTED else self.body[:_QUOTED] + "..."
         return f"{self.status} {body}"
+
+
+@dataclass(frozen=True)
+class Caller:
+    """Somebody who sends requests, as a request builder sees them: a way to send one."""
+
+    request: Callable[..., object]
 
 
 class Existence:
@@ -146,6 +185,11 @@ class Existence:
 
     def as_stranger(self, method: str, path: str, **kwargs):
         return self._send(_STRANGER_TOKEN, method, path, **kwargs)
+
+    @property
+    def stranger(self) -> Caller:
+        """The stranger as a caller a request builder can read its own state through."""
+        return Caller(self.as_stranger)
 
     def _send(self, token: str, method: str, path: str, **kwargs):
         headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
@@ -355,6 +399,42 @@ def existence_problems(existence: Existence, method: str, path: str, probe=None)
     return problems
 
 
+def chosen_id_problems(existence: Existence, route: str, chosen: Chosen) -> list[str]:
+    """Every way a create route tells a stranger another workspace chose an id, as sentences."""
+    method, path = route_key(route)
+    owners = str(chosen.owned(existence))
+    fresh = str(uuid.uuid4())
+
+    def ask(caller, value: str) -> Answer:
+        response = caller.request(method, path, **chosen.request(caller, value))
+        return Answer.of(response, {chosen.field: value})
+
+    foreign = ask(existence.stranger, owners)
+    invented = ask(existence.stranger, fresh)
+    problems = []
+    if (foreign.status, foreign.code, foreign.shape) != (
+        invented.status,
+        invented.code,
+        invented.shape,
+    ):
+        problems.append(
+            f"{route} answers a stranger naming the {chosen.field} another workspace chose "
+            f"otherwise than a fresh one:\n    foreign: {foreign}\n    invented: {invented}"
+        )
+    if not 200 <= invented.status < 300:
+        problems.append(
+            f"{route} refused a stranger's fresh {chosen.field} ({invented}), so the answers "
+            "compared are two refusals and say nothing about the id"
+        )
+    reused = ask(existence, owners)
+    if not (400 <= reused.status < 500 and reused.code):
+        problems.append(
+            f"{route} answered the owner naming its own {chosen.field} again with {reused}, "
+            "which is not a refusal by name"
+        )
+    return problems
+
+
 # -- without a database ---------------------------------------------------------------------------
 
 
@@ -394,6 +474,21 @@ def test_every_builder_is_for_an_id_some_route_takes():
     assert sorted(set(EXISTENCE_BUILDERS) - taken) == []
 
 
+def test_every_chosen_id_names_a_field_its_create_route_takes():
+    """The stale-entry check for CHOSEN_IDS, read from each route's own request schema."""
+    from exulanica.api.surface import routing_only_application
+
+    spec = routing_only_application().openapi()
+    routes = list(CHOSEN_IDS)
+    assert routes == sorted(routes, key=lambda route: route_key(route)[::-1])
+    for route, chosen in CHOSEN_IDS.items():
+        method, path = route_key(route)
+        assert isinstance(permissions.ROUTE_RULES.get((method, path)), Requires), route
+        body = spec["paths"][path][method.lower()]["requestBody"]["content"]["application/json"]
+        schema = spec["components"]["schemas"][body["schema"]["$ref"].split("/")[-1]]
+        assert chosen.field in schema["properties"], (route, chosen.field)
+
+
 @pytest.mark.parametrize("table", ["BUILDER_OVERRIDES", "EXISTENCE_REQUESTS"])
 def test_every_route_entry_names_an_id_route_and_stays_sorted(table):
     """The stale-entry check for the two per-route tables, and the order two changes share."""
@@ -425,6 +520,12 @@ def test_an_address_names_its_kind_and_the_kinds_outside_it():
 @pytest.mark.parametrize(("method", "path"), id_routes())
 def test_a_stranger_cannot_tell_a_foreign_id_from_an_invented_one(existence, method, path):
     problems = existence_problems(existence, method, path)
+    assert problems == [], "\n".join(problems)
+
+
+@pytest.mark.parametrize("route", sorted(CHOSEN_IDS))
+def test_a_stranger_cannot_tell_an_id_another_workspace_chose_from_a_fresh_one(existence, route):
+    problems = chosen_id_problems(existence, route, CHOSEN_IDS[route])
     assert problems == [], "\n".join(problems)
 
 
@@ -489,3 +590,52 @@ def test_the_same_route_answering_both_alike_passes(existence, monkeypatch):
     """The controls' other arm, so what they report is the difference and not the planting."""
     method, path = _plant(existence, monkeypatch, _NOWHERE)
     assert existence_problems(existence, method, path, {}) == []
+
+
+#: The create route the chosen-id controls mount. It records nothing; it answers from what already
+#: exists, which is all the check reads.
+_PLANTED_CREATE = "/planted-proposals"
+
+
+def _plant_create(existence: Existence, monkeypatch, *, every_workspace: bool) -> Chosen:
+    """Mount a create route refusing a proposal id already used, in every workspace or the caller's.
+
+    Looking in every workspace is the fault 0102 removed from three tables: the refusal it gives a
+    stranger for another workspace's id is what a fresh id never gets.
+    """
+
+    def planted(body: dict, session: CurrentSession):
+        where = "" if every_workspace else " and workspace_id = %s"
+        found = existence.repository.connection.execute(
+            "select 1 from world_style_proposal where proposal_id = %s" + where,
+            (body["proposal_id"],)
+            if every_workspace
+            else (body["proposal_id"], session.workspace_id),
+        ).fetchone()
+        if found is not None:
+            return JSONResponse({"code": "proposal_id_used", "detail": "already used"}, 409)
+        return JSONResponse({"proposal_id": body["proposal_id"]}, 201)
+
+    existence.app.add_api_route(_PLANTED_CREATE, planted, methods=["POST"])
+    rule = Requires(frozenset({Permission.WORLD_WRITE}))
+    declared = MappingProxyType({**permissions.ROUTE_RULES, ("POST", _PLANTED_CREATE): rule})
+    monkeypatch.setattr(permissions, "ROUTE_RULES", declared)
+    return Chosen(
+        "proposal_id",
+        CHOSEN_IDS["POST /world/styles/previews"].owned,
+        lambda _caller, value: {"json": {"proposal_id": value}},
+    )
+
+
+def test_a_create_route_refusing_another_workspaces_id_fails(existence, monkeypatch):
+    """Positive control: the fault, planted, is reported with both answers."""
+    chosen = _plant_create(existence, monkeypatch, every_workspace=True)
+    problems = chosen_id_problems(existence, f"POST {_PLANTED_CREATE}", chosen)
+    assert len(problems) == 1, problems
+    assert "foreign: 409" in problems[0] and "invented: 201" in problems[0], problems[0]
+
+
+def test_the_same_create_route_looking_only_in_the_callers_workspace_passes(existence, monkeypatch):
+    """The control's other arm, so what it reports is the lookup and not the planting."""
+    chosen = _plant_create(existence, monkeypatch, every_workspace=False)
+    assert chosen_id_problems(existence, f"POST {_PLANTED_CREATE}", chosen) == []

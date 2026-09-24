@@ -400,20 +400,29 @@ def environment_source(owner) -> uuid.UUID:
     return environment(owner)["admission_id"]
 
 
+def place_declaration(caller, place_id: str | None = None) -> dict[str, Any]:
+    """A request declaring a place's frame, under ``place_id`` when one is given.
+
+    Each request states its frame in words of its own, so two requests are two different frames:
+    a caller declaring an id it already declared is a conflict, never a retry of the same thing.
+    """
+    body: dict[str, Any] = {
+        "provider_key": "nyc-open-data",
+        "provider_frame_statement": (
+            f"The provider publishes these bounds in this frame, statement {uuid.uuid4().hex}."
+        ),
+        "geographic_frame": _frame().model_dump(mode="json"),
+        "geographic_bounds": _bounds().model_dump(mode="json"),
+    }
+    if place_id is not None:
+        body["place_id"] = place_id
+    return {"json": body}
+
+
 def declared_place(owner) -> str:
     """A place whose frame a provider declared (API)."""
     made = _ok(
-        owner.request(
-            "POST",
-            "/environment-resources/places",
-            json={
-                "provider_key": "nyc-open-data",
-                "provider_frame_statement": "The provider publishes these bounds in this frame.",
-                "geographic_frame": _frame().model_dump(mode="json"),
-                "geographic_bounds": _bounds().model_dump(mode="json"),
-            },
-        ),
-        201,
+        owner.request("POST", "/environment-resources/places", **place_declaration(owner)), 201
     )
     return made["place_id"]
 
@@ -460,26 +469,34 @@ def invented_environment_instance() -> str:
 # -- the owner's settings: interaction policy and style -----------------------------------------
 
 
+def interaction_preview_request(caller, proposal_id: str) -> dict[str, Any]:
+    """A request previewing a field-of-view choice under ``proposal_id``, made against the
+    caller's own current interaction policy and structural world."""
+    base = _ok(caller.request("GET", "/world/interactions/current"), 200)
+    return {
+        "json": {
+            "proposal_id": proposal_id,
+            "origin": "settings",
+            "origin_reference": "existence-panel",
+            "base_policy_version_id": (base.get("current") or {}).get("version_id"),
+            "base_structure_snapshot_id": base["base_structure_snapshot_id"],
+            "base_topology_sha256": base["base_topology_sha256"],
+            "capability_patch": {"comfort.field-of-view-degrees": 82},
+            "proposal_input": {"control_ids": ["fieldOfView"]},
+            "explanation": "Apply the field-of-view choice made in Settings.",
+        }
+    }
+
+
 def _interaction_preview(owner) -> dict[str, Any]:
     if "interaction" not in owner.memo:
         world(owner)
-        base = _ok(owner.request("GET", "/world/interactions/current"), 200)
         proposal_id = str(uuid.uuid4())
         preview = _ok(
             owner.request(
                 "POST",
                 "/world/interactions/previews",
-                json={
-                    "proposal_id": proposal_id,
-                    "origin": "settings",
-                    "origin_reference": "existence-panel",
-                    "base_policy_version_id": None,
-                    "base_structure_snapshot_id": base["base_structure_snapshot_id"],
-                    "base_topology_sha256": base["base_topology_sha256"],
-                    "capability_patch": {"comfort.field-of-view-degrees": 82},
-                    "proposal_input": {"control_ids": ["fieldOfView"]},
-                    "explanation": "Apply the field-of-view choice made in Settings.",
-                },
+                **interaction_preview_request(owner, proposal_id),
             ),
             201,
         )
@@ -498,28 +515,34 @@ def interaction_proposal(owner) -> str:
     return _interaction_preview(owner)["proposal_id"]
 
 
+def style_preview_request(caller, proposal_id: str) -> dict[str, Any]:
+    """A request previewing a style under ``proposal_id``, made against the caller's own
+    current style and topology."""
+    current = _ok(caller.request("GET", "/world/styles/current"), 200)
+    return {
+        "json": {
+            "proposal_id": proposal_id,
+            "origin": "settings",
+            "origin_reference": "appearance-panel",
+            "scope": {"kind": "global"},
+            "base_style_version_id": current["current"]["version_id"],
+            "base_topology_digest": current["current_topology_digest"],
+            "profile": {
+                "profile_id": "origin-landscape",
+                "profile_version": 1,
+                "parameters": {"vitality": 0.25},
+            },
+        }
+    }
+
+
 def _style_preview(owner) -> dict[str, Any]:
     if "style" not in owner.memo:
         world(owner)
-        current = _ok(owner.request("GET", "/world/styles/current"), 200)
         proposal_id = str(uuid.uuid4())
         preview = _ok(
             owner.request(
-                "POST",
-                "/world/styles/previews",
-                json={
-                    "proposal_id": proposal_id,
-                    "origin": "settings",
-                    "origin_reference": "appearance-panel",
-                    "scope": {"kind": "global"},
-                    "base_style_version_id": current["current"]["version_id"],
-                    "base_topology_digest": current["current_topology_digest"],
-                    "profile": {
-                        "profile_id": "origin-landscape",
-                        "profile_version": 1,
-                        "parameters": {"vitality": 0.25},
-                    },
-                },
+                "POST", "/world/styles/previews", **style_preview_request(owner, proposal_id)
             ),
             201,
         )

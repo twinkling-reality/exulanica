@@ -218,8 +218,9 @@ class EnvironmentRepository:
                     declared_by=actor,
                 )
         except psycopg.errors.UniqueViolation as exc:
-            # A fixed sentence rather than the database's, because ``place_id`` is unique across
-            # every workspace and the database's message would say whether one is already taken.
+            # A declaration of the same place in this workspace reached the insert first. A place
+            # id is unique within its workspace (migration 0102), so no other workspace's place
+            # can collide with it here, and the sentence names only the identifier asked for.
             raise PlaceFrameConflict(
                 f"place {value.place_id} cannot be declared under this identifier"
             ) from exc

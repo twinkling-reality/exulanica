@@ -91,7 +91,8 @@ because there is no other tenant to leak. Rejected alternative: 403 everywhere. 
 when decided before lookup, but M10 cannot tell why a 403 was issued, and the rule in
 `exulanica/api/app.py` already says 404 on an id.
 
-**The existence rule.** CLOSED for ids in a route's path. A route that takes an id in its path
+**The existence rule.** CLOSED for ids in a route's path and for the ids a caller chooses when it
+creates a place, a style proposal or an interaction proposal. A route that takes an id in its path
 answers a caller who holds every permission for another workspace exactly as it answers an id
 nobody allocated: the same status, problem code and body once the id is put back as its
 placeholder. `tests/test_existence_oracle.py` holds every such route in `ROUTE_RULES` to it. For
@@ -104,6 +105,16 @@ answer to differ, which shows the ids are real and the route looked them up. A p
 answering a foreign id 403, or 404 with another detail, fails it. Reviewed assets and baked tiles
 belong to no workspace and are declared shared with the reason; a stranger must get exactly the
 owner's answer for one.
+
+An id a caller chooses in a create request's body is held to the same rule. A place's, a style
+proposal's and an interaction proposal's are unique within their workspace, keyed by
+`(workspace_id, id)` as every reference to them already was (migration 0102), so naming an id
+another workspace chose creates the caller's own object exactly as a fresh id does, and only the
+caller's own workspace naming one again is refused, by name: `409 place_frame_conflict`,
+`422 invalid_style_data` or `422 invalid_interaction_data`. `CHOSEN_IDS` in `tests/route_probes.py`
+names those routes, and `tests/test_existence_oracle.py` compares a stranger's answer for the
+owner's id with its answer for a fresh one, requires the fresh one to be accepted and the owner's
+own reuse to be refused, and fails a planted route that looks the id up in every workspace.
 
 **Consent withdrawal.** DECISION. `consent.write` covers granting, revoking and withdrawing a
 person's consent and linking and unlinking subject regions, so a credential that may grant consent
@@ -139,13 +150,9 @@ vocabulary does not load, and the API does not start.
   with one permission.
 - Row-level security still decides which rows a permitted route can see; a permission never widens
   that.
-- The existence rule covers ids in a path, not ids a caller writes into a body or a query. Three
-  of those answer another workspace's id differently from a fresh one, because each is unique
-  across every workspace and a unique constraint holds whatever row-level security hides: a place
-  declaration naming another workspace's `place_id` answers `409 place_frame_conflict`, a style
-  preview naming its `proposal_id` answers `422 invalid_style_data`, and an interaction preview
-  naming its `proposal_id` fails with 500, where a fresh id is created in each case (migrations
-  0038, 0017 and 0021).
+- The existence rule covers ids in a path and the three chosen ids above. An id a request names in
+  a body or a query to point at an existing object is outside both checks, and no test compares a
+  stranger's answer for another workspace's object with its answer for an invented one there.
 
 ## 2. Per-workspace tile quotas
 

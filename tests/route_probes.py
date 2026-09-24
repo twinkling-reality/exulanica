@@ -24,6 +24,8 @@ object of each kind to ask about: :data:`EXISTENCE_BUILDERS` says how each is ma
 id's address (the route template up to its placeholder), :data:`BUILDER_OVERRIDES` names a
 narrower kind for a route that asks about one, and :data:`EXISTENCE_REQUESTS` gives a request made
 from the owner's own objects where a static probe could not show that the owner's id is real.
+:data:`CHOSEN_IDS` names the create routes whose body carries an id the caller chooses, which the
+same file asks whether naming another workspace's id is answered as a fresh id is.
 """
 
 from __future__ import annotations
@@ -46,11 +48,13 @@ import existence_builders as build
 __all__ = [
     "ACCOUNT_ROUTES",
     "BUILDER_OVERRIDES",
+    "CHOSEN_IDS",
     "EXISTENCE_BUILDERS",
     "EXISTENCE_REQUESTS",
     "PROBE_OVERRIDES",
     "PUBLIC_ROUTES",
     "ROUTE_PROBES",
+    "Chosen",
     "IdAddress",
     "Owned",
     "Shared",
@@ -659,4 +663,36 @@ EXISTENCE_REQUESTS: Final[Mapping[str, Callable[[Any], dict[str, Any]]]] = {
     ),
     "PUT /world-entries/{entry_id}": build.entry_update_request,
     "POST /world/styles/previews/{preview_id}/apply": build.style_apply_request,
+}
+
+
+@dataclass(frozen=True)
+class Chosen:
+    """A create route whose body names an id the caller chooses, and how to ask it about one.
+
+    ``owned`` makes the owner's own object of the kind and returns the id the owner chose for it.
+    ``request`` makes a request naming a given id, for a given caller, from that caller's own
+    state, so each caller's request is one its route accepts whoever sends it.
+    """
+
+    field: str
+    owned: Callable[[Any], object]
+    request: Callable[[Any, str], dict[str, Any]]
+
+
+#: Create routes whose body carries an id the caller chooses rather than the server, sorted by path
+#: and then method. Each id's table keys it by workspace (migration 0102 for these three), so an id
+#: another workspace chose names a new object of the caller's own and must be answered as a fresh
+#: id is. The other ids a caller chooses, such as experiment, attempt, operation and idempotency
+#: ids, were keyed by workspace from their first migration and are not asked about here.
+CHOSEN_IDS: Final[Mapping[str, Chosen]] = {
+    "POST /environment-resources/places": Chosen(
+        "place_id", build.declared_place, build.place_declaration
+    ),
+    "POST /world/interactions/previews": Chosen(
+        "proposal_id", build.interaction_proposal, build.interaction_preview_request
+    ),
+    "POST /world/styles/previews": Chosen(
+        "proposal_id", build.style_proposal, build.style_preview_request
+    ),
 }

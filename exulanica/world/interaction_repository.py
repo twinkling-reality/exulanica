@@ -489,6 +489,21 @@ class WorldInteractionPolicyRepository:
     def _insert_proposal(
         self, proposal: InteractionProposal, status: str, rejected: Exception | None
     ) -> None:
+        """Record the proposal under the caller's id, or refuse an id this workspace has used.
+
+        The id is unique within the workspace (migration 0102), so only this workspace's own
+        proposals can collide with it, and the refusal is the one a reused style proposal id gets.
+        """
+        try:
+            self._write_proposal(proposal, status, rejected)
+        except psycopg.errors.UniqueViolation as exc:
+            raise InvalidInteractionData(
+                f"proposal id {proposal.proposal_id} was already used"
+            ) from exc
+
+    def _write_proposal(
+        self, proposal: InteractionProposal, status: str, rejected: Exception | None
+    ) -> None:
         self.connection.execute(
             "insert into world_interaction_policy_proposal "
             "(proposal_id,workspace_id,world_id,origin,actor,origin_reference,model_id,"
