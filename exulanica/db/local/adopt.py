@@ -32,7 +32,9 @@ every backup does.
 **What adopting never does.** It never migrates, never changes authentication (``pg_hba.conf``,
 roles and passwords are read and never written) and never moves or copies the data directory. A
 running server stays running on its port; a stopped one is started only on the private port and
-is stopped again.
+is stopped again. Its marker records that the cluster trusts its connections, as the owner role's
+connection without a password showed; ``exulanica-local-db require-passwords`` changes that
+afterwards (:mod:`~exulanica.db.local.require_passwords`).
 
 **The layout.** The command keeps a database as ``<dir>/data``, ``<dir>/backups`` and
 ``<dir>/server.log``, and every command derives all three from ``<dir>``. So ``--directory`` names
@@ -66,9 +68,10 @@ from exulanica.db.local.database import (
     LocalDatabase,
     schema_state,
     utc_now,
-    write_private,
 )
+from exulanica.db.local.files import write_private
 from exulanica.db.local.locations import LOCAL_DATABASE_MARKER, refuse_location
+from exulanica.db.local.passwords import Authentication
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
 
 __all__ = ["ADOPT", "DURABILITY_SETTINGS", "adopt"]
@@ -185,7 +188,9 @@ def _reached(cluster: Cluster) -> Iterator[tuple[int, bool]]:
 
 def _owner_connection(port: int, owner: str, database: str, data: Path) -> psycopg.Connection:
     try:
-        return psycopg.connect(url(port, owner, database), autocommit=True, row_factory=dict_row)
+        return psycopg.connect(
+            url(port, owner, database, passfile=None), autocommit=True, row_factory=dict_row
+        )
     except psycopg.OperationalError as error:
         reason = " ".join(str(error).split())
         raise LocalDatabaseRefused(
@@ -292,6 +297,7 @@ def adopt(
         marker_to_write={
             "profile": MARKER_PROFILE,
             "created_by": ADOPT,
+            "authentication": Authentication.TRUST.value,
             "owner_role": owner,
             "database": database_name,
             "postgres": binaries().version,

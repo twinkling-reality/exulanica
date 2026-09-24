@@ -36,6 +36,7 @@ from pathlib import Path
 import psycopg
 import pytest
 from exulanica import migrations as migration_package
+from exulanica.db.local import cli as local_cli
 from exulanica.db.local import cluster
 from exulanica.db.local.backup import (
     check_digest,
@@ -46,6 +47,12 @@ from exulanica.db.local.backup import (
 )
 from exulanica.db.local.database import LocalDatabase, applied_versions
 from exulanica.db.local.locations import SCRATCH_DIRECTORY_NAME, base_for_scratch_servers
+from exulanica.db.local.passwords import (
+    PASSWORD_FILE_NAME,
+    Authentication,
+    new_password,
+    write_passwords,
+)
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
 from exulanica.db.local.upgrade import migrate, rehearse
 from exulanica.db.migrate import verify_schema
@@ -144,6 +151,12 @@ def migration_files(directory: Path, *, drop_last: int = 0, extra: dict[str, str
 def _init(servers: Servers, directory: Path) -> LocalDatabase:
     result = cli("init", "--directory", directory)
     assert result.status == 0, result.err
+    return servers.track(directory)
+
+
+def _init_trusted(servers: Servers, directory: Path) -> LocalDatabase:
+    """A local database made as ``init`` made one before passwords were required."""
+    local_cli.initialise(directory, port=None, authentication=Authentication.TRUST)
     return servers.track(directory)
 
 
@@ -473,8 +486,13 @@ def test_the_next_command_stops_a_copy_whose_owner_and_watcher_are_both_gone(mod
     root = base_for_scratch_servers() / "left-by-a-restart"
     root.mkdir(parents=True)
     (root / cluster.OWNER_FILE).write_text(str(_exited_process()))
-    orphan = cluster.Cluster(data=root / "data", log=root / "server.log")
-    orphan.initialise(owner=cluster.bootstrap_user(), durable=False)
+    orphan = cluster.Cluster(
+        data=root / "data", log=root / "server.log", passfile=root / PASSWORD_FILE_NAME
+    )
+    write_passwords(root / PASSWORD_FILE_NAME, {cluster.bootstrap_user(): new_password()})
+    orphan.initialise(
+        owner=cluster.bootstrap_user(), durable=False, authentication=Authentication.SCRAM
+    )
     port = orphan.start_on_a_free_port(cluster.SCRATCH_SETTINGS)
     try:
         result = cli("status", "--directory", module_machine.durable / "absent")

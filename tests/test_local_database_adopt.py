@@ -42,7 +42,7 @@ from psycopg.rows import dict_row
 from test_local_database import Machine, cli, simulate_machine
 from test_local_database_postgres import (
     Servers,
-    _init,
+    _init_trusted,
     _require_server_binaries,
     _state,
     _stop_when_this_process_exits,
@@ -95,8 +95,9 @@ def _start_as_another_tool(database: LocalDatabase, port: int) -> None:
 
 
 def _unmarked_world(servers: Servers, directory: Path) -> World:
-    """A world the command made, then left the way a cluster another tool made looks."""
-    database = _init(servers, directory)
+    """A world the command made, then left the way a cluster another tool made looks: one that
+    trusts every connection from this computer, as adopting requires."""
+    database = _init_trusted(servers, directory)
     _write_person_rows(database)
     port = database.cluster.running_port()
     with database.connect(port) as connection:
@@ -144,7 +145,7 @@ def _assert_nothing_written(database: LocalDatabase, files: dict[str, bytes], au
 
 def _applied_without_a_marker(port: int) -> tuple[str, ...]:
     """The migrations a cluster with no marker records, read as its bootstrap superuser."""
-    owner = cluster.url(port, cluster.bootstrap_user(), "exulanica")
+    owner = cluster.url(port, cluster.bootstrap_user(), "exulanica", passfile=None)
     with psycopg.connect(owner, autocommit=True, row_factory=dict_row) as connection:
         return tuple(applied_versions(connection))
 
@@ -339,7 +340,7 @@ def test_a_server_running_with_durability_off_by_its_settings_is_refused(world, 
     port = cluster._free_port()
     database.cluster.start(port)
     _stop_when_this_process_exits(database)
-    owner = cluster.url(port, cluster.bootstrap_user(), "postgres")
+    owner = cluster.url(port, cluster.bootstrap_user(), "postgres", passfile=None)
     with psycopg.connect(owner, autocommit=True) as connection:
         connection.execute("alter system set fsync = off")
         connection.execute("select pg_reload_conf()")
@@ -355,7 +356,9 @@ def test_a_cluster_whose_settings_turn_durability_off_is_refused(world, servers,
     database = _copy(world, servers, tmp_path / "database")
     port = cluster._free_port()
     database.cluster.start(port)
-    with psycopg.connect(cluster.url(port, cluster.bootstrap_user(), "postgres")) as connection:
+    with psycopg.connect(
+        cluster.url(port, cluster.bootstrap_user(), "postgres", passfile=None)
+    ) as connection:
         connection.autocommit = True
         connection.execute("alter system set fsync = off")
     database.cluster.stop()
@@ -372,7 +375,9 @@ def test_an_owner_role_that_cannot_connect_or_is_not_the_bootstrap_superuser_is_
     database = _copy(world, servers, tmp_path / "database")
     port = cluster._free_port()
     database.cluster.start(port)
-    with psycopg.connect(cluster.url(port, cluster.bootstrap_user(), "postgres")) as connection:
+    with psycopg.connect(
+        cluster.url(port, cluster.bootstrap_user(), "postgres", passfile=None)
+    ) as connection:
         connection.autocommit = True
         connection.execute("create role another_superuser superuser login")
     database.cluster.stop()

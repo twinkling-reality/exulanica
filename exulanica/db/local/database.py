@@ -6,11 +6,17 @@ The directory a person states holds everything, and nothing outside it is writte
       data/                               the PostgreSQL data directory
         exulanica-local-database.json     the marker (LOCAL_DATABASE_MARKER)
       backups/                            one .pgdump, .json and .pgdump.sha256 per backup
+      passwords.pgpass                    each role's password (PASSWORD_FILE_NAME), mode 0600
       server.log
 
 The marker lives inside the data directory rather than beside it so that it travels with the
 data: a link or a copy of ``data/`` alone still carries it, and ``scripts/test_postgres.py``
 still refuses it. PostgreSQL ignores a file it does not know in that directory.
+
+The marker states how the server admits connections (:class:`Authentication`); a marker of the
+first profile, which did not say, was only ever written for a cluster that trusts them. The
+passwords stay outside ``data/`` and outside every backup: a copy of the data or a dump carries
+no password, and a restore gives the roles new ones (:mod:`~exulanica.db.local.passwords`).
 """
 
 from __future__ import annotations
@@ -19,7 +25,7 @@ import contextlib
 import datetime as dt
 import json
 import os
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -27,17 +33,34 @@ from typing import Any, Final
 import psycopg
 from psycopg.rows import dict_row
 
-from exulanica.db.local.cluster import Cluster, binaries, url
+from exulanica.db.account_roles import ACCOUNT_ROLE
+from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV
+from exulanica.db.local.cluster import Cluster, binaries
+from exulanica.db.local.files import PRIVATE_DIRECTORY_MODE, write_private
 from exulanica.db.local.locations import (
     LOCAL_DATABASE_MARKER,
     refuse_existing_data,
     refuse_location,
 )
+from exulanica.db.local.passwords import (
+    PASSWORD_FILE_NAME,
+    Authentication,
+    give_password,
+    new_password,
+    read_passwords,
+    refuse_exposed,
+    write_passwords,
+)
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
 from exulanica.db.migrate import applied_migrations
+from exulanica.db.roles import EXECUTOR_ROLE, PURGE_ROLE, RUNTIME_ROLE
+from exulanica.db.session import DATABASE_URL_ENV
+from exulanica.env import env_name
 from exulanica.migrations import migrations, verify_applied
 
 __all__ = [
+    "APPLICATION_ROLES",
+    "CONNECTIONS",
     "DATABASE_NAME",
     "MARKER_PROFILE",
     "LocalDatabase",
@@ -47,43 +70,35 @@ __all__ = [
     "schema_state",
     "server_identity",
     "utc_now",
-    "write_private",
 ]
 
-#: The identity and version of the marker's content.
-MARKER_PROFILE: Final = "exulanica.local-database/v1"
+#: The identity and version of the marker's content. The second profile states the cluster's
+#: authentication; the first, which a cluster made or adopted before it may still carry, did not,
+#: and every such cluster trusts its connections.
+MARKER_PROFILE: Final = "exulanica.local-database/v2"
+_FIRST_MARKER_PROFILE: Final = "exulanica.local-database/v1"
+_READABLE_MARKER_PROFILES: Final = (MARKER_PROFILE, _FIRST_MARKER_PROFILE)
 
 #: The database a new local cluster holds the schema in.
 DATABASE_NAME: Final = "exulanica"
 
-#: Files this command writes can hold a person's world; only their account may read them.
-PRIVATE_FILE_MODE: Final = 0o600
-PRIVATE_DIRECTORY_MODE: Final = 0o700
+#: The connections the application reads, and the provisioned role each is made as. The two
+#: names read above this package are restated here; ``tests/test_local_database.py`` holds them
+#: equal to ``exulanica.api.services`` and ``exulanica.deletion.cli``.
+CONNECTIONS: Final = (
+    (DATABASE_URL_ENV, RUNTIME_ROLE),
+    (env_name("READONLY_DATABASE_URL"), EXECUTOR_ROLE),
+    (env_name("PURGE_DATABASE_URL"), PURGE_ROLE),
+    (ACCOUNT_DATABASE_URL_ENV, ACCOUNT_ROLE),
+)
+
+#: The roles the application logs in as, each of which a password-protected cluster gives a
+#: password beside the bootstrap superuser's.
+APPLICATION_ROLES: Final = tuple(role for _, role in CONNECTIONS)
 
 
 def utc_now() -> str:
     return dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-def write_private(target: Path, content: str) -> None:
-    """Write ``content`` to ``target`` in one step: to a sibling, synced, then renamed over it."""
-    partial = target.with_name(target.name + ".partial")
-    with open(partial, "w", encoding="utf-8") as handle:
-        os.fchmod(handle.fileno(), PRIVATE_FILE_MODE)
-        handle.write(content)
-        handle.flush()
-        os.fsync(handle.fileno())
-    partial.replace(target)
-    sync_directory(target.parent)
-
-
-def sync_directory(directory: Path) -> None:
-    """Make a rename in ``directory`` durable, as a file's own fsync does not."""
-    descriptor = os.open(directory, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
 
 
 def applied_versions(connection: psycopg.Connection[Any]) -> list[str]:
@@ -177,14 +192,39 @@ class LocalDatabase:
         return self.data / LOCAL_DATABASE_MARKER
 
     @property
+    def passfile(self) -> Path:
+        return self.root / PASSWORD_FILE_NAME
+
+    @property
     def cluster(self) -> Cluster:
-        return Cluster(data=self.data, log=self.root / "server.log")
+        """The cluster, with its password file whenever one exists.
+
+        A URL names the file whenever it exists, whatever the marker says: a server that trusts
+        its connections ignores a password, so this reaches a cluster in either state, including
+        one whose change to passwords stopped part way.
+        """
+        return Cluster(
+            data=self.data,
+            log=self.root / "server.log",
+            passfile=self.passfile if self.passfile.is_file() else None,
+        )
 
     @classmethod
     def open(cls, directory: Path) -> LocalDatabase:
-        """The local database in ``directory``, or a refusal if this command did not make it."""
+        """The local database in ``directory``, or a refusal if this command did not make it, or
+        if the passwords it asks for are missing or exposed."""
         database = cls(directory.expanduser().resolve())
-        database.read_marker()
+        authentication = database.authentication
+        if database.passfile.exists():
+            refuse_exposed(database.passfile)
+        elif authentication is Authentication.SCRAM:
+            raise LocalDatabaseRefused(
+                Refusal.PASSWORD_FILE_MISSING,
+                f"{database.root} asks every connection for a password and "
+                f"{database.passfile} is gone, so nothing can connect. Restore it from wherever "
+                "it was copied to; otherwise restore a backup into a new directory, which gives "
+                "every role a new password.",
+            )
         return database
 
     @classmethod
@@ -195,19 +235,24 @@ class LocalDatabase:
         owner: str,
         database_name: str,
         created_by: str,
+        authentication: Authentication,
         restored_from: Mapping[str, Any] | None = None,
     ) -> LocalDatabase:
         """Initialise a durable, empty cluster in ``directory`` and mark it as a local database.
 
         The location is refused here as well as by the caller, immediately before ``initdb``,
-        so no path reaches a new cluster without passing both checks.
+        so no path reaches a new cluster without passing both checks. A cluster that asks for
+        passwords has its password file, holding the bootstrap superuser's, before ``initdb``
+        runs; :meth:`give_passwords` adds the other roles' once they exist.
         """
         root = refuse_location(directory)
         refuse_existing_data(root)
         root.mkdir(mode=PRIVATE_DIRECTORY_MODE, parents=True, exist_ok=True)
         os.chmod(root, PRIVATE_DIRECTORY_MODE)
         database = cls(root)
-        database.cluster.initialise(owner=owner, durable=True)
+        if authentication is Authentication.SCRAM:
+            write_passwords(database.passfile, {owner: new_password()})
+        database.cluster.initialise(owner=owner, durable=True, authentication=authentication)
         write_private(
             database.marker,
             json.dumps(
@@ -215,6 +260,7 @@ class LocalDatabase:
                     "profile": MARKER_PROFILE,
                     "created_at": utc_now(),
                     "created_by": created_by,
+                    "authentication": authentication.value,
                     "owner_role": owner,
                     "database": database_name,
                     "postgres": binaries().version,
@@ -243,10 +289,10 @@ class LocalDatabase:
             raise LocalDatabaseRefused(
                 Refusal.NOT_A_LOCAL_DATABASE, f"{self.marker} cannot be read: {error}"
             ) from error
-        if not isinstance(marker, dict) or marker.get("profile") != MARKER_PROFILE:
+        if not isinstance(marker, dict) or marker.get("profile") not in _READABLE_MARKER_PROFILES:
             raise LocalDatabaseRefused(
                 Refusal.NOT_A_LOCAL_DATABASE,
-                f"{self.marker} is not a {MARKER_PROFILE} marker",
+                f"{self.marker} is not a {' or '.join(_READABLE_MARKER_PROFILES)} marker",
             )
         return marker
 
@@ -258,11 +304,46 @@ class LocalDatabase:
     def database_name(self) -> str:
         return str(self.read_marker()["database"])
 
+    @property
+    def authentication(self) -> Authentication:
+        """How the server admits connections, as the marker states it."""
+        marker = self.read_marker()
+        if marker["profile"] == _FIRST_MARKER_PROFILE:
+            return Authentication.TRUST
+        try:
+            return Authentication(marker["authentication"])
+        except (KeyError, ValueError) as error:
+            raise LocalDatabaseRefused(
+                Refusal.NOT_A_LOCAL_DATABASE,
+                f"{self.marker} names no authentication this command knows: "
+                f"{marker.get('authentication')!r}; it knows "
+                f"{', '.join(method.value for method in Authentication)}",
+            ) from error
+
     def owner_url(self, port: int) -> str:
-        return url(port, self.owner, self.database_name)
+        return self.cluster.url(port, self.owner, self.database_name)
 
     def role_url(self, port: int, role: str) -> str:
-        return url(port, role, self.database_name)
+        return self.cluster.url(port, role, self.database_name)
+
+    def give_passwords(self, port: int, roles: Iterable[str]) -> tuple[str, ...]:
+        """Give each of ``roles`` the password file lacks a password: the file first, then the role.
+
+        Only a cluster that asks for passwords has any to give. Written in that order, a role
+        never holds a password the file does not.
+        """
+        if self.authentication is not Authentication.SCRAM:
+            return ()
+        held = read_passwords(self.passfile)
+        missing = tuple(role for role in roles if role not in held)
+        if not missing:
+            return ()
+        write_passwords(self.passfile, {**held, **{role: new_password() for role in missing}})
+        written = read_passwords(self.passfile)
+        with self.connect(port) as connection:
+            for role in missing:
+                give_password(connection, role, written[role])
+        return missing
 
     def connect(self, port: int) -> psycopg.Connection[Any]:
         """An owner connection in autocommit, with dictionary rows as everywhere in the spine."""

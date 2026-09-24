@@ -11,7 +11,9 @@ only client) it:
     schema check the API runs at boot;
 4.  migrates the real database only after a rehearsal of that same fresh backup passed, and
     refuses otherwise (:func:`migrate`);
-5.  takes a second backup of the migrated database.
+5.  gives a password to any role the application connects as that provisioning created and the
+    password file lacks, when the database asks for passwords;
+6.  takes a second backup of the migrated database.
 
 A rehearsal that fails leaves the real database exactly as it was, because nothing but the
 scratch copy has been written. A migration that fails after its rehearsal passed leaves the
@@ -40,8 +42,9 @@ from exulanica.db.local.backup import (
     row_counts,
     take_backup,
 )
-from exulanica.db.local.cluster import scratch_cluster, url
+from exulanica.db.local.cluster import scratch_cluster
 from exulanica.db.local.database import (
+    APPLICATION_ROLES,
     LocalDatabase,
     MaintenanceSession,
     applied_versions,
@@ -142,7 +145,7 @@ def rehearse(backup: Backup) -> Rehearsal:
     check_digest(backup)
     with scratch_cluster(owner=backup.owner_role) as (cluster, port):
         restore_database(cluster, port, backup)
-        copy_url = url(port, backup.owner_role, backup.database)
+        copy_url = cluster.url(port, backup.owner_role, backup.database)
         with psycopg.connect(copy_url, autocommit=True, row_factory=dict_row) as connection:
             before = compare_with_manifest(connection, backup)
         try:
@@ -197,6 +200,7 @@ def migrate(session: MaintenanceSession, rehearsal: Rehearsal) -> tuple[tuple[st
     session.leave_stopped = True
     try:
         applied = migrate_and_provision(session.owner_url)
+        session.database.give_passwords(session.port, APPLICATION_ROLES)
     except Exception as error:
         raise LocalDatabaseRefused(
             Refusal.MIGRATION_FAILED,

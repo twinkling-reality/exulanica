@@ -16,6 +16,13 @@ setup mistake a person can make on their own machine. So the rules are these:
     manifest of row counts taken in the dump's own snapshot (:mod:`~exulanica.db.local.backup`).
     ``stop`` takes one. ``verify`` restores one into a scratch server and compares the counts.
 *   **A restore only ever creates.** It refuses a location that holds anything.
+*   **Every connection presents a password.** A cluster ``init`` or ``restore`` makes, and every
+    scratch copy, admits a connection only with its role's password (``scram-sha-256``). The
+    passwords are in a private file in the database's own directory that every URL names and
+    libpq reads, so none is printed, logged or passed on a command line
+    (:mod:`~exulanica.db.local.passwords`). ``require-passwords`` converts a cluster that trusts
+    its connections, backed up first and proven afterwards
+    (:mod:`~exulanica.db.local.require_passwords`).
 *   **Starting never migrates.** ``upgrade`` is the only path to a newer schema, and it backs up,
     rehearses the pending migrations on a scratch copy of that backup, migrates, and backs up again
     (:mod:`~exulanica.db.local.upgrade`).

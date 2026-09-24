@@ -13,9 +13,11 @@ PostgreSQL 18 binaries with ``initdb`` and ``pg_ctl``. Two kinds are made here:
     so it runs the way the test servers in ``scripts/test_postgres.py`` do.
 
 Every cluster listens on the loopback interface only, over TCP, with no socket file: it is never
-reachable from another machine, and no socket path can exceed the 103 bytes macOS allows. It
-trusts every connection from this computer, as a default Homebrew install does, so it is not a
-boundary between the people who log in to one computer.
+reachable from another machine, and no socket path can exceed the 103 bytes macOS allows. Both
+kinds are made to ask every connection for a password (``scram-sha-256``), read from a password
+file in the cluster's own directory (:mod:`~exulanica.db.local.passwords`), so they are a boundary
+between the accounts on one computer. A cluster that trusts every connection from this computer,
+as a default Homebrew install does, is one made before that or by another tool.
 """
 
 from __future__ import annotations
@@ -36,6 +38,15 @@ from pathlib import Path
 from typing import Final
 
 from exulanica.db.local.locations import LOCAL_DATABASE_MARKER, base_for_scratch_servers
+from exulanica.db.local.passwords import (
+    HOST,
+    PASSWORD_FILE_NAME,
+    Authentication,
+    new_password,
+    passfile_parameter,
+    read_passwords,
+    write_passwords,
+)
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
 from exulanica.env import env_name
 
@@ -100,6 +111,10 @@ WATCH_INTERVAL_SECONDS: Final = 1
 
 #: The file in a scratch copy's directory naming the process that owns it.
 OWNER_FILE: Final = "owner.pid"
+
+#: Where ``initdb`` reads the bootstrap superuser's password from, beside the data directory in
+#: the cluster's private directory, for as long as ``initdb`` runs.
+INITDB_PASSWORD_FILE: Final = "initdb-password"
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,18 +255,27 @@ def _free_port() -> int:
 
 @dataclass(frozen=True, slots=True)
 class Cluster:
-    """One PostgreSQL data directory and the log its server writes."""
+    """One PostgreSQL data directory, the log its server writes, and its password file.
+
+    ``passfile`` is ``None`` for a cluster that asks no password, and for one this process only
+    starts and stops.
+    """
 
     data: Path
     log: Path
+    passfile: Path | None = None
 
-    def initialise(self, *, owner: str, durable: bool) -> None:
-        """``initdb``, with ``owner`` as the bootstrap superuser, into an empty directory."""
+    def initialise(self, *, owner: str, durable: bool, authentication: Authentication) -> None:
+        """``initdb``, with ``owner`` as the bootstrap superuser, into an empty directory.
+
+        For :attr:`~Authentication.SCRAM`, the password file must already hold ``owner``'s
+        password: ``initdb`` reads it from a private file that exists only while it runs.
+        """
         arguments = [
             "-D",
             str(self.data),
             f"--username={owner}",
-            "--auth=trust",
+            f"--auth={authentication.value}",
             "--encoding=UTF8",
             f"--locale={LOCALE}",
             "--no-instructions",
@@ -260,7 +284,37 @@ class Cluster:
             arguments += ["--set", f"{name}={value}"]
         if not durable:
             arguments.append("--no-sync")
-        run("initdb", *arguments, refusal=Refusal.SERVER_FAILED)
+        match authentication:
+            case Authentication.TRUST:
+                run("initdb", *arguments, refusal=Refusal.SERVER_FAILED)
+            case Authentication.SCRAM:
+                self._initialise_with_password(owner, arguments)
+            case _:
+                raise LocalDatabaseRefused(
+                    Refusal.SERVER_FAILED, f"no way to initialise a cluster for {authentication}"
+                )
+
+    def _initialise_with_password(self, owner: str, arguments: list[str]) -> None:
+        passwords = (
+            read_passwords(self.passfile)
+            if self.passfile is not None and self.passfile.is_file()
+            else {}
+        )
+        if owner not in passwords:
+            raise LocalDatabaseRefused(
+                Refusal.PASSWORD_FILE_MISSING,
+                f"{self.data} is to ask for passwords and no password file holds {owner}'s",
+            )
+        password_file = self.data.parent / INITDB_PASSWORD_FILE
+        _write_initdb_password(password_file, passwords[owner])
+        try:
+            run("initdb", *arguments, f"--pwfile={password_file}", refusal=Refusal.SERVER_FAILED)
+        finally:
+            password_file.unlink(missing_ok=True)
+
+    def url(self, port: int, user: str, database: str) -> str:
+        """A URL for ``user`` on this cluster, naming its password file when it has one."""
+        return url(port, user, database, passfile=self.passfile)
 
     def major(self) -> int:
         """The PostgreSQL major version that made this data directory."""
@@ -385,15 +439,25 @@ class Cluster:
         )
 
 
-def url(port: int, user: str, database: str) -> str:
-    return f"postgresql://{user}@localhost:{port}/{database}"
+def url(port: int, user: str, database: str, *, passfile: Path | None) -> str:
+    """A libpq URL that holds no password: ``passfile`` names the file libpq reads one from."""
+    query = f"?{passfile_parameter(passfile)}" if passfile is not None else ""
+    return f"postgresql://{user}@{HOST}:{port}/{database}{query}"
+
+
+def _write_initdb_password(target: Path, password: str) -> None:
+    """``initdb --pwfile`` reads the first line of a file as the bootstrap superuser's password."""
+    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(password + "\n")
 
 
 @contextlib.contextmanager
 def scratch_cluster(owner: str) -> Iterator[tuple[Cluster, int]]:
     """A running scratch cluster owned by ``owner``, deleted when the block ends.
 
-    It may hold a copy of somebody's world, so its directory is private to this account. A
+    It may hold a copy of somebody's world, so its directory is private to this account and its
+    server asks for the password in the copy's own password file, as a local database's does. A
     watcher stops and deletes it when this process exits, however it exits; and should the
     watcher be killed with it, the next command sweeps it (:func:`sweep_scratch`).
     """
@@ -402,10 +466,12 @@ def scratch_cluster(owner: str) -> Iterator[tuple[Cluster, int]]:
     base.mkdir(mode=0o700, parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix=f"{os.getpid()}-", dir=base))
     (root / OWNER_FILE).write_text(str(os.getpid()))
-    cluster = Cluster(data=root / "data", log=root / "server.log")
+    passfile = root / PASSWORD_FILE_NAME
+    cluster = Cluster(data=root / "data", log=root / "server.log", passfile=passfile)
     try:
         _remove_when_this_process_exits(root, cluster)
-        cluster.initialise(owner=owner, durable=False)
+        write_passwords(passfile, {owner: new_password()})
+        cluster.initialise(owner=owner, durable=False, authentication=Authentication.SCRAM)
         port = cluster.start_on_a_free_port(SCRATCH_SETTINGS)
         yield cluster, port
     finally:

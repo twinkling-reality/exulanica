@@ -5,8 +5,11 @@ different questions. ``exulanica-db`` brings a database it is given a URL for, o
 schema and roles this code expects, in the one correct order, and takes no arguments so there is
 no second way to ask. This command owns a PostgreSQL cluster on this machine: where its files
 live, starting and stopping it, backing it up, proving a backup restores, restoring one,
-upgrading it, and adopting one it did not create (:mod:`~exulanica.db.local.adopt`). It runs
-``exulanica-db``'s provisioning as one step of ``init`` and ``upgrade``.
+upgrading it, adopting one it did not create (:mod:`~exulanica.db.local.adopt`), and making one
+that trusts its connections ask for passwords (:mod:`~exulanica.db.local.require_passwords`). It
+runs ``exulanica-db``'s provisioning as one step of ``init`` and ``upgrade``, and gives each role
+it provisions a password itself (:mod:`~exulanica.db.local.passwords`), never through
+``exulanica-db``'s password variables, which a process listing can show.
 
 Every command names the directory it works on, and nothing has a default location. See
 :mod:`exulanica.db.local` for the rules, and ``docs/development-setup.md`` for a walk-through.
@@ -24,8 +27,6 @@ from typing import Any, Final, NoReturn, TextIO
 import psycopg
 from psycopg import sql
 
-from exulanica.db.account_roles import ACCOUNT_ROLE
-from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV
 from exulanica.db.local.adopt import adopt
 from exulanica.db.local.backup import (
     Backup,
@@ -42,31 +43,28 @@ from exulanica.db.local.cluster import (
     bootstrap_user,
     port_is_free,
     sweep_scratch,
-    url,
 )
-from exulanica.db.local.database import DATABASE_NAME, LocalDatabase, schema_state
+from exulanica.db.local.database import (
+    APPLICATION_ROLES,
+    CONNECTIONS,
+    DATABASE_NAME,
+    LocalDatabase,
+    schema_state,
+)
 from exulanica.db.local.locations import (
     base_for_scratch_servers,
     refuse_existing_data,
     refuse_location,
 )
+from exulanica.db.local.passwords import Authentication
 from exulanica.db.local.refusals import FAILURES, LocalDatabaseRefused, Refusal
+from exulanica.db.local.require_passwords import hba_rules, require_passwords
 from exulanica.db.local.upgrade import migrate_and_provision, upgrade
-from exulanica.db.roles import EXECUTOR_ROLE, PURGE_ROLE, RUNTIME_ROLE
-from exulanica.db.session import DATABASE_URL_ENV
-from exulanica.env import env_name
 
-__all__ = ["CONNECTIONS", "main"]
+__all__ = ["CONNECTIONS", "NEW_CLUSTER_AUTHENTICATION", "initialise", "main"]
 
-#: The connections the application reads, and the provisioned role each is made as. The two
-#: names read above this package are restated here; ``tests/test_local_database.py`` holds them
-#: equal to ``exulanica.api.services`` and ``exulanica.deletion.cli``.
-CONNECTIONS: Final = (
-    (DATABASE_URL_ENV, RUNTIME_ROLE),
-    (env_name("READONLY_DATABASE_URL"), EXECUTOR_ROLE),
-    (env_name("PURGE_DATABASE_URL"), PURGE_ROLE),
-    (ACCOUNT_DATABASE_URL_ENV, ACCOUNT_ROLE),
-)
+#: How ``init`` and ``restore`` make a cluster admit connections.
+NEW_CLUSTER_AUTHENTICATION: Final = Authentication.SCRAM
 
 #: What a backup taken by ``backup`` without ``--reason`` is named by.
 ON_REQUEST: Final = "on-request"
@@ -77,6 +75,29 @@ _PORTS: Final = range(1, 65536)
 Handler = Callable[[argparse.Namespace, TextIO], None]
 
 
+def _authentication(database: LocalDatabase) -> str:
+    """How the server admits connections and, when it asks for passwords, how a process gets one."""
+    match database.authentication:
+        case Authentication.SCRAM:
+            return (
+                f"authentication: every connection presents a password "
+                f"({Authentication.SCRAM.value}). The passwords are in {database.passfile}, "
+                "readable by this account only; each URL names that file with passfile=, and "
+                "libpq reads the password from it when it connects, so no URL, variable, command "
+                "line or log holds one"
+            )
+        case Authentication.TRUST:
+            return (
+                f"authentication: trusts every connection from this computer "
+                f"({Authentication.TRUST.value}); `exulanica-local-db require-passwords "
+                f"--directory {database.root}` makes it ask for passwords"
+            )
+        case _:
+            raise LocalDatabaseRefused(
+                Refusal.NOT_A_LOCAL_DATABASE, f"no description of {database.authentication}"
+            )
+
+
 def _connections(database: LocalDatabase, port: int, stream: TextIO) -> None:
     for name, role in CONNECTIONS:
         print(f"export {name}={database.role_url(port, role)}", file=stream)
@@ -84,11 +105,13 @@ def _connections(database: LocalDatabase, port: int, stream: TextIO) -> None:
         f"owner (migrations and provisioning only; the API refuses it): {database.owner_url(port)}",
         file=stream,
     )
+    print(_authentication(database), file=stream)
 
 
 def _keep_port(database: LocalDatabase, port: int) -> None:
     """Record ``port`` in the cluster's own settings, so every later start uses it."""
-    with psycopg.connect(url(port, database.owner, "postgres"), autocommit=True) as connection:
+    owner = database.cluster.url(port, database.owner, "postgres")
+    with psycopg.connect(owner, autocommit=True) as connection:
         connection.execute(sql.SQL("alter system set port = {}").format(sql.Literal(port)))
 
 
@@ -113,26 +136,47 @@ def _stop_after_failure(database: LocalDatabase, error: BaseException, step: Ref
     ) from error
 
 
-def _init(arguments: argparse.Namespace, stream: TextIO) -> None:
-    target = refuse_location(arguments.directory)
+def initialise(
+    directory: Path, *, port: int | None, authentication: Authentication
+) -> tuple[LocalDatabase, int, tuple[str, ...]]:
+    """Create, start, migrate and provision a local database; return it, its port and what applied.
+
+    ``init`` makes every cluster with :data:`NEW_CLUSTER_AUTHENTICATION`. The tests make one with
+    :attr:`~Authentication.TRUST` the same way, to stand for a cluster made before passwords were
+    required, which ``require-passwords`` converts.
+    """
+    target = refuse_location(directory)
     refuse_existing_data(target)
-    if arguments.port is not None and not port_is_free(arguments.port):
-        raise LocalDatabaseRefused(Refusal.PORT_IN_USE, f"port {arguments.port} is in use")
+    if port is not None and not port_is_free(port):
+        raise LocalDatabaseRefused(Refusal.PORT_IN_USE, f"port {port} is in use")
     database = LocalDatabase.create(
-        target, owner=bootstrap_user(), database_name=DATABASE_NAME, created_by="init"
+        target,
+        owner=bootstrap_user(),
+        database_name=DATABASE_NAME,
+        created_by="init",
+        authentication=authentication,
     )
     cluster = database.cluster
     try:
-        port = cluster.start(arguments.port) if arguments.port else cluster.start_on_a_free_port()
-        _keep_port(database, port)
-        with psycopg.connect(url(port, database.owner, "postgres"), autocommit=True) as created:
+        serving = cluster.start(port) if port else cluster.start_on_a_free_port()
+        _keep_port(database, serving)
+        owner = cluster.url(serving, database.owner, "postgres")
+        with psycopg.connect(owner, autocommit=True) as created:
             created.execute(sql.SQL("create database {}").format(sql.Identifier(DATABASE_NAME)))
     except (LocalDatabaseRefused, psycopg.Error) as error:
         _stop_after_failure(database, error, Refusal.SERVER_FAILED)
     try:
-        applied = migrate_and_provision(database.owner_url(port))
+        applied = migrate_and_provision(database.owner_url(serving))
+        database.give_passwords(serving, APPLICATION_ROLES)
     except Exception as error:
         _stop_after_failure(database, error, Refusal.MIGRATION_FAILED)
+    return database, serving, applied
+
+
+def _init(arguments: argparse.Namespace, stream: TextIO) -> None:
+    database, port, applied = initialise(
+        arguments.directory, port=arguments.port, authentication=NEW_CLUSTER_AUTHENTICATION
+    )
     print(
         f"initialised {database.root} with PostgreSQL {binaries().version}, durability at "
         f"PostgreSQL's defaults; running on port {port}",
@@ -186,6 +230,8 @@ def _status(arguments: argparse.Namespace, stream: TextIO) -> None:
         print(f"server: running on port {port}", file=stream)
         with database.connect(port) as connection:
             print(f"schema: {schema_state(connection).describe()}", file=stream)
+            methods = sorted({str(rule.auth_method) for rule in hba_rules(connection)})
+        print(f"pg_hba.conf, as the server reads it: {', '.join(methods)}", file=stream)
     else:
         print(
             f"server: stopped; starts on port {cluster.configured_port()}; schema not read",
@@ -194,6 +240,8 @@ def _status(arguments: argparse.Namespace, stream: TextIO) -> None:
     print(f"backups: {len(backups)} in {database.backups}, {size} bytes{newest}", file=stream)
     if cluster.running():
         _connections(database, cluster.running_port(), stream)
+    else:
+        print(_authentication(database), file=stream)
 
 
 def _backup(arguments: argparse.Namespace, stream: TextIO) -> None:
@@ -246,6 +294,7 @@ def _restore(arguments: argparse.Namespace, stream: TextIO) -> None:
         owner=backup.owner_role,
         database_name=backup.database,
         created_by="restore",
+        authentication=NEW_CLUSTER_AUTHENTICATION,
         restored_from={
             "dump": backup.dump.name,
             "sha256": backup.sha256,
@@ -256,6 +305,7 @@ def _restore(arguments: argparse.Namespace, stream: TextIO) -> None:
         database.cluster.start(port)
         _keep_port(database, port)
         restore_database(database.cluster, port, backup)
+        database.give_passwords(port, _restored_application_roles(backup))
         with database.connect(port) as connection:
             connection.execute("analyze")
             counts = compare_with_manifest(connection, backup)
@@ -271,8 +321,23 @@ def _restore(arguments: argparse.Namespace, stream: TextIO) -> None:
     _connections(database, port, stream)
 
 
+def _restored_application_roles(backup: Backup) -> list[str]:
+    """The application roles a backup's cluster had and could log in as, to give passwords to."""
+    logins = {role["name"] for role in backup.manifest["roles"] if role["rolcanlogin"]}
+    return [role for role in APPLICATION_ROLES if role in logins]
+
+
 def _upgrade(arguments: argparse.Namespace, stream: TextIO) -> None:
     upgrade(LocalDatabase.open(arguments.directory), stream)
+
+
+def _require_passwords(arguments: argparse.Namespace, stream: TextIO) -> None:
+    database = LocalDatabase.open(arguments.directory)
+    require_passwords(database, stream)
+    if database.cluster.running():
+        _connections(database, database.cluster.running_port(), stream)
+    else:
+        print(_authentication(database), file=stream)
 
 
 def _adopt(arguments: argparse.Namespace, stream: TextIO) -> None:
@@ -298,8 +363,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="exulanica-local-db",
         description=(
-            "A durable PostgreSQL database for a personal install: create it, start and stop "
-            "it, back it up, prove a backup restores, restore one, and upgrade its schema."
+            "A durable PostgreSQL database for a personal install that asks every connection for "
+            "a password: create it, start and stop it, back it up, prove a backup restores, "
+            "restore one, and upgrade its schema."
         ),
     )
     commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
@@ -359,6 +425,17 @@ def build_parser() -> argparse.ArgumentParser:
             "upgrade",
             "Back up, rehearse the pending migrations on a scratch copy, migrate, back up again.",
             _upgrade,
+        )
+    )
+
+    directory(
+        command(
+            "require-passwords",
+            "Make a cluster that trusts every connection from this computer ask for passwords: "
+            "back up and prove the backup, give every role a password, change pg_hba.conf, then "
+            "prove each role is refused without its password and admitted with it. Any failure "
+            "puts everything back.",
+            _require_passwords,
         )
     )
 

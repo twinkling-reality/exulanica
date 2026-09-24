@@ -76,6 +76,20 @@ class Refusal(StrEnum):
     RESTORE_FAILED = "restore-failed"
     #: A migration failed on the real database after its rehearsal passed.
     MIGRATION_FAILED = "migration-failed"
+    #: The local database already asks every connection for a password.
+    PASSWORDS_ALREADY_REQUIRED = "passwords-already-required"
+    #: The local database asks for passwords and its password file is gone.
+    PASSWORD_FILE_MISSING = "password-file-missing"
+    #: The password file holds a line this command does not write.
+    PASSWORD_FILE_UNREADABLE = "password-file-unreadable"
+    #: Another account could read the password file, or replace it in its directory.
+    PASSWORDS_EXPOSED = "passwords-exposed"
+    #: ``pg_hba.conf`` holds a rule that changing trust to passwords cannot carry over safely.
+    AUTHENTICATION_RULES = "authentication-rules"
+    #: A role the application connects as is absent, or may not log in.
+    LOGIN_ROLE_MISSING = "login-role-missing"
+    #: Requiring passwords failed after it began, and what it changed was put back.
+    AUTHENTICATION_CHANGE_FAILED = "authentication-change-failed"
 
 
 #: The stops that follow an attempted step rather than precede any change.
@@ -85,6 +99,7 @@ FAILURES: Final = frozenset(
         Refusal.BACKUP_FAILED,
         Refusal.RESTORE_FAILED,
         Refusal.MIGRATION_FAILED,
+        Refusal.AUTHENTICATION_CHANGE_FAILED,
     }
 )
 

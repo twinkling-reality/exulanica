@@ -21,7 +21,8 @@ file are written, and only then is the dump renamed to its final name.
 roles that belong to the whole cluster. The manifest records every role the cluster has beyond
 the bootstrap superuser, with its attributes and memberships but never a password, and a restore
 creates them before ``pg_restore`` runs. The dump's objects are owned by the bootstrap superuser,
-so a restore initialises its cluster with the same superuser name.
+so a restore initialises its cluster with the same superuser name. Neither file holds a password,
+so a backup never carries one: a restore gives the roles new passwords, in its own password file.
 """
 
 from __future__ import annotations
@@ -40,15 +41,14 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 
-from exulanica.db.local.cluster import Cluster, run, scratch_cluster, url
+from exulanica.db.local.cluster import Cluster, run, scratch_cluster
 from exulanica.db.local.database import (
     LocalDatabase,
     applied_versions,
     server_identity,
-    sync_directory,
     utc_now,
-    write_private,
 )
+from exulanica.db.local.files import sync_directory, write_private
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
 
 __all__ = [
@@ -381,7 +381,7 @@ def restore_database(cluster: Cluster, port: int, backup: Backup) -> None:
     The cluster must have been initialised with the backup's owner as its bootstrap superuser,
     because the dump names that role as the owner of everything in it.
     """
-    maintenance_url = url(port, backup.owner_role, "postgres")
+    maintenance_url = cluster.url(port, backup.owner_role, "postgres")
     try:
         with psycopg.connect(maintenance_url, autocommit=True, row_factory=dict_row) as connection:
             _create_roles(connection, backup)
@@ -428,6 +428,6 @@ def verify_backup(backup: Backup) -> dict[str, int]:
     check_digest(backup)
     with scratch_cluster(owner=backup.owner_role) as (cluster, port):
         restore_database(cluster, port, backup)
-        restored = url(port, backup.owner_role, backup.database)
+        restored = cluster.url(port, backup.owner_role, backup.database)
         with psycopg.connect(restored, autocommit=True, row_factory=dict_row) as connection:
             return compare_with_manifest(connection, backup)

@@ -272,6 +272,7 @@ each of those a step it takes rather than a practice to remember:
 | Proving a backup | OPEN (section 9.4) | `verify` restores one into a scratch server and compares it with its manifest |
 | Upgrading | The one-shot migration service | `upgrade` backs up, rehearses the pending migrations on a scratch copy, migrates, and backs up again |
 | Restoring | From the nightly dump (section 9.3) | `restore`, only into an empty directory |
+| Database authentication | Whatever the connection URL carries; `exulanica-db` sets role passwords only from the variables in section 5 | Every connection presents a password (`scram-sha-256`), read by libpq from a mode 0600 file in the database's directory that each URL names; `require-passwords` converts a cluster that trusts its connections |
 
 The servers `scripts/test_postgres.py` starts, for the test suite and for `serve`, are test
 servers and are disposable: they run with `fsync` off in the system temporary directory, each
