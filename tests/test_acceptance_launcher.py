@@ -129,13 +129,6 @@ def test_each_slot_owns_five_consecutive_ports_inside_the_table():
     assert min(seen) == LAUNCH.PORT_BASE
 
 
-def test_the_rehearsal_finds_its_preview_port_where_it_looks_for_it():
-    """``rehearse.py`` serves its build on ``browser + 1`` and refuses one past ``PORT_LIMIT``."""
-    for slot in range(LAUNCH.SLOT_COUNT):
-        owned = LAUNCH.ports(slot)
-        assert owned["spare"] == owned["browser"] + 1 <= LAUNCH.PORT_LIMIT
-
-
 def test_a_slot_outside_the_table_is_refused_by_name():
     assert _refusal(LAUNCH.ports, LAUNCH.SLOT_COUNT) == "slot-out-of-range"
     assert _refusal(LAUNCH.ports, -1) == "slot-out-of-range"

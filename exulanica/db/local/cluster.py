@@ -48,6 +48,7 @@ __all__ = [
     "Cluster",
     "binaries",
     "bootstrap_user",
+    "client_program",
     "port_is_free",
     "scratch_cluster",
     "sweep_scratch",
@@ -118,33 +119,67 @@ def binaries() -> Binaries:
     return _binaries(os.environ.get(POSTGRES_BIN_ENV))
 
 
-@functools.cache
-def _binaries(configured: str | None) -> Binaries:
+def _candidates(configured: str | None, program: str) -> list[Path]:
+    """Where to look, in order: the configured directory, the known places, then ``program``'s
+    directory on ``PATH``."""
     candidates = [Path(configured)] if configured else []
     candidates += KNOWN_BINARY_DIRECTORIES
-    located = shutil.which("postgres")
+    located = shutil.which(program)
     if located:
         candidates.append(Path(located).parent)
+    return candidates
+
+
+def _reported_version(program: Path) -> tuple[str, int | None, str]:
+    """What ``program --version`` prints, and the PostgreSQL major and version it names."""
+    reported = subprocess.run(
+        [str(program), "--version"], capture_output=True, text=True, check=False
+    ).stdout.strip()
+    found = re.search(r"\(PostgreSQL\) (\d+)(\.\d+)?", reported)
+    if found is None:
+        return reported, None, ""
+    return reported, int(found.group(1)), found.group(1) + (found.group(2) or "")
+
+
+@functools.cache
+def _binaries(configured: str | None) -> Binaries:
     seen = []
-    for directory in candidates:
+    for directory in _candidates(configured, "postgres"):
         if not all((directory / name).is_file() for name in ("initdb", "pg_ctl", "postgres")):
             continue
-        reported = subprocess.run(
-            [str(directory / "postgres"), "--version"],
-            capture_output=True,
-            text=True,
-            check=False,
-        ).stdout.strip()
+        reported, major, version = _reported_version(directory / "postgres")
         seen.append(f"{directory}: {reported or 'unreadable'}")
-        found = re.search(r"\(PostgreSQL\) (\d+)(\.\d+)?", reported)
-        if found and int(found.group(1)) >= MINIMUM_MAJOR:
-            version = found.group(1) + (found.group(2) or "")
-            return Binaries(directory=directory, major=int(found.group(1)), version=version)
+        if major is not None and major >= MINIMUM_MAJOR:
+            return Binaries(directory=directory, major=major, version=version)
     raise LocalDatabaseRefused(
         Refusal.POSTGRES_MISSING,
         f"no PostgreSQL {MINIMUM_MAJOR} server binaries found; install PostgreSQL "
         f"{MINIMUM_MAJOR} with pgvector or set {POSTGRES_BIN_ENV}. "
         f"Checked: {'; '.join(seen) or 'nothing with initdb, pg_ctl and postgres'}",
+    )
+
+
+def client_program(name: str) -> str:
+    """A PostgreSQL 18 or newer client program, such as ``pg_dump`` or ``psql``, found in the
+    places the server binaries are looked for.
+
+    A machine may hold the client without the server, as a runner with its database in a
+    container does, and an older client first on ``PATH`` refuses a newer server rather than
+    reading it, so each place is asked for its version.
+    """
+    seen = []
+    for directory in _candidates(os.environ.get(POSTGRES_BIN_ENV), name):
+        program = directory / name
+        if not program.is_file():
+            continue
+        reported, major, _ = _reported_version(program)
+        seen.append(f"{program}: {reported or 'unreadable'}")
+        if major is not None and major >= MINIMUM_MAJOR:
+            return str(program)
+    raise LocalDatabaseRefused(
+        Refusal.POSTGRES_MISSING,
+        f"no PostgreSQL {MINIMUM_MAJOR} {name} found; install the PostgreSQL {MINIMUM_MAJOR} "
+        f"client or set {POSTGRES_BIN_ENV}. Checked: {'; '.join(seen) or 'nowhere holds it'}",
     )
 
 

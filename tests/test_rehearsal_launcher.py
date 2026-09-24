@@ -1,11 +1,16 @@
-"""The rehearsal hands the acceptance launcher the run's spend bound, and nothing else it holds.
+"""How the rehearsal starts the acceptance launcher and takes the application it serves.
 
-``scripts/rehearsal/rehearse.py`` starts the launcher in an environment with every ``EXULANICA_``
-variable removed. In a run with a hosted model it then puts back exactly one: the step list's
-``spend.bound_usd`` as ``EXULANICA_BUDGET_USD``, which the launcher requires and passes to the API,
-so the API itself refuses a model call past the run's bound. These tests run ``Run.launcher_up``
-with the in-repository launcher and stop it at the process boundary: nothing is started, and the
-model environment file is never read.
+``scripts/rehearsal/rehearse.py`` runs the repository's own launcher by default,
+``scripts/acceptance/launch.py``, with ``up --production``, in an environment with every
+``EXULANICA_`` variable removed. In a run with a hosted model it puts back exactly one: the step
+list's ``spend.bound_usd`` as ``EXULANICA_BUDGET_USD``, which the launcher requires and passes to
+the API, so the API itself refuses a model call past the run's bound. The application is the
+production build the launcher made and serves, and the rehearsal records that build and the page
+the preview served, and looks for the workspace token in it as well as in its own run directory.
+
+These run ``Run.launcher_up`` and ``Run.take_build`` without starting anything: the launcher is
+stopped at the process boundary, the preview's answer is given, and the model environment file is
+never read.
 """
 
 from __future__ import annotations
@@ -40,8 +45,7 @@ REHEARSE = _rehearse()
 BOUND = steplist.load()["spend"]["bound_usd"]
 
 
-def _launch(tmp_path: Path, monkeypatch, *, model: bool) -> tuple[list[str], dict[str, str]]:
-    """Run ``launcher_up`` up to the launcher process; return its command and environment."""
+def _run(tmp_path: Path, monkeypatch, *, model: bool, launcher: Path | None = LAUNCHER):
     temporary = tmp_path / "system-temporary"
     temporary.mkdir()
     monkeypatch.setenv("TMPDIR", str(temporary))
@@ -52,7 +56,7 @@ def _launch(tmp_path: Path, monkeypatch, *, model: bool) -> tuple[list[str], dic
     out.mkdir()
     model_env = tmp_path / "model.env"
     model_env.write_text("")
-    run = REHEARSE.Run(
+    return REHEARSE.Run(
         Namespace(
             worktree=str(ROOT),
             out=str(out),
@@ -60,10 +64,15 @@ def _launch(tmp_path: Path, monkeypatch, *, model: bool) -> tuple[list[str], dic
             model_env=str(model_env) if model else None,
             sessions=None,
             reuse_database=False,
-            launcher=str(LAUNCHER),
+            launcher=None if launcher is None else str(launcher),
             gpu_slot=None,
         )
     )
+
+
+def _launch(tmp_path: Path, monkeypatch, *, model: bool) -> tuple[list[str], dict[str, str]]:
+    """Run ``launcher_up`` up to the launcher process; return its command and environment."""
+    run = _run(tmp_path, monkeypatch, model=model)
     calls: list[tuple[list[str], dict[str, str]]] = []
 
     def stopped_at_the_boundary(command, **options):
@@ -77,7 +86,17 @@ def _launch(tmp_path: Path, monkeypatch, *, model: bool) -> tuple[list[str], dic
     return calls[0]
 
 
-def test_a_model_run_hands_the_launcher_the_step_lists_bound(tmp_path, monkeypatch):
+def test_the_rehearsal_runs_the_repositorys_own_launcher_unless_told_otherwise(
+    tmp_path, monkeypatch
+):
+    run = _run(tmp_path, monkeypatch, model=False, launcher=None)
+
+    assert run.launcher_path == LAUNCHER
+
+
+def test_a_model_run_asks_for_a_production_build_and_hands_over_the_step_lists_bound(
+    tmp_path, monkeypatch
+):
     command, environment = _launch(tmp_path, monkeypatch, model=True)
 
     assert environment["EXULANICA_BUDGET_USD"] == BOUND
@@ -85,11 +104,80 @@ def test_a_model_run_hands_the_launcher_the_step_lists_bound(tmp_path, monkeypat
         "EXULANICA_BUDGET_USD"
     ]
     assert command[-1] == "--model"
+    assert "--production" in command
     assert str(LAUNCHER) in command
 
 
-def test_a_run_without_a_model_hands_the_launcher_no_bound(tmp_path, monkeypatch):
+def test_a_run_without_a_model_asks_for_a_production_build_and_hands_over_no_bound(
+    tmp_path, monkeypatch
+):
     command, environment = _launch(tmp_path, monkeypatch, model=False)
 
     assert not [name for name in environment if name.startswith("EXULANICA_")]
     assert "--model" not in command
+    assert "--production" in command
+
+
+def _launched_state(run_dir: Path, mode: str = "production") -> dict:
+    build = {
+        "command": "vite build --outDir <run>/app-build --emptyOutDir",
+        "vite": "vite/6.4.3",
+        "seconds": 3.5,
+        "development_token_in_environment": False,
+        "index_html_sha256": "a" * 64,
+        "scripts": {"index.js": "b" * 64},
+    }
+    return {
+        "run_dir": str(run_dir),
+        "ports": {"database": 19205, "api": 19206, "vite": 19207, "browser": 19208},
+        "app": {
+            "mode": mode,
+            "build": build,
+            "served_index_sha256": "a" * 64,
+            "served_index_is_the_build": True,
+        },
+    }
+
+
+def test_the_run_takes_the_launchers_production_build_and_keeps_what_the_preview_served(
+    tmp_path, monkeypatch
+):
+    run = _run(tmp_path, monkeypatch, model=False)
+    run.state = _launched_state(tmp_path / "launcher-run")
+    run.preview_port = run.state["ports"]["vite"]
+    asked: list[str] = []
+    monkeypatch.setattr(
+        REHEARSE, "wait_http", lambda url, seconds: (asked.append(url), (200, {}))[1]
+    )
+
+    run.take_build()
+
+    assert run.build_directory == tmp_path / "launcher-run" / "app-build"
+    assert run.build["mode"] == "production"
+    assert run.build["served_index_sha256"] == run.build["index_html_sha256"]
+    assert run.build["served_index_is_the_build"] is True
+    assert run.build["development_token_in_environment"] is False
+    assert asked == ["http://localhost:19207/api/healthz"]
+
+
+def test_a_launcher_that_served_no_production_build_is_refused(tmp_path, monkeypatch):
+    run = _run(tmp_path, monkeypatch, model=False)
+    run.state = _launched_state(tmp_path / "launcher-run", mode="development")
+    run.preview_port = run.state["ports"]["vite"]
+
+    with pytest.raises(REHEARSE.Refused, match="no production build"):
+        run.take_build()
+
+
+def test_the_leak_check_reads_the_production_build_as_well_as_the_run_directory(
+    tmp_path, monkeypatch
+):
+    run = _run(tmp_path, monkeypatch, model=False)
+    run.token = "a-synthetic-workspace-token"
+    run.build_directory = tmp_path / "launcher-run" / "app-build"
+    (run.build_directory / "assets").mkdir(parents=True)
+    (run.build_directory / "assets" / "main.js").write_text(f"const token = '{run.token}';")
+    (run.build_directory / "index.html").write_text("<html></html>")
+    (run.out / "summary.txt").write_text(f"token {run.token}")
+
+    assert run.leak_check() == ["app-build/assets/main.js", "summary.txt"]

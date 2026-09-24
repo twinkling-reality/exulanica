@@ -206,6 +206,65 @@ def test_the_test_servers_state_no_postgresql_location_or_locale_of_their_own():
     assert not literals & stated_by_the_product
 
 
+def test_the_restore_replay_test_finds_the_postgresql_client_through_the_product():
+    """``tests/test_restore_replay.py`` asks the product for ``pg_dump`` and ``psql``."""
+    replay = Path(__file__).resolve().parent / "test_restore_replay.py"
+    tree = ast.parse(replay.read_text(encoding="utf-8"))
+    imported = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module == "exulanica.db.local.cluster"
+        for alias in node.names
+    }
+    literals = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+
+    assert "client_program" in imported
+    assert not literals & set(map(str, cluster.KNOWN_BINARY_DIRECTORIES))
+
+
+def _program(directory: Path, name: str, version: str) -> Path:
+    """A stand-in for a PostgreSQL program that reports ``version``."""
+    directory.mkdir(parents=True, exist_ok=True)
+    program = directory / name
+    program.write_text(f"#!/bin/sh\necho '{name} (PostgreSQL) {version}'\n")
+    program.chmod(0o755)
+    return program
+
+
+def _only_these_places(monkeypatch, configured: Path, on_path: Path) -> None:
+    monkeypatch.setenv(cluster.POSTGRES_BIN_ENV, str(configured))
+    monkeypatch.setenv("PATH", str(on_path))
+    monkeypatch.setattr(cluster, "KNOWN_BINARY_DIRECTORIES", ())
+
+
+def test_a_client_program_is_found_where_the_server_is_and_an_older_one_is_passed_over(
+    tmp_path, monkeypatch
+):
+    configured, on_path = tmp_path / "configured", tmp_path / "on-path"
+    _program(configured, "pg_dump", "16.4")
+    newer = _program(on_path, "pg_dump", "18.6")
+    _only_these_places(monkeypatch, configured, on_path)
+
+    assert cluster.client_program("pg_dump") == str(newer)
+
+
+def test_no_client_program_new_enough_is_refused_naming_what_was_checked(tmp_path, monkeypatch):
+    configured, on_path = tmp_path / "configured", tmp_path / "on-path"
+    older = _program(configured, "psql", "16.4")
+    on_path.mkdir()
+    _only_these_places(monkeypatch, configured, on_path)
+
+    with pytest.raises(LocalDatabaseRefused) as refused:
+        cluster.client_program("psql")
+
+    assert refused.value.refusal is Refusal.POSTGRES_MISSING
+    assert f"{older}: psql (PostgreSQL) 16.4" in refused.value.detail
+
+
 def test_serve_and_start_refuse_a_data_directory_the_local_command_made(machine):
     helper = _test_postgres_helper()
     server = helper.lane_server()

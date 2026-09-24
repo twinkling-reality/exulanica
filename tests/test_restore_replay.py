@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import uuid
 from dataclasses import replace
-from pathlib import Path
 
 import psycopg
 import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
+from exulanica.db.local.cluster import client_program
+from exulanica.db.local.refusals import LocalDatabaseRefused
 from exulanica.db.roles import provision_purge_role, provision_runtime_role
 from exulanica.deletion.restore import (
     RestoreRefused,
@@ -70,20 +70,13 @@ def _app(purged, marker):
 
 
 def _postgres_tool(name):
-    # Homebrew leaves its older unversioned client first on PATH; the server is PostgreSQL 18.
-    # A missing compatible client is a failed real-restore prerequisite, never a skipped proof.
-    configured = os.environ.get("EXULANICA_POSTGRES_BIN")
-    candidates = ([Path(configured) / name] if configured else []) + [
-        Path("/opt/homebrew/opt/postgresql@18/bin") / name,
-        Path("/usr/lib/postgresql/18/bin") / name,
-    ]
-    located = shutil.which(name)
-    if located:
-        candidates.append(Path(located))
-    for path in candidates:
-        if path.is_file():
-            return str(path)
-    pytest.fail(f"PostgreSQL 18 {name} is required; set EXULANICA_POSTGRES_BIN")
+    # The PostgreSQL 18 client, from the places exulanica.db.local.cluster states, never the older
+    # unversioned client Homebrew leaves first on PATH. A missing compatible client is a failed
+    # real-restore prerequisite, never a skipped proof.
+    try:
+        return client_program(name)
+    except LocalDatabaseRefused as missing:
+        pytest.fail(missing.detail)
 
 
 def _backup(purged, tmp_path):

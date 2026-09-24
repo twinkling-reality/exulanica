@@ -154,19 +154,18 @@ step has no driver.
 **Running it.**
 
 ```bash
-python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <new directory> --launcher scripts/acceptance/launch.py --model-env <environment file>
+python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <new directory> --model-env <environment file>
 ```
 
 - `--worktree` is the checkout whose application is rehearsed, a linked worktree or a plain clone.
-  It needs its own `.venv` and web packages. The runtime comes from the acceptance launcher that
-  `--launcher` names; from a clone that is the repository's own, `scripts/acceptance/launch.py`.
-  Without `--launcher` the rehearsal looks for `.exulanica/acceptance/launch.py` in the main
-  checkout, an ignored file a clone does not have. The launcher starts that checkout's disposable
-  test server, a fresh synthetic workspace with its own token, and the API, on the port block
-  `--slot` chooses.
-- The application is built for production into the run directory and served with `vite preview` on
-  the slot's spare port. No development token is built in, so every page load passes the
-  application's own access-token gate. Account sign-in is not exercised.
+  It needs its own `.venv` and web packages. The runtime comes from the acceptance launcher,
+  `scripts/acceptance/launch.py` in the rehearsal's own tree unless `--launcher` names another,
+  run with `up --production`. It starts that checkout's disposable test server, a fresh synthetic
+  workspace with its own token, and the API, on the port block `--slot` chooses.
+- The launcher builds the application for production, with no development token in the build
+  environment, and serves it with `vite preview` on the slot's application port. Every page load
+  passes the application's own access-token gate. The result records the build's hashes and the
+  hash of the page the preview served. Account sign-in is not exercised.
 - Each browser session is one headless Chrome with one page, driven over the DevTools protocol, and
   waits its turn behind the development machine's GPU slot where that machine provides one.
 - `--model-env` names the environment file that holds the hosted-model key. A child process reads
@@ -207,7 +206,7 @@ and each browser session's log. Every step appears once, in step-list order:
 
 The gate table gives each gate the worst status of its steps and names its first failed step with
 that step's owner area. The command exits 0 only when every step passed or is declared not
-available, and 3 when the run directory holds the workspace token.
+available, and 3 when the run directory or the production build holds the workspace token.
 
 **What it does not do.** It does not observe a person or record demonstration footage, and it
 measures no frame time. The photo drawer grants only the depth right, so the rehearsal grants the

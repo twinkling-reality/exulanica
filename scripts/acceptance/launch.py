@@ -7,8 +7,9 @@
     python3 scripts/acceptance/launch.py down   --worktree PATH
 
 ``--worktree`` names any checkout of this repository, a linked worktree or a plain clone, with its
-own ``.venv`` and installed web packages. ``scripts/rehearsal/rehearse.py --launcher`` names this
-file. Standard library only, so it never imports the code it starts.
+own ``.venv`` and installed web packages. ``scripts/rehearsal/rehearse.py`` runs this file with
+``up --production`` unless its ``--launcher`` names another. Standard library only, so it never
+imports the code it starts.
 
 ``up`` does, in order, and refuses by name at the first thing that is not as expected:
 
@@ -61,8 +62,8 @@ from pathlib import Path
 from typing import NoReturn
 
 #: The port slots, the one fixed table: slot N owns WIDTH ports from BASE + WIDTH * N, in the order
-#: of ROLES. The spare port is where ``scripts/rehearsal/rehearse.py`` serves its own production
-#: build, so it reads ``PORT_LIMIT`` and takes ``browser + 1``.
+#: of ROLES. The application is served on ``vite``, by the development server or, with
+#: ``--production``, by ``vite preview``; ``spare`` is held for whatever a run adds.
 PORT_BASE = 19200
 SLOT_WIDTH = 5
 SLOT_COUNT = 7

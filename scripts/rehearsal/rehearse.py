@@ -11,33 +11,36 @@ names. In order, refusing at the first precondition that does not hold:
 1.  Checks the step list is well formed, and refuses a run whose hosted-model steps are estimated
     above the step list's ``ask_before_usd``.
 2.  Starts the acceptance runtime for that worktree on the slot with the acceptance launcher
-    (``.exulanica/acceptance/launch.py`` in the main checkout by default): the worktree's private
-    database, a fresh synthetic workspace with its own token, and the API. With ``--model-env`` the
-    launcher runs with ``--model``: a short child process reads the one variable ``NEBIUS_API_KEY``
-    from that file, puts it in its own environment with ``EXULANICA_EGRESS_ALLOWLIST`` set to the
-    origin of the model manifest's ``base_url`` in the worktree, and replaces itself with the
-    launcher. The key never enters this process, and nothing here prints, logs or writes it.
-3.  Builds the application for production (``vite build``) into the run directory, with no
-    development token in the build environment, and serves that build with ``vite preview`` on the
-    slot's spare port, proxying ``/api`` to the launcher's API. The launcher's own development
-    server stays up and unused.
+    (``scripts/acceptance/launch.py`` in this tree by default; ``--launcher`` names another) and
+    ``up --production``: the worktree's disposable test server, a fresh synthetic workspace with
+    its own token, the API, and the application built for production with no development token in
+    the build environment and served by ``vite preview`` on the slot's application port, proxying
+    ``/api`` to the API. With ``--model-env`` the launcher runs with ``--model``: a short child
+    process reads the one variable ``NEBIUS_API_KEY`` from that file, puts it in its own
+    environment with ``EXULANICA_EGRESS_ALLOWLIST`` set to the origin of the model manifest's
+    ``base_url`` in the worktree, and replaces itself with the launcher, with the step list's
+    ``spend.bound_usd`` as ``EXULANICA_BUDGET_USD`` so the API itself refuses a call past it. The key
+    never enters this process, and nothing here prints, logs or writes it.
+3.  Takes the launcher's record of that build (its script and index hashes, and the hash of the page
+    the preview served) as this run's build, and checks the preview's ``/api`` proxy answers.
 4.  Runs the sessions in step-list order. An orchestrator session is run here; a browser session is
     one ``node session.mjs`` process, one headless Chrome with one page, queued behind the
     machine's GPU slot (``.exulanica/bin/gpu-slot``) because browser work on this machine takes
     turns. A step that requires a step that did not pass is reported ``not_reachable`` with that
     reason; a hosted-model step is not started once reported spend reaches the step list's bound.
 5.  Writes ``result.json`` (``result.schema.json``) and ``summary.txt``, checks that no file in the
-    run directory holds the synthetic token, and stops everything it started, in every outcome.
+    run directory or the production build holds the synthetic token, and stops everything it
+    started, in every outcome.
 
 Exit 0 when every step passed or is declared not available; 1 when a step failed or was not
-reachable; 2 when a precondition refused the run; 3 when the token was found in the run directory.
+reachable; 2 when a precondition refused the run; 3 when the token was found in the run directory
+or the build.
 Standard library only, like the launcher, so it imports nothing it measures.
 """
 
 from __future__ import annotations
 
 import argparse
-import contextlib
 import datetime as dt
 import hashlib
 import importlib.util
@@ -192,16 +195,6 @@ def wait_http(url: str, seconds: float) -> tuple[int, Any]:
     raise Refused(f"{url} did not answer within {seconds:.0f} s ({last})")
 
 
-def listening(port: int) -> bool:
-    found = subprocess.run(
-        ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return bool(found.stdout.strip())
-
-
 def model_allowlist(worktree: Path) -> str:
     """The egress allowlist the API needs: the origin of the manifest's endpoint, nothing more."""
     manifest = json.loads((worktree / "exulanica/models/models.manifest.json").read_text())
@@ -219,7 +212,7 @@ class Run:
         self.slot = arguments.slot
         checkout = main_checkout(REHEARSAL_TREE)
         self.launcher_path = Path(
-            arguments.launcher or checkout / ".exulanica/acceptance/launch.py"
+            arguments.launcher or REHEARSAL_TREE / "scripts" / "acceptance" / "launch.py"
         )
         gpu_slot = Path(arguments.gpu_slot or checkout / ".exulanica/bin/gpu-slot")
         self.gpu_slot = gpu_slot if gpu_slot.exists() else None
@@ -232,9 +225,9 @@ class Run:
         self.launcher: ModuleType | None = None
         self.state: dict[str, Any] | None = None
         self.token: str | None = None
-        self.preview_pid: int | None = None
         self.preview_port: int | None = None
         self.build: dict[str, Any] = {}
+        self.build_directory: Path | None = None
         self.model_configured = arguments.model_env is not None
         self.started_at = now()
 
@@ -253,6 +246,7 @@ class Run:
         ]
         if self.arguments.reuse_database:
             command.append("--reuse-database")
+        command.append("--production")
         if self.model_configured:
             command = [
                 sys.executable,
@@ -278,13 +272,8 @@ class Run:
             raise Refused(f"the launcher refused: {completed.stderr.strip()[-600:]}")
         self.state = json.loads(state_file.read_text())
         self.token = Path(self.state["token_file"]).read_text().strip()
-        ports = self.state["ports"]
-        # Slot N's five ports are base, +1 api, +2 vite, +3 browser and one spare (launch.py).
-        self.preview_port = ports["browser"] + 1
-        if self.preview_port > self.launcher.PORT_LIMIT or listening(self.preview_port):
-            raise Refused(
-                f"the slot's spare port {self.preview_port} is outside the range or in use"
-            )
+        # ``up --production`` serves the build on the slot's application port.
+        self.preview_port = self.state["ports"]["vite"]
 
     def launcher_down(self) -> None:
         if (
@@ -302,74 +291,31 @@ class Run:
             scrub(f"exit {completed.returncode}\n{completed.stdout}\n{completed.stderr}")
         )
 
-    def build_app(self) -> None:
-        app = self.worktree / "web/packages/app"
-        vite = app / "node_modules/.bin/vite"
-        target = self.out / "app-build"
-        started = time.monotonic()
-        completed = subprocess.run(
-            [str(vite), "build", "--outDir", str(target), "--emptyOutDir"],
-            cwd=app,
-            env=clean_environment(),
-            capture_output=True,
-            text=True,
-        )
-        (self.out / "build.log").write_text(scrub(completed.stdout + completed.stderr))
-        if completed.returncode != 0:
-            raise Refused(f"vite build exited {completed.returncode}; see build.log")
-        version = subprocess.run([str(vite), "--version"], cwd=app, capture_output=True, text=True)
-        scripts = sorted(target.glob("assets/*.js"))
-        self.build = {
-            "command": "vite build --outDir <run>/app-build --emptyOutDir",
-            "mode": "production",
-            "vite": version.stdout.strip(),
-            "seconds": round(time.monotonic() - started, 1),
-            "development_token_in_environment": False,
-            "index_html_sha256": hashlib.sha256((target / "index.html").read_bytes()).hexdigest(),
-            "scripts": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in scripts},
-        }
+    def take_build(self) -> None:
+        """Take the production build the launcher made and serves as this run's application.
 
-    def start_preview(self) -> None:
+        ``up --production`` built it with no development token in its environment and serves it
+        with ``vite preview``; this records what was built and what the preview served, and checks
+        that the preview's ``/api`` proxy answers.
+        """
         assert self.state is not None and self.preview_port is not None
-        app = self.worktree / "web/packages/app"
-        environment = clean_environment()
-        environment["EXULANICA_API_URL"] = f"http://127.0.0.1:{self.state['ports']['api']}"
-        log = (self.out / "preview.log").open("ab")
-        process = subprocess.Popen(
-            [
-                str(app / "node_modules/.bin/vite"),
-                "preview",
-                "--outDir",
-                str(self.out / "app-build"),
-                "--port",
-                str(self.preview_port),
-                "--strictPort",
-            ],
-            cwd=app,
-            env=environment,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-        self.preview_pid = process.pid
+        app = self.state.get("app") or {}
+        if app.get("mode") != "production" or "build" not in app:
+            raise Refused(
+                f"the launcher served no production build (mode {app.get('mode')!r}); "
+                "a launcher without up --production cannot run the rehearsal"
+            )
+        self.build_directory = Path(self.state["run_dir"]) / "app-build"
+        self.build = {
+            **app["build"],
+            "mode": "production",
+            "made_by": "the acceptance launcher, up --production",
+            "served_index_sha256": app["served_index_sha256"],
+            "served_index_is_the_build": app["served_index_is_the_build"],
+        }
         status, _ = wait_http(f"http://localhost:{self.preview_port}/api/healthz", 60)
         if status != 200:
             raise Refused(f"the preview's /api proxy answered {status}")
-
-    def stop_preview(self) -> None:
-        if self.preview_pid is None:
-            return
-        try:
-            os.killpg(self.preview_pid, signal.SIGTERM)
-        except ProcessLookupError:
-            return
-        for _ in range(40):
-            if self.preview_port is None or not listening(self.preview_port):
-                return
-            time.sleep(0.25)
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(self.preview_pid, signal.SIGKILL)
 
     @property
     def api(self) -> str:
@@ -568,12 +514,17 @@ class Run:
     # -- result ---------------------------------------------------------------------------------
 
     def leak_check(self) -> list[str]:
+        """Every file of the run directory or the production build that holds the token."""
         if self.token is None:
             return []
         needle = self.token.encode()
+        places = [(self.out, self.out)]
+        if self.build_directory is not None and self.build_directory.is_dir():
+            places.append((self.build_directory, self.build_directory.parent))
         return sorted(
-            str(path.relative_to(self.out))
-            for path in self.out.rglob("*")
+            str(path.relative_to(base))
+            for root, base in places
+            for path in root.rglob("*")
             if path.is_file() and needle in path.read_bytes()
         )
 
@@ -682,7 +633,8 @@ def clean_start(
     )
     with urllib.request.urlopen(run.app_url, timeout=10) as response:
         served = response.read()
-    built = (run.out / "app-build" / "index.html").read_bytes()
+    assert run.build_directory is not None
+    built = (run.build_directory / "index.html").read_bytes()
     observe(
         "production-build-served",
         served == built,
@@ -844,7 +796,9 @@ def main() -> int:
     )
     parser.add_argument("--sessions", help="run only these sessions, comma separated")
     parser.add_argument("--reuse-database", action="store_true")
-    parser.add_argument("--launcher", help="the acceptance launcher (default: the main checkout's)")
+    parser.add_argument(
+        "--launcher", help="the acceptance launcher (default: scripts/acceptance/launch.py here)"
+    )
     parser.add_argument(
         "--gpu-slot", help="the machine's GPU slot command (default: the main checkout's)"
     )
@@ -869,13 +823,11 @@ def main() -> int:
     refused = None
     try:
         run.launcher_up()
-        run.build_app()
-        run.start_preview()
+        run.take_build()
         run.run_sessions()
     except Refused as error:
         refused = str(error)
     finally:
-        run.stop_preview()
         run.launcher_down()
     if refused is not None:
         for step in run.steps["steps"]:
