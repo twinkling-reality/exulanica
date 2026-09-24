@@ -247,9 +247,12 @@ def test_no_module_restates_the_locks_key():
 
 
 def test_the_helper_is_what_the_scan_would_refuse_anywhere_else():
-    """The positive control on real code: the helper makes both statements the ratchet looks for."""
+    """The positive control on real code: the helper makes both statements the ratchet looks for.
+
+    It names the lock twice, once for the read check and once for a writer's last question.
+    """
     tree = ast.parse((ROOT / HELPER).read_text(encoding="utf-8"))
-    assert _takes_the_lock(tree) == 1
+    assert _takes_the_lock(tree) == 2
     assert _reads_only(tree)
 
 
