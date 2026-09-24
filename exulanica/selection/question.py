@@ -19,7 +19,9 @@ Four rules this module exists to hold, none of which is enforced by asking the m
     before it is applied".
 *   **Resolved ids only.** The planner is given a bounded catalogue of entities the session can
     already see, and it may only choose from it. It is never given a name-to-id lookup, so it
-    cannot reference an entity the caller was not already entitled to.
+    cannot reference an entity the caller was not already entitled to. The catalogue names only
+    what the question names, so a Selection the planner proposes is searched only when every id
+    in it is one of those: any other is a guess.
 *   **The model never sees the corpus.** It sees a packet of at most 24 items.
 *   **One repair, then the deterministic answer.** Not a retry loop. A second failure discards
     the model's output entirely, which is what makes the validator safe to enforce strictly.
@@ -60,6 +62,7 @@ from exulanica.selection.answer import (
     AnswerRejected,
     ClauseType,
     abstain,
+    abstain_from_a_guess,
     abstain_without_a_selection,
     render_deterministic_answer,
     validate_answer,
@@ -147,6 +150,14 @@ COMPOSER_MAX_TOKENS: Final = 32768
 #: on a full packet; on an empty one, in the same session, it answered with a top-level JSON
 #: array instead of an object. It is not reliably either, which is why nothing routes to it and
 #: why the strict local check is what makes the difference visible rather than silent.
+
+
+#: Why a Selection the planner proposed was not searched, for ``AnsweredQuestion.rejections``. It
+#: names no id: the plan it refers to is returned with the answer.
+_UNNAMED_REFERENCE: Final = (
+    "unnamed_reference: the plan refers to an entity the question does not name, which the "
+    "planner could only have guessed"
+)
 
 
 #: What a CONTENT row with no label is called, by kind. Generic on purpose: the executor gives
@@ -384,6 +395,11 @@ def answer_question(
     than returning an empty one; the answer here is to say so and search nothing, not to search
     everything and call it a reply.
 
+    **A Selection the planner proposes that refers to anything the question does not name
+    abstains the same way**, with :func:`~exulanica.selection.answer.abstain_from_a_guess` and
+    before anything is searched: its id was a guess, and searching it answers about a place or a
+    person nobody asked about.
+
     **``client`` may be ``None`` only for a supplied CONTENT plan** (:func:`requires_model`).
     Anything else raises before a query runs, rather than answering part of the question.
     """
@@ -404,6 +420,9 @@ def answer_question(
         saved_names(connection, session.workspace_id) if requires_model(plan) else ()
     )
     asked = names.sendable(question)
+    # What the question's own words name: the only entities the planner is sent by name, and so
+    # the only ids a Selection it proposes may refer to. Taken before a packet line names more.
+    named = frozenset(names.placeholders)
     if plan is None:
         catalogue = entity_catalogue(connection, session.workspace_id)
         try:
@@ -434,6 +453,22 @@ def answer_question(
             plan=plan,
             abstention=reason,
             rejections=(str(rejected),),
+            calls=log.calls,
+        )
+    if proposed and _unnamed(plan, named):
+        # **An id the question does not name is a guess, refused before anything is searched.**
+        # The planner is sent a name only for what the question names (`_catalogue_line` in
+        # planner.py), so it cannot tell one other id from the next. A rehearsal of the running
+        # product saw one: asked "What does the sign say at Harbour Station?" with one place
+        # saved, the planner put that place in the plan, and the composer answered about Harbour
+        # Station over that place's photographs, citing one. The plan is kept, as it is above,
+        # so the guess can be seen. A plan the caller supplies is the caller's own choice.
+        answer, reason = abstain_from_a_guess()
+        return AnsweredQuestion(
+            answer=answer,
+            plan=plan,
+            abstention=reason,
+            rejections=(_UNNAMED_REFERENCE,),
             calls=log.calls,
         )
     query_vector = None
@@ -573,6 +608,20 @@ def answer_question(
         calls=log.calls,
         names=tuple((label, entity_id) for entity_id, label in names.placeholders.items()),
     )
+
+
+def _unnamed(plan: SelectionPlan, named: frozenset[uuid.UUID]) -> tuple[uuid.UUID, ...]:
+    """Each entity id the plan refers to that the question does not name, in the plan's order.
+
+    Read from every dimension that selects by ids, so a dimension added to the plan is covered
+    without a second list of them here.
+    """
+    referred = (
+        entity_id
+        for field in type(plan).model_fields
+        for entity_id in getattr(getattr(plan, field), "ids", ())
+    )
+    return tuple(entity_id for entity_id in referred if entity_id not in named)
 
 
 def _without_names(packet: EvidencePacket, names: RequestNames) -> EvidencePacket:

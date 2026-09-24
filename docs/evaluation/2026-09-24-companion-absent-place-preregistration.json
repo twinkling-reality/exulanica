@@ -1,0 +1,512 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "admission": {
+      "account_authority_basis": "synthetic drawings made by scripts/measure_companion_absent_place.py from the place proposal experiment's scene generator; no personal photograph",
+      "corpus_class": "synthetic",
+      "granted_roles": [
+        "vision",
+        "embedding",
+        "reasoning_cheap"
+      ],
+      "operation": "detect",
+      "purpose": "Companion absent-place measurement on synthetic drawings: questions about saved places and about places nobody saved",
+      "route": "POST /personal-admission"
+    },
+    "arms": {
+      "baseline": "the answer path at aaa1bd30e146f39c077e5d7fd5807a74b295e8b4: answer_question and validate_answer compiled from that commit's source, both prompts read from it, every other function they call checked to be the same code",
+      "change": "the answer path in the tree whose sources are bound below",
+      "pairing": "within a run the arms share one proposed plan and one query vector per question and one response cache, and the packet's tokens come from one seed per question; a fresh cache and fresh samples each run"
+    },
+    "development": {
+      "artifact": "docs/evaluation/artifacts/2026-09-24-companion-absent-place/development-run.json",
+      "counts": {
+        "baseline": {
+          "absent_abstained": 0,
+          "absent_answers": 40,
+          "absent_cited": 19,
+          "absent_composed": 40,
+          "absent_historical": 14,
+          "absent_mechanical_pass": 21,
+          "errors": 0,
+          "present_answers": 40,
+          "present_recalled": 40,
+          "rule_1": 0,
+          "rule_2": 0
+        },
+        "change": {
+          "absent_abstained": 40,
+          "absent_answers": 40,
+          "absent_cited": 0,
+          "absent_composed": 0,
+          "absent_historical": 0,
+          "absent_mechanical_pass": 40,
+          "errors": 0,
+          "present_answers": 40,
+          "present_recalled": 40,
+          "rule_1": 40,
+          "rule_2": 0
+        }
+      },
+      "run_sha256": "efc5ae77ad4c00fcf0e2b2205f4004cbdddb1addf8ffba1089d4fabfc95b8518",
+      "saved": {
+        "BRISCOE STEPS": {
+          "confirmed_photographs": [
+            4,
+            5
+          ],
+          "entity_id": "01a0d167-9c5f-7ec9-9860-49f52c120a2e",
+          "saved_name": "Briscoe Steps"
+        },
+        "CALDMOOR KNOLL": {
+          "confirmed_photographs": [
+            6,
+            7
+          ],
+          "entity_id": "01a0d167-9c85-79d5-a45c-2436f45326dd",
+          "saved_name": "Caldmoor Knoll"
+        },
+        "DRAVEN MANOR": {
+          "confirmed_photographs": [
+            8,
+            9
+          ],
+          "entity_id": "01a0d167-9cb5-72a2-acca-e8609059d5a2",
+          "saved_name": "Draven Manor"
+        },
+        "ORMSKELL FERRY": {
+          "confirmed_photographs": [
+            1,
+            2
+          ],
+          "entity_id": "01a0d167-9c0e-7a21-b304-790d51b4fc70",
+          "saved_name": "Ormskell Ferry"
+        }
+      }
+    },
+    "gate": {
+      "an_error_counts_as": "a failure in the change arm and no recall in either arm",
+      "exclusions": "a saved place the vision stage wrote on none of its photographs cannot be saved through the product's naming path; its present questions are reported and not scored, and its workspace's absent questions still are",
+      "rule": "Every change-arm answer to every absent-place question passes: no clause cites a photograph; the answer abstained, or every clause is 'meta' or 'uncertain'; and the measurer marks no clause false. And for every present-place question whose place was saved, the change arm recalls in at least as many runs as the baseline arm.",
+      "runs_per_question": 5
+    },
+    "models": {
+      "embedding": [
+        "Qwen/Qwen3-Embedding-8B"
+      ],
+      "reasoning_cheap": [
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "nvidia/Nemotron-3_5-Lightning"
+      ],
+      "structured_extraction": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "deepseek-ai/DeepSeek-V4-Flash-0731"
+      ],
+      "vision": [
+        "MiniMaxAI/MiniMax-M3",
+        "openbmb/MiniCPM-V-4_5"
+      ]
+    },
+    "not_covered": [
+      "Synthetic drawings of signs, English names and English questions; captions are what the vision role writes on this corpus, not on personal photographs.",
+      "One admission per split: the vision stage writes each caption once and every run asks over the same library.",
+      "Two library shapes, one saved place and three; a library with many saved places or saved people is not measured.",
+      "A place drawn on a photograph and never saved is present in the three-place workspace as a distractor and never asked about.",
+      "The measurer's reading decides only whether a composed clause is false; every clause read is in the outcome record."
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-23-rehearsal-main.json",
+      "record_sha256": "4b19fe2375cef000c7bf1802573dfb87da742e6f31d21af5853cba0c1722b3d3"
+    },
+    "question": "Whether a Companion question about a named place nobody saved and no photograph shows is answered honestly, abstaining or saying plainly that no photograph shows it and never citing a photograph or stating something false, while questions about saved places keep their recall, with the change in exulanica/selection/question.py and answer.py against the answer path of the commit it was made on.",
+    "questions": [
+      {
+        "id": "one.present.norbreck-brae.written",
+        "kind": "present",
+        "place": "NORBRECK BRAE",
+        "template": "written",
+        "text": "What is written on the sign at Norbreck Brae?",
+        "workspace": "one"
+      },
+      {
+        "id": "one.present.norbreck-brae.when",
+        "kind": "present",
+        "place": "NORBRECK BRAE",
+        "template": "when",
+        "text": "When was I at Norbreck Brae?",
+        "workspace": "one"
+      },
+      {
+        "id": "one.present.norbreck-brae.which",
+        "kind": "present",
+        "place": "NORBRECK BRAE",
+        "template": "which",
+        "text": "Which photographs did I take at Norbreck Brae?",
+        "workspace": "one"
+      },
+      {
+        "id": "one.absent.kestrel-point.written",
+        "kind": "absent",
+        "place": "Kestrel Point",
+        "template": "written",
+        "text": "What is written on the sign at Kestrel Point?",
+        "workspace": "one"
+      },
+      {
+        "id": "one.absent.kestrel-point.when",
+        "kind": "absent",
+        "place": "Kestrel Point",
+        "template": "when",
+        "text": "When was I at Kestrel Point?",
+        "workspace": "one"
+      },
+      {
+        "id": "one.absent.kestrel-point.which",
+        "kind": "absent",
+        "place": "Kestrel Point",
+        "template": "which",
+        "text": "Which photographs did I take at Kestrel Point?",
+        "workspace": "one"
+      },
+      {
+        "id": "one.absent.lindworth-bridge.written",
+        "kind": "absent",
+        "place": "Lindworth Bridge",
+        "template": "written",
+        "text": "What is written on the sign at Lindworth Bridge?",
+        "workspace": "one"
+      },
+      {
+        "id": "one.absent.lindworth-bridge.when",
+        "kind": "absent",
+        "place": "Lindworth Bridge",
+        "template": "when",
+        "text": "When was I at Lindworth Bridge?",
+        "workspace": "one"
+      },
+      {
+        "id": "one.absent.lindworth-bridge.which",
+        "kind": "absent",
+        "place": "Lindworth Bridge",
+        "template": "which",
+        "text": "Which photographs did I take at Lindworth Bridge?",
+        "workspace": "one"
+      },
+      {
+        "id": "three.present.pelham-wynd.written",
+        "kind": "present",
+        "place": "PELHAM WYND",
+        "template": "written",
+        "text": "What is written on the sign at Pelham Wynd?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.present.pelham-wynd.when",
+        "kind": "present",
+        "place": "PELHAM WYND",
+        "template": "when",
+        "text": "When was I at Pelham Wynd?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.present.pelham-wynd.which",
+        "kind": "present",
+        "place": "PELHAM WYND",
+        "template": "which",
+        "text": "Which photographs did I take at Pelham Wynd?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.present.rusken-folly.written",
+        "kind": "present",
+        "place": "RUSKEN FOLLY",
+        "template": "written",
+        "text": "What is written on the sign at Rusken Folly?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.present.rusken-folly.when",
+        "kind": "present",
+        "place": "RUSKEN FOLLY",
+        "template": "when",
+        "text": "When was I at Rusken Folly?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.present.rusken-folly.which",
+        "kind": "present",
+        "place": "RUSKEN FOLLY",
+        "template": "which",
+        "text": "Which photographs did I take at Rusken Folly?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.present.selworthy-loft.written",
+        "kind": "present",
+        "place": "SELWORTHY LOFT",
+        "template": "written",
+        "text": "What is written on the sign at Selworthy Loft?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.present.selworthy-loft.when",
+        "kind": "present",
+        "place": "SELWORTHY LOFT",
+        "template": "when",
+        "text": "When was I at Selworthy Loft?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.present.selworthy-loft.which",
+        "kind": "present",
+        "place": "SELWORTHY LOFT",
+        "template": "which",
+        "text": "Which photographs did I take at Selworthy Loft?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.absent.mossgate-market.written",
+        "kind": "absent",
+        "place": "Mossgate Market",
+        "template": "written",
+        "text": "What is written on the sign at Mossgate Market?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.absent.mossgate-market.when",
+        "kind": "absent",
+        "place": "Mossgate Market",
+        "template": "when",
+        "text": "When was I at Mossgate Market?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.absent.mossgate-market.which",
+        "kind": "absent",
+        "place": "Mossgate Market",
+        "template": "which",
+        "text": "Which photographs did I take at Mossgate Market?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.absent.netherby-cross.written",
+        "kind": "absent",
+        "place": "Netherby Cross",
+        "template": "written",
+        "text": "What is written on the sign at Netherby Cross?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.absent.netherby-cross.when",
+        "kind": "absent",
+        "place": "Netherby Cross",
+        "template": "when",
+        "text": "When was I at Netherby Cross?",
+        "workspace": "three"
+      },
+      {
+        "id": "three.absent.netherby-cross.which",
+        "kind": "absent",
+        "place": "Netherby Cross",
+        "template": "which",
+        "text": "Which photographs did I take at Netherby Cross?",
+        "workspace": "three"
+      }
+    ],
+    "recipe": {
+      "photographs": [
+        {
+          "board_text": "NORBRECK BRAE",
+          "bytes": 140237,
+          "captured_at_utc": "2026-06-08T10:15:00Z",
+          "file": "held_out-01-one-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 1,
+          "place": "NORBRECK BRAE",
+          "scene_index": 450,
+          "sha256": "781218885bce5ef48ebbb4f2aedd9d6158ed6db80991fdd7bfa609e37e61abb7",
+          "workspace": "one"
+        },
+        {
+          "board_text": "NORBRECK BRAE",
+          "bytes": 142297,
+          "captured_at_utc": "2026-06-09T10:15:00Z",
+          "file": "held_out-02-one-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 2,
+          "place": "NORBRECK BRAE",
+          "scene_index": 451,
+          "sha256": "d62d9c5c8f7762742c533aa4781d93904d110fd8c8b8c6868695e3740c5d839b",
+          "workspace": "one"
+        },
+        {
+          "board_text": null,
+          "bytes": 132185,
+          "captured_at_utc": "2026-06-10T10:15:00Z",
+          "file": "held_out-03-one-no_text.jpg",
+          "kind": "no_text",
+          "photograph": 3,
+          "place": null,
+          "scene_index": 452,
+          "sha256": "e28f9694dd35095f3dc15a7fcc596bc367230f94943d0e7cfb51df2ec2c83e0c",
+          "workspace": "one"
+        },
+        {
+          "board_text": "PELHAM WYND",
+          "bytes": 138938,
+          "captured_at_utc": "2026-06-11T10:15:00Z",
+          "file": "held_out-04-three-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 4,
+          "place": "PELHAM WYND",
+          "scene_index": 453,
+          "sha256": "7eab6aa0d9fa3ce695d7be3ecc4645e293aba2c0f5fe21b395889b39f2c29a88",
+          "workspace": "three"
+        },
+        {
+          "board_text": "PELHAM WYND",
+          "bytes": 140540,
+          "captured_at_utc": "2026-06-12T10:15:00Z",
+          "file": "held_out-05-three-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 5,
+          "place": "PELHAM WYND",
+          "scene_index": 454,
+          "sha256": "5fcf2363adfe7fdca19243914866a9c26e00eeb48b05e9491af1dd804c7c9b65",
+          "workspace": "three"
+        },
+        {
+          "board_text": "RUSKEN FOLLY",
+          "bytes": 139341,
+          "captured_at_utc": "2026-06-13T10:15:00Z",
+          "file": "held_out-06-three-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 6,
+          "place": "RUSKEN FOLLY",
+          "scene_index": 455,
+          "sha256": "0627aaceafe0684f8942ea4d548cff92a4cf4860758b8b59621dbfc8bd5fd5b7",
+          "workspace": "three"
+        },
+        {
+          "board_text": "RUSKEN FOLLY",
+          "bytes": 141098,
+          "captured_at_utc": "2026-06-14T10:15:00Z",
+          "file": "held_out-07-three-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 7,
+          "place": "RUSKEN FOLLY",
+          "scene_index": 456,
+          "sha256": "1380cbdb386667aa8a0210f23dcb77f25cdaeb682ff6428c1f845f47921d677a",
+          "workspace": "three"
+        },
+        {
+          "board_text": "SELWORTHY LOFT",
+          "bytes": 139535,
+          "captured_at_utc": "2026-06-15T10:15:00Z",
+          "file": "held_out-08-three-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 8,
+          "place": "SELWORTHY LOFT",
+          "scene_index": 457,
+          "sha256": "ab5906a46a0eb3222fcbb52da38d739a91ce8a659b82bc969cb140eaf7a4193c",
+          "workspace": "three"
+        },
+        {
+          "board_text": "SELWORTHY LOFT",
+          "bytes": 142071,
+          "captured_at_utc": "2026-06-16T10:15:00Z",
+          "file": "held_out-09-three-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 9,
+          "place": "SELWORTHY LOFT",
+          "scene_index": 458,
+          "sha256": "01419d4a66799786a35667e8faa7945774a3e236c18378ffd7bac946481c7c28",
+          "workspace": "three"
+        },
+        {
+          "board_text": "TAVIN GROVE",
+          "bytes": 135145,
+          "captured_at_utc": "2026-06-17T10:15:00Z",
+          "file": "held_out-10-three-street_sign.jpg",
+          "kind": "street_sign",
+          "photograph": 10,
+          "place": "TAVIN GROVE",
+          "scene_index": 459,
+          "sha256": "a70f0ccd7d67703374fd434dd6ad017e11788b8b659036eaa1080bc35eb3095c",
+          "workspace": "three"
+        },
+        {
+          "board_text": null,
+          "bytes": 131750,
+          "captured_at_utc": "2026-06-18T10:15:00Z",
+          "file": "held_out-11-three-no_text.jpg",
+          "kind": "no_text",
+          "photograph": 11,
+          "place": null,
+          "scene_index": 460,
+          "sha256": "68397d6a38d45ada4b840e985d65a6ef50133569b737e2177f1fff67f2a3cc08",
+          "workspace": "three"
+        }
+      ],
+      "scenes_from": "scene() in scripts/make_place_proposal_d_photographs.py"
+    },
+    "scores": {
+      "absent_false": "The measurer reads every clause of every composed answer to an absent-place question and marks it false when it (a) says the library lacks something the registered corpus shows it holds, such as a sign, a saved place's name or a photograph; (b) attributes anything to the place asked about, which nothing in the corpus shows: a sign's words, a photograph, a visit or a date; or (c) states the text of a sign other than as the corpus drew it. A clause that says no photograph shows or names the place asked about is true of this corpus. The product's fixed abstention sentences are not read.",
+      "absent_mechanical": "no clause cites a photograph, and the answer abstained or every clause is 'meta' or 'uncertain'",
+      "present": "recalled: a historical or uncertain clause cites a photograph the account holder confirmed at the place asked about"
+    },
+    "sources_sha256": {
+      "exulanica/api/composer_rights.py": "9df21bb1819aac4f4d4f49dc6bf1ed17fb79299a9925efb2f7cbf1a99ff95cd1",
+      "exulanica/epistemics/hosted_requests.py": "7ed306e0845053c39b91bbe69e3e578bf1c908a1fec8ac7fde039e28ead15ece",
+      "exulanica/ingest/place_proposal.py": "476c31d0c2fe6e35e1847e46d96f2edd3be026a2c3aed256811a1ca919375aa1",
+      "exulanica/ingest/vision.py": "de8be543b8c758cc6e8ec0f0fc60e43a116221ad7aa95558229b9d4fa1ab4f05",
+      "exulanica/selection/answer.py": "3f6e2c9d7a5292e488f7ca75433ea2e6a57ea6ed288a33a83f3e9c6796e7085a",
+      "exulanica/selection/embeddings.py": "d7666d173905a5ac4a07dd494da0760ea14926ec4591958fa4e83e080f39c35f",
+      "exulanica/selection/executor.py": "5e8154d754dc8231b7ff1d5c71ef9209db10fd96746ac66be8a9da0c73143d08",
+      "exulanica/selection/packet.py": "5d00bb1880bc390dc50fb9e4556c36b2ebf9ce01aefea79b59ac43472088dbb3",
+      "exulanica/selection/planner.py": "16fe27b19f542be7ea235b184fe701ea7647f33141f6e268f84026a64487c644",
+      "exulanica/selection/prompts.py": "6eba9d6021a535de25283de76ad90506de6fa5b1c975ba7885b731abed84f04d",
+      "exulanica/selection/question.py": "b96b412ed61fb18328f0c9f888876748140178cddfe6949e613b587d308ccb5f",
+      "exulanica/selection/request_names.py": "3f63d32c084c493fa6949ef38ae8396f7cacedace7d25fe681b94e3ef16b28d7",
+      "exulanica/selection/validation.py": "e8b0c024ffd2008fbccebcafc5158af49cce28f34895aa8ccf09cbdf537b8341",
+      "scripts/make_place_photographs.py": "7acba32366e9a1e695306e3fea05f2487c0bcf3fd5903441ea4dcb9ef9e187b3",
+      "scripts/make_place_proposal_d_photographs.py": "cf15efc114ee4eb6b0cb3c6daa6ebb47de1b4440ecaca3dd50408910c6a4bff9",
+      "scripts/measure_companion_absent_place.py": "9d407905b85c5006651709593214092a57822d8d91d86ce13dfbc94c728aa107"
+    },
+    "spend": {
+      "per_invocation_bound_usd": "0.45",
+      "read_from": "the usage the provider reported, as the client's ledger counts it",
+      "total_bound_usd": "2"
+    },
+    "workspaces": [
+      {
+        "absent": [
+          "Kestrel Point",
+          "Lindworth Bridge"
+        ],
+        "key": "one",
+        "saved": [
+          "NORBRECK BRAE"
+        ],
+        "unsaved": []
+      },
+      {
+        "absent": [
+          "Mossgate Market",
+          "Netherby Cross"
+        ],
+        "key": "three",
+        "saved": [
+          "PELHAM WYND",
+          "RUSKEN FOLLY",
+          "SELWORTHY LOFT"
+        ],
+        "unsaved": [
+          "TAVIN GROVE"
+        ]
+      }
+    ],
+    "written_before_any_model_call": "on the held-out split"
+  },
+  "record_sha256": "0fc3cf6cae05b6ecd822fb1bde170f0d21043805ca9c2d33bbbc53bcac5e5629"
+}

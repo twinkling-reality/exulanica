@@ -1,6 +1,6 @@
 """What ``answer_question`` returns on every one of its exits, held whole to a golden document.
 
-``answer_question`` has eleven ways to return an :class:`AnsweredQuestion` and three to raise, and
+``answer_question`` has twelve ways to return an :class:`AnsweredQuestion` and three to raise, and
 the answer path's split keeps it where it is because tests replace its module globals. Each exit
 is driven here through the product's own code over a workspace with a person and a place saved on
 a photograph's sign, and what it returns is reduced to a document: the answer, the plan, what the
@@ -101,12 +101,13 @@ class Context:
         plan: SelectionPlan | None = None,
         before_compose: Callable | None = None,
         client: Any = "scripted",
+        question: str = QUESTION,
     ) -> AnsweredQuestion:
         chosen = _client(self.repository, replies)[0] if client == "scripted" else client
         return answer_question(
             self.connection,
             chosen,
-            QUESTION,
+            question,
             self.session,
             plan=plan,
             now=NOW,
@@ -162,6 +163,18 @@ EXITS: dict[str, Callable[[Context], AnsweredQuestion]] = {
                 ).model_dump_json()
             )
         ]
+    ),
+    "the planner referred to an entity the question does not name": lambda c: c.ask(
+        [
+            _reply(
+                SelectionPlan(
+                    intent=Intent.CAPTURES,
+                    entities=EntitySelector(ids=[c.entities["person"]]),
+                    semantic_query="running club",
+                ).model_dump_json()
+            )
+        ],
+        question=f"Who is wearing the running club shirt outside {PLACE}?",
     ),
     "a content Selection found nothing": lambda c: c.ask(
         [],
@@ -320,7 +333,7 @@ def test_each_exit_returns_the_document_it_always_has(context, exit_name):
 
 
 def test_every_exit_is_a_different_document():
-    """The control: fourteen ways to leave the function, fourteen things said."""
+    """The control: fifteen ways to leave the function, fifteen things said."""
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
     assert sorted(golden) == sorted(EXITS)
     documents = [json.dumps(golden[name], sort_keys=True) for name in sorted(golden)]

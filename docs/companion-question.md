@@ -66,7 +66,17 @@ happens when it cannot, and the guarantee is structural rather than promised:
 nothing and they are four different facts: nothing matched, the matches are unconfirmed, the
 answer would need a modality this corpus does not have, and the question never became a search at
 all. Merging the last into the first would assert something about the user's photographs from a
-failure to read their sentence.
+failure to read their sentence. The last includes a Selection the planner proposes that refers to a
+person, a place or a thing the question does not name by the name the account holder gave it. The
+planner's catalogue names nothing else, so such an id is a guess, and `answer_question` in
+`exulanica/selection/question.py` refuses it before anything is searched, answering with the
+sentence `abstain_from_a_guess` in `exulanica/selection/answer.py` writes: that answering would mean
+guessing, and that a person, a place or a thing is found by the name the account holder gave it.
+Searching such a Selection would answer a question about a place nobody saved from the photographs
+of the saved place the planner stood in for it, and cite them. A plan the caller supplies is the
+caller's own choice and is not held to the question's words. A statement about the search, a `meta`
+clause, carries no citation: `validate_answer` refuses one that does, so no photograph is offered
+under a sentence about the whole library.
 
 **A failure is stated, never substituted.** A 503 from an instance with no model credential, a
 refusal, a lost session and a request that never arrived are four different facts, and the
@@ -445,6 +455,37 @@ in the corpus. The run made 191 model calls for 0.03437730 US dollars, from the 
 usage. The records are `docs/evaluation/2026-09-23-embedding-placeholders-preregistration.json` and
 `docs/evaluation/2026-09-23-embedding-placeholders-outcome.json`, made by
 `scripts/measure_embedding_placeholders.py`.
+
+**A place nobody saved.** One pre-registered measurement asked about places the account holder saved
+and about places nobody saved and no photograph shows, over synthetic drawings admitted through the
+product's routes: a library with one saved place, and one with three saved places, a sign whose
+place was never saved and a photograph with no text, each saved place drawn on two nameplates.
+Twelve held-out questions named a saved place and twelve an unsaved one, in names and wordings the
+development questions did not use. Each was asked five times in two arms that shared each run's plan
+and query vector, one without the two rules above and one with them.
+
+| Held-out answers | Without the rules | With the rules |
+| --- | --- | --- |
+| About an unsaved place, citing a photograph | 22 of 60 | 0 of 60 |
+| About an unsaved place, abstaining | 0 of 60 | 60 of 60 |
+| About a saved place, citing a photograph confirmed there | 60 of 60 | 60 of 60 |
+
+In every plan for an unsaved place, 40 in development and 60 held out, the planner stood a saved
+place in for it, so every answer with the rules was the abstention the first one writes. Without
+them, the answers that cited a photograph included "The sign at Kestrel Point reads PLACE A." and "I
+took these photographs at Netherby Cross.", each citing a photograph of the saved place. The rule
+for `meta` clauses never acted in either split: no question about a saved place drew a cited
+statement about the search, and questions about unsaved places, which drew 11 across the two splits
+without the rules, no longer reach the composer; the transport tests in
+`tests/test_companion_absent_place.py` hold it. What this does not establish: a planner that leaves
+an unsaved place out of its plan, which never happened here, would have the question's other words
+searched, and what the composer says about the photographs found is not measured; synthetic
+drawings, English names and questions; libraries of one and three saved places with no saved person.
+The runs made 196 and 282 requests for 0.08059216 and 0.13705072 US dollars, from the provider's
+reported usage. The records are
+`docs/evaluation/2026-09-24-companion-absent-place-preregistration.json` and
+`docs/evaluation/2026-09-24-companion-absent-place-outcome.json`, made by
+`scripts/measure_companion_absent_place.py`.
 
 Changes to this contract require checking the affected route, repository, request-policy and
 browser boundary. Broader continuity, live-model usefulness and personal-source acceptance need

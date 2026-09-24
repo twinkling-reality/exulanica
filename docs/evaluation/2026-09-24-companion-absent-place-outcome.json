@@ -1,0 +1,525 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "counts": {
+      "baseline": {
+        "absent_abstained": 0,
+        "absent_answers": 60,
+        "absent_cited": 22,
+        "absent_composed": 60,
+        "absent_historical": 16,
+        "absent_mechanical_pass": 38,
+        "errors": 0,
+        "present_answers": 60,
+        "present_recalled": 60,
+        "rule_1": 0,
+        "rule_2": 0
+      },
+      "change": {
+        "absent_abstained": 60,
+        "absent_answers": 60,
+        "absent_cited": 0,
+        "absent_composed": 0,
+        "absent_historical": 0,
+        "absent_mechanical_pass": 60,
+        "errors": 0,
+        "present_answers": 60,
+        "present_recalled": 60,
+        "rule_1": 60,
+        "rule_2": 0
+      }
+    },
+    "gate": {
+      "absent_places": true,
+      "enough_runs": true,
+      "passed": true,
+      "present_places": true
+    },
+    "measurers_reading": {
+      "artifact": "docs/evaluation/artifacts/2026-09-24-companion-absent-place/judgments.json",
+      "read": {},
+      "rubric": "The measurer reads every clause of every composed answer to an absent-place question and marks it false when it (a) says the library lacks something the registered corpus shows it holds, such as a sign, a saved place's name or a photograph; (b) attributes anything to the place asked about, which nothing in the corpus shows: a sign's words, a photograph, a visit or a date; or (c) states the text of a sign other than as the corpus drew it. A clause that says no photograph shows or names the place asked about is true of this corpus. The product's fixed abstention sentences are not read.",
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    "per_question": {
+      "one.absent.kestrel-point.when": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 1,
+          "passed": 4
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "When was I at Kestrel Point?"
+      },
+      "one.absent.kestrel-point.which": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 1,
+          "passed": 4
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "Which photographs did I take at Kestrel Point?"
+      },
+      "one.absent.kestrel-point.written": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 4,
+          "passed": 1
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "What is written on the sign at Kestrel Point?"
+      },
+      "one.absent.lindworth-bridge.when": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 1,
+          "passed": 4
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "When was I at Lindworth Bridge?"
+      },
+      "one.absent.lindworth-bridge.which": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "Which photographs did I take at Lindworth Bridge?"
+      },
+      "one.absent.lindworth-bridge.written": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "What is written on the sign at Lindworth Bridge?"
+      },
+      "one.present.norbreck-brae.when": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "When was I at Norbreck Brae?"
+      },
+      "one.present.norbreck-brae.which": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "Which photographs did I take at Norbreck Brae?"
+      },
+      "one.present.norbreck-brae.written": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "What is written on the sign at Norbreck Brae?"
+      },
+      "three.absent.mossgate-market.when": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "When was I at Mossgate Market?"
+      },
+      "three.absent.mossgate-market.which": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 3,
+          "passed": 2
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "Which photographs did I take at Mossgate Market?"
+      },
+      "three.absent.mossgate-market.written": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 4,
+          "passed": 1
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "What is written on the sign at Mossgate Market?"
+      },
+      "three.absent.netherby-cross.when": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 2,
+          "passed": 3
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "When was I at Netherby Cross?"
+      },
+      "three.absent.netherby-cross.which": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 3,
+          "passed": 2
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "Which photographs did I take at Netherby Cross?"
+      },
+      "three.absent.netherby-cross.written": {
+        "baseline": {
+          "abstained": 0,
+          "answers": 5,
+          "cited": 3,
+          "passed": 2
+        },
+        "change": {
+          "abstained": 5,
+          "answers": 5,
+          "cited": 0,
+          "passed": 5
+        },
+        "kind": "absent",
+        "text": "What is written on the sign at Netherby Cross?"
+      },
+      "three.present.pelham-wynd.when": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "When was I at Pelham Wynd?"
+      },
+      "three.present.pelham-wynd.which": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "Which photographs did I take at Pelham Wynd?"
+      },
+      "three.present.pelham-wynd.written": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "What is written on the sign at Pelham Wynd?"
+      },
+      "three.present.rusken-folly.when": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "When was I at Rusken Folly?"
+      },
+      "three.present.rusken-folly.which": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "Which photographs did I take at Rusken Folly?"
+      },
+      "three.present.rusken-folly.written": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "What is written on the sign at Rusken Folly?"
+      },
+      "three.present.selworthy-loft.when": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "When was I at Selworthy Loft?"
+      },
+      "three.present.selworthy-loft.which": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "Which photographs did I take at Selworthy Loft?"
+      },
+      "three.present.selworthy-loft.written": {
+        "baseline": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "change": {
+          "answers": 5,
+          "recalled": 5
+        },
+        "kind": "present",
+        "text": "What is written on the sign at Selworthy Loft?"
+      }
+    },
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-24-companion-absent-place-preregistration.json",
+      "record_sha256": "0fc3cf6cae05b6ecd822fb1bde170f0d21043805ca9c2d33bbbc53bcac5e5629"
+    },
+    "present_answers_the_same_in_both_arms": 59,
+    "run": {
+      "artifact": "docs/evaluation/artifacts/2026-09-24-companion-absent-place/held-out-run.json",
+      "baseline": {
+        "exulanica/selection/answer.py": {
+          "added_by_the_change": [
+            "abstain_from_a_guess"
+          ],
+          "compiled_from_base": [
+            "validate_answer"
+          ],
+          "same_code_in_both": 11,
+          "source_sha256_at_base": "8d1f40a87959ebdbc0c2e03745a9627f348049a6e36b3e5de050550f67978249"
+        },
+        "exulanica/selection/prompts.py": {
+          "baseline_prompt_version": "selection-7",
+          "change_prompt_version": "selection-7",
+          "composer_prompt_same": true,
+          "source_sha256_at_base": "6eba9d6021a535de25283de76ad90506de6fa5b1c975ba7885b731abed84f04d"
+        },
+        "exulanica/selection/question.py": {
+          "added_by_the_change": [
+            "_UNNAMED_REFERENCE",
+            "_unnamed"
+          ],
+          "compiled_from_base": [
+            "answer_question"
+          ],
+          "same_code_in_both": 10,
+          "source_sha256_at_base": "bf822ee34451cbc78c79f936f40cc60f212bd64fecc25f0a4bee1aeb3c0b316c"
+        }
+      },
+      "cache_hits": 60,
+      "decisions": {
+        "1": {
+          "outcome": "written",
+          "written_label": "NORBRECK BRAE"
+        },
+        "10": {
+          "outcome": "written",
+          "written_label": "TAVIN GROVE"
+        },
+        "11": {
+          "outcome": "nothing_proposed",
+          "written_label": null
+        },
+        "2": {
+          "outcome": "written",
+          "written_label": "NORBRECK BRAE"
+        },
+        "3": {
+          "outcome": "nothing_proposed",
+          "written_label": null
+        },
+        "4": {
+          "outcome": "written",
+          "written_label": "PELHAM WYND"
+        },
+        "5": {
+          "outcome": "written",
+          "written_label": "PELHAM WYND"
+        },
+        "6": {
+          "outcome": "written",
+          "written_label": "RUSKEN FOLLY"
+        },
+        "7": {
+          "outcome": "written",
+          "written_label": "RUSKEN FOLLY"
+        },
+        "8": {
+          "outcome": "written",
+          "written_label": "SELWORTHY LOFT"
+        },
+        "9": {
+          "outcome": "written",
+          "written_label": "SELWORTHY LOFT"
+        }
+      },
+      "requests": 282,
+      "runs_started": 5,
+      "saved": {
+        "NORBRECK BRAE": {
+          "confirmed_photographs": [
+            1,
+            2
+          ],
+          "entity_id": "01a0d176-ff1b-7423-b5a5-2b4ea7929d9e",
+          "saved_name": "Norbreck Brae"
+        },
+        "PELHAM WYND": {
+          "confirmed_photographs": [
+            4,
+            5
+          ],
+          "entity_id": "01a0d176-ff86-7c8a-b469-cfe4381318af",
+          "saved_name": "Pelham Wynd"
+        },
+        "RUSKEN FOLLY": {
+          "confirmed_photographs": [
+            6,
+            7
+          ],
+          "entity_id": "01a0d176-ffb5-7b4a-baf2-30c8824a1319",
+          "saved_name": "Rusken Folly"
+        },
+        "SELWORTHY LOFT": {
+          "confirmed_photographs": [
+            8,
+            9
+          ],
+          "entity_id": "01a0d176-ffe7-7366-90ee-0d1bb8e1769f",
+          "saved_name": "Selworthy Loft"
+        }
+      },
+      "sha256": "b308ddca5cd813e79cdf32e945d4a2ecc84c9d4d99ac9732b763b988a862ec4c",
+      "spent_usd": "0.13705072",
+      "stopped": null
+    },
+    "sources_sha256": {
+      "exulanica/api/composer_rights.py": "9df21bb1819aac4f4d4f49dc6bf1ed17fb79299a9925efb2f7cbf1a99ff95cd1",
+      "exulanica/epistemics/hosted_requests.py": "7ed306e0845053c39b91bbe69e3e578bf1c908a1fec8ac7fde039e28ead15ece",
+      "exulanica/ingest/place_proposal.py": "476c31d0c2fe6e35e1847e46d96f2edd3be026a2c3aed256811a1ca919375aa1",
+      "exulanica/ingest/vision.py": "de8be543b8c758cc6e8ec0f0fc60e43a116221ad7aa95558229b9d4fa1ab4f05",
+      "exulanica/selection/answer.py": "3f6e2c9d7a5292e488f7ca75433ea2e6a57ea6ed288a33a83f3e9c6796e7085a",
+      "exulanica/selection/embeddings.py": "d7666d173905a5ac4a07dd494da0760ea14926ec4591958fa4e83e080f39c35f",
+      "exulanica/selection/executor.py": "5e8154d754dc8231b7ff1d5c71ef9209db10fd96746ac66be8a9da0c73143d08",
+      "exulanica/selection/packet.py": "5d00bb1880bc390dc50fb9e4556c36b2ebf9ce01aefea79b59ac43472088dbb3",
+      "exulanica/selection/planner.py": "16fe27b19f542be7ea235b184fe701ea7647f33141f6e268f84026a64487c644",
+      "exulanica/selection/prompts.py": "6eba9d6021a535de25283de76ad90506de6fa5b1c975ba7885b731abed84f04d",
+      "exulanica/selection/question.py": "b96b412ed61fb18328f0c9f888876748140178cddfe6949e613b587d308ccb5f",
+      "exulanica/selection/request_names.py": "3f63d32c084c493fa6949ef38ae8396f7cacedace7d25fe681b94e3ef16b28d7",
+      "exulanica/selection/validation.py": "e8b0c024ffd2008fbccebcafc5158af49cce28f34895aa8ccf09cbdf537b8341",
+      "scripts/make_place_photographs.py": "7acba32366e9a1e695306e3fea05f2487c0bcf3fd5903441ea4dcb9ef9e187b3",
+      "scripts/make_place_proposal_d_photographs.py": "cf15efc114ee4eb6b0cb3c6daa6ebb47de1b4440ecaca3dd50408910c6a4bff9",
+      "scripts/measure_companion_absent_place.py": "9d407905b85c5006651709593214092a57822d8d91d86ce13dfbc94c728aa107"
+    }
+  },
+  "record_sha256": "d2746ea7ae420375649e0b4d3adb2f5981f57ac1a7447f67f14b15a3d6f92c31"
+}

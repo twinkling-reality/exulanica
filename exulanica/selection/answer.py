@@ -43,6 +43,7 @@ __all__ = [
     "AnswerRejected",
     "ClauseType",
     "abstain",
+    "abstain_from_a_guess",
     "abstain_without_a_selection",
     "render_deterministic_answer",
     "validate_answer",
@@ -64,7 +65,10 @@ class ClauseType(StrEnum):
     #: A hedge, a possibility, an explicitly unconfirmed reading. May cite and need not.
     UNCERTAIN = "uncertain"
     #: A statement about the system rather than the world: what was searched, what was found,
-    #: what is missing. Needs no citation, and is still subject to the digit rule.
+    #: what is missing. Carries no citation, and is still subject to the digit rule. A search is
+    #: not a photograph, so a citation here would put a photograph under a sentence about the whole
+    #: library, as the false "Your collection does not contain a sign that mentions a location."
+    #: once came with one; :func:`validate_answer` refuses it.
     META = "meta"
 
 
@@ -92,7 +96,9 @@ class Abstention(StrEnum):
     AMBIGUOUS = "UNANSWERABLE_AMBIGUOUS"
     #: The answer would need audio, speech or continuous time, none of which this corpus has.
     NOT_IN_MODALITY = "UNANSWERABLE_NOT_IN_MODALITY"
-    #: The question could not be turned into a Selection at all, so nothing was searched.
+    #: The question could not be turned into a Selection at all, so nothing was searched. That
+    #: includes a Selection the planner returned that names an entity nobody has, or one the
+    #: question does not name (:func:`abstain_from_a_guess`).
     #:
     #: **A fourth code, added for the same reason the third was, and it is the same argument.**
     #: M3 adds ``NOT_IN_MODALITY`` so "the corpus's modality gap" is not "laundered into a
@@ -165,6 +171,15 @@ def validate_answer(answer: Answer, packet: EvidencePacket) -> Answer:
                 "user's past resolves to the original source or it is not made."
             )
 
+        if clause.type is ClauseType.META and clause.citations:
+            cited = ", ".join(repr(token) for token in clause.citations)
+            reasons.append(
+                f"{where} is 'meta', a statement about the search, and cites {cited}. A 'meta' "
+                "clause carries no citation: if a photograph supports what it says, make it "
+                "'historical' or 'uncertain' and cite it there; if it is about the search, "
+                "remove the citation."
+            )
+
         covered: set[str] = set()
         for key in clause.value_refs:
             value = packet.value(key)
@@ -221,6 +236,37 @@ def abstain_without_a_selection(detail: str) -> tuple[Answer, Abstention]:
                     text=(
                         "I could not turn that into a search of your photographs, so I have not "
                         "looked. Ask it another way and I will try again."
+                    ),
+                    type=ClauseType.META,
+                )
+            ]
+        ),
+        Abstention.NOT_UNDERSTOOD,
+    )
+
+
+def abstain_from_a_guess() -> tuple[Answer, Abstention]:
+    """The answer when a Selection the planner proposed refers to what the question does not name.
+
+    The planner is sent a name only for an entity the question names, so an id it chose for any
+    other is one it could only have guessed, and searching it would answer about a place or a
+    person nobody asked about (:func:`~exulanica.selection.question.answer_question`). Nothing is
+    searched, so the code is the one that says so. ``NOT_CAPTURED`` would say that nothing in the
+    library matches, of a library nobody looked at, which is the laundering
+    :data:`Abstention.NOT_UNDERSTOOD` exists to prevent. The sentence says what the words could
+    not do and how to ask instead: a person, a place or a thing is found by the name the account
+    holder gave it.
+
+    One ``meta`` clause, for the reason :func:`abstain` gives.
+    """
+    return (
+        Answer(
+            clauses=[
+                AnswerClause(
+                    text=(
+                        "Answering that would mean guessing which person, place or thing in your "
+                        "library you mean, so I have not searched your photographs. I can find "
+                        "one only by the name you gave it."
                     ),
                     type=ClauseType.META,
                 )

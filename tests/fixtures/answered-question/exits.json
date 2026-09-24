@@ -804,5 +804,54 @@
     ],
     "repaired": false,
     "result": null
+  },
+  "the planner referred to an entity the question does not name": {
+    "abstention": "UNANSWERABLE_NOT_UNDERSTOOD",
+    "answer": [
+      {
+        "citations": [],
+        "text": "Answering that would mean guessing which person, place or thing in your library you mean, so I have not searched your photographs. I can find one only by the name you gave it.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "prompt_tokens": 100,
+        "reasoning_tokens": 150,
+        "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "role": "structured_extraction",
+        "served_model": "test/model",
+        "usd": "0.00014000",
+        "used_fallback": false
+      }
+    ],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": {
+        "ids": [
+          "<id 1>"
+        ],
+        "mode": "any"
+      },
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "running club",
+      "time": []
+    },
+    "rejections": [
+      "unnamed_reference: the plan refers to an entity the question does not name, which the planner could only have guessed"
+    ],
+    "repaired": false,
+    "result": null
   }
 }
