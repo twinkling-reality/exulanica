@@ -36,8 +36,17 @@ import type { EvidenceHandle } from '@exulanica/graph-client';
 import { parseContentSurface, type CompanionContentSurface } from './companion-content.js';
 import { worldPath } from './world-scope.js';
 
-/** Long enough for the reasoning core, which has been measured at tens of seconds on a packet. */
-const ASK_TIMEOUT_MS = 180_000;
+/**
+ * How long the page waits for an answer: the server's bound on one answer's model calls, then the
+ * allowance for the answer path's own reads, which is `PACKET_TIMEOUT_MS` below.
+ *
+ * The bound is `answer_bound_seconds` in `exulanica/selection/question.py`: each hosted call the
+ * answer path can make (the planner and its repair, the query vector, the composer and its repair)
+ * times the longest one call to its role can take, its manifest timeout over its chain. A page that
+ * gave up sooner reported a failure for a question the server was still answering.
+ * `tests/test_companion_ask_deadline.py` fails when this is less than that bound plus the allowance.
+ */
+const ASK_TIMEOUT_MS = 395_000;
 
 /** Locating the cited photographs is a second question; it must not hold the answer hostage. */
 const PACKET_TIMEOUT_MS = 20_000;

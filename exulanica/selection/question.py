@@ -77,7 +77,12 @@ from exulanica.selection.packet import (
     build_packet,
 )
 from exulanica.selection.plan import Intent, SelectionPlan
-from exulanica.selection.planner import EntityChoice, entity_catalogue, propose_plan
+from exulanica.selection.planner import (
+    PLANNER_ATTEMPTS,
+    EntityChoice,
+    entity_catalogue,
+    propose_plan,
+)
 from exulanica.selection.prompts import _COMPOSER_SYSTEM, PROMPT_VERSION
 from exulanica.selection.request_names import RequestNames
 from exulanica.selection.validation import (
@@ -89,11 +94,15 @@ from exulanica.selection.validation import (
 from exulanica.store.base import ContentAddressedStore
 
 __all__ = [
+    "ANSWER_PATH_CALLS",
+    "COMPOSER_ATTEMPTS",
     "PROMPT_VERSION",
+    "QUERY_VECTORS",
     "AnsweredQuestion",
     "CallLog",
     "EntityChoice",
     "ModelCall",
+    "answer_bound_seconds",
     "answer_question",
     "compose_answer",
     "entity_catalogue",
@@ -114,6 +123,36 @@ __all__ = [
 #: largest observed rather than at it. A ceiling is not a spend: an unused one costs nothing and
 #: a low one costs a failed answer on a request somebody is waiting for.
 COMPOSER_MAX_TOKENS: Final = 32768
+
+#: How many times the composer may be asked for one answer: one try and one repair. The loop in
+#: :func:`compose_answer` runs to it, and :data:`ANSWER_PATH_CALLS` counts it.
+COMPOSER_ATTEMPTS: Final = 2
+
+#: How many query vectors one question asks for: :func:`answer_question` embeds the plan's
+#: semantic query once, and only when the workspace holds search entries.
+QUERY_VECTORS: Final = 1
+
+#: Every hosted call one answer can make, as the role it is sent to and the most times its call
+#: site may send it: the planner and its repair, the query vector, the composer and its repair.
+#: ``tests/test_companion_ask_deadline.py`` drives each call site to its worst case and fails when
+#: it sends a role, or a count, this does not state.
+ANSWER_PATH_CALLS: Final[tuple[tuple[Role, int], ...]] = (
+    (Role.STRUCTURED_EXTRACTION, PLANNER_ATTEMPTS),
+    (Role.EMBEDDING, QUERY_VECTORS),
+    (Role.REASONING_CHEAP, COMPOSER_ATTEMPTS),
+)
+
+
+def answer_bound_seconds(client: ModelClient) -> float:
+    """The longest the model calls of one answer can take on ``client``, retries and fallbacks in.
+
+    Each call site's count times what the client says one call to that role can take at worst
+    (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`: the manifest's timeout for
+    the role, its chain and the client's retries). The browser waits for an answer at least this
+    long; ``tests/test_companion_ask_deadline.py`` holds its deadline to it.
+    """
+    return sum(count * client.worst_case_seconds(role) for role, count in ANSWER_PATH_CALLS)
+
 
 #: What the three candidates did on one 24-item packet, recorded because the choice is not
 #: obvious and the numbers are the whole argument:
@@ -301,7 +340,7 @@ def compose_answer(
         {"role": "user", "content": f"{_render_packet(packet)}\n\nQuestion: {question}"},
     ]
     rejections: tuple[str, ...] = ()
-    for attempt in (1, 2):
+    for attempt in range(1, COMPOSER_ATTEMPTS + 1):
         try:
             composed = client.structured(
                 # **The NVIDIA reasoning core, doing the reasoning.** `reasoning_cheap`'s own
@@ -329,7 +368,7 @@ def compose_answer(
             return validate_answer(answer, packet), False, rejections
         except AnswerRejected as rejected:
             rejections = rejected.reasons
-            if attempt == 2:
+            if attempt == COMPOSER_ATTEMPTS:
                 break
             messages.append(
                 {
