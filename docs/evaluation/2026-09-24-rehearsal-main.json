@@ -1,0 +1,2060 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "access": "the production build's credential gate: the launcher's synthetic token typed into its access-token field, on every page load; the account sign-in path is not exercised because the launcher configures none",
+    "application_tree": {
+      "branch": "lane/0923-rehearsal4-main",
+      "changed_paths": "0",
+      "diff_head_bytes": "0",
+      "diff_head_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "head": "209b57420bed5a56c224b35ca2312f2dd6a83c31",
+      "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "artifacts": [
+      {
+        "byte_size": 8153,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/app.mjs.txt",
+        "sha256": "69c22588418d511e4b6d7a82c8719090d20dfa1c9402bf79c1b8ddbb1fcbfb69"
+      },
+      {
+        "byte_size": 15841,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/cdp.mjs.txt",
+        "sha256": "c4fde4ad3a5edbc8d9bbf6542db34f29ebd314d0d83035672f5a1d553258267f"
+      },
+      {
+        "byte_size": 71276,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/handlers.mjs.txt",
+        "sha256": "45f36903118d1e5b50c7766cf35c9b7794ba473c26e6c969dc8a54bf3a228841"
+      },
+      {
+        "byte_size": 3458,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/photographs.py.txt",
+        "sha256": "df1ea7f88c87edceb0b8dd777cbd5f4e000dece26799fc26f589bd361d162732"
+      },
+      {
+        "byte_size": 37305,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/rehearse.py.txt",
+        "sha256": "fe946a1b8aacc7bb86c5a2e3da7c3e8915087d6653dcd22a8d0a1a62ecf54b36"
+      },
+      {
+        "byte_size": 8976,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/result.schema.json.txt",
+        "sha256": "060ba11a84e60eef3f54cec54f079032352534a821b26c47607c1e1d60af0dfe"
+      },
+      {
+        "byte_size": 5833,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/resultdoc.py.txt",
+        "sha256": "94cb3e0e080c549eff63df82fd8feba26bda206c7fc2eca430c64cbc6712d36b"
+      },
+      {
+        "byte_size": 7604,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/session.mjs.txt",
+        "sha256": "d94a46947fb2836c636a857b8232b9bc987f3721b9dded7557cd987bc63e2441"
+      },
+      {
+        "byte_size": 13482,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/steplist.py.txt",
+        "sha256": "83a7f54acc4d98c551f9e2db6e886e213844debe71e8efe810a539828b1bc8a1"
+      },
+      {
+        "byte_size": 37096,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/steps.json.txt",
+        "sha256": "88409e3b13c16659f56bae8b19a3bcd33fa910ebe5e492e4c9e3c678fb7b5a52"
+      },
+      {
+        "byte_size": 1365,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/driver/usd.mjs.txt",
+        "sha256": "0d5b7f78b26cde08b934a680bf84b006b9e8382194cfb88f40452019122f3116"
+      },
+      {
+        "byte_size": 1826524,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/result.json",
+        "sha256": "4fe6a0bc88a3295e0ceef763f1703340f0dca570f20873aa2aa224d7f72e2a71"
+      },
+      {
+        "byte_size": 3592,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/summary.txt",
+        "sha256": "d95825026651fd7250986dc2cc4873d1bc726696391d8de6a9c5cc9be3c9db72"
+      },
+      {
+        "byte_size": 17256,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/write_record.py.txt",
+        "sha256": "fda2efd1280c015aef57f9f96a4d1d14ec2a6cd3f04e946b876192b65b003ef0"
+      }
+    ],
+    "browser": {
+      "gpu_slot": true,
+      "sessions": [
+        {
+          "chrome_argv": [
+            "--headless=new",
+            "--remote-debugging-port=19218",
+            "--user-data-dir=<session profile>",
+            "--window-size=1280,860",
+            "--hide-scrollbars",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--password-store=basic",
+            "--use-mock-keychain",
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows",
+            "--use-angle=metal",
+            "--enable-gpu",
+            "--ignore-gpu-blocklist",
+            "about:blank"
+          ],
+          "exit": 0,
+          "gpu_slot": true,
+          "id": "arrival",
+          "milliseconds": 10700,
+          "timed_out": false
+        },
+        {
+          "chrome_argv": [
+            "--headless=new",
+            "--remote-debugging-port=19218",
+            "--user-data-dir=<session profile>",
+            "--window-size=1280,860",
+            "--hide-scrollbars",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--password-store=basic",
+            "--use-mock-keychain",
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows",
+            "--use-angle=metal",
+            "--enable-gpu",
+            "--ignore-gpu-blocklist",
+            "about:blank"
+          ],
+          "exit": 0,
+          "gpu_slot": true,
+          "id": "creation",
+          "milliseconds": 11300,
+          "timed_out": false
+        },
+        {
+          "chrome_argv": [
+            "--headless=new",
+            "--remote-debugging-port=19218",
+            "--user-data-dir=<session profile>",
+            "--window-size=1280,860",
+            "--hide-scrollbars",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--password-store=basic",
+            "--use-mock-keychain",
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows",
+            "--use-angle=metal",
+            "--enable-gpu",
+            "--ignore-gpu-blocklist",
+            "about:blank"
+          ],
+          "exit": 0,
+          "gpu_slot": true,
+          "id": "appearance",
+          "milliseconds": 8300,
+          "timed_out": false
+        },
+        {
+          "chrome_argv": [
+            "--headless=new",
+            "--remote-debugging-port=19218",
+            "--user-data-dir=<session profile>",
+            "--window-size=1280,860",
+            "--hide-scrollbars",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--password-store=basic",
+            "--use-mock-keychain",
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows",
+            "--use-angle=metal",
+            "--enable-gpu",
+            "--ignore-gpu-blocklist",
+            "about:blank"
+          ],
+          "exit": 0,
+          "gpu_slot": true,
+          "id": "photos",
+          "milliseconds": 35300,
+          "timed_out": false
+        },
+        {
+          "chrome_argv": [
+            "--headless=new",
+            "--remote-debugging-port=19218",
+            "--user-data-dir=<session profile>",
+            "--window-size=1280,860",
+            "--hide-scrollbars",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--password-store=basic",
+            "--use-mock-keychain",
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows",
+            "--use-angle=metal",
+            "--enable-gpu",
+            "--ignore-gpu-blocklist",
+            "about:blank"
+          ],
+          "exit": 0,
+          "gpu_slot": true,
+          "id": "companion",
+          "milliseconds": 42500,
+          "timed_out": false
+        },
+        {
+          "chrome_argv": [
+            "--headless=new",
+            "--remote-debugging-port=19218",
+            "--user-data-dir=<session profile>",
+            "--window-size=1280,860",
+            "--hide-scrollbars",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--password-store=basic",
+            "--use-mock-keychain",
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows",
+            "--use-angle=metal",
+            "--enable-gpu",
+            "--ignore-gpu-blocklist",
+            "about:blank"
+          ],
+          "exit": 0,
+          "gpu_slot": true,
+          "id": "return",
+          "milliseconds": 3500,
+          "timed_out": false
+        }
+      ]
+    },
+    "build": {
+      "command": "vite build --outDir <run>/app-build --emptyOutDir",
+      "development_token_in_environment": false,
+      "index_html_sha256": "73d4c2594e1e7c15a58fa460c94b871adb739ab40c25eaff313da75192a1ae22",
+      "made_by": "the acceptance launcher, up --production",
+      "milliseconds": 2200,
+      "mode": "production",
+      "scripts": {
+        "index-HMZdocAv.js": "6f0525a8513435ade1cd35e9ef04afd3ef0521242812245bea300c14855bf079",
+        "main-aq5ampLh.js": "6957f57ea0fc9138c89a85d572c867ce9faeef96597d0bec33487effe9aab249",
+        "media-sampler-DoJAVaLP.js": "8aa0f518f974b19da69c79a9d3f1bd74c43e08183075a7fa18bd9ae929f14b07",
+        "preview-graph-BIMQ7_wh.js": "cf9e4cf57b98180588f9dfa9fe80a4c5a47c2e4afd6113cc2fa8feda51934d78",
+        "preview-media-BKmSDqIM.js": "240767a68936b9c1da0c2e55a4d1602c059183e6983ea69a5d939d0f7e4ea47b",
+        "preview-point-maps-Bc2yjgoe.js": "b3d0dd0719811d84faacadf4e7f4a940340f05a689cbec8700fa49fce358444a"
+      },
+      "served_index_is_the_build": true,
+      "served_index_sha256": "73d4c2594e1e7c15a58fa460c94b871adb739ab40c25eaff313da75192a1ae22",
+      "vite": "vite/6.4.3 darwin-arm64 node-v24.15.0"
+    },
+    "captures": [
+      {
+        "byte_size": 501725,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/photos-04-grant-model-rights-in-app-offered.png",
+        "sha256": "8a65d9761ceba20be4abcbda2f241eb4aa47ff7988ea65188a145a399c707ccb",
+        "shows": "The rights step: step 2 offers the vision, search and Companion rights, each unticked beside the notice the server states",
+        "step": "grant-model-rights-in-app"
+      },
+      {
+        "byte_size": 494543,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/photos-04-grant-model-rights-in-app-ticked.png",
+        "sha256": "b381ebf479852fa894f0d880d727e1daf2cd1eee891dc508bf90aa06a55f6b9d",
+        "shows": "The rights step: the three boxes ticked by trusted clicks before the grant",
+        "step": "grant-model-rights-in-app"
+      },
+      {
+        "byte_size": 458644,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/photos-04-grant-model-rights-in-app-listed.png",
+        "sha256": "8b87627693c5d34fe1ff814ee681468232688395d9944acdefe5912c0121eec7",
+        "shows": "The rights step: after the grant, each photograph lists every right with the end of its recorded term and a stop control",
+        "step": "grant-model-rights-in-app"
+      },
+      {
+        "byte_size": 655937,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/companion-01-ask-grounded-question-answer.png",
+        "sha256": "41ceb101fdb852d009eecc98da127273a12e1d429123ca1b970ab046c9387397",
+        "shows": "Companion interaction: the grounded answer with the model that composed it and its citation",
+        "step": "ask-grounded-question"
+      },
+      {
+        "byte_size": 617526,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/companion-02-open-cited-photograph-evidence.png",
+        "sha256": "4d8c86b5a0cbf9fc92ba182efb1d6aeb7172ca79ab5c6167d1a10c962da81ce9",
+        "shows": "Companion interaction: the cited photograph, a synthetic drawing, drawn inside the Companion",
+        "step": "open-cited-photograph"
+      },
+      {
+        "byte_size": 675165,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/companion-03-unanswerable-question-abstains-abstained.png",
+        "sha256": "e3e7ba99803d3feb50c38354844cda138a3efb2fbf6d0619e353decf14635111",
+        "shows": "Companion interaction: the answer to a question about a place no photograph shows",
+        "step": "unanswerable-question-abstains"
+      },
+      {
+        "byte_size": 555496,
+        "path": "docs/evaluation/artifacts/2026-09-24-rehearsal-main/companion-04-companion-proposes-appearance-change-proposal.png",
+        "sha256": "ca3e334d55111baa9f24848a8673422f7cc2fde481462f40f26561cf34bcca57",
+        "shows": "Companion interaction: the reply to the appearance request",
+        "step": "companion-proposes-appearance-change"
+      }
+    ],
+    "compared_with_predecessor": {
+      "application_head": "7364a21df1e899d2d7ec2838b762bb8c626579dc",
+      "differing_steps": [
+        {
+          "earlier_status": "not_available",
+          "step": "grant-model-rights-in-app",
+          "this_status": "passed"
+        }
+      ],
+      "steps_only_here": [
+        "read-about-this-place"
+      ],
+      "steps_only_there": [
+        "grant-model-rights-by-route"
+      ],
+      "summary": {
+        "failed": 1,
+        "not_available": 3,
+        "not_reachable": 0,
+        "passed": 26
+      }
+    },
+    "completed_at": "2026-09-24T12:01:19+00:00",
+    "corpus": {
+      "personal_media_admitted": false,
+      "photographs": [
+        {
+          "arm": "positive",
+          "board_text": "MIRELAND HALL",
+          "bytes": 139017,
+          "captured_at_utc": "2026-08-14T10:20:00+00:00",
+          "file": "mireland-01-nameplate.jpg",
+          "kind": "nameplate",
+          "place_name": "MIRELAND HALL",
+          "sha256": "721e888c86b76f92d63e9569878e21a1ce668af8c0a8c55f72c859c369d712ae"
+        },
+        {
+          "arm": "positive",
+          "board_text": "MIRELAND HALL",
+          "bytes": 141303,
+          "captured_at_utc": "2026-08-16T14:05:00+00:00",
+          "file": "mireland-02-nameplate-tree.jpg",
+          "kind": "nameplate_tree_beside",
+          "place_name": "MIRELAND HALL",
+          "sha256": "5d2d3d52cb9b6ea2702edc4367d8bc74169eb10dda598c65a070fcc8faf119d4"
+        },
+        {
+          "arm": "negative",
+          "board_text": null,
+          "bytes": 131882,
+          "captured_at_utc": "2026-08-17T16:30:00+00:00",
+          "file": "mireland-04-no-text.jpg",
+          "kind": "no_text",
+          "place_name": null,
+          "sha256": "3b6ad01fc14cb3ff6b341fda7fc4ec281f729aaa7f75edb5603e9f54471c9946"
+        }
+      ],
+      "photographs_reason": "Drawings of scripts/make_place_proposal_d_photographs.py at the indices the places and Companion lanes' end-to-end runs proposed MIRELAND HALL from, plus the drawing with no text as the control. No personal photograph.",
+      "workspace": "a fresh synthetic workspace minted by the acceptance launcher for this run"
+    },
+    "corpus_class": "synthetic",
+    "failures": [
+      {
+        "observations": [
+          {
+            "id": "proposal-drafted",
+            "observed": {
+              "classification": "appearance",
+              "proposal": null,
+              "refusal": {
+                "code": "unsupported_reference",
+                "detail": "this world holds no evidence a proposal could cite; attach a reviewed photograph to it, and a proposal can cite that photograph"
+              },
+              "status": 200
+            },
+            "ok": false
+          },
+          {
+            "id": "proposal-offered",
+            "observed": {
+              "mode": "answer",
+              "text": "UNNAMED COMPANION\n\nMake the horizon softer and the colours warmer\n\nThe proposed change did not name any of the photographs this world is drawn over, so there is nothing to review it against.\n\nQwen/Qwen3-235B-A22B-Instruct-2507 read that in 1.4 s. The reviewed design has no way to make that change."
+            },
+            "ok": false
+          },
+          {
+            "id": "proposal-ready-in-customize",
+            "observed": {
+              "lifecycle": "idle",
+              "review": ""
+            },
+            "ok": false
+          }
+        ],
+        "reason": "did not hold: proposal-drafted, proposal-offered, proposal-ready-in-customize",
+        "step": "companion-proposes-appearance-change"
+      }
+    ],
+    "gates": [
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "milestone:World entry",
+        "heading": "First milestone",
+        "name": "World entry",
+        "status": "passed",
+        "steps": [
+          {
+            "id": "enter-owned-starter",
+            "status": "passed"
+          },
+          {
+            "id": "read-about-this-place",
+            "status": "passed"
+          },
+          {
+            "id": "name-world",
+            "status": "passed"
+          },
+          {
+            "id": "open-close-photo-intake",
+            "status": "passed"
+          },
+          {
+            "id": "returning-user-reopens",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "milestone:Durable creation",
+        "heading": "First milestone",
+        "name": "Durable creation",
+        "status": "passed",
+        "steps": [
+          {
+            "id": "place-reviewed-object",
+            "status": "passed"
+          },
+          {
+            "id": "move-object",
+            "status": "passed"
+          },
+          {
+            "id": "creation-survives-reload",
+            "status": "passed"
+          },
+          {
+            "id": "undo-last-change",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "milestone:Inspection",
+        "heading": "First milestone",
+        "name": "Inspection",
+        "status": "passed",
+        "steps": [
+          {
+            "id": "inspect-object",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "milestone:Bounded interaction",
+        "heading": "First milestone",
+        "name": "Bounded interaction",
+        "status": "passed",
+        "steps": [
+          {
+            "id": "give-bounded-motion",
+            "status": "passed"
+          },
+          {
+            "id": "trigger-stop-reset",
+            "status": "passed"
+          },
+          {
+            "id": "refuse-unsupported-behaviour",
+            "status": "passed"
+          },
+          {
+            "id": "creation-survives-reload",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": {
+          "owner_area": "Companion appearance proposals: POST /selection/appearance (exulanica/api/routes/selection.py, exulanica/selection/proposal.py) and web/packages/app/src/composition/appearance.ts",
+          "reason": "did not hold: proposal-drafted, proposal-offered, proposal-ready-in-customize",
+          "step": "companion-proposes-appearance-change"
+        },
+        "gate": "milestone:Companion interaction",
+        "heading": "First milestone",
+        "name": "Companion interaction",
+        "status": "failed",
+        "steps": [
+          {
+            "id": "upload-synthetic-photographs",
+            "status": "passed"
+          },
+          {
+            "id": "grant-model-rights-in-app",
+            "status": "passed"
+          },
+          {
+            "id": "confirm-proposed-place",
+            "status": "passed"
+          },
+          {
+            "id": "ask-grounded-question",
+            "status": "passed"
+          },
+          {
+            "id": "open-cited-photograph",
+            "status": "passed"
+          },
+          {
+            "id": "unanswerable-question-abstains",
+            "status": "passed"
+          },
+          {
+            "id": "companion-proposes-appearance-change",
+            "status": "failed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "milestone:Developer proof",
+        "heading": "First milestone",
+        "name": "Developer proof",
+        "status": "passed",
+        "steps": [
+          {
+            "id": "developer-client-walkthrough",
+            "status": "passed"
+          },
+          {
+            "id": "returning-user-reopens",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "milestone:Personal-media path",
+        "heading": "First milestone",
+        "name": "Personal-media path",
+        "status": "not_available",
+        "steps": [
+          {
+            "id": "upload-synthetic-photographs",
+            "status": "passed"
+          },
+          {
+            "id": "authorize-admission-in-app",
+            "status": "passed"
+          },
+          {
+            "id": "grant-model-rights-in-app",
+            "status": "passed"
+          },
+          {
+            "id": "reconstruct-scene-geometry",
+            "status": "not_available"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "delivery:Usable environment",
+        "heading": "Delivery gates for the first demonstration",
+        "name": "Usable environment",
+        "status": "passed",
+        "steps": [
+          {
+            "id": "enter-owned-starter",
+            "status": "passed"
+          },
+          {
+            "id": "read-about-this-place",
+            "status": "passed"
+          },
+          {
+            "id": "explore-walk",
+            "status": "passed"
+          },
+          {
+            "id": "inspect-object",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": {
+          "owner_area": "Companion appearance proposals: POST /selection/appearance (exulanica/api/routes/selection.py, exulanica/selection/proposal.py) and web/packages/app/src/composition/appearance.ts",
+          "reason": "did not hold: proposal-drafted, proposal-offered, proposal-ready-in-customize",
+          "step": "companion-proposes-appearance-change"
+        },
+        "gate": "delivery:Meaningful action",
+        "heading": "Delivery gates for the first demonstration",
+        "name": "Meaningful action",
+        "status": "failed",
+        "steps": [
+          {
+            "id": "place-reviewed-object",
+            "status": "passed"
+          },
+          {
+            "id": "change-appearance",
+            "status": "passed"
+          },
+          {
+            "id": "ask-grounded-question",
+            "status": "passed"
+          },
+          {
+            "id": "companion-proposes-appearance-change",
+            "status": "failed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "delivery:Persistence",
+        "heading": "Delivery gates for the first demonstration",
+        "name": "Persistence",
+        "status": "passed",
+        "steps": [
+          {
+            "id": "name-world",
+            "status": "passed"
+          },
+          {
+            "id": "creation-survives-reload",
+            "status": "passed"
+          },
+          {
+            "id": "undo-last-change",
+            "status": "passed"
+          },
+          {
+            "id": "appearance-survives-reload",
+            "status": "passed"
+          },
+          {
+            "id": "restore-original-appearance",
+            "status": "passed"
+          },
+          {
+            "id": "returning-user-reopens",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "delivery:Independent use",
+        "heading": "Delivery gates for the first demonstration",
+        "name": "Independent use",
+        "status": "passed",
+        "steps": [
+          {
+            "id": "developer-client-walkthrough",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "document": "docs/product-direction.md",
+        "first_failure": null,
+        "gate": "delivery:Release rehearsal",
+        "heading": "Delivery gates for the first demonstration",
+        "name": "Release rehearsal",
+        "status": "not_available",
+        "steps": [
+          {
+            "id": "clean-start",
+            "status": "passed"
+          },
+          {
+            "id": "access-gate",
+            "status": "passed"
+          },
+          {
+            "id": "observe-a-person-and-footage",
+            "status": "not_available"
+          }
+        ]
+      }
+    ],
+    "machine_load": {
+      "one_minute_max": "36.23",
+      "one_minute_min": "7.50",
+      "readings": "12"
+    },
+    "model": {
+      "allowlist": [
+        "https://api.tokenfactory.nebius.com"
+      ],
+      "configured": true,
+      "credential": "read by a child process from the named environment file, by environment only",
+      "spend": {
+        "ask_before_usd": "0.50",
+        "bound_usd": "0.10",
+        "estimate_usd": "0.05",
+        "reported_usd": "0.00557062",
+        "step_list_bound_usd": "1.00"
+      }
+    },
+    "model_rights_step": {
+      "observations": [
+        {
+          "id": "rights-offered",
+          "observed": {
+            "clicks": [
+              {
+                "checked": true,
+                "note": null,
+                "role": "vision",
+                "trusted": true
+              },
+              {
+                "checked": true,
+                "note": null,
+                "role": "embedding",
+                "trusted": true
+              },
+              {
+                "checked": true,
+                "note": null,
+                "role": "reasoning_cheap",
+                "trusted": true
+              }
+            ],
+            "drawn": [
+              {
+                "checked": false,
+                "choice": "Let an outside AI model describe these photos and read any text in them",
+                "label": "Let an outside AI model describe these photos and read any text in them",
+                "notice": "A copy of each selected photo, reduced in size if it is large and without its location or camera details, will be sent to an AI service outside Exulanica, at api.tokenfactory.nebius.com, where a model will describe what it shows and read any text in it. The people in the photo are not hidden from this model: it is the model that finds them, so that Exulanica can hide them in what it builds. The model is MiniMaxAI/MiniMax-M3, or when that one is unavailable, openbmb/MiniCPM-V-4_5. You can stop this at any time: nothing more is sent from then on, and descriptions already made stay in your library.",
+                "notice_equals_offer": true,
+                "role": "vision"
+              },
+              {
+                "checked": false,
+                "choice": "Let an outside AI model index these photos' descriptions so your questions can find them",
+                "label": "Let an outside AI model index these photos' descriptions so your questions can find them",
+                "notice": "The descriptions made from each selected photo will be sent to an AI service outside Exulanica, at api.tokenfactory.nebius.com, where a model will index them so your questions can find the photo. Names you gave people are replaced before anything is sent, and a place's name is sent only where you allowed it for that place. The model is Qwen/Qwen3-Embedding-8B. You can stop this at any time: nothing more is sent from then on, and search entries already made stay.",
+                "notice_equals_offer": true,
+                "role": "embedding"
+              },
+              {
+                "checked": false,
+                "choice": "Let an outside AI model write Companion answers from these photos",
+                "label": "Let an outside AI model write Companion answers from these photos",
+                "notice": "The descriptions and dates of the selected photos, whenever a Companion question finds them, will be sent to an AI service outside Exulanica, at api.tokenfactory.nebius.com, where a model will write the answer to your question. Names you gave people are replaced before anything is sent, and a place's name is sent only where you allowed it for that place. The model is nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B, or when that one is unavailable, nvidia/Nemotron-3_5-Lightning. You can stop this at any time: nothing more is sent from then on, and answers already given stay.",
+                "notice_equals_offer": true,
+                "role": "reasoning_cheap"
+              }
+            ],
+            "drawn_but_not_offered": [],
+            "mismatches": [],
+            "offered_roles": [
+              "vision",
+              "embedding",
+              "reasoning_cheap"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "id": "rights-recorded",
+          "observed": {
+            "detail": null,
+            "members": [
+              "01a0d349-6c24-7e2a-8462-9e093a303968",
+              "01a0d349-6c3f-7d67-ba00-b5c897c054e7",
+              "01a0d349-6c52-7ebf-af32-ae2a92911a0f"
+            ],
+            "per_photo": [
+              {
+                "capture_id": "01a0d349-6c24-7e2a-8462-9e093a303968",
+                "in_request": true,
+                "listed": [
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "reasoning_cheap"
+                    },
+                    "notice_current": true,
+                    "right_id": "dff49845-6cbb-5064-973a-41713b14fe8a",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "Qwen/Qwen3-Embedding-8B",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "embedding"
+                    },
+                    "notice_current": true,
+                    "right_id": "cbf9f09e-e4ee-583e-906b-99457cef7c9c",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "MiniMaxAI/MiniMax-M3",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "vision"
+                    },
+                    "notice_current": true,
+                    "right_id": "848ff864-e51c-5734-aaae-79ebfb3de3c2",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "openbmb/MiniCPM-V-4_5",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "vision"
+                    },
+                    "notice_current": true,
+                    "right_id": "10130a52-8a25-5d44-9238-12e1f5e491c9",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "nvidia/Nemotron-3_5-Lightning",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "reasoning_cheap"
+                    },
+                    "notice_current": true,
+                    "right_id": "0bd40645-c987-5a3c-b90b-3336feef86e1",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  }
+                ],
+                "listed_current_with_these_words": [
+                  "vision",
+                  "embedding",
+                  "reasoning_cheap"
+                ],
+                "receipt_covers": [
+                  "vision",
+                  "embedding",
+                  "reasoning_cheap"
+                ]
+              },
+              {
+                "capture_id": "01a0d349-6c3f-7d67-ba00-b5c897c054e7",
+                "in_request": true,
+                "listed": [
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "MiniMaxAI/MiniMax-M3",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "vision"
+                    },
+                    "notice_current": true,
+                    "right_id": "91b11891-df16-51b5-92dd-53ac4419e1ac",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "Qwen/Qwen3-Embedding-8B",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "embedding"
+                    },
+                    "notice_current": true,
+                    "right_id": "7a91ad5a-fbaf-5482-ad85-df3f15a4e2dd",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "reasoning_cheap"
+                    },
+                    "notice_current": true,
+                    "right_id": "793d3e7f-4e31-50da-8f4a-440fd62dea96",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "nvidia/Nemotron-3_5-Lightning",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "reasoning_cheap"
+                    },
+                    "notice_current": true,
+                    "right_id": "6c32a8ad-cf1c-58dd-a61f-374b56847f39",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "openbmb/MiniCPM-V-4_5",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "vision"
+                    },
+                    "notice_current": true,
+                    "right_id": "2dd5e6db-9762-5623-a3c3-f96f76a90ec5",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  }
+                ],
+                "listed_current_with_these_words": [
+                  "vision",
+                  "embedding",
+                  "reasoning_cheap"
+                ],
+                "receipt_covers": [
+                  "vision",
+                  "embedding",
+                  "reasoning_cheap"
+                ]
+              },
+              {
+                "capture_id": "01a0d349-6c52-7ebf-af32-ae2a92911a0f",
+                "in_request": true,
+                "listed": [
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "Qwen/Qwen3-Embedding-8B",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "embedding"
+                    },
+                    "notice_current": true,
+                    "right_id": "fc5120ec-7780-59f7-b329-f71a6bde8f57",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "nvidia/Nemotron-3_5-Lightning",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "reasoning_cheap"
+                    },
+                    "notice_current": true,
+                    "right_id": "f5d07eda-78d2-5560-9b7b-bf6130a6769d",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "openbmb/MiniCPM-V-4_5",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "vision"
+                    },
+                    "notice_current": true,
+                    "right_id": "a23eec11-4c40-5307-956d-84db7de7a2f4",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "reasoning_cheap"
+                    },
+                    "notice_current": true,
+                    "right_id": "3a09e0ef-a93b-5c21-b34a-74fcf3acdb63",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  },
+                  {
+                    "destination": "https://api.tokenfactory.nebius.com",
+                    "model": {
+                      "model_id": "MiniMaxAI/MiniMax-M3",
+                      "provider": "nebius_token_factory",
+                      "revision": null,
+                      "role": "vision"
+                    },
+                    "notice_current": true,
+                    "right_id": "145f5033-c13a-5837-86c7-593c6d392fce",
+                    "state": "current",
+                    "valid_until": "2026-09-25T12:00:00.000000Z"
+                  }
+                ],
+                "listed_current_with_these_words": [
+                  "vision",
+                  "embedding",
+                  "reasoning_cheap"
+                ],
+                "receipt_covers": [
+                  "vision",
+                  "embedding",
+                  "reasoning_cheap"
+                ]
+              }
+            ],
+            "request_body_recorded": true,
+            "sent": [
+              {
+                "notice_equals_offer": true,
+                "role": "vision",
+                "valid_until": "2026-09-25T12:00:00.000Z"
+              },
+              {
+                "notice_equals_offer": true,
+                "role": "embedding",
+                "valid_until": "2026-09-25T12:00:00.000Z"
+              },
+              {
+                "notice_equals_offer": true,
+                "role": "reasoning_cheap",
+                "valid_until": "2026-09-25T12:00:00.000Z"
+              }
+            ],
+            "status": 202
+          },
+          "ok": true
+        },
+        {
+          "id": "rights-listed",
+          "observed": {
+            "boxes_after": [
+              {
+                "checked": false,
+                "role": "vision"
+              },
+              {
+                "checked": false,
+                "role": "embedding"
+              },
+              {
+                "checked": false,
+                "role": "reasoning_cheap"
+              }
+            ],
+            "expected_lines": {
+              "01a0d349-6c24-7e2a-8462-9e093a303968": {
+                "embedding": "Search index: allowed until 9/25/2026, 8:00:00 AM",
+                "reasoning_cheap": "Companion answers: allowed until 9/25/2026, 8:00:00 AM",
+                "vision": "Photo descriptions: allowed until 9/25/2026, 8:00:00 AM"
+              },
+              "01a0d349-6c3f-7d67-ba00-b5c897c054e7": {
+                "embedding": "Search index: allowed until 9/25/2026, 8:00:00 AM",
+                "reasoning_cheap": "Companion answers: allowed until 9/25/2026, 8:00:00 AM",
+                "vision": "Photo descriptions: allowed until 9/25/2026, 8:00:00 AM"
+              },
+              "01a0d349-6c52-7ebf-af32-ae2a92911a0f": {
+                "embedding": "Search index: allowed until 9/25/2026, 8:00:00 AM",
+                "reasoning_cheap": "Companion answers: allowed until 9/25/2026, 8:00:00 AM",
+                "vision": "Photo descriptions: allowed until 9/25/2026, 8:00:00 AM"
+              }
+            },
+            "photographs": [
+              {
+                "capture": "01a0d349-6c24-7e2a-8462-9e093a303968",
+                "states": {
+                  "embedding": "Search index: allowed until 9/25/2026, 8:00:00 AM",
+                  "reasoning_cheap": "Companion answers: allowed until 9/25/2026, 8:00:00 AM",
+                  "vision": "Photo descriptions: allowed until 9/25/2026, 8:00:00 AM"
+                },
+                "stops": [
+                  "Stop sending this photo for descriptions",
+                  "Stop sending its descriptions for search",
+                  "Stop sending its descriptions for answers"
+                ]
+              },
+              {
+                "capture": "01a0d349-6c3f-7d67-ba00-b5c897c054e7",
+                "states": {
+                  "embedding": "Search index: allowed until 9/25/2026, 8:00:00 AM",
+                  "reasoning_cheap": "Companion answers: allowed until 9/25/2026, 8:00:00 AM",
+                  "vision": "Photo descriptions: allowed until 9/25/2026, 8:00:00 AM"
+                },
+                "stops": [
+                  "Stop sending this photo for descriptions",
+                  "Stop sending its descriptions for search",
+                  "Stop sending its descriptions for answers"
+                ]
+              },
+              {
+                "capture": "01a0d349-6c52-7ebf-af32-ae2a92911a0f",
+                "states": {
+                  "embedding": "Search index: allowed until 9/25/2026, 8:00:00 AM",
+                  "reasoning_cheap": "Companion answers: allowed until 9/25/2026, 8:00:00 AM",
+                  "vision": "Photo descriptions: allowed until 9/25/2026, 8:00:00 AM"
+                },
+                "stops": [
+                  "Stop sending this photo for descriptions",
+                  "Stop sending its descriptions for search",
+                  "Stop sending its descriptions for answers"
+                ]
+              }
+            ]
+          },
+          "ok": true
+        },
+        {
+          "id": "vision-ran",
+          "observed": {
+            "cost": {
+              "input_tokens": 5928,
+              "model_calls": 8,
+              "output_tokens": 1989,
+              "usd_estimate": "0.00402136"
+            },
+            "jobs": {
+              "01a0d349-6c5f-7972-a5e1-3eb4a49d8c79": "job_succeeded",
+              "01a0d349-6ef8-71e3-a06c-ddd3f5b8777a": "job_succeeded",
+              "01a0d349-790a-7534-8693-19909471503e": "job_succeeded"
+            }
+          },
+          "ok": true
+        },
+        {
+          "id": "place-proposed",
+          "observed": {
+            "expected": [
+              "01a0d349-6c24-7e2a-8462-9e093a303968",
+              "01a0d349-6c3f-7d67-ba00-b5c897c054e7"
+            ],
+            "place_occurrences": [
+              {
+                "capture_id": "01a0d349-6c24-7e2a-8462-9e093a303968",
+                "entity_id": null,
+                "occurrence_id": "01a0d349-9098-796a-be48-a03fe0a36799"
+              },
+              {
+                "capture_id": "01a0d349-6c3f-7d67-ba00-b5c897c054e7",
+                "entity_id": null,
+                "occurrence_id": "01a0d349-aef9-72b3-9a07-85a56d6d1a93"
+              }
+            ]
+          },
+          "ok": true
+        }
+      ],
+      "status": "passed"
+    },
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-23-rehearsal-main.json",
+      "record_sha256": "4b19fe2375cef000c7bf1802573dfb87da742e6f31d21af5853cba0c1722b3d3",
+      "relation": "the earlier recorded rehearsal of main, whose rights step posted the grant through the route"
+    },
+    "profile": "exulanica.rehearsal-run/v1",
+    "rehearsal": {
+      "driver": {
+        "app.mjs": {
+          "published_as": "driver/app.mjs.txt",
+          "sha256": "69c22588418d511e4b6d7a82c8719090d20dfa1c9402bf79c1b8ddbb1fcbfb69"
+        },
+        "cdp.mjs": {
+          "published_as": "driver/cdp.mjs.txt",
+          "sha256": "c4fde4ad3a5edbc8d9bbf6542db34f29ebd314d0d83035672f5a1d553258267f"
+        },
+        "handlers.mjs": {
+          "published_as": "driver/handlers.mjs.txt",
+          "sha256": "45f36903118d1e5b50c7766cf35c9b7794ba473c26e6c969dc8a54bf3a228841"
+        },
+        "photographs.py": {
+          "published_as": "driver/photographs.py.txt",
+          "sha256": "df1ea7f88c87edceb0b8dd777cbd5f4e000dece26799fc26f589bd361d162732"
+        },
+        "rehearse.py": {
+          "published_as": "driver/rehearse.py.txt",
+          "sha256": "fe946a1b8aacc7bb86c5a2e3da7c3e8915087d6653dcd22a8d0a1a62ecf54b36"
+        },
+        "result.schema.json": {
+          "published_as": "driver/result.schema.json.txt",
+          "sha256": "060ba11a84e60eef3f54cec54f079032352534a821b26c47607c1e1d60af0dfe"
+        },
+        "resultdoc.py": {
+          "published_as": "driver/resultdoc.py.txt",
+          "sha256": "94cb3e0e080c549eff63df82fd8feba26bda206c7fc2eca430c64cbc6712d36b"
+        },
+        "session.mjs": {
+          "published_as": "driver/session.mjs.txt",
+          "sha256": "d94a46947fb2836c636a857b8232b9bc987f3721b9dded7557cd987bc63e2441"
+        },
+        "steplist.py": {
+          "published_as": "driver/steplist.py.txt",
+          "sha256": "83a7f54acc4d98c551f9e2db6e886e213844debe71e8efe810a539828b1bc8a1"
+        },
+        "steps.json": {
+          "published_as": "driver/steps.json.txt",
+          "sha256": "88409e3b13c16659f56bae8b19a3bcd33fa910ebe5e492e4c9e3c678fb7b5a52"
+        },
+        "usd.mjs": {
+          "published_as": "driver/usd.mjs.txt",
+          "sha256": "0d5b7f78b26cde08b934a680bf84b006b9e8382194cfb88f40452019122f3116"
+        }
+      },
+      "driver_established": "each file's bytes hash to the SHA-256 the run recorded for it in run.rehearsal_files",
+      "rehearsal_tree": {
+        "diff_head_sha256": "5afc526164dbcc5618cd23a57ff1ba85d7df1ac051da5fb3282a74294748711d",
+        "head": "209b57420bed5a56c224b35ca2312f2dd6a83c31"
+      },
+      "steps_profile": "exulanica.rehearsal-steps/v1",
+      "steps_sha256_as_run": "88409e3b13c16659f56bae8b19a3bcd33fa910ebe5e492e4c9e3c678fb7b5a52",
+      "steps_version": 4
+    },
+    "result_sha256_as_written_by_the_run": "56ef8fb91bfc57a3c040c5b2c4c401a7e9d01befeb01fc872e66f81cab1bb573",
+    "runtime": {
+      "api_imported_exulanica_from": "<application-tree>/exulanica/__init__.py",
+      "derivative_worker": "in-process",
+      "launcher": "<rehearsal-tree>/scripts/acceptance/launch.py",
+      "ports": {
+        "api": 19216,
+        "browser": 19218,
+        "database": 19215,
+        "preview": 19217,
+        "spare": 19219,
+        "vite": 19217
+      },
+      "slot": 3,
+      "workspace": "a fresh synthetic workspace minted by the acceptance launcher for this run",
+      "workspace_id": "69885f66-9561-4080-9230-0fba32f40d32"
+    },
+    "scope": "One run of the automated rehearsal of the first demonstration (scripts/rehearsal) against main in the real application: a production build in headless Chrome over the DevTools protocol, one page per session, a fresh synthetic workspace on acceptance slot 3, and the hosted models through the product's configured client. The model rights the Companion needs are given in the photo drawer against the notices the server states. Each step is a person's action with its declared observable results; each gate of docs/product-direction.md is reported with its first failed step.",
+    "scrubbing": "machine locations in the published result and summary are replaced by <application-tree>, <model-environment-file>, <run>, <main-checkout>, <rehearsal-tree> and <temporary>, and neither holds the placeholder the run wrote for the home directory. The images are the bytes the run captured, and each matches the SHA-256 the run recorded for it. Durations the run wrote in seconds are given here in whole milliseconds.",
+    "spend": {
+      "ask_before_usd": "0.50",
+      "bound_usd": "0.10",
+      "by_step": {
+        "ask-grounded-question": "0.00104666",
+        "companion-proposes-appearance-change": "0.0001174",
+        "grant-model-rights-in-app": "0.00402136",
+        "unanswerable-question-abstains": "0.0003852"
+      },
+      "estimate_usd": "0.05",
+      "reported_usd": "0.00557062",
+      "step_list_bound_usd": "1.00"
+    },
+    "steps": [
+      {
+        "gates": [
+          "delivery:Release rehearsal"
+        ],
+        "id": "clean-start",
+        "observations": [
+          {
+            "id": "no-saved-world-yet",
+            "ok": true
+          },
+          {
+            "id": "runtime-ready",
+            "ok": true
+          },
+          {
+            "id": "production-build-served",
+            "ok": true
+          }
+        ],
+        "owner_area": "rehearsal runtime: the acceptance launcher and the production build of web/packages/app",
+        "reason": null,
+        "session": "setup",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "delivery:Release rehearsal"
+        ],
+        "id": "access-gate",
+        "observations": [
+          {
+            "id": "gate-shown",
+            "ok": true
+          },
+          {
+            "id": "wrong-token-refused",
+            "ok": true
+          },
+          {
+            "id": "token-opens-world",
+            "ok": true
+          }
+        ],
+        "owner_area": "access: web/packages/app/src/main.ts (askForAccess) and the API's bearer authentication",
+        "reason": null,
+        "session": "arrival",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:World entry",
+          "delivery:Usable environment"
+        ],
+        "id": "enter-owned-starter",
+        "observations": [
+          {
+            "id": "starter-opens",
+            "ok": true
+          },
+          {
+            "id": "first-use-card",
+            "ok": true
+          },
+          {
+            "id": "renderer-mounted",
+            "ok": true
+          },
+          {
+            "id": "one-authored-starter",
+            "ok": true
+          },
+          {
+            "id": "same-world-after-reload",
+            "ok": true
+          }
+        ],
+        "owner_area": "saved-world entry: web/packages/app/src/composition/session-and-geometry.ts and exulanica/api/routes/world_entries.py",
+        "reason": null,
+        "session": "arrival",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:World entry",
+          "delivery:Usable environment"
+        ],
+        "id": "read-about-this-place",
+        "observations": [
+          {
+            "id": "about-states-the-world",
+            "ok": true
+          },
+          {
+            "id": "starter-offers-no-district-views",
+            "ok": true
+          }
+        ],
+        "owner_area": "the About panel: web/packages/app/src/world-about.ts, the world.about sentences in web/packages/app/src/ui/copy.ts, and web/packages/app/src/composition/environment-selection.ts; which camera views a kind of world offers: worldViews in web/packages/atlas-react/src/playcanvas/world-kind.ts",
+        "reason": null,
+        "session": "arrival",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:World entry",
+          "delivery:Persistence"
+        ],
+        "id": "name-world",
+        "observations": [
+          {
+            "id": "title-saved-shown",
+            "ok": true
+          },
+          {
+            "id": "title-held",
+            "ok": true
+          },
+          {
+            "id": "title-after-reload",
+            "ok": true
+          }
+        ],
+        "owner_area": "saved-world entry: web/packages/app/src/ui/world-identity.ts and PUT /world-entries/{entry_id}",
+        "reason": null,
+        "session": "arrival",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "delivery:Usable environment"
+        ],
+        "id": "explore-walk",
+        "observations": [
+          {
+            "id": "canvas-takes-keys",
+            "ok": true
+          },
+          {
+            "id": "moves-while-held",
+            "ok": true
+          },
+          {
+            "id": "stops-when-released",
+            "ok": true
+          }
+        ],
+        "owner_area": "movement: web/packages/atlas-react/src/playcanvas/controls.ts and web/packages/app/src/composition/renderer.ts",
+        "reason": null,
+        "session": "arrival",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Durable creation",
+          "delivery:Meaningful action"
+        ],
+        "id": "place-reviewed-object",
+        "observations": [
+          {
+            "id": "confirm-before-write",
+            "ok": true
+          },
+          {
+            "id": "object-listed",
+            "ok": true
+          },
+          {
+            "id": "object-in-version",
+            "ok": true
+          }
+        ],
+        "owner_area": "world objects and composition: web/packages/app/src/composition/objects.ts and exulanica/api/routes/world_compositions.py",
+        "reason": null,
+        "session": "creation",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Durable creation"
+        ],
+        "id": "move-object",
+        "observations": [
+          {
+            "id": "move-confirmed",
+            "ok": true
+          },
+          {
+            "id": "transform-changed",
+            "ok": true
+          }
+        ],
+        "owner_area": "world objects: web/packages/app/src/composition/objects.ts and POST /world/versions/{version_id}/objects/{object_id}/move",
+        "reason": null,
+        "session": "creation",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Inspection",
+          "delivery:Usable environment"
+        ],
+        "id": "inspect-object",
+        "observations": [
+          {
+            "id": "inspector-shown",
+            "ok": true
+          },
+          {
+            "id": "subject-selectable",
+            "ok": true
+          },
+          {
+            "id": "geometry-and-origin",
+            "ok": true
+          },
+          {
+            "id": "missing-explicit",
+            "ok": true
+          }
+        ],
+        "owner_area": "world to data inspection: web/packages/app/src/ui/representation-availability.ts and the representation inspector",
+        "reason": null,
+        "session": "creation",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Bounded interaction"
+        ],
+        "id": "give-bounded-motion",
+        "observations": [
+          {
+            "id": "motion-confirmed",
+            "ok": true
+          },
+          {
+            "id": "behaviour-held",
+            "ok": true
+          }
+        ],
+        "owner_area": "object behaviours: web/packages/app/src/composition/objects.ts and POST /world/versions/{version_id}/objects/{object_id}/behaviour",
+        "reason": null,
+        "session": "creation",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Bounded interaction"
+        ],
+        "id": "trigger-stop-reset",
+        "observations": [
+          {
+            "id": "travelling",
+            "ok": true
+          },
+          {
+            "id": "stopped-part-way",
+            "ok": true
+          },
+          {
+            "id": "reset-to-rest",
+            "ok": true
+          },
+          {
+            "id": "no-write",
+            "ok": true
+          }
+        ],
+        "owner_area": "object behaviours at runtime: web/packages/atlas-react/src/playcanvas/scene-objects.ts and web/packages/app/src/composition/objects.ts",
+        "reason": null,
+        "session": "creation",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Bounded interaction"
+        ],
+        "id": "refuse-unsupported-behaviour",
+        "observations": [
+          {
+            "id": "refused-with-reason",
+            "ok": true
+          },
+          {
+            "id": "nothing-written",
+            "ok": true
+          }
+        ],
+        "owner_area": "object behaviours: exulanica/world/objects.py and exulanica/api/routes/world_objects.py",
+        "reason": null,
+        "session": "creation",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Durable creation",
+          "milestone:Bounded interaction",
+          "delivery:Persistence"
+        ],
+        "id": "creation-survives-reload",
+        "observations": [
+          {
+            "id": "same-version-state",
+            "ok": true
+          },
+          {
+            "id": "definition-kept",
+            "ok": true
+          },
+          {
+            "id": "object-drawn",
+            "ok": true
+          }
+        ],
+        "owner_area": "world objects: exulanica/world/object_repository.py and web/packages/app/src/composition/objects.ts",
+        "reason": null,
+        "session": "creation",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Durable creation",
+          "delivery:Persistence"
+        ],
+        "id": "undo-last-change",
+        "observations": [
+          {
+            "id": "undo-confirmed",
+            "ok": true
+          },
+          {
+            "id": "undo-is-an-edit",
+            "ok": true
+          },
+          {
+            "id": "undo-kept",
+            "ok": true
+          }
+        ],
+        "owner_area": "world objects: POST /world/versions/{version_id}/objects/undo and web/packages/app/src/composition/objects.ts",
+        "reason": null,
+        "session": "creation",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "delivery:Meaningful action"
+        ],
+        "id": "change-appearance",
+        "observations": [
+          {
+            "id": "preview-validated",
+            "ok": true
+          },
+          {
+            "id": "applied-as-new-revision",
+            "ok": true
+          },
+          {
+            "id": "new-style-version",
+            "ok": true
+          }
+        ],
+        "owner_area": "world appearance: web/packages/app/src/ui/options.ts, web/packages/app/src/composition/appearance.ts and the style routes in exulanica/api/routes/world.py",
+        "reason": null,
+        "session": "appearance",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "delivery:Persistence"
+        ],
+        "id": "appearance-survives-reload",
+        "observations": [
+          {
+            "id": "style-kept",
+            "ok": true
+          }
+        ],
+        "owner_area": "world appearance: web/packages/app/src/composition/appearance.ts and GET /world/styles/current",
+        "reason": null,
+        "session": "appearance",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "delivery:Persistence"
+        ],
+        "id": "restore-original-appearance",
+        "observations": [
+          {
+            "id": "restored-shown",
+            "ok": true
+          },
+          {
+            "id": "restored-values",
+            "ok": true
+          },
+          {
+            "id": "history-kept",
+            "ok": true
+          },
+          {
+            "id": "restore-kept",
+            "ok": true
+          }
+        ],
+        "owner_area": "world appearance: POST /world/styles/rollback and web/packages/app/src/ui/options.ts",
+        "reason": null,
+        "session": "appearance",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:World entry"
+        ],
+        "id": "open-close-photo-intake",
+        "observations": [
+          {
+            "id": "drawer-beside-world",
+            "ok": true
+          },
+          {
+            "id": "world-kept",
+            "ok": true
+          }
+        ],
+        "owner_area": "personal photo intake: web/packages/app/src/ui/personal-intake.ts",
+        "reason": null,
+        "session": "photos",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Personal-media path",
+          "milestone:Companion interaction"
+        ],
+        "id": "upload-synthetic-photographs",
+        "observations": [
+          {
+            "id": "originals-listed",
+            "ok": true
+          },
+          {
+            "id": "captures-accepted",
+            "ok": true
+          }
+        ],
+        "owner_area": "personal photo intake: web/packages/app/src/composition/personal-intake.ts and exulanica/api/routes/intake.py",
+        "reason": null,
+        "session": "photos",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Personal-media path"
+        ],
+        "id": "authorize-admission-in-app",
+        "observations": [
+          {
+            "id": "receipts-recorded",
+            "ok": true
+          },
+          {
+            "id": "admitted-for-detection",
+            "ok": true
+          }
+        ],
+        "owner_area": "personal admission: web/packages/app/src/composition/personal-intake.ts and exulanica/api/routes/personal_admission.py",
+        "reason": null,
+        "session": "photos",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Companion interaction",
+          "milestone:Personal-media path"
+        ],
+        "id": "grant-model-rights-in-app",
+        "observations": [
+          {
+            "id": "rights-offered",
+            "ok": true
+          },
+          {
+            "id": "rights-recorded",
+            "ok": true
+          },
+          {
+            "id": "rights-listed",
+            "ok": true
+          },
+          {
+            "id": "vision-ran",
+            "ok": true
+          },
+          {
+            "id": "place-proposed",
+            "ok": true
+          }
+        ],
+        "owner_area": "model rights in the photo drawer: web/packages/app/src/ui/model-right-controls.ts, web/packages/app/src/composition/personal-intake.ts, exulanica/ingest/model-right-uses.v1.json and exulanica/ingest/personal_admission.py; the vision stage: exulanica/ingest/stages/vision.py and exulanica/ingest/place_proposal.py",
+        "reason": null,
+        "session": "photos",
+        "spend_usd": "0.00402136",
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Companion interaction"
+        ],
+        "id": "confirm-proposed-place",
+        "observations": [
+          {
+            "id": "place-named",
+            "ok": true
+          },
+          {
+            "id": "library-lists-place",
+            "ok": true
+          }
+        ],
+        "owner_area": "place identity: exulanica/api/routes/identity.py; the Library: web/packages/app/src/ui (index)",
+        "reason": null,
+        "session": "photos",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Companion interaction",
+          "delivery:Meaningful action"
+        ],
+        "id": "ask-grounded-question",
+        "observations": [
+          {
+            "id": "answer-shown",
+            "ok": true
+          },
+          {
+            "id": "names-restored",
+            "ok": true
+          },
+          {
+            "id": "executed-model-shown",
+            "ok": true
+          },
+          {
+            "id": "citation-offered",
+            "ok": true
+          },
+          {
+            "id": "grounded-execution",
+            "ok": true
+          }
+        ],
+        "owner_area": "Companion answers: exulanica/selection/question.py, web/packages/app/src/composition/companion.ts and web/packages/app/src/ui/companion-speech.ts",
+        "reason": null,
+        "session": "companion",
+        "spend_usd": "0.00104666",
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Companion interaction"
+        ],
+        "id": "open-cited-photograph",
+        "observations": [
+          {
+            "id": "photograph-shown",
+            "ok": true
+          },
+          {
+            "id": "evidence-served",
+            "ok": true
+          }
+        ],
+        "owner_area": "Companion evidence: web/packages/app/src/composition/companion.ts and GET /evidence/{span_id}/masked",
+        "reason": null,
+        "session": "companion",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Companion interaction"
+        ],
+        "id": "unanswerable-question-abstains",
+        "observations": [
+          {
+            "id": "missing-said",
+            "ok": true
+          },
+          {
+            "id": "nothing-cited-for-absent-place",
+            "ok": true
+          }
+        ],
+        "owner_area": "Companion answers: exulanica/selection/question.py and exulanica/selection/answer.py",
+        "reason": null,
+        "session": "companion",
+        "spend_usd": "0.0003852",
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Companion interaction",
+          "delivery:Meaningful action"
+        ],
+        "id": "companion-proposes-appearance-change",
+        "observations": [
+          {
+            "id": "proposal-drafted",
+            "ok": false
+          },
+          {
+            "id": "proposal-offered",
+            "ok": false
+          },
+          {
+            "id": "proposal-ready-in-customize",
+            "ok": false
+          }
+        ],
+        "owner_area": "Companion appearance proposals: POST /selection/appearance (exulanica/api/routes/selection.py, exulanica/selection/proposal.py) and web/packages/app/src/composition/appearance.ts",
+        "reason": "did not hold: proposal-drafted, proposal-offered, proposal-ready-in-customize",
+        "session": "companion",
+        "spend_usd": "0.0001174",
+        "status": "failed"
+      },
+      {
+        "gates": [
+          "milestone:Developer proof",
+          "delivery:Independent use"
+        ],
+        "id": "developer-client-walkthrough",
+        "observations": [
+          {
+            "id": "discovers-capabilities",
+            "ok": true
+          },
+          {
+            "id": "reads-the-saved-version",
+            "ok": true
+          },
+          {
+            "id": "unsupported-edit-refused",
+            "ok": true
+          },
+          {
+            "id": "accepted-edit-confirmed",
+            "ok": true
+          }
+        ],
+        "owner_area": "developer client and World API: clients/python/exulanica_client and the world routes",
+        "reason": null,
+        "session": "developer-client",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:World entry",
+          "milestone:Developer proof",
+          "delivery:Persistence"
+        ],
+        "id": "returning-user-reopens",
+        "observations": [
+          {
+            "id": "saved-world-opens",
+            "ok": true
+          },
+          {
+            "id": "objects-as-saved",
+            "ok": true
+          },
+          {
+            "id": "appearance-as-saved",
+            "ok": true
+          },
+          {
+            "id": "resume-point-current",
+            "ok": true
+          }
+        ],
+        "owner_area": "saved-world entry and reopening: web/packages/app/src/composition/session-and-geometry.ts",
+        "reason": null,
+        "session": "return",
+        "spend_usd": null,
+        "status": "passed"
+      },
+      {
+        "gates": [
+          "milestone:Personal-media path"
+        ],
+        "id": "reconstruct-scene-geometry",
+        "observations": [],
+        "owner_area": "scene reconstruction: docs/capabilities/scene-reconstruction.md and the scene jobs",
+        "reason": "No control in the application produces scene geometry from admitted photographs. Multi-view reconstruction runs as a scheduled job on GPU compute outside this runtime, and a photograph's point map is placed only through the World API; both also need a person's review of each photograph, which a rehearsal cannot truthfully give.",
+        "session": null,
+        "spend_usd": null,
+        "status": "not_available"
+      },
+      {
+        "gates": [
+          "delivery:Release rehearsal"
+        ],
+        "id": "observe-a-person-and-footage",
+        "observations": [],
+        "owner_area": "the operator's release rehearsal",
+        "reason": "A person's use of the experience and the demonstration footage are observed and recorded by a person; this rehearsal keeps a screenshot of each step as its own record.",
+        "session": null,
+        "spend_usd": null,
+        "status": "not_available"
+      }
+    ],
+    "summary": {
+      "failed": 1,
+      "not_available": 2,
+      "not_reachable": 0,
+      "passed": 27
+    },
+    "what_this_does_not_show": [
+      "The world is the authored starter of a synthetic workspace, and the photographs are synthetic drawings; no personal photograph or reconstructed place is involved.",
+      "The proposed place was confirmed through the identity routes rather than in the application.",
+      "Stopping a right in the drawer was not exercised by this run.",
+      "One run: the Companion's answers vary between runs.",
+      "Access used the production build's operator token gate; account sign-in was not exercised.",
+      "No person observed the run and no demonstration footage was recorded; no frame time was measured.",
+      "Other work loaded the machine during the run (machine_load, from the GPU slot's own log lines); the times are not timing measurements."
+    ]
+  },
+  "record_sha256": "91658704a416d4f9c77936254672200ed0f4f155882fd190d34201a9f5dca7ec"
+}

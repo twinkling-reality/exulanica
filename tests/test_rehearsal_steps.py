@@ -307,24 +307,54 @@ def test_a_result_reports_every_step_once_and_the_first_failure_of_each_gate():
 
 
 def test_a_failed_step_fails_its_gate_whatever_comes_before_it():
-    # The Companion gate holds a declared not-available step ahead of the steps that run; a failure
-    # after it must still be the gate's status.
-    runnable = [step for step in STEPS["steps"] if "not_available" not in step]
+    # A gate whose declared not-available step comes ahead of a step that runs and fails must still
+    # report the failure. The step list is reordered on a copy so that order exists whatever the
+    # step list holds.
+    steps = copy.deepcopy(STEPS)
+    moved = _step(steps, "observe-a-person-and-footage")
+    steps["steps"].remove(moved)
+    steps["steps"].insert([s["id"] for s in steps["steps"]].index("access-gate"), moved)
+    runnable = [step for step in steps["steps"] if "not_available" not in step]
     outcomes = {step["id"]: _passing(step) for step in runnable}
-    outcomes["unanswerable-question-abstains"] = {
+    outcomes["access-gate"] = {
         "status": "failed",
-        "reason": "did not hold: missing-said",
+        "reason": "did not hold: gate-shown",
         "observations": [],
         "evidence": {},
     }
-    document = resultdoc.assemble(STEPS, GATES, outcomes, {}, _run_block())
-    companion = next(g for g in document["gates"] if g["gate"] == "milestone:Companion interaction")
-    order = [s["status"] for s in companion["steps"]]
+    document = resultdoc.assemble(steps, GATES, outcomes, {}, _run_block())
+    release = next(g for g in document["gates"] if g["gate"] == "delivery:Release rehearsal")
+    order = [s["status"] for s in release["steps"]]
     assert order.index("not_available") < order.index("failed")
-    assert companion["status"] == "failed"
-    assert companion["first_failure"]["step"] == "unanswerable-question-abstains"
+    assert release["status"] == "failed"
+    assert release["first_failure"]["step"] == "access-gate"
     personal = next(g for g in document["gates"] if g["gate"] == "milestone:Personal-media path")
     assert personal["status"] == "not_available" and personal["first_failure"] is None
+
+
+def test_the_model_rights_are_given_in_the_drawer_by_one_hosted_step():
+    """The rights a grounded answer needs are ticked in the photo drawer, not posted by a route.
+
+    One step gives them, after the first in-app admission and before the place is confirmed, which
+    requires it; it is the photos session's hosted step, carrying the job wait the model work needs,
+    and it checks both what the page shows and what the server recorded.
+    """
+    ids = [step["id"] for step in STEPS["steps"]]
+    rights = _step(STEPS, "grant-model-rights-in-app")
+    assert not [i for i in ids if i.startswith("grant-model-rights") and i != rights["id"]]
+    assert "not_available" not in rights and rights["session"] == "photos"
+    assert rights["requires"] == ["authorize-admission-in-app"]
+    assert _step(STEPS, "confirm-proposed-place")["requires"] == ["grant-model-rights-in-app"]
+    assert rights["hosted_model"] is True and rights["spend_estimate_source"].strip()
+    parameters = rights["parameters"]
+    assert parameters["roles"] and parameters["roles_reason"].strip()
+    assert parameters["job_wait_seconds"] > 0 and parameters["job_wait_reason"].strip()
+    photos = next(s for s in STEPS["sessions"] if s["id"] == "photos")
+    assert photos["budget_seconds"] > parameters["job_wait_seconds"]
+    assert {kind: [o["id"] for o in found] for kind, found in rights["expect"].items()} == {
+        "page": ["rights-offered", "rights-listed"],
+        "api": ["rights-recorded", "vision-ran", "place-proposed"],
+    }
 
 
 def test_a_runner_may_not_report_a_step_as_not_available():

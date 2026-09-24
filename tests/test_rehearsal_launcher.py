@@ -45,7 +45,14 @@ REHEARSE = _rehearse()
 BOUND = steplist.load()["spend"]["bound_usd"]
 
 
-def _run(tmp_path: Path, monkeypatch, *, model: bool, launcher: Path | None = LAUNCHER):
+def _run(
+    tmp_path: Path,
+    monkeypatch,
+    *,
+    model: bool,
+    launcher: Path | None = LAUNCHER,
+    bound_usd: str | None = None,
+):
     temporary = tmp_path / "system-temporary"
     temporary.mkdir()
     monkeypatch.setenv("TMPDIR", str(temporary))
@@ -62,6 +69,7 @@ def _run(tmp_path: Path, monkeypatch, *, model: bool, launcher: Path | None = LA
             out=str(out),
             slot=1,
             model_env=str(model_env) if model else None,
+            bound_usd=bound_usd,
             sessions=None,
             reuse_database=False,
             launcher=None if launcher is None else str(launcher),
@@ -70,9 +78,11 @@ def _run(tmp_path: Path, monkeypatch, *, model: bool, launcher: Path | None = LA
     )
 
 
-def _launch(tmp_path: Path, monkeypatch, *, model: bool) -> tuple[list[str], dict[str, str]]:
+def _launch(
+    tmp_path: Path, monkeypatch, *, model: bool, bound_usd: str | None = None
+) -> tuple[list[str], dict[str, str]]:
     """Run ``launcher_up`` up to the launcher process; return its command and environment."""
-    run = _run(tmp_path, monkeypatch, model=model)
+    run = _run(tmp_path, monkeypatch, model=model, bound_usd=bound_usd)
     calls: list[tuple[list[str], dict[str, str]]] = []
 
     def stopped_at_the_boundary(command, **options):
@@ -106,6 +116,18 @@ def test_a_model_run_asks_for_a_production_build_and_hands_over_the_step_lists_b
     assert command[-1] == "--model"
     assert "--production" in command
     assert str(LAUNCHER) in command
+
+
+def test_a_run_may_lower_the_bound_it_hands_over_and_never_raise_it(tmp_path, monkeypatch):
+    above = str(steplist.Decimal(BOUND) + 1)
+    for index, refused in enumerate((above, "0", "-0.01", "NaN", "a dollar")):
+        each = tmp_path / f"refused-{index}"
+        each.mkdir()
+        with pytest.raises(REHEARSE.Refused, match="--bound-usd"):
+            _run(each, monkeypatch, model=True, bound_usd=refused)
+    lower = str(steplist.Decimal(BOUND) / 10)
+    _, environment = _launch(tmp_path, monkeypatch, model=True, bound_usd=lower)
+    assert environment["EXULANICA_BUDGET_USD"] == lower
 
 
 def test_a_run_without_a_model_asks_for_a_production_build_and_hands_over_no_bound(
