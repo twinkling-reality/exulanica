@@ -51,7 +51,9 @@ A-8, P-1, a cloud deployment, or disaster recovery completeness after an uncheck
 ## Canonical representation
 
 The checkpoint is an `exulanica.digest-bound-record/v1` envelope. Its record profile is
-`exulanica.restore-tombstone-checkpoint/v1`; `record_sha256` is SHA-256 of `canonical_json(record)`.
+`exulanica.restore-tombstone-checkpoint/v1`, or `/v2`, which also carries every withdrawal that is
+not a tombstone ([ADR-0026](0026-a-restore-carries-every-withdrawal.md));
+`record_sha256` is SHA-256 of `canonical_json(record)`.
 Rows use PostgreSQL JSON encodings for UUIDs, timestamps and the half-open `int8multirange` string.
 An outer state first says `prepared`, and says `sealed` only after the database seal commits.
 Prepared files are unusable. Checkpoint files are created at fresh paths and not overwritten.

@@ -19,6 +19,7 @@ from exulanica.db.local.backup import verify_backup
 from exulanica.db.local.refusals import LocalDatabaseRefused, Refusal
 from exulanica.evidence import BlobId
 from exulanica.ingest.repository import IngestRepository
+from exulanica.migrations import migrations
 from exulanica.models.manifest import Role
 
 from test_local_database_postgres import _init, _only_backup, _state, cli, migration_files
@@ -75,7 +76,8 @@ def _grants(connection) -> list:
 def test_a_backup_taken_before_0106_that_holds_a_model_right_restores(
     module_machine, servers, manifest, tmp_path, monkeypatch
 ):
-    with migration_files(tmp_path / "migrations", drop_last=1) as versions:
+    after = sum(1 for migration in migrations() if migration.version >= PINNED_IN)
+    with migration_files(tmp_path / "migrations", drop_last=after) as versions:
         assert versions[-1] < PINNED_IN, versions[-1]
         database = _init(servers, tmp_path / "database")
         granted = _grant_a_model_right(database, manifest)

@@ -93,9 +93,9 @@ search model made are deleted. The deletion is as prompt as the purge worker, an
 entries still exist while the search already leaves them out (`exulanica/selection/embeddings.py`),
 as it does a deleted photograph's. An expiry deletes nothing.
 `tests/test_search_entries_on_stop.py` holds this through the runtime and purge roles. A restore
-replays the stop's tombstone; from a backup taken before the stop it refuses to complete while the
-backup's copy of the right keeps an entry the stop deleted
-([privacy threat model, section 5.4](privacy-consent-threat-model.md#54-tombstones-that-survive-retries-and-restores)).
+writes the stop again from its checkpoint before it replays the stop's tombstone, so a backup taken
+before the stop comes back with the right stopped and its entries deleted
+([ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md)).
 
 **Where it is enforced.** The vision stage (hosted), the depth stage and the segmentation stage
 (local) call it immediately before their model; a refusal records `stage_unavailable` with the

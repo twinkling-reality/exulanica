@@ -158,6 +158,20 @@ def _replay(fixture, client, source, marker, entry: dict) -> Restored:
     )
 
 
+def _as_version_1(source) -> None:
+    """The checkpoint as profile v1 wrote it: its tombstones, and no withdrawal or catalog."""
+    envelope = json.loads(source.read_bytes())
+    record = {
+        key: value
+        for key, value in envelope["record"].items()
+        if key not in ("withdrawals", "withdrawal_catalog")
+    }
+    record["profile"] = "exulanica.restore-tombstone-checkpoint/v1"
+    envelope["record"] = record
+    envelope["record_sha256"] = hashlib.sha256(canonical_json(record)).hexdigest()
+    source.write_bytes(canonical_json(envelope))
+
+
 def _search_right_current(fixture) -> bool:
     [row] = fixture.rows(
         "select bool_or(personal_model_right_allows(workspace_id,right_id,capture_id,"
@@ -228,15 +242,11 @@ def test_a_search_right_stopped_and_purged_before_the_backup_replays_to_completi
     assert run(fixture.repository, DESCRIBED).total_matched == 1, "the photograph survives"
 
 
-def test_a_search_right_stopped_after_the_backup_is_never_served_again(
-    indexed, client, commands, tmp_path
-):
-    """The stop is not in the checkpoint, so the restored right keeps the entry, and replay refuses.
+def test_a_search_right_stopped_after_the_backup_stays_stopped(indexed, client, commands, tmp_path):
+    """The checkpoint carries the stop, and replay writes it again before any tombstone.
 
-    The backup holds the right as current, and the replayed ``caption_search`` tombstone's cascade
-    erases only what no current right covers, so it keeps the entry the stop deleted. Replay then
-    finds that entry, made before the stop took effect, and refuses to complete rather than serve
-    it.
+    So the replayed ``caption_search`` tombstone's cascade finds no current right covering the
+    entry, records it, and the purge erases it (migration 0104), as the stop itself did.
     """
     fixture = indexed.fixture
     entry = _entry(fixture)
@@ -247,8 +257,32 @@ def test_a_search_right_stopped_after_the_backup_is_never_served_again(
     assert _entries(fixture) == [indexed.embedding_id], "the backup holds the entry"
     assert _search_right_current(fixture), "the backup holds the right as current"
 
+    assert _replay(fixture, client, source, marker, entry) == ERASED
+    assert not _search_right_current(fixture)
+    assert run(fixture.repository, DESCRIBED).total_matched == 1, "the photograph survives"
+
+
+def test_a_version_1_checkpoint_of_that_stop_is_never_served(indexed, client, commands, tmp_path):
+    """A checkpoint of profile v1 holds tombstones only, so the restored right keeps the entry.
+
+    The replayed ``caption_search`` tombstone's cascade erases only what no current right covers,
+    so it keeps the entry the stop deleted. Replay then finds that entry, made before the stop took
+    effect, and refuses to complete rather than serve it.
+    """
+    fixture = indexed.fixture
+    entry = _entry(fixture)
+    dump, blobs = _backup(fixture, tmp_path)
+    _stop_search(indexed)
+    source = tmp_path / "independent-journal" / "checkpoint.json"
+    marker = tmp_path / "independent-control" / "restore.json"
+    assert restore_command(["checkpoint", "--checkpoint", str(source)]) == 0
+    _as_version_1(source)
+    assert restore_command(["prepare", "--checkpoint", str(source), "--marker", str(marker)]) == 0
+    _restore(fixture, dump, blobs)
+
     restored = _replay(fixture, client, source, marker, entry)
     assert (restored.refusal, restored.serves) == (ENTRY_LEFT, False)
+    assert _search_right_current(fixture), "a v1 checkpoint carries no withdrawal"
 
 
 def test_an_entry_indexed_again_under_a_later_right_survives_the_replay(

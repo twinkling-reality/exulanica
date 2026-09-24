@@ -1,0 +1,191 @@
+{
+  "profile": "exulanica.restore-withdrawal-catalog/v1",
+  "note": "Every withdrawal a person can make that lives outside the tombstone table, which a restore from an older backup would otherwise undo. A restore checkpoint of profile exulanica.restore-tombstone-checkpoint/v2 carries each row this names, and replay writes each one again into the restored database, before any tombstone, by the same statement the product writes: a column kind sets the columns a withdrawal sets on a row whose withdrawal is still open, and an event kind appends the withdrawal's own row. `withdrawn` is the condition a withdrawn row meets; `carried_when` narrows it; `workspace` names the column that says which workspace a row belongs to, or null for a row no workspace owns. An event kind's `ends` names the rows the withdrawal ends, and `order` the column that orders a chain of decisions. `excluded` names every other withdrawal-shaped table or column in the schema and why it is not carried; tests/test_restore_replay_withdrawal_catalog.py fails on any the catalog neither carries nor excludes.",
+  "kinds": [
+    {
+      "kind": "model_right",
+      "table": "personal_model_right",
+      "shape": "column",
+      "identity": ["workspace_id", "right_id"],
+      "columns": ["withdrawn_at", "withdrawn_by"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id"
+    },
+    {
+      "kind": "scene_training_right",
+      "table": "scene_training_right",
+      "shape": "column",
+      "identity": ["workspace_id", "right_id"],
+      "columns": ["withdrawn_at", "withdrawn_by"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id"
+    },
+    {
+      "kind": "companion_memory",
+      "table": "companion_answer",
+      "shape": "column",
+      "identity": ["workspace_id", "answer_id"],
+      "columns": ["status", "withdrawn_at"],
+      "withdrawn": {"column": "status", "in": ["withdrawn"]},
+      "carried_when": [{"column": "withdrawn_by", "is": "null"}],
+      "workspace": "workspace_id"
+    },
+    {
+      "kind": "environment_source",
+      "table": "environment_source_admission",
+      "shape": "column",
+      "identity": ["workspace_id", "admission_id"],
+      "columns": ["withdrawn_at"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id"
+    },
+    {
+      "kind": "environment_asset",
+      "table": "derived_environment_asset",
+      "shape": "column",
+      "identity": ["workspace_id", "asset_id"],
+      "columns": ["withdrawn_at"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id"
+    },
+    {
+      "kind": "account",
+      "table": "account_user",
+      "shape": "column",
+      "identity": ["user_id"],
+      "columns": ["disabled_at"],
+      "withdrawn": {"column": "disabled_at", "is": "not null"},
+      "workspace": null
+    },
+    {
+      "kind": "account_workspace",
+      "table": "account_workspace",
+      "shape": "column",
+      "identity": ["workspace_id"],
+      "columns": ["disabled_at"],
+      "withdrawn": {"column": "disabled_at", "is": "not null"},
+      "workspace": null
+    },
+    {
+      "kind": "account_membership",
+      "table": "account_membership",
+      "shape": "column",
+      "identity": ["workspace_id", "user_id"],
+      "columns": ["revoked_at"],
+      "withdrawn": {"column": "revoked_at", "is": "not null"},
+      "workspace": null
+    },
+    {
+      "kind": "session",
+      "table": "account_browser_session",
+      "shape": "column",
+      "identity": ["session_sha256"],
+      "columns": ["revoked_at"],
+      "withdrawn": {"column": "revoked_at", "is": "not null"},
+      "workspace": null
+    },
+    {
+      "kind": "place_name_right",
+      "table": "place_name_right_event",
+      "shape": "event",
+      "identity": ["workspace_id", "event_id"],
+      "withdrawn": {"column": "event", "in": ["withdrawn"]},
+      "workspace": "workspace_id",
+      "ends": {
+        "table": "place_name_right_event",
+        "columns": ["workspace_id", "entity_id", "model_provider", "model_role", "model_id", "model_revision", "destination"]
+      },
+      "order": "sequence"
+    },
+    {
+      "kind": "presentation_consent",
+      "table": "person_presentation_consent",
+      "shape": "event",
+      "identity": ["consent_id"],
+      "withdrawn": {"column": "decision", "in": ["revoked", "withdrawn"]},
+      "workspace": "workspace_id",
+      "ends": {
+        "table": "person_presentation_consent",
+        "columns": ["workspace_id", "subject_id", "consent_scope", "region_key"]
+      },
+      "order": "sequence"
+    },
+    {
+      "kind": "training_consent",
+      "table": "training_use_consent",
+      "shape": "event",
+      "identity": ["receipt_id"],
+      "withdrawn": {"column": "decision", "in": ["revoked", "withdrawn"]},
+      "workspace": "workspace_id",
+      "ends": {
+        "table": "training_use_consent",
+        "columns": ["workspace_id", "package_id", "licensee", "subject_id"]
+      },
+      "order": "sequence"
+    },
+    {
+      "kind": "material_recipe",
+      "table": "material_recipe_withdrawal",
+      "shape": "event",
+      "identity": ["workspace_id", "recipe_id"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "material_recipe", "columns": ["workspace_id", "recipe_id"]},
+      "order": null
+    }
+  ],
+  "excluded": [
+    {
+      "table": "identity_rejection",
+      "reason": "A person's identity decision (not them), which undo takes back (exulanica/identity/undo.py). A restore returns it to the backup's state like any other authored edit; it withdraws no permission and no consent."
+    },
+    {
+      "table": "entity_link",
+      "reason": "A confirmed or revoked identity link, an identity decision undo takes back, as for identity_rejection."
+    },
+    {
+      "table": "identity_event",
+      "reason": "The log of identity decisions, derived from them."
+    },
+    {
+      "table": "place_entity_bridge_decision",
+      "reason": "A decision about how a place record and an entity relate, which a later decision can reverse. It withdraws no permission and no consent."
+    },
+    {
+      "table": "retraction",
+      "reason": "A retraction withdraws a claim, and one retraction writes two rows no trigger ties together: this row and assertion.status (exulanica/epistemics/assertions.py retract). The generic event insert would record it without retracting the claim. A claim is not a permission or a consent; a restore returns claims to the backup's state like any other authored edit."
+    },
+    {
+      "table": "assertion",
+      "reason": "assertion.status 'retracted' is the second row of a retraction; see retraction."
+    },
+    {
+      "table": "consent_record",
+      "reason": "Nothing writes consent_record.revoked_at, and nothing makes a revocation there final."
+    },
+    {
+      "table": "user_annotation",
+      "reason": "Nothing writes user_annotation.redacted_at."
+    },
+    {
+      "table": "material_bake",
+      "reason": "failure_class 'withdrawn' is written by the recipe withdrawal's own trigger, which replaying the withdrawal runs again."
+    },
+    {
+      "table": "place_record_state_event",
+      "reason": "A state event with basis 'withdrawal' records a tombstone's effect on a place record and names that tombstone; every read of the record asks tombstone_blocks_place_record (migration 0063), which the replayed tombstone answers again."
+    },
+    {
+      "table": "person_withdrawal_receipt",
+      "reason": "Written by the cascade of a person's entity tombstone (migration 0030), which replaying the tombstone runs again."
+    },
+    {
+      "table": "saved_world_source_detach",
+      "reason": "Taking a photograph out of a saved world is an authored edit of that world, not a withdrawal of a permission or a consent; a restore returns a saved world to the backup's state like any other edit."
+    },
+    {
+      "table": "saved_world_source_detach_operation",
+      "reason": "The operation record of saved_world_source_detach."
+    }
+  ]
+}

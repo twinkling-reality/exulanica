@@ -274,7 +274,9 @@ uv run exulanica-local-db require-passwords --directory ~/Exulanica/database  # 
   leaves it running on the port the backed-up database served, or on `--port`. Both load the
   schema, give every function the rows' constraints run a search path of its own, then load the
   rows ([`load_functions.py`](../exulanica/db/load_functions.py)), so a dump taken before
-  migration 0106, whose receipt canonicaliser had none, restores too.
+  migration 0106, whose receipt canonicaliser had none, restores too. A plain dump that `psql`
+  loads has no step between its schema and its rows, so one taken before 0106 still stops at its
+  first receipt; `exulanica-local-db` restores the custom-format backups it takes, not a plain dump.
 - **Upgrade.** `upgrade` refuses while another client is connected, so stop the API and the
   workers first. It restarts the server on a private port, backs up, applies the pending
   migrations and role provisioning to a scratch copy of that backup with the schema check the API
