@@ -31,6 +31,8 @@ export interface SessionOptions {
   readonly baseUrl: string;
   readonly token: string;
   readonly csrfToken?: string;
+  /** The open world's region for each photograph it holds, asked at every graph read. */
+  readonly worldRegions?: () => ReadonlyMap<string, string> | undefined;
 }
 
 /**

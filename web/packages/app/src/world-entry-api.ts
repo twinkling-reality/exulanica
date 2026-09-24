@@ -61,7 +61,19 @@ export function personalSourceWorld(worlds: WorkspaceWorlds): string {
 }
 
 /** What composing the workspace's reviewed photographs into a world would do now. */
-export type PersonalWorldAction = 'create_world' | 'update_world' | 'save_entry';
+export type PersonalWorldAction = 'create_world' | 'update_world' | 'save_entry' | 'add_photographs';
+
+/**
+ * What adding newly reviewed photographs to a made world does, as the server words and counts it.
+ *
+ * The browser shows `sentences` as they are, in order, and sends `previewSha256` back when the
+ * person confirms, so the server adds exactly what this showed or refuses by name.
+ */
+export interface PersonalWorldPreview {
+  readonly previewSha256: string;
+  readonly sentences: readonly string[];
+  readonly photographsAdded: number;
+}
 
 /**
  * The server's answer to "can a world be made from my reviewed photographs now?"
@@ -84,6 +96,8 @@ export interface PersonalWorldState {
   /** The digest the write takes back, so it composes exactly what this read showed. */
   readonly topologyDigest: string | null;
   readonly currentTopologyDigest: string | null;
+  /** What adding the photographs does, for `add_photographs` only. */
+  readonly preview: PersonalWorldPreview | null;
 }
 
 /** What `POST /worlds/personal-source` composed, and the world every later request names. */
@@ -409,7 +423,9 @@ export class WorldEntryClient {
    * The composition is refused by the server if the photographs changed since `state` was read.
    * When a saved world already names the personal-source world, that entry is read and returned
    * rather than a second one created; otherwise the new world is opened through the protected
-   * bootstrap and saved under `title`. A state the server refused is not sent.
+   * bootstrap and saved under `title`. Adding photographs to a made world sends back the preview
+   * the person confirmed, and the saved world it moved is read and returned. A state the server
+   * refused is not sent.
    */
   async makeFromPersonalSources(
     state: PersonalWorldState,
@@ -420,7 +436,9 @@ export class WorldEntryClient {
     }
     const composed = parseComposedPersonalWorld(await this.#transport.postJson<unknown>(
       '/worlds/personal-source',
-      { topology_digest: state.topologyDigest },
+      state.preview === null
+        ? { topology_digest: state.topologyDigest }
+        : { topology_digest: state.topologyDigest, preview_sha256: state.preview.previewSha256 },
     ));
     return composed.savedEntryId !== null
       ? this.entry(composed.savedEntryId)
@@ -579,8 +597,26 @@ function parseWorlds(value: unknown): WorkspaceWorlds {
 }
 
 const PERSONAL_WORLD_ACTIONS: ReadonlySet<string> = new Set<PersonalWorldAction>([
-  'create_world', 'update_world', 'save_entry',
+  'create_world', 'update_world', 'save_entry', 'add_photographs',
 ]);
+
+function parsePersonalWorldPreview(value: unknown): PersonalWorldPreview {
+  const body = record(value, 'addition preview');
+  const digest = text(body['preview_sha256'], 'addition preview digest');
+  if (!/^[0-9a-f]{64}$/.test(digest)) {
+    throw new TypeError('The server returned an invalid addition preview digest.');
+  }
+  const sentences = body['sentences'];
+  if (!Array.isArray(sentences) || sentences.length === 0) {
+    throw new TypeError('The server returned an addition preview with nothing to say.');
+  }
+  const counts = record(body['counts'], 'addition preview counts');
+  return Object.freeze({
+    previewSha256: digest,
+    sentences: Object.freeze(sentences.map((line) => text(line, 'addition preview sentence'))),
+    photographsAdded: integer(counts['photographs_added'], 'photographs added'),
+  });
+}
 
 function personalWorldAction(value: unknown): PersonalWorldAction {
   if (typeof value !== 'string' || !PERSONAL_WORLD_ACTIONS.has(value)) {
@@ -597,6 +633,11 @@ function parsePersonalWorld(value: unknown): PersonalWorldState {
   // Exactly one of the two: an action the server allows, or its refusal with its words.
   if ((action === null) === (refusal === null)) {
     throw new TypeError('The server returned a personal world state with no single answer.');
+  }
+  // A preview belongs to adding photographs, and adding photographs always has one.
+  const preview = body['preview'] === null ? null : parsePersonalWorldPreview(body['preview']);
+  if ((action === 'add_photographs') !== (preview !== null)) {
+    throw new TypeError('The server returned an addition without its preview, or a stray one.');
   }
   return Object.freeze({
     action,
@@ -618,6 +659,7 @@ function parsePersonalWorld(value: unknown): PersonalWorldState {
     currentTopologyDigest: optionalText(
       body['current_topology_digest'], 'current topology digest',
     ),
+    preview,
   });
 }
 

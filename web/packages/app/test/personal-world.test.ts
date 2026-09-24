@@ -25,6 +25,7 @@ const stateWire = (overrides: Record<string, unknown> = {}) => ({
   regions: 1,
   topology_digest: DIGEST,
   current_topology_digest: null,
+  preview: null,
   ...overrides,
 });
 
@@ -195,6 +196,7 @@ const offered = (overrides: Partial<PersonalWorldState> = {}): PersonalWorldStat
   regions: 1,
   topologyDigest: DIGEST,
   currentTopologyDigest: null,
+  preview: null,
   ...overrides,
 });
 
@@ -250,22 +252,6 @@ describe('the choice to make a world from reviewed photographs', () => {
     expect(button(control.root).textContent).toBe('Make a world from my photographs');
     expect(control.root.querySelector<HTMLElement>('.personal-world-title-row')?.hidden)
       .toBe(false);
-  });
-
-  it('shows the refusal for a world already made in its words, with no button', async () => {
-    const words = 'Your world from your photographs was made with 3 photographs. 1 photograph you '
-      + 'reviewed since is not in it. This app does not add photographs to a world once it is '
-      + 'made, or move them in it.';
-    const control = buildPersonalWorldChoice({
-      read: vi.fn(async () => offered({
-        action: null, refusal: { code: 'personal_world_already_made', detail: words },
-        worldId: PERSONAL_WORLD, savedEntryId: entry().entryId,
-      })),
-      make: vi.fn(), open: vi.fn(),
-    });
-    await control.refresh();
-    expect(control.root.querySelector('.personal-world-status')?.textContent).toBe(words);
-    expect(button(control.root).hidden).toBe(true);
   });
 
   it('shows a refused write in the server words, not its code, and reads again', async () => {

@@ -125,8 +125,28 @@ class WorldStructureRepository:
         base_reconstruction_sha256: str | None,
         committed_by: uuid.UUID,
         base_composed_topology_digest: str | None = None,
+        advanced_composed_topology_digest: str | None = None,
+        confirmed_preview_sha256: str | None = None,
     ) -> SpatialSnapshot:
-        """Atomically revalidate, append, and CAS every protected current base."""
+        """Atomically revalidate, append, and CAS every protected current base.
+
+        ``base_composed_topology_digest`` makes a world's first snapshot from its composed
+        topology. ``advanced_composed_topology_digest`` appends the next one to a made world from
+        its current composed topology, which composing photographs the person added has just
+        registered; it is given only with ``confirmed_preview_sha256``, the digest of the addition
+        preview the person confirmed, which the applied audit row records. Either way the candidate
+        must be exactly the composed candidate of that topology, apart from the placement
+        migrations an addition declares for the places that grow.
+        """
+        if (advanced_composed_topology_digest is None) != (confirmed_preview_sha256 is None):
+            raise InvalidStructuralData(
+                "an addition to a made world is applied only with the preview the person confirmed"
+            )
+        if (
+            base_composed_topology_digest is not None
+            and advanced_composed_topology_digest is not None
+        ):
+            raise InvalidStructuralData("a snapshot is either a world's first or an addition")
         failure: Exception | None = None
         result: SpatialSnapshot | None = None
         with self.connection.transaction():
@@ -183,6 +203,29 @@ class WorldStructureRepository:
                         raise InvalidStructuralData(
                             "bootstrap must preserve the exact composed sources"
                         )
+                elif advanced_composed_topology_digest is not None:
+                    preserved = WorldStyleRepository(
+                        self.connection, self.workspace_id, world_id=self.world_id
+                    ).current_topology_contract()
+                    if (
+                        state is None
+                        or preserved.topology_digest != advanced_composed_topology_digest
+                    ):
+                        raise StaleStructuralBase(
+                            "the addition no longer names the current composed base"
+                        )
+                    expected = replace(
+                        composed_candidate(
+                            preserved, candidate.graph_sha256, candidate.reconstruction_sha256
+                        ),
+                        placement_migrations=candidate.placement_migrations,
+                    )
+                    if canonical_candidate_document(candidate) != canonical_candidate_document(
+                        expected
+                    ):
+                        raise InvalidStructuralData(
+                            "an addition must preserve the exact composed sources"
+                        )
                 result = self._commit_snapshot(
                     preview_id,
                     candidate,
@@ -191,6 +234,7 @@ class WorldStructureRepository:
                     region_changes,
                     committed_by,
                     preserved,
+                    confirmed_preview_sha256,
                 )
         if failure is not None:
             raise failure
@@ -267,6 +311,7 @@ class WorldStructureRepository:
         region_changes: Mapping[str, tuple[str, str]],
         committed_by: uuid.UUID,
         preserved_topology: TopologyContract | None = None,
+        confirmed_preview_sha256: str | None = None,
     ) -> SpatialSnapshot:
         revision = (
             0
@@ -438,12 +483,16 @@ class WorldStructureRepository:
             "where workspace_id=%s and world_id=%s and preview_id=%s",
             (self.workspace_id, self.world_id, preview_id),
         )
+        details = {"snapshot_sha256": digests.snapshot_sha256}
+        if confirmed_preview_sha256 is not None:
+            # Who confirmed is the row's actor and when is its time; this is what they saw.
+            details["confirmed_preview_sha256"] = confirmed_preview_sha256
         self._audit(
             "preview_applied",
             actor=committed_by,
             preview_id=preview_id,
             snapshot_id=snapshot_id,
-            details={"snapshot_sha256": digests.snapshot_sha256},
+            details=details,
         )
         return SpatialSnapshot(
             snapshot_id,

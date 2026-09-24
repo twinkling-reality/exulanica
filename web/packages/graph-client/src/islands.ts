@@ -68,6 +68,25 @@ export function groupIslands(payload: GraphPayload): IslandOf {
 }
 
 /**
+ * The open world's own regions first, then the grouping for every photograph the world does not hold.
+ *
+ * A world made from photographs keeps its regions in its structural snapshot, and the server says
+ * which region holds which photograph (`GET /world/source-media`). Scene grouping runs again as
+ * photographs arrive and never retires a row it wrote before, so a place photographed again is
+ * held by two live groups, and `groupIslands` puts its photographs in the later one. That id is
+ * not a region of the world, so an object placed in the world's region would name a region
+ * nothing draws. A photograph the world holds is therefore in the world's region whatever the
+ * groups say now, and every other photograph is placed by the grouping as before.
+ */
+export function worldRegionIslands(
+  regions: ReadonlyMap<string, string>,
+  payload: GraphPayload,
+): IslandOf {
+  const grouped = groupIslands(payload);
+  return (captureId) => (regions.get(captureId) as IslandIdRef | undefined) ?? grouped(captureId);
+}
+
+/**
  * The islands, built by putting EVERY capture the groups, entities or occurrences name through
  * the same `islandOf` the occurrences went through.
  *

@@ -36,7 +36,7 @@ export function buildPersonalIntake() {
     class: 'photo-reference-grid', 'aria-label': 'Reviewed photographs ready to add',
   });
   const ready = el('section', { class: 'photo-ready', 'aria-labelledby': 'photo-ready-title' }, [
-    el('h4', { id: 'photo-ready-title', text: 'Ready to add' }),
+    el('h4', { id: 'photo-ready-title', text: 'Ready to attach as references' }),
     readyReferences,
   ]);
   ready.hidden = true;

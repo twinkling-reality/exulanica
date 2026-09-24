@@ -1,5 +1,6 @@
 /** Choosing between saved worlds. The one-world states live in `ui/startup-state.ts`. */
 
+import { tierPolicy } from '@exulanica/companion-runtime';
 import { ApiError } from '@exulanica/graph-client';
 import type {
   PersonalWorldAction,
@@ -133,7 +134,16 @@ const PERSONAL_WORLD_ACTION_LABELS: Readonly<Record<PersonalWorldAction, string>
   create_world: 'Make a world from my photographs',
   update_world: 'Make a world from my photographs',
   save_entry: 'Open a world from my photographs',
+  add_photographs: 'Add my new photographs as places',
 };
+
+/**
+ * Adding photographs to a made world changes more than one place and carries everything the person
+ * made into a new version, so it is confirmed the way interaction-model.md section 5.3 asks of a
+ * tier 2 consequence: its blast radius stated first, separate Cancel and Confirm, and Confirm
+ * enabled only after the delay the tier policy states once.
+ */
+const ADDITION_CONFIRM_DELAY_MS = tierPolicy(2).confirmEnabledAfterMs;
 
 /** The name a new world from photographs is saved under unless the person gives another. */
 const PERSONAL_WORLD_DEFAULT_TITLE = 'My photographs';
@@ -151,6 +161,11 @@ export interface PersonalWorldControl {
  * the server's counts when it is, and a button whose label follows the server's action. Pressing
  * it sends back the digest that read returned, so the server composes exactly what was shown or
  * refuses by name; a refusal is shown in the server's words and the state is read again.
+ *
+ * Adding photographs to a made world is confirmed first. Pressing the button writes nothing: it
+ * shows the server's preview, every sentence as the server wrote it, with Cancel and Confirm.
+ * Cancel returns to the offer and sends nothing; Confirm is enabled after the tier 2 delay and
+ * sends back the digest of exactly the preview on screen.
  */
 export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWorldControl {
   const status = el('p', {
@@ -163,17 +178,37 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
   }) as HTMLInputElement;
   const titleRow = el('label', { class: 'personal-world-title-row' }, ['Name ', title]);
   const make = el('button', { type: 'button', class: 'personal-world-make' });
+  const previewList = el('ul', { class: 'personal-world-preview' });
+  const cancel = el('button', {
+    type: 'button', class: 'personal-world-cancel', text: 'Cancel',
+  });
+  const confirm = el('button', {
+    type: 'button', class: 'personal-world-confirm-add', text: 'Confirm: add them as places',
+  });
+  const confirmation = el('section', {
+    class: 'personal-world-confirm', 'aria-label': 'What adding your photographs as places does',
+  }, [previewList, el('div', { class: 'personal-world-confirm-controls' }, [cancel, confirm])]);
   const failure = el('p', { class: 'gate-failure personal-world-failure', role: 'alert' });
   const root = el('section', {
     class: 'personal-world-choice', 'aria-label': 'A world from your photographs',
   }, [
     el('h3', { text: 'A world from your photographs' }),
-    status, counts, titleRow, make, failure,
+    status, counts, titleRow, make, confirmation, failure,
   ]);
   let current: PersonalWorldState | null = null;
   let busy = false;
+  let arming: ReturnType<typeof setTimeout> | null = null;
+
+  const closeConfirmation = (): void => {
+    if (arming !== null) clearTimeout(arming);
+    arming = null;
+    confirmation.hidden = true;
+    confirm.disabled = true;
+    previewList.replaceChildren();
+  };
 
   const show = (state: PersonalWorldState | null): void => {
+    closeConfirmation();
     current = state;
     root.dataset['state'] = state === null ? 'unknown' : state.action ?? 'refused';
     const action = state?.action ?? null;
@@ -184,7 +219,10 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
         : '';
     status.hidden = status.textContent === '';
     counts.hidden = state === null || state.photographs.reviewed === 0;
-    if (state !== null) {
+    if (state !== null && state.preview !== null) {
+      // What adding does is the server's to say; its first sentence is the offer's count.
+      counts.textContent = state.preview.sentences[0] ?? '';
+    } else if (state !== null) {
       const { composed, outsideSceneGroups } = state.photographs;
       counts.textContent = [
         composed > 0
@@ -215,14 +253,15 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
     }
   };
 
-  make.addEventListener('click', () => {
-    const state = current;
-    if (state === null || state.action === null || busy) return;
+  const commit = (state: PersonalWorldState): void => {
     busy = true;
     failure.hidden = true;
     make.disabled = true;
     status.hidden = false;
-    status.textContent = 'Making your world from your photographs…';
+    status.textContent = state.action === 'add_photographs'
+      ? 'Adding your photographs to your world…'
+      : 'Making your world from your photographs…';
+    closeConfirmation();
     void deps.make(state, title.value.trim() || PERSONAL_WORLD_DEFAULT_TITLE)
       .then((entry) => deps.open(entry))
       .catch(async (error: unknown) => {
@@ -232,9 +271,45 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
         await refresh();
       })
       .finally(() => { busy = false; });
+  };
+
+  make.addEventListener('click', () => {
+    const state = current;
+    if (state === null || state.action === null || busy) return;
+    if (state.preview === null) {
+      commit(state);
+      return;
+    }
+    // Nothing is written yet: the preview, then a choice. The offer's button goes away, so
+    // Confirm is not under the pointer that pressed it, and it wakes only after the delay.
+    failure.hidden = true;
+    make.hidden = true;
+    // The offer's line is the preview's first sentence, which the list below says again.
+    counts.hidden = true;
+    previewList.replaceChildren(
+      ...state.preview.sentences.map((sentence) => el('li', { text: sentence })),
+    );
+    confirmation.hidden = false;
+    confirm.disabled = true;
+    arming = setTimeout(() => {
+      arming = null;
+      confirm.disabled = false;
+    }, ADDITION_CONFIRM_DELAY_MS);
+  });
+
+  cancel.addEventListener('click', () => {
+    if (busy) return;
+    show(current);
+  });
+
+  confirm.addEventListener('click', () => {
+    const state = current;
+    if (state === null || state.preview === null || busy || confirm.disabled) return;
+    commit(state);
   });
 
   failure.hidden = true;
+  closeConfirmation();
   show(null);
   return { root, refresh };
 }

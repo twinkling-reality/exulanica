@@ -245,6 +245,58 @@ class CharacterAppearanceRepository:
             "generation_status": "not_requested",
         }
 
+    def avatar_revisions(self, version_id: uuid.UUID) -> int:
+        """How many avatar appearance revisions the version holds, for every avatar in it."""
+        row = self.connection.execute(
+            "select count(*) as revisions from world_character_appearance_revision "
+            "where workspace_id=%s and world_id=%s and version_id=%s and subject_kind='avatar'",
+            (self.workspace_id, self.world_id, version_id),
+        ).fetchone()
+        return int(row["revisions"])
+
+    def carry_avatar_history(self, from_version_id: uuid.UUID, to_version_id: uuid.UUID) -> int:
+        """Write every avatar's appearance history again in a version carried from another.
+
+        Adding photographs to a made world carries its saved version onto the next snapshot, and
+        an avatar's appearance belongs to the version. Each revision keeps its number, operation,
+        recipe, family and representation, who chose it and when, so a reset to an earlier
+        revision works in the carried version as it did before; only the version the document
+        names is the carried one, as every revision's document names its own version. An
+        inhabitant's appearance belongs to its society, which is not carried. Returns how many
+        revisions were written.
+        """
+        rows = self.connection.execute(
+            "select * from world_character_appearance_revision "
+            "where workspace_id=%s and world_id=%s and version_id=%s and subject_kind='avatar' "
+            "order by subject_id,revision",
+            (self.workspace_id, self.world_id, from_version_id),
+        ).fetchall()
+        for row in rows:
+            self._validated(row)
+            document = {**row["document"], "version_id": str(to_version_id)}
+            self.connection.execute(
+                "insert into world_character_appearance_revision(workspace_id,world_id,version_id,"
+                "subject_kind,subject_id,society_id,revision,operation,restored_from_revision,"
+                "document,document_sha256,created_by,created_at) "
+                "values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    self.workspace_id,
+                    self.world_id,
+                    to_version_id,
+                    row["subject_kind"],
+                    row["subject_id"],
+                    row["society_id"],
+                    row["revision"],
+                    row["operation"],
+                    row["restored_from_revision"],
+                    Jsonb(document),
+                    document_sha256(document),
+                    row["created_by"],
+                    row["created_at"],
+                ),
+            )
+        return len(rows)
+
     def available_families(self, version_id: uuid.UUID, subject: CharacterSubject) -> list[dict]:
         with self.connection.transaction():
             self._authorize(version_id, subject)

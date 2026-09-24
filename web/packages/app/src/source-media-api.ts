@@ -19,6 +19,8 @@ export interface SourceMediaIssue {
 export interface SourceMediaSession {
   readonly catalog: SourceMediaCatalog;
   readonly issues: readonly SourceMediaIssue[];
+  /** The world's region for each photograph its topology holds, by capture id. See `worldRegionsOf`. */
+  readonly worldRegions: ReadonlyMap<string, string>;
   dispose(): void;
 }
 
@@ -214,6 +216,7 @@ export class SourceMediaClient {
     return Object.freeze({
       catalog,
       issues: Object.freeze(issues),
+      worldRegions: worldRegionsOf(topology),
       dispose: () => {
         if (disposed) return;
         disposed = true;
@@ -223,6 +226,28 @@ export class SourceMediaClient {
       },
     });
   }
+}
+
+/**
+ * The region the world's own topology puts each photograph in, available or not.
+ *
+ * The server's snapshot decides which region holds a photograph, so a photograph the world stopped
+ * drawing keeps its region. A photograph the topology names in two regions is left out, and the
+ * grouping places it, rather than going to whichever slot was read first.
+ */
+function worldRegionsOf(topology: readonly SourceMediaWire[]): ReadonlyMap<string, string> {
+  const regions = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  for (const source of topology) {
+    if (source.regionId === null) continue;
+    for (const captureId of source.captureIds) {
+      const held = regions.get(captureId);
+      if (held !== undefined && held !== source.regionId) ambiguous.add(captureId);
+      else regions.set(captureId, source.regionId);
+    }
+  }
+  for (const captureId of ambiguous) regions.delete(captureId);
+  return regions;
 }
 
 function installDescriptor(

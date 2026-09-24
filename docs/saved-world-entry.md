@@ -54,11 +54,14 @@ Creation has one source-independent first-world path and two explicit personal-s
 1. `POST /world-entries/starter` creates an authored starter with no personal source dependency.
 2. Choose an existing authored version and an appearance version from the same named world.
 3. Choose **Make a world from my photographs**, offered in the photo drawer and under the list of
-   saved worlds. `GET /worlds/personal-source` answers whether composing the account holder's
-   reviewed photographs now would make the personal-source world (`create_world`), give a world
-   composed but never made its next topology (`update_world`) or need only a saved entry
-   (`save_entry`), or refuses by name (`no_reviewed_personal_sources`,
-   `no_grouped_personal_sources`, `personal_world_already_made`, `personal_world_current`,
+   saved worlds. `GET /worlds/personal-source` writes nothing and answers whether composing the
+   account holder's reviewed photographs now would make the personal-source world
+   (`create_world`), give a world composed but never made its next topology (`update_world`), need
+   only a saved entry (`save_entry`) or add photographs reviewed since the world was made to its
+   places (`add_photographs`, [below](#adding-photographs-to-a-made-world)), or refuses by name
+   (`no_reviewed_personal_sources`, `no_grouped_personal_sources`, `personal_world_current`,
+   `personal_world_source_deleted`, `personal_world_changed_elsewhere`,
+   `personal_world_not_latest`, `personal_world_edit_cannot_carry`, `personal_world_not_composed`,
    `several_personal_source_worlds`) in words the browser shows as they are, with how many
    photographs are reviewed, composed and in no scene group. The browser offers the choice only
    when that read names an action and holds no copy of the rule. `POST /worlds/personal-source`
@@ -76,22 +79,87 @@ The server chooses; a request names no photograph and no region. A photograph is
 account holder authorized it as personal, a human review of it found it eligible and still stands,
 it is live, and the viewer bytes that review allows are present: one rule in
 `exulanica/world/reviewed_sources.py`, which attaching and adding back a reference read as well.
-Each live scene group holding such a photograph becomes one region, named by the group, so a
-composition of several groups has several regions. A reviewed photograph in no live scene group,
-such as one with no capture time, is left out and counted rather than refused, because grouping
-never places it and refusing would keep every other photograph out. The route and the operator
+Grouping keeps every earlier scene group live beside a later one, so a place photographed again is
+several overlapping groups, each numbered from zero in its own run. A place is therefore the set
+of photographs the live groups connect: two photographs share a place when some live group holds
+both. Each place holding such a photograph becomes one region, named by its largest live group, so
+a composition of several places has several regions; for one grouping run every group is its own
+place, and the regions are exactly the groups in grouping order. The rule is `arrange` in
+`exulanica/world/personal_composition.py`, the only rule any path uses, and
+`tests/fixtures/personal-composition/single-run.json` holds one run's regions, order and digest.
+A reviewed photograph in no live scene group, such as one with no capture time, is left out and
+counted rather than refused, because grouping never places it and refusing would keep every other
+photograph out. The route and the operator
 script `scripts/compose_reference_sources.py` register through one writer,
 `register_composition` in `exulanica/world/personal_composition.py`, which creates the world under
 the count policy.
 
-A made world is not changed. Once the personal-source world has a structural snapshot, every saved
-world of it opens that snapshot and nothing advances it, so composing again could only change a
-topology nobody sees. When the reviewed photographs differ from the ones the world was made with,
-the read refuses `personal_world_already_made` and offers no button. Its words say how many
-photographs the world was made with, and for each kind of change what the world shows: a photograph
-reviewed since is not in it; a photograph no longer allowed (deleted, withdrawn, or without a
-current review) is no longer shown; a photograph still reviewed but in no live scene group is still
-shown where it was placed.
+### Adding photographs to a made world
+
+Once the personal-source world has a structural snapshot and a saved world names it, photographs the
+account holder reviewed since are added to its places only when they confirm. The read answers
+`add_photographs` with a preview: in counts and in the server's sentences, how many photographs are
+added, how many join places already in the world and how many places they make, which reviewed
+photographs are left out and why, what the world keeps of the photographs it was made with, what
+carries over and what stays behind, and `preview_sha256`, the SHA-256 of that preview together with
+every base it was read from (the structural snapshot, the saved entry's revision, snapshot, authored
+cursor and style version, and the composition digest). Photographs are added only to the world's
+latest snapshot: `PUT /world-entries/{entry_id}` accepts any valid version of the world, and a saved
+world moved to an earlier one is refused `personal_world_not_latest` until it is moved to the latest
+again; the browser offers no control that moves a saved world between versions. The browser shows
+the sentences as they are, with Cancel and Confirm; Confirm is enabled only after the tier 2 delay
+of [interaction-model.md](interaction-model.md#53-consequence-tiers), and nothing is written before
+it. `POST /worlds/personal-source` takes back that digest, recomputes the preview under the
+workspace lock, and refuses `personal_world_preview_changed` with nothing written when the preview
+no longer matches, when the digest is missing, or when a digest is given for any other action.
+
+Which region each photograph joins is the place rule above with the made world's regions fixed. A
+region the world was made with keeps its id and every photograph it was made with, and takes in
+each photograph reviewed since that shares its place; a place holding none of the world's
+photographs becomes a region of its own; a photograph whose place holds photographs of several of
+the world's regions is left out and counted, because adding a photograph never joins places.
+Adding never removes or moves a photograph the world was made with: one no longer allowed
+(deleted, withdrawn or without a current review) stays in its slot and is not drawn until a new
+review, and one in no live scene group stays where it was placed.
+
+Confirming writes, in one transaction: the composition, which moves the composed topology pointer;
+the next structural snapshot, appended by `WorldStructureRepository.apply` with the candidate held
+to exactly the composed candidate of that topology and a placement migration for each region that
+takes in photographs, under the compare-and-swap on the snapshot, graph and reconstruction bases;
+a version of the saved world's authored version on that snapshot, whose parent is the old one; and
+the saved entry moved to it, under the compare-and-swap on its revision and authored cursor. The
+previous version and its snapshot are not changed and stay readable (`GET
+/world/versions/{version_id}`, and `GET /world/source-media` with its `source_snapshot_id`). The
+world's appearance carries by identity: every region keeps its id, so the saved style's regional
+appearances still name regions of the world. The confirmation is recorded in the append-only
+`preview_applied` structural audit row: its actor is who confirmed, its time is when, and
+`details.confirmed_preview_sha256` is the preview they saw; each placement migration's
+`approved_by` names the same person.
+
+What carries is decided once, before the preview is shown, by `carry_plan` in
+`exulanica/world/object_repository.py`, and `carry_version` writes exactly that: every object,
+element override, environment piece and depth estimate the new version can hold, as the database
+would accept writing it at that moment, stored removals included; the change list, whole, when every
+one of those carries, so Take back reaches changes made before the addition; and the avatar's
+appearance history. A placement whose source can never be written again stays only in the previous
+version, and the preview names it by kind, reason and count: an environment piece whose source was
+withdrawn, changed or may no longer be placed, and a depth estimate whose depth right ended, that
+can no longer be read, or whose photograph was deleted. A placement pins its exact right and
+receipts, so renewing a right does not restore it. When anything stays behind the change list does
+not carry, Take back starts at the addition, and the preview says so. The carry asks its plan again
+under the global asset read lock before it writes anything (`lock_asset_reads_until_commit` in
+`exulanica/db/read_check.py`, the lock the add paths' final authorization takes), so a source
+withdrawn before that question refuses the addition as `personal_world_preview_changed`, and one
+withdrawn after it cannot commit until the addition has; a withdrawal of a depth right waits for the
+addition to commit, because the addition's reads of rights hold the workspace's privacy currency
+lock the withdrawal takes (`tests/test_personal_world_addition.py` measures both). A placement the
+database refuses as it is written, because its right passed its end after that question, refuses the
+addition the same way. In each case nothing is written. A society and its history stay in the
+previous version, and the preview says where its inhabitants are only when its engine keeps that;
+inhabitants who are here refuse the addition as `personal_world_edit_cannot_carry` until the person
+sends them away. A saved world changed elsewhere is refused as `personal_world_changed_elsewhere`,
+and a world one of whose photographs was deleted as `personal_world_source_deleted`: rebuilding a
+world from the photographs that remain is not something the app does.
 
 A world draws a personal photograph only while its personal authorization and human review are
 current, the rule saved-world references follow. `GET /world/source-media` reads the same rule
@@ -316,7 +384,11 @@ The browser names the open world on every world request: style, source-media, bo
 environment, interaction, society and Companion requests. A client built where no world is open,
 as in the preview, refuses its requests instead of sending one that names none. Source-media reads
 also carry the entry’s exact `source_snapshot_id`, preserving its source
-context after the global topology pointer moves. Historical style display uses the selected
+context after the global topology pointer moves. The same read names the region of each
+photograph the world holds, and the browser draws those photographs in those regions whatever the
+live scene groups hold, because grouping again after a new photograph gives a place another group
+id (`worldRegionIslands` in `web/packages/graph-client/src/islands.ts`); a photograph the world
+does not hold is placed by its scene group. Historical style display uses the selected
 style’s topology while reconciliation and writes retain the live authority base.
 Authored object composition receives `authored_version_id` explicitly. The entry surface never
 uses `WorldObjectsClient.connect()` without a pinned version. Composition prepare and ready
@@ -553,8 +625,8 @@ cannot be restored over them; recovery is a restore from backup.
 | `POST` | `/world-entries/starter` | Atomically create or exactly reuse the source-independent authored starter |
 | `GET` | `/world-entries/{entry_id}` | One entry, with cross-workspace IDs answered as absent |
 | `GET` | `/worlds` | The workspace's worlds with their kinds, and the count policy |
-| `GET` | `/worlds/personal-source` | Whether a world can be made or brought up to date from the reviewed photographs, or why not |
-| `POST` | `/worlds/personal-source` | Compose exactly what that read showed into the personal-source world |
+| `GET` | `/worlds/personal-source` | Whether a world can be made from the reviewed photographs, or photographs added to its places with a preview, or why not; writes nothing |
+| `POST` | `/worlds/personal-source` | Compose exactly what that read showed into the personal-source world, or add exactly what its confirmed preview showed |
 | `PUT` | `/world-entries/{entry_id}` | Compare and advance the exact version references |
 | `POST` | `/world-entries/{entry_id}/source-attachments` | Attach reviewed reference photographs while preserving the world cursor |
 | `POST` | `/world-entries/{entry_id}/source-detachments` | Remove references from the current collection; no row or media is deleted |
@@ -575,12 +647,27 @@ FORCE row-level security to end as it began.
 connected as the runtime roles, with row-level security in force: each named refusal and that it
 writes nothing, a photograph reviewed only for detection, by somebody else, or never, a reviewed
 photograph in no scene group counted and left out, a digest the person was not shown, the world
-the browser then saves and names, a made world refused rather than changed after a new review,
-the refusal's words for a photograph added, no longer allowed and in no place, each against what the
-world's source media then shows, a slot that stops drawing a photograph whose review lapsed and
+the browser then saves and names, a slot that stops drawing a photograph whose review lapsed and
 draws it again after a new review while its depth estimate stays refused, one world shared with the
 operator script, and a stranger who sees none of it. `web/packages/app/test/personal-world.test.ts`
 covers the client calls and each state of the choice.
+
+`tests/test_personal_world_addition.py` holds the place rule over the groupings grouping leaves
+(a place photographed again, a position split, a new place, a photograph between two places, made
+photographs that lapse or leave every group) and one grouping run's composition byte for byte
+against its fixture. Through the routes, as runtime roles, it covers a read that writes nothing,
+an addition that keeps every region, the object, the regional appearance, the avatar's look and a
+change list Take back still reaches, the previous version read back unchanged, the confirmation's
+provenance, a preview that changed, a missing or misplaced preview digest, a removed depth
+estimate whose right ended staying behind with Take back starting at the addition, inhabitants who
+refuse until sent away and ones who stay behind, a deleted photograph, and a stranger, and it holds
+the tables that belong to a version equal to the ones the addition names.
+`web/packages/app/test/personal-world-addition.test.ts` covers the preview's parsing, the
+confirmed write and the choice's offer, preview, Cancel, delayed Confirm and refused confirm.
+`web/packages/graph-client/test/world-region-islands.test.ts` and
+`web/packages/app/test/world-region-islands.test.ts` hold a made world's photographs in its own
+regions while a later grouping holds them in another group, through the client's graph read and
+through opening the world.
 
 `tests/test_authored_starter_scene.py` pins the exact bytes each ground module version commits,
 version 1's taken from the tree that created the worlds already holding it, and checks that a

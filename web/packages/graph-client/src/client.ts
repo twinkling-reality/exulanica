@@ -11,7 +11,7 @@
  * is what the boundary was for.
  */
 
-import { type IslandOf } from './islands.js';
+import { type IslandOf, worldRegionIslands } from './islands.js';
 import type { EvidenceHandle, GraphSnapshot, ResolvedEvidence } from './read-model.js';
 import type { GraphSource } from './source.js';
 import { adaptSnapshot } from './snapshot.js';
@@ -20,24 +20,39 @@ import { type GraphPayload, toMs } from './wire.js';
 
 export interface ClientOptions extends TransportOptions {
   readonly islandOf?: IslandOf;
+  /**
+   * The open world's region for each photograph it holds, asked each time a graph is read. A
+   * function because the world is chosen after the session opens and another world can be opened
+   * later. See `worldRegionIslands`.
+   */
+  readonly worldRegions?: () => ReadonlyMap<string, string> | undefined;
 }
 
 export class ExulanicaClient implements GraphSource {
   readonly #transport: Transport;
   readonly #islandOf: IslandOf | undefined;
+  readonly #worldRegions: (() => ReadonlyMap<string, string> | undefined) | undefined;
 
   constructor(options: ClientOptions) {
+    if (options.islandOf !== undefined && options.worldRegions !== undefined) {
+      throw new TypeError('An island rule and a world\'s regions are two answers to one question.');
+    }
     this.#transport = new Transport(options);
     // Held as the caller's OVERRIDE rather than resolved to a default here, because the default
     // is built from the payload's own grouping and there is no payload yet.
     this.#islandOf = options.islandOf;
+    this.#worldRegions = options.worldRegions;
   }
 
   /** The whole graph at one state version. What the index and turn generation run against. */
   async snapshot(): Promise<GraphSnapshot> {
+    const payload = await this.#transport.getJson<GraphPayload>('/graph');
+    const regions = this.#worldRegions?.();
     return adaptSnapshot(
-      await this.#transport.getJson<GraphPayload>('/graph'),
-      this.#islandOf,
+      payload,
+      this.#islandOf ?? (regions === undefined || regions.size === 0
+        ? undefined
+        : worldRegionIslands(regions, payload)),
     );
   }
 

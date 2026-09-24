@@ -11284,7 +11284,7 @@
     "tags": [
      "world"
     ],
-    "summary": "Whether a world can be made or brought up to date from your reviewed photographs now.",
+    "summary": "Whether a world can be made, or photographs added to it, from your reviewed photographs now; writes nothing.",
     "operationId": "personal_source_world_worlds_personal_source_get",
     "parameters": [
      {
@@ -11331,7 +11331,7 @@
     "tags": [
      "world"
     ],
-    "summary": "Compose your reviewed photographs into your personal-source world, as last read.",
+    "summary": "Compose your reviewed photographs into your personal-source world, or add them to it, as last read.",
     "operationId": "compose_personal_source_world_worlds_personal_source_post",
     "parameters": [
      {
@@ -13495,6 +13495,18 @@
       "maxLength": 256,
       "minLength": 1,
       "title": "Topology Digest"
+     },
+     "preview_sha256": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preview Sha256"
      }
     },
     "additionalProperties": false,
@@ -13511,7 +13523,8 @@
       "enum": [
        "create_world",
        "update_world",
-       "save_entry"
+       "save_entry",
+       "add_photographs"
       ],
       "title": "Action"
      },
@@ -17976,6 +17989,128 @@
     ],
     "title": "PersonalPhotographsView"
    },
+   "PersonalWorldAdditionCountsView": {
+    "properties": {
+     "photographs_added": {
+      "type": "integer",
+      "title": "Photographs Added"
+     },
+     "photographs_joining_places": {
+      "type": "integer",
+      "title": "Photographs Joining Places"
+     },
+     "places_growing": {
+      "type": "integer",
+      "title": "Places Growing"
+     },
+     "new_places": {
+      "type": "integer",
+      "title": "New Places"
+     },
+     "photographs_in_new_places": {
+      "type": "integer",
+      "title": "Photographs In New Places"
+     },
+     "left_out_in_no_place": {
+      "type": "integer",
+      "title": "Left Out In No Place"
+     },
+     "left_out_between_places": {
+      "type": "integer",
+      "title": "Left Out Between Places"
+     },
+     "kept_not_allowed": {
+      "type": "integer",
+      "title": "Kept Not Allowed"
+     },
+     "kept_in_no_place": {
+      "type": "integer",
+      "title": "Kept In No Place"
+     },
+     "carried": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Carried"
+     },
+     "carried_removals": {
+      "type": "integer",
+      "title": "Carried Removals"
+     },
+     "region_appearances": {
+      "type": "integer",
+      "title": "Region Appearances"
+     },
+     "avatar_revisions": {
+      "type": "integer",
+      "title": "Avatar Revisions"
+     },
+     "stays_behind": {
+      "items": {
+       "$ref": "#/components/schemas/StaysBehindView"
+      },
+      "type": "array",
+      "title": "Stays Behind"
+     },
+     "society_staying": {
+      "type": "boolean",
+      "title": "Society Staying"
+     },
+     "changes_carried": {
+      "type": "integer",
+      "title": "Changes Carried"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "photographs_added",
+     "photographs_joining_places",
+     "places_growing",
+     "new_places",
+     "photographs_in_new_places",
+     "left_out_in_no_place",
+     "left_out_between_places",
+     "kept_not_allowed",
+     "kept_in_no_place",
+     "carried",
+     "carried_removals",
+     "region_appearances",
+     "avatar_revisions",
+     "stays_behind",
+     "society_staying",
+     "changes_carried"
+    ],
+    "title": "PersonalWorldAdditionCountsView",
+    "description": "What adding the photographs does, in counts; the sentences say the same in words."
+   },
+   "PersonalWorldPreviewView": {
+    "properties": {
+     "preview_sha256": {
+      "type": "string",
+      "title": "Preview Sha256"
+     },
+     "sentences": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sentences"
+     },
+     "counts": {
+      "$ref": "#/components/schemas/PersonalWorldAdditionCountsView"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "preview_sha256",
+     "sentences",
+     "counts"
+    ],
+    "title": "PersonalWorldPreviewView"
+   },
    "PersonalWorldView": {
     "properties": {
      "action": {
@@ -17985,7 +18120,8 @@
         "enum": [
          "create_world",
          "update_world",
-         "save_entry"
+         "save_entry",
+         "add_photographs"
         ]
        },
        {
@@ -18055,6 +18191,16 @@
        }
       ],
       "title": "Current Topology Digest"
+     },
+     "preview": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PersonalWorldPreviewView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,
@@ -18067,7 +18213,8 @@
      "photographs",
      "regions",
      "topology_digest",
-     "current_topology_digest"
+     "current_topology_digest",
+     "preview"
     ],
     "title": "PersonalWorldView"
    },
@@ -22589,6 +22736,30 @@
      "records"
     ],
     "title": "StageRecordCount"
+   },
+   "StaysBehindView": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     },
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "reason",
+     "count"
+    ],
+    "title": "StaysBehindView"
    },
    "StepBody": {
     "properties": {

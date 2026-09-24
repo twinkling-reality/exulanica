@@ -49,19 +49,7 @@ def bootstrap_world(
         composed = "reused"
         if snapshot is None:
             candidate = composed_candidate(
-                contract,
-                _plane_digest(
-                    connection,
-                    "select capture_id, blob_sha256 from capture "
-                    "where workspace_id=%s and deleted_at is null order by capture_id",
-                    workspace_id,
-                ),
-                _plane_digest(
-                    connection,
-                    "select artifact_id, kind, content_sha256 from artifact "
-                    "where workspace_id=%s and purged_at is null order by artifact_id",
-                    workspace_id,
-                ),
+                contract, *structural_input_digests(connection, workspace_id)
             )
             preview = structures.preview(candidate, proposed_by=actor)
             snapshot = structures.apply(
@@ -94,6 +82,31 @@ def bootstrap_world(
             "version_id": str(version.version_id),
             "state_sha256": version.state_sha256,
         }
+
+
+def structural_input_digests(
+    connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> tuple[str, str]:
+    """The graph and reconstruction digests a composed snapshot records as its inputs.
+
+    The live captures with their bytes, and the unpurged artifacts with their kind and content, as
+    they are when the snapshot is composed: the first one a world is made with, and each one that
+    adds photographs to it.
+    """
+    return (
+        _plane_digest(
+            connection,
+            "select capture_id, blob_sha256 from capture "
+            "where workspace_id=%s and deleted_at is null order by capture_id",
+            workspace_id,
+        ),
+        _plane_digest(
+            connection,
+            "select artifact_id, kind, content_sha256 from artifact "
+            "where workspace_id=%s and purged_at is null order by artifact_id",
+            workspace_id,
+        ),
+    )
 
 
 def _plane_digest(connection: psycopg.Connection, statement: str, workspace_id: uuid.UUID) -> str:

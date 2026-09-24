@@ -17,8 +17,8 @@ gets. The reviewed asset and behaviour registries are the same for every world a
 | Method and path | Responsibility |
 | --- | --- |
 | `GET /worlds` | The worlds the workspace holds, each with its kind, and how many of each it may hold |
-| `GET /worlds/personal-source` | Whether the account holder's reviewed photographs can make or update the personal-source world now, or the named refusal |
-| `POST /worlds/personal-source` | Compose the selection that read showed, by its `topology_digest`, and return the world's `world_id` |
+| `GET /worlds/personal-source` | Whether the account holder's reviewed photographs can make or update the personal-source world now, or be added to the made world's places with a preview, or the named refusal; writes nothing |
+| `POST /worlds/personal-source` | Compose the selection that read showed, by its `topology_digest`, or add the photographs its confirmed preview showed, by its `preview_sha256`, and return the world's `world_id` |
 | `GET /world-read/scenes/{scene_id}` | Read an authorized scene bundle, placed in the regions of the named world |
 | `GET /world-read/places/{place_id}` | Read a place in the named world, optionally resolved at a requested time |
 | `POST /world-write/scenes/{scene_id}/generated` | Record a generated-scene receipt tied to its conditioning sources |

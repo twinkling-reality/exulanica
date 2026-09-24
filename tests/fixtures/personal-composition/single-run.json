@@ -1,0 +1,182 @@
+{
+ "facts": {
+  "actor": "a0c7d1e2-4b3f-4a59-8e6d-1f2a3b4c5d6e",
+  "groups": [
+   {
+    "capture_ids": [
+     "01a0d35b-0000-7000-8300-000000000003",
+     "01a0d35b-0000-7000-8100-000000000001",
+     "01a0d35b-0000-7000-8200-000000000002"
+    ],
+    "group_id": "f0e1d2c3-b4a5-4968-8776-655443322110",
+    "ordinal": 0
+   },
+   {
+    "capture_ids": [
+     "01a0d35b-0000-7000-8500-000000000005",
+     "01a0d35b-0000-7000-8400-000000000004"
+    ],
+    "group_id": "0a1b2c3d-4e5f-4061-8273-849506172839",
+    "ordinal": 1
+   },
+   {
+    "capture_ids": [
+     "01a0d35b-0000-7000-8900-000000000009",
+     "01a0d35b-0000-7000-8600-000000000006"
+    ],
+    "group_id": "8c7b6a59-4837-4261-9504-f3e2d1c0b9a8",
+    "ordinal": 2
+   },
+   {
+    "capture_ids": [
+     "01a0d35b-0000-7000-8700-000000000007"
+    ],
+    "group_id": "4d3c2b1a-0f9e-4d8c-8b7a-695847362514",
+    "ordinal": 3
+   }
+  ],
+  "reviewed": [
+   {
+    "capture_id": "01a0d35b-0000-7000-8100-000000000001",
+    "evidence_span_id": "d5a645c7-a55f-57f4-98cf-c2ec09ab218a",
+    "source_sha256": "6ac96ff669df10f835bcd3bec22cf124ac5e36d64b834667590ff8163e2aa9ca",
+    "viewer_available": true
+   },
+   {
+    "capture_id": "01a0d35b-0000-7000-8200-000000000002",
+    "evidence_span_id": "e78adc94-94ea-5b41-8ac4-6e5b152b17dd",
+    "source_sha256": "b879cf5acaca0527264e2c6d71778d9a77068102939adbf35712e708387ceb07",
+    "viewer_available": true
+   },
+   {
+    "capture_id": "01a0d35b-0000-7000-8300-000000000003",
+    "evidence_span_id": "3d98e490-b3b4-55d0-ab81-6f0aa4f541e3",
+    "source_sha256": "74fd656daa24a2f6f04ac6224fc651d2f53b984c415da34a404eb47e57c0440b",
+    "viewer_available": true
+   },
+   {
+    "capture_id": "01a0d35b-0000-7000-8400-000000000004",
+    "evidence_span_id": "100f7450-7bd9-587c-83a8-458b02b12fad",
+    "source_sha256": "00b011c3990321527ff67cdcaa389eac74e5b39d21e383ebebe439bef86df950",
+    "viewer_available": true
+   },
+   {
+    "capture_id": "01a0d35b-0000-7000-8600-000000000006",
+    "evidence_span_id": "f1df7300-3ccc-51d1-9f51-e87a58a7e62d",
+    "source_sha256": "e42b237ee27d404d8cf04df4db4c07ce702536da47fb255d413c68af3b4102c8",
+    "viewer_available": true
+   },
+   {
+    "capture_id": "01a0d35b-0000-7000-8800-000000000008",
+    "evidence_span_id": "966a4031-a72f-5d75-aa7f-2bb2c0380a26",
+    "source_sha256": "a1d3b5183ce328daf154f080920f60bbfc3b66dda5d0f774c75ef8ff53889e34",
+    "viewer_available": true
+   },
+   {
+    "capture_id": "01a0d35b-0000-7000-8900-000000000009",
+    "evidence_span_id": "4ced6bbd-a4ef-559a-b626-150770159d91",
+    "source_sha256": "191635f8d746d449113ad8d57d4df4a2e6a9edd70d9cf45ca62b9c424f917bbc",
+    "viewer_available": false
+   }
+  ],
+  "workspace_id": "5e1f6a0e-3c2b-4d7e-9a18-2b6c0f4d9e31"
+ },
+ "note": "One grouping run over four places, composed by the reader as it was before places were read through overlapping groups (main at 2e43e498). A never-made world's regions, their order and its topology digest must stay exactly these; regenerate only for an intended change.",
+ "outside_scene_groups": 1,
+ "record": {
+  "interpretation": "membership of reviewed photographs in their scene groups; no new reconstruction or evidence",
+  "profile": "exulanica.personal-source-composition/v1",
+  "regions": [
+   {
+    "region_id": "f0e1d2c3-b4a5-4968-8776-655443322110",
+    "source_slots": [
+     {
+      "capture_id": "01a0d35b-0000-7000-8100-000000000001",
+      "evidence_span_id": "d5a645c7-a55f-57f4-98cf-c2ec09ab218a",
+      "slot_key": "source-01a0d35b-0000-7000-8100-000000000001",
+      "source_id": "30d61a87-55aa-55e7-83c7-9f1058e4af3e",
+      "source_sha256": "6ac96ff669df10f835bcd3bec22cf124ac5e36d64b834667590ff8163e2aa9ca"
+     },
+     {
+      "capture_id": "01a0d35b-0000-7000-8200-000000000002",
+      "evidence_span_id": "e78adc94-94ea-5b41-8ac4-6e5b152b17dd",
+      "slot_key": "source-01a0d35b-0000-7000-8200-000000000002",
+      "source_id": "02999c4b-d245-5c57-91f0-9366cf474a1c",
+      "source_sha256": "b879cf5acaca0527264e2c6d71778d9a77068102939adbf35712e708387ceb07"
+     },
+     {
+      "capture_id": "01a0d35b-0000-7000-8300-000000000003",
+      "evidence_span_id": "3d98e490-b3b4-55d0-ab81-6f0aa4f541e3",
+      "slot_key": "source-01a0d35b-0000-7000-8300-000000000003",
+      "source_id": "621becdc-138f-581c-88f0-d393eef5a7f4",
+      "source_sha256": "74fd656daa24a2f6f04ac6224fc651d2f53b984c415da34a404eb47e57c0440b"
+     }
+    ]
+   },
+   {
+    "region_id": "0a1b2c3d-4e5f-4061-8273-849506172839",
+    "source_slots": [
+     {
+      "capture_id": "01a0d35b-0000-7000-8400-000000000004",
+      "evidence_span_id": "100f7450-7bd9-587c-83a8-458b02b12fad",
+      "slot_key": "source-01a0d35b-0000-7000-8400-000000000004",
+      "source_id": "eb9c2c5b-5073-5f20-8e8a-2bd8b19f0d0b",
+      "source_sha256": "00b011c3990321527ff67cdcaa389eac74e5b39d21e383ebebe439bef86df950"
+     }
+    ]
+   },
+   {
+    "region_id": "8c7b6a59-4837-4261-9504-f3e2d1c0b9a8",
+    "source_slots": [
+     {
+      "capture_id": "01a0d35b-0000-7000-8600-000000000006",
+      "evidence_span_id": "f1df7300-3ccc-51d1-9f51-e87a58a7e62d",
+      "slot_key": "source-01a0d35b-0000-7000-8600-000000000006",
+      "source_id": "08a4f874-fd9f-59a7-acea-3d56d8316140",
+      "source_sha256": "e42b237ee27d404d8cf04df4db4c07ce702536da47fb255d413c68af3b4102c8"
+     }
+    ]
+   }
+  ],
+  "workspace_id": "5e1f6a0e-3c2b-4d7e-9a18-2b6c0f4d9e31"
+ },
+ "region_ids": [
+  "f0e1d2c3-b4a5-4968-8776-655443322110",
+  "0a1b2c3d-4e5f-4061-8273-849506172839",
+  "8c7b6a59-4837-4261-9504-f3e2d1c0b9a8"
+ ],
+ "reviewed": 6,
+ "sources": [
+  {
+   "capture_id": "01a0d35b-0000-7000-8100-000000000001",
+   "evidence_span_id": "d5a645c7-a55f-57f4-98cf-c2ec09ab218a",
+   "region_id": "f0e1d2c3-b4a5-4968-8776-655443322110",
+   "source_sha256": "6ac96ff669df10f835bcd3bec22cf124ac5e36d64b834667590ff8163e2aa9ca"
+  },
+  {
+   "capture_id": "01a0d35b-0000-7000-8200-000000000002",
+   "evidence_span_id": "e78adc94-94ea-5b41-8ac4-6e5b152b17dd",
+   "region_id": "f0e1d2c3-b4a5-4968-8776-655443322110",
+   "source_sha256": "b879cf5acaca0527264e2c6d71778d9a77068102939adbf35712e708387ceb07"
+  },
+  {
+   "capture_id": "01a0d35b-0000-7000-8300-000000000003",
+   "evidence_span_id": "3d98e490-b3b4-55d0-ab81-6f0aa4f541e3",
+   "region_id": "f0e1d2c3-b4a5-4968-8776-655443322110",
+   "source_sha256": "74fd656daa24a2f6f04ac6224fc651d2f53b984c415da34a404eb47e57c0440b"
+  },
+  {
+   "capture_id": "01a0d35b-0000-7000-8400-000000000004",
+   "evidence_span_id": "100f7450-7bd9-587c-83a8-458b02b12fad",
+   "region_id": "0a1b2c3d-4e5f-4061-8273-849506172839",
+   "source_sha256": "00b011c3990321527ff67cdcaa389eac74e5b39d21e383ebebe439bef86df950"
+  },
+  {
+   "capture_id": "01a0d35b-0000-7000-8600-000000000006",
+   "evidence_span_id": "f1df7300-3ccc-51d1-9f51-e87a58a7e62d",
+   "region_id": "8c7b6a59-4837-4261-9504-f3e2d1c0b9a8",
+   "source_sha256": "e42b237ee27d404d8cf04df4db4c07ce702536da47fb255d413c68af3b4102c8"
+  }
+ ],
+ "topology_digest": "0ad96dcff643c5233b89dca9598bc85ae879674366bd27fd71acbf0b118b57c0"
+}

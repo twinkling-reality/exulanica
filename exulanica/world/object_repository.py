@@ -30,15 +30,18 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, ClassVar, Final
 
 import psycopg
 from psycopg.types.json import Jsonb
 
+from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
-from exulanica.world.authored_delta import AlternateVersion, delta_sha256
+from exulanica.world.authored_delta import DELTA_SECTIONS, AlternateVersion, delta_sha256
 from exulanica.world.edit_kinds import EditSubject, edit_kind
 from exulanica.world.environment_instances import (
     EnvironmentInstance,
@@ -54,6 +57,9 @@ from exulanica.world.environment_source_authority import (
     ResolvedEnvironmentSource,
 )
 from exulanica.world.errors import (
+    EnvironmentBindingDrift,
+    EnvironmentCompositionDenied,
+    EnvironmentSourceWithdrawn,
     InvalidatedSourceVersion,
     InvalidEnvironmentData,
     InvalidEnvironmentState,
@@ -90,10 +96,85 @@ from exulanica.world.reviewed_catalog import ReviewedAssetRow, ReviewedCatalog
 from exulanica.world.society_engines import INPUT_ENGINES
 from exulanica.world.workspace_lock import lock_workspace
 
-__all__ = ["ResolvedEnvironmentSource", "ReviewedAssetRow", "WorldObjectRepository"]
+__all__ = [
+    "CarriedPart",
+    "CarryOutcome",
+    "CarryPlan",
+    "ResolvedEnvironmentSource",
+    "ReviewedAssetRow",
+    "StayReason",
+    "WorldObjectRepository",
+]
 
 #: Every subject id column of the edit log, in the order the table declares them.
 _SUBJECT_COLUMNS: Final = ",".join(subject.column for subject in EditSubject)
+
+
+class CarryOutcome(StrEnum):
+    """What carrying a version onto a later snapshot does with one row of its delta."""
+
+    #: Written into the new version as it is.
+    CARRIED = "carried"
+    #: Stays only in the previous version: the database would refuse to write it again, or its
+    #: source was deleted and removed data is never written back.
+    STAYS = "stays"
+
+
+class StayReason(StrEnum):
+    """Why ``carry_plan`` leaves a row in the previous version: every reason it can give.
+
+    The words a person reads for each are the addition preview's
+    (``exulanica.world.personal_composition``), and a test holds the two sets equal.
+    """
+
+    #: An environment piece whose pinned source or render was withdrawn.
+    SOURCE_WITHDRAWN = "source_withdrawn"
+    #: An environment piece whose source may no longer be composed into a world.
+    COMPOSITION_DENIED = "composition_denied"
+    #: An environment piece whose pinned binding no longer resolves to the same receipts.
+    BINDING_DRIFT = "binding_drift"
+    #: A depth estimate whose photograph was deleted: removed data is never written back.
+    SOURCE_DELETED = "source_deleted"
+    #: A depth estimate whose pinned depth right no longer stands.
+    RIGHT_ENDED = "right_ended"
+    #: A depth estimate whose bytes may no longer be read.
+    NOT_READABLE = "not_readable"
+
+
+@dataclass(frozen=True, slots=True)
+class CarriedPart:
+    """One row of a version's delta, and whether it carries, with the reason when it does not."""
+
+    subject: EditSubject
+    subject_id: str
+    removed: bool
+    outcome: CarryOutcome
+    reason: StayReason | None = None
+
+    def __post_init__(self) -> None:
+        if (self.outcome is CarryOutcome.STAYS) != (self.reason is not None):
+            raise ValueError("a row that stays names why, and a row that carries names no reason")
+
+
+@dataclass(frozen=True, slots=True)
+class CarryPlan:
+    """What carrying one version onto a later snapshot would write, read without writing.
+
+    ``state_sha256`` and ``edit_seq`` are the version's as read; the carry refuses a version that
+    moved since. The change list carries whole or not at all: undo restores documents the log
+    stored, so a log whose rows did not all carry could name something the new version lacks.
+    """
+
+    version_id: uuid.UUID
+    state_sha256: str
+    edit_seq: int
+    parts: tuple[CarriedPart, ...]
+    #: How many edits the version's change list holds.
+    edits: int
+
+    @property
+    def change_list_carries(self) -> bool:
+        return all(part.outcome is CarryOutcome.CARRIED for part in self.parts)
 
 
 class WorldObjectRepository:
@@ -108,6 +189,19 @@ class WorldObjectRepository:
             EditSubject.ELEMENT: "_undo_override",
             EditSubject.ENVIRONMENT_INSTANCE: "_undo_environment",
             EditSubject.POINT_MAP_INSTANCE: "_undo_point_map",
+        }
+    )
+
+    #: How a version's rows carry onto a later snapshot of its world, for each subject the
+    #: edit-kind registry names: the method that says whether one row carries, and the method
+    #: that writes it into the new version. ``tests/test_personal_world_addition.py`` requires
+    #: one for every subject.
+    _CARRY_RULES: ClassVar[Mapping[EditSubject, tuple[str, str]]] = MappingProxyType(
+        {
+            EditSubject.OBJECT: ("_object_carries", "_carry_object"),
+            EditSubject.ELEMENT: ("_override_carries", "_carry_override"),
+            EditSubject.ENVIRONMENT_INSTANCE: ("_environment_carries", "_carry_environment"),
+            EditSubject.POINT_MAP_INSTANCE: ("_point_map_carries", "_carry_point_map"),
         }
     )
 
@@ -237,6 +331,332 @@ class WorldObjectRepository:
                     self._point_map_edit_ids(parent_version_id, placed.instance_id),
                 )
         return self.version(version_id)
+
+    # -- carrying a version onto the next snapshot ------------------------------------------
+    #
+    # Adding photographs to a made world appends its next structural snapshot and carries the
+    # saved world's version onto it: the same delta under a new version whose parent is the old
+    # one, which stays as it was. What each row does is decided once, by carry_plan, read without
+    # writing so it can be shown before anything is written; carry_version writes exactly that.
+
+    def carry_plan(self, version_id: uuid.UUID) -> CarryPlan:
+        """Whether each row of the version's delta can be written into a new version now."""
+        version = self.version(version_id)
+        parts = []
+        for section in DELTA_SECTIONS:
+            carries = getattr(self, self._CARRY_RULES[section.subject][0])
+            for row in getattr(version, section.key):
+                outcome, reason = carries(row)
+                parts.append(
+                    CarriedPart(
+                        section.subject,
+                        section.sort_key(row),
+                        bool(getattr(row, "removed", False)),
+                        outcome,
+                        reason,
+                    )
+                )
+        return CarryPlan(
+            version.version_id,
+            version.state_sha256,
+            version.edit_seq,
+            tuple(parts),
+            len(version.edits),
+        )
+
+    def carry_version(
+        self, plan: CarryPlan, *, source_snapshot_id: uuid.UUID, created_by: uuid.UUID
+    ) -> AlternateVersion:
+        """Write ``plan``'s version again onto the snapshot that follows its own.
+
+        The new version's parent is the old one, which is not changed. Every row the plan carries
+        is written as it is, with the edit ids it was authored under, and the change list is
+        copied whole (new edit ids, the same documents, actors and times) when every row carries,
+        so undo reaches back through it; otherwise the new version's list starts empty. A version
+        that moved since the plan was read, or whose rows would carry differently now, is refused
+        as stale, and nothing is written.
+
+        The plan asked again is the carry's last question, and it is asked under the global asset
+        read lock, taken before anything is written (the discipline of the add paths' final
+        authorization; ``exulanica.db.read_check``). A right or source that ended before it is
+        seen, and the carry is refused as stale; a withdrawal that comes after it cannot commit
+        until this transaction does. So no placement is written, or committed, against a right
+        that ended during the carry. The question is the carry's own rule rather than the add
+        paths' availability: an estimate whose review lapsed carries undrawn, as the database
+        allows, where adding it anew is refused.
+        """
+        with self.connection.transaction():
+            self._lock_workspace()
+            parent = self._version_row(plan.version_id, for_update=True)
+            self._require_edit_base(parent, plan.state_sha256)
+            lock_asset_reads_until_commit(
+                self.connection,
+                outside="a version is carried only inside the transaction that writes it",
+            )
+            if parent["edit_seq"] != plan.edit_seq or self.carry_plan(plan.version_id) != plan:
+                raise StaleObjectBase(
+                    "this version changed after what carries from it was read; read it again"
+                )
+            self._require_snapshot(source_snapshot_id)
+            follows = self.connection.execute(
+                "select parent_snapshot_id from world_structure_snapshot "
+                "where workspace_id=%s and world_id=%s and snapshot_id=%s",
+                (self.workspace_id, self.world_id, source_snapshot_id),
+            ).fetchone()
+            if follows["parent_snapshot_id"] != parent["source_snapshot_id"]:
+                raise InvalidObjectData(
+                    "a version is carried only onto the snapshot that follows its own"
+                )
+            regions = self._source_region_ids(source_snapshot_id)
+            elements = self._source_element_ids(source_snapshot_id)
+            carried = {
+                (part.subject, part.subject_id)
+                for part in plan.parts
+                if part.outcome is CarryOutcome.CARRIED
+            }
+            version = self.version(plan.version_id)
+            sections = {
+                section.key: tuple(
+                    row
+                    for row in getattr(version, section.key)
+                    if (section.subject, section.sort_key(row)) in carried
+                )
+                for section in DELTA_SECTIONS
+            }
+            for row in (
+                *sections["objects"],
+                *sections["environment_instances"],
+                *sections["point_map_instances"],
+            ):
+                if row.region_id not in regions:
+                    raise InvalidObjectData(f"{row.region_id} is not a region of the new snapshot")
+            for override in sections["element_overrides"]:
+                if override.element_id not in elements:
+                    raise InvalidObjectData(
+                        f"{override.element_id} is not an element of the new snapshot"
+                    )
+            whole = plan.change_list_carries
+            state = delta_sha256(**sections)
+            if whole and state != plan.state_sha256:
+                raise StaleObjectBase("the carried delta is not the version's delta")
+            version_id = uuid.uuid4()
+            self.connection.execute(
+                "insert into world_alternate_version (version_id,workspace_id,world_id,"
+                "source_snapshot_id,parent_version_id,title,origin,style_version_id,"
+                "state_sha256,edit_seq,created_by) "
+                "values (%s,%s,%s,%s,%s,%s,'authored',%s,%s,%s,%s)",
+                (
+                    version_id,
+                    self.workspace_id,
+                    self.world_id,
+                    source_snapshot_id,
+                    plan.version_id,
+                    parent["title"],
+                    parent["style_version_id"],
+                    state,
+                    plan.edit_seq if whole else 0,
+                    created_by,
+                ),
+            )
+            edit_ids = self._carry_edits(plan.version_id, version_id) if whole else {}
+            for section in DELTA_SECTIONS:
+                write = getattr(self, self._CARRY_RULES[section.subject][1])
+                for row in sections[section.key]:
+                    write(plan.version_id, version_id, row, edit_ids)
+        return self.version(version_id)
+
+    def _object_carries(self, obj: AuthoredObject) -> tuple[CarryOutcome, StayReason | None]:
+        # A reviewed catalog asset, pinned by digest, is the only thing an object names.
+        return CarryOutcome.CARRIED, None
+
+    def _override_carries(
+        self, override: ElementOverride
+    ) -> tuple[CarryOutcome, StayReason | None]:
+        # An element of a made region keeps its id and owner in every later snapshot.
+        return CarryOutcome.CARRIED, None
+
+    def _environment_carries(
+        self, instance: EnvironmentInstance
+    ) -> tuple[CarryOutcome, StayReason | None]:
+        """The authority's final check, which is what writing the row asks of its source again.
+
+        A binding pins exact receipts, so one that no longer passes never will: it is not a cause
+        the person can fix, and the row stays in the previous version whether or not it was
+        removed. A withdrawn source is removed data, never written back.
+        """
+        try:
+            self._require_pinned_environment_current(
+                instance, require_bytes=False, validate_feature_bytes=False
+            )
+        except EnvironmentSourceWithdrawn:
+            return CarryOutcome.STAYS, StayReason.SOURCE_WITHDRAWN
+        except EnvironmentCompositionDenied:
+            return CarryOutcome.STAYS, StayReason.COMPOSITION_DENIED
+        except (EnvironmentBindingDrift, UnknownWorldResource):
+            return CarryOutcome.STAYS, StayReason.BINDING_DRIFT
+        return CarryOutcome.CARRIED, None
+
+    def _point_map_carries(
+        self, instance: PointMapInstance
+    ) -> tuple[CarryOutcome, StayReason | None]:
+        """What writing the placement asks now: the right it pins still stands, the bytes allow.
+
+        These are the two conditions ``tg_world_point_map_binding`` checks at the moment a row is
+        written, asked through the same functions; every other term it checks compares rows that
+        do not change. An estimate whose review lapsed, or whose photograph was detached from the
+        saved world, still carries and stays undrawn exactly as before. A right pins its exact
+        receipt, so one that ended never stands again, and the placement stays in the previous
+        version; so does one whose photograph was deleted, because removed data is never written
+        back.
+        """
+        if instance.unavailable_reason == "source_deleted":
+            return CarryOutcome.STAYS, StayReason.SOURCE_DELETED
+        source = instance.source
+        row = self.connection.execute(
+            "select personal_model_right_allows(%(w)s,r.right_id,r.capture_id,r.model_provider,"
+            "r.model_role,r.model_id,r.model_revision,r.destination,statement_timestamp()) "
+            "as right_stands,"
+            "asset_point_allows(%(w)s,%(artifact)s,statement_timestamp()) as readable "
+            "from personal_model_right r where r.workspace_id=%(w)s and r.right_id=%(right)s",
+            {"w": self.workspace_id, "right": source.right_id, "artifact": source.artifact_id},
+        ).fetchone()
+        if row is None or not row["right_stands"]:
+            return CarryOutcome.STAYS, StayReason.RIGHT_ENDED
+        if not row["readable"]:
+            return CarryOutcome.STAYS, StayReason.NOT_READABLE
+        return CarryOutcome.CARRIED, None
+
+    def _carry_edits(
+        self, from_version_id: uuid.UUID, to_version_id: uuid.UUID
+    ) -> dict[uuid.UUID, uuid.UUID]:
+        """Copy the change list, in order, under new edit ids; returns old id to new id."""
+        rows = self.connection.execute(
+            f"select edit_id,edit_seq,kind,{_SUBJECT_COLUMNS},undone_edit_id,base_state_sha256,"
+            "result_state_sha256,before_document,after_document,actor,recorded_at "
+            "from world_alternate_version_edit "
+            "where workspace_id=%s and world_id=%s and version_id=%s order by edit_seq",
+            (self.workspace_id, self.world_id, from_version_id),
+        ).fetchall()
+        ids = {row["edit_id"]: uuid.uuid4() for row in rows}
+        statement = (
+            "insert into world_alternate_version_edit (edit_id,workspace_id,world_id,version_id,"
+            f"edit_seq,kind,{_SUBJECT_COLUMNS},undone_edit_id,base_state_sha256,"
+            "result_state_sha256,before_document,after_document,actor,recorded_at)"
+        )
+        # The placeholders and the order of the values both come from the statement's own list.
+        columns = statement[statement.index("(") + 1 : -1].split(",")
+        for row in rows:
+            values = {
+                "edit_id": ids[row["edit_id"]],
+                "workspace_id": self.workspace_id,
+                "world_id": self.world_id,
+                "version_id": to_version_id,
+                "edit_seq": row["edit_seq"],
+                "kind": row["kind"],
+                **{subject.column: row[subject.column] for subject in EditSubject},
+                "undone_edit_id": None
+                if row["undone_edit_id"] is None
+                else ids[row["undone_edit_id"]],
+                "base_state_sha256": row["base_state_sha256"],
+                "result_state_sha256": row["result_state_sha256"],
+                "before_document": None
+                if row["before_document"] is None
+                else Jsonb(row["before_document"]),
+                "after_document": None
+                if row["after_document"] is None
+                else Jsonb(row["after_document"]),
+                "actor": row["actor"],
+                "recorded_at": row["recorded_at"],
+            }
+            self.connection.execute(
+                f"{statement} values ({','.join(['%s'] * len(columns))})",
+                tuple(values[column] for column in columns),
+            )
+        return ids
+
+    @staticmethod
+    def _carried_edit_ids(
+        edit_ids: Mapping[uuid.UUID, uuid.UUID], created: uuid.UUID, last: uuid.UUID
+    ) -> tuple[uuid.UUID, uuid.UUID]:
+        # A row copied from a branch names its parent's edits, which no list here holds.
+        return edit_ids.get(created, created), edit_ids.get(last, last)
+
+    def _carry_object(
+        self,
+        from_version_id: uuid.UUID,
+        to_version_id: uuid.UUID,
+        obj: AuthoredObject,
+        edit_ids: Mapping[uuid.UUID, uuid.UUID],
+    ) -> None:
+        self._insert_object(
+            to_version_id,
+            obj,
+            self._carried_edit_ids(edit_ids, *self._object_edit_ids(from_version_id, obj)),
+        )
+
+    def _carry_override(
+        self,
+        from_version_id: uuid.UUID,
+        to_version_id: uuid.UUID,
+        override: ElementOverride,
+        edit_ids: Mapping[uuid.UUID, uuid.UUID],
+    ) -> None:
+        last = self._override_edit_id(from_version_id, override)
+        self._write_override(to_version_id, override, edit_ids.get(last, last))
+
+    def _carry_environment(
+        self,
+        from_version_id: uuid.UUID,
+        to_version_id: uuid.UUID,
+        instance: EnvironmentInstance,
+        edit_ids: Mapping[uuid.UUID, uuid.UUID],
+    ) -> None:
+        created, last = self._carried_edit_ids(
+            edit_ids, *self._environment_edit_ids(from_version_id, instance.instance_id)
+        )
+        self._write_carried(
+            lambda: self._insert_environment(to_version_id, instance, (created, last)),
+            lambda: self._environment_carries(instance),
+        )
+
+    def _carry_point_map(
+        self,
+        from_version_id: uuid.UUID,
+        to_version_id: uuid.UUID,
+        instance: PointMapInstance,
+        edit_ids: Mapping[uuid.UUID, uuid.UUID],
+    ) -> None:
+        created, last = self._carried_edit_ids(
+            edit_ids, *self._point_map_edit_ids(from_version_id, instance.instance_id)
+        )
+        self._write_carried(
+            lambda: self._insert_point_map(to_version_id, instance, (created, last)),
+            lambda: self._point_map_carries(instance),
+        )
+
+    def _write_carried(
+        self,
+        write: Callable[[], None],
+        carries: Callable[[], tuple[CarryOutcome, StayReason | None]],
+    ) -> None:
+        """Write one carried placement, whose binding trigger asks its source again as it lands.
+
+        The trigger asks at the instant the row is written, after the carry's last question: a
+        right can pass its end in between, which no lock holds back. The row is written in its
+        own savepoint, so a refusal leaves the carry able to ask the row's rule again. A row that
+        would stay behind now is the carry's plan gone stale, refused as such, and nothing of the
+        addition is written; any other refusal is not the carry's to explain and is raised as it
+        is.
+        """
+        try:
+            with self.connection.transaction():
+                write()
+        except psycopg.errors.CheckViolation as exc:
+            if carries()[0] is CarryOutcome.STAYS:
+                raise StaleObjectBase(
+                    "a source a carried placement pins ended while it was written; read it again"
+                ) from exc
+            raise
 
     def versions(self) -> tuple[AlternateVersion, ...]:
         rows = self.connection.execute(

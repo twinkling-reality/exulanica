@@ -88,7 +88,11 @@ export async function openAppSession(
   state.credentials = env.preview
     ? previewCredentials(window.location.origin)
     : credentials(token, csrfToken);
-  const opened = await openSession(state.credentials);
+  // The graph puts every photograph the open world holds in that world's region. The regions come
+  // with the world's source media, which is read when a world opens, after this first read.
+  const opened = await openSession({
+    ...state.credentials, worldRegions: () => state.sourceMediaSession?.worldRegions,
+  });
   state.session = opened.session;
   state.snapshot = opened.initial;
   state.evidence = new EvidenceCache(opened.session.client);
@@ -229,9 +233,48 @@ export async function openWorldEntryContext(
       { cause: error },
     );
   }
+  const regionsBefore = state.sourceMediaSession?.worldRegions;
   state.sourceMediaSession?.dispose();
   state.sourceMediaSession = null;
   const settingsNotices = await connectInteractionPolicy(state, state.credentials, entry.worldId);
+  await connectEntrySourceMedia(state, state.credentials, entry, settingsNotices);
+  await readGraphForWorldRegions(state, regionsBefore);
+}
+
+/**
+ * Read the graph again when the opened world holds its photographs in other regions.
+ *
+ * The session's client asks for the open world's regions at each graph read, and the regions
+ * arrive with the world's source media, after the graph the page holds was read. Without this
+ * read, an object placed in a region of the world names a region nothing draws until the next
+ * write happens to read the graph. Opening an authored world, or the same world again, reads
+ * nothing more.
+ */
+async function readGraphForWorldRegions(
+  state: SessionState,
+  before: ReadonlyMap<string, string> | undefined,
+): Promise<void> {
+  const after = state.sourceMediaSession?.worldRegions;
+  if (state.session === null || sameRegions(before, after)) return;
+  state.snapshot = await state.session.snapshot();
+}
+
+function sameRegions(
+  left: ReadonlyMap<string, string> | undefined,
+  right: ReadonlyMap<string, string> | undefined,
+): boolean {
+  const a = left ?? new Map<string, string>();
+  const b = right ?? new Map<string, string>();
+  return a.size === b.size && [...a].every(([captureId, regionId]) => b.get(captureId) === regionId);
+}
+
+/** The chosen world's source media and the notices opening it leaves, or none for an authored world. */
+async function connectEntrySourceMedia(
+  state: SessionState,
+  credentials: Credentials,
+  entry: SavedWorldEntry,
+  settingsNotices: readonly string[],
+): Promise<void> {
   if (entry.sourceKind === 'authored') {
     state.previewSourceMedia = new Map();
     state.sourceMediaNotices = Object.freeze(settingsNotices);
@@ -244,7 +287,7 @@ export async function openWorldEntryContext(
       state.preferences.worldStyleParameters,
     );
     state.sourceMediaSession = await new SourceMediaClient({
-      ...state.credentials,
+      ...credentials,
       worldId: entry.worldId,
       sourceSnapshotId: entry.sourceSnapshotId,
     }).load(

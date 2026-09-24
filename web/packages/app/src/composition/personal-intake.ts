@@ -411,7 +411,7 @@ export function mountPersonalIntake(deps: {
   }
   function readyCard(source: { captureId: string; evidenceSpanId: string }): HTMLElement {
     const add = el('button', {
-      type: 'button', class: 'photo-reference-add', text: 'Add to this world',
+      type: 'button', class: 'photo-reference-add', text: 'Attach as a reference',
     });
     add.disabled = busy || deps.preview === true || deps.attachSources === undefined ||
       pendingAttachment !== null;
