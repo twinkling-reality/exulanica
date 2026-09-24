@@ -25,8 +25,10 @@
  * the record promises and decides nothing about where a photograph stands.
  */
 
-import { singleViewDepths } from './point-cloud.js';
-import type { PlacedScenePointMap } from './scene-point-maps.js';
+import { localToAtlas, localVec3, type Island, type NavigationWorld } from '@exulanica/atlas-core';
+import * as pc from 'playcanvas';
+import { singleViewDepths, type StandpointSurface } from './point-cloud.js';
+import { scenePointMapViewpoint, type PlacedScenePointMap } from './scene-point-maps.js';
 import { standpointTransform, type StandpointTransform } from './standpoint-transform.js';
 
 export { standpointTransform, type StandpointTransform } from './standpoint-transform.js';
@@ -177,4 +179,105 @@ function overlaps(
   const between = Math.acos(Math.max(-1, Math.min(1, cosine)));
   const halfDiagonal = (tan: readonly [number, number]): number => Math.atan(Math.hypot(tan[0], tan[1]));
   return between < halfDiagonal(tanA) + halfDiagonal(tanB);
+}
+
+/** What drawing one member of a joined standpoint takes beyond an ordinary single photograph. */
+export interface StandpointMemberDrawing {
+  readonly plan: StandpointMemberPlan;
+  /** The shared print's depth along this member's own axis, in its local units. */
+  readonly printDepth: number;
+  /** What `PointCloud.enableStandpoint` is given. */
+  readonly surface: StandpointSurface;
+  /** Radians of parallax per world unit from the standpoint, the same for every member. */
+  readonly parallaxPerUnit: number;
+}
+
+/**
+ * One island's point maps in their order, each with its standpoint drawing when it has one.
+ *
+ * A measured standpoint's members are drawn as one view, so they are planned together: each
+ * member's share of the directions, one print for all of them, one parallax rate. A standpoint
+ * member the plan does not hold is left out, and a set the shaders cannot hold leaves all of its
+ * members out: none is drawn in 3D rather than any drawn with a seam doubled. Every other map is
+ * yielded with no drawing, to be drawn as it always is.
+ */
+export function* withStandpointDrawings(
+  pointMaps: readonly PlacedScenePointMap[],
+  islandScale: number,
+  eyeHeightWorld: number,
+): Generator<readonly [PlacedScenePointMap, StandpointMemberDrawing | undefined]> {
+  const members = pointMaps.filter((pointMap) => pointMap.arrangement === 'standpoint');
+  let plan: StandpointPlan | null = null;
+  try {
+    plan = members.length > 0 ? planStandpoint(members) : null;
+  } catch {
+    plan = null;
+  }
+  for (const pointMap of pointMaps) {
+    if (pointMap.arrangement !== 'standpoint') {
+      yield [pointMap, undefined];
+      continue;
+    }
+    const member = plan?.members.get(pointMap.artifactId);
+    if (plan === null || member === undefined) continue;
+    yield [pointMap, Object.freeze({
+      plan: member,
+      // Local z is scaled by the member's depth scale, and the island scales everything after that.
+      printDepth: plan.printRadius / member.transform.depth,
+      surface: Object.freeze({
+        printRadiusWorld: plan.printRadius * islandScale,
+        eyeHeightWorld,
+        lateral: member.transform.lateral / member.transform.depth,
+        others: member.others,
+        otherCount: member.otherCount,
+        edgeFraction: STANDPOINT_EDGE_FRACTION,
+      }),
+      parallaxPerUnit: plan.parallaxPerUnit / islandScale,
+    })];
+  }
+}
+
+/**
+ * A standpoint member's transform, `R diag(a, a, b)` as the server sent it: PlayCanvas composes
+ * local scale before local rotation, which is exactly that order, so the entity carries it as it is.
+ */
+export function applyStandpointTransform(
+  entity: pc.Entity,
+  m: readonly number[],
+  member: StandpointMemberPlan,
+): void {
+  const [x, y, z, w] = member.transform.rotation;
+  entity.setLocalPosition(m[3]!, m[7]!, m[11]!);
+  entity.setLocalRotation(new pc.Quat(x, y, z, w));
+  entity.setLocalScale(member.transform.lateral, member.transform.lateral, member.transform.depth);
+}
+
+/**
+ * Lift or lower an unmeasured photograph so its camera stands exactly where a walking visitor's
+ * eye does over the ground at that spot.
+ *
+ * A single photograph's depth is right only from its own camera, and every edge, seam and bridge
+ * of its surface is drawn on that assumption. The walking controls hold the eye at the navigation
+ * surface plus `eyeHeight` wherever the visitor stands, while the display frame put the camera at
+ * its own eye height above the photograph's own ground, and nothing makes those the same height:
+ * the authored landscape is not flat and the island has its own scale. With this, MEASURED
+ * 2026-09-11 on the first personal place, the arrival eye and all three photographs' cameras
+ * coincide to float precision. The arrangement is unmeasured, so moving it vertically claims
+ * nothing; not moving it would draw every photograph from a viewpoint nobody stood at. A joined
+ * standpoint's members stand the same way: their record measures how each was turned, not how
+ * high their shared camera was.
+ */
+export function standOnTheGround(
+  entity: pc.Entity,
+  pointMap: PlacedScenePointMap,
+  island: Island,
+  navigationWorld: NavigationWorld,
+): void {
+  const [x, y, z] = scenePointMapViewpoint(pointMap);
+  const camera = localToAtlas(island.placement, localVec3(x, y, z));
+  const ground = navigationWorld.surface.sample(camera.x, camera.z);
+  if (ground === null || !(island.placement.scale > 0)) return;
+  const lift = (ground.height + navigationWorld.eyeHeight - camera.y) / island.placement.scale;
+  const at = entity.getLocalPosition();
+  entity.setLocalPosition(at.x, at.y + lift, at.z);
 }

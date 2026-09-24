@@ -16,6 +16,7 @@ import {
   STANDPOINT_MAX_OTHERS,
   planStandpoint,
   standpointTransform,
+  withStandpointDrawings,
 } from '../src/playcanvas/standpoint-scene.js';
 
 /**
@@ -147,6 +148,34 @@ describe('a standpoint plan', () => {
     expect(() => planStandpoint([{ ...member('a', 0), arrangement: 'unmeasured-fan' }])).toThrow(TypeError);
     const crowded = Array.from({ length: STANDPOINT_MAX_OTHERS + 2 }, (_, index) => member(`m${index}`, -index * 5));
     expect(() => planStandpoint(crowded)).toThrow(/can consult/);
+  });
+});
+
+describe('the drawings a binding takes for an island', () => {
+  it('yields every map in order, a standpoint member with its share of the shared print', () => {
+    const posed: PlacedScenePointMap = { ...member('p', 0), arrangement: 'recovered' };
+    const drawn = [...withStandpointDrawings([posed, member('a', 0), member('b', -30, 2)], 0.5, 1.6)];
+    expect(drawn.map(([pointMap, joined]) => [pointMap.artifactId, joined !== undefined]))
+      .toEqual([['p', false], ['a', true], ['b', true]]);
+    const plan = planStandpoint([member('a', 0), member('b', -30, 2)]);
+    const b = drawn[2]![1]!;
+    expect(b.plan.otherCount).toBe(plan.members.get('b')!.otherCount);
+    // The print along b's own axis is in its local units, which its depth scale of 2 stretches.
+    expect(b.printDepth).toBeCloseTo(plan.printRadius / 2, 9);
+    expect(b.surface.printRadiusWorld).toBeCloseTo(plan.printRadius * 0.5, 9);
+    expect(b.surface.eyeHeightWorld).toBe(1.6);
+    expect(b.surface.lateral).toBeCloseTo(1, 9);
+    expect(b.surface.edgeFraction).toBe(STANDPOINT_EDGE_FRACTION);
+    // One rate for every member, in world units.
+    expect(b.parallaxPerUnit).toBeCloseTo(plan.parallaxPerUnit / 0.5, 9);
+    expect(drawn[1]![1]!.parallaxPerUnit).toBe(b.parallaxPerUnit);
+  });
+
+  it('leaves out every member of a set it cannot plan, and nothing else', () => {
+    const crowded = Array.from({ length: STANDPOINT_MAX_OTHERS + 2 }, (_, index) => member(`m${index}`, -index * 5));
+    const fan: PlacedScenePointMap = { ...member('f', 0), arrangement: 'unmeasured-fan' };
+    const drawn = [...withStandpointDrawings([...crowded, fan], 1, 1.6)];
+    expect(drawn.map(([pointMap, joined]) => [pointMap.artifactId, joined])).toEqual([['f', undefined]]);
   });
 });
 
