@@ -26,6 +26,7 @@ from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json
 from exulanica.db.session import Database, set_workspace
+from exulanica.deletion.queue import DESTROYABLE_KINDS, STORED_KINDS
 from exulanica.deletion.worker import PurgeWorker
 from exulanica.env import env_get, resolve_data_dir
 from exulanica.evidence.blob import BlobId
@@ -95,7 +96,42 @@ def _checkpoint(path: Path) -> tuple[dict[str, Any], str]:
     identities = [item["tombstone"]["tombstone_id"] for item in record["tombstones"]]
     if len(set(identities)) != len(identities):
         raise RestoreRefused("checkpoint repeats a tombstone identity")
+    kinds = {target["target_kind"] for item in record["tombstones"] for target in item["targets"]}
+    unknown = sorted(kinds - set(DESTROYABLE_KINDS))
+    if unknown:
+        raise RestoreRefused(f"checkpoint names purge targets no worker destroys: {unknown}")
     return record, digest
+
+
+def _stored(item: dict[str, Any]) -> list[dict[str, str]]:
+    """One checkpoint tombstone's targets whose bytes live in an object store."""
+    return [target for target in item["targets"] if target["target_kind"] in STORED_KINDS]
+
+
+def _refuse_entries_left(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, item: dict[str, Any]
+) -> None:
+    """Refuse completion while a search entry this checkpoint tombstone erased is still here.
+
+    The checkpoint names every entry the deletion erased where it happened. An entry of the same
+    identity may exist again only when it was made after the deletion took effect: an entry's
+    identity is a digest of its photograph, text and model, and a search right granted again
+    after a stop indexes the photograph again (migration 0104). One made at or before that
+    moment is the entry the person deleted, still here because the backup predates the deletion
+    and holds something that keeps the entry, such as a search right whose stop this checkpoint
+    does not carry.
+    """
+    stored = _stored(item)
+    erased = [target["target_ref"] for target in item["targets"] if target not in stored]
+    if not erased:
+        return
+    left = connection.execute(
+        "select 1 from embedding where workspace_id=%s and embedding_id=any(%s::uuid[]) "
+        "and created_at<=%s::timestamptz limit 1",
+        (workspace_id, erased, item["tombstone"]["effective_at"]),
+    ).fetchone()
+    if left is not None:
+        raise RestoreRefused("a search entry the checkpoint deleted is still in this database")
 
 
 def checkpoint(database: Database, path: Path) -> str:
@@ -220,6 +256,10 @@ def replay(
     Existing tombstones get a deterministic replay identity to run every existing trigger
     again. This also repairs a database backup containing completed jobs paired with an older
     object-store backup. Archived targets retain objects whose row was already marked purged.
+    A search entry is a row of the restored database rather than stored bytes, so the replay
+    copy's own cascade decides which entries the deletion still erases here, and the checkpoint's
+    list of erased entries is a check afterwards: an entry it names may be present only when it
+    was made after the deletion took effect.
     Stub rows and evidence addresses remain for audit; serving paths refuse their tombstones.
     Every aggregate in affected workspaces is invalidated because its prior closure is untrusted.
 
@@ -242,7 +282,7 @@ def replay(
         raise RestoreRefused("restore marker names a different authoritative checkpoint")
     restore_id = uuid.UUID(marker["restore_id"])
     _write(marker_path, {**marker, "state": "pending"})
-    applied: list[tuple[uuid.UUID, uuid.UUID]] = []
+    applied: list[tuple[uuid.UUID, uuid.UUID, dict[str, Any]]] = []
     workspaces = frozenset(
         uuid.UUID(row["tombstone"]["workspace_id"]) for row in record["tombstones"]
     )
@@ -301,17 +341,29 @@ def replay(
                 "on conflict (tombstone_id) do nothing",
                 (Jsonb(value),),
             )
-            for target in item["targets"]:
+            # Store bytes can be older than this database, so the checkpoint's own record of
+            # them is queued again. A search entry is a row of this database: the cascade that
+            # just ran for the replay copy recorded every entry the deletion still erases here,
+            # with the target row that alone authorizes its purge. A checkpoint entry it did not
+            # record is gone already or was made again after the deletion, and queued it could
+            # never be claimed, so the replay could never complete. After the purge,
+            # _refuse_entries_left asks whether each is truly gone.
+            for target in _stored(item):
                 connection.execute(
                     "insert into purge_job (tombstone_id,workspace_id,target_kind,target_ref) "
                     "values (%s,%s,%s,%s) on conflict(tombstone_id,target_kind,target_ref) "
                     "do nothing",
                     (tombstone_id, workspace_id, target["target_kind"], target["target_ref"]),
                 )
+            # The original's search-entry jobs stay as this database holds them. A done one
+            # erased its entry before this backup was taken, and an entry of that identity here
+            # now was made again under a later right, which its old target row would authorize
+            # a reset job to destroy.
             connection.execute(
                 "update purge_job set state='queued',attempts=0,attempted_at=null,"
-                "completed_at=null,last_error=null where tombstone_id in (%s,%s)",
-                (tombstone_id, original["tombstone_id"]),
+                "completed_at=null,last_error=null where tombstone_id=%s "
+                "or (tombstone_id=%s and target_kind=any(%s))",
+                (tombstone_id, original["tombstone_id"], list(STORED_KINDS)),
             )
             connection.execute(
                 "update tombstone set purge_completed_at=null where tombstone_id in (%s,%s)",
@@ -320,7 +372,7 @@ def replay(
             connection.execute(
                 "update derived_artifact set stale=true where workspace_id=%s", (workspace_id,)
             )
-            applied.append((workspace_id, tombstone_id))
+            applied.append((workspace_id, tombstone_id, item))
     worker = PurgeWorker(purge_database, store, workspaces, material_stores=materials)
     while True:
         outcome = worker.drain()
@@ -330,17 +382,18 @@ def replay(
             break
     with database.unscoped() as connection:
         _admin(connection)
-        for workspace_id, tombstone_id in applied:
+        for workspace_id, tombstone_id, item in applied:
             set_workspace(connection, workspace_id)
             complete = connection.execute(
                 "select tombstone_purge_is_complete(%s) as complete", (tombstone_id,)
             ).fetchone()
             if not complete or not complete["complete"]:
                 raise RestoreRefused("a replayed tombstone is not completely purged")
+            _refuse_entries_left(connection, workspace_id, item)
             targets = connection.execute(
                 "select target_kind, target_ref from purge_job where tombstone_id=%s "
-                "and target_kind in ('blob','artifact','material_bake')",
-                (tombstone_id,),
+                "and target_kind=any(%s)",
+                (tombstone_id, list(STORED_KINDS)),
             ).fetchall()
             for row in targets:
                 blob_id = BlobId.from_hex(row["target_ref"])

@@ -66,6 +66,11 @@ Missing original tombstones retain their IDs. Each checkpoint tombstone also rec
 UUIDv5 replay ID derived from the attempt and original ID, causing the existing deletion triggers
 to run even when an old original row was already present. Repeating the same attempt adds no rows.
 Archived targets and reset jobs cover a completed database paired with older restored blob bytes.
+Only targets whose bytes live in an object store are queued again from the checkpoint. A search entry
+is a row of the restored database: the replayed tombstone's own cascade records the entries it still
+erases there, with the target rows that alone authorize their purge, and the checkpoint's list of
+erased entries is checked after the purge instead, so an entry made before its deletion took effect
+refuses completion while an entry made again under a later search right is kept.
 Every aggregate in affected workspaces becomes stale: a pre-restore closure is not trusted. Other
 workspaces are not invalidated. This operation does not recompute a model-produced artifact.
 
@@ -76,7 +81,8 @@ individual monotonic deletions and destroy bytes before a later failure; retry r
 idempotently. Missing/corrupt checkpoint files, conflicting tombstone contents, missing capture-to-blob
 bindings needed by an interval or hash blocklist, narrow
 administrative visibility, unavailable marker, wrong attempt receipts, failed or deferred purge,
-exhausted jobs, and surviving target bytes refuse completion or startup. If the final external
+exhausted jobs, surviving target bytes, a surviving search entry made before its deletion took
+effect, and a checkpoint naming a purge target no worker destroys refuse completion or startup. If the final external
 marker write fails after the database receipt commits, startup still refuses until replay is
 resumed. Startup checks this even when the test-only schema-verification bypass is selected.
 
@@ -85,7 +91,10 @@ resumed. Startup checks this even when the test-only schema-verification bypass 
 Migration `0036_restore_tombstone_replay.sql` is forward-only. Historical migrations and evidence
 addresses do not change. It also binds the recursive JSON-schema validators to their own schema:
 an actual pg_dump restore exposed their unqualified self-calls failing during COPY with the
-restorer’s empty search path. An ordinary instance with no declared restore keeps its existing startup
+restorer’s empty search path. Migration 0106 binds the recursive receipt canonicaliser,
+`privacy_canonical`, for the same measured failure: before it, a backup holding one model right could
+not be restored at all. `exulanica-local-db` gives such functions a path between the schema and the
+rows of a dump taken before 0106. An ordinary instance with no declared restore keeps its existing startup
 behaviour; a sealed or replaying database refuses. `EXULANICA_RESTORE_STATE_PATH` configures the
 independent marker for API startup. `Services.restore_state_path` is the injectable equivalent.
 `exulanica.deletion.restore` supplies checkpoint, prepare and replay commands. Runtime provisioning

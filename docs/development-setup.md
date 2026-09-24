@@ -271,7 +271,10 @@ uv run exulanica-local-db require-passwords --directory ~/Exulanica/database  # 
 - **Verify and restore.** `verify` checks the digest, restores the dump into a scratch server
   under the system temporary directory, compares its row counts and migrations with the
   manifest, and deletes the copy. `restore` does the same into an empty or absent directory and
-  leaves it running on the port the backed-up database served, or on `--port`.
+  leaves it running on the port the backed-up database served, or on `--port`. Both load the
+  schema, give every function the rows' constraints run a search path of its own, then load the
+  rows ([`load_functions.py`](../exulanica/db/load_functions.py)), so a dump taken before
+  migration 0106, whose receipt canonicaliser had none, restores too.
 - **Upgrade.** `upgrade` refuses while another client is connected, so stop the API and the
   workers first. It restarts the server on a private port, backs up, applies the pending
   migrations and role provisioning to a scratch copy of that backup with the schema check the API

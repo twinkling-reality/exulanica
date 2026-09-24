@@ -52,6 +52,7 @@ __all__ = [
     "DESTROYABLE_KINDS",
     "MAX_ATTEMPTS",
     "RETRY_AFTER",
+    "STORED_KINDS",
     "PurgeTarget",
     "Visibility",
     "claim_purge",
@@ -92,6 +93,13 @@ MAX_ATTEMPTS: Final = 8
 #: a worker given no material namespaces leaves them queued, so their tombstone stays incomplete
 #: and says so rather than completing over bytes nobody destroyed.
 DESTROYABLE_KINDS: Final = ("blob", "artifact", "embedding", "material_bake")
+
+#: The destroyable kinds whose target names bytes in an object store, outside the database. A
+#: restore can pair a database with older store bytes, so :mod:`exulanica.deletion.restore`
+#: queues these again from its checkpoint and looks for the bytes after the purge. The one kind
+#: left, ``embedding``, names a row of the database itself, a search entry, which the restored
+#: database's own tombstone cascade finds and records as that purge's authorization.
+STORED_KINDS: Final = ("blob", "artifact", "material_bake")
 
 
 #: The policy `provision_purge_role` creates. Named here as well as there because this module is

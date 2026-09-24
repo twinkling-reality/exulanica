@@ -41,6 +41,7 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 
+from exulanica.db.load_functions import pin_loading_functions
 from exulanica.db.local.cluster import Cluster, run, scratch_cluster
 from exulanica.db.local.database import (
     LocalDatabase,
@@ -376,10 +377,16 @@ def _create_roles(connection: psycopg.Connection[Any], backup: Backup) -> None:
 
 
 def restore_database(cluster: Cluster, port: int, backup: Backup) -> None:
-    """Load ``backup`` into the running, empty ``cluster``: its roles, then its database.
+    """Load ``backup`` into the running, empty ``cluster``: its roles, its schema, then its rows.
 
     The cluster must have been initialised with the backup's owner as its bootstrap superuser,
     because the dump names that role as the owner of everything in it.
+
+    The schema and the rows are two runs of ``pg_restore`` with one step between them: every
+    function the rows' constraints will run that resolves names through the path is given a path
+    of its own (:mod:`exulanica.db.load_functions`), because ``pg_restore`` loads rows under an
+    empty path. A dump taken before migration 0106 holds ``privacy_canonical`` without one, and
+    without this step its first model right stops the restore. A newer dump has none to pin.
     """
     maintenance_url = cluster.url(port, backup.owner_role, "postgres")
     try:
@@ -394,7 +401,27 @@ def restore_database(cluster: Cluster, port: int, backup: Backup) -> None:
         "--create",
         "--exit-on-error",
         "--no-password",
+        "--section=pre-data",
         f"--dbname={maintenance_url}",
+        str(backup.dump),
+        refusal=Refusal.RESTORE_FAILED,
+    )
+    restored_url = cluster.url(port, backup.owner_role, backup.database)
+    try:
+        with psycopg.connect(restored_url, autocommit=True) as connection:
+            pin_loading_functions(connection)
+    except psycopg.Error as error:
+        raise LocalDatabaseRefused(
+            Refusal.RESTORE_FAILED,
+            f"giving the functions {backup.dump.name} loads rows with a path failed: {error}",
+        ) from error
+    run(
+        "pg_restore",
+        "--exit-on-error",
+        "--no-password",
+        "--section=data",
+        "--section=post-data",
+        f"--dbname={restored_url}",
         str(backup.dump),
         refusal=Refusal.RESTORE_FAILED,
     )

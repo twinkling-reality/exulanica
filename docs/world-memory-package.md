@@ -99,6 +99,11 @@ The package contains canonical JSON for:
 - deletion tombstones without the private reason or requesting actor; and
 - export/consent boundary and generated-content declarations.
 
+A package holds no search entries, so a `caption_search` tombstone, written when a person stops a
+photograph's search right, is in `deletion/tombstones.json` as an audit record that blocks nothing:
+the photograph and the rest of `memory/graph.json` are the same in a package made after the stop as
+in one made before it (`tests/test_world_package_caption_search.py`).
+
 A person who withdrew is exported without their name. Their entity row and their naming
 assertions stay in `memory/graph.json`, so the package still shows that somebody was named and
 when; the entity's `display_name` and each naming assertion's `object_value` are null, and each

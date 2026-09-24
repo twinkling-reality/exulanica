@@ -90,8 +90,12 @@ and returns after the stop is refused by the database, and its result is not sto
 photograph, its descriptions and its other rights stay, so the photograph can still be found by the
 words of its own description, a match made in the database without any model; only the entries the
 search model made are deleted. The deletion is as prompt as the purge worker, and until it runs the
-search still ranks those entries, as it does a deleted photograph's. An expiry deletes nothing.
-`tests/test_search_entries_on_stop.py` holds this through the runtime and purge roles.
+entries still exist while the search already leaves them out (`exulanica/selection/embeddings.py`),
+as it does a deleted photograph's. An expiry deletes nothing.
+`tests/test_search_entries_on_stop.py` holds this through the runtime and purge roles. A restore
+replays the stop's tombstone; from a backup taken before the stop it refuses to complete while the
+backup's copy of the right keeps an entry the stop deleted
+([privacy threat model, section 5.4](privacy-consent-threat-model.md#54-tombstones-that-survive-retries-and-restores)).
 
 **Where it is enforced.** The vision stage (hosted), the depth stage and the segmentation stage
 (local) call it immediately before their model; a refusal records `stage_unavailable` with the

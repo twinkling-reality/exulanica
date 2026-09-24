@@ -769,6 +769,18 @@ Rules:
 5. **Restore runbook**: any restore from backup or PITR must, before the system accepts traffic, replay
    every tombstone with `effective_at` at or before the restore point and re-run the cascade. This step
    is mandatory, gated by a check that **fails the restore if skipped**, and tested at least once.
+   The offline replay of [ADR-0019](adr/0019-offline-restore-tombstone-replay.md)
+   (`exulanica/deletion/restore.py`) does this from a sealed checkpoint. A search entry is a row of
+   the restored database, so each replayed tombstone's own cascade erases the entries it reaches
+   there, and the replay refuses to complete while an entry the checkpoint records as erased is
+   present and was made before its deletion took effect; one made again later, under a search right
+   granted after a stop, is kept (`tests/test_restore_replay_search_entries.py`). A backup that holds
+   a model right restores: every function a restore runs while loading rows resolves its own names
+   (migration 0106), and `exulanica-local-db` loads a dump taken before 0106 by giving those functions
+   a path between its schema and its rows (`tests/test_local_database_restores_older_dumps.py`). A
+   withdrawal that is not a tombstone is not in the checkpoint: a backup taken before a model right
+   was stopped restores the right as current, and when that right keeps a search entry the stop
+   erased, the replay refuses to complete rather than serve it.
 6. A nightly **verifier** samples completed tombstones and independently proves absence in the primary
    database, the vector index files, the object store including non-current versions, the search index,
    and the cache. `verified_at` is set only by the verifier, never by the worker that performed the
