@@ -20,8 +20,10 @@ cp .env.example .env         # then fill in the two keys below
 uv run ruff check .          # static validation; select behavior-focused tests below
 ```
 
-The full suite is run with all four extras. Without `reconstruction` (numpy) and `pose`
-(pycolmap), some tests fail rather than skip.
+The full suite is run with all four extras. A plain `uv sync` installs none of them, and a test
+that needs a missing extra then skips instead of failing. Every skip cause the suite accepts is
+listed in [`tests/expected_skips.toml`](../tests/expected_skips.toml); continuous integration
+installs no extras and fails a skip that file does not accept.
 
 `.env` is gitignored and must never be committed. Two variables:
 
