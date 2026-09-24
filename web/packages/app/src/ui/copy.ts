@@ -291,6 +291,8 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'provenance.refused':
     '{model} read that in {duration}. The reviewed design has no way to make that change.',
   'provenance.none': 'No model was asked. This is what the search found.',
+  // A proposal or a refusal with no model to name. There was no search, so none is mentioned.
+  'provenance.proposalNone': 'No model was asked.',
   // A model WAS asked and gave back something unusable. Saying "no model was asked" here would
   // be false, and saying anything about the search would be false too, because there was none.
   'provenance.unreadable': 'A model was asked and could not turn that into a search.',

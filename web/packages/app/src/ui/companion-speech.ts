@@ -83,13 +83,14 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
 
   if (provenance.composed === 'proposed' || provenance.composed === 'refused') {
     // Both name the model that read the request, and neither mentions evidence or a search,
-    // because a proposal is not an answer and nothing was looked at to make one.
-    return provenance.servedModel === null
-      ? say('provenance.none')
-      : fill(`provenance.${provenance.composed}`, {
-          model: provenance.servedModel,
-          duration: spent,
-        });
+    // because a proposal is not an answer and nothing was looked at to make one. A refusal can
+    // come after the classifier read the request and before any model drew anything, so it
+    // names the classifier; a proposal is only ever credited to the model that drew it.
+    const model =
+      provenance.servedModel ?? (provenance.composed === 'refused' ? provenance.plannedBy : null);
+    return model === null
+      ? say('provenance.proposalNone')
+      : fill(`provenance.${provenance.composed}`, { model, duration: spent });
   }
 
   if (provenance.composed === 'discarded') {
