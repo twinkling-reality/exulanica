@@ -26,7 +26,13 @@ from exulanica.evidence import BlobId, EvidenceAddress
 from exulanica.models.client import ModelClient
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
-from exulanica.selection.packet import ConfirmedPlace, EvidenceItem, EvidencePacket, ValueReference
+from exulanica.selection.packet import (
+    ConfirmedPerson,
+    ConfirmedPlace,
+    EvidenceItem,
+    EvidencePacket,
+    ValueReference,
+)
 from exulanica.selection.plan import EntitySelector, Intent, SelectionPlan
 from exulanica.selection.question import EntityChoice, _without_names, compose_answer, propose_plan
 from exulanica.selection.request_names import RequestNames
@@ -89,6 +95,7 @@ def _packet() -> EvidencePacket:
                 text=None,
                 trust="capture_supported",
                 confirmed_places=(ConfirmedPlace(PLACE.entity_id),),
+                confirmed_people=(ConfirmedPerson(PERSON.entity_id),),
             ),
             EvidenceItem(
                 token="B7GHK3MNP4",

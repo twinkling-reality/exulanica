@@ -26,15 +26,18 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Any, Final
 
 import psycopg
 
+from exulanica.epistemics.saved_names import PLACEHOLDER
 from exulanica.errors import ExulanicaError, TombstonedError
 
 __all__ = [
+    "NO_NAMES",
     "AnswerCitation",
     "AnswerOrigin",
     "CompanionAnswer",
@@ -67,6 +70,9 @@ ABSTENTIONS: Final = frozenset(
         "UNANSWERABLE_NOT_UNDERSTOOD",
     }
 )
+
+#: An answer that names nothing. Shared and read-only, so no answer can grow another's map.
+NO_NAMES: Final[Mapping[str, uuid.UUID]] = MappingProxyType({})
 
 
 class CompanionMemoryError(ExulanicaError):
@@ -134,6 +140,10 @@ class CompanionAnswer:
     correction_note: str | None
     status: MemoryStatus
     citations: tuple[AnswerCitation, ...]
+    #: Each placeholder the answer text carries, ``[person A]``, and the entity it stood for. Ids
+    #: only: the browser draws each name from the account holder's library when the answer is
+    #: drawn, so a rename, a deletion or a withdrawn consent carries through.
+    names: Mapping[str, uuid.UUID]
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +170,8 @@ class RecordedAnswer:
     prompt_version: str
     latency_ms: int
     citations: tuple[AnswerCitation, ...]
+    #: The answer's own ``names``, as the answer route served it: placeholder to entity id.
+    names: Mapping[str, uuid.UUID] = field(default_factory=lambda: NO_NAMES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,9 +234,14 @@ class CompanionMemoryRepository:
             "order by asked_at desc, answer_id desc limit %s",
             (self.workspace_id, self.actor_id, limit),
         ).fetchall()
-        citations = self._citations_for(tuple(row["answer_id"] for row in rows))
+        ids = tuple(row["answer_id"] for row in rows)
+        citations = self._citations_for(ids)
+        names = self._names_for(ids)
         answers = tuple(
-            _row_to_answer(row, citations.get(row["answer_id"], ())) for row in rows
+            _row_to_answer(
+                row, citations.get(row["answer_id"], ()), names.get(row["answer_id"], NO_NAMES)
+            )
+            for row in rows
         )
         escape_rows = self.connection.execute(
             "select * from companion_escape "
@@ -253,7 +270,8 @@ class CompanionMemoryRepository:
         if row is None:
             raise UnknownCompanionMemory(f"no companion memory {answer_id}")
         citations = self._citations_for((answer_id,))
-        return _row_to_answer(row, citations.get(answer_id, ()))
+        names = self._names_for((answer_id,))
+        return _row_to_answer(row, citations.get(answer_id, ()), names.get(answer_id, NO_NAMES))
 
     def _citations_for(
         self, answer_ids: Sequence[uuid.UUID]
@@ -277,6 +295,22 @@ class CompanionMemoryRepository:
             )
         return {answer_id: tuple(items) for answer_id, items in grouped.items()}
 
+    def _names_for(
+        self, answer_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, Mapping[str, uuid.UUID]]:
+        """Every placeholder map for a set of answers, in one query rather than one per answer."""
+        if not answer_ids:
+            return {}
+        rows = self.connection.execute(
+            "select answer_id, label, entity_id from companion_answer_name "
+            "where workspace_id=%s and answer_id = any(%s) order by answer_id, label",
+            (self.workspace_id, list(answer_ids)),
+        ).fetchall()
+        grouped: dict[uuid.UUID, dict[str, uuid.UUID]] = {}
+        for row in rows:
+            grouped.setdefault(row["answer_id"], {})[row["label"]] = row["entity_id"]
+        return {answer_id: MappingProxyType(items) for answer_id, items in grouped.items()}
+
     # -- writes ---------------------------------------------------------------------------
 
     def record_answer(self, recorded: RecordedAnswer) -> CompanionAnswer:
@@ -297,7 +331,11 @@ class CompanionMemoryRepository:
         # reach the client as a 500.
         except psycopg.IntegrityError as exc:
             raise _refusal(exc) from exc
-        return _row_to_answer(row, tuple(sorted(recorded.citations, key=_by_ordinal)))
+        return _row_to_answer(
+            row,
+            tuple(sorted(recorded.citations, key=_by_ordinal)),
+            MappingProxyType(dict(recorded.names)),
+        )
 
     def _insert_answer(self, recorded: RecordedAnswer) -> Mapping[str, Any]:
         with self.connection.transaction():
@@ -322,6 +360,7 @@ class CompanionMemoryRepository:
             ).fetchone()
             assert row is not None
             self._insert_citations(row["answer_id"], recorded.citations)
+            self._insert_names(row["answer_id"], recorded.names)
         return row
 
     def record_escape(self, recorded: RecordedEscape) -> CompanionEscape:
@@ -370,7 +409,9 @@ class CompanionMemoryRepository:
         The correction inherits the superseded answer's citations verbatim. It is the same
         question about the same photographs, so it must be reachable by the same withdrawal; a
         correction with no citations would be a stored sentence about somebody's library that no
-        deletion could reach, which is the whole failure this plane is built against.
+        deletion could reach, which is the whole failure this plane is built against. It inherits
+        the answer's placeholder map too, so a placeholder the person kept in their correction is
+        drawn with the same name.
         """
         if not answer_text.strip() or len(answer_text) > 8000:
             raise InvalidCompanionMemory("a correction carries 1 to 8000 characters of text")
@@ -425,12 +466,21 @@ class CompanionMemoryRepository:
                 (self.workspace_id, row["answer_id"], self.workspace_id, answer_id),
             )
             self.connection.execute(
+                "insert into companion_answer_name (workspace_id,answer_id,label,entity_id) "
+                "select %s,%s,label,entity_id from companion_answer_name "
+                "where workspace_id=%s and answer_id=%s",
+                (self.workspace_id, row["answer_id"], self.workspace_id, answer_id),
+            )
+            self.connection.execute(
                 "update companion_answer set status='superseded', superseded_at=now() "
                 "where workspace_id=%s and answer_id=%s",
                 (self.workspace_id, answer_id),
             )
         citations = self._citations_for((row["answer_id"],))
-        return _row_to_answer(row, citations.get(row["answer_id"], ()))
+        names = self._names_for((row["answer_id"],))
+        return _row_to_answer(
+            row, citations.get(row["answer_id"], ()), names.get(row["answer_id"], NO_NAMES)
+        )
 
     def withdraw(self, answer_id: uuid.UUID) -> None:
         """Delete one memory: withdraw it and its whole correction lineage.
@@ -473,9 +523,7 @@ class CompanionMemoryRepository:
 
     # -- internal validation and rows -----------------------------------------------------
 
-    def _insert_citations(
-        self, answer_id: uuid.UUID, citations: Sequence[AnswerCitation]
-    ) -> None:
+    def _insert_citations(self, answer_id: uuid.UUID, citations: Sequence[AnswerCitation]) -> None:
         for citation in sorted(citations, key=_by_ordinal):
             self.connection.execute(
                 "insert into companion_answer_citation "
@@ -487,6 +535,14 @@ class CompanionMemoryRepository:
                     citation.span_id,
                     citation.capture_id,
                 ),
+            )
+
+    def _insert_names(self, answer_id: uuid.UUID, names: Mapping[str, uuid.UUID]) -> None:
+        for label, entity_id in sorted(names.items()):
+            self.connection.execute(
+                "insert into companion_answer_name (workspace_id,answer_id,label,entity_id) "
+                "values (%s,%s,%s,%s)",
+                (self.workspace_id, answer_id, label, entity_id),
             )
 
     @staticmethod
@@ -506,6 +562,11 @@ class CompanionMemoryRepository:
             raise InvalidCompanionMemory("two citations claim the same reading position")
         if any(ordinal < 0 for ordinal in ordinals):
             raise InvalidCompanionMemory("a citation's reading position is not negative")
+        # The refusal never quotes the label: one that is not a placeholder may be a name.
+        if any(PLACEHOLDER.fullmatch(label) is None for label in recorded.names):
+            raise InvalidCompanionMemory(
+                "an answer's names map placeholders, and only placeholders"
+            )
 
 
 def _by_ordinal(citation: AnswerCitation) -> int:
@@ -527,9 +588,17 @@ def _refusal(exc: psycopg.Error) -> Exception:
     branch below reads a distinction the trigger drew rather than guessing at one.
     """
     message = str(exc)
+    if "tombstoned:" in message and "companion_answer_name" in message:
+        return TombstonedError(
+            "this answer names someone or something that has been deleted, so it was not kept"
+        )
     if "tombstoned:" in message:
         return TombstonedError(
             "this answer cites a photograph that has been deleted, so it was not kept"
+        )
+    if "names an entity that is not in this workspace" in message:
+        return UnknownCompanionMemory(
+            "this answer names someone or something that is not in this library"
         )
     if "not in this workspace" in message:
         return UnknownCompanionMemory("this answer cites a photograph that is not in this library")
@@ -537,7 +606,9 @@ def _refusal(exc: psycopg.Error) -> Exception:
 
 
 def _row_to_answer(
-    row: Mapping[str, Any], citations: tuple[AnswerCitation, ...]
+    row: Mapping[str, Any],
+    citations: tuple[AnswerCitation, ...],
+    names: Mapping[str, uuid.UUID],
 ) -> CompanionAnswer:
     return CompanionAnswer(
         row["answer_id"],
@@ -556,6 +627,7 @@ def _row_to_answer(
         row["correction_note"],
         MemoryStatus(row["status"]),
         citations,
+        names,
     )
 
 

@@ -77,6 +77,22 @@ withdraws one right for the caller's workspace and answers with the right's refe
 `"state": "ended"`; a second withdrawal changes nothing, and another workspace's right gets the same
 404 as an id nobody granted.
 
+**Stopping a search right deletes the search entries made from the photograph.** Withdrawing a
+right for the `embedding` role, "Search index" in the photo drawer, writes a `caption_search`
+tombstone over the photograph in the same transaction
+(`exulanica/migrations/0104_a_stopped_search_right_deletes_its_search_entries.sql`). Its cascade
+records every search entry made from the photograph's descriptions and queues their purge, and the
+purge worker deletes them as it deletes a deleted photograph's (`exulanica/deletion/worker.py`). An
+entry made by a model that another current search right still covers for the same photograph is
+kept until that right stops too; the drawer's stop ends every current right of the role at once,
+so stopping "Search index" there deletes every entry. A model call that was allowed when it left
+and returns after the stop is refused by the database, and its result is not stored. The
+photograph, its descriptions and its other rights stay, so the photograph can still be found by the
+words of its own description, a match made in the database without any model; only the entries the
+search model made are deleted. The deletion is as prompt as the purge worker, and until it runs the
+search still ranks those entries, as it does a deleted photograph's. An expiry deletes nothing.
+`tests/test_search_entries_on_stop.py` holds this through the runtime and purge roles.
+
 **Where it is enforced.** The vision stage (hosted), the depth stage and the segmentation stage
 (local) call it immediately before their model; a refusal records `stage_unavailable` with the
 reason and sends nothing. The person-region stage does the same for any person detector that
@@ -172,7 +188,11 @@ the purpose). A batch that names no role records no right, and the worker then s
 to no model. A replay with the same `request_id` reports each granted right as `current` or `ended`,
 and `GET /personal-admission` lists the rights the actor granted over each source, each with
 `notice_current`, true only when the server states words for the right's role and the right was
-granted against exactly those words. Neither answer is a permission.
+granted against exactly those words. Neither answer is a permission. A search right granted
+against the role's earlier words, which said the search entries already made would stay, is listed
+with `notice_current` false, and the drawer shows it as allowed without the wording shown; stopping
+it deletes those entries as well, which removes more than those words said and nothing they
+promised to keep for the person.
 `POST /personal-admission/model-rights/{right_id}/withdraw` ends one right.
 
 For `review`, supply `reviewed_by_name`, `attestation`, and either `no-person` or `confirmed-regions`

@@ -201,6 +201,9 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'proposal.refused.unsupported_reference':
     'The proposed change did not name any of the photographs this world is drawn over, so there '
     + 'is nothing to review it against.',
+  'proposal.refused.no_evidence':
+    'This world has no photograph a change could be checked against yet. Attach a reviewed '
+    + 'photograph to it, and a change can be proposed from that photograph.',
   'proposal.refused.not_drafted':
     'That could not be turned into a change to this world, so nothing was proposed.',
   'proposal.refused.no_world':

@@ -631,9 +631,10 @@ def _without_names(packet: EvidencePacket, names: RequestNames) -> EvidencePacke
     the caller kept. The text is a sign, a caption or another stored claim, and a saved name can be
     painted on a building or written on a shirt as easily as typed into a question.
 
-    A place the account holder confirmed a photograph was taken at is named by its id, from its
-    own saved name alone, so another entity saved under the same words cannot take its place. A
-    place with no saved name has nothing to be named by and is not stated.
+    A place the account holder confirmed a photograph was taken at, and a person they confirmed
+    is in it, is named by its id, from its own saved name alone, so another entity saved under the
+    same words cannot take its place. A person is only ever named by placeholder. An entity with
+    no saved name has nothing to be named by and is not stated.
     """
     items = []
     for item in packet.items:
@@ -642,6 +643,10 @@ def _without_names(packet: EvidencePacket, names: RequestNames) -> EvidencePacke
             confirmed_places=tuple(
                 replace(place, reference=names.reference(place.entity_id))
                 for place in item.confirmed_places
+            ),
+            confirmed_people=tuple(
+                replace(person, reference=names.reference(person.entity_id))
+                for person in item.confirmed_people
             ),
         )
         if item.text is not None:
@@ -687,6 +692,10 @@ def _render_packet(packet: EvidencePacket) -> str:
             # Only as the request names it. A place with no saved name has no line.
             if place.reference is not None:
                 lines.append(f"      user_confirmed_place: {place.reference}")
+        for person in item.confirmed_people:
+            # Only by placeholder, and a person with no saved name has no line.
+            if person.reference is not None:
+                lines.append(f"      user_confirmed_person: {person.reference}")
         if item.text is not None:
             lines.append(f'      untrusted_text: """{item.text}"""')
     lines.extend(

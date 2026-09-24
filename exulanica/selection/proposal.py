@@ -177,6 +177,10 @@ class RefusalCode(StrEnum):
     NO_CHANGE = "no_change"
     #: The draft named no evidence, or named evidence outside the bounded catalogue.
     UNSUPPORTED_REFERENCE = "unsupported_reference"
+    #: The world holds no evidence a proposal could cite: no source slot its topology binds and no
+    #: reviewed photograph attached to it. Distinct from a draft that named the wrong evidence,
+    #: because what changes it is attaching a photograph, not asking differently.
+    NO_EVIDENCE = "no_evidence"
     #: The model could not fill the form twice, or its reply was truncated.
     NOT_DRAFTED = "not_drafted"
     #: The world has no reviewed appearance state to propose against yet.
@@ -586,7 +590,7 @@ def propose_appearance(
         return AppearanceOutcome(
             kind=kind,
             refusal=ProposalRefusal(
-                RefusalCode.UNSUPPORTED_REFERENCE,
+                RefusalCode.NO_EVIDENCE,
                 "this world holds no evidence a proposal could cite; attach a reviewed "
                 "photograph to it, and a proposal can cite that photograph",
             ),

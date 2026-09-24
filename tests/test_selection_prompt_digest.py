@@ -1,7 +1,7 @@
 """Every prompt the Companion sends is pinned to the version its output is recorded under.
 
 Each prompt version is an input to the response cache key and is stored with what the prompt
-produced: an answer's execution block names ``selection-7``, a world style proposal names
+produced: an answer's execution block names ``selection-8``, a world style proposal names
 ``proposal-2``, an environment proposal names ``environment-proposal-1``. A prompt edited without
 its version moving would file new output under a prompt that no longer exists, and would serve a
 cached answer composed under the old wording. So the bytes of every prompt text are hashed here,
@@ -18,7 +18,7 @@ from exulanica.selection import environment_proposal, prompts, proposal
 
 #: version -> SHA-256 of the canonical JSON of that family's prompt texts, as ``_texts`` reads them.
 PINNED = {
-    "selection-7": "a90070a8e65f7eb60703db3a4d5a02d80af8bcf227d7373ebd85a94e85fc52f5",
+    "selection-8": "127e11c1d78fa9bed8f222ab06a087a6d8ee7388f5751f32949a1a41df83ea20",
     "proposal-2": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
     "environment-proposal-1": "88314630219bea7f6571a54fff583920ac765581a25efa581e20f4b04e9e0a92",
 }

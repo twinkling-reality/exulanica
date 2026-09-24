@@ -11849,6 +11849,19 @@
       "type": "array",
       "maxItems": 64,
       "title": "Citations"
+     },
+     "names": {
+      "additionalProperties": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "propertyNames": {
+       "maxLength": 64,
+       "minLength": 1
+      },
+      "type": "object",
+      "maxProperties": 64,
+      "title": "Names"
      }
     },
     "additionalProperties": false,
@@ -23515,6 +23528,14 @@
       },
       "type": "array",
       "title": "Citations"
+     },
+     "names": {
+      "additionalProperties": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "object",
+      "title": "Names"
      }
     },
     "additionalProperties": false,
@@ -23534,7 +23555,8 @@
      "origin",
      "supersedes",
      "correction_note",
-     "citations"
+     "citations",
+     "names"
     ],
     "title": "AnswerView"
    },

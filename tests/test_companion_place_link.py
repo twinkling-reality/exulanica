@@ -171,8 +171,11 @@ def test_stating_the_link_adds_no_line(confirmed):
     assert all(not item.confirmed_places for item in packet.items if item.assertion_id is not None)
 
 
-def test_a_confirmed_person_is_not_stated(confirmed):
-    """Telling a model who is in a photograph is a decision about people; the packet makes none."""
+def test_a_confirmed_person_is_not_stated_as_a_place(confirmed):
+    """A person link is carried as a person, never as a place.
+
+    What is stated for a person is held by ``tests/test_companion_person_link.py``.
+    """
     repository, store, session, captures, entities = confirmed
     plan = SelectionPlan(intent=Intent.CAPTURES, entities=EntitySelector(ids=[entities["person"]]))
     result, packet = _packet(repository, store, session, plan)

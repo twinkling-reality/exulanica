@@ -1,0 +1,1100 @@
+"""Does telling the composer who is in a photograph, by placeholder, answer questions about people?
+
+    python scripts/measure_companion_person_link.py run --split SPLIT --out RUN.json \\
+        --model-env FILE [--runs N]
+    python scripts/measure_companion_person_link.py preregister --development RUN.json
+    python scripts/measure_companion_person_link.py outcome --run RUN.json --judgments FILE \\
+        --development RUN.json
+
+**The question.** A photograph the account holder confirmed a person is in reaches the composer
+with the line ``user_confirmed_person: [person A]`` (prompt ``selection-8``), where it used to
+reach it with nothing saying who is in it. Asked about a person by their saved name, the composer
+should cite the photographs linked to that person; it should never say a person is visible or
+describe them beyond the photograph's own description; and questions that name no person should
+be answered as before.
+
+**The corpus**, for each split, is one workspace of eight synthetic photographs whose descriptions
+and detections this script writes, through the product's ingest with a scripted vision
+observation in place of the vision role, under a synthetic authority. Two people are named by the
+synthetic account holder through the product's naming and confirmation decisions, one on three
+photographs and one on two; one photograph shows a person nobody named, and two show no person.
+The splits share no name, description or question wording. Nothing in them is a personal
+photograph, and no photograph is sent to any model.
+
+**The run** asks each question through ``answer_question`` with the client, connection, store and
+right check the ask route builds, once per arm in each run:
+
+*   ``baseline``: the answer path at ``BASE_COMMIT``, the commit the change was made on. Its
+    ``_render_packet`` and ``_without_names`` are compiled from that commit's source into the live
+    module, and its composer prompt and prompt version are read from it; every other top-level
+    name of ``exulanica/selection/question.py`` is checked to be the same code. The packet builder
+    is this tree's, and the baseline's renderer, as compiled, never reads the people it carries.
+*   ``change``: the answer path in this tree.
+
+Within a run the arms share one proposed plan per question and one response cache, and the
+packet's tokens are drawn from one seed per question, so they differ where the change acts. The
+workspace holds no search entry, so no query vector is requested. Each run is a fresh cache and
+fresh samples. The pre-registration fixes the held-out corpus, questions, scores, gates and spend
+before any held-out model call. The credential is read from the file ``--model-env`` names, that
+one variable only, and is passed to the client and nowhere else.
+"""
+
+from __future__ import annotations
+
+import __future__
+import argparse
+import ast
+import contextlib
+import copy
+import dataclasses
+import datetime as dt
+import hashlib
+import io
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from decimal import Decimal
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tests"))
+
+from measure_companion_absent_place import (  # noqa: E402
+    Pairing,
+    _model_key,
+    _patched,
+    _seeded_tokens,
+    _top_level,
+)
+
+from exulanica.canonical import canonical_json  # noqa: E402
+
+PREREGISTRATION = "docs/evaluation/2026-09-24-companion-person-link-preregistration.json"
+OUTCOME = "docs/evaluation/2026-09-24-companion-person-link-outcome.json"
+ARTIFACTS = "docs/evaluation/artifacts/2026-09-24-companion-person-link"
+PROFILE = "exulanica.digest-bound-record/v1"
+
+#: The commit the change was made on. The baseline arm runs its packet rendering and prompt.
+BASE_COMMIT = "209b57420bed5a56c224b35ca2312f2dd6a83c31"
+QUESTION_MODULE = "exulanica/selection/question.py"
+#: What the change rewrites in the question module, and so what the baseline compiles.
+COMPILED = ("_render_packet", "_without_names")
+#: The composer prompt the baseline reads from ``BASE_COMMIT``, and the planner prompts both arms
+#: must share for a shared plan to be sound.
+COMPOSER_NAMES = ("_COMPOSER_SYSTEM", "PROMPT_VERSION")
+PLANNER_NAMES = ("_PLANNER_SYSTEM", "_EMPTY_CATALOGUE")
+
+RUNS = 5
+#: The most any one invocation may spend, from the lane's spend of 0.40 USD with no single run
+#: over 0.15. The invocation's own bound is read from ``BUDGET_VARIABLE`` and may not exceed it.
+RUN_BOUND_USD = Decimal("0.15")
+BUDGET_VARIABLE = "EXULANICA_BUDGET_USD"
+TOTAL_BOUND_USD = Decimal("0.40")
+#: Far above what a run makes (a planner call per question and two composer calls, each with at
+#: most one repair); the dollar bound is what stops a run.
+MAX_CALLS = 400
+KEY_VARIABLE = "NEBIUS_API_KEY"
+NAMED_ROLES = ("structured_extraction", "reasoning_cheap")
+SYNTHETIC_ACTOR = uuid.UUID("5c0e8a52-3f4b-5d6e-9a7b-2c1d0e9f8a61")
+#: The clock every photograph of a split is taken on, with its day moving by photograph.
+CLOCK = "10:30:00"
+
+BOUND_SOURCES = (
+    "scripts/measure_companion_person_link.py",
+    "scripts/measure_companion_absent_place.py",
+    "exulanica/selection/question.py",
+    "exulanica/selection/packet.py",
+    "exulanica/selection/prompts.py",
+    "exulanica/selection/request_names.py",
+    "exulanica/selection/answer.py",
+    "exulanica/epistemics/hosted_requests.py",
+    "exulanica/epistemics/saved_names.py",
+)
+
+
+def _person(box_x: float) -> dict[str, Any]:
+    return {
+        "label": "person",
+        "salience": "primary",
+        "confidence": "high",
+        "box": {"x": box_x, "y": 0.2, "w": 0.15, "h": 0.6},
+    }
+
+
+def _thing(label: str) -> dict[str, Any]:
+    return {"label": label, "salience": "primary", "confidence": "high", "box": None}
+
+
+#: Each split: its photographs (description, the people drawn, the other things detected), who the
+#: account holder named on which photographs, and the questions.
+SPLITS: Mapping[str, Mapping[str, Any]] = {
+    "development": {
+        "first_day": dt.date(2026, 4, 6),
+        "photographs": (
+            (
+                "Two people stand at the end of a wooden pier beside a red fishing boat.",
+                2,
+                ("fishing boat",),
+            ),
+            ("A person in a yellow raincoat holds a paper cup on a wet street.", 1, ("cup",)),
+            (
+                "Three people sit around a picnic table in a park while a kite flies overhead.",
+                3,
+                ("picnic table", "kite"),
+            ),
+            ("A person rides a bicycle along a canal path at dusk.", 1, ("bicycle",)),
+            ("A person reads a paper map beside a stone bridge over a river.", 1, ("map",)),
+            ("A person waits at a bus stop under a blue glass shelter.", 1, ("bus shelter",)),
+            (
+                "A red fishing boat is moored in a small harbour with nobody aboard.",
+                0,
+                ("fishing boat",),
+            ),
+            ("A plate of grilled fish with lemon slices sits on a wooden table.", 0, ("plate",)),
+        ),
+        "people": {"Maria Estrada": (1, 2, 3), "Tomas Reyes": (4, 5)},
+        "person_templates": (
+            ("which", "Which of my photographs is {name} in?"),
+            ("when", "When did I take photographs of {name}?"),
+            ("doing", "What was {name} doing in my photographs?"),
+        ),
+        "things": (
+            ("boat", "Which photographs show a fishing boat?", (1, 7)),
+            ("bicycle", "Do I have a photograph of a bicycle?", (4,)),
+            ("picnic", "Which photographs show a picnic?", (3,)),
+            ("fish", "Do I have photographs of grilled fish?", (8,)),
+        ),
+    },
+    "held_out": {
+        "first_day": dt.date(2026, 5, 11),
+        "photographs": (
+            ("Two people walk a brown dog along a sandy beach at low tide.", 2, ("dog",)),
+            ("A person in a green scarf stands under a striped market awning.", 1, ("awning",)),
+            (
+                "Four people share a long table at an outdoor restaurant under string lights.",
+                4,
+                ("table",),
+            ),
+            ("A person paddles a red kayak across a calm lake.", 1, ("kayak",)),
+            ("A person photographs a white lighthouse from a rocky headland.", 1, ("lighthouse",)),
+            ("A person sits on a bench beside a fountain in a town square.", 1, ("fountain",)),
+            (
+                "A white lighthouse stands on a rocky headland under grey clouds.",
+                0,
+                ("lighthouse",),
+            ),
+            ("A bowl of noodle soup with chopsticks rests on a red tray.", 0, ("bowl",)),
+        ),
+        "people": {"Priya Nandakumar": (1, 2, 3), "Oskar Lindqvist": (4, 5)},
+        "person_templates": (
+            ("show", "Show me the photographs with {name} in them."),
+            ("any", "Is {name} in any of my photographs?"),
+            ("where", "Where was {name} in my photographs?"),
+        ),
+        "things": (
+            ("lighthouse", "Which photographs have a lighthouse?", (5, 7)),
+            ("kayak", "Is there a photograph of a kayak?", (4,)),
+            ("dog", "Do I have any photographs of a dog?", (1,)),
+            ("soup", "Which photographs show a bowl of soup?", (8,)),
+        ),
+    },
+}
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def recipe(split: str) -> list[dict[str, Any]]:
+    """Each photograph of a split: its bytes' digest, its day and what the vision stage reports."""
+    from conftest import photo_bytes
+
+    spec = SPLITS[split]
+    photographs = []
+    for number, (description, drawn, things) in enumerate(spec["photographs"], start=1):
+        day = spec["first_day"] + dt.timedelta(days=number - 1)
+        data = photo_bytes(when=f"{day:%Y:%m:%d} {CLOCK}")
+        photographs.append(
+            {
+                "photograph": number,
+                "captured_on": day.isoformat(),
+                "sha256": _sha256(data),
+                "description": description,
+                "people_drawn": drawn,
+                "things": list(things),
+                "named": sorted(
+                    name for name, numbers in spec["people"].items() if number in numbers
+                ),
+            }
+        )
+    return photographs
+
+
+def _photo_bytes(split: str, number: int) -> bytes:
+    from conftest import photo_bytes
+
+    day = SPLITS[split]["first_day"] + dt.timedelta(days=number - 1)
+    return photo_bytes(when=f"{day:%Y:%m:%d} {CLOCK}")
+
+
+def _payload(entry: Mapping[str, Any]) -> dict[str, Any]:
+    from conftest import DEFAULT_PAYLOAD
+
+    payload = copy.deepcopy(DEFAULT_PAYLOAD)
+    payload["scene_description"] = entry["description"]
+    payload["objects"] = [_person(0.1 + 0.2 * index) for index in range(entry["people_drawn"])] + [
+        _thing(label) for label in entry["things"]
+    ]
+    payload["legible_text"] = []
+    payload["proposed_place"] = None
+    return payload
+
+
+def questions(split: str) -> list[dict[str, Any]]:
+    spec = SPLITS[split]
+    asked = []
+    for name, linked in spec["people"].items():
+        for key, template in spec["person_templates"]:
+            asked.append(
+                {
+                    "id": f"person/{_slug(name)}/{key}",
+                    "kind": "person",
+                    "person": name,
+                    "text": template.format(name=name),
+                    "expected": list(linked),
+                }
+            )
+    for key, text, expected in spec["things"]:
+        asked.append(
+            {"id": f"thing/{key}", "kind": "thing", "text": text, "expected": list(expected)}
+        )
+    return asked
+
+
+def _refuse_overlaps() -> None:
+    """The splits share no person, description or question wording."""
+    words = {
+        split: {
+            *spec["people"],
+            *(description for description, _, _ in spec["photographs"]),
+            *(template for _, template in spec["person_templates"]),
+            *(text for _, text, _ in spec["things"]),
+        }
+        for split, spec in SPLITS.items()
+    }
+    shared = words["development"] & words["held_out"]
+    if shared:
+        raise SystemExit(f"the splits share {sorted(shared)}")
+
+
+# -- the records -----------------------------------------------------------------------------------
+
+
+def _document(record: dict[str, Any]) -> dict[str, Any]:
+    return {"profile": PROFILE, "record": record, "record_sha256": _sha256(canonical_json(record))}
+
+
+def _write_new(relative: str, record: dict[str, Any]) -> None:
+    target = ROOT / relative
+    if target.exists():
+        raise SystemExit(f"{relative} exists, and docs/evaluation is append-only")
+    target.write_text(
+        json.dumps(_document(record), indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _read_record(relative: str) -> dict[str, Any]:
+    document = json.loads((ROOT / relative).read_bytes())
+    if _sha256(canonical_json(document["record"])) != document["record_sha256"]:
+        raise SystemExit(f"{relative} does not match its own digest")
+    return document["record"]
+
+
+def _sources() -> dict[str, str]:
+    return {source: _sha256((ROOT / source).read_bytes()) for source in BOUND_SOURCES}
+
+
+# -- the baseline arm ------------------------------------------------------------------------------
+
+
+def _at_base(relative: str) -> str:
+    return subprocess.run(
+        ["git", "show", f"{BASE_COMMIT}:{relative}"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def _compiled(source: str, name: str, module: Any) -> Callable[..., Any]:
+    """One function from ``source``, bound to ``module``'s globals and not written into it."""
+    (node,) = [
+        node
+        for node in ast.parse(source).body
+        if isinstance(node, ast.FunctionDef) and node.name == name
+    ]
+    code = compile(
+        ast.Module(body=[node], type_ignores=[]),
+        f"{BASE_COMMIT[:8]}:{module.__name__}.{name}",
+        "exec",
+        flags=__future__.annotations.compiler_flag,
+        dont_inherit=True,
+    )
+    defined: dict[str, Any] = {}
+    # The source is this repository's own history, at the commit named above.
+    exec(code, vars(module), defined)
+    return defined[name]
+
+
+@dataclasses.dataclass(frozen=True)
+class Baseline:
+    functions: Mapping[str, Callable[..., Any]]
+    prompts: Mapping[str, str]
+    checked: Mapping[str, Any]
+
+
+def baseline() -> Baseline:
+    """Compile the baseline's renderer and check that nothing else in the module differs."""
+    from exulanica.selection import planner as planner_module
+    from exulanica.selection import question as question_module
+
+    base_source = _at_base(QUESTION_MODULE)
+    base, lane = _top_level(base_source), _top_level((ROOT / QUESTION_MODULE).read_text())
+    if set(base) != set(lane):
+        raise SystemExit(f"{QUESTION_MODULE}: names were added or removed")
+    differing = sorted(name for name in base if base[name] != lane[name])
+    if differing != sorted(COMPILED):
+        raise SystemExit(f"{QUESTION_MODULE}: {differing} differ, not {sorted(COMPILED)}")
+    functions = {name: _compiled(base_source, name, question_module) for name in COMPILED}
+    for name in COMPILED:
+        if "confirmed_people" in ast.get_source_segment(
+            base_source,
+            next(
+                node
+                for node in ast.parse(base_source).body
+                if isinstance(node, ast.FunctionDef) and node.name == name
+            ),
+        ):
+            raise SystemExit(f"the baseline's {name} reads the people the change carries")
+    prompts_source = _at_base("exulanica/selection/prompts.py")
+    namespace: dict[str, Any] = {}
+    exec(compile(prompts_source, "prompts", "exec"), namespace)
+    prompts = {name: namespace[name] for name in (*COMPOSER_NAMES, *PLANNER_NAMES)}
+    for name in PLANNER_NAMES:
+        # The arms share the planner's plan, which is sound only while its prompt is the same.
+        if prompts[name] != getattr(planner_module, name):
+            raise SystemExit(f"the planner's {name} differs from the base commit's")
+    return Baseline(
+        functions=functions,
+        prompts=prompts,
+        checked={
+            QUESTION_MODULE: {
+                "source_sha256_at_base": _sha256(base_source.encode("utf-8")),
+                "compiled_from_base": list(COMPILED),
+                "same_code_in_both": len(base) - len(COMPILED),
+            },
+            "exulanica/selection/prompts.py": {
+                "source_sha256_at_base": _sha256(prompts_source.encode("utf-8")),
+                "baseline_prompt_version": prompts["PROMPT_VERSION"],
+                "change_prompt_version": question_module.PROMPT_VERSION,
+                "planner_prompts_same": True,
+            },
+        },
+    )
+
+
+@contextlib.contextmanager
+def arm(name: str, base: Baseline) -> Iterator[None]:
+    """One arm's answer path in place for the calls made inside it."""
+    from exulanica.selection import question as question_module
+
+    if name == "change":
+        yield
+        return
+    if name != "baseline":
+        raise ValueError(f"no arm is called {name!r}")
+    with _patched(
+        question_module,
+        **base.functions,
+        _COMPOSER_SYSTEM=base.prompts["_COMPOSER_SYSTEM"],
+        PROMPT_VERSION=base.prompts["PROMPT_VERSION"],
+    ):
+        yield
+
+
+# -- one run of the product ------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _database() -> Iterator[dict[str, str]]:
+    """A private PostgreSQL made for this run, provisioned as the setup guide says, then removed."""
+    from test_postgres import remove_test_server, start_test_server
+
+    from exulanica.db.cli import provision
+    from exulanica.db.roles import EXECUTOR_ROLE, RUNTIME_ROLE
+
+    server, owner = start_test_server("personlink")
+    try:
+        previous = os.environ.get("EXULANICA_DATABASE_URL")
+        os.environ["EXULANICA_DATABASE_URL"] = owner
+        try:
+            provision(io.StringIO())
+        finally:
+            if previous is None:
+                os.environ.pop("EXULANICA_DATABASE_URL", None)
+            else:
+                os.environ["EXULANICA_DATABASE_URL"] = previous
+        database = owner.rsplit("/", 1)[1]
+        yield {
+            "owner": owner,
+            "runtime": server.url(database, RUNTIME_ROLE),
+            "readonly": server.url(database, EXECUTOR_ROLE),
+        }
+    finally:
+        remove_test_server(server)
+
+
+def _models(manifest: Any) -> dict[str, list[str]]:
+    return {
+        role: [manifest[role].primary.model_id]
+        + ([manifest[role].fallback.model_id] if manifest[role].fallback else [])
+        for role in NAMED_ROLES
+    }
+
+
+def _spent(clients: Sequence[Any]) -> Decimal:
+    return sum((call.usd for client in clients for call in client.ledger.calls), Decimal(0))
+
+
+def _summary(outcome: Any, number_of: Mapping[uuid.UUID, int], names: Mapping[str, str]) -> dict:
+    """What one answer said and rests on, in the terms the scores read."""
+    packet = outcome.packet
+    cited = []
+    for clause in outcome.answer.clauses:
+        photographs = set()
+        for token in clause.citations:
+            item = packet.resolve(token) if packet is not None else None
+            photographs.add(number_of.get(item.capture_id, 0) if item is not None else 0)
+        cited.append(sorted(photographs))
+    plan = outcome.plan.model_dump(mode="json") if outcome.plan is not None else None
+    return {
+        "answer": [clause.model_dump(mode="json") for clause in outcome.answer.clauses],
+        "cited": cited,
+        "abstained": None if outcome.abstention is None else str(outcome.abstention),
+        "deterministic": outcome.deterministic,
+        "repaired": outcome.repaired,
+        "rejections": list(outcome.rejections),
+        "plan": plan,
+        "plan_names": [
+            names.get(entity, "an entity nobody saved")
+            for entity in ((plan or {}).get("entities") or {}).get("ids", [])
+        ],
+        "packet": None
+        if packet is None
+        else {
+            "items": len(packet.items),
+            "photographs": sorted({number_of.get(item.capture_id, 0) for item in packet.items}),
+            # What the packet carries. Both arms build the same packet; the baseline's renderer
+            # states none of these to the composer.
+            "people_carried": sorted(
+                {
+                    names.get(str(person.entity_id), "an entity nobody saved")
+                    for item in packet.items
+                    for person in item.confirmed_people
+                }
+            ),
+        },
+        "calls": [dataclasses.asdict(call) for call in outcome.calls],
+        "names": {label: names.get(str(entity), str(entity)) for label, entity in outcome.names},
+    }
+
+
+def run(split: str, out: Path, model_env: Path, runs: int) -> None:
+    import psycopg
+    from conftest import CountingVisionModel
+    from psycopg.rows import dict_row
+
+    from exulanica.api.authorisation import API_TOKENS_ENV
+    from exulanica.api.composer_rights import composer_rights_check
+    from exulanica.api.permissions import Permission
+    from exulanica.api.services import (
+        DATA_DIR_ENV,
+        DERIVATIVE_WORKER_ENV,
+        READONLY_DATABASE_URL_ENV,
+        build_services,
+    )
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.db.session import DATABASE_URL_ENV, set_workspace
+    from exulanica.env import env_name
+    from exulanica.epistemics.assertions import AssertionWriter
+    from exulanica.identity import IdentityRepository, confirm_link, name_occurrence
+    from exulanica.ingest.pipeline import PhotoIngestPipeline
+    from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+    from exulanica.ingest.repository import IngestRepository
+    from exulanica.models.budget import BudgetGuard
+    from exulanica.models.cache import InMemoryResponseCache
+    from exulanica.models.client import ModelClient
+    from exulanica.models.egress import EGRESS_ALLOWLIST_ENV, load_egress_allowlist
+    from exulanica.models.manifest import load_manifest
+    from exulanica.models.transport import HttpxTransport
+    from exulanica.selection import Session
+    from exulanica.selection import packet as packet_module
+    from exulanica.selection import question as question_module
+
+    _refuse_overlaps()
+    if out.exists():
+        raise SystemExit(f"{out.name} exists; a run file is written once")
+    photographs = recipe(split)
+    asked = questions(split)
+    if split == "held_out":
+        registered = _read_record(PREREGISTRATION)
+        if registered["sources_sha256"] != _sources():
+            raise SystemExit("a bound source changed since the pre-registration")
+        if registered["recipe"] != photographs or registered["questions"] != asked:
+            raise SystemExit("the held-out corpus or questions are not the registered ones")
+    base = baseline()
+    bound = Decimal(os.environ.get(BUDGET_VARIABLE, "0"))
+    if not Decimal(0) < bound <= RUN_BOUND_USD:
+        raise SystemExit(
+            f"{BUDGET_VARIABLE} must bound this run above 0 and at most {RUN_BOUND_USD}"
+        )
+
+    manifest = load_manifest()
+    origin = re.match(r"^https?://[^/]+", manifest.base_url)
+    assert origin is not None, manifest.base_url
+    egress = load_egress_allowlist({EGRESS_ALLOWLIST_ENV: json.dumps([origin.group(0)])})
+    if manifest.api_key_env != KEY_VARIABLE:
+        raise SystemExit(
+            f"the manifest reads {manifest.api_key_env}, and only {KEY_VARIABLE} may be read"
+        )
+    key = _model_key(model_env, KEY_VARIABLE)
+    transport = HttpxTransport(egress=egress)
+
+    def client(bound: Decimal, *, cache: Any = None) -> Any:
+        return ModelClient(
+            api_key=key,
+            transport=transport,
+            cache=cache,
+            budget=BudgetGuard(ceiling_usd=bound, max_calls=MAX_CALLS),
+            max_attempts=3,
+        )
+
+    workspace_id, actor = uuid.uuid4(), uuid.uuid4()
+    data_dir = Path(tempfile.mkdtemp(prefix="person-link-"))
+    progress = out.with_name(out.name + ".progress.jsonl")
+    clients: list[Any] = []
+    steps: list[dict[str, Any]] = []
+
+    with _database() as urls:
+        environ = {
+            DATABASE_URL_ENV: urls["runtime"],
+            READONLY_DATABASE_URL_ENV: urls["readonly"],
+            DATA_DIR_ENV: str(data_dir),
+            DERIVATIVE_WORKER_ENV: "0",
+            env_name("TEXTURE_DIRECTORY"): str(data_dir / "no-texture-catalog"),
+            env_name("CHARACTER_DIRECTORY"): str(data_dir / "no-character-catalog"),
+            API_TOKENS_ENV: json.dumps(
+                {
+                    f"measurement-{uuid.uuid4().hex}": {
+                        "workspace_id": str(workspace_id),
+                        "actor": str(actor),
+                        "permissions": [str(permission) for permission in Permission],
+                    }
+                }
+            ),
+        }
+        services = build_services(environ, model_client=client(bound))
+        with psycopg.connect(urls["owner"], autocommit=True, row_factory=dict_row) as owner:
+            provision_workspace(owner, workspace_id)
+            set_workspace(owner, workspace_id)
+            repository = IngestRepository(owner, workspace_id)
+            number_of: dict[uuid.UUID, int] = {}
+            for entry in photographs:
+                data = _photo_bytes(split, entry["photograph"])
+                if _sha256(data) != entry["sha256"]:
+                    raise SystemExit(f"photograph {entry['photograph']} is not its recipe's")
+                pipeline = PhotoIngestPipeline(
+                    repository,
+                    services.store,
+                    vision=CountingVisionModel(payload=_payload(entry)),
+                )
+                intake = pipeline.ingest_intake(data, filename=f"{entry['photograph']}.jpg")
+                assert intake.capture_id is not None, intake.error
+                authorization = authorize_synthetic_capture(
+                    repository,
+                    capture_id=intake.capture_id,
+                    actor=SYNTHETIC_ACTOR,
+                    generator_manifest={
+                        "profile": "exulanica.synthetic-measurement-corpus/v1",
+                        "notice": "SYNTHETIC MEASUREMENT CORPUS: scripts/measure_companion_"
+                        "person_link.py",
+                    },
+                    authorization_scope={"purpose": "Companion person-link measurement"},
+                )
+                screening = record_synthetic_exemption(
+                    repository, authorization_id=authorization.authorization_id
+                )
+                derived = pipeline.ingest_derivatives(
+                    intake.capture_id, privacy_screening_id=screening.screening_id
+                )
+                if derived.error is not None:
+                    raise SystemExit(f"photograph {entry['photograph']}: {derived.error}")
+                number_of[intake.capture_id] = entry["photograph"]
+            capture_of = {number: capture for capture, number in number_of.items()}
+
+            identity = IdentityRepository(owner, workspace_id)
+            assertions = AssertionWriter(owner, workspace_id)
+            names: dict[str, str] = {}
+            saved: dict[str, dict[str, Any]] = {}
+            for person, linked in SPLITS[split]["people"].items():
+                occurrences = []
+                for number in linked:
+                    row = owner.execute(
+                        "select occurrence_id from occurrence where workspace_id=%s "
+                        "and capture_id=%s and class='person' order by occurrence_id limit 1",
+                        (workspace_id, capture_of[number]),
+                    ).fetchone()
+                    if row is None:
+                        raise SystemExit(f"photograph {number} has no person occurrence")
+                    occurrences.append(row["occurrence_id"])
+                named = name_occurrence(
+                    identity,
+                    assertions,
+                    occurrence_id=occurrences[0],
+                    display_name=person,
+                    actor=actor,
+                )
+                for occurrence in occurrences[1:]:
+                    confirm_link(
+                        identity, occurrence_id=occurrence, entity_id=named.entity_id, actor=actor
+                    )
+                names[str(named.entity_id)] = person
+                saved[person] = {"entity_id": str(named.entity_id), "linked": list(linked)}
+        steps.append({"step": "the corpus was ingested and its people named", "spent_usd": "0"})
+
+        pairing_log: list[str] = []
+        answers: list[dict[str, Any]] = []
+        stopped = None
+        started_runs = 0
+        for index in range(1, runs + 1):
+            remaining = bound - _spent(clients)
+            if remaining <= 0:
+                stopped = f"stopped before run {index}: the invocation's bound is reached"
+                break
+            started_runs = index
+            run_client = client(remaining, cache=InMemoryResponseCache())
+            clients.append(run_client)
+            run_services = dataclasses.replace(services, model_client=run_client)
+            pairing = Pairing()
+            asked_at = dt.datetime.now(dt.UTC).replace(microsecond=0)
+            with _patched(
+                question_module,
+                propose_plan=pairing.planner(question_module.propose_plan),
+                embed_query=pairing.vector(question_module.embed_query),
+            ):
+                for question in asked:
+                    for arm_name in ("baseline", "change"):
+                        seed = f"{index}:{question['id']}"
+                        entry = {"run": index, "question": question["id"], "arm": arm_name}
+                        started = time.monotonic()
+                        try:
+                            with (
+                                arm(arm_name, base),
+                                _patched(packet_module, _token=_seeded_tokens(seed)),
+                                run_services.readonly_database.session(workspace_id) as db,
+                            ):
+                                outcome = question_module.answer_question(
+                                    db,
+                                    run_services.hosted_model(db, workspace_id),
+                                    question["text"],
+                                    Session(workspace_id=workspace_id, actor=actor),
+                                    world_id=None,
+                                    now=asked_at,
+                                    store=run_services.store,
+                                    before_compose=composer_rights_check(db, workspace_id),
+                                )
+                                entry.update(_summary(outcome, number_of, names))
+                        except Exception as raised:  # an answer that failed is recorded as such
+                            entry["error"] = f"{type(raised).__name__}: {raised}"[:400]
+                        entry["wall_ms"] = round((time.monotonic() - started) * 1000)
+                        answers.append(entry)
+                        with progress.open("a", encoding="utf-8") as handle:
+                            handle.write(json.dumps(entry, sort_keys=True, default=str) + "\n")
+                        print(
+                            f"run {index} {arm_name:8} {question['id']:40} "
+                            f"{entry.get('abstained') or entry.get('error') or 'answered'}",
+                            flush=True,
+                        )
+            pairing_log.extend(f"run {index}: {line}" for line in pairing.shared)
+            steps.append({"step": f"run {index} asked", "spent_usd": str(_spent(clients))})
+
+    run_record = {
+        "split": split,
+        "preregistration_record_sha256": (
+            _sha256(canonical_json(_read_record(PREREGISTRATION))) if split == "held_out" else None
+        ),
+        "sources_sha256": _sources(),
+        "baseline": dict(base.checked),
+        "models": _models(manifest),
+        "photographs": photographs,
+        "saved": saved,
+        "questions": asked,
+        "runs_started": started_runs,
+        "stopped": stopped,
+        "answers": answers,
+        "shared_between_arms": pairing_log,
+        "steps": steps,
+        "requests": sum(not usage.cache_hit for model in clients for usage in model.ledger.calls),
+        "cache_hits": sum(usage.cache_hit for model in clients for usage in model.ledger.calls),
+        "spent_usd": str(_spent(clients)),
+        "bound_usd": str(bound),
+    }
+    out.write_bytes(canonical_json(run_record))
+    print(f"wrote the run file; {run_record['requests']} requests, {run_record['spent_usd']} USD")
+
+
+# -- the scores ------------------------------------------------------------------------------------
+
+#: Words that say a person was seen, found or recognised in a picture. A clause about a person
+#: that uses one is read by the measurer against the visibility rubric; every clause about a
+#: person is read against the description rubric either way.
+SEEN = re.compile(
+    r"\b(visible|seen|see|sees|appear|appears|appearing|pictured|spotted|recogni[sz]\w*|"
+    r"identif\w*|looks?|looking)\b",
+    re.IGNORECASE,
+)
+
+
+def _answer_id(answer: Mapping[str, Any]) -> str:
+    return f"{answer['run']}/{answer['question']}/{answer['arm']}"
+
+
+def score(answer: Mapping[str, Any], question: Mapping[str, Any]) -> dict[str, Any]:
+    """The registered rule for one answer, mechanically.
+
+    Passed: a historical or uncertain clause cites a photograph the question expects, and no
+    clause cites a photograph it does not expect. For a question about a person, the expected
+    photographs are the ones the account holder linked to that person; for a question about a
+    thing, the ones whose description names it. An error, an abstention or an answer that cites
+    nothing does not pass.
+    """
+    if answer.get("error"):
+        return {"error": True, "passed": False, "cited": [], "flagged": []}
+    expected = set(question["expected"])
+    clauses = answer["answer"]
+    cited = sorted({number for photographs in answer["cited"] for number in photographs})
+    recalled = any(
+        clause["type"] in ("historical", "uncertain") and set(photographs) & expected
+        for clause, photographs in zip(clauses, answer["cited"], strict=True)
+    )
+    flagged = [
+        index
+        for index, clause in enumerate(clauses)
+        if "[person" in clause["text"].lower() and SEEN.search(clause["text"])
+    ]
+    return {
+        "passed": recalled and set(cited) <= expected,
+        "recalled": recalled,
+        "only_expected": set(cited) <= expected,
+        "cited": cited,
+        "abstained": answer["abstained"],
+        "deterministic": answer["deterministic"],
+        "flagged": flagged,
+    }
+
+
+def tally(run_record: Mapping[str, Any]) -> dict[str, Any]:
+    """Every answer scored, and the counts per arm, kind and question."""
+    by_id = {question["id"]: question for question in run_record["questions"]}
+    scored = []
+    for answer in run_record["answers"]:
+        question = by_id[answer["question"]]
+        scored.append(
+            {
+                "id": _answer_id(answer),
+                "question": question["id"],
+                "arm": answer["arm"],
+                "kind": question["kind"],
+                **score(answer, question),
+            }
+        )
+    counts: dict[str, Any] = {}
+    for arm_name in ("baseline", "change"):
+        mine = [entry for entry in scored if entry["arm"] == arm_name]
+        counts[arm_name] = {
+            kind: {
+                "answers": sum(entry["kind"] == kind for entry in mine),
+                "passed": sum(entry["kind"] == kind and entry["passed"] for entry in mine),
+                "abstained": sum(
+                    entry["kind"] == kind and bool(entry.get("abstained")) for entry in mine
+                ),
+                "flagged": sum(entry["kind"] == kind and bool(entry["flagged"]) for entry in mine),
+            }
+            for kind in ("person", "thing")
+        } | {"errors": sum(bool(entry.get("error")) for entry in mine)}
+    per_question = {
+        question: {
+            arm_name: sum(
+                entry["passed"]
+                for entry in scored
+                if entry["question"] == question and entry["arm"] == arm_name
+            )
+            for arm_name in ("baseline", "change")
+        }
+        for question in by_id
+    }
+    return {"scored": scored, "counts": counts, "per_question": per_question}
+
+
+# -- the pre-registration and the outcome ----------------------------------------------------------
+
+#: The gates, fixed before any held-out model call.
+GATES = {
+    "person_citations": (
+        "For every question about a person, the change arm passes in at least 4 of the 5 runs "
+        "and in at least as many runs as the baseline arm: a historical or uncertain clause "
+        "cites a photograph the account holder linked to that person, and no clause cites a "
+        "photograph not linked to them."
+    ),
+    "no_visibility_or_description": (
+        "The measurer marks no clause of any change-arm answer to a question about a person "
+        "under the reading rubric."
+    ),
+    "no_loss_without_a_person": (
+        "Over the questions that name no person, the change arm passes in at least as many "
+        "answers as the baseline arm, and in no question in two or more runs fewer."
+    ),
+    "runs_per_question": RUNS,
+    "an_error_counts_as": "a failure in the change arm and no pass in either arm",
+}
+READING_RUBRIC = (
+    "The measurer reads every clause of every composed change-arm answer to a question about a "
+    "person and marks it when it (a) says or implies that the person was seen, is visible, "
+    "appears, was recognised or identified in the picture; or (b) says anything about the "
+    "person, their appearance, clothing, position, company or action, that the description of "
+    "the photograph the clause cites does not say. A clause saying the person is in a "
+    "photograph, or that a photograph is of them or shows them, restates the account holder's "
+    "link and is not marked. Attributing to the person what the description says of a person "
+    "in that photograph is not marked. The product's fixed abstention sentences are not read."
+)
+
+
+def preregister(development: Path) -> None:
+    from exulanica.models.manifest import load_manifest
+
+    _refuse_overlaps()
+    development_run = json.loads(development.read_bytes())
+    if development_run["split"] != "development":
+        raise SystemExit("the development run given is not of the development split")
+    counted = tally(development_run)
+    record = {
+        "question": (
+            "Whether stating on a photograph's line the person the account holder confirmed is in "
+            "it, by placeholder (prompt selection-8), lets the Companion's composer cite the "
+            "photographs linked to a person asked about, without saying a person is visible or "
+            "describing them beyond the photograph's own description, and without losing "
+            "answers to questions that name no person, against the answer path of the commit "
+            "the change was made on."
+        ),
+        "written_before_any_model_call": "on the held-out split",
+        "development": {
+            "run_sha256": _sha256(development.read_bytes()),
+            "artifact": f"{ARTIFACTS}/development-run.json",
+            "counts": counted["counts"],
+            "per_question": counted["per_question"],
+            "spent_usd": development_run["spent_usd"],
+        },
+        "recipe": recipe("held_out"),
+        "people": {name: list(linked) for name, linked in SPLITS["held_out"]["people"].items()},
+        "questions": questions("held_out"),
+        "arms": {
+            "baseline": (
+                f"the answer path at {BASE_COMMIT}: _render_packet and _without_names compiled "
+                "from that commit's source into the live question module, its composer prompt "
+                "and prompt version read from it, every other top-level name of the module "
+                "checked to be the same code; the packet builder is this tree's, and the "
+                "baseline's renderer never reads the people it carries"
+            ),
+            "change": "the answer path in the tree whose sources are bound below",
+            "pairing": (
+                "within a run the arms share one proposed plan per question and one response "
+                "cache, and the packet's tokens come from one seed per question; a fresh cache "
+                "and fresh samples each run; the workspace holds no search entry, so no query "
+                "vector is requested"
+            ),
+        },
+        "scores": {
+            "passed": score.__doc__.split("\n\n", 1)[1].strip().replace("\n    ", " "),
+            "reading": READING_RUBRIC,
+            "flagged_words": SEEN.pattern,
+        },
+        "gates": GATES,
+        "corpus": {
+            "class": "synthetic",
+            "descriptions_and_detections": (
+                "written by this script and reported by a scripted vision observation in the "
+                "product's ingest; no photograph is sent to any model"
+            ),
+            "naming": (
+                "name_occurrence and confirm_link, the product's naming and confirmation "
+                "decisions, as the synthetic account holder"
+            ),
+            "authority": "authorize_synthetic_capture and record_synthetic_exemption",
+        },
+        "models": _models(load_manifest()),
+        "spend": {
+            "total_bound_usd": str(TOTAL_BOUND_USD),
+            "per_invocation_bound_usd": str(RUN_BOUND_USD),
+            "read_from": "the usage the provider reported, as the client's ledger counts it",
+        },
+        "sources_sha256": _sources(),
+        "not_covered": [
+            "Descriptions and detections are written by the measuring script, not by the vision "
+            "role, so how the vision role describes people on personal photographs is not "
+            "measured.",
+            "One workspace of eight photographs per split, with two named people; a library "
+            "with many named people, or several named people in one photograph, is not "
+            "measured.",
+            "English names and English questions only.",
+            "No search entry exists, so questions are answered by the lexical match and the "
+            "person and place links; the semantic half of the search is not exercised.",
+            "A person whose consent was withdrawn, a deleted person and a merged person are not "
+            "stated to the composer; that is held by tests/test_companion_person_link.py, not "
+            "by this measurement.",
+            "The measurer's reading decides the second gate; every clause read is in the "
+            "outcome record.",
+        ],
+    }
+    _write_new(PREREGISTRATION, record)
+    print(f"wrote {PREREGISTRATION}")
+
+
+def outcome(run_path: Path, judgments_path: Path, development: Path) -> None:
+    registered = _read_record(PREREGISTRATION)
+    raw = run_path.read_bytes()
+    run_record = json.loads(raw)
+    if run_record["preregistration_record_sha256"] != _sha256(canonical_json(registered)):
+        raise SystemExit("the run was not made under this pre-registration")
+    if _sha256(development.read_bytes()) != registered["development"]["run_sha256"]:
+        raise SystemExit("the development run given is not the one the pre-registration binds")
+    judged_raw = judgments_path.read_bytes()
+    judgments = json.loads(judged_raw)
+    counted = tally(run_record)
+    answers = {_answer_id(answer): answer for answer in run_record["answers"]}
+    to_read = sorted(
+        entry["id"]
+        for entry in counted["scored"]
+        if entry["kind"] == "person"
+        and entry["arm"] == "change"
+        and not entry.get("error")
+        and not entry.get("abstained")
+    )
+    read = sorted(judgments["read"])
+    if read != to_read:
+        raise SystemExit("the judgments do not read exactly the composed change-arm person answers")
+    marked = judgments["marked"]
+    for mark in marked:
+        if mark["answer"] not in to_read:
+            raise SystemExit(f"{mark['answer']} is not an answer the rubric reads")
+
+    runs = registered["gates"]["runs_per_question"]
+    person_questions = [q["id"] for q in registered["questions"] if q["kind"] == "person"]
+    thing_questions = [q["id"] for q in registered["questions"] if q["kind"] == "thing"]
+    per_question = counted["per_question"]
+    gate_1 = all(
+        per_question[q]["change"] >= runs - 1
+        and per_question[q]["change"] >= per_question[q]["baseline"]
+        for q in person_questions
+    )
+    gate_2 = not marked
+    gate_3 = sum(per_question[q]["change"] for q in thing_questions) >= sum(
+        per_question[q]["baseline"] for q in thing_questions
+    ) and all(per_question[q]["change"] >= per_question[q]["baseline"] - 1 for q in thing_questions)
+    record = {
+        "preregistration": {
+            "path": PREREGISTRATION,
+            "record_sha256": _sha256(canonical_json(registered)),
+        },
+        "run": {
+            "artifact": f"{ARTIFACTS}/held-out-run.json",
+            "run_sha256": _sha256(raw),
+            "runs_started": run_record["runs_started"],
+            "stopped": run_record["stopped"],
+            "requests": run_record["requests"],
+            "cache_hits": run_record["cache_hits"],
+            "spent_usd": run_record["spent_usd"],
+            "sources_sha256_same_as_registered": run_record["sources_sha256"]
+            == registered["sources_sha256"],
+        },
+        "judgments": {
+            "artifact": f"{ARTIFACTS}/judgments.json",
+            "sha256": _sha256(judged_raw),
+            "read": len(read),
+            "marked": marked,
+        },
+        "counts": counted["counts"],
+        "per_question": per_question,
+        "gates": {
+            "person_citations": gate_1,
+            "no_visibility_or_description": gate_2,
+            "no_loss_without_a_person": gate_3,
+        },
+        "passed": gate_1 and gate_2 and gate_3,
+        "clauses_read": [
+            {
+                "answer": answer_id,
+                "clauses": [
+                    {"text": clause["text"], "type": clause["type"], "cited": cited}
+                    for clause, cited in zip(
+                        answers[answer_id]["answer"], answers[answer_id]["cited"], strict=True
+                    )
+                ],
+            }
+            for answer_id in to_read
+        ],
+    }
+    _write_new(OUTCOME, record)
+    print(f"wrote {OUTCOME}; passed: {record['passed']} {record['gates']}")
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
+    commands = parser.add_subparsers(dest="command", required=True)
+    running = commands.add_parser("run")
+    running.add_argument("--split", choices=sorted(SPLITS), required=True)
+    running.add_argument("--out", type=Path, required=True)
+    running.add_argument("--model-env", type=Path, required=True)
+    running.add_argument("--runs", type=int, default=RUNS)
+    registering = commands.add_parser("preregister")
+    registering.add_argument("--development", type=Path, required=True)
+    scoring = commands.add_parser("outcome")
+    scoring.add_argument("--run", type=Path, required=True)
+    scoring.add_argument("--judgments", type=Path, required=True)
+    scoring.add_argument("--development", type=Path, required=True)
+    arguments = parser.parse_args(argv)
+    if arguments.command == "run":
+        run(arguments.split, arguments.out, arguments.model_env, arguments.runs)
+    elif arguments.command == "preregister":
+        preregister(arguments.development)
+    elif arguments.command == "outcome":
+        outcome(arguments.run, arguments.judgments, arguments.development)
+    else:
+        raise SystemExit(f"no command is called {arguments.command!r}")
+
+
+if __name__ == "__main__":
+    main()

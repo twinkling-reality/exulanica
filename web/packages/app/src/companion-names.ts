@@ -20,11 +20,11 @@
  * has its own words in the copy table, so "a place no longer in your library" and "a place you have
  * not named" stay two different statements.
  *
- * What it does not do: an answer kept in the Companion's memory stores its text and not its
- * `names`, so every placeholder in a remembered answer reads as `not_identified` and none is ever
- * restored. And a name is the entity's name in the library the page holds when the answer is drawn:
- * an answer drawn again in the same page session, once the page has read a rename, shows the new
- * name, even where the placeholder stood for the words on a sign.
+ * An answer kept in the Companion's memory keeps its `names` too (`companion_answer_name`, migration
+ * 0103), so a remembered answer is drawn through this resolver exactly as a fresh one is. What it
+ * does not do: a name is the entity's name in the library the page holds when the answer is drawn,
+ * so an answer drawn again, after a reload or once the page has read a rename, shows the new name,
+ * even where the placeholder stood for the words on a sign.
  */
 
 import { entityById, type EntityRecord, type GraphSnapshot } from '@exulanica/graph-client';
@@ -171,8 +171,8 @@ const NOT_INSIDE_A_WORD = '(?![\\w\\]])';
  * its letters could be one, a one-letter word or two or more letters, it must have punctuation or
  * the end of the text after it, so "the place I visited" keeps its pronoun and "THE PLACE A FRIEND
  * CHOSE" its article, while "taken at place I." is the place. `A` after a class word in running
- * text is never the article, which is written `a` there. A remembered answer has no `names`, and in
- * its text only the bracketed form is recognised.
+ * text is never the article, which is written `a` there. In text with no `names`, only the
+ * bracketed form is recognised.
  */
 function bareLabels(names: Readonly<Record<string, string>> | undefined): RegExp | null {
   const forms = Object.keys(names ?? {}).flatMap((label) => {

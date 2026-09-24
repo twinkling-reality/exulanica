@@ -618,7 +618,7 @@ def test_a_world_with_no_bound_evidence_refuses_before_it_asks_the_drafter(repos
     )
 
     assert isinstance(outcome.refusal, ProposalRefusal)
-    assert outcome.refusal.code is RefusalCode.UNSUPPORTED_REFERENCE
+    assert outcome.refusal.code is RefusalCode.NO_EVIDENCE
     assert transport.call_count == 1
 
 

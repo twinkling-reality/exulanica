@@ -384,7 +384,11 @@ def withdraw_model_right(
     """End a right now. Final: a withdrawn right is never restored, only granted again.
 
     Withdrawing a right that is already withdrawn returns it unchanged, keeping the first
-    withdrawal's actor and time.
+    withdrawal's actor and time. Withdrawing a search right (the embedding role) also deletes the
+    search entries made from the photograph's descriptions: migration 0104's trigger on this
+    update writes a ``caption_search`` tombstone, in this transaction, whose purge the deletion
+    worker carries out. An entry whose model another current search right still covers for the
+    photograph is kept until that right stops too.
     """
     right_id = uuid.UUID(str(right_id))
     repository.connection.execute(

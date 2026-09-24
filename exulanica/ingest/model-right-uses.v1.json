@@ -25,8 +25,8 @@
       "what": "The descriptions made from each selected photo",
       "purpose": "index them so your questions can find the photo",
       "detail": "Names you gave people are replaced before anything is sent, and a place's name is sent only where you allowed it for that place.",
-      "kept": "search entries already made stay",
-      "stop": "Stop sending this photo's descriptions to the search model? Nothing more is sent from now on. Search entries already made from it stay.",
+      "kept": "the search entries already made from a photo are deleted, though it can still be found by the words of its own description",
+      "stop": "Stop sending this photo's descriptions to the search model? Nothing more is sent from now on, and the search entries already made from it are deleted. It can still be found by the words of its own description.",
       "stop_action": "Stop sending its descriptions for search",
       "stop_confirm": "Stop sending them"
     },

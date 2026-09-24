@@ -199,13 +199,18 @@ recognised. A placeholder the page cannot resolve is said in words and never sho
 
 The noun follows the placeholder's class, `a person`, `a place`, `an object` and so on, from
 `web/packages/app/src/ui/copy.ts`, and `tests/test_companion_placeholder_parity.py` holds the
-browser's placeholder pattern and naming predicate to the server's. What it does not do: an answer
-the Companion remembers across a reload keeps its text and not its `names`, because
-`companion_answer` has no column for them, so each placeholder in it reads as one this answer does
-not name and none is restored; an appearance proposal's words arrive with no `names` either; and a
-name is the one in the library the page holds when the answer is drawn, so an answer drawn again in
-the same page session, once the page has read a rename, shows the new name, even where the
-placeholder stood for the words on a sign.
+browser's placeholder pattern and naming predicate to the server's. An answer the Companion
+remembers across a reload keeps its `names` with its text: `companion_answer_name`
+(`exulanica/migrations/0103_a_remembered_answer_keeps_whom_its_placeholders_stood_for.sql`) holds
+each placeholder and the entity it stood for, as ids and never as a name, append-only, of the
+entity's own class and refused for an entity already deleted, and a correction keeps the map of the
+answer it replaces. `GET /companion/memory/recent` serves the map with each answer, and the browser
+draws a remembered answer through the same resolver as a fresh one, so every case in the table
+above holds for it. What it does not do: an appearance proposal's words arrive with no `names`, so
+each placeholder in them reads as one the answer does not name; and a name is the one in the
+library the page holds when the answer is drawn, so an answer drawn again after a reload, or once
+the page has read a rename, shows the new name, even where the placeholder stood for the words on
+a sign.
 
 **The composer is told where the account holder confirmed a photograph was taken.** A Selection
 filtered by a place holds a photograph because of a confirmed link from the photograph's place
@@ -215,7 +220,7 @@ occurrence to that place, and only a person's decision writes a confirmed link
 (`ConfirmedPlace`), which adds no line and no token. `_without_names` in
 `exulanica/selection/question.py` names the place from the request's record, by its id and from its
 own saved name alone, and `_render_packet` states it under the photograph's token as
-`user_confirmed_place: [place A]`. The composer's prompt, `selection-7`, says that line is the
+`user_confirmed_place: [place A]`. The composer's prompt says that line is the
 user's confirmation that the photograph was taken there, which supports a historical clause citing
 it, and that it says nothing about what the photograph shows. Without it, each such photograph
 reached the composer as a bare line with no description, and asked which photographs were taken at
@@ -223,11 +228,37 @@ the place, the composer answered that no photograph could be identified as taken
 under Evidence and limits). The line names the place as the request names it: by its placeholder,
 or by its saved name where the account holder allowed that place's name for the composer, whose
 role, `reasoning_cheap`, the uses file (`exulanica/consent/place-name-uses.v1.json`) offers for
-writing the Companion's answer. A person or an object linked the same way is not stated, because
-telling a hosted model who is in a photograph is a decision about people that this path does not
-make, and a place with no saved name has no placeholder and is not stated.
+writing the Companion's answer. A place with no saved name has no placeholder and is not stated.
 `tests/test_companion_place_link.py` holds the line, the placeholder given by id, and, with no right
 granted, the absence of the saved name from every request.
+
+**The composer is told who the account holder confirmed is in a photograph, by placeholder only.**
+A Selection filtered by a person holds a photograph because of a confirmed link from one of its
+person occurrences to that person. `build_packet` keeps that link on the photograph's line as the
+person's id (`ConfirmedPerson`), and `_render_packet` states it as
+`user_confirmed_person: [person A]`: the request's placeholder, never the name, because a person's
+saved name never reaches a hosted model, with or without a right, and the browser restores it. The
+composer's prompt, `selection-8`, says that line is the account holder's statement that the person
+is in the photograph, not something anybody saw; that it supports a historical clause saying so;
+and that it says nothing about how they look, where they are in the picture, what they wear or
+what they are doing, which only the photograph's own description may say, and never that a person
+is visible or can be seen. A person who was deleted, who was merged into another, or whose consent
+was withdrawn is not stated, the last because their name is withheld from every surface and a
+statement that they are in a photograph is the same fact in other words; a person with no saved
+name has no placeholder and is not stated; and an object linked the same way is not stated.
+`tests/test_companion_person_link.py` holds the line, each person who is not stated, and the
+absence of every form of the person's saved name from every request, with no right granted and
+with every entity released as though a right existed for each. Measured on a synthetic library whose
+descriptions and detections the measuring script writes, with the live planner and composer, the
+baseline arm being the answer path without the line and with the previous prompt, paired within
+each run, gates written before any held-out call: on the held-out split, answers to the six
+questions about a person cited only the photographs linked to that person in 30 of 30 with the
+line and 7 of 30 without it, the measurer marked no clause as saying a person was seen or
+describing them, and the four questions that name no person passed 20 of 20 in both arms
+(`docs/evaluation/2026-09-24-companion-person-link-preregistration.json`,
+`docs/evaluation/2026-09-24-companion-person-link-outcome.json`). The library, eight photographs
+with two named people, is small, and how the vision role describes people on personal photographs
+is not measured.
 
 **Every hosted request passes one boundary.** `ModelClient` in `exulanica/models/client.py` hands
 every request it sends, from `chat`, `structured`, `vision` and `embed` alike, to the policies
@@ -368,8 +399,10 @@ request to change appearance have distinct inputs and responsibilities.
 A proposal cites the evidence of the world it is asked in: the slots that world's current topology
 binds, then the reviewed photographs attached to its saved entry that are available when it is
 read, each named to the drafter by its attachment id alone. A world with neither, such as a starter
-with no attached photograph, is refused as `unsupported_reference`, in words saying that attaching a
-reviewed photograph makes a proposal possible.
+with no attached photograph, is refused as `no_evidence`, in words saying that attaching a
+reviewed photograph makes a proposal possible. A draft that names none of the evidence the world holds, or names
+evidence outside it, is refused as `unsupported_reference`, and the page says each of the two in
+its own words (`proposal.refused.*` in `web/packages/app/src/ui/copy.ts`).
 
 The drafter's schema derives from the registry's profiles, controls, ranges and choices. An invalid
 value is refused, not silently converted into a different proposed value. Apply remains a separate

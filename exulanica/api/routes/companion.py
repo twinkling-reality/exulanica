@@ -54,6 +54,12 @@ _MAX_ANSWER = 8000
 _MAX_NOTE = 2000
 #: One chip per photograph, and the rail that renders them is not unbounded either.
 _MAX_CITATIONS = 64
+#: One placeholder per entity the answer names. The answer route names at most the entities one
+#: question recognised; the rail's bound keeps a stored map as small as a stored citation set.
+_MAX_NAMES = _MAX_CITATIONS
+#: The longest placeholder the server writes is a class word and a few letters; this bounds a label
+#: before the repository checks its shape against the server's own pattern.
+_MAX_LABEL = 64
 
 
 def _problem(status: int, code: str, detail: str) -> JSONResponse:
@@ -107,6 +113,12 @@ class AnswerBody(BaseModel):
     citations: Annotated[list[CitationBody], Field(max_length=_MAX_CITATIONS)] = Field(
         default_factory=list
     )
+    #: The answer's own ``names`` as the answer route served it: each placeholder the text carries
+    #: and the entity it stands for. Ids only; a label that is not a placeholder is refused.
+    names: Annotated[
+        dict[Annotated[str, Field(min_length=1, max_length=_MAX_LABEL)], uuid.UUID],
+        Field(max_length=_MAX_NAMES),
+    ] = Field(default_factory=dict)
 
 
 class EscapeBody(BaseModel):
@@ -160,6 +172,9 @@ class AnswerView(BaseModel):
     supersedes: uuid.UUID | None
     correction_note: str | None
     citations: list[CitationView]
+    #: Each placeholder the answer text carries and the entity it stood for. The browser draws each
+    #: name from the account holder's library when the answer is drawn, never from here.
+    names: dict[str, uuid.UUID]
 
 
 class EscapeView(BaseModel):
@@ -241,10 +256,15 @@ def record_answer(body: AnswerBody, repository: WriteMemory) -> AnswerView | JSO
                     )
                     for citation in body.citations
                 ),
+                names=dict(body.names),
             )
         )
     except InvalidCompanionMemory as exc:
         return _problem(422, "invalid_companion_memory", str(exc))
+    except UnknownCompanionMemory as exc:
+        # An entity or a photograph another workspace holds is one this library does not, and
+        # the answer is the one an absent id gets, so the route is not an existence oracle.
+        return _problem(404, "unknown_reference", str(exc))
     return _answer_view(answer)
 
 
@@ -336,6 +356,7 @@ def _answer_view(answer: CompanionAnswer) -> AnswerView:
             )
             for citation in answer.citations
         ],
+        names=dict(answer.names),
     )
 
 

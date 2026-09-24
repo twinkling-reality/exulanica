@@ -51,6 +51,7 @@ from exulanica.store.resolve import address_from_span_row
 __all__ = [
     "MAX_PACKET_ITEMS",
     "TOKEN_LENGTH",
+    "ConfirmedPerson",
     "ConfirmedPlace",
     "ContentEvidenceItem",
     "ContentEvidencePacket",
@@ -87,6 +88,13 @@ _TRUST: Final[dict[str, str]] = {
 #: (:class:`~exulanica.selection.executor.Support`).
 _PLACE_DIMENSION: Final = "place"
 
+#: The support dimension of a photograph the Selection holds because of another entity's
+#: confirmed link, a person's among them (:class:`~exulanica.selection.executor.Support`).
+_ENTITY_DIMENSION: Final = "entity"
+
+#: The one class of entity whose confirmed link on a photograph is stated as who is in it.
+_PERSON_CLASS: Final = "person"
+
 
 @dataclass(frozen=True, slots=True)
 class ConfirmedPlace:
@@ -99,9 +107,7 @@ class ConfirmedPlace:
     account holder's statement about where the photograph was taken, never something a model saw
     in it, and the composer is told it as that.
 
-    People and objects linked the same way are not carried. Telling a hosted model that somebody
-    the account holder named is in a photograph is a decision about people, and this packet does
-    not make it.
+    A person linked the same way is carried as :class:`ConfirmedPerson`, and an object is not.
     """
 
     entity_id: uuid.UUID
@@ -111,6 +117,29 @@ class ConfirmedPlace:
     #: reads as the same words. Set when the request's names are decided
     #: (:class:`~exulanica.selection.request_names.RequestNames`), and ``None`` in a packet as
     #: built. A place with no saved name has neither and is not stated at all.
+    reference: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmedPerson:
+    """A person the account holder confirmed is in a cited photograph.
+
+    Read, like :class:`ConfirmedPlace`, from the confirmed link that put the photograph in the
+    Selection, so it is the account holder's statement of who is in the photograph, never
+    something a model saw in it. The account holder's rule is that a person's name never reaches
+    a hosted model, with or without a right, so the composer is told this person only by the
+    request's placeholder, ``[person A]``, and the browser restores the name.
+
+    Carried only for a person who is in the library, not merged into another and whose consent
+    stands: the Companion answers nothing about a deleted or merged entity, and a person who
+    withdrew has their name withheld from every surface, so a statement that they are in a
+    photograph, which is the same fact in other words, is withheld too.
+    """
+
+    entity_id: uuid.UUID
+    #: The request's placeholder for this person, set when the request's names are decided
+    #: (:class:`~exulanica.selection.request_names.RequestNames`), and ``None`` in a packet as
+    #: built. A person with no saved name has no placeholder and is not stated at all.
     reference: str | None = None
 
 
@@ -132,6 +161,9 @@ class EvidenceItem:
     #: span the link rests on (the whole photograph, for a place the vision stage proposed). Empty
     #: on a claim's line and on a photograph no place link selected.
     confirmed_places: tuple[ConfirmedPlace, ...] = ()
+    #: The people the account holder confirmed are in this photograph, on the line of the span
+    #: the link rests on, the way ``confirmed_places`` are. Empty where no person link selected it.
+    confirmed_people: tuple[ConfirmedPerson, ...] = ()
 
     @property
     def uri(self) -> str:
@@ -315,16 +347,24 @@ def _load_items(
     answer resolves to this address, and an address that no longer hashes to what was stored is
     a citation that has silently stopped verifying.
 
-    A place link supports its photograph's whole line rather than adding one, so stating it
-    changes no item count and no token.
+    A place or person link supports its photograph's whole line rather than adding one, so
+    stating it changes no item count and no token.
     """
     if not spans:
         return ()
     places: dict[tuple[uuid.UUID, uuid.UUID | None], dict[uuid.UUID, None]] = {}
+    linked: dict[tuple[uuid.UUID, uuid.UUID | None], dict[uuid.UUID, None]] = {}
     for support, _, _ in spans:
-        if support.dimension == _PLACE_DIMENSION and support.entity_id is not None:
-            key = (support.span_id, support.assertion_id)
+        if support.entity_id is None:
+            continue
+        key = (support.span_id, support.assertion_id)
+        if support.dimension == _PLACE_DIMENSION:
             places.setdefault(key, {})[support.entity_id] = None
+        elif support.dimension == _ENTITY_DIMENSION:
+            linked.setdefault(key, {})[support.entity_id] = None
+    people = _stated_people(
+        connection, workspace_id, {entity for found in linked.values() for entity in found}
+    )
     span_ids = list({support.span_id for support, _, _ in spans})
     rows = {
         row["span_id"]: row
@@ -378,9 +418,38 @@ def _load_items(
                     ConfirmedPlace(entity_id=place)
                     for place in places.get((span_id, assertion_id), {})
                 ),
+                confirmed_people=tuple(
+                    ConfirmedPerson(entity_id=entity)
+                    for entity in linked.get((span_id, assertion_id), {})
+                    if entity in people
+                ),
             )
         )
     return tuple(items)
+
+
+def _stated_people(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, linked: set[uuid.UUID]
+) -> frozenset[uuid.UUID]:
+    """Which linked entities are people the packet may state as in a photograph.
+
+    A person, in the library, merged into nobody, and not a person who withdrew:
+    ``person_subject_is_withdrawn`` is the predicate the graph withholds a withdrawn person's name
+    by (``exulanica/graph/entities.py``), asked rather than restated.
+    """
+    if not linked:
+        return frozenset()
+    rows = connection.execute(
+        "select e.entity_id from entity e where e.workspace_id = %s "
+        "and e.entity_id = any(%s::uuid[]) and e.class::text = %s "
+        "and e.deleted_at is null and e.merged_into is null "
+        "and not tombstone_blocks_entity(e.workspace_id, e.entity_id) "
+        "and not exists (select 1 from person_subject s where s.workspace_id = e.workspace_id "
+        "and s.entity_id = e.entity_id "
+        "and person_subject_is_withdrawn(s.workspace_id, s.subject_id))",
+        (workspace_id, list(linked), _PERSON_CLASS),
+    ).fetchall()
+    return frozenset(row["entity_id"] for row in rows)
 
 
 def _values(

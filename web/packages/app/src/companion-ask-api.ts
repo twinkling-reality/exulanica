@@ -619,6 +619,7 @@ export type ProposalRefusalCode =
   | 'out_of_range'
   | 'no_change'
   | 'unsupported_reference'
+  | 'no_evidence'
   | 'not_drafted'
   | 'no_world';
 
@@ -634,6 +635,7 @@ export const REFUSAL_CODES: readonly ProposalRefusalCode[] = [
   'out_of_range',
   'no_change',
   'unsupported_reference',
+  'no_evidence',
   'not_drafted',
   'no_world',
 ];

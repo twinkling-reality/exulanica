@@ -36,6 +36,12 @@ use the general question: a scene artefact all of whose members are live still h
 ``purge_releases_bytes`` refuses these for ever. ``scene_training_withdrawal_releases_artifact`` is
 the question a tombstone of that scope asks instead.
 
+**A stopped search right is destroyed here too, through the vector branch.** Migration 0104 writes
+a ``caption_search`` tombstone when an account holder stops a photograph's search right, and its
+cascade records the photograph's search entries as vector targets, as a capture tombstone does.
+``caption_vector_purge_is_authorized`` answers for any tombstone's recorded targets, so a vector
+job of that scope is asked the question every vector job is asked, and the photograph survives.
+
 **What this can delete from the database.** The purge role has DELETE on ``embedding`` only.
 Person withdrawal must remove the vector itself, and a soft marker would retain the sensitive
 derivative. Stored objects still use the content-addressed purge path and keep their stub rows.

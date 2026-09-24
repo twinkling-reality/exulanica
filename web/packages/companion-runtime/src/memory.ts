@@ -303,6 +303,12 @@ export interface PersistedAnswer {
   readonly supersedes: string | null;
   readonly correctionNote: string | null;
   readonly citations: readonly PersistedCitation[];
+  /**
+   * Each placeholder the answer text carries, `[person A]`, and the entity it stood for, as the
+   * answer route served them. Ids only: the name is drawn from the account holder's library when
+   * the answer is drawn, so a rename, a deletion or a withdrawn consent carries through.
+   */
+  readonly names: Readonly<Record<string, string>>;
 }
 
 export interface PersistedEscape {

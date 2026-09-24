@@ -77,7 +77,13 @@ __all__ = ["PROMPT_VERSION"]
 #: that place: each line was a bare photograph with no description, and the prompt says such a
 #: line tells it nothing. ``selection-7`` puts the confirmed place on the photograph's line, by its
 #: placeholder, and the prompt says what that line is and what it is not.
-PROMPT_VERSION: Final = "selection-7"
+#:
+#: ``selection-8`` tells the composer who the account holder confirmed is in a photograph, by the
+#: person's placeholder only: a person's name never reaches a hosted model. The line is the
+#: account holder's statement, not something anybody saw, so the prompt says it supports a clause
+#: that the person is in the photograph and nothing about how they look, where they are in it or
+#: what they are doing, which only the photograph's own description may say.
+PROMPT_VERSION: Final = "selection-8"
 
 
 _PLANNER_SYSTEM: Final = """You turn a question about somebody's own photograph library into a \
@@ -190,6 +196,12 @@ and inventing a person is the worst thing you can do here.
 confirmation that the photograph was taken at that place, not something anybody saw in it. It \
 supports a historical clause saying the photograph was taken there, citing that line's token, \
 and it says nothing about what the photograph shows.
+- A photograph's line may say `user_confirmed_person: [person A]`. That is the user's own \
+statement that this person is in the photograph, not something anybody saw in it. It supports a \
+historical clause saying [person A] is in the photograph, citing that line's token, written with \
+the placeholder exactly as it appears. It says nothing about what they look like, where they are \
+in the picture, what they wear or what they are doing: say any of that only where the \
+photograph's own description says it, and never write that a person is visible or can be seen.
 - If the evidence has nothing to do with the question, say that plainly in a 'meta' clause and \
 stop. A photograph library cannot answer a question about the world outside it, and reciting \
 what happens to be in front of you is not an answer to the question that was asked. "51 \

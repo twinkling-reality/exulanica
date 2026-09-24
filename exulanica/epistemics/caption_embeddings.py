@@ -1,8 +1,10 @@
 """Shared caption sources, vector identity and persistence for ingest and retrieval.
 
 Vectors reference the whole-photograph span. Migration 0044 durably records vector targets in
-capture/workspace tombstone transactions and the purge worker removes them. Indexing refuses
-schemas without that lifecycle capability before any model call. Assertions remain the source
+capture/workspace tombstone transactions and the purge worker removes them; migration 0104 does
+the same when the account holder stops the photograph's search right, whose tombstone erases the
+photograph's vectors and leaves the photograph. Indexing refuses schemas without that lifecycle
+capability before any model call. Assertions remain the source
 text; a content fingerprint excludes stale vectors after a correction. Callers supply the
 configured budgeted ModelClient, and no response cache retains deleted caption text.
 
@@ -105,8 +107,9 @@ def embed_capture(
     with the embedding role's whole chain and its endpoint, and a refusal it raises propagates with
     nothing sent. The request names ``capture_id`` as the photograph it carries, and ``client``'s
     policy decides what of the text leaves. The write re-reads the text and stores nothing when it
-    changed or went, and the insert's tombstone guard refuses a deletion that arrived while the
-    model ran. No response cache retains deleted caption text.
+    changed or went, and the insert's tombstone guard refuses a deletion, or a stop of the search
+    right, that arrived while the model ran; that refusal stores nothing and returns the result,
+    as a changed text does. No response cache retains deleted caption text.
 
     Returns the model's result whenever a request was sent, so its cost is counted, and None when
     nothing was sent.
@@ -160,19 +163,29 @@ def embed_capture(
                 or _stored(connection, workspace_id, key)
             ):
                 return result
-            connection.execute(
-                "insert into embedding (embedding_id, workspace_id, family, ref_type, ref_id, "
-                "model_ref, pipeline_version, dims, v) values (%s,%s,%s,'span',%s,%s,%s,4096,%s)",
-                (
-                    key,
-                    workspace_id,
-                    family,
-                    source["span_id"],
-                    result.model_id,
-                    version,
-                    vector.literal,
-                ),
-            )
+            try:
+                # A savepoint, so the database's refusal leaves the outer transaction usable.
+                with connection.transaction():
+                    connection.execute(
+                        "insert into embedding (embedding_id, workspace_id, family, ref_type, "
+                        "ref_id, model_ref, pipeline_version, dims, v) "
+                        "values (%s,%s,%s,'span',%s,%s,%s,4096,%s)",
+                        (
+                            key,
+                            workspace_id,
+                            family,
+                            source["span_id"],
+                            result.model_id,
+                            version,
+                            vector.literal,
+                        ),
+                    )
+            except psycopg.errors.IntegrityConstraintViolation as refused:
+                # `tombstone_refuse`'s own words: a deletion or a stopped search right reached
+                # this photograph while the model ran. The call was made and is counted; its
+                # result is not kept.
+                if "tombstoned:" not in str(refused):
+                    raise
         return result
     finally:
         if not connection.closed:

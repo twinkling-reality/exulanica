@@ -131,6 +131,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0099 registers each world once and its append-only trigger refuses every update
     # and delete.
     "world_identity",
+    # Migration 0103 keeps a remembered answer's placeholder map and refuses every update and
+    # delete of it.
+    "companion_answer_name",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

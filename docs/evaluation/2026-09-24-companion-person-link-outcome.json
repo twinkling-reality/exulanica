@@ -1,0 +1,517 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "clauses_read": [
+      {
+        "answer": "1/person/oskar-lindqvist/about/change",
+        "clauses": [
+          {
+            "cited": [
+              4,
+              5
+            ],
+            "text": "There are 2 photographs that contain [person A].",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "1/person/oskar-lindqvist/any/change",
+        "clauses": [
+          {
+            "cited": [
+              5
+            ],
+            "text": "This photograph contains person A.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "1/person/oskar-lindqvist/show/change",
+        "clauses": [
+          {
+            "cited": [
+              4,
+              5
+            ],
+            "text": "2 photographs contain [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "1/person/priya-nandakumar/about/change",
+        "clauses": [
+          {
+            "cited": [
+              1,
+              2,
+              3
+            ],
+            "text": "There are 3 photographs that include the individual you identified.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "1/person/priya-nandakumar/any/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "Yes, this photograph includes a person you identified.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "1/person/priya-nandakumar/show/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "3 photographs contain person A.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "2/person/oskar-lindqvist/about/change",
+        "clauses": [
+          {
+            "cited": [
+              4,
+              5
+            ],
+            "text": "There are 2 photographs that contain [person A].",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "2/person/oskar-lindqvist/any/change",
+        "clauses": [
+          {
+            "cited": [
+              5
+            ],
+            "text": "This photograph includes [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "2/person/oskar-lindqvist/show/change",
+        "clauses": [
+          {
+            "cited": [
+              5
+            ],
+            "text": "This photograph includes [person A]",
+            "type": "historical"
+          },
+          {
+            "cited": [
+              4
+            ],
+            "text": "This photograph includes [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "2/person/priya-nandakumar/about/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "There are 3 photographs that include [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "2/person/priya-nandakumar/any/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "This photograph includes [person A].",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "2/person/priya-nandakumar/show/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "This photograph includes person A.",
+            "type": "historical"
+          },
+          {
+            "cited": [
+              2
+            ],
+            "text": "This photograph includes person A.",
+            "type": "historical"
+          },
+          {
+            "cited": [
+              1
+            ],
+            "text": "This photograph includes person A.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "3/person/oskar-lindqvist/about/change",
+        "clauses": [
+          {
+            "cited": [
+              4,
+              5
+            ],
+            "text": "There are 2 photographs that include [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "3/person/oskar-lindqvist/any/change",
+        "clauses": [
+          {
+            "cited": [
+              5
+            ],
+            "text": "This photograph includes person A",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "3/person/oskar-lindqvist/show/change",
+        "clauses": [
+          {
+            "cited": [
+              4,
+              5
+            ],
+            "text": "Your library contains 2 photographs that include [person A].",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "3/person/priya-nandakumar/about/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "There are 3 photographs that include [person A].",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "3/person/priya-nandakumar/any/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "person A is in one of your photographs.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "3/person/priya-nandakumar/show/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "These photographs include [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "4/person/oskar-lindqvist/about/change",
+        "clauses": [
+          {
+            "cited": [
+              4,
+              5
+            ],
+            "text": "There are 2 photographs that include person A.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "4/person/oskar-lindqvist/any/change",
+        "clauses": [
+          {
+            "cited": [
+              5
+            ],
+            "text": "person A is in this photograph.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "4/person/oskar-lindqvist/show/change",
+        "clauses": [
+          {
+            "cited": [
+              4,
+              5
+            ],
+            "text": "There are 2 photographs that include [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "4/person/priya-nandakumar/about/change",
+        "clauses": [
+          {
+            "cited": [
+              1,
+              2,
+              3
+            ],
+            "text": "There are 3 photographs that include person A.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "4/person/priya-nandakumar/any/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "This photograph includes [person A].",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "4/person/priya-nandakumar/show/change",
+        "clauses": [
+          {
+            "cited": [
+              1,
+              2,
+              3
+            ],
+            "text": "Your three photographs show [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "5/person/oskar-lindqvist/about/change",
+        "clauses": [
+          {
+            "cited": [
+              5
+            ],
+            "text": "Both include [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "5/person/oskar-lindqvist/any/change",
+        "clauses": [
+          {
+            "cited": [
+              5
+            ],
+            "text": "Yes, [person A] is in this photograph.",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "5/person/oskar-lindqvist/show/change",
+        "clauses": [
+          {
+            "cited": [
+              4,
+              5
+            ],
+            "text": "These 2 photographs contain [person A]",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "5/person/priya-nandakumar/about/change",
+        "clauses": [
+          {
+            "cited": [
+              1,
+              2,
+              3
+            ],
+            "text": "There are 3 photographs that include [person A].",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "5/person/priya-nandakumar/any/change",
+        "clauses": [
+          {
+            "cited": [
+              3
+            ],
+            "text": "This photograph includes person A",
+            "type": "historical"
+          }
+        ]
+      },
+      {
+        "answer": "5/person/priya-nandakumar/show/change",
+        "clauses": [
+          {
+            "cited": [
+              1,
+              2,
+              3
+            ],
+            "text": "These three photographs include a person.",
+            "type": "historical"
+          }
+        ]
+      }
+    ],
+    "counts": {
+      "baseline": {
+        "errors": 0,
+        "person": {
+          "abstained": 0,
+          "answers": 30,
+          "flagged": 2,
+          "passed": 7
+        },
+        "thing": {
+          "abstained": 0,
+          "answers": 20,
+          "flagged": 0,
+          "passed": 20
+        }
+      },
+      "change": {
+        "errors": 0,
+        "person": {
+          "abstained": 0,
+          "answers": 30,
+          "flagged": 0,
+          "passed": 30
+        },
+        "thing": {
+          "abstained": 0,
+          "answers": 20,
+          "flagged": 0,
+          "passed": 20
+        }
+      }
+    },
+    "gates": {
+      "no_loss_without_a_person": true,
+      "no_visibility_or_description": true,
+      "person_citations": true
+    },
+    "judgments": {
+      "artifact": "docs/evaluation/artifacts/2026-09-24-companion-person-link/judgments.json",
+      "marked": [],
+      "read": 30,
+      "sha256": "613bce34a507bf8733a5393496ab61479d9121236fc405b1d4d3e1f4d3233cd9"
+    },
+    "passed": true,
+    "per_question": {
+      "person/oskar-lindqvist/about": {
+        "baseline": 0,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "person/oskar-lindqvist/any": {
+        "baseline": 1,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "person/oskar-lindqvist/show": {
+        "baseline": 2,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "person/priya-nandakumar/about": {
+        "baseline": 0,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "person/priya-nandakumar/any": {
+        "baseline": 4,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "person/priya-nandakumar/show": {
+        "baseline": 0,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "thing/dog": {
+        "baseline": 5,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "thing/kayak": {
+        "baseline": 5,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "thing/lighthouse": {
+        "baseline": 5,
+        "change": 5,
+        "scored_runs": 5
+      },
+      "thing/soup": {
+        "baseline": 5,
+        "change": 5,
+        "scored_runs": 5
+      }
+    },
+    "preregistration": {
+      "path": "docs/evaluation/2026-09-24-companion-person-link-preregistration.json",
+      "record_sha256": "811c1c6bd2c3423ab46de7758d752b2ae065ad614aa365b441ba1c73d773edc4"
+    },
+    "run": {
+      "artifact": "docs/evaluation/artifacts/2026-09-24-companion-person-link/held-out-run.json",
+      "cache_hits": 0,
+      "requests": 157,
+      "run_sha256": "5043426c209a506002513865a55ae30bff93d9f925610883ae020fb202dddba1",
+      "runs_started": 5,
+      "sources_sha256_same_as_registered": true,
+      "spent_usd": "0.07058236",
+      "stopped": null
+    }
+  },
+  "record_sha256": "e0e82af887ef86347dc5810ef3fe2d2aa0360addbbb675d03367a8a02fabb14c"
+}

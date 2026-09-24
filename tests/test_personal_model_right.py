@@ -923,6 +923,12 @@ def test_the_database_holds_one_spelling_of_each_destination(personal):
     )
     for destination in accepted:
         assert destination == LOCAL_PROCESS or egress_origin(destination) == destination
+    enabled = (
+        "select count(*) as n from pg_trigger where tgrelid='personal_model_right'::regclass "
+        "and not tgisinternal and tgenabled='O'"
+    )
+    triggers = connection.execute(enabled).fetchone()["n"]
+    assert triggers > 0
     with connection.transaction():
         connection.execute("alter table personal_model_right disable trigger user")
         for index, destination in enumerate(accepted):
@@ -945,13 +951,7 @@ def test_the_database_holds_one_spelling_of_each_destination(personal):
         assert violated.value.diag.constraint_name == "personal_model_right_purpose_check"
         raise psycopg.Rollback()
     assert len(model_rights_for_capture(personal.repository, personal.capture_id)) == 1
-    assert (
-        connection.execute(
-            "select count(*) as n from pg_trigger where tgrelid='personal_model_right'::regclass "
-            "and not tgisinternal and tgenabled='O'"
-        ).fetchone()["n"]
-        == 4
-    )
+    assert connection.execute(enabled).fetchone()["n"] == triggers
 
 
 def test_a_purpose_in_any_script_survives_the_receipt_check(personal):

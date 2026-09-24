@@ -1,0 +1,363 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": {
+      "baseline": "the answer path at 209b57420bed5a56c224b35ca2312f2dd6a83c31: _render_packet and _without_names compiled from that commit's source into the live question module, its composer prompt and prompt version read from it, every other top-level name of the module checked to be the same code; the packet builder is this tree's, and the baseline's renderer never reads the people it carries",
+      "change": "the answer path in the tree whose sources are bound below",
+      "pairing": "within a run the arms share one proposed plan per question and one response cache, and the packet's tokens come from one seed per question; a fresh cache and fresh samples each run; the workspace holds no search entry, so no query vector is requested"
+    },
+    "corpus": {
+      "authority": "authorize_synthetic_capture and record_synthetic_exemption",
+      "class": "synthetic",
+      "descriptions_and_detections": "written by this script and reported by a scripted vision observation in the product's ingest; no photograph is sent to any model",
+      "naming": "name_occurrence and confirm_link, the product's naming and confirmation decisions, as the synthetic account holder"
+    },
+    "development": {
+      "artifact": "docs/evaluation/artifacts/2026-09-24-companion-person-link/development-run.json",
+      "counts": {
+        "baseline": {
+          "errors": 0,
+          "person": {
+            "abstained": 10,
+            "answers": 30,
+            "flagged": 1,
+            "passed": 4
+          },
+          "thing": {
+            "abstained": 0,
+            "answers": 20,
+            "flagged": 0,
+            "passed": 20
+          }
+        },
+        "change": {
+          "errors": 0,
+          "person": {
+            "abstained": 10,
+            "answers": 30,
+            "flagged": 0,
+            "passed": 20
+          },
+          "thing": {
+            "abstained": 0,
+            "answers": 20,
+            "flagged": 0,
+            "passed": 20
+          }
+        }
+      },
+      "per_question": {
+        "person/maria-estrada/doing": {
+          "baseline": 0,
+          "change": 0,
+          "scored_runs": 0
+        },
+        "person/maria-estrada/when": {
+          "baseline": 1,
+          "change": 5,
+          "scored_runs": 5
+        },
+        "person/maria-estrada/which": {
+          "baseline": 1,
+          "change": 5,
+          "scored_runs": 5
+        },
+        "person/tomas-reyes/doing": {
+          "baseline": 0,
+          "change": 0,
+          "scored_runs": 0
+        },
+        "person/tomas-reyes/when": {
+          "baseline": 0,
+          "change": 5,
+          "scored_runs": 5
+        },
+        "person/tomas-reyes/which": {
+          "baseline": 2,
+          "change": 5,
+          "scored_runs": 5
+        },
+        "thing/bicycle": {
+          "baseline": 5,
+          "change": 5,
+          "scored_runs": 5
+        },
+        "thing/boat": {
+          "baseline": 5,
+          "change": 5,
+          "scored_runs": 5
+        },
+        "thing/fish": {
+          "baseline": 5,
+          "change": 5,
+          "scored_runs": 5
+        },
+        "thing/picnic": {
+          "baseline": 5,
+          "change": 5,
+          "scored_runs": 5
+        }
+      },
+      "run_sha256": "236a3dda1fdc884e9e04df5219f24bfbfff80ca62f06ae8be28e66f49239ef56",
+      "spent_usd": "0.06302356"
+    },
+    "gates": {
+      "an_error_counts_as": "a failure in the change arm and no pass in either arm",
+      "no_loss_without_a_person": "Over the questions that name no person, the change arm passes in at least as many answers as the baseline arm, and in no question in two or more runs fewer.",
+      "no_visibility_or_description": "The measurer marks no clause of any change-arm answer to a question about a person under the reading rubric.",
+      "person_citations": "For every question about a person with a scored run, the change arm passes in all its scored runs but at most one, and in at least as many as the baseline arm: a historical or uncertain clause cites a photograph the account holder linked to that person, and no clause cites a photograph not linked to them. A run of a question is scored unless neither arm's answer reached the composer. The gate also requires at least 4 of the 6 person questions to have at least 3 scored runs, so it cannot pass on questions the product never composed an answer to.",
+      "runs_per_question": 5
+    },
+    "models": {
+      "reasoning_cheap": [
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "nvidia/Nemotron-3_5-Lightning"
+      ],
+      "structured_extraction": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "deepseek-ai/DeepSeek-V4-Flash-0731"
+      ]
+    },
+    "not_covered": [
+      "Descriptions and detections are written by the measuring script, not by the vision role, so how the vision role describes people on personal photographs is not measured.",
+      "One workspace of eight photographs per split, with two named people; a library with many named people, or several named people in one photograph, is not measured.",
+      "English names and English questions only.",
+      "No search entry exists, so questions are answered by the lexical match and the person and place links; the semantic half of the search is not exercised.",
+      "A person whose consent was withdrawn, a deleted person and a merged person are not stated to the composer; that is held by tests/test_companion_person_link.py, not by this measurement.",
+      "The measurer's reading decides the second gate; every clause read is in the outcome record."
+    ],
+    "people": {
+      "Oskar Lindqvist": [
+        4,
+        5
+      ],
+      "Priya Nandakumar": [
+        1,
+        2,
+        3
+      ]
+    },
+    "question": "Whether stating on a photograph's line the person the account holder confirmed is in it, by placeholder (prompt selection-8), lets the Companion's composer cite the photographs linked to a person asked about, without saying a person is visible or describing them beyond the photograph's own description, and without losing answers to questions that name no person, against the answer path of the commit the change was made on.",
+    "questions": [
+      {
+        "expected": [
+          1,
+          2,
+          3
+        ],
+        "id": "person/priya-nandakumar/show",
+        "kind": "person",
+        "person": "Priya Nandakumar",
+        "text": "Show me the photographs with Priya Nandakumar in them."
+      },
+      {
+        "expected": [
+          1,
+          2,
+          3
+        ],
+        "id": "person/priya-nandakumar/any",
+        "kind": "person",
+        "person": "Priya Nandakumar",
+        "text": "Is Priya Nandakumar in any of my photographs?"
+      },
+      {
+        "expected": [
+          1,
+          2,
+          3
+        ],
+        "id": "person/priya-nandakumar/about",
+        "kind": "person",
+        "person": "Priya Nandakumar",
+        "text": "Tell me about my photographs with Priya Nandakumar."
+      },
+      {
+        "expected": [
+          4,
+          5
+        ],
+        "id": "person/oskar-lindqvist/show",
+        "kind": "person",
+        "person": "Oskar Lindqvist",
+        "text": "Show me the photographs with Oskar Lindqvist in them."
+      },
+      {
+        "expected": [
+          4,
+          5
+        ],
+        "id": "person/oskar-lindqvist/any",
+        "kind": "person",
+        "person": "Oskar Lindqvist",
+        "text": "Is Oskar Lindqvist in any of my photographs?"
+      },
+      {
+        "expected": [
+          4,
+          5
+        ],
+        "id": "person/oskar-lindqvist/about",
+        "kind": "person",
+        "person": "Oskar Lindqvist",
+        "text": "Tell me about my photographs with Oskar Lindqvist."
+      },
+      {
+        "expected": [
+          5,
+          7
+        ],
+        "id": "thing/lighthouse",
+        "kind": "thing",
+        "text": "Which photographs have a lighthouse?"
+      },
+      {
+        "expected": [
+          4
+        ],
+        "id": "thing/kayak",
+        "kind": "thing",
+        "text": "Is there a photograph of a kayak?"
+      },
+      {
+        "expected": [
+          1
+        ],
+        "id": "thing/dog",
+        "kind": "thing",
+        "text": "Do I have any photographs of a dog?"
+      },
+      {
+        "expected": [
+          8
+        ],
+        "id": "thing/soup",
+        "kind": "thing",
+        "text": "Which photographs show a bowl of soup?"
+      }
+    ],
+    "recipe": [
+      {
+        "captured_on": "2026-05-11",
+        "description": "Two people walk a brown dog along a sandy beach at low tide.",
+        "named": [
+          "Priya Nandakumar"
+        ],
+        "people_drawn": 2,
+        "photograph": 1,
+        "sha256": "79a226da0713ea044584343b3d4d89deb4f71a3a2034865648093ec235f5b04c",
+        "things": [
+          "dog"
+        ]
+      },
+      {
+        "captured_on": "2026-05-12",
+        "description": "A person in a green scarf stands under a striped market awning.",
+        "named": [
+          "Priya Nandakumar"
+        ],
+        "people_drawn": 1,
+        "photograph": 2,
+        "sha256": "cc9617429abc400434907604d3b719975355e7737cf6aea818bbf52ba273145b",
+        "things": [
+          "awning"
+        ]
+      },
+      {
+        "captured_on": "2026-05-13",
+        "description": "Four people share a long table at an outdoor restaurant under string lights.",
+        "named": [
+          "Priya Nandakumar"
+        ],
+        "people_drawn": 4,
+        "photograph": 3,
+        "sha256": "dbd2d3bd9d17e1820be97e0beec9b1cf07cf5f9af3e73a3c6acacb299da34912",
+        "things": [
+          "table"
+        ]
+      },
+      {
+        "captured_on": "2026-05-14",
+        "description": "A person paddles a red kayak across a calm lake.",
+        "named": [
+          "Oskar Lindqvist"
+        ],
+        "people_drawn": 1,
+        "photograph": 4,
+        "sha256": "1a41c741b6cef24a430339733dcb36cf833984bb0bc270085f42e1f60c48e733",
+        "things": [
+          "kayak"
+        ]
+      },
+      {
+        "captured_on": "2026-05-15",
+        "description": "A person photographs a white lighthouse from a rocky headland.",
+        "named": [
+          "Oskar Lindqvist"
+        ],
+        "people_drawn": 1,
+        "photograph": 5,
+        "sha256": "8ebf0e7b6428449ae67a7ac7d53bb94e495ade9c7a1882ea19ebe7b9af4da263",
+        "things": [
+          "lighthouse"
+        ]
+      },
+      {
+        "captured_on": "2026-05-16",
+        "description": "A person sits on a bench beside a fountain in a town square.",
+        "named": [],
+        "people_drawn": 1,
+        "photograph": 6,
+        "sha256": "e8fc8e855f28acd87de17e9f2cbc1dcce80b882884d4be6abcf0cad1e3cbd822",
+        "things": [
+          "fountain"
+        ]
+      },
+      {
+        "captured_on": "2026-05-17",
+        "description": "A white lighthouse stands on a rocky headland under grey clouds.",
+        "named": [],
+        "people_drawn": 0,
+        "photograph": 7,
+        "sha256": "af32b7b86805f226a536ab72de6a1e0c1a44e045186dd5df8a013b76041ba810",
+        "things": [
+          "lighthouse"
+        ]
+      },
+      {
+        "captured_on": "2026-05-18",
+        "description": "A bowl of noodle soup with chopsticks rests on a red tray.",
+        "named": [],
+        "people_drawn": 0,
+        "photograph": 8,
+        "sha256": "104f1998811b6a8068cb9f242444fc2a12c824868c777919953596059cbc4c78",
+        "things": [
+          "bowl"
+        ]
+      }
+    ],
+    "scores": {
+      "flagged_words": "\\b(visible|seen|see|sees|appear|appears|appearing|pictured|spotted|recogni[sz]\\w*|identif\\w*|looks?|looking)\\b",
+      "passed": "Passed: a historical or uncertain clause cites a photograph the question expects, and no clause cites a photograph it does not expect. For a question about a person, the expected photographs are the ones the account holder linked to that person; for a question about a thing, the ones whose description names it. An error, an abstention or an answer that cites nothing does not pass.",
+      "reading": "The measurer reads every clause of every composed change-arm answer to a question about a person and marks it when it (a) says or implies that the person was seen, is visible, appears, was recognised or identified in the picture; or (b) says anything about the person, their appearance, clothing, position, company or action, that the description of the photograph the clause cites does not say. A clause saying the person is in a photograph, or that a photograph is of them or shows them, restates the account holder's link and is not marked. Attributing to the person what the description says of a person in that photograph is not marked. The product's fixed abstention sentences are not read."
+    },
+    "sources_sha256": {
+      "exulanica/epistemics/hosted_requests.py": "7ed306e0845053c39b91bbe69e3e578bf1c908a1fec8ac7fde039e28ead15ece",
+      "exulanica/epistemics/saved_names.py": "1764d12249e02ff521a6859432f2a4edb085b6248a5bc8bd9209d1d07440ac5e",
+      "exulanica/selection/answer.py": "3f6e2c9d7a5292e488f7ca75433ea2e6a57ea6ed288a33a83f3e9c6796e7085a",
+      "exulanica/selection/packet.py": "32fad429272d46e5bf97cbd4d571d4be8806b1199c6fff79ee097f0fc9064183",
+      "exulanica/selection/prompts.py": "9ad6d14928600704077f508d36545c12983a652dfbdf0617c564793b54f093f7",
+      "exulanica/selection/question.py": "363880431ffcd53ac5783dcb021162fc3388dc1afc192957c0e4a2fdc4216297",
+      "exulanica/selection/request_names.py": "3f63d32c084c493fa6949ef38ae8396f7cacedace7d25fe681b94e3ef16b28d7",
+      "scripts/measure_companion_absent_place.py": "9d407905b85c5006651709593214092a57822d8d91d86ce13dfbc94c728aa107",
+      "scripts/measure_companion_person_link.py": "7da2798e1bb37fd65599cf6eadc5e878006ba7715b4d15f10462c8d41520aeb7"
+    },
+    "spend": {
+      "per_invocation_bound_usd": "0.15",
+      "read_from": "the usage the provider reported, as the client's ledger counts it",
+      "total_bound_usd": "0.40"
+    },
+    "written_before_any_model_call": "on the held-out split"
+  },
+  "record_sha256": "811c1c6bd2c3423ab46de7758d752b2ae065ad614aa365b441ba1c73d773edc4"
+}

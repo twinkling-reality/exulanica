@@ -547,7 +547,9 @@ role the app does not offer, such as a local segmentation role, is granted throu
 with no notice, as it was before any hosted role had words. Each saved photograph lists every role
 given over it with the end of its recorded term, and one stop per role, which withdraws every
 current right of that role over that photograph, because a request to the role can reach every model
-of its chain. A right granted through the API before its role had stated words keeps its own terms
+of its chain. Stopping the search right also deletes the search entries already made from that
+photograph through the purge a deletion uses (migration 0104), and the photograph can still be found
+by the words of its own description. A right granted through the API before its role had stated words keeps its own terms
 until its term or authority ends or the person stops it, and the drawer says it was allowed without
 the wording shown.
 

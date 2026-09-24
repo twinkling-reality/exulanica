@@ -135,7 +135,7 @@ def starter(repository, tmp_path) -> Starter:
 
 def _refused_for_want_of_evidence(outcome) -> None:
     assert isinstance(outcome.refusal, ProposalRefusal)
-    assert outcome.refusal.code is RefusalCode.UNSUPPORTED_REFERENCE
+    assert outcome.refusal.code is RefusalCode.NO_EVIDENCE
     assert "attach a reviewed photograph" in outcome.refusal.detail
 
 
@@ -234,7 +234,7 @@ def test_the_route_gives_a_saved_starter_world_a_proposal_citing_its_photograph(
 
         transport.responses[:] = [reply({"kind": "appearance"})]
         refused = ask()
-        assert refused["refusal"]["code"] == "unsupported_reference"
+        assert refused["refusal"]["code"] == "no_evidence"
         assert "attach a reviewed photograph" in refused["refusal"]["detail"]
 
         attachment_id = str(starter.attach(minute=4))

@@ -215,6 +215,7 @@ describe('a restored answer keeps what was stored and invents nothing', () => {
     supersedes: null,
     correctionNote: null,
     citations: [{ spanId: 'span-a', captureId: 'capture-a', ordinal: 0 }],
+    names: {},
   };
 
   it('carries the sentence, the model and the citations, and claims no executed calls', () => {

@@ -67,6 +67,7 @@ function answer(over: Partial<PersistedAnswer> = {}): PersistedAnswer {
     supersedes: null,
     correctionNote: null,
     citations: [],
+    names: {},
     ...over,
   };
 }

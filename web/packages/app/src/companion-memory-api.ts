@@ -125,6 +125,8 @@ interface WireAnswer {
   readonly supersedes: string | null;
   readonly correction_note: string | null;
   readonly citations: readonly WireCitation[];
+  /** Each placeholder the answer carries and the entity it stood for. Ids only. */
+  readonly names?: Readonly<Record<string, string>>;
 }
 
 interface WireEscape {
@@ -163,6 +165,12 @@ export interface AnswerToRemember {
   /** A whole number of milliseconds. A float rewrites its own last digits on a JSON round trip. */
   readonly latencyMs: number;
   readonly citations: readonly PersistedCitation[];
+  /**
+   * The answer's own `names`, as the answer route served them: which entity each placeholder
+   * stands for. Kept so the answer is drawn again with its names; the names themselves are never
+   * sent, because they are read from the library when the answer is drawn.
+   */
+  readonly names: Readonly<Record<string, string>>;
 }
 
 /** One escape, as `CompanionSession` recorded it against the turn it was taken on. */
@@ -241,6 +249,15 @@ function citationOf(wire: WireCitation): PersistedCitation {
   });
 }
 
+/** The placeholder map as the server sent it, keeping only entries that name an id. */
+function namesOf(wire: WireAnswer): Readonly<Record<string, string>> {
+  const names: Record<string, string> = {};
+  for (const [label, id] of Object.entries(wire.names ?? {})) {
+    if (typeof id === 'string' && id.length > 0) names[label] = id;
+  }
+  return Object.freeze(names);
+}
+
 function answerOf(wire: WireAnswer): PersistedAnswer {
   const abstained = wire.abstained;
   return Object.freeze({
@@ -262,6 +279,7 @@ function answerOf(wire: WireAnswer): PersistedAnswer {
     supersedes: wire.supersedes,
     correctionNote: wire.correction_note,
     citations: Object.freeze((wire.citations ?? []).map(citationOf)),
+    names: namesOf(wire),
   });
 }
 
@@ -364,6 +382,7 @@ export class CompanionMemoryClient {
         capture_id: citation.captureId,
         ordinal: citation.ordinal,
       })),
+      names: answer.names,
     }));
   }
 
@@ -460,6 +479,7 @@ export function answerToRemember(answer: CompanionAnswer): AnswerToRemember {
     // alone. A whole number already, because the route reports whole milliseconds.
     latencyMs: answer.provenance.latencyMs,
     citations,
+    names: answer.names ?? {},
   };
 }
 
@@ -480,6 +500,9 @@ export function answerToRemember(answer: CompanionAnswer): AnswerToRemember {
  * person read. Storing the clauses would let the restored copy be re-validated later, which
  * nothing does; storing the paragraph is what makes the restored answer say exactly what
  * the original said.
+ *
+ * The placeholder map IS carried, so the restored answer is drawn through `companionNames` exactly
+ * as the fresh one was: each name from the library the page holds when it is drawn.
  */
 export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer {
   const evidence = remembered.citations.map((citation) => ({
@@ -502,6 +525,7 @@ export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer
     repaired: remembered.repaired,
     evidence,
     content: { rows: [], placeConfirmed: false, totalMatched: 0 },
+    ...(Object.keys(remembered.names).length === 0 ? {} : { names: remembered.names }),
     provenance: {
       // A correction has no composing model, and a restored one must not borrow the model that
       // wrote the sentence it replaced. `servedModel` null is what the provenance line reads as

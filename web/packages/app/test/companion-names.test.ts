@@ -160,7 +160,7 @@ describe('a placeholder in an answer', () => {
     ]) {
       expect(spokenText(names.restore(text, NAMES)), text).toBe(text);
     }
-    // A remembered answer keeps no names, so only the bracketed form is read as a placeholder.
+    // Text with no names, as a turn's words are drawn, reads only the bracketed form.
     expect(spokenText(names.restore('Taken at place A.', undefined))).toBe('Taken at place A.');
   });
 
