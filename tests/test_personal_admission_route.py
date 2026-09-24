@@ -6,7 +6,7 @@ import uuid
 import pytest
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest.model_rights import ModelHandoff
-from exulanica.ingest.personal_admission import HUMAN_ATTESTATION
+from exulanica.ingest.personal_admission import HUMAN_ATTESTATION, role_notices
 from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.models.manifest import Role, load_manifest
 
@@ -54,7 +54,9 @@ def batch(upload, count=2):
         ],
         # A receipt names no model. Without this explicit right the worker sends these
         # photographs to no model at all, and the detection pass below finds nobody.
-        "model_rights": [{"role": "vision", "valid_until": valid_until}],
+        "model_rights": [
+            {"role": "vision", "valid_until": valid_until, "notice": role_notices()["vision"]}
+        ],
     }
 
 

@@ -2,9 +2,10 @@
 import { formationLabel } from '@exulanica/formation';
 import { ApiError, type GraphSnapshot, type TransportOptions } from '@exulanica/graph-client';
 import type { SourceMediaCatalog } from '@exulanica/atlas-react/playcanvas';
-import { PersonalAdmissionApi, DEPTH_MODEL_NOTICE, DEPTH_ROLE, HUMAN_ATTESTATION,
-  STOP_DEPTH_ESTIMATES, sha256, type PersonalSource, type PersonalAdmission,
-  type AdmissionResult, type ModelRightState } from '../personal-admission-api.js';
+import { PersonalAdmissionApi, DEPTH_ROLE, HUMAN_ATTESTATION,
+  sha256, type PersonalSource, type PersonalAdmission,
+  type AdmissionResult, type ModelRightOffer, type ModelRightState } from '../personal-admission-api.js';
+import { readOffers, standingControls, standingOf, standingText } from '../ui/model-right-controls.js';
 import { PersonReviewApi, type PersonReview } from '../person-review-api.js';
 import { listBatches, watchBatch } from '../formation.js';
 import { SourceMediaClient } from '../source-media-api.js';
@@ -28,6 +29,10 @@ import {
 } from '../world-entry-api.js';
 
 type MembershipRequest = SourceDetachRequest | SourceRebindRequest;
+
+/** The server's own reason: the detail an ApiError carries after its code in the message. */
+const reasonOf = (error: ApiError): string =>
+  error.message.startsWith(`${error.code}: `) ? error.message.slice(error.code.length + 2) : error.message;
 
 /**
  * Plain words for each stable refusal code. The code itself is shown only inside Details, so a
@@ -64,20 +69,6 @@ const REFERENCE_STATUS: Readonly<Record<string, string>> = {
   authorization_expired: 'In this world, but the permission to use it has ended',
   screening_expired: 'In this world, but its review has expired',
   viewer_unavailable: 'In this world, but its image cannot be shown right now',
-};
-
-/**
- * What the account holder is told about 3D estimates for one photograph.
- *
- * ``not allowed`` and ``stopped`` are deliberately different words for different facts: nobody
- * ever ticked the box, against a person who ticked it and then took it back. Neither is a state
- * the estimate can be shown in, and a person who stopped one should not read a sentence implying
- * they never asked.
- */
-const DEPTH_STATE: Readonly<Record<string, string>> = {
-  none: '3D estimate: not allowed',
-  current: '3D estimate: allowed',
-  ended: '3D estimate: stopped',
 };
 
 const RECEIPT_STATE: Readonly<Record<string, string>> = {
@@ -136,13 +127,19 @@ export function mountPersonalIntake(deps: {
   let pendingMembership: MembershipRequest | null = null;
   let membershipStorageKey = '';
   let confirmingRemoval: string | null = null;
+  /** The photo and role whose stop is waiting for confirmation, as `capture:role`. */
   let confirmingStop: string | null = null;
   /**
-   * The depth rights this account holder granted, newest first per photograph, as the server last
-   * reported them. Read-only: the state shown comes from GET /personal-admission and is replaced
-   * on every reload, so a stop that the server refused never looks like it happened.
+   * Every model right this account holder granted, newest first per photograph, as the server
+   * last reported them. Read-only: the state shown comes from GET /personal-admission and is
+   * replaced on every reload, so a stop that the server refused never looks like it happened.
    */
-  const depthRights = new Map<string, ModelRightState[]>();
+  const grantedRights = new Map<string, ModelRightState[]>();
+  /**
+   * The rights a person may give, with every word shown for them, as the server last stated them.
+   * Empty until the first read and after a read that states none, so nothing can be ticked then.
+   */
+  let offers: readonly ModelRightOffer[] = [];
   /**
    * Placed estimates in the open world, by the photograph they were made from.
    *
@@ -276,54 +273,45 @@ export function mountPersonalIntake(deps: {
   }
 
   /**
-   * What this photograph's 3D estimate permission is now, in words, with the right a stop acts on.
-   *
-   * The newest right decides. An older stopped right beside a newer current one means the person
-   * allowed it, stopped it, and allowed it again after a fresh review, which is a permitted
-   * sequence and reads as allowed.
+   * Each offered role's standing over one photograph, in the server's order. ``not allowed`` and
+   * ``stopped`` stay different words for different facts: nobody ever ticked the box, against a
+   * person who ticked it and then took it back. An older stopped right beside a newer current one
+   * means the person allowed it again after a fresh review, and reads as allowed.
    */
-  function depthPermission(captureId: string): { text: string; stoppable: ModelRightState | null } {
-    const [newest] = depthRights.get(captureId) ?? [];
-    if (newest === undefined) return { text: DEPTH_STATE['none'] ?? '', stoppable: null };
-    const state = newest.state ?? (newest.withdrawn ? 'ended' : 'current');
-    return {
-      text: DEPTH_STATE[state] ?? DEPTH_STATE['none'] ?? '',
-      stoppable: state === 'current' ? newest : null,
-    };
+  function standings(captureId: string): ReturnType<typeof standingOf>[] {
+    const rights = grantedRights.get(captureId) ?? [];
+    return offers.map((offer) => standingOf(offer, rights));
   }
-  /** Stop one photograph's 3D estimates. Final on the server; the reload reads back what it did. */
-  async function stopDepth(rightId: string): Promise<void> {
-    await api.stopModelRight(rightId);
+  /**
+   * Stop one role for one photograph: every current right it holds there, since the role's chain
+   * is refused as a whole once any of them ends. Final on the server; the reload reads back what
+   * it did, so a stop the server refused never reads as done.
+   */
+  async function stopRole(captureId: string, role: string): Promise<void> {
+    const standing = standings(captureId).find((each) => each.offer.role === role);
+    for (const right of standing?.current ?? []) await api.stopModelRight(right.right_id);
     confirmingStop = null;
     await reload();
-    say('3D estimates are stopped for that photo. Estimates made from it are no longer shown.');
+    const after = standings(captureId).find((each) => each.offer.role === role);
+    say(after === undefined ? 'Stopped for that photo.' : `${standingText(after)} for that photo.`);
   }
-  /** The permission line and, while it is allowed, the control that ends it. */
-  function depthControls(captureId: string): HTMLElement[] {
-    const permission = depthPermission(captureId);
-    const children: HTMLElement[] = [
-      el('span', { class: 'photo-depth-state', text: permission.text }),
-    ];
-    const right = permission.stoppable;
-    if (right === null) return children;
+  /**
+   * Each offered role's state line and, while it is allowed, the control that ends it. ``given``
+   * leaves out the roles never given for this photo, for the inventory, where every saved photo is
+   * listed whether or not it is in a world and a row per role nobody asked about would bury it.
+   */
+  function rightControls(captureId: string, given = false): HTMLElement[] {
     const locked = busy || deps.preview === true;
-    if (confirmingStop === right.right_id) {
-      const stop = el('button', { type: 'button', class: 'photo-depth-stop-confirm', text: 'Stop 3D estimates' });
-      const keep = el('button', { type: 'button', text: 'Keep allowing them' });
-      stop.disabled = locked;
-      stop.onclick = () => { void act(() => stopDepth(right.right_id)); };
-      keep.onclick = () => { confirmingStop = null; reflect(); };
-      children.push(el('div', { class: 'photo-depth-confirm', role: 'group', 'aria-label': 'Confirm stopping 3D estimates' }, [
-        el('p', { text: STOP_DEPTH_ESTIMATES }),
-        el('div', { class: 'photo-reference-actions' }, [stop, keep]),
-      ]));
-      return children;
-    }
-    const stop = el('button', { type: 'button', class: 'photo-depth-stop', text: 'Stop 3D estimates for this photo' });
-    stop.disabled = locked;
-    stop.onclick = () => { confirmingStop = right.right_id; reflect(); };
-    children.push(el('div', { class: 'photo-reference-actions' }, [stop]));
-    return children;
+    return standings(captureId).filter((standing) => !given || standing.standing !== 'none').flatMap((standing) => {
+      const key = `${captureId}:${standing.offer.role}`;
+      return standingControls(standing, {
+        confirming: confirmingStop === key,
+        locked,
+        onAsk: () => { confirmingStop = key; reflect(); },
+        onStop: () => { void act(() => stopRole(captureId, standing.offer.role)); },
+        onKeep: () => { confirmingStop = null; reflect(); },
+      });
+    });
   }
   function currentCard(attachment: SavedWorldSourceAttachment, index: number): HTMLElement {
     const children: HTMLElement[] = [
@@ -341,13 +329,14 @@ export function mountPersonalIntake(deps: {
       ? referenceImage(attachment.evidenceSpanId, attachment.captureId) : null;
     if (image !== null) children.push(image);
     children.push(lineage(attachment.captureId, attachment.sourceSha256));
-    children.push(...depthControls(attachment.captureId));
+    children.push(...rightControls(attachment.captureId));
     for (const instance of placedEstimates.get(attachment.captureId) ?? []) {
-      const permission = depthPermission(attachment.captureId);
+      // A placed estimate exists because of the depth right, so its own Stop asks to stop that.
+      const depth = standings(attachment.captureId).find((each) => each.offer.role === DEPTH_ROLE);
       children.push(buildPhotoGeometryInspector({
         instance,
-        ...(permission.stoppable === null ? {} : {
-          onStop: () => { confirmingStop = permission.stoppable!.right_id; reflect(); },
+        ...(depth === undefined || depth.current.length === 0 ? {} : {
+          onStop: () => { confirmingStop = `${attachment.captureId}:${DEPTH_ROLE}`; reflect(); },
         }),
       }));
     }
@@ -493,13 +482,13 @@ export function mountPersonalIntake(deps: {
       say('Browser recovery storage is unavailable. Keep this page open to retry the photo change.');
     }
   }
-  /** The right ends when the authority granting it ends, so the person is told which date that is. */
-  function depthTerm(): string {
-    if (!ui.depthConsent.checked) return '';
+  /** A right ends when the authority granting it ends, so the person is told which date that is. */
+  function rightsTerm(grants: typeof ui.processingRights): string {
+    if (grants.chosen().length === 0) return '';
     const until = new Date(ui.validUntil.value);
     return Number.isFinite(until.getTime()) && until.getTime() > Date.now()
       ? `Allowed until ${until.toLocaleString()}. You can stop it sooner from any photo below.`
-      : 'Enter a future authority expiry above; a 3D estimate is allowed only while that lasts.';
+      : 'Enter a future authority expiry above; what you allow here lasts only while that does.';
   }
   /**
    * Both ticks in step 4 describe the photographs as they are now: which ones were selected, and
@@ -508,11 +497,13 @@ export function mountPersonalIntake(deps: {
    */
   function forgetConsent(): void {
     ui.attestation.checked = false;
-    ui.depthConsent.checked = false;
+    ui.processingRights.reset();
+    ui.reviewRights.reset();
   }
   function reflect(): void {
     ui.controls.disabled = busy || deps.preview === true;
-    ui.depthTerm.textContent = depthTerm();
+    ui.processingRights.term.textContent = rightsTerm(ui.processingRights);
+    ui.reviewRights.term.textContent = rightsTerm(ui.reviewRights);
     ui.retry.hidden = journal.pending === null;
     const attachment = attachmentSelection();
     ui.retryAttachment.hidden = pendingAttachment === null;
@@ -566,6 +557,9 @@ export function mountPersonalIntake(deps: {
       };
       return el('div', { class: 'intake-original' }, [
         el('label', {}, [checkbox, ` Original ${index + 1} · ${(source.bytes / 1_000_000).toFixed(2)} MB`]),
+        // What models this photo was allowed to reach, and the controls that stop them, wherever
+        // the photo is: a right given at detection exists before the photo is in any world.
+        el('div', { class: 'intake-original-rights' }, rightControls(source.capture_id, true)),
         el('details', {}, [el('summary', { text: 'File identity' }),
           el('p', { text: `${source.bytes} bytes; SHA-256 ${source.sha256}; capture ${source.capture_id}` })]),
       ]);
@@ -579,7 +573,7 @@ export function mountPersonalIntake(deps: {
       el('p', { text: 'Recorded so far:' }),
       ...[...latest].map(([captureId, state]) => el('p', {
         text: `${photoLabel(captureId)}: ${RECEIPT_STATE[state] ?? 'not ready'}. ` +
-          `${depthPermission(captureId).text}.`,
+          standings(captureId).map((standing) => `${standingText(standing)}.`).join(' '),
       })),
       el('details', {}, [
         el('summary', { text: 'Receipt details' }),
@@ -664,10 +658,17 @@ export function mountPersonalIntake(deps: {
     const recovered = await api.status();
     if (disposed) return;
     journal.sources = recovered.sources.filter(s => ids.has(s.capture_id)).map(({ capture_id, sha256, bytes }) => ({ capture_id, sha256, bytes }));
-    depthRights.clear();
+    grantedRights.clear();
     for (const source of recovered.sources) {
-      const granted = (source.model_rights ?? []).filter(right => right.model.role === DEPTH_ROLE);
-      if (granted.length > 0) depthRights.set(source.capture_id, granted);
+      if ((source.model_rights ?? []).length > 0) grantedRights.set(source.capture_id, [...source.model_rights!]);
+    }
+    // The words each right is shown with are the server's, read again on every reload. A changed
+    // set takes every tick back, so nothing ticked against older words can be sent.
+    const stated = readOffers(recovered.model_right_offers);
+    if (JSON.stringify(stated) !== JSON.stringify(offers)) {
+      offers = stated;
+      ui.processingRights.show(offers.filter((offer) => offer.offered_with === 'detect'));
+      ui.reviewRights.show(offers.filter((offer) => offer.offered_with === 'review'));
     }
     await readPlacedEstimates();
     const available = new Set(journal.sources.map(s => s.capture_id));
@@ -756,6 +757,15 @@ export function mountPersonalIntake(deps: {
       ui.review.append(cancel);
     }
   }
+  /** The rights ticked in one step, each with the server's own words, or nothing at all. */
+  function grantsFor(grants: typeof ui.processingRights, until: Date): Pick<PersonalAdmission, 'model_rights'> {
+    const chosen = grants.chosen();
+    return chosen.length === 0 ? {} : {
+      model_rights: chosen.map((offer) => ({
+        role: offer.role, valid_until: until.toISOString(), notice: offer.notice,
+      })),
+    };
+  }
   function prepare(operation: 'detect' | 'review'): PersonalAdmission {
     const members = journal.sources.filter(s => journal.memberIds.includes(s.capture_id));
     if (!members.length || members.length > 200) throw new Error('Select between 1 and 200 photographs for this admission.');
@@ -774,12 +784,11 @@ export function mountPersonalIntake(deps: {
       authority: { account_authority_basis: ui.authority.value.trim(), authorized_at: now, valid_until: until.toISOString() },
       recorded_at: now, operation,
       ...(operation === 'review' ? { reviewed_by_name: ui.reviewer.value.trim(), attestation: HUMAN_ATTESTATION } : {}),
-      // Sent only when the box is ticked, and only with the review that carries the authority the
-      // right is granted under. The notice is the text displayed above it; the server compares it
-      // with its own and refuses anything else, so a client that showed nothing cannot grant this.
-      ...(operation === 'review' && ui.depthConsent.checked
-        ? { model_rights: [{ role: DEPTH_ROLE, valid_until: until.toISOString(), notice: DEPTH_MODEL_NOTICE }] }
-        : {}),
+      // Sent only for the boxes ticked in this admission's own step, with the authority the rights
+      // are granted under. Each notice is the server's text displayed beside its box; the server
+      // compares it with its own and refuses anything else, so a client that showed nothing, or
+      // something else, cannot grant a right.
+      ...grantsFor(operation === 'detect' ? ui.processingRights : ui.reviewRights, until),
     };
   }
   async function sendPending(): Promise<void> {
@@ -787,11 +796,29 @@ export function mountPersonalIntake(deps: {
     let result: AdmissionResult;
     try { result = await api.requests.pending() ? await api.requests.retry<AdmissionResult>() : await api.admit(journal.pending); }
     catch (error) {
-      if (!await api.requests.pending()) { journal.pending = null; persist(); throw error; }
+      if (!await api.requests.pending()) {
+        journal.pending = null; persist();
+        // Answered and refused: nothing was recorded. The reason is the server's, said as its
+        // words rather than a status code. The offers are read again, and if the words for a
+        // right changed while the person was reading, that is what they are told.
+        if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+          const before = JSON.stringify(offers);
+          try { await reload(); } catch { /* The refusal is still the thing to say. */ }
+          throw new Error(JSON.stringify(offers) !== before
+            ? 'The wording for what you allowed changed while you were reading it, so nothing was '
+              + 'recorded. Read it again, then allow it if you still want to.'
+            : `Nothing was recorded. The server said: ${reasonOf(error)}`);
+        }
+        throw error;
+      }
       throw new Error(`${error instanceof Error ? error.message : 'Admission did not answer.'} `
         + 'The exact request is retained. Retry recovers its original receipt identities without repeating the operation.');
     }
+    const sent = journal.pending.operation;
     journal.result = result; journal.pending = null; persist();
+    // The rights ticked for that admission are recorded, and they spoke about those photos. The
+    // ticks are taken back, so a later admission carries only what is ticked for it.
+    (sent === 'detect' ? ui.processingRights : ui.reviewRights).reset();
     watch(result.batch_id);
     say('Admission receipts recorded. Reload proposals after processing; detection never completes human review.');
     await reload();
@@ -1020,7 +1047,8 @@ export function mountPersonalIntake(deps: {
       notice(REFERENCE_REFUSALS[apiError.code] ?? 'The change was not saved.', apiError.code);
     }
   }
-  ui.depthConsent.onchange = () => { reflect(); };
+  ui.processingRights.onChange(() => { reflect(); });
+  ui.reviewRights.onChange(() => { reflect(); });
   ui.originals.onchange = () => { void act(async () => {
     for (const file of [...ui.originals.files ?? []]) {
       const digest = await sha256(await file.arrayBuffer());

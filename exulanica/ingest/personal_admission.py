@@ -4,14 +4,20 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
+import string
+import urllib.parse
 import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, NoReturn
+from typing import Any, Final, Literal, NoReturn
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.model_rights import (
+    LOCAL_PROCESS,
     LOCAL_PROVIDER,
     ModelHandoff,
     ModelIdentity,
@@ -343,12 +349,12 @@ class ModelRightRequest(StrictInput):
     A role, never an identifier: the server resolves it against the manifest and records a right
     for each exact model the role can reach, which the response names.
 
-    ``notice`` is the wording the account holder was shown before granting it. A role listed in
-    :data:`ROLE_NOTICE` carries its exact text and nothing else; a role that is not listed carries
-    none. Both halves matter. Without the first, a client could grant the depth role while showing
-    a person any sentence it liked, or none; without the second, a client could attach a sentence
-    of its own invention to a role whose wording the server has never approved, and the stored
-    receipt would say the person read it.
+    ``notice`` is the wording the account holder was shown before granting it. A role
+    :func:`role_notices` states words for carries exactly those words and nothing else; a role it
+    states none for carries none. Both halves matter. Without the first, a client could grant a
+    role while showing a person any sentence it liked, or none; without the second, a client could
+    attach a sentence of its own invention to a role whose wording the server has never stated,
+    and the stored receipt would say the person read it.
     """
 
     role: str = Field(min_length=1, max_length=63)
@@ -421,10 +427,234 @@ DEPTH_MODEL_NOTICE = (
     "stop being shown in your worlds."
 )
 
-#: The roles a person is shown wording for, and the exact wording. Checked the way
-#: :data:`HUMAN_ATTESTATION` is: the client sends back the text it displayed, and a single
-#: character of difference is a different statement and is refused.
-ROLE_NOTICE: dict[str, str] = {DEPTH_ROLE: DEPTH_MODEL_NOTICE}
+#: The depth use's words beside its notice: the control's label, the per-photo state's name, what
+#: a person reads before stopping it and the two buttons that stop it. The hosted uses state
+#: theirs in :data:`MODEL_RIGHT_USES_PATH`; depth's notice is a fixed text rather than that file's
+#: template, because it describes a model inside Exulanica's own processing.
+DEPTH_LABEL: Final = "Estimate 3D shape from these photos"
+DEPTH_SHORT: Final = "3D estimate"
+DEPTH_STOP: Final = (
+    "Stop 3D estimates for this photo? Your photo, review and worlds stay. Estimates made from it "
+    "stop showing, and none are made again unless you review it again and allow it."
+)
+DEPTH_STOP_ACTION: Final = "Stop 3D estimates for this photo"
+DEPTH_STOP_CONFIRM: Final = "Stop 3D estimates"
+
+#: The hosted roles a person may allow from the app, and the words each is granted against.
+MODEL_RIGHT_USES_PATH: Final = Path(__file__).with_name("model-right-uses.v1.json")
+MODEL_RIGHT_USES_PROFILE: Final = "exulanica.model-right-uses/v1"
+#: The admission a use is offered with. Detection queues the processing job the vision stage runs
+#: in; review records the screening depth needs.
+OfferedWith = Literal["detect", "review"]
+#: One paragraph a person reads whole, and sends back in the request that grants it: the bound
+#: the purpose field and a place name notice already have.
+_NOTICE_LIMIT: Final = 2000
+_CONTROL: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+_USES_KEYS: Final = frozenset({"profile", "note", "notice", "fallback_joiner", "uses"})
+_USE_KEYS: Final = frozenset(
+    {
+        "role",
+        "offered_with",
+        "label",
+        "short",
+        "what",
+        "purpose",
+        "detail",
+        "kept",
+        "stop",
+        "stop_action",
+        "stop_confirm",
+    }
+)
+_NOTICE_FIELDS: Final = frozenset({"what", "host", "purpose", "detail", "models", "kept"})
+
+
+def _words(value: object, what: str) -> str:
+    """One trimmed, printable piece of wording from the uses file, or a refusal naming it."""
+    if not isinstance(value, str) or not value.strip() or value != value.strip():
+        raise ValueError(f"{what} is a trimmed, non-empty string")
+    if _CONTROL.search(value):
+        raise ValueError(f"{what} carries a control character")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class ModelRightUse:
+    """One hosted role a person may allow, with the sentences its notice is made from."""
+
+    role: str
+    offered_with: OfferedWith
+    label: str
+    short: str
+    what: str
+    purpose: str
+    detail: str
+    kept: str
+    stop: str
+    stop_action: str
+    stop_confirm: str
+
+
+@dataclass(frozen=True, slots=True)
+class ModelRightUses:
+    """The declared hosted uses and the template every hosted notice is filled from."""
+
+    notice_template: str
+    fallback_joiner: str
+    uses: tuple[ModelRightUse, ...]
+
+    def use(self, role: str) -> ModelRightUse | None:
+        """The use declared for ``role``, or None: an undeclared role is never offered."""
+        return next((use for use in self.uses if use.role == role), None)
+
+    def notice(self, use: ModelRightUse, handoff: ModelHandoff) -> str:
+        """The exact words a person reads before allowing ``use``, naming every model and host."""
+        if handoff.destination == LOCAL_PROCESS:
+            raise ValueError(f"the {use.role} use is offered only for a hosted model")
+        if any(identity.role != use.role for identity in handoff.identities):
+            raise ValueError(f"the hand-over does not belong to the {use.role} role")
+        text = self.notice_template.format(
+            what=use.what,
+            host=urllib.parse.urlsplit(handoff.destination).netloc,
+            purpose=use.purpose,
+            detail=f" {use.detail}" if use.detail else "",
+            models=self.fallback_joiner.join(identity.model_id for identity in handoff.identities),
+            kept=use.kept,
+        )
+        if len(text) > _NOTICE_LIMIT:
+            raise ValueError(f"a model right notice is at most {_NOTICE_LIMIT} characters")
+        return _words(text, f"the {use.role} notice")
+
+
+def parse_model_right_uses(raw: Mapping[str, Any]) -> ModelRightUses:
+    """The declared uses, refused whole on anything this module does not know."""
+    if not isinstance(raw, Mapping) or set(raw) != _USES_KEYS:
+        raise ValueError(f"a model right uses file has exactly the keys {sorted(_USES_KEYS)}")
+    if raw["profile"] != MODEL_RIGHT_USES_PROFILE:
+        raise ValueError(f"a model right uses file declares {MODEL_RIGHT_USES_PROFILE}")
+    template = _words(raw["notice"], "the notice template")
+    if {name for _, name, _, _ in string.Formatter().parse(template) if name} != _NOTICE_FIELDS:
+        raise ValueError(f"the notice template fills exactly {sorted(_NOTICE_FIELDS)}")
+    joiner = raw["fallback_joiner"]
+    if not isinstance(joiner, str) or not joiner.strip() or _CONTROL.search(joiner):
+        raise ValueError("the fallback joiner is printable text")
+    hosted = {member.value for member in models_manifest.Role}
+    uses: list[ModelRightUse] = []
+    for entry in raw["uses"] if isinstance(raw["uses"], list) else ():
+        if not isinstance(entry, Mapping) or set(entry) != _USE_KEYS:
+            raise ValueError(f"a model right use has exactly the keys {sorted(_USE_KEYS)}")
+        role = entry["role"]
+        if role not in hosted:
+            raise ValueError(f"the manifest states no hosted model role {role!r}")
+        if entry["offered_with"] not in ("detect", "review"):
+            raise ValueError(f"the {role} use is offered with detect or review")
+        detail = entry["detail"]
+        uses.append(
+            ModelRightUse(
+                role=role,
+                offered_with=entry["offered_with"],
+                label=_words(entry["label"], f"the {role} label"),
+                short=_words(entry["short"], f"the {role} short name"),
+                what=_words(entry["what"], f"the {role} subject"),
+                purpose=_words(entry["purpose"], f"the {role} purpose"),
+                detail="" if detail == "" else _words(detail, f"the {role} detail"),
+                kept=_words(entry["kept"], f"the {role} kept clause"),
+                stop=_words(entry["stop"], f"the {role} stop sentence"),
+                stop_action=_words(entry["stop_action"], f"the {role} stop action"),
+                stop_confirm=_words(entry["stop_confirm"], f"the {role} stop confirmation"),
+            )
+        )
+    if not uses:
+        raise ValueError("a model right uses file offers at least one use")
+    if len({use.role for use in uses}) != len(uses) or any(use.role == DEPTH_ROLE for use in uses):
+        raise ValueError("a model right uses file offers each hosted role once")
+    return ModelRightUses(notice_template=template, fallback_joiner=joiner, uses=tuple(uses))
+
+
+def load_model_right_uses(path: Path = MODEL_RIGHT_USES_PATH) -> ModelRightUses:
+    return parse_model_right_uses(json.loads(path.read_text(encoding="utf-8")))
+
+
+MODEL_RIGHT_USES: Final = load_model_right_uses()
+
+
+@dataclass(frozen=True, slots=True)
+class ModelRightOffer:
+    """One role a person may allow from the app: the words shown for it and what it covers."""
+
+    role: str
+    offered_with: OfferedWith
+    label: str
+    short: str
+    notice: str
+    stop: str
+    stop_action: str
+    stop_confirm: str
+    handoff: ModelHandoff
+
+    def as_record(self) -> dict[str, Any]:
+        return {
+            "role": self.role,
+            "offered_with": self.offered_with,
+            "label": self.label,
+            "short": self.short,
+            "notice": self.notice,
+            "stop": self.stop,
+            "stop_action": self.stop_action,
+            "stop_confirm": self.stop_confirm,
+            "destination": self.handoff.destination,
+            "models": [identity.as_record() for identity in self.handoff.identities],
+        }
+
+
+def model_right_offers(
+    manifest: models_manifest.Manifest | None = None,
+) -> tuple[ModelRightOffer, ...]:
+    """Every model right a person may grant, depth first, each with the exact words it needs.
+
+    The hosted notices are filled from the manifest as it is, so the words name the models and host
+    a grant would cover now, and a grant made against older words is refused.
+    """
+    offers = [
+        ModelRightOffer(
+            role=DEPTH_ROLE,
+            offered_with="review",
+            label=DEPTH_LABEL,
+            short=DEPTH_SHORT,
+            notice=DEPTH_MODEL_NOTICE,
+            stop=DEPTH_STOP,
+            stop_action=DEPTH_STOP_ACTION,
+            stop_confirm=DEPTH_STOP_CONFIRM,
+            handoff=role_handoff(DEPTH_ROLE),
+        )
+    ]
+    for use in MODEL_RIGHT_USES.uses:
+        handoff = role_handoff(use.role, manifest)
+        offers.append(
+            ModelRightOffer(
+                role=use.role,
+                offered_with=use.offered_with,
+                label=use.label,
+                short=use.short,
+                notice=MODEL_RIGHT_USES.notice(use, handoff),
+                stop=use.stop,
+                stop_action=use.stop_action,
+                stop_confirm=use.stop_confirm,
+                handoff=handoff,
+            )
+        )
+    return tuple(offers)
+
+
+def role_notices(manifest: models_manifest.Manifest | None = None) -> dict[str, str]:
+    """The roles the app offers, and the exact words each is granted against.
+
+    Checked the way :data:`HUMAN_ATTESTATION` is: the client sends back the text it displayed, and
+    a single character of difference is a different statement and is refused. A role absent here
+    is not offered in the app and is granted only with no notice, as every role was before the
+    server stated words for any hosted one; the local segmentation roles are granted that way.
+    """
+    return {offer.role: offer.notice for offer in model_right_offers(manifest)}
 
 
 def admit_batch(
@@ -462,6 +692,7 @@ def admit_batch(
     # Every requested right is resolved and checked before anything is written, like the members.
     if len({request.role for request in body.model_rights}) != len(body.model_rights):
         raise ValueError("a batch names each model role at most once")
+    notices = role_notices() if body.model_rights else {}
     rights = []
     for request in body.model_rights:
         until = instant(request.valid_until)
@@ -469,13 +700,16 @@ def admit_batch(
             raise ValueError(
                 "a model right must end in the future and no later than the authority granting it"
             )
-        expected = ROLE_NOTICE.get(request.role)
-        if request.notice != expected:
+        # An offered role is granted only against the exact words the server states for it. A role
+        # the server states no words for keeps the rule it always had: it carries no notice, so no
+        # client can attach a sentence of its own invention and record it as read.
+        expected = notices.get(request.role)
+        if expected is not None and request.notice != expected:
             raise ValueError(
                 f"the {request.role} model right is granted against this server's own notice"
-                if expected is not None
-                else f"this server states no notice for the model role {request.role!r}"
             )
+        if expected is None and request.notice is not None:
+            raise ValueError(f"this server states no notice for the model role {request.role!r}")
         rights.append((role_handoff(request.role), until))
     # Check all originals, including storage bytes, before the first receipt is written.
     for member in body.members:

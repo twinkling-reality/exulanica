@@ -1,0 +1,47 @@
+{
+  "profile": "exulanica.model-right-uses/v1",
+  "note": "The hosted model roles a person may let process their own photographs from the app, one per role a grounded Companion answer needs, with the words each is granted against. A role absent from this list is not offered in the app; POST /personal-admission grants such a role only with no notice, as it grants every role the server states no words for. The notice is this template filled with one use's sentences, the host the manifest's endpoint names and every model of the role's chain, primary first; the person reads it before allowing the use, the browser sends it back unchanged, and the server compares it for exact equality, so a changed chain, host or sentence needs a new yes for new grants. offered_with names the admission that carries the grant: detect for these roles, because the processing job that detection queues is when the vision stage runs and a right given later arrives after the photograph was already refused. label, short, stop, stop_action and stop_confirm are the words the app shows for the control, the per-photo state, the confirmation before stopping and its two buttons, so the app holds no wording of its own for any right.",
+  "notice": "{what} will be sent to an AI service outside Exulanica, at {host}, where a model will {purpose}.{detail} The model is {models}. You can stop this at any time: nothing more is sent from then on, and {kept}.",
+  "fallback_joiner": ", or when that one is unavailable, ",
+  "uses": [
+    {
+      "role": "vision",
+      "offered_with": "detect",
+      "label": "Let an outside AI model describe these photos and read any text in them",
+      "short": "Photo descriptions",
+      "what": "A copy of each selected photo, reduced in size if it is large and without its location or camera details,",
+      "purpose": "describe what it shows and read any text in it",
+      "detail": "The people in the photo are not hidden from this model: it is the model that finds them, so that Exulanica can hide them in what it builds.",
+      "kept": "descriptions already made stay in your library",
+      "stop": "Stop sending this photo to the description model? Nothing more is sent from now on. Descriptions already made from it stay in your library.",
+      "stop_action": "Stop sending this photo for descriptions",
+      "stop_confirm": "Stop sending it"
+    },
+    {
+      "role": "embedding",
+      "offered_with": "detect",
+      "label": "Let an outside AI model index these photos' descriptions so your questions can find them",
+      "short": "Search index",
+      "what": "The descriptions made from each selected photo",
+      "purpose": "index them so your questions can find the photo",
+      "detail": "Names you gave people are replaced before anything is sent, and a place's name is sent only where you allowed it for that place.",
+      "kept": "search entries already made stay",
+      "stop": "Stop sending this photo's descriptions to the search model? Nothing more is sent from now on. Search entries already made from it stay.",
+      "stop_action": "Stop sending its descriptions for search",
+      "stop_confirm": "Stop sending them"
+    },
+    {
+      "role": "reasoning_cheap",
+      "offered_with": "detect",
+      "label": "Let an outside AI model write Companion answers from these photos",
+      "short": "Companion answers",
+      "what": "The descriptions and dates of the selected photos, whenever a Companion question finds them,",
+      "purpose": "write the answer to your question",
+      "detail": "Names you gave people are replaced before anything is sent, and a place's name is sent only where you allowed it for that place.",
+      "kept": "answers already given stay",
+      "stop": "Stop sending this photo's descriptions to the answer model? From your next question, any answer that draws on it is put together by Exulanica without that model. Answers already given stay.",
+      "stop_action": "Stop sending its descriptions for answers",
+      "stop_confirm": "Stop sending them"
+    }
+  ]
+}

@@ -10,7 +10,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { adaptSnapshot } from '@exulanica/graph-client';
 import { mountPersonalIntake, createPersonalIntakeSession } from '../src/composition/personal-intake.js';
-import { DEPTH_MODEL_NOTICE, HUMAN_ATTESTATION, sha256 } from '../src/personal-admission-api.js';
+import { HUMAN_ATTESTATION, sha256, type ModelRightOffer } from '../src/personal-admission-api.js';
 import type { SavedWorldEntry, SavedWorldSourceAttachment } from '../src/world-entry-api.js';
 
 const mocks = vi.hoisted(() => ({ media: new Map<string, unknown>() }));
@@ -20,6 +20,19 @@ vi.mock('../src/source-media-api.js', () => ({ SourceMediaClient: class {
 } }));
 
 const CAPTURE = '11111111-1111-4111-8111-111111111111';
+/**
+ * The depth offer as the server states it. The notice is deliberately not the product's sentence:
+ * whatever the drawer shows and sends back must be this text, read from the response.
+ */
+const DEPTH_OFFER: ModelRightOffer = Object.freeze({
+  role: 'depth', offered_with: 'review', label: 'Estimate 3D shape from these photos',
+  short: '3D estimate', notice: 'Fixture notice for depth: the words the server states, and only those.',
+  stop: 'Stop 3D estimates for this photo? Your photo, review and worlds stay. Estimates made from it '
+    + 'stop showing, and none are made again unless you review it again and allow it.',
+  stop_action: 'Stop 3D estimates for this photo', stop_confirm: 'Stop 3D estimates',
+  destination: 'local-process',
+  models: [{ provider: 'local', role: 'depth', model_id: 'Ruicheng/moge-2-vitl', revision: '39c4d5e' }],
+});
 const RIGHT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const json = (body: unknown) => new Response(JSON.stringify(body));
 
@@ -77,6 +90,7 @@ function fixture(rights: 'none' | 'current' | 'ended' = 'none', placed = false) 
           media_type: 'image/jpeg', authority: null, model_rights: modelRights(),
         }],
         requests: saved,
+        model_right_offers: [DEPTH_OFFER],
       });
     }
     if (init.method === 'POST') {
@@ -211,7 +225,7 @@ describe('permission for a 3D estimate from a personal photograph', () => {
     await settle(mounted.root);
     const tick = field(mounted.root, 'Estimate 3D shape from these photos');
     expect(tick.checked).toBe(false);
-    expect(mounted.root.textContent).toContain(DEPTH_MODEL_NOTICE);
+    expect(mounted.root.textContent).toContain(DEPTH_OFFER.notice);
 
     // The control: a complete review with the box untouched grants nothing.
     await readyToReview(mounted.root, f.file);
@@ -232,7 +246,7 @@ describe('permission for a 3D estimate from a personal photograph', () => {
     expect(ticked['model_rights']).toEqual([{
       role: 'depth',
       valid_until: new Date('2099-01-01T12:00').toISOString(),
-      notice: DEPTH_MODEL_NOTICE,
+      notice: DEPTH_OFFER.notice,
     }]);
     mounted.dispose();
   });

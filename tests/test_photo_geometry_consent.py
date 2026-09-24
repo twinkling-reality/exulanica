@@ -9,7 +9,7 @@ afterwards.
 """
 
 
-from exulanica.ingest.personal_admission import DEPTH_MODEL_NOTICE, ROLE_NOTICE
+from exulanica.ingest.personal_admission import DEPTH_MODEL_NOTICE, role_notices
 from exulanica.ingest.stages.segmentation import DEPTH_ROLE, local_model_role
 
 from test_intake_upload import upload as upload
@@ -101,17 +101,27 @@ def test_a_notice_this_server_did_not_write_is_refused_before_anything_is_writte
     assert len(upload.rows("select * from personal_model_right")) == 1
 
 
-def test_a_notice_cannot_be_attached_to_a_role_this_server_states_none_for(upload):
+def test_a_hosted_role_is_granted_only_against_its_own_stated_notice(upload):
     body = reviewing(batch(upload, count=1))
     valid_until = body["authority"]["valid_until"]
-    assert "vision" not in ROLE_NOTICE
+    vision = role_notices()["vision"]
+    assert vision != DEPTH_MODEL_NOTICE
+    for notice in (DEPTH_MODEL_NOTICE, None, vision + " "):
+        body["model_rights"] = [{"role": "vision", "valid_until": valid_until, "notice": notice}]
+        refused = post(upload, "/personal-admission", body)
+        assert refused.status_code == 409, (notice, refused.text)
+        assert "granted against this server's own notice" in refused.json()["detail"]
+    # A role the app does not offer keeps the rule it had: words of the client's own are refused.
     body["model_rights"] = [
-        {"role": "vision", "valid_until": valid_until, "notice": DEPTH_MODEL_NOTICE}
+        {"role": "structured_extraction", "valid_until": valid_until, "notice": vision}
     ]
-    assert post(upload, "/personal-admission", body).status_code == 409
+    unoffered = post(upload, "/personal-admission", body)
+    assert unoffered.status_code == 409, unoffered.text
+    detail = unoffered.json()["detail"]
+    assert "states no notice for the model role 'structured_extraction'" in detail
     assert upload.rows("select * from personal_model_right") == []
-    # The same role without a notice is the behaviour that existed before this lane.
-    body["model_rights"] = [{"role": "vision", "valid_until": valid_until}]
+    # Positive control over the same fixture: the words the server states are accepted.
+    body["model_rights"] = [{"role": "vision", "valid_until": valid_until, "notice": vision}]
     assert post(upload, "/personal-admission", body).status_code == 202
 
 

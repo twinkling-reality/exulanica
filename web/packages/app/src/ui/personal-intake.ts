@@ -1,5 +1,6 @@
 import { el } from './dom.js';
-import { DEPTH_MODEL_NOTICE, HUMAN_ATTESTATION } from '../personal-admission-api.js';
+import { HUMAN_ATTESTATION } from '../personal-admission-api.js';
+import { buildModelRightGrants } from './model-right-controls.js';
 
 /** Sequential reading groups; callbacks and server receipts still own progress. */
 export function buildPersonalIntake() {
@@ -115,6 +116,10 @@ export function buildPersonalIntake() {
   const purpose = field('Purpose of this use');
   const authority = field('Your account authority basis');
   const validUntil = field('Authority valid until', 'datetime-local');
+  // The rights the processing this admission starts needs, as the server offers them. Each is its
+  // own decision, unticked, and none is implied by authorizing the admission itself.
+  const processingRights = buildModelRightGrants('Models that may process these photos');
+  group.append(processingRights.root);
   const detect = button('Authorize personal admission and request detection');
   const retry = button('Retry exact interrupted admission');
   retry.hidden = true;
@@ -148,16 +153,15 @@ export function buildPersonalIntake() {
   const attestation = field(HUMAN_ATTESTATION, 'checkbox');
   // A second, separate decision. Unticked, and never implied by the review above: a person who
   // said "I looked at this photograph and these are the people in it" has said nothing about
-  // whether a depth network may read the same pixels.
-  const depthConsent = field('Estimate 3D shape from these photos', 'checkbox');
-  const depthTerm = el('p', { class: 'depth-consent-term' });
-  group.append(el('p', { class: 'depth-consent-notice', text: DEPTH_MODEL_NOTICE }), depthTerm);
+  // whether a model may read the same pixels.
+  const reviewRights = buildModelRightGrants('Models that may use the reviewed photos');
+  group.append(reviewRights.root);
   const complete = button('Record human review');
   workflow.append(controls);
   root.append(collection, status, workflow);
   return { root, controls, status, files, upload, inventory, members, purpose, authority, validUntil, detect,
     retry, retryReview, receipts, progress, reload, source, review, linkedSubject, selection, link,
-    reviewChoice, reviewer, attestation, depthConsent, depthTerm, complete, attachedReferences, referenceCount,
+    reviewChoice, reviewer, attestation, processingRights, reviewRights, complete, attachedReferences, referenceCount,
     attachmentStatus, worldAction, retryAttachment, originals, workflow, referenceNotice,
     ready, readyReferences, previous, previousReferences, retryMembership };
 }

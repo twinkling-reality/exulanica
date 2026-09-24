@@ -11,6 +11,13 @@ Model rights granted by an admission are kept the same way, as identities. A rep
 reports whether each one is current now, as it reports whether each screening is eligible now,
 and neither answer is a permission: a model read asks
 :func:`~exulanica.ingest.model_rights.require_model_right` itself.
+
+The status read also states every right a person may grant, with the exact words each is granted
+against (:func:`~exulanica.ingest.personal_admission.model_right_offers`), so the app shows the
+server's words rather than a copy of them, and says of each right already given whether it was
+granted against the words stated now. That answer is a disclosure, not a term: a right granted
+against other words, or none, keeps the terms on its own row until its term or authority ends or
+the person stops it.
 """
 
 from __future__ import annotations
@@ -25,6 +32,7 @@ from psycopg.types.json import Jsonb
 from exulanica.canonical import sha256_of_canonical
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest.model_rights import model_rights_for_capture
+from exulanica.ingest.personal_admission import model_right_offers
 from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.ingest.repository import IngestRepository
 
@@ -198,10 +206,35 @@ def personal_request(
         return receipt_response(connection, workspace, request_id, refs)
 
 
+def _granted_notices(
+    connection: psycopg.Connection, workspace: uuid.UUID, authorizations: Sequence[uuid.UUID]
+) -> dict[tuple[uuid.UUID, str], str | None]:
+    """The words each right was granted against, as its authority receipt fixed them, by role.
+
+    An admission records ``{role, valid_until, notice}`` for every right it grants inside the
+    authority scope the screening receipt hashes; a right granted another way records nothing
+    there, and reads as granted against no words.
+    """
+    if not authorizations:
+        return {}
+    notices: dict[tuple[uuid.UUID, str], str | None] = {}
+    for row in connection.execute(
+        "select authorization_id,authorization_scope->'model_rights' as rights "
+        "from capture_reconstruction_authorization where workspace_id=%s "
+        "and authorization_id=any(%s)",
+        (workspace, list(authorizations)),
+    ).fetchall():
+        for entry in row["rights"] or []:
+            notices[(row["authorization_id"], entry.get("role"))] = entry.get("notice")
+    return notices
+
+
 def admission_status(
     connection: psycopg.Connection, workspace: uuid.UUID, actor: uuid.UUID
 ) -> dict[str, Any]:
     """Current source metadata and this actor's operation identities, never original delivery."""
+    offers = model_right_offers()
+    stated = {offer.role: offer.notice for offer in offers}
     with connection.transaction():
         connection.execute("select privacy_currency_lock(%s)", (workspace,))
         rows = connection.execute(
@@ -218,6 +251,22 @@ def admission_status(
             (actor, workspace),
         ).fetchall()
         repository = IngestRepository(connection, workspace)
+        granted = {
+            row["capture_id"]: [
+                (right, current)
+                for right, current in model_rights_for_capture(repository, row["capture_id"])
+                if right.granted_by == actor
+            ]
+            for row in rows
+        }
+        notices = _granted_notices(
+            connection,
+            workspace,
+            sorted(
+                {right.authorization_id for rights in granted.values() for right, _ in rights},
+                key=str,
+            ),
+        )
         sources = []
         for row in rows:
             authority = None
@@ -238,13 +287,17 @@ def admission_status(
                     "bytes": row["byte_size"],
                     "media_type": row["media_type"],
                     "authority": authority,
-                    # The rights this actor granted over the source, and whether each is current.
+                    # The rights this actor granted over the source, whether each is current, and
+                    # whether it was granted against the words stated for its role now.
                     "model_rights": [
-                        {**right.as_reference(), "state": "current" if current else "ended"}
-                        for right, current in model_rights_for_capture(
-                            repository, row["capture_id"]
-                        )
-                        if right.granted_by == actor
+                        {
+                            **right.as_reference(),
+                            "state": "current" if current else "ended",
+                            "notice_current": stated.get(right.identity.role) is not None
+                            and notices.get((right.authorization_id, right.identity.role))
+                            == stated[right.identity.role],
+                        }
+                        for right, current in granted[row["capture_id"]]
                     ],
                 }
             )
@@ -271,6 +324,7 @@ def admission_status(
         return {
             "sources": sources,
             "requests": requests,
+            "model_right_offers": [offer.as_record() for offer in offers],
             "notice": "Receipt identities are history, not current consent "
             "or original-byte delivery permission.",
         }

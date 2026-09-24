@@ -16864,7 +16864,7 @@
      "valid_until"
     ],
     "title": "ModelRightRequest",
-    "description": "A role whose models may process every photograph in the batch, until ``valid_until``.\n\nA role, never an identifier: the server resolves it against the manifest and records a right\nfor each exact model the role can reach, which the response names.\n\n``notice`` is the wording the account holder was shown before granting it. A role listed in\n:data:`ROLE_NOTICE` carries its exact text and nothing else; a role that is not listed carries\nnone. Both halves matter. Without the first, a client could grant the depth role while showing\na person any sentence it liked, or none; without the second, a client could attach a sentence\nof its own invention to a role whose wording the server has never approved, and the stored\nreceipt would say the person read it."
+    "description": "A role whose models may process every photograph in the batch, until ``valid_until``.\n\nA role, never an identifier: the server resolves it against the manifest and records a right\nfor each exact model the role can reach, which the response names.\n\n``notice`` is the wording the account holder was shown before granting it. A role\n:func:`role_notices` states words for carries exactly those words and nothing else; a role it\nstates none for carries none. Both halves matter. Without the first, a client could grant a\nrole while showing a person any sentence it liked, or none; without the second, a client could\nattach a sentence of its own invention to a role whose wording the server has never stated,\nand the stored receipt would say the person read it."
    },
    "MoveObjectBody": {
     "properties": {

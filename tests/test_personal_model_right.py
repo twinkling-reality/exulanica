@@ -45,7 +45,7 @@ from exulanica.ingest.model_rights import (
     withdraw_model_right,
 )
 from exulanica.ingest.person_detectors import RecordedObservationDetector
-from exulanica.ingest.personal_admission import role_handoff
+from exulanica.ingest.personal_admission import role_handoff, role_notices
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.privacy import (
     authorize_benchmark_capture,
@@ -1231,7 +1231,13 @@ def test_a_directly_built_pipeline_gates_its_person_detector(personal):
 
 
 def _vision_rights(body):
-    return [{"role": "vision", "valid_until": body["authority"]["valid_until"]}]
+    return [
+        {
+            "role": "vision",
+            "valid_until": body["authority"]["valid_until"],
+            "notice": role_notices()["vision"],
+        }
+    ]
 
 
 def test_an_admission_that_names_no_model_sends_nothing(upload):

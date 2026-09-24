@@ -28,7 +28,7 @@ from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest import derivative_queue
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.model_rights import ModelHandoff, grant_model_right
-from exulanica.ingest.personal_admission import role_handoff
+from exulanica.ingest.personal_admission import role_handoff, role_notices
 from exulanica.ingest.worker import DerivativeWorker
 from exulanica.models.manifest import Role
 from exulanica.models.transport import HttpResponse
@@ -179,7 +179,10 @@ def _worker(upload, embedding_pass) -> DerivativeWorker:
 def _admitted(upload, roles: list[str], count: int = 1) -> dict:
     body = batch(upload, count=count)
     until = body["authority"]["valid_until"]
-    body["model_rights"] = [{"role": role, "valid_until": until} for role in roles]
+    notices = role_notices()
+    body["model_rights"] = [
+        {"role": role, "valid_until": until, "notice": notices[role]} for role in roles
+    ]
     response = post(upload, "/personal-admission", body)
     assert response.status_code == 202, response.text
     provision_workspace(upload.repository.connection, upload.workspace_id)

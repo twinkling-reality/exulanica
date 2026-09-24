@@ -20,27 +20,15 @@ export interface PersonalAuthority {
 export const HUMAN_ATTESTATION = 'I personally inspected every exact photograph in this inventory and reviewed all people '
   + 'and sensitive person regions, including any missed by the detector.';
 /**
- * What a person reads before letting the depth model estimate shape from their photographs.
- *
- * Sent back verbatim with the right and compared for exact equality by the server, which holds
- * the same sentences. The browser is not the authority on what somebody was told; sending the
- * displayed text back is how the server can refuse a client that showed something else.
+ * The role whose estimates can be placed in a world. The placed-estimate inspector stops this role
+ * for its photo; every word it is shown with still comes from the server's offer for it.
  */
-export const DEPTH_MODEL_NOTICE = "Exulanica's depth model (MoGe-2, a fixed version) will estimate the 3D shape of what each "
-  + "selected photo shows. It runs inside Exulanica's own processing; the photo is not sent to "
-  + 'an outside AI service for this step. People you chose to hide are hidden before the model '
-  + 'sees the photo. The result is an estimate from one photo: sizes and distances are '
-  + 'approximate, and it shows only what the camera saw. It appears in a world only where you '
-  + 'place it. You can stop this at any time: no new estimates are made and existing estimates '
-  + 'stop being shown in your worlds.';
-/** Shown before a stop is sent. A stop is final: the right is never restored, only granted again. */
-export const STOP_DEPTH_ESTIMATES = 'Stop 3D estimates for this photo? Your photo, review and worlds stay. '
-  + 'Estimates made from it stop showing, and none are made again unless you review it again and allow it.';
 export const DEPTH_ROLE = 'depth';
 export interface ModelRightRequest {
   readonly role: string;
   readonly valid_until: string;
-  readonly notice?: string;
+  /** The offer's notice, exactly as the server stated it. The server refuses any other text. */
+  readonly notice: string;
 }
 export interface ModelRightState {
   readonly right_id: string;
@@ -52,6 +40,26 @@ export interface ModelRightState {
   readonly valid_until: string;
   readonly withdrawn: boolean;
   readonly state?: 'current' | 'ended';
+  /** Whether it was granted against the words the server states for its role now. */
+  readonly notice_current?: boolean;
+}
+/**
+ * One model right a person may give, with every word the app shows for it, as the server states
+ * them in `GET /personal-admission`. The browser keeps no copy of any of these words.
+ */
+export interface ModelRightOffer {
+  readonly role: string;
+  /** The admission that carries the grant: detection starts processing, review permits depth. */
+  readonly offered_with: 'detect' | 'review';
+  readonly label: string;
+  readonly short: string;
+  /** Shown in full before the tick, and sent back unchanged with the grant. */
+  readonly notice: string;
+  readonly stop: string;
+  readonly stop_action: string;
+  readonly stop_confirm: string;
+  readonly destination: string;
+  readonly models: readonly ModelRightState['model'][];
 }
 export interface PersonalAdmission {
   readonly request_id?: string;
@@ -150,6 +158,8 @@ export interface PersonalStatus {
     readonly model_rights?: readonly ModelRightState[];
   })[];
   readonly requests: readonly (Partial<AdmissionResult> & { readonly request_id: string; readonly operation: string })[];
+  /** Every right a person may give, depth first. Absent from a server that offers none. */
+  readonly model_right_offers?: unknown;
 }
 interface PendingRequest { path: string; body: Record<string, unknown>; request_id: string }
 /** One recoverable browser write at a time, backed by the server's atomic receipt boundary. */
