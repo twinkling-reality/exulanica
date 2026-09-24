@@ -1059,7 +1059,7 @@
      "sequence": 4,
      "stage": {
       "key": "rendition",
-      "version": 2
+      "version": 3
      },
      "started_at": "<time:19>",
      "trigger": "ingest",
@@ -1090,7 +1090,7 @@
      "sequence": 8,
      "stage": {
       "key": "rendition",
-      "version": 2
+      "version": 3
      },
      "started_at": "<time:22>",
      "trigger": "ingest",
@@ -1395,7 +1395,7 @@
      "sequence": 2,
      "stage": {
       "key": "rendition",
-      "version": 2
+      "version": 3
      },
      "started_at": "<time:19>",
      "trigger": "ingest",
@@ -1424,7 +1424,7 @@
      "sequence": 6,
      "stage": {
       "key": "rendition",
-      "version": 2
+      "version": 3
      },
      "started_at": "<time:22>",
      "trigger": "ingest",
@@ -1662,7 +1662,7 @@
      "sequence": 3,
      "stage": {
       "key": "rendition",
-      "version": 2
+      "version": 3
      },
      "started_at": null,
      "trigger": "ingest",
@@ -1691,7 +1691,7 @@
      "sequence": 7,
      "stage": {
       "key": "rendition",
-      "version": 2
+      "version": 3
      },
      "started_at": null,
      "trigger": "ingest",
@@ -1850,7 +1850,7 @@
      "models_tried": null,
      "occurred_at": "<time:50>",
      "output_artifact_ids": [],
-     "params_sha256": "9df92c99063a923e",
+     "params_sha256": "7a2a13a42649d0dd",
      "parent_event_id": null,
      "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
      "run_status": "succeeded",
@@ -1877,7 +1877,7 @@
      "models_tried": null,
      "occurred_at": "<time:51>",
      "output_artifact_ids": [],
-     "params_sha256": "baf16c0dd54b3b5f",
+     "params_sha256": "93dde45d3225b6d7",
      "parent_event_id": null,
      "run_id": "urn:exulanica:wmp:pipeline-run:<urn:40>",
      "run_status": "succeeded",
@@ -1904,7 +1904,7 @@
      "models_tried": null,
      "occurred_at": "<time:52>",
      "output_artifact_ids": [],
-     "params_sha256": "baf16c0dd54b3b5f",
+     "params_sha256": "93dde45d3225b6d7",
      "parent_event_id": null,
      "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
      "run_status": "succeeded",
@@ -1931,7 +1931,7 @@
      "models_tried": null,
      "occurred_at": "<time:53>",
      "output_artifact_ids": [],
-     "params_sha256": "baf16c0dd54b3b5f",
+     "params_sha256": "93dde45d3225b6d7",
      "parent_event_id": null,
      "run_id": "urn:exulanica:wmp:pipeline-run:<urn:46>",
      "run_status": "succeeded",
@@ -2092,7 +2092,7 @@
      "scene": null,
      "stage": {
       "key": "rendition",
-      "version": 2
+      "version": 3
      },
      "state": "available-by-authorized-digest-resolver",
      "superseded_by": null
@@ -2108,7 +2108,7 @@
      "scene": null,
      "stage": {
       "key": "rendition",
-      "version": 2
+      "version": 3
      },
      "state": "available-by-authorized-digest-resolver",
      "superseded_by": null
