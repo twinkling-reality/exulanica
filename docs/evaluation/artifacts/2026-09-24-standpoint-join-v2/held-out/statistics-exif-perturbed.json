@@ -1,0 +1,159 @@
+{
+ "arm": "exif-perturbed",
+ "policy_sha256": "8c3aecf64cbfe38e9cb90e84e4ac07142bced454516621b65b7d9f8c4875d791",
+ "stage_version": 2,
+ "statistics": {
+  "outcomes_by_class": {
+   "changed": {
+    "scene_changed": 16,
+    "joined": 1,
+    "insufficient_overlap": 5
+   },
+   "joinable": {
+    "joined": 89,
+    "insufficient_overlap": 41,
+    "scene_changed": 3
+   },
+   "moved": {
+    "insufficient_overlap": 17,
+    "moved_between_photographs": 12
+   },
+   "no_overlap": {
+    "insufficient_overlap": 72,
+    "joined": 2
+   }
+  },
+  "misnamed": [
+   {
+    "set": "held2-courtyard-121-c1",
+    "a": 1,
+    "b": 2,
+    "class": "changed",
+    "outcome": "joined"
+   },
+   {
+    "set": "held2-room-221-m1",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "outcome": "scene_changed"
+   },
+   {
+    "set": "held2-room-222-s2",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "outcome": "scene_changed"
+   },
+   {
+    "set": "held2-room-222-c2",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "outcome": "scene_changed"
+   }
+  ],
+  "moved_named_changed": 0,
+  "changed_named_moved": 0,
+  "pairs_in_one_arrangement": 109,
+  "excess_misregistration_deg": {
+   "p50": 0.0368,
+   "p95": 0.462,
+   "max": 0.9848
+  },
+  "worst_pairs": [
+   {
+    "set": "held2-courtyard-122-s2",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.9848
+   },
+   {
+    "set": "held2-room-222-g1",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.7686
+   },
+   {
+    "set": "held2-room-222-m1",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.5736
+   },
+   {
+    "set": "held2-room-222-g1",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.5384
+   },
+   {
+    "set": "held2-room-221-m1",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.4924
+   }
+  ],
+  "seam_depth_p50_by_pair": {
+   "n": 109,
+   "median": 0.0333,
+   "p90": 0.213,
+   "max": 0.4906
+  },
+  "up_error_deg": {
+   "n": 45,
+   "p50": 0.1949,
+   "p95": 0.6396,
+   "max": 1.0118
+  },
+  "up_methods": {
+   "vertical-edges": 45
+  },
+  "moved_in_one_arrangement": 0,
+  "moved_named": [
+   9,
+   20
+  ],
+  "changed_in_one_arrangement": 1,
+  "changed_named": [
+   7,
+   9
+  ],
+  "joinable_refused_as_moved": [
+   0,
+   133
+  ],
+  "joinable_refused_as_changed": [
+   3,
+   133
+  ],
+  "joinable_in_one_arrangement": [
+   67,
+   82
+  ]
+ },
+ "judged": {
+  "verdicts": {
+   "moved_never_joined": true,
+   "changed_never_joined": false,
+   "moved_never_named_changed": true,
+   "changed_never_named_moved": true,
+   "joinable_named_moved": true,
+   "joinable_named_changed": false,
+   "moved_named": true,
+   "changed_named": true,
+   "lines_up_p95": false,
+   "lines_up_max": true,
+   "up_p50": true,
+   "up_p95": true,
+   "joins": true,
+   "seam_depth_median": true,
+   "seam_depth_p90": true
+  },
+  "passed": false
+ }
+}

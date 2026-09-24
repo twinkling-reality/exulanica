@@ -1,0 +1,73 @@
+"""Read-only diagnosis of a held-out pair (after the one measurement): which v2 step refuses it."""
+from __future__ import annotations
+
+import json
+import math
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).parent))
+from k3lib import DATA, LANE, inputs_for, load_camera, set_photo_ids, truth_of  # noqa: E402
+
+from exulanica.reconstruction import standpoint as sp
+from exulanica.reconstruction.standpoint_features import PycolmapSift
+
+POLICY = sp.StandpointPolicy.from_params(json.loads((LANE / "v2-params-f.json").read_text()))
+
+
+def main(arm, *specs):
+    for spec in specs:
+        set_id, a, b = spec.split(":")
+        a, b = int(a), int(b)
+        scene = next(p for p in (DATA / "held2").iterdir() if set_id.startswith(p.name + "-"))
+        truth = truth_of(scene)
+        ids = set_photo_ids(truth, set_id)
+        cams = [load_camera(scene, truth, pid) for pid in ids]
+        ex = PycolmapSift(max_features=POLICY.max_features, peak_threshold=POLICY.peak_threshold, threads=POLICY.feature_threads)
+        inputs = inputs_for(scene, truth, set_id, arm)
+        members = {i.ordinal: sp._prepare(i, POLICY, ex) for i in inputs}
+        readable = sorted(members)
+        everyone = [(x, y) for k, x in enumerate(readable) for y in readable[k + 1:]]
+        prov = {(x, y): sp._join_pair(members[x], members[y], POLICY, provisional=True) for x, y in everyone}
+        focals = sp._refine_focals(members, prov, POLICY)
+        members = {o: sp._with_focal(m, focals[o]) for o, m in members.items()}
+        A, B = members[a], members[b]
+        ia, ib = sp._match(A, B, POLICY.match_ratio)
+        target, source = A.bearings[ia], B.bearings[ib]
+        rot = sp._ransac(target, source, POLICY, (a, b))
+        window = sp._angles_deg(target, source @ rot.T) <= POLICY.candidate_window_deg
+        plain = sp._Motion(rot, np.zeros(3), np.full((3, 3), np.inf), 0.0)
+        inl = window
+        for _ in range(2):
+            plain = sp._fit_rotation_translation(A, B, ia[inl], ib[inl], plain.rotation, POLICY)
+            inl = window & (sp._angles_deg(target, plain.predict(B, ib)) <= POLICY.inlier_threshold_deg)
+        zoomed = sp._zoom_refinement(A, B, ia[inl], ib[inl], plain.rotation, POLICY)
+        turn = sp._turn_only(target[inl], source[inl], plain.rotation, POLICY)
+        ra = 1.0 / np.where(A.inverse_range[ia[inl]] > 0, A.inverse_range[ia[inl]], np.nan)
+        rb = 1.0 / np.where(B.inverse_range[ib[inl]] > 0, B.inverse_range[ib[inl]], np.nan)
+        carried = np.linalg.norm((zoomed.source(B, ib[inl]) * rb[:, None]) @ zoomed.rotation.T + zoomed.translation[None, :], axis=1)
+        ratios = ra / carried
+        ratio = float(np.exp(np.median(np.log(ratios[np.isfinite(ratios) & (ratios > 0)]))))
+        r_true = cams[a]["R"].T @ cams[b]["R"]
+
+        def rot_err(r):
+            return round(math.degrees(math.acos(max(-1.0, min(1.0, (float(np.trace(r.T @ r_true)) - 1) / 2)))), 3)
+
+        out = {
+            "focal_err_pct": [round(100 * (members[o].focal_source / cams[o]["focal"] - 1), 2) for o in (a, b)],
+            "zoom": round(math.exp(zoomed.zoom), 4),
+            "|t| plain": round(float(np.linalg.norm(plain.translation)) * ratio, 3),
+            "|t| zoomed": round(float(np.linalg.norm(zoomed.translation)) * ratio, 3),
+            "rot err plain": rot_err(plain.rotation), "rot err zoomed": rot_err(zoomed.rotation), "rot err turn": rot_err(turn),
+            "turn strict": round(sp._pair_changed(A, B, turn, np.zeros(3), ratio, POLICY, tolerant=False), 4),
+            "zoomed tolerant": round(sp._pair_changed(A, B, zoomed.rotation, zoomed.translation, ratio, POLICY, tolerant=True), 4),
+            "plain tolerant": round(sp._pair_changed(A, B, plain.rotation, plain.translation, ratio, POLICY, tolerant=True), 4),
+            "plain strict (v1)": round(sp._pair_changed(A, B, plain.rotation, plain.translation, ratio, POLICY, tolerant=False), 4),
+        }
+        print(arm, spec, out, flush=True)
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

@@ -1,0 +1,67 @@
+"""Version 1's parameters through the current join: every record must equal the bound runs' bytes.
+
+    python v1_parity.py <v1-params.json> <arm> [--only <prefix>]
+
+The bound v1 runs (docs/evaluation/artifacts/2026-09-23-standpoint-join/{development,held-out}/
+run-<arm>.json) carry each set's record sha256; this joins every set again, exactly as the v1
+evaluation did (standpoint_eval.evaluate_set's inputs), and compares.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from k3lib import DATA, inputs_for, truth_of  # noqa: E402
+
+from exulanica.canonical import sha256_of_canonical
+from exulanica.reconstruction.standpoint import StandpointPolicy, join_standpoint
+from exulanica.reconstruction.standpoint_features import PycolmapSift
+
+NAMESPACE = uuid.UUID("5c0f3a7e-2d1b-4b8e-9a3c-7d5e1f0b2a64")
+WORKTREE = Path(__file__).resolve().parents[4]
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("params", type=Path)
+    parser.add_argument("arm")
+    parser.add_argument("--only")
+    args = parser.parse_args()
+    params = json.loads(args.params.read_text())
+    policy = StandpointPolicy.from_params(params)
+    digest = sha256_of_canonical(params).hex()
+    extractor = PycolmapSift(max_features=policy.max_features, peak_threshold=policy.peak_threshold, threads=policy.feature_threads)
+    bound = {}
+    for split in ("development", "held-out"):
+        run = json.loads((WORKTREE / "docs/evaluation/artifacts/2026-09-23-standpoint-join" / split / f"run-{args.arm}.json").read_text())
+        assert run["policy_sha256"] == digest, (run["policy_sha256"], digest)
+        for s in run["sets"]:
+            bound[s["set"]] = s["record_sha256"]
+    same = differ = 0
+    for split in ("dev", "held"):
+        for scene in sorted(p for p in (DATA / split).iterdir() if (p / "truth.json").exists()):
+            truth = truth_of(scene)
+            for set_entry in truth["sets"]:
+                if args.only and not set_entry["id"].startswith(args.only):
+                    continue
+                inputs = inputs_for(scene, truth, set_entry["id"], args.arm)
+                record = join_standpoint(
+                    scene_ref=str(uuid.uuid5(NAMESPACE, f"set:{set_entry['id']}")),
+                    inputs=inputs, policy=policy, policy_sha256=digest, stage_version=1, extractor=extractor,
+                )
+                got = hashlib.sha256(record.to_bytes()).hexdigest()
+                if got == bound[set_entry["id"]]:
+                    same += 1
+                else:
+                    differ += 1
+                    print("DIFFERS", set_entry["id"], got, bound[set_entry["id"]], flush=True)
+    print(f"{args.arm}: {same} identical, {differ} differ")
+
+
+if __name__ == "__main__":
+    main()

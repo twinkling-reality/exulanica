@@ -1,0 +1,188 @@
+{
+ "arm": "exif-perturbed",
+ "policy_sha256": "a7a582c038d6408f4fd76cb791e551fdeb4925332e32bb68f64d2f331993bc06",
+ "stage_version": 1,
+ "statistics": {
+  "outcomes_by_class": {
+   "changed": {
+    "scene_changed": 16,
+    "joined": 1,
+    "insufficient_overlap": 5
+   },
+   "joinable": {
+    "joined": 91,
+    "insufficient_overlap": 39,
+    "scene_changed": 3
+   },
+   "moved": {
+    "scene_changed": 4,
+    "moved_between_photographs": 14,
+    "insufficient_overlap": 11
+   },
+   "no_overlap": {
+    "insufficient_overlap": 72,
+    "joined": 2
+   }
+  },
+  "misnamed": [
+   {
+    "set": "held2-courtyard-121-mv",
+    "a": 0,
+    "b": 1,
+    "class": "moved",
+    "outcome": "scene_changed"
+   },
+   {
+    "set": "held2-courtyard-121-c1",
+    "a": 1,
+    "b": 2,
+    "class": "changed",
+    "outcome": "joined"
+   },
+   {
+    "set": "held2-courtyard-121-mv2",
+    "a": 0,
+    "b": 1,
+    "class": "moved",
+    "outcome": "scene_changed"
+   },
+   {
+    "set": "held2-courtyard-122-s1",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "outcome": "scene_changed"
+   },
+   {
+    "set": "held2-courtyard-122-s2",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "outcome": "scene_changed"
+   },
+   {
+    "set": "held2-courtyard-122-c1",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "outcome": "scene_changed"
+   },
+   {
+    "set": "held2-landscape-322-mv",
+    "a": 1,
+    "b": 2,
+    "class": "moved",
+    "outcome": "scene_changed"
+   },
+   {
+    "set": "held2-landscape-322-mv2",
+    "a": 1,
+    "b": 2,
+    "class": "moved",
+    "outcome": "scene_changed"
+   }
+  ],
+  "moved_named_changed": 4,
+  "changed_named_moved": 0,
+  "pairs_in_one_arrangement": 110,
+  "excess_misregistration_deg": {
+   "p50": 0.0395,
+   "p95": 0.4304,
+   "max": 0.9858
+  },
+  "worst_pairs": [
+   {
+    "set": "held2-room-222-c2",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.9858
+   },
+   {
+    "set": "held2-room-222-g1",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.7686
+   },
+   {
+    "set": "held2-room-222-m1",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.5736
+   },
+   {
+    "set": "held2-room-222-g1",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.5384
+   },
+   {
+    "set": "held2-room-221-g1",
+    "a": 2,
+    "b": 3,
+    "class": "joinable",
+    "excess_deg": 0.4769
+   }
+  ],
+  "seam_depth_p50_by_pair": {
+   "n": 110,
+   "median": 0.0309,
+   "p90": 0.2124,
+   "max": 0.4902
+  },
+  "up_error_deg": {
+   "n": 45,
+   "p50": 1.4954,
+   "p95": 3.5046,
+   "max": 3.9481
+  },
+  "up_methods": {
+   "camera-horizontal-axes": 45
+  },
+  "moved_in_one_arrangement": 0,
+  "moved_named": [
+   9,
+   20
+  ],
+  "changed_in_one_arrangement": 1,
+  "changed_named": [
+   7,
+   9
+  ],
+  "joinable_refused_as_moved": [
+   0,
+   133
+  ],
+  "joinable_refused_as_changed": [
+   3,
+   133
+  ],
+  "joinable_in_one_arrangement": [
+   68,
+   82
+  ]
+ },
+ "judged": {
+  "verdicts": {
+   "moved_never_joined": true,
+   "changed_never_joined": false,
+   "moved_never_named_changed": false,
+   "changed_never_named_moved": true,
+   "joinable_named_moved": true,
+   "joinable_named_changed": false,
+   "moved_named": true,
+   "changed_named": true,
+   "lines_up_p95": false,
+   "lines_up_max": true,
+   "up_p50": false,
+   "up_p95": false,
+   "joins": true,
+   "seam_depth_median": true,
+   "seam_depth_p90": true
+  },
+  "passed": false
+ }
+}

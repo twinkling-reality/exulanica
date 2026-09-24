@@ -165,7 +165,8 @@ how such photographs were turned relative to one another and writes one `standpo
 in place of an unmeasured arrangement. It runs from the scene worker's refresh pass
 (`--standpoints-refresh-seconds`) or on demand with
 `python -m exulanica.ingest.standpoint_scenes --workspace <uuid> [--scene <uuid>]`, where pycolmap is
-installed. It never touches a scene whose pose recovery placed a member.
+installed; it needs pycolmap and numpy only, which the scene worker's image carries. It never touches
+a scene whose pose recovery placed a member.
 
 - **Method.** COLMAP SIFT features per photograph, a rotation-only fit per pair through each
   photograph's EXIF 35 mm equivalent focal length, a global rotation solve over the set, the focal
@@ -206,6 +207,21 @@ percent at the 90th percentile). 4 and 5 of 129 joinable pairs were refused as c
 The arrangement's up direction was not gated and leans by 1.4 degrees at the median and up to 4.0
 degrees. Records: `docs/evaluation/2026-09-23-standpoint-join-preregistration.json` and
 `docs/evaluation/2026-09-23-standpoint-join-outcome.json`.
+
+MEASURED for version 2 on a second held-out split of 72 synthetic sets and 228 photographs, in the
+same two arms: the pre-registered gates failed in both arms. The join carries version 2's paths (up
+from vertical edges, a zoom in the pair fit, a cause named only where it is measured), selected by
+its parameters, and the stage registers version 1 because version 2 failed. The arrangement stood within 0.19
+degrees of true up at the median and 0.66 degrees at the 95th percentile, 1.01 at worst (version 1
+on the same split: 1.50, 3.48 and 4.02), and no moved pair was joined or named changed (version 1
+named 3 and 4 moved pairs changed). One changed pair was joined, as version 1 joins it: an object
+covering 1.2 percent of the pair's shared view, under the 2 percent the comparison refuses. 2 and 3
+of 133 joinable pairs were refused as changed; each of the five was traced after the run to the
+change comparison, which applies the motion fitted with a zoom of the second lens while carrying
+that photograph through its unzoomed lens. With the lens off by up to 3 percent, joined photographs
+lined up within 0.46 degrees at the 95th percentile against the gate's 0.41 (version 1 on the same
+split: 0.43). Records: `docs/evaluation/2026-09-24-standpoint-join-v2-preregistration.json` and
+`docs/evaluation/2026-09-24-standpoint-join-v2-outcome.json`.
 
 ## 5. Recorded rung, displayed rung, and substrate
 

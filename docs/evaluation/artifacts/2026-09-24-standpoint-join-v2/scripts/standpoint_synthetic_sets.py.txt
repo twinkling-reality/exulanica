@@ -1,0 +1,945 @@
+"""Same-standpoint photograph sets with exact ground truth, rendered by Blender.
+
+    python standpoint_synthetic_sets.py plan <split> <out_dir>     # write every scene spec
+    python standpoint_synthetic_sets.py render <out_dir> [--only <scene>]   # run Blender
+    python standpoint_synthetic_sets.py finish <out_dir>           # JPEG + EXIF, ground truth
+
+A split is a list of scenes; a scene is one procedural place (a family and a seed) and the
+cameras of every set taken in it. A set is what a person would hand the product: photographs
+from one standpoint (or, for a refusal condition, photographs that are NOT from one standpoint,
+share too little, or show a scene that changed). Every random choice is made here from the
+split's seed and written into the spec, so the spec is the ground truth and Blender makes no
+choice of its own.
+
+Units are metres and degrees. Blender's world is Z up; the ground truth this script writes is in
+the OPM convention the product uses everywhere else: Y up, a camera looking down its own -Z.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+#: The Blender 4.5.9 binary, located by STANDPOINT_BLENDER on the machine that renders and checked
+#: against the repository's pin for it (assets/characters/makehuman-parametric-v1/source-lock.json).
+BLENDER = Path(os.environ.get("STANDPOINT_BLENDER", ""))
+BLENDER_SHA256 = "3d297c91a96ef848bdb987da48cad2b4591ffa51f4f3591b231ce075b1c8af48"
+SCENE_SCRIPT = Path(__file__).with_name("standpoint_blender_scene.py")
+
+#: Rendered size of a landscape photograph; a portrait one swaps them. 4:3 is a phone's shape.
+LONG_EDGE = 1024
+SHORT_EDGE = 768
+#: Cycles samples before denoising, and CPU threads for one render.
+SAMPLES = 32
+THREADS = 10
+#: Eye height range of a standing person, metres.
+EYE_HEIGHT = (1.52, 1.72)
+
+#: 35 mm equivalent focal lengths of the phone lenses a set may use. The field of view is derived
+#: from the equivalent focal over the 43.27 mm full-frame diagonal, exactly as EXIF defines it.
+LENSES_MM = {"1x": 26.0, "2x": 52.0, "5x": 120.0, "0.5x": 13.0}
+FULL_FRAME_DIAGONAL_MM = math.hypot(36.0, 24.0)
+
+
+def fov_y_deg(lens: str, width: int, height: int) -> float:
+    half_diagonal = (FULL_FRAME_DIAGONAL_MM / 2) / LENSES_MM[lens]
+    diagonal_px = math.hypot(width, height)
+    return math.degrees(2 * math.atan(half_diagonal * height / diagonal_px))
+
+
+def fov_x_deg(lens: str, width: int, height: int) -> float:
+    half_diagonal = (FULL_FRAME_DIAGONAL_MM / 2) / LENSES_MM[lens]
+    diagonal_px = math.hypot(width, height)
+    return math.degrees(2 * math.atan(half_diagonal * width / diagonal_px))
+
+
+# -- materials, in metres ------------------------------------------------------------------------
+
+
+def _jitter(rng: np.random.Generator, color: tuple[float, float, float], amount: float) -> list:
+    return [float(np.clip(c * (1 + rng.uniform(-amount, amount)), 0.0, 1.0)) for c in color]
+
+
+def brick(rng):
+    base = [(0.45, 0.18, 0.10), (0.55, 0.35, 0.18), (0.40, 0.36, 0.32), (0.62, 0.52, 0.34)][
+        int(rng.integers(0, 4))
+    ]
+    return {
+        "kind": "brick",
+        "scale": 1.0,
+        "seed": int(rng.integers(0, 1000)),
+        "color": _jitter(rng, base, 0.15),
+        "color2": _jitter(rng, base, 0.35),
+        "mortar": _jitter(rng, (0.62, 0.60, 0.56), 0.1),
+        "mortar_size": 0.008,
+        "brick_width": float(rng.uniform(0.21, 0.30)),
+        "row_height": float(rng.uniform(0.065, 0.09)),
+        "brick_scale": 1.0,
+    }
+
+
+def paving(rng):
+    base = [(0.42, 0.41, 0.38), (0.50, 0.46, 0.40), (0.35, 0.34, 0.33)][int(rng.integers(0, 3))]
+    return {
+        "kind": "brick",
+        "scale": 1.0,
+        "seed": int(rng.integers(0, 1000)),
+        "color": _jitter(rng, base, 0.1),
+        "color2": _jitter(rng, base, 0.3),
+        "mortar": _jitter(rng, (0.25, 0.25, 0.24), 0.1),
+        "mortar_size": 0.01,
+        "brick_width": float(rng.uniform(0.35, 0.7)),
+        "row_height": float(rng.uniform(0.2, 0.4)),
+        "brick_scale": 1.0,
+    }
+
+
+def noisy(rng, colors, noise_scale, *, detail=10.0, voronoi=False, voronoi_scale=10.0, bump=0.2):
+    return {
+        "kind": "noise",
+        "scale": 1.0,
+        "seed": int(rng.integers(0, 1000)),
+        "colors": [_jitter(rng, color, 0.12) for color in colors],
+        "noise_scale": float(noise_scale),
+        "detail": float(detail),
+        "voronoi": bool(voronoi),
+        "voronoi_scale": float(voronoi_scale),
+        "bump": float(bump),
+    }
+
+
+def plaster(rng):
+    pairs = [
+        ((0.85, 0.80, 0.68), (0.72, 0.66, 0.55)),
+        ((0.80, 0.62, 0.45), (0.65, 0.48, 0.34)),
+        ((0.78, 0.78, 0.74), (0.60, 0.61, 0.58)),
+        ((0.70, 0.45, 0.35), (0.55, 0.33, 0.25)),
+        ((0.62, 0.70, 0.72), (0.45, 0.52, 0.55)),
+    ]
+    pair = pairs[int(rng.integers(0, len(pairs)))]
+    return noisy(rng, pair, rng.uniform(1.0, 3.0), detail=14.0, bump=0.12)
+
+
+def wood(rng):
+    base = [(0.45, 0.28, 0.14), (0.60, 0.42, 0.24), (0.32, 0.20, 0.12)][int(rng.integers(0, 3))]
+    return {
+        "kind": "wood",
+        "scale": 1.0,
+        "seed": int(rng.integers(0, 1000)),
+        "colors": [_jitter(rng, base, 0.1), _jitter(rng, base, 0.35)],
+        "wave_scale": float(rng.uniform(2.0, 4.0)),
+    }
+
+
+def foliage(rng):
+    return noisy(
+        rng,
+        [(0.10, 0.22, 0.06), (0.22, 0.35, 0.10), (0.35, 0.40, 0.12)],
+        rng.uniform(2.0, 5.0),
+        voronoi=True,
+        voronoi_scale=rng.uniform(6.0, 12.0),
+        bump=0.5,
+    )
+
+
+def grass(rng):
+    return noisy(
+        rng,
+        [(0.20, 0.30, 0.08), (0.32, 0.36, 0.14), (0.40, 0.34, 0.20)],
+        rng.uniform(0.3, 1.2),
+        detail=15.0,
+        voronoi=True,
+        voronoi_scale=rng.uniform(3.0, 8.0),
+        bump=0.3,
+    )
+
+
+def rock(rng):
+    return noisy(
+        rng,
+        [(0.30, 0.29, 0.27), (0.48, 0.45, 0.40), (0.22, 0.20, 0.19)],
+        rng.uniform(1.5, 4.0),
+        detail=14.0,
+        voronoi=True,
+        voronoi_scale=rng.uniform(2.0, 5.0),
+        bump=0.6,
+    )
+
+
+def fabric(rng):
+    base = [(0.25, 0.30, 0.45), (0.50, 0.20, 0.18), (0.30, 0.42, 0.30), (0.55, 0.50, 0.40)][
+        int(rng.integers(0, 4))
+    ]
+    return noisy(rng, [base, _jitter(rng, base, 0.4)], rng.uniform(8.0, 20.0), bump=0.1)
+
+
+def art(rng):
+    colors = [
+        tuple(float(v) for v in rng.uniform(0.1, 0.9, size=3)) for _ in range(3)
+    ]
+    return noisy(rng, colors, rng.uniform(3.0, 9.0), voronoi=True, voronoi_scale=rng.uniform(4, 9))
+
+
+def flat(color):
+    return {"kind": "flat", "color": list(color)}
+
+
+def glass():
+    return {"kind": "glass", "color": [0.08, 0.10, 0.12]}
+
+
+# -- scene families ------------------------------------------------------------------------------
+
+
+@dataclass
+class Scene:
+    family: str
+    seed: int
+    objects: list[dict[str, Any]] = field(default_factory=list)
+    lights: list[dict[str, Any]] = field(default_factory=list)
+    sky: dict[str, Any] = field(default_factory=dict)
+    #: Where a person may stand: (x, y) centre in Blender metres and a radius.
+    open_area: tuple[float, float, float] = (0.0, 0.0, 1.0)
+    #: Ground height function, Blender z at (x, y).
+    ground: Any = None
+    #: Objects a changed-scene set may hide or move: id -> (centre xyz, size metres).
+    changeable: dict[str, tuple[tuple[float, float, float], float]] = field(default_factory=dict)
+
+    def add(self, item: dict[str, Any]) -> dict[str, Any]:
+        self.objects.append(item)
+        return item
+
+
+def _box(oid, size, location, material, rotation_z=0.0):
+    return {
+        "id": oid,
+        "shape": "box",
+        "size": [float(v) for v in size],
+        "location": [float(v) for v in location],
+        "rotation_deg": [0.0, 0.0, float(rotation_z)],
+        "material": material,
+    }
+
+
+def _rotate(x, y, angle_deg):
+    a = math.radians(angle_deg)
+    return (x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a))
+
+
+def _tree(scene: Scene, rng, oid, x, y, z0, scale=1.0):
+    height = rng.uniform(2.0, 4.0) * scale
+    radius = rng.uniform(0.12, 0.28) * scale
+    scene.add(
+        {
+            "id": f"{oid}-trunk",
+            "shape": "cylinder",
+            "radius": float(radius),
+            "height": float(height),
+            "location": [float(x), float(y), float(z0 + height / 2)],
+            "material": noisy(rng, [(0.25, 0.18, 0.12), (0.18, 0.13, 0.09)], 6.0, bump=0.6),
+        }
+    )
+    for k in range(int(rng.integers(2, 4))):
+        r = rng.uniform(1.0, 2.2) * scale
+        scene.add(
+            {
+                "id": f"{oid}-crown{k}",
+                "shape": "sphere",
+                "radius": float(r),
+                "squash": [1.0, 1.0, float(rng.uniform(0.7, 1.0))],
+                "location": [
+                    float(x + rng.uniform(-0.8, 0.8) * scale),
+                    float(y + rng.uniform(-0.8, 0.8) * scale),
+                    float(z0 + height + r * 0.6 + rng.uniform(-0.3, 0.6)),
+                ],
+                "material": foliage(rng),
+            }
+        )
+
+
+def courtyard(seed: int) -> Scene:
+    rng = np.random.default_rng([seed, 1])
+    scene = Scene("courtyard", seed)
+    scene.ground = lambda x, y: 0.0
+    scene.sky = {
+        "kind": "nishita",
+        "sun_elevation_deg": float(rng.uniform(18, 55)),
+        "sun_rotation_deg": float(rng.uniform(0, 360)),
+        "strength": 0.3,
+        "sun_energy": 3.5,
+    }
+    scene.add(
+        {
+            "id": "ground",
+            "shape": "plane",
+            "size": [600.0, 600.0],
+            "location": [0.0, 0.0, 0.0],
+            "material": paving(rng),
+        }
+    )
+    count = int(rng.integers(8, 13))
+    start = rng.uniform(0, 360)
+    for index in range(count):
+        angle = start + index * 360.0 / count + rng.uniform(-8, 8)
+        distance = rng.uniform(9.0, 30.0)
+        width = rng.uniform(8.0, 18.0)
+        depth = rng.uniform(8.0, 14.0)
+        height = rng.uniform(6.0, 22.0)
+        centre = (distance + depth / 2) * math.cos(math.radians(angle)), (
+            distance + depth / 2
+        ) * math.sin(math.radians(angle))
+        facing = angle + 90.0
+        facade = brick(rng) if rng.random() < 0.55 else plaster(rng)
+        scene.add(_box(f"building{index}", (width, depth, height), (*centre, height / 2), facade, facing))
+        trim = plaster(rng)
+        scene.add(
+            _box(
+                f"building{index}-cornice",
+                (width + 0.4, depth + 0.4, 0.45),
+                (*centre, height + 0.2),
+                trim,
+                facing,
+            )
+        )
+        floors = max(1, int(height // 3.2))
+        columns = max(1, int((width - 1.5) // 2.6))
+        for floor in range(floors):
+            for column in range(columns):
+                local_x = -width / 2 + 1.5 + column * 2.6 + 0.55
+                if local_x > width / 2 - 1.0:
+                    continue
+                if floor == 0 and column == columns // 2:
+                    local_z = 1.2
+                    size = (1.4, 0.08, 2.4)
+                    material = wood(rng)
+                else:
+                    local_z = floor * 3.2 + 1.2 + 0.75
+                    size = (1.1, 0.08, 1.5)
+                    material = glass()
+                ox, oy = _rotate(local_x, depth / 2 + 0.02, facing)
+                scene.add(
+                    _box(
+                        f"building{index}-w{floor}-{column}",
+                        size,
+                        (centre[0] + ox, centre[1] + oy, local_z),
+                        material,
+                        facing,
+                    )
+                )
+    for index in range(int(rng.integers(3, 7))):
+        angle = rng.uniform(0, 360)
+        distance = rng.uniform(4.5, 12.0)
+        x, y = distance * math.cos(math.radians(angle)), distance * math.sin(math.radians(angle))
+        _tree(scene, rng, f"tree{index}", x, y, 0.0)
+    kinds = ["bench", "crate", "planter", "bollards", "lamp", "fountain"]
+    for index in range(int(rng.integers(6, 11))):
+        kind = kinds[int(rng.integers(0, len(kinds)))]
+        angle = rng.uniform(0, 360)
+        distance = rng.uniform(2.6, 8.5)
+        x, y = distance * math.cos(math.radians(angle)), distance * math.sin(math.radians(angle))
+        facing = rng.uniform(0, 360)
+        oid = f"{kind}{index}"
+        if kind == "bench":
+            scene.add(_box(f"{oid}-seat", (1.8, 0.5, 0.08), (x, y, 0.45), wood(rng), facing))
+            bx, by = _rotate(0.0, -0.22, facing)
+            scene.add(_box(f"{oid}-back", (1.8, 0.06, 0.45), (x + bx, y + by, 0.75), wood(rng), facing))
+            for side in (-0.8, 0.8):
+                lx, ly = _rotate(side, 0.0, facing)
+                scene.add(_box(f"{oid}-leg{side}", (0.08, 0.45, 0.42), (x + lx, y + ly, 0.21), flat((0.1, 0.1, 0.1)), facing))
+            scene.changeable[f"{oid}-seat"] = ((x, y, 0.45), 1.8)
+        elif kind == "crate":
+            size = rng.uniform(0.6, 1.1)
+            scene.add(_box(oid, (size, size, size), (x, y, size / 2), wood(rng), facing))
+            scene.changeable[oid] = ((x, y, size / 2), size)
+        elif kind == "planter":
+            scene.add(_box(f"{oid}-box", (1.2, 1.2, 0.7), (x, y, 0.35), plaster(rng), facing))
+            scene.add({"id": f"{oid}-bush", "shape": "sphere", "radius": 0.7, "squash": [1, 1, 0.8], "location": [x, y, 1.1], "material": foliage(rng)})
+        elif kind == "bollards":
+            for k in range(4):
+                lx, ly = _rotate(k * 1.2 - 1.8, 0.0, facing)
+                scene.add({"id": f"{oid}-{k}", "shape": "cylinder", "radius": 0.1, "height": 0.9, "location": [x + lx, y + ly, 0.45], "material": flat((0.15, 0.15, 0.16))})
+        elif kind == "lamp":
+            scene.add({"id": f"{oid}-post", "shape": "cylinder", "radius": 0.07, "height": 3.8, "location": [x, y, 1.9], "material": flat((0.08, 0.09, 0.08))})
+            scene.add({"id": f"{oid}-head", "shape": "sphere", "radius": 0.25, "location": [x, y, 3.9], "material": flat((0.85, 0.85, 0.8))})
+        elif kind == "fountain":
+            scene.add({"id": f"{oid}-basin", "shape": "cylinder", "radius": 1.6, "height": 0.6, "location": [x, y, 0.3], "material": rock(rng)})
+            scene.add({"id": f"{oid}-column", "shape": "cylinder", "radius": 0.3, "height": 1.6, "location": [x, y, 0.8], "material": rock(rng)})
+            scene.changeable[f"{oid}-basin"] = ((x, y, 0.3), 3.2)
+    for index in range(int(rng.integers(3, 6))):
+        angle = rng.uniform(0, 360)
+        distance = rng.uniform(220.0, 480.0)
+        radius = rng.uniform(80.0, 190.0)
+        scene.add(
+            {
+                "id": f"hill{index}",
+                "shape": "sphere",
+                "radius": float(radius),
+                "squash": [1.0, 1.0, float(rng.uniform(0.35, 0.6))],
+                "location": [
+                    distance * math.cos(math.radians(angle)),
+                    distance * math.sin(math.radians(angle)),
+                    -radius * 0.25,
+                ],
+                "material": grass(rng),
+            }
+        )
+    scene.open_area = (0.0, 0.0, 1.2)
+    return scene
+
+
+def room(seed: int) -> Scene:
+    rng = np.random.default_rng([seed, 2])
+    scene = Scene("room", seed)
+    scene.ground = lambda x, y: 0.0
+    width = rng.uniform(6.0, 9.0)
+    depth = rng.uniform(5.0, 8.0)
+    height = rng.uniform(2.6, 3.2)
+    scene.sky = {"kind": "flat", "color": [0.9, 0.92, 1.0], "strength": 0.35}
+    scene.add(_box("floor", (width, depth, 0.1), (0, 0, -0.05), wood(rng)))
+    scene.add(_box("ceiling", (width, depth, 0.1), (0, 0, height + 0.05), plaster(rng)))
+    walls = plaster(rng)
+    accent = plaster(rng)
+    scene.add(_box("wall-n", (width, 0.2, height), (0, depth / 2 + 0.1, height / 2), walls))
+    scene.add(_box("wall-s", (width, 0.2, height), (0, -depth / 2 - 0.1, height / 2), accent))
+    scene.add(_box("wall-e", (0.2, depth, height), (width / 2 + 0.1, 0, height / 2), walls))
+    scene.add(_box("wall-w", (0.2, depth, height), (-width / 2 - 0.1, 0, height / 2), walls))
+    scene.add(_box("skirting-n", (width, 0.04, 0.12), (0, depth / 2 - 0.02, 0.06), flat((0.9, 0.9, 0.88))))
+    # Windows: bright panes with frames on the north and east walls.
+    for index, (x, y, w, facing) in enumerate(
+        [(rng.uniform(-width / 4, width / 4), depth / 2 - 0.01, rng.uniform(1.2, 2.0), 0.0),
+         (width / 2 - 0.01, rng.uniform(-depth / 4, depth / 4), rng.uniform(1.0, 1.6), 90.0)]
+    ):
+        scene.add({**_box(f"window{index}", (w, 0.02, 1.4), (x, y, 1.65), {"kind": "emission", "color": [0.8, 0.88, 1.0], "strength": 3.0}, facing)})
+        for k, (dx, dz, sw, sh) in enumerate([(0, 0.72, w + 0.1, 0.06), (0, -0.72, w + 0.1, 0.06), (-w / 2, 0, 0.06, 1.5), (w / 2, 0, 0.06, 1.5)]):
+            ox, oy = _rotate(dx, -0.02, facing)
+            scene.add(_box(f"window{index}-frame{k}", (sw, 0.06, sh), (x + ox, y + oy, 1.65 + dz), flat((0.92, 0.92, 0.9)), facing))
+    scene.lights = [
+        {"id": f"ceiling-light{k}", "location": [float(rng.uniform(-width / 3, width / 3)), float(rng.uniform(-depth / 3, depth / 3)), height - 0.05], "rotation_deg": [0, 0, 0], "energy": float(rng.uniform(250, 450)), "size": 1.2}
+        for k in range(int(rng.integers(2, 4)))
+    ]
+    # Table with things on it.
+    # Between the room's centre and its north wall, whatever the room's depth.
+    tx, ty = rng.uniform(-1.2, 1.2), rng.uniform(0.9, max(1.0, depth / 2 - 1.0))
+    scene.add(_box("table-top", (1.6, 0.9, 0.05), (tx, ty, 0.75), wood(rng)))
+    for k, (dx, dy) in enumerate([(-0.72, -0.38), (0.72, -0.38), (-0.72, 0.38), (0.72, 0.38)]):
+        scene.add(_box(f"table-leg{k}", (0.06, 0.06, 0.73), (tx + dx, ty + dy, 0.365), wood(rng)))
+    for k in range(int(rng.integers(3, 6))):
+        kind = int(rng.integers(0, 3))
+        px, py = tx + rng.uniform(-0.6, 0.6), ty + rng.uniform(-0.3, 0.3)
+        if kind == 0:
+            scene.add({"id": f"cup{k}", "shape": "cylinder", "radius": 0.045, "height": 0.1, "location": [px, py, 0.83], "material": flat(tuple(rng.uniform(0.2, 0.9, 3)))})
+        elif kind == 1:
+            scene.add(_box(f"book{k}", (0.22, 0.16, 0.04), (px, py, 0.8), fabric(rng), rng.uniform(0, 90)))
+        else:
+            scene.add({"id": f"bowl{k}", "shape": "sphere", "radius": 0.12, "squash": [1, 1, 0.45], "location": [px, py, 0.8], "material": art(rng)})
+    scene.changeable["table-top"] = ((tx, ty, 0.75), 1.6)
+    # Shelves along the west wall with books.
+    sx = -width / 2 + 0.25
+    sy = rng.uniform(-depth / 4, depth / 4)
+    for level in range(5):
+        scene.add(_box(f"shelf{level}", (0.35, 1.8, 0.03), (sx, sy, 0.3 + level * 0.42), wood(rng)))
+        cursor = sy - 0.85
+        while cursor < sy + 0.8:
+            thickness = rng.uniform(0.025, 0.06)
+            tall = rng.uniform(0.2, 0.34)
+            if rng.random() < 0.85:
+                scene.add(_box(f"book-s{level}-{cursor:.2f}", (0.22, thickness, tall), (sx, cursor + thickness / 2, 0.315 + level * 0.42 + tall / 2), fabric(rng)))
+            cursor += thickness + rng.uniform(0.0, 0.01)
+    scene.add(_box("shelf-side-a", (0.35, 0.03, 2.1), (sx, sy - 0.9, 1.05), wood(rng)))
+    scene.add(_box("shelf-side-b", (0.35, 0.03, 2.1), (sx, sy + 0.9, 1.05), wood(rng)))
+    # Sofa by the south wall.
+    fx = rng.uniform(-width / 4, width / 4)
+    fy = -depth / 2 + 0.55
+    cloth = fabric(rng)
+    scene.add(_box("sofa-seat", (2.2, 0.9, 0.42), (fx, fy, 0.21), cloth))
+    scene.add(_box("sofa-back", (2.2, 0.22, 0.5), (fx, fy - 0.34, 0.66), cloth))
+    scene.add(_box("sofa-arm-a", (0.2, 0.9, 0.6), (fx - 1.1, fy, 0.3), cloth))
+    scene.add(_box("sofa-arm-b", (0.2, 0.9, 0.6), (fx + 1.1, fy, 0.3), cloth))
+    scene.changeable["sofa-seat"] = ((fx, fy, 0.21), 2.2)
+    scene.add(_box("rug", (2.4, 1.7, 0.01), (fx, fy + 1.4, 0.005), art(rng)))
+    # Paintings.
+    for index, (x, y, facing) in enumerate(
+        [(rng.uniform(-width / 3, width / 3), -depth / 2 + 0.02, 0.0),
+         (width / 2 - 0.02, rng.uniform(-depth / 3, depth / 3) - 1.2, 90.0),
+         (rng.uniform(-width / 3, width / 3) + 1.5, depth / 2 - 0.02, 0.0)]
+    ):
+        w = rng.uniform(0.5, 1.1)
+        scene.add(_box(f"painting{index}", (w, 0.03, w * rng.uniform(0.6, 1.3)), (x, y, rng.uniform(1.4, 1.8)), art(rng), facing))
+    # A plant and a floor lamp.
+    px, py = width / 2 - 0.6, -depth / 2 + 0.6
+    scene.add({"id": "pot", "shape": "cylinder", "radius": 0.22, "height": 0.4, "location": [px, py, 0.2], "material": plaster(rng)})
+    scene.add({"id": "plant", "shape": "sphere", "radius": 0.45, "squash": [1, 1, 1.3], "location": [px, py, 0.9], "material": foliage(rng)})
+    scene.changeable["plant"] = ((px, py, 0.9), 0.9)
+    lx, ly = -width / 2 + 0.6, depth / 2 - 0.6
+    scene.add({"id": "lamp-post", "shape": "cylinder", "radius": 0.02, "height": 1.6, "location": [lx, ly, 0.8], "material": flat((0.1, 0.1, 0.1))})
+    scene.add({"id": "lamp-shade", "shape": "cone", "radius": 0.25, "height": 0.35, "location": [lx, ly, 1.7], "material": fabric(rng)})
+    scene.add({"id": "door", "shape": "box", "size": [0.95, 0.06, 2.1], "location": [float(rng.uniform(-width / 3, width / 3)), -depth / 2 + 0.02, 1.05], "rotation_deg": [0, 0, 0], "material": wood(rng)})
+    scene.open_area = (0.0, 0.0, 0.5)
+    return scene
+
+
+def _value_noise(rng, count, octaves, base_cells):
+    """Smooth fractal noise on a count x count grid, amplitude about 1."""
+    total = np.zeros((count, count))
+    amplitude = 1.0
+    cells = base_cells
+    for _ in range(octaves):
+        lattice = rng.uniform(-1, 1, size=(cells + 2, cells + 2))
+        coordinates = np.linspace(0, cells, count)
+        i = np.floor(coordinates).astype(int)
+        f = coordinates - i
+        s = f * f * (3 - 2 * f)
+        rows = lattice[i][:, i] * (1 - s)[None, :] + lattice[i][:, i + 1] * s[None, :]
+        rows_next = lattice[i + 1][:, i] * (1 - s)[None, :] + lattice[i + 1][:, i + 1] * s[None, :]
+        total += amplitude * (rows * (1 - s)[:, None] + rows_next * s[:, None])
+        amplitude *= 0.5
+        cells *= 2
+    return total
+
+
+def landscape(seed: int) -> Scene:
+    rng = np.random.default_rng([seed, 3])
+    scene = Scene("landscape", seed)
+    count = 161
+    spacing = 2.5
+    relief = rng.uniform(3.0, 8.0)
+    heights = _value_noise(rng, count, 5, 4) * relief
+    half = (count - 1) * spacing / 2
+
+    def ground(x: float, y: float) -> float:
+        u = (x + half) / spacing
+        v = (y + half) / spacing
+        c0, r0 = int(math.floor(u)), int(math.floor(v))
+        fu, fv = u - c0, v - r0
+        c0 = min(max(c0, 0), count - 2)
+        r0 = min(max(r0, 0), count - 2)
+        h00, h01 = heights[r0, c0], heights[r0, c0 + 1]
+        h10, h11 = heights[r0 + 1, c0], heights[r0 + 1, c0 + 1]
+        # The grid's quads are split by Blender along one diagonal; bilinear is within a few mm
+        # at this spacing and is only used to rest objects and cameras on the ground.
+        return float((h00 * (1 - fu) + h01 * fu) * (1 - fv) + (h10 * (1 - fu) + h11 * fu) * fv)
+
+    scene.ground = ground
+    scene.sky = {
+        "kind": "nishita",
+        "sun_elevation_deg": float(rng.uniform(12, 50)),
+        "sun_rotation_deg": float(rng.uniform(0, 360)),
+        "strength": 0.3,
+        "sun_energy": 3.5,
+    }
+    scene.add(
+        {
+            "id": "terrain",
+            "shape": "heightfield",
+            "count": count,
+            "spacing": spacing,
+            "heights": [round(float(v), 4) for v in heights.reshape(-1)],
+            "location": [0.0, 0.0, 0.0],
+            "material": grass(rng),
+        }
+    )
+    for index in range(int(rng.integers(12, 26))):
+        angle = rng.uniform(0, 360)
+        distance = rng.uniform(3.0, 45.0)
+        x, y = distance * math.cos(math.radians(angle)), distance * math.sin(math.radians(angle))
+        radius = rng.uniform(0.3, 2.2) * (1 + distance / 40)
+        z = ground(x, y) + radius * 0.25
+        scene.add(
+            {
+                "id": f"rock{index}",
+                "shape": "sphere",
+                "radius": float(radius),
+                "squash": [float(rng.uniform(0.8, 1.3)), float(rng.uniform(0.8, 1.3)), float(rng.uniform(0.5, 0.9))],
+                "location": [x, y, z],
+                "rotation_deg": [0.0, 0.0, float(rng.uniform(0, 360))],
+                "material": rock(rng),
+            }
+        )
+        if radius > 0.8 and distance < 25:
+            scene.changeable[f"rock{index}"] = ((x, y, z), 2 * radius)
+    for index in range(int(rng.integers(15, 35))):
+        angle = rng.uniform(0, 360)
+        distance = rng.uniform(6.0, 140.0)
+        x, y = distance * math.cos(math.radians(angle)), distance * math.sin(math.radians(angle))
+        _tree(scene, rng, f"tree{index}", x, y, ground(x, y), scale=float(rng.uniform(0.8, 1.6)))
+    # A fence line and a hut.
+    angle = rng.uniform(0, 360)
+    offset = rng.uniform(7.0, 14.0)
+    direction = angle + 90
+    for k in range(-8, 9):
+        along = k * 2.4
+        x = offset * math.cos(math.radians(angle)) + along * math.cos(math.radians(direction))
+        y = offset * math.sin(math.radians(angle)) + along * math.sin(math.radians(direction))
+        z = ground(x, y)
+        scene.add({"id": f"post{k}", "shape": "cylinder", "radius": 0.06, "height": 1.2, "location": [x, y, z + 0.6], "material": wood(rng)})
+        if k < 8:
+            mx = x + 1.2 * math.cos(math.radians(direction))
+            my = y + 1.2 * math.sin(math.radians(direction))
+            mz = ground(mx, my)
+            for rail, rz in enumerate((0.55, 1.0)):
+                scene.add(_box(f"rail{k}-{rail}", (2.4, 0.05, 0.08), (mx, my, mz + rz), wood(rng), direction))
+    hx, hy = _rotate(rng.uniform(15, 35), 0.0, rng.uniform(0, 360))
+    hz = ground(hx, hy)
+    facing = rng.uniform(0, 360)
+    scene.add(_box("hut", (4.0, 3.0, 2.6), (hx, hy, hz + 1.3), wood(rng), facing))
+    scene.add({"id": "hut-roof", "shape": "cone", "radius": 3.0, "height": 1.6, "location": [hx, hy, hz + 3.4], "rotation_deg": [0, 0, facing + 45], "material": noisy(rng, [(0.3, 0.12, 0.1), (0.2, 0.1, 0.08)], 5.0)})
+    scene.changeable["hut"] = ((hx, hy, hz + 1.3), 4.0)
+    for index in range(int(rng.integers(4, 8))):
+        angle = rng.uniform(0, 360)
+        distance = rng.uniform(450.0, 1100.0)
+        radius = rng.uniform(150.0, 380.0)
+        scene.add(
+            {
+                "id": f"mountain{index}",
+                "shape": "cone",
+                "radius": float(radius),
+                "height": float(rng.uniform(120.0, 420.0)),
+                "location": [distance * math.cos(math.radians(angle)), distance * math.sin(math.radians(angle)), 40.0],
+                "material": rock(rng),
+            }
+        )
+    scene.open_area = (0.0, 0.0, 1.5)
+    return scene
+
+
+#: The scene families a split may name. A family missing here is refused, never guessed.
+FAMILIES = {"courtyard": courtyard, "room": room, "landscape": landscape}
+
+
+# -- camera sets ---------------------------------------------------------------------------------
+
+
+def _euler_for(yaw_deg, pitch_deg, roll_deg):
+    """Blender camera Euler XYZ, degrees: pitch 0 looks along +Y rotated by yaw about +Z."""
+    return [90.0 + pitch_deg, roll_deg, yaw_deg]
+
+
+def _offset(rng, magnitude):
+    """A point uniformly inside a ball of diameter ``magnitude``: pairwise offsets <= magnitude."""
+    if magnitude <= 0:
+        return (0.0, 0.0, 0.0)
+    while True:
+        v = rng.uniform(-1, 1, size=3)
+        if np.linalg.norm(v) <= 1:
+            v = v * magnitude / 2
+            return (float(v[0]), float(v[1]), float(v[2] * 0.4))
+
+
+def _camera(set_id, index, standpoint, yaw, pitch, roll, lens, portrait, offset):
+    width, height = (SHORT_EDGE, LONG_EDGE) if portrait else (LONG_EDGE, SHORT_EDGE)
+    return {
+        "id": f"{set_id}-p{index}",
+        "set": set_id,
+        "index": index,
+        "lens": lens,
+        "portrait": portrait,
+        "location": [standpoint[0] + offset[0], standpoint[1] + offset[1], standpoint[2] + offset[2]],
+        "rotation_deg": _euler_for(yaw, pitch, roll),
+        "fov_y_deg": fov_y_deg(lens, width, height),
+        "width": width,
+        "height": height,
+        "yaw_deg": yaw,
+        "pitch_deg": pitch,
+        "roll_deg": roll,
+        "offset_m": list(offset),
+    }
+
+
+def _standpoint(scene: Scene, rng):
+    cx, cy, radius = scene.open_area
+    angle = rng.uniform(0, 2 * math.pi)
+    r = radius * math.sqrt(rng.uniform(0, 1))
+    x, y = cx + r * math.cos(angle), cy + r * math.sin(angle)
+    return (x, y, scene.ground(x, y) + rng.uniform(*EYE_HEIGHT))
+
+
+def _sweep(rng, count, lens, portrait, overlaps, pitch_range):
+    width, height = (SHORT_EDGE, LONG_EDGE) if portrait else (LONG_EDGE, SHORT_EDGE)
+    hfov = fov_x_deg(lens, width, height)
+    yaws = [0.0]
+    for overlap in overlaps[: count - 1]:
+        yaws.append(yaws[-1] - hfov * (1 - overlap))
+    pitches = [float(rng.uniform(*pitch_range)) for _ in range(count)]
+    return yaws, pitches
+
+
+def design_set(scene: Scene, rng, set_id: str, condition: dict[str, Any]) -> list[dict[str, Any]]:
+    """The cameras of one set. ``condition`` is the split's instruction for it."""
+    kind = condition["kind"]
+    translation = float(condition.get("translation_m", 0.0))
+    base_yaw = float(rng.uniform(0, 360))
+    standpoint = _standpoint(scene, rng)
+    cameras: list[dict[str, Any]] = []
+    roll = lambda: float(rng.normal(0.0, 1.2))  # noqa: E731 - hand-held photographs lean a little
+    if kind in ("sweep", "changed"):
+        count = int(condition.get("count", 3))
+        lens = condition.get("lens", "1x")
+        portrait = bool(condition.get("portrait", False))
+        low, high = condition.get("overlap", (0.15, 0.6))
+        overlaps = [float(rng.uniform(low, high)) for _ in range(count - 1)]
+        yaws, pitches = _sweep(rng, count, lens, portrait, overlaps, condition.get("pitch", (-8, 12)))
+        for index in range(count):
+            cameras.append(
+                _camera(set_id, index, standpoint, base_yaw + yaws[index], pitches[index], roll(), lens, portrait, _offset(rng, translation))
+            )
+    elif kind == "grid":
+        lens = condition.get("lens", "1x")
+        width, height = LONG_EDGE, SHORT_EDGE
+        hfov = fov_x_deg(lens, width, height)
+        vfov = fov_y_deg(lens, width, height)
+        columns = int(condition.get("columns", 2))
+        overlap = float(rng.uniform(0.25, 0.5))
+        row_overlap = float(rng.uniform(0.2, 0.45))
+        index = 0
+        for row in range(2):
+            pitch = -vfov * (1 - row_overlap) / 2 + row * vfov * (1 - row_overlap) + 4.0
+            for column in range(columns):
+                yaw = base_yaw - column * hfov * (1 - overlap)
+                cameras.append(_camera(set_id, index, standpoint, yaw, pitch, roll(), lens, False, _offset(rng, translation)))
+                index += 1
+    elif kind == "mixed_lens":
+        # The operator's own first set: a 1x frame, then 2x and 5x frames of what it shows.
+        wide = _camera(set_id, 0, standpoint, base_yaw, float(rng.uniform(-4, 8)), roll(), "1x", False, _offset(rng, translation))
+        cameras.append(wide)
+        hfov = fov_x_deg("1x", LONG_EDGE, SHORT_EDGE)
+        for index, lens in enumerate(condition.get("lenses", ["2x", "5x"]), start=1):
+            yaw = base_yaw + float(rng.uniform(-0.3, 0.3)) * hfov
+            pitch = wide["pitch_deg"] + float(rng.uniform(-6, 6))
+            cameras.append(_camera(set_id, index, standpoint, yaw, pitch, roll(), lens, False, _offset(rng, translation)))
+        if condition.get("second_wide", True):
+            yaw = base_yaw - hfov * (1 - float(rng.uniform(0.3, 0.5)))
+            cameras.append(_camera(set_id, len(cameras), standpoint, yaw, float(rng.uniform(-4, 8)), roll(), "1x", False, _offset(rng, translation)))
+    elif kind == "moved":
+        # Walked between photographs: each is taken from a place metres to the side of the last,
+        # turned a little, so that neighbouring photographs still show some of the same things.
+        # Sideways, because stepping towards what one photographs can walk into it.
+        count = int(condition.get("count", 3))
+        step = condition.get("step_m", (1.5, 3.5))
+        eye = standpoint[2] - scene.ground(standpoint[0], standpoint[1])
+        position = np.array(standpoint[:2])
+        yaw = base_yaw
+        for index in range(count):
+            z = scene.ground(float(position[0]), float(position[1])) + eye
+            cameras.append(_camera(set_id, index, (float(position[0]), float(position[1]), z), yaw, float(rng.uniform(-6, 8)), roll(), "1x", False, (0.0, 0.0, 0.0)))
+            distance = float(rng.uniform(*step))
+            walk = math.radians(yaw) + rng.uniform(-0.3, 0.3)
+            position = position + distance * np.array([math.cos(walk), math.sin(walk)])
+            yaw -= float(rng.uniform(5, 20))
+    elif kind == "low_overlap":
+        count = int(condition.get("count", 2))
+        low, high = condition.get("overlap", (-0.1, 0.08))
+        overlaps = [float(rng.uniform(low, high)) for _ in range(count - 1)]
+        yaws, pitches = _sweep(rng, count, "1x", False, overlaps, (-6, 10))
+        for index in range(count):
+            cameras.append(_camera(set_id, index, standpoint, base_yaw + yaws[index], pitches[index], roll(), "1x", False, _offset(rng, translation)))
+    else:
+        raise ValueError(f"no set condition named {kind!r}")
+    return cameras
+
+
+def _direction_to(camera, point):
+    """Where ``point`` falls in ``camera``: frame fractions (x, y), negative depth behind it."""
+    yaw, pitch = math.radians(camera["yaw_deg"]), math.radians(camera["pitch_deg"])
+    forward = np.array([-math.sin(yaw) * math.cos(pitch), math.cos(yaw) * math.cos(pitch), math.sin(pitch)])
+    right = np.array([math.cos(yaw), math.sin(yaw), 0.0])
+    up = np.cross(right, forward)
+    v = np.array(point) - np.array(camera["location"])
+    depth = float(v @ forward)
+    tan_y = math.tan(math.radians(camera["fov_y_deg"]) / 2)
+    tan_x = tan_y * camera["width"] / camera["height"]
+    if depth <= 0:
+        return None
+    return (float(v @ right) / (depth * tan_x), float(v @ up) / (depth * tan_y), depth)
+
+
+def apply_change(scene: Scene, rng, cameras, condition) -> dict[str, Any]:
+    """Change the scene between photograph 0 and photograph 1 inside their shared view."""
+    first, second = cameras[0], cameras[1]
+    candidates = []
+    for oid, (centre, size) in scene.changeable.items():
+        a = _direction_to(first, centre)
+        b = _direction_to(second, centre)
+        if a is None or b is None:
+            continue
+        near, far = condition.get("candidate_depth_m", (2.0, 25.0))
+        if max(abs(a[0]), abs(a[1])) < 0.85 and max(abs(b[0]), abs(b[1])) < 0.85 and near < a[2] < far:
+            candidates.append((size / a[2], oid, centre))
+    mode = condition.get("change", "remove")
+    if mode in ("remove", "move") and candidates:
+        candidates.sort(reverse=True)
+        _, oid, centre = candidates[0]
+        # An object and its parts share the id before the first hyphen: "bench3-seat" is one
+        # part of "bench3", and "hut-roof" is a part of "hut".
+        group = oid.split("-")[0]
+        members = [o for o in scene.objects if o["id"] == group or o["id"].startswith(group + "-")]
+        if mode == "remove":
+            second["hide"] = [o["id"] for o in members]
+        else:
+            angle = rng.uniform(0, 2 * math.pi)
+            shift = rng.uniform(1.5, 3.0) * np.array([math.cos(angle), math.sin(angle), 0.0])
+            second["move"] = {
+                o["id"]: [float(o["location"][0] + shift[0]), float(o["location"][1] + shift[1]), float(o["location"][2])]
+                for o in members
+            }
+        return {"mode": mode, "object": group, "parts": [o["id"] for o in members]}
+    # Add: something large appears between the photographs, in the middle of the shared view.
+    yaw = math.radians((first["yaw_deg"] + second["yaw_deg"]) / 2)
+    # A room is a few metres across: what arrives there arrives inside it, at a room's size.
+    distance = float(rng.uniform(*condition.get("add_distance_m", (4.0, 9.0))))
+    x = first["location"][0] - math.sin(yaw) * distance
+    y = first["location"][1] + math.cos(yaw) * distance
+    z = scene.ground(x, y)
+    oid = f"arrival-{first['set']}"
+    size = tuple(float(v) for v in condition.get("add_size_m", (1.9, 4.3, 1.5)))
+    scene.add({**_box(oid, size, (x, y, z + size[2] / 2), {"kind": "flat", "color": [float(v) for v in rng.uniform(0.1, 0.8, 3)]}, float(rng.uniform(0, 180))), "hidden": True})
+    second["show"] = [oid]
+    return {"mode": "add", "object": oid}
+
+
+# -- plan, render, finish ------------------------------------------------------------------------
+
+
+def plan(split: dict[str, Any], out_dir: Path) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for scene_entry in split["scenes"]:
+        family = scene_entry["family"]
+        if family not in FAMILIES:
+            raise ValueError(f"no scene family named {family!r}")
+        scene = FAMILIES[family](int(scene_entry["seed"]))
+        rng = np.random.default_rng([int(scene_entry["seed"]), 99])
+        cameras: list[dict[str, Any]] = []
+        sets = []
+        for set_entry in scene_entry["sets"]:
+            set_cameras = design_set(scene, rng, set_entry["id"], set_entry["condition"])
+            change = None
+            if set_entry["condition"]["kind"] == "changed":
+                change = apply_change(scene, rng, set_cameras, set_entry["condition"])
+            cameras.extend(set_cameras)
+            sets.append({"id": set_entry["id"], "condition": set_entry["condition"], "change": change, "cameras": [c["id"] for c in set_cameras]})
+        spec = {
+            "family": family,
+            "seed": int(scene_entry["seed"]),
+            "render": {"samples": SAMPLES, "seed": int(scene_entry["seed"]), "threads": THREADS},
+            "sky": scene.sky,
+            "lights": scene.lights,
+            "objects": scene.objects,
+            "cameras": cameras,
+            "sets": sets,
+        }
+        directory = out_dir / scene_entry["name"]
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "spec.json").write_text(json.dumps(spec), encoding="utf-8")
+        print(f"planned {scene_entry['name']}: {len(scene.objects)} objects, {len(cameras)} cameras")
+
+
+def render(out_dir: Path, only: str | None) -> None:
+    if not BLENDER.is_file():
+        raise SystemExit("set STANDPOINT_BLENDER to the pinned Blender binary")
+    binary = hashlib.sha256(BLENDER.read_bytes()).hexdigest()
+    if binary != BLENDER_SHA256:
+        raise SystemExit(f"Blender binary {binary} is not the pinned {BLENDER_SHA256}")
+    for directory in sorted(p for p in out_dir.iterdir() if (p / "spec.json").exists()):
+        if only is not None and directory.name != only:
+            continue
+        if (directory / "render" / "manifest.json").exists():
+            print(f"rendered already: {directory.name}")
+            continue
+        started = time.monotonic()
+        log = (directory / "blender.log").open("w")
+        completed = subprocess.run(
+            [str(BLENDER), "--background", "--factory-startup", "--python-exit-code", "1",
+             "--python", str(SCENE_SCRIPT), "--", str(directory / "spec.json"), str(directory / "render")],
+            stdout=log, stderr=subprocess.STDOUT, check=False,
+        )
+        log.close()
+        if completed.returncode != 0:
+            raise SystemExit(f"Blender failed on {directory.name}; see {directory / 'blender.log'}")
+        print(f"rendered {directory.name} in {time.monotonic() - started:.1f} s")
+
+
+def _y_up(matrix_blender):
+    """Blender world (Z up) to the product's Y-up world; the camera's own frame is unchanged."""
+    m = np.array(matrix_blender, dtype=float)
+    swap = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]], dtype=float)
+    rotation = swap @ m[:3, :3]
+    centre = swap @ m[:3, 3]
+    return rotation, centre
+
+
+def finish(out_dir: Path) -> None:
+    """JPEG photographs with and without EXIF focal length, and one ground-truth file per scene."""
+    from PIL import Image
+
+    for directory in sorted(p for p in out_dir.iterdir() if (p / "render" / "manifest.json").exists()):
+        spec = json.loads((directory / "spec.json").read_text(encoding="utf-8"))
+        manifest = json.loads((directory / "render" / "manifest.json").read_text(encoding="utf-8"))
+        by_id = {c["id"]: c for c in spec["cameras"]}
+        truth = {"family": spec["family"], "seed": spec["seed"], "sets": spec["sets"], "cameras": {}}
+        for rendered in manifest["cameras"]:
+            camera = by_id[rendered["id"]]
+            png = directory / "render" / rendered["image"]
+            image = Image.open(png).convert("RGB")
+            rotation, centre = _y_up(rendered["world_from_camera_blender"])
+            exif = Image.Exif()
+            exif[0x010F] = "Synthetic"  # Make
+            exif[0x0110] = "standpoint-render"  # Model
+            exif_ifd = exif.get_ifd(0x8769)
+            exif_ifd[0xA405] = int(round(LENSES_MM[camera["lens"]]))  # FocalLengthIn35mmFilm
+            with_exif = directory / f"{rendered['id']}.jpg"
+            image.save(with_exif, format="JPEG", quality=92, exif=exif.tobytes())
+            without = directory / f"{rendered['id']}.noexif.jpg"
+            image.save(without, format="JPEG", quality=92)
+            truth["cameras"][rendered["id"]] = {
+                "set": camera["set"],
+                "index": camera["index"],
+                "lens": camera["lens"],
+                "width": rendered["width"],
+                "height": rendered["height"],
+                "fov_y_deg": rendered["fov_y_deg"],
+                "rotation_world_from_camera": rotation.tolist(),
+                "centre_world": centre.tolist(),
+                "depth_file": f"render/{rendered['depth']}",
+                "depth_convention": "planar distance along the camera's view axis, metres",
+                "jpeg_sha256": hashlib.sha256(with_exif.read_bytes()).hexdigest(),
+                "noexif_jpeg_sha256": hashlib.sha256(without.read_bytes()).hexdigest(),
+                "render_seconds": rendered["render_seconds"],
+            }
+        (directory / "truth.json").write_text(json.dumps(truth, indent=1), encoding="utf-8")
+        print(f"finished {directory.name}: {len(truth['cameras'])} photographs")
+
+
+def main(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    p_plan = sub.add_parser("plan")
+    p_plan.add_argument("split", type=Path)
+    p_plan.add_argument("out", type=Path)
+    p_render = sub.add_parser("render")
+    p_render.add_argument("out", type=Path)
+    p_render.add_argument("--only")
+    p_finish = sub.add_parser("finish")
+    p_finish.add_argument("out", type=Path)
+    args = parser.parse_args(argv)
+    if args.command == "plan":
+        plan(json.loads(args.split.read_text(encoding="utf-8")), args.out)
+    elif args.command == "render":
+        render(args.out, args.only)
+    elif args.command == "finish":
+        finish(args.out)
+    else:
+        raise SystemExit(f"no command named {args.command!r}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -32,14 +32,21 @@ class Box:
     low: tuple[float, float, float]
     high: tuple[float, float, float]
     tint: tuple[float, float, float]
+    #: A plain box is one flat colour, with no texture: a painted pillar, whose silhouette is a
+    #: long straight edge.
+    plain: bool = False
 
 
 @dataclass(frozen=True)
 class Room:
-    """The room's inside faces and the boxes standing in it. +Y up, metres."""
+    """The room's inside faces and the boxes standing in it. +Y up, metres.
+
+    ``texture_contrast`` is how far the voxel texture darkens a surface below its tint.
+    """
 
     low: tuple[float, float, float] = (-4.0, 0.0, -5.0)
     high: tuple[float, float, float] = (4.0, 3.0, 5.0)
+    texture_contrast: float = 0.75
     boxes: tuple[Box, ...] = field(
         default=(
             Box((-1.6, 0.0, -3.4), (-0.6, 1.1, -2.6), (0.9, 0.6, 0.5)),
@@ -92,9 +99,8 @@ def _noise(points: np.ndarray, cell: float) -> np.ndarray:
     return ((h >> 8) & 0xFF).astype(np.float64) / 255.0
 
 
-def render(room: Room, camera: Camera) -> tuple[np.ndarray, np.ndarray]:
-    """``(rgb, ranges)``: the photograph, and each pixel's distance from the camera centre."""
-    columns, rows = np.meshgrid(np.arange(WIDTH) + 0.5, np.arange(HEIGHT) + 0.5)
+def _trace(room: Room, camera: Camera, columns: np.ndarray, rows: np.ndarray):
+    """``(rgb, distance)`` along the rays through the given pixel positions, flattened."""
     rays = np.stack(
         [
             (columns - WIDTH / 2) / camera.focal,
@@ -115,6 +121,7 @@ def render(room: Room, camera: Camera) -> tuple[np.ndarray, np.ndarray]:
         distance = np.min(np.where(exits > 0, exits, np.inf), axis=1)
         normal_axis = np.argmin(np.where(exits > 0, exits, np.inf), axis=1)
         tint = np.tile(np.array([0.85, 0.82, 0.78]), (len(rays), 1))
+        plain = np.zeros(len(rays), dtype=bool)
         for box in room.boxes:
             near = (np.array(box.low) - origin) * inverse
             far = (np.array(box.high) - origin) * inverse
@@ -124,10 +131,32 @@ def render(room: Room, camera: Camera) -> tuple[np.ndarray, np.ndarray]:
             distance = np.where(hit, enter, distance)
             normal_axis = np.where(hit, np.argmax(np.minimum(near, far), axis=1), normal_axis)
             tint[hit] = box.tint
+            plain = np.where(hit, box.plain, plain)
     points = origin + directions * distance[:, None]
     grey = 0.55 * _noise(points, 0.21) + 0.45 * _noise(points + 0.37, 0.061)
+    grey = np.where(plain, 1.0, grey)
     shade = np.array([0.72, 1.0, 0.85])[normal_axis]
-    rgb = np.clip(tint * (0.25 + 0.75 * grey)[:, None] * shade[:, None], 0, 1)
+    contrast = room.texture_contrast
+    rgb = np.clip(tint * (1.0 - contrast + contrast * grey)[:, None] * shade[:, None], 0, 1)
+    return rgb, distance
+
+
+def render(room: Room, camera: Camera, *, supersample: int = 1) -> tuple[np.ndarray, np.ndarray]:
+    """``(rgb, ranges)``: the photograph, and each pixel's distance from the camera centre.
+
+    ``supersample`` averages that many rays a side per pixel, as a camera's sensor does, so a
+    straight edge is drawn straight rather than as a staircase of whole pixels; the distance is
+    always the one along the pixel's centre ray.
+    """
+    columns, rows = np.meshgrid(np.arange(WIDTH) + 0.5, np.arange(HEIGHT) + 0.5)
+    rgb, distance = _trace(room, camera, columns, rows)
+    if supersample > 1:
+        offsets = (np.arange(supersample) + 0.5) / supersample - 0.5
+        total = np.zeros_like(rgb)
+        for dy in offsets:
+            for dx in offsets:
+                total += _trace(room, camera, columns + dx, rows + dy)[0]
+        rgb = total / supersample**2
     image = (rgb.reshape(HEIGHT, WIDTH, 3) * 255).round().astype(np.uint8)
     return image, distance.reshape(HEIGHT, WIDTH)
 
@@ -164,7 +193,7 @@ class ExactDepth:
 
 
 def photograph(
-    room: Room, camera: Camera, *, estimated_fov_y_deg: float | None = None
+    room: Room, camera: Camera, *, estimated_fov_y_deg: float | None = None, supersample: int = 1
 ) -> tuple[Image.Image, bytes]:
     """One photograph and the point map the depth stage would make of it.
 
@@ -172,7 +201,7 @@ def photograph(
     default the true one. The depth itself is exact either way, so what a wrong estimate changes is
     only the sideways extent of the unprojected points, which is what EXIF corrects.
     """
-    rgb, ranges = render(room, camera)
+    rgb, ranges = render(room, camera, supersample=supersample)
     image = Image.fromarray(rgb)
     fov = camera.fov_y_deg if estimated_fov_y_deg is None else estimated_fov_y_deg
     _prediction, _decision, payload = encode_point_map(

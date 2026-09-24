@@ -1,0 +1,62 @@
+"""For an added box: the share of the pair's shared view its own surface covers, beside the truth's
+bounding-sphere share. Read-only, from the render's truth and the scene spec."""
+from __future__ import annotations
+
+import importlib.util
+import json
+import math
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).parent))
+from k3lib import DATA, LANE, load_camera, set_photo_ids, truth_of  # noqa: E402
+
+spec_ = importlib.util.spec_from_file_location("ev", LANE / "scripts/k3/standpoint_eval.py")
+EV = importlib.util.module_from_spec(spec_)
+spec_.loader.exec_module(EV)
+
+
+def main(split, set_id, a, b):
+    a, b = int(a), int(b)
+    scene = next(p for p in (DATA / split).iterdir() if set_id.startswith(p.name + "-"))
+    truth = truth_of(scene)
+    spec = json.loads((scene / "spec.json").read_text())
+    set_entry = next(s for s in truth["sets"] if s["id"] == set_id)
+    obj = next(o for o in spec["objects"] if o["id"] == set_entry["change"]["object"])
+    ids = set_photo_ids(truth, set_id)
+    k, l = load_camera(scene, truth, ids[a]), load_camera(scene, truth, ids[b])
+    changed_cam = k if a == 1 else l
+    other = l if a == 1 else k
+    # Photograph 1 sees the box; sample its pixels, keep those the other photograph also frames.
+    width, height = changed_cam["size"]
+    cols, rows = np.meshgrid(np.arange(2, width, 4), np.arange(2, height, 4))
+    xy = np.stack([cols.ravel(), rows.ravel()], 1).astype(float)
+    depth = changed_cam["depth"][xy[:, 1].astype(int), xy[:, 0].astype(int)]
+    near = depth < 3000
+    xy, depth = xy[near], depth[near]
+    world = (EV._rays(xy, changed_cam["size"], changed_cam["focal"]) * depth[:, None]) @ changed_cam["R"].T + changed_cam["c"]
+    in_o = (world - other["c"]) @ other["R"]
+    z = -in_o[:, 2]
+    ahead = z > 0.05
+    u = other["focal"] * in_o[:, 0] / np.where(ahead, z, 1) + other["size"][0] / 2
+    v = -other["focal"] * in_o[:, 1] / np.where(ahead, z, 1) + other["size"][1] / 2
+    shared = ahead & (u >= 0) & (u < other["size"][0]) & (v >= 0) & (v < other["size"][1])
+    # The box in the Y-up world: Blender (x, y, z) -> (x, z, -y); rotation about Blender z = about -Y.
+    bx, by, bz = obj["location"]
+    centre = np.array([bx, bz, -by])
+    sx, sy, sz = obj["size"]
+    angle = math.radians(obj["rotation_deg"][2])
+    rel = world - centre
+    # undo the box's rotation about the vertical axis
+    c, s = math.cos(angle), math.sin(angle)
+    local_x = rel[:, 0] * c + (-rel[:, 2]) * s
+    local_y = -rel[:, 0] * s + (-rel[:, 2]) * c
+    on_box = (np.abs(local_x) <= sx / 2 + 0.03) & (np.abs(local_y) <= sy / 2 + 0.03) & (np.abs(rel[:, 1]) <= sz / 2 + 0.03)
+    print(set_id, a, b, "box surface share of the shared view", round(float(np.count_nonzero(on_box & shared)) / max(1, np.count_nonzero(shared)), 4),
+          "samples shared", int(np.count_nonzero(shared)), "box", obj["size"])
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

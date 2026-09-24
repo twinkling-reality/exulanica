@@ -46,9 +46,38 @@ bound is chosen against that: a hand-held turn moves a phone by tens of centimet
 joined; a few steps sideways must be refused. Photographs within the bound still carry that small
 movement as parallax at the seam, and every pair records how large it is.
 
+**A cause is named only where its measurement holds (stage version 2).** Matched features that
+all lie at about one distance, one facade across a square, cannot tell a step aside from a turn:
+the parallax a step makes is the same at every one of them, and a turn absorbs it. So a pair is
+named moved only when the movement estimated would shift the nearer matched points against the
+farther ones by the policy's angle (``min_translation_parallax_deg``), and the camera
+counts as having stood still only when a movement of the moved bound would have shifted them so; a
+pair whose features cannot show a movement is never named moved. A pair is named ``scene_changed``
+only when the camera is measured to have stood within the policy's hand-held bound
+(``still_max_translation_m``), because a disagreement beside a movement the depth model's scale
+may understate cannot be told from a change. Between the two, or without a measurement, a pair
+joins only if a pure turn explains what the photographs share, and is otherwise refused as
+``insufficient_overlap``: what they share does not establish one standpoint. The translation of
+version 2 is fitted with a relative zoom between the pair's lenses, held to the stated lenses by
+the focal prior, so that a focal length stated a few percent off is not read as a step forward.
+Where the camera stood still, a tile at a depth edge whose parallax under the measured movement
+exceeds the comparison's search is not compared: the far surface beside a near post is uncovered
+by the movement, not changed. Version 1's parameters name none of this and are decoded to exactly
+what they meant.
+
+**Up (stage version 2).** People hold a camera level only roughly, so the camera's own
+horizontal axes lean with its roll. Version 2 takes up from the photographs' vertical edges: the
+direction most perpendicular to the planes through the camera and each strong edge, sought from
+the camera-axes estimate as a mode rather than a least-squares fit, so that a photograph with no
+vertical structure adds background and not a pull. Where the edges do not stand out of that
+background by the policy's ratio, the camera-axes estimate is kept and the record says so.
+
 **Deterministic in the ADR-0017 sense.** No model runs here: MoGe-2 ran in the depth stage, and
 this stage reads its point maps. Feature extraction is COLMAP's SIFT, measured deterministic on
 repeat; every random choice comes from a generator seeded by the policy and the pair.
+
+**numpy only.** The scene worker's image installs pycolmap and the numpy it pulls in, and nothing
+else of the numeric stack, so the two image filters the join needs are written here.
 
 **Every number is the policy's.** :class:`StandpointPolicy` is decoded from the stage's integer
 parameters, which are inside its idempotency key, so a changed threshold re-keys every scene.
@@ -60,13 +89,12 @@ import dataclasses
 import hashlib
 import json
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
 import numpy as np
 from PIL import Image
-from scipy import ndimage
 
 from exulanica.reconstruction.standpoint_record import (
     MICROPIXELS,
@@ -89,6 +117,7 @@ __all__ = [
     "StandpointExclusion",
     "StandpointInput",
     "StandpointPolicy",
+    "UpFromEdges",
     "join_standpoint",
 ]
 
@@ -101,10 +130,47 @@ FULL_FRAME_DIAGONAL_MM: Final = math.hypot(36.0, 24.0)
 _MILLI: Final = 1_000
 _MICRO: Final = 1_000_000
 
+#: How far scipy's Gaussian filter reaches, in standard deviations: its default ``truncate``, which
+#: the version 1 join ran with. The filter below reproduces it (see :func:`_gaussian_filter`).
+_GAUSSIAN_TRUNCATE: Final = 4.0
+
+#: What a pair's rotation and translation are fitted with, by the name the policy gives. Version
+#: 1's parameters name none: theirs is the rotation-and-translation fit, and decoding keeps it.
+_PAIR_FIT_V1: Final = "rotation-translation"
+#: Where the camera stood still, how tiles at depth edges are treated, by name. Version 1's
+#: parameters name none: theirs compares every tile, and decoding keeps it.
+_DISOCCLUSION_V1: Final = "none"
+
+
+@dataclass(frozen=True, slots=True)
+class UpFromEdges:
+    """The vertical-edges up method's parameters (stage version 2), decoded and named.
+
+    ``background_deg`` is the band of angles from perpendicular whose edge density stands for
+    edges that are not vertical; ``min_evidence`` is how many times denser than it the mode must
+    be for the edges to decide.
+    """
+
+    long_edge_px: int
+    blur_px: float
+    edge_fraction: float
+    max_pixels: int
+    kernel_deg: float
+    search_deg: float
+    background_deg: tuple[float, float]
+    iterations: int
+    min_evidence: float
+
 
 @dataclass(frozen=True, slots=True)
 class StandpointPolicy:
-    """The stage's parameters, decoded once and named. See the stage registry for each reason."""
+    """The stage's parameters, decoded once and named. See the stage registry for each reason.
+
+    The fields after ``up_min_spread`` exist from stage version 2. Version 1's parameters decode
+    to the values that keep what version 1 computed: the rotation-and-translation fit, no zoom,
+    no hand-held bound or depth-spread requirement (two outcomes of the moved test, not three),
+    every tile compared, and up from the cameras' horizontal axes.
+    """
 
     feature_max_edge_px: int
     max_features: int
@@ -142,6 +208,17 @@ class StandpointPolicy:
     focal_refine_min_inliers: int
     focal_refine_max_translation_m: float
     up_min_spread: float
+    pair_fit: str
+    zoom_prior_sigma: float
+    still_max_translation_m: float | None
+    min_translation_parallax_deg: float | None
+    change_disocclusion: str
+    change_edge_jump: float
+    change_disocclusion_max_px: int
+    change_disocclusion_min_share: float
+    change_disocclusion_margin_px: int
+    up_method: str
+    up_edges: UpFromEdges | None
 
     @classmethod
     def from_params(cls, params: Mapping[str, Any]) -> StandpointPolicy:
@@ -163,8 +240,37 @@ class StandpointPolicy:
             raise ValueError("this join knows one scale gauge and the policy names another")
         if change["method"] != "registered-appearance":
             raise ValueError("this join knows one way to see a change and the policy names another")
-        if up["method"] != "camera-horizontal-axes":
-            raise ValueError("this join knows one way to estimate up and the policy names another")
+        pair_fit = str(translation.get("fit", _PAIR_FIT_V1))
+        if pair_fit not in _PAIR_FITS:
+            raise ValueError(f"this join knows no pair fit named {pair_fit!r}")
+        disocclusion = str(change.get("disocclusion", _DISOCCLUSION_V1))
+        if disocclusion not in _DISOCCLUSIONS:
+            raise ValueError(f"this join knows no depth-edge treatment named {disocclusion!r}")
+        if (disocclusion == "depth-edge-parallax") != all(
+            key in change
+            for key in (
+                "edge_jump_ppm",
+                "disocclusion_max_px",
+                "disocclusion_min_share_ppm",
+                "disocclusion_margin_px",
+            )
+        ):
+            raise ValueError("the depth-edge treatment and its parameters come together")
+        up_method = str(up["method"])
+        if up_method not in _UP_METHODS:
+            raise ValueError(f"this join knows no way to estimate up named {up_method!r}")
+        edges = up.get("edges")
+        if (up_method == "vertical-edges") != (edges is not None):
+            raise ValueError("the vertical-edges up method and its parameters come together")
+        if edges is not None and up.get("fallback") != "camera-horizontal-axes":
+            raise ValueError("the vertical-edges up method falls back to the camera axes only")
+        still = translation.get("still_max_mm")
+        parallax = translation.get("min_parallax_millidegrees")
+        if (still is None) != (parallax is None):
+            raise ValueError("a hand-held bound and a measured-parallax requirement come together")
+        zoom_sigma = translation.get("zoom_prior_sigma_ppm")
+        if (pair_fit == "rotation-translation-zoom") != (zoom_sigma is not None):
+            raise ValueError("the zoom fit and its prior come together")
         low, high = intrinsics["exif_plausible_mm"]
         return cls(
             feature_max_edge_px=int(features["max_edge_px"]),
@@ -203,6 +309,34 @@ class StandpointPolicy:
             focal_refine_min_inliers=int(intrinsics["refine"]["min_inliers"]),
             focal_refine_max_translation_m=int(intrinsics["refine"]["max_translation_mm"]) / _MILLI,
             up_min_spread=int(up["min_spread_ppm"]) / _MICRO,
+            pair_fit=pair_fit,
+            zoom_prior_sigma=0.0 if zoom_sigma is None else int(zoom_sigma) / _MICRO,
+            still_max_translation_m=None if still is None else int(still) / _MILLI,
+            min_translation_parallax_deg=None if parallax is None else int(parallax) / _MILLI,
+            change_disocclusion=disocclusion,
+            change_edge_jump=int(change.get("edge_jump_ppm", 0)) / _MICRO,
+            change_disocclusion_max_px=int(change.get("disocclusion_max_px", 0)),
+            change_disocclusion_min_share=int(change.get("disocclusion_min_share_ppm", 0)) / _MICRO,
+            change_disocclusion_margin_px=int(change.get("disocclusion_margin_px", 0)),
+            up_method=up_method,
+            up_edges=(
+                None
+                if edges is None
+                else UpFromEdges(
+                    long_edge_px=int(edges["long_edge_px"]),
+                    blur_px=int(edges["blur_milli_px"]) / _MILLI,
+                    edge_fraction=int(edges["edge_fraction_ppm"]) / _MICRO,
+                    max_pixels=int(edges["max_pixels"]),
+                    kernel_deg=int(edges["kernel_millidegrees"]) / _MILLI,
+                    search_deg=int(edges["search_millidegrees"]) / _MILLI,
+                    background_deg=(
+                        int(edges["background_millidegrees"][0]) / _MILLI,
+                        int(edges["background_millidegrees"][1]) / _MILLI,
+                    ),
+                    iterations=int(edges["iterations"]),
+                    min_evidence=int(edges["min_evidence_milli"]) / _MILLI,
+                )
+            ),
         )
 
 
@@ -346,6 +480,75 @@ def _stats_millidegrees(angles: np.ndarray) -> dict[str, int]:
 
 def _ppb(rotation: np.ndarray) -> tuple[int, ...]:
     return tuple(round(float(value) * PARTS_PER_BILLION) for value in rotation.reshape(-1))
+
+
+# -- image filters, numpy only -------------------------------------------------------------------
+
+
+def _gaussian_filter(image: np.ndarray, sigma: float, *, outside: str) -> np.ndarray:
+    """``scipy.ndimage.gaussian_filter`` in numpy: separable, reaching ``_GAUSSIAN_TRUNCATE`` sigma.
+
+    ``outside`` is ``"zero"`` (scipy's ``mode="constant"``) or ``"mirror"`` (scipy's default
+    ``"reflect"``, the edge sample repeated). MEASURED 2026-09-24 against scipy 1.17.1 on 150
+    random images at three widths: largest difference 6.7e-16 of the largest value.
+    """
+    radius = int(_GAUSSIAN_TRUNCATE * float(sigma) + 0.5)
+    offsets = np.arange(-radius, radius + 1, dtype=np.float64)
+    weights = np.exp(-0.5 * (offsets / sigma) ** 2)
+    weights /= weights.sum()
+    mode = {"zero": "constant", "mirror": "symmetric"}[outside]
+    out = np.asarray(image, dtype=np.float64)
+    for axis in range(out.ndim):
+        moved = np.moveaxis(out, axis, 0)
+        padded = np.pad(moved, [(radius, radius)] + [(0, 0)] * (moved.ndim - 1), mode=mode)
+        total = np.zeros_like(moved)
+        for index, weight in enumerate(weights):
+            total += weight * padded[index : index + moved.shape[0]]
+        out = np.moveaxis(total, 0, axis)
+    return out
+
+
+def _component_sizes(mask: np.ndarray) -> np.ndarray:
+    """The sizes of the 4-connected regions of a 2D mask (``scipy.ndimage.label``'s default).
+
+    Every cell takes the smallest index among its connected neighbours until nothing changes, so
+    each region ends labelled by its first cell. The masks here are tile grids of at most a few
+    thousand cells.
+    """
+    height, width = mask.shape
+    empty = height * width
+    labels = np.where(mask, np.arange(height * width).reshape(height, width), empty)
+    while True:
+        spread = labels.copy()
+        down = mask[1:, :] & mask[:-1, :]
+        spread[1:, :] = np.where(down, np.minimum(spread[1:, :], labels[:-1, :]), spread[1:, :])
+        spread[:-1, :] = np.where(down, np.minimum(spread[:-1, :], labels[1:, :]), spread[:-1, :])
+        across = mask[:, 1:] & mask[:, :-1]
+        spread[:, 1:] = np.where(across, np.minimum(spread[:, 1:], labels[:, :-1]), spread[:, 1:])
+        spread[:, :-1] = np.where(across, np.minimum(spread[:, :-1], labels[:, 1:]), spread[:, :-1])
+        if np.array_equal(spread, labels):
+            break
+        labels = spread
+    _regions, sizes = np.unique(labels[mask], return_counts=True)
+    return sizes
+
+
+def _neighbourhood(values: np.ndarray, reduce: Callable[..., np.ndarray]) -> np.ndarray:
+    """``reduce`` over each cell's 3 x 3 neighbourhood, the border cells repeated outward."""
+    height, width = values.shape
+    padded = np.pad(values, 1, mode="edge")
+    return reduce(
+        np.stack([padded[dy : dy + height, dx : dx + width] for dy in range(3) for dx in range(3)]),
+        axis=0,
+    )
+
+
+def _sobel(image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Horizontal and vertical Sobel derivatives, the edge sample repeated outward."""
+    p = np.pad(image, 1, mode="symmetric")
+    gx = (p[:-2, 2:] + 2 * p[1:-1, 2:] + p[2:, 2:]) - (p[:-2, :-2] + 2 * p[1:-1, :-2] + p[2:, :-2])
+    gy = (p[2:, :-2] + 2 * p[2:, 1:-1] + p[2:, 2:]) - (p[:-2, :-2] + 2 * p[:-2, 1:-1] + p[:-2, 2:])
+    return gx, gy
 
 
 # -- members -------------------------------------------------------------------------------------
@@ -624,6 +827,161 @@ def _refine(
     return refined, parameters[3:], covariance[3:, 3:]
 
 
+def _refine_zoom(
+    target: np.ndarray,
+    xy: np.ndarray,
+    size: tuple[int, int],
+    focal: float,
+    inverse: np.ndarray,
+    rotation: np.ndarray,
+    policy: StandpointPolicy,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+    """:func:`_refine` with one more unknown: a relative zoom of ``b``'s lens, held by a prior.
+
+    A lens stated a few percent off scales every direction about the frame's centre, and so does a
+    step towards what is photographed, where the matched points lie at about one distance. Fitted
+    without the zoom, the step takes the lens's error: MEASURED on the development sets with the
+    stated lenses perturbed by up to 3 percent, translations of 0.14 to 0.69 m along the view
+    appeared where the camera had moved 0.01 to 0.02 m, and one joinable pair was refused as moved.
+    The zoom is ``exp(s)`` on ``b``'s focal length; ``s / zoom_prior_sigma`` is one more residual,
+    scaled to the angular noise the focal refinement uses. Returns the rotation, the translation
+    and its covariance, and ``s``.
+    """
+    delta = math.radians(policy.inlier_threshold_deg)
+    noise = math.radians(policy.focal_refine_noise_deg)
+
+    def angular(parameters: np.ndarray) -> np.ndarray:
+        bearings = _bearings(xy, size, focal * math.exp(float(parameters[6])))
+        turned = bearings @ (_rotation_from_vector(parameters[:3]) @ rotation).T
+        predicted = turned + parameters[3:6][None, :] * inverse[:, None]
+        predicted /= np.linalg.norm(predicted, axis=1, keepdims=True)
+        return np.cross(target, predicted)
+
+    def residuals(parameters: np.ndarray) -> np.ndarray:
+        prior = parameters[6] / policy.zoom_prior_sigma * noise
+        return np.concatenate([angular(parameters).reshape(-1), [prior]])
+
+    parameters = np.zeros(7)
+    observable = bool(np.any(inverse > 0))
+    step = 1e-7
+    normal = np.eye(7)
+    residual = residuals(parameters)
+    for _ in range(policy.refine_iterations):
+        norms = np.linalg.norm(residual[:-1].reshape(-1, 3), axis=1)
+        weights = np.concatenate([np.repeat(_huber(norms, delta), 3), [1.0]])
+        jacobian = np.empty((len(residual), 7))
+        for column in range(7):
+            nudged = parameters.copy()
+            nudged[column] += step
+            jacobian[:, column] = (residuals(nudged) - residual) / step
+        normal = jacobian.T @ (jacobian * weights[:, None])
+        damping = 1e-9 * max(float(np.max(np.diag(normal))), 1e-12)
+        normal = normal + damping * np.eye(7)
+        gradient = jacobian.T @ (residual * weights)
+        if not observable:
+            # No matched point has a depth, so nothing constrains a translation: hold it at zero.
+            normal[3:6, :] = 0.0
+            normal[:, 3:6] = 0.0
+            normal[3:6, 3:6] = np.eye(3)
+            gradient[3:6] = 0.0
+        update = -np.linalg.solve(normal, gradient)
+        parameters = parameters + update
+        residual = residuals(parameters)
+        if float(np.linalg.norm(update)) < 1e-12:
+            break
+    norms = np.linalg.norm(residual[:-1].reshape(-1, 3), axis=1)
+    weights = _huber(norms, delta)
+    dof = max(1, 2 * len(norms) - 7)
+    variance = float(np.sum(weights * norms**2)) / dof
+    covariance = variance * np.linalg.inv(normal)
+    if not observable:
+        covariance[3:6, 3:6] = np.inf
+    refined = _rotation_from_vector(parameters[:3]) @ rotation
+    return refined, parameters[3:6], covariance[3:6, 3:6], float(parameters[6])
+
+
+@dataclass(frozen=True, slots=True)
+class _Motion:
+    """A pair's fitted motion of ``b`` into ``a``: turn, translation (``b``'s depth units), zoom."""
+
+    rotation: np.ndarray
+    translation: np.ndarray
+    covariance: np.ndarray
+    zoom: float
+
+    def source(self, b: _Member, ib: np.ndarray) -> np.ndarray:
+        """``b``'s matched bearings through the zoom the fit found (none for version 1)."""
+        if self.zoom == 0.0:
+            return b.bearings[ib]
+        return _bearings(b.xy[ib], b.source_size, b.focal_source * math.exp(self.zoom))
+
+    def predict(self, b: _Member, ib: np.ndarray) -> np.ndarray:
+        predicted = self.source(b, ib) @ self.rotation.T + (
+            self.translation[None, :] * b.inverse_range[ib][:, None]
+        )
+        return predicted / np.linalg.norm(predicted, axis=1, keepdims=True)
+
+
+def _fit_rotation_translation(
+    a: _Member,
+    b: _Member,
+    ia: np.ndarray,
+    ib: np.ndarray,
+    rotation: np.ndarray,
+    policy: StandpointPolicy,
+) -> _Motion:
+    refined, translation, covariance = _refine(
+        a.bearings[ia], b.bearings[ib], b.inverse_range[ib], rotation, policy
+    )
+    return _Motion(refined, translation, covariance, 0.0)
+
+
+def _zoom_refinement(
+    a: _Member,
+    b: _Member,
+    ia: np.ndarray,
+    ib: np.ndarray,
+    rotation: np.ndarray,
+    policy: StandpointPolicy,
+) -> _Motion:
+    refined, translation, covariance, zoom = _refine_zoom(
+        a.bearings[ia],
+        b.xy[ib],
+        b.source_size,
+        b.focal_source,
+        b.inverse_range[ib],
+        rotation,
+        policy,
+    )
+    return _Motion(refined, translation, covariance, zoom)
+
+
+#: What the final pass adds to a pair's rotation-and-translation fit, by the name the policy gives:
+#: nothing, or a relative zoom. A name missing here is refused when the policy is decoded.
+_PAIR_FITS: Final[Mapping[str, Callable[..., _Motion] | None]] = {
+    "rotation-translation": None,
+    "rotation-translation-zoom": _zoom_refinement,
+}
+_DISOCCLUSIONS: Final = frozenset({"none", "depth-edge-parallax"})
+
+
+def _bound_parallax_deg(inverse: np.ndarray, movement: float) -> float:
+    """How far a movement of ``movement`` would shift the nearer matched points against the farther.
+
+    The difference between the 90th and 10th percentile of the points' inverse depths, times the
+    movement, in degrees: the parallax a sideways step of that size makes between them, which is
+    the signal a translation estimate rests on. MEASURED on the development sets for a step of the
+    moved bound: under 0.2 degrees the estimates were off by up to 3.3 m (one facade 29 m away,
+    where it is 0.03 degrees); from 0.3 degrees the median error was 0.02 m. Zero when too few
+    points carry a depth to say.
+    """
+    placed = inverse[inverse > 0]
+    if len(placed) < 6:
+        return 0.0
+    low, high = np.percentile(placed, [10, 90])
+    return math.degrees(movement * float(high - low))
+
+
 def _cells(xy: np.ndarray, size: tuple[int, int], grid: int) -> int:
     columns = np.clip((xy[:, 0] / size[0] * grid).astype(np.int64), 0, grid - 1)
     rows = np.clip((xy[:, 1] / size[1] * grid).astype(np.int64), 0, grid - 1)
@@ -684,8 +1042,8 @@ def _bilinear(image: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 def _low_pass(image: np.ndarray, mask: np.ndarray, sigma: float) -> np.ndarray:
     """Gaussian smoothing where only ``mask`` pixels contribute and count."""
-    weight = ndimage.gaussian_filter(mask.astype(np.float64), sigma, mode="constant")
-    total = ndimage.gaussian_filter(np.where(mask, image, 0.0), sigma, mode="constant")
+    weight = _gaussian_filter(mask.astype(np.float64), sigma, outside="zero")
+    total = _gaussian_filter(np.where(mask, image, 0.0), sigma, outside="zero")
     return total / np.maximum(weight, 1e-9)
 
 
@@ -696,6 +1054,8 @@ def _changed_fraction(
     translation: np.ndarray,
     ratio: float,
     policy: StandpointPolicy,
+    *,
+    tolerant: bool = False,
 ) -> float:
     """How much of the view ``to`` shares with ``from_`` shows something else in ``from_``.
 
@@ -709,6 +1069,14 @@ def _changed_fraction(
     different brightness. What counts is the share of compared tiles in connected regions of at
     least the policy's size: a change is a region, and the scattered tiles a fine pattern sampled
     twice disagrees on are not. A small low-pass first keeps that pattern from reading as a change.
+
+    ``tolerant`` (stage version 2, only where the camera was measured to stand still) leaves out
+    a tile whose shifts cannot cover what the movement does to it: the parallax its own nearest
+    point allows, or, where the tile and its eight neighbours span a depth edge, the parallax
+    between the edge's near and far sides. There the movement uncovers the far surface beside the
+    near one, which one photograph shows and the other hides, and no shift lines that up.
+    MEASURED on the development sets: such strips beside lamp posts and building edges were what
+    refused four joinable courtyard pairs as changed.
     """
     angle = max(
         1.0 / to.gray_focal,
@@ -768,38 +1136,72 @@ def _changed_fraction(
     # the tile's nearest placed point, never less than the base nor more than the maximum.
     moved = float(np.linalg.norm(translation)) * ratio
     nearest = np.min(tiled(np.where(placed, ranges, np.inf)), axis=(1, 3))
+    needed = policy.change_search_base_px + policy.change_depth_uncertainty * focal_here * moved / (
+        np.maximum(nearest, 1e-9)
+    )
+    counted = tiled(valid).all(axis=(1, 3))
     reach = np.floor(
-        np.clip(
-            policy.change_search_base_px
-            + policy.change_depth_uncertainty * focal_here * moved / np.maximum(nearest, 1e-9),
-            policy.change_search_base_px,
-            policy.change_search_max_px,
-        )
+        np.clip(needed, policy.change_search_base_px, policy.change_search_max_px)
     ).astype(np.int64)
     here_tiles = tiled(here)
-    here_mean = here_tiles.mean(axis=(1, 3))
-    here_sigma = here_tiles.std(axis=(1, 3))
-    counted = tiled(valid).all(axis=(1, 3))
     widest = policy.change_search_max_px
     padded = np.pad(np.where(valid, warped, np.nan), widest, constant_values=np.nan)
     best = np.full((tiles_high, tiles_wide), -np.inf)
-    there_mean = there_sigma = np.zeros((tiles_high, tiles_wide))
-    for dy in range(-widest, widest + 1):
-        for dx in range(-widest, widest + 1):
-            shifted = tiled(
-                padded[widest + dy : widest + dy + height, widest + dx : widest + dx + width]
-            )
-            usable = np.isfinite(shifted).all(axis=(1, 3)) & (reach >= max(abs(dx), abs(dy)))
-            filled = np.where(np.isfinite(shifted), shifted, 0.0)
-            mean = filled.mean(axis=(1, 3))
-            sigma = filled.std(axis=(1, 3))
-            if dx == 0 and dy == 0:
-                there_mean, there_sigma = mean, sigma
-            covariance = (
-                (here_tiles - here_mean[:, None, :, None]) * (filled - mean[:, None, :, None])
-            ).mean(axis=(1, 3))
-            correlation = covariance / np.maximum(here_sigma * sigma, 1e-9)
-            best = np.where(usable, np.maximum(best, correlation), best)
+    if tolerant and policy.change_disocclusion == "depth-edge-parallax":
+        # A tile is compared on the pixels no depth edge's band marks, and only when they are at
+        # least the policy's share of it.
+        weight = tiled((~_disocclusion(placed, ranges, focal_here * moved, policy)).astype(float))
+        kept = weight.sum(axis=(1, 3))
+        counted &= kept >= policy.change_disocclusion_min_share * tile * tile
+        kept = np.maximum(kept, 1.0)
+
+        def statistics(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            mean = (values * weight).sum(axis=(1, 3)) / kept
+            spread = (weight * (values - mean[:, None, :, None]) ** 2).sum(axis=(1, 3)) / kept
+            return mean, np.sqrt(np.maximum(spread, 0.0))
+
+        here_mean, here_sigma = statistics(here_tiles)
+        there_mean = there_sigma = np.zeros((tiles_high, tiles_wide))
+        for dy in range(-widest, widest + 1):
+            for dx in range(-widest, widest + 1):
+                shifted = tiled(
+                    padded[widest + dy : widest + dy + height, widest + dx : widest + dx + width]
+                )
+                finite = np.isfinite(shifted)
+                usable = (finite | (weight == 0)).all(axis=(1, 3)) & (
+                    reach >= max(abs(dx), abs(dy))
+                )
+                filled = np.where(finite, shifted, 0.0)
+                mean, sigma = statistics(filled)
+                if dx == 0 and dy == 0:
+                    there_mean, there_sigma = mean, sigma
+                covariance = (
+                    weight
+                    * (here_tiles - here_mean[:, None, :, None])
+                    * (filled - mean[:, None, :, None])
+                ).sum(axis=(1, 3)) / kept
+                correlation = covariance / np.maximum(here_sigma * sigma, 1e-9)
+                best = np.where(usable, np.maximum(best, correlation), best)
+    else:
+        here_mean = here_tiles.mean(axis=(1, 3))
+        here_sigma = here_tiles.std(axis=(1, 3))
+        there_mean = there_sigma = np.zeros((tiles_high, tiles_wide))
+        for dy in range(-widest, widest + 1):
+            for dx in range(-widest, widest + 1):
+                shifted = tiled(
+                    padded[widest + dy : widest + dy + height, widest + dx : widest + dx + width]
+                )
+                usable = np.isfinite(shifted).all(axis=(1, 3)) & (reach >= max(abs(dx), abs(dy)))
+                filled = np.where(np.isfinite(shifted), shifted, 0.0)
+                mean = filled.mean(axis=(1, 3))
+                sigma = filled.std(axis=(1, 3))
+                if dx == 0 and dy == 0:
+                    there_mean, there_sigma = mean, sigma
+                covariance = (
+                    (here_tiles - here_mean[:, None, :, None]) * (filled - mean[:, None, :, None])
+                ).mean(axis=(1, 3))
+                correlation = covariance / np.maximum(here_sigma * sigma, 1e-9)
+                best = np.where(usable, np.maximum(best, correlation), best)
     flat = policy.change_flat_sigma
     flat_here, flat_there = here_sigma < flat, there_sigma < flat
     one_flat = (flat_here & (there_sigma > 2 * flat)) | (flat_there & (here_sigma > 2 * flat))
@@ -812,10 +1214,86 @@ def _changed_fraction(
     total = int(np.count_nonzero(counted))
     if total == 0:
         return 0.0
-    labels, _count = ndimage.label(disagree)
-    sizes = np.bincount(labels.ravel())[1:]
+    sizes = _component_sizes(disagree)
     clustered = int(np.sum(sizes[sizes >= policy.change_min_cluster_tiles]))
     return clustered / total
+
+
+def _disocclusion(
+    placed: np.ndarray,
+    ranges: np.ndarray,
+    pixels_per_inverse_metre: float,
+    policy: StandpointPolicy,
+) -> np.ndarray:
+    """The pixels a movement may uncover beside a depth edge, which one photograph shows and the
+    other hides.
+
+    A depth edge is two neighbouring pixels whose inverse depths differ by more than
+    ``change_edge_jump`` of the nearer one's, or a placed pixel beside one the depth model left
+    unplaced (taken at infinity). A movement shifts the near side against the far side by
+    ``pixels_per_inverse_metre`` (the comparison's focal length times the movement) times their
+    inverse-depth difference, and the band that uncovers is as wide as that shift, beside the edge.
+    Every pixel within that distance of an edge is marked, the band capped at
+    ``change_disocclusion_max_px``; a shift within the comparison's base search marks nothing. A
+    surface's own slope is not an edge: the ground running up to an object on it changes smoothly,
+    and what stands on it is still compared. MEASURED on the development sets: the rule it replaced,
+    every tile whose 3 x 3 neighbourhood of tiles spanned a large enough inverse-depth range, took
+    the ground under a moved fountain for an edge and left 1.85 percent of a changed pair
+    disagreeing where the comparison without it saw 3.78.
+    """
+    inverse = np.where(placed, 1.0 / np.where(placed, ranges, 1.0), 0.0)
+    band = np.zeros(inverse.shape)
+    for axis in (0, 1):
+        first = np.take(inverse, np.arange(inverse.shape[axis] - 1), axis=axis)
+        second = np.take(inverse, np.arange(1, inverse.shape[axis]), axis=axis)
+        nearer = np.maximum(first, second)
+        step = np.abs(first - second)
+        edge = (nearer > 0) & (step > policy.change_edge_jump * nearer)
+        shift = np.where(edge, pixels_per_inverse_metre * step, 0.0)
+        if axis == 0:
+            band[:-1, :] = np.maximum(band[:-1, :], shift)
+            band[1:, :] = np.maximum(band[1:, :], shift)
+        else:
+            band[:, :-1] = np.maximum(band[:, :-1], shift)
+            band[:, 1:] = np.maximum(band[:, 1:], shift)
+    # A shift the comparison's base search covers uncovers nothing it cannot line up. Each other
+    # edge pixel reaches as far as its own shift: a reach that falls by one pixel a step.
+    band = np.where(
+        band > policy.change_search_base_px, band + policy.change_disocclusion_margin_px, 0.0
+    )
+    reach = np.minimum(np.ceil(band), policy.change_disocclusion_max_px)
+    for _ in range(policy.change_disocclusion_max_px):
+        spread = _neighbourhood(reach, np.max) - 1.0
+        grown = np.maximum(reach, spread)
+        if np.array_equal(grown, reach):
+            break
+        reach = grown
+    return reach > 0
+
+
+def _pair_changed(
+    a: _Member,
+    b: _Member,
+    rotation: np.ndarray,
+    translation: np.ndarray,
+    ratio: float,
+    policy: StandpointPolicy,
+    *,
+    tolerant: bool,
+) -> float:
+    """The changed share of a pair under one motion: each photograph carried into the other, the
+    larger of the two, since what one of them added shows only from its own side."""
+    changed_ab = _changed_fraction(a, b, rotation, translation, ratio, policy, tolerant=tolerant)
+    changed_ba = _changed_fraction(
+        b,
+        a,
+        rotation.T,
+        -(rotation.T @ translation) * ratio,
+        1.0 / ratio,
+        policy,
+        tolerant=tolerant,
+    )
+    return max(changed_ab, changed_ba)
 
 
 def _join_pair(
@@ -854,18 +1332,28 @@ def _join_pair(
         return refused("insufficient_overlap")
     window = _angles_deg(target, source @ rotation.T) <= policy.candidate_window_deg
     inverse = b.inverse_range[ib]
-    translation = np.zeros(3)
-    covariance = np.full((3, 3), np.inf)
+    motion = _Motion(rotation, np.zeros(3), np.full((3, 3), np.inf), 0.0)
     inliers = window
     for _ in range(2):
         if np.count_nonzero(inliers) < max(3, policy.min_inliers // 2):
             break
-        rotation, translation, covariance = _refine(
-            target[inliers], source[inliers], inverse[inliers], rotation, policy
-        )
-        predicted = source @ rotation.T + translation[None, :] * inverse[:, None]
-        predicted /= np.linalg.norm(predicted, axis=1, keepdims=True)
+        motion = _fit_rotation_translation(a, b, ia[inliers], ib[inliers], motion.rotation, policy)
+        predicted = motion.predict(b, ib)
         inliers = window & (_angles_deg(target, predicted) <= policy.inlier_threshold_deg)
+    # What the final pass adds to that fit, on its inliers and from its rotation. The provisional
+    # pass's motions start the focal refinement and keep version 1's fit: MEASURED on the
+    # development sets, starting that refinement from motions fitted with a zoom left one room's
+    # lens 3.4 percent off where version 1's start left it 0.1 percent off. And fitted from the
+    # RANSAC turn with its inliers chosen again, the zoom found a 17 percent zoom and a 0.7 m step
+    # in a landscape pair whose camera stood still, on 74 of the 125 matches the plain fit keeps.
+    refinement = _PAIR_FITS[policy.pair_fit]
+    if (
+        refinement is not None
+        and not provisional
+        and np.count_nonzero(inliers) >= max(3, policy.min_inliers // 2)
+    ):
+        motion = refinement(a, b, ia[inliers], ib[inliers], motion.rotation, policy)
+    rotation, translation, covariance = motion.rotation, motion.translation, motion.covariance
     count = int(np.count_nonzero(inliers))
     cells = min(
         _cells(a.xy[ia[inliers]], a.source_size, policy.coverage_grid),
@@ -873,8 +1361,7 @@ def _join_pair(
     )
     if count < policy.min_inliers or cells < policy.min_inlier_cells:
         return refused("insufficient_overlap", inliers=count, cells=cells)
-    predicted = source[inliers] @ rotation.T + translation[None, :] * inverse[inliers][:, None]
-    predicted /= np.linalg.norm(predicted, axis=1, keepdims=True)
+    predicted = motion.predict(b, ib[inliers])
     residual = _stats_millidegrees(_angles_deg(target[inliers], predicted))
     turn = _turn_only(target[inliers], source[inliers], rotation, policy)
     turn_angles = _angles_deg(target[inliers], source[inliers] @ turn.T)
@@ -889,7 +1376,8 @@ def _join_pair(
     )
     ranges_b = 1.0 / np.where(inverse[inliers] > 0, inverse[inliers], np.nan)
     carried = np.linalg.norm(
-        (source[inliers] * ranges_b[:, None]) @ rotation.T + translation[None, :], axis=1
+        (motion.source(b, ib[inliers]) * ranges_b[:, None]) @ rotation.T + translation[None, :],
+        axis=1,
     )
     ratios = ranges_a / carried
     ratios = ratios[np.isfinite(ratios) & (ratios > 0)]
@@ -913,19 +1401,53 @@ def _join_pair(
         "translation_sigma_mm": None if not math.isfinite(sigma) else round(sigma * _MILLI),
         "depth_ratio_ppm": round(ratio * PARTS_PER_MILLION),
     }
+
+    # Whether a movement shows at all: only as parallax between points at different depths
+    # (version 1 asks no such question, and every translation counts). A movement is claimed only
+    # where the one estimated would show; the camera is claimed to have stood still only where a
+    # movement of the moved bound would have shown.
+    def shows(movement: float) -> bool:
+        return policy.min_translation_parallax_deg is None or (
+            _bound_parallax_deg(inverse[inliers], movement) >= policy.min_translation_parallax_deg
+        )
+
     if (
-        math.isfinite(sigma)
+        shows(distance)
+        and math.isfinite(sigma)
         and distance - policy.translation_sigmas * sigma > policy.max_translation_m
     ):
         return refused("moved_between_photographs", **fields)
-    changed_ab = _changed_fraction(a, b, rotation, translation, ratio, policy)
-    changed_ba = _changed_fraction(
-        b, a, rotation.T, -(rotation.T @ translation) * ratio, 1.0 / ratio, policy
-    )
-    changed = max(changed_ab, changed_ba)
+    if policy.still_max_translation_m is None:
+        # Version 1: the camera is taken to have stood still wherever it was not measured to move.
+        still = True
+        changed = _pair_changed(a, b, rotation, translation, ratio, policy, tolerant=False)
+    else:
+        still = (
+            shows(policy.max_translation_m)
+            and math.isfinite(sigma)
+            and distance + policy.translation_sigmas * sigma <= policy.still_max_translation_m
+        )
+        # Where the camera stood still, the measured movement and a pure turn are both admissible
+        # and the one that explains more of what the photographs share decides; elsewhere only a
+        # pure turn is, because a movement nobody measured must not be used to explain anything.
+        # There the turn must also explain the matched features themselves, within the inlier
+        # threshold at the 90th percentile: MEASURED on the development sets, the one pair such a
+        # turn left 2.4 degrees apart there joined 0.81 degrees misregistered, and no pair joined
+        # under a measured movement left more than 1.0.
+        if (
+            not still
+            and turn_angles.size
+            and (float(np.percentile(turn_angles, 90)) > policy.inlier_threshold_deg)
+        ):
+            return refused("insufficient_overlap", **fields)
+        changed = _pair_changed(a, b, turn, np.zeros(3), ratio, policy, tolerant=False)
+        if still:
+            changed = min(
+                changed, _pair_changed(a, b, rotation, translation, ratio, policy, tolerant=True)
+            )
     fields["changed_ppm"] = round(changed * PARTS_PER_MILLION)
     if changed > policy.max_changed_fraction:
-        return refused("scene_changed", **fields)
+        return refused("scene_changed" if still else "insufficient_overlap", **fields)
     record = StandpointPair(
         a=a.source.ordinal,
         b=b.source.ordinal,
@@ -1203,16 +1725,18 @@ def _solve_scales(
     return scales, residuals
 
 
-def _level(
-    absolute: dict[int, np.ndarray], reference: int, policy: StandpointPolicy
-) -> tuple[dict[int, np.ndarray], dict[str, Any]]:
-    """Turn the arrangement so the estimated up is +Y and the reference faces -Z.
+def _up_camera_axes(
+    absolute: Mapping[int, np.ndarray], policy: StandpointPolicy
+) -> tuple[np.ndarray, str]:
+    """Up from the cameras' own axes, and the name of the way it was found.
 
     People hold a camera level far more reliably than they hold its pitch, so the camera's own
     horizontal axis is taken to lie in the horizontal plane, and up is the direction closest to
     perpendicular to all of them. Photographs turned only up and down share one horizontal axis,
     which leaves up undetermined in a plane; then the average camera up, projected onto that
-    plane, is used, and the record says which method decided.
+    plane, is used. MEASURED on the development sets, whose photographs roll by 1.2 degrees at
+    one standard deviation: this leans by 1.3 degrees at the median and 3.9 at worst on the true
+    turns, and by nothing once the roll is removed, so the roll is its whole error.
     """
     nodes = sorted(absolute)
     horizontal = np.array([absolute[node][:, 0] for node in nodes])
@@ -1230,6 +1754,148 @@ def _level(
         method = "mean-camera-up-about-a-shared-horizontal-axis"
     if float(up @ np.sum(camera_up, axis=0)) < 0:
         up = -up
+    return up, method
+
+
+def _edge_normals(member: _Member, edges: UpFromEdges) -> tuple[np.ndarray, np.ndarray]:
+    """The planes through the camera and each of the photograph's strongest edge pixels.
+
+    Each is given by its unit normal in the camera frame, weighted by the edge's gradient. A
+    vertical line in the scene lies in the plane of every one of its edge pixels, so up is
+    perpendicular to all their normals; an edge that is not vertical has a normal pointing
+    anywhere. The pixels are the ``edge_fraction`` with the strongest gradient after a small blur,
+    at most ``max_pixels`` of them, taken evenly in raster order.
+    """
+    gray = member.gray
+    focal = member.gray_focal
+    height, width = gray.shape
+    scale = min(1.0, edges.long_edge_px / max(height, width))
+    if scale < 1.0:
+        size = (max(1, round(width * scale)), max(1, round(height * scale)))
+        gray = np.asarray(
+            Image.fromarray(gray).resize(size, Image.Resampling.BOX), dtype=np.float32
+        )
+        focal = focal * size[0] / width
+        height, width = gray.shape
+    smooth = _gaussian_filter(gray, edges.blur_px, outside="mirror")
+    gx, gy = _sobel(smooth)
+    magnitude = np.hypot(gx, gy)
+    threshold = max(float(np.quantile(magnitude, 1.0 - edges.edge_fraction)), 1e-9)
+    rows, columns = np.nonzero(magnitude > threshold)
+    if len(rows) > edges.max_pixels:
+        pick = (np.arange(edges.max_pixels) * (len(rows) / edges.max_pixels)).astype(np.int64)
+        rows, columns = rows[pick], columns[pick]
+    strength = magnitude[rows, columns]
+    # The edge runs across the gradient; image v grows downward and camera y upward.
+    along_u = -gy[rows, columns] / strength
+    along_v = gx[rows, columns] / strength
+    rays = np.stack(
+        [
+            (columns + 0.5 - width / 2) / focal,
+            -(rows + 0.5 - height / 2) / focal,
+            -np.ones(len(rows)),
+        ],
+        axis=1,
+    )
+    along = np.stack([along_u / focal, -along_v / focal, np.zeros(len(rows))], axis=1)
+    normals = np.cross(rays, along)
+    normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-15)
+    return normals, strength
+
+
+def _up_vertical_edges(
+    members: Mapping[int, _Member],
+    absolute: Mapping[int, np.ndarray],
+    start: np.ndarray,
+    edges: UpFromEdges,
+) -> tuple[np.ndarray, float, int]:
+    """Up as the mode of the edges' perpendicular, sought from ``start``; its evidence; its support.
+
+    Every photograph's edge-plane normals are turned into the arrangement. From ``start``, up is
+    repeatedly replaced by the direction least aligned with the normals within ``search_deg`` of
+    perpendicular, each weighted by its gradient and by a Gaussian of ``kernel_deg`` in its angle
+    from perpendicular: a mode, which a photograph of rocks with no vertical structure shifts
+    little, where a least-squares fit follows it. MEASURED on the development sets with the true
+    turns: 0.51 degrees at the 95th percentile and 0.71 at worst, where least squares in a
+    shrinking window left one set 5.7 degrees off. The evidence is how many times denser the
+    edges are within ``kernel_deg`` of perpendicular than in the ``background_deg`` band.
+    """
+    found_normals, found_weights = [], []
+    for node in sorted(absolute):
+        node_normals, node_weights = _edge_normals(members[node], edges)
+        found_normals.append(node_normals @ absolute[node].T)
+        found_weights.append(node_weights)
+    normals = np.concatenate(found_normals)
+    weights = np.concatenate(found_weights)
+    up = start / np.linalg.norm(start)
+    reach = math.sin(math.radians(edges.search_deg))
+    for _ in range(edges.iterations):
+        sines = normals @ up
+        near = np.abs(sines) < reach
+        if not np.any(near):
+            break
+        angles = np.degrees(np.arcsin(np.clip(sines[near], -1.0, 1.0)))
+        kernel = weights[near] * np.exp(-0.5 * (angles / edges.kernel_deg) ** 2)
+        scatter = (normals[near] * kernel[:, None]).T @ normals[near]
+        _values, vectors = np.linalg.eigh(scatter)
+        found = vectors[:, 0] if float(vectors[:, 0] @ up) >= 0 else -vectors[:, 0]
+        moved = float(np.degrees(np.arccos(np.clip(found @ up, -1.0, 1.0))))
+        up = found
+        if moved < 1e-4:
+            break
+    angles = np.degrees(np.arcsin(np.clip(normals @ up, -1.0, 1.0)))
+    low, high = edges.background_deg
+    peak = float(np.sum(weights[np.abs(angles) < edges.kernel_deg])) / (2 * edges.kernel_deg)
+    band = (np.abs(angles) >= low) & (np.abs(angles) < high)
+    background = float(np.sum(weights[band])) / (2 * (high - low))
+    evidence = peak / max(background, peak * 1e-6, 1e-12)
+    return up, evidence, int(np.count_nonzero(np.abs(angles) < edges.kernel_deg))
+
+
+#: The ways up is estimated, by the name the policy gives. A name missing here is refused when
+#: the policy is decoded, never guessed.
+_UP_METHODS: Final = frozenset({"camera-horizontal-axes", "vertical-edges"})
+
+
+def _estimate_up(
+    members: Mapping[int, _Member], absolute: Mapping[int, np.ndarray], policy: StandpointPolicy
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """The arrangement's up and what the record says about how it was found."""
+    axes_up, axes_method = _up_camera_axes(absolute, policy)
+    if policy.up_method == "camera-horizontal-axes":
+        return axes_up, {
+            "method": axes_method,
+            "assumption": "each photograph was held without roll",
+        }
+    if policy.up_method == "vertical-edges" and policy.up_edges is not None:
+        edges_up, evidence, support = _up_vertical_edges(
+            members, absolute, axes_up, policy.up_edges
+        )
+        facts = {"vertical_edges_evidence_milli": round(evidence * _MILLI)}
+        if evidence >= policy.up_edges.min_evidence:
+            return edges_up, {
+                "method": "vertical-edges",
+                "assumption": "the scene's vertical edges are vertical",
+                "edge_pixels": support,
+                "camera_axes_millidegrees": round(
+                    math.degrees(math.acos(max(-1.0, min(1.0, float(edges_up @ axes_up)))))
+                    * MILLIDEGREES
+                ),
+                **facts,
+            }
+        return axes_up, {
+            "method": axes_method,
+            "assumption": "each photograph was held without roll",
+            **facts,
+        }
+    raise ValueError(f"this join knows no way to estimate up named {policy.up_method!r}")
+
+
+def _level(
+    absolute: dict[int, np.ndarray], reference: int, up: np.ndarray
+) -> tuple[dict[int, np.ndarray], list[float]]:
+    """Turn the arrangement so ``up`` is +Y and the reference faces -Z; each photograph's roll."""
+    nodes = sorted(absolute)
     target = np.array([0.0, 1.0, 0.0])
     axis = np.cross(up, target)
     sine = float(np.linalg.norm(axis))
@@ -1244,14 +1910,7 @@ def _level(
     rolls = [
         math.degrees(math.asin(max(-1.0, min(1.0, float(leveled[node][1, 0]))))) for node in nodes
     ]
-    return leveled, {
-        "method": method,
-        "implied_roll_millidegrees": {
-            "max": round(max(abs(roll) for roll in rolls) * MILLIDEGREES),
-            "rms": round(math.sqrt(sum(roll * roll for roll in rolls) / len(rolls)) * MILLIDEGREES),
-        },
-        "assumption": "each photograph was held without roll",
-    }
+    return leveled, rolls
 
 
 def join_standpoint(
@@ -1346,7 +2005,13 @@ def join_standpoint(
         component = joined_components[0]
         joined = set(component)
         reference = component[0]
-        leveled, up = _level({node: solved[node] for node in component}, reference, policy)
+        turned = {node: solved[node] for node in component}
+        up_direction, up = _estimate_up(members, turned, policy)
+        leveled, rolls = _level(turned, reference, up_direction)
+        up["implied_roll_millidegrees"] = {
+            "max": round(max(abs(roll) for roll in rolls) * MILLIDEGREES),
+            "rms": round(math.sqrt(sum(roll * roll for roll in rolls) / len(rolls)) * MILLIDEGREES),
+        }
         ratios = {
             key: (pairs[key].depth_ratio, pairs[key].weight)
             for key in sorted(accepted)

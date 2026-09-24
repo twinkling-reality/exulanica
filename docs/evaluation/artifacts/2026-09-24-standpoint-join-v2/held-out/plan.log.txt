@@ -1,0 +1,6 @@
+planned held2-courtyard-121: 217 objects, 38 cameras
+planned held2-courtyard-122: 176 objects, 38 cameras
+planned held2-room-221: 199 objects, 38 cameras
+planned held2-room-222: 211 objects, 38 cameras
+planned held2-landscape-321: 202 objects, 38 cameras
+planned held2-landscape-322: 199 objects, 38 cameras

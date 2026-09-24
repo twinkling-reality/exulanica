@@ -1,0 +1,470 @@
+"""Join every set of a split with the standpoint method and score it against ground truth.
+
+    python standpoint_eval.py <split_dir> <policy.json> <out.json> --stage-version <n> [--arm exif|exif-perturbed]
+
+This process imports pycolmap (the method's feature extractor) and never torch: the point maps
+were made by standpoint_depth_pass.py in a process of its own.
+
+Per set it calls ``join_standpoint`` exactly as the stage will: the upright pixels intake would
+hand over, the point map the depth stage made, and the photograph's own FocalLengthIn35mmFilm
+(arm ``exif``) or none (arm ``depth-model``, where the depth model's field of view is used). The
+record is parsed back through ``parse_standpoint_record``, so every number scored is one the
+record carries, and every renderer-facing number is derived with ``scene_from_opm_row_major``.
+
+Ground truth comes from the renders: planar depth, camera rotation and centre, field of view.
+
+Scored per pair of photographs in a set:
+
+* ``truth``: overlap (fraction of one photograph's sampled pixels the other sees, depth tested),
+  the distance between the two cameras, the parallax a perfect rotation-only join would still
+  show (95th percentile over the overlap after the best rotation), and the pair's class:
+  ``joinable``, ``moved`` (cameras at least ``MOVED_M`` apart), ``changed`` (the set's change
+  falls in this pair's shared view) or ``no_overlap`` (overlap under ``NO_OVERLAP``).
+* ``method``: the outcome the record names, and for a pair both in the arrangement, the error of
+  their relative rotation, the misregistration a person at the standpoint sees at the overlap
+  (angle between where the two drawn photographs put one true point), and depth agreement between
+  the two drawn surfaces over the overlap and on the seam where ownership changes hands.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import sys
+import time
+import uuid
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+from PIL import Image
+
+from exulanica.canonical import sha256_of_canonical
+from exulanica.ingest.exif import extract_exif_facts
+from exulanica.reconstruction.standpoint import (
+    StandpointInput,
+    StandpointPolicy,
+    join_standpoint,
+)
+from exulanica.reconstruction.standpoint_features import PycolmapSift
+from exulanica.reconstruction.standpoint_record import (
+    PARTS_PER_BILLION,
+    parse_standpoint_record,
+    scene_from_opm_row_major,
+)
+
+#: Pair classes, decided from ground truth before the method runs.
+MOVED_M = 1.0
+NO_OVERLAP = 0.05
+#: Pixels sampled per photograph for ground-truth overlap: every SAMPLE_STEP-th row and column.
+SAMPLE_STEP = 4
+#: A sample is on the seam when its two frame fractions differ by less than this.
+SEAM_BAND = 0.03
+NAMESPACE = uuid.UUID("5c0f3a7e-2d1b-4b8e-9a3c-7d5e1f0b2a64")
+
+
+def _load_camera(scene: Path, truth: dict, photo_id: str) -> dict:
+    camera = truth["cameras"][photo_id]
+    width, height = camera["width"], camera["height"]
+    depth = np.fromfile(scene / camera["depth_file"], dtype="<f4").reshape(height, width)
+    focal = (height / 2) / math.tan(math.radians(camera["fov_y_deg"]) / 2)
+    return {
+        "id": photo_id,
+        "R": np.array(camera["rotation_world_from_camera"]),
+        "c": np.array(camera["centre_world"]),
+        "depth": depth.astype(np.float64),
+        "focal": focal,
+        "size": (width, height),
+    }
+
+
+def _rays(xy: np.ndarray, size: tuple[int, int], focal: float) -> np.ndarray:
+    width, height = size
+    return np.stack(
+        [(xy[:, 0] - width / 2) / focal, -(xy[:, 1] - height / 2) / focal, -np.ones(len(xy))], 1
+    )
+
+
+def _unit(v: np.ndarray) -> np.ndarray:
+    return v / np.linalg.norm(v, axis=1, keepdims=True)
+
+
+def _angles(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    return np.degrees(np.arctan2(np.linalg.norm(np.cross(a, b), axis=1), np.sum(a * b, axis=1)))
+
+
+def _kabsch(target: np.ndarray, source: np.ndarray) -> np.ndarray:
+    u, _s, vt = np.linalg.svd(source.T @ target)
+    d = np.sign(np.linalg.det(vt.T @ u.T)) or 1.0
+    return vt.T @ np.diag([1.0, 1.0, d]) @ u.T
+
+
+def _rotation_angle(r: np.ndarray) -> float:
+    return math.degrees(math.acos(max(-1.0, min(1.0, (float(np.trace(r)) - 1) / 2))))
+
+
+def truth_pair(k: dict, l: dict) -> dict:
+    """Ground-truth overlap samples of photograph k seen by photograph l."""
+    width, height = k["size"]
+    columns, rows = np.meshgrid(
+        np.arange(SAMPLE_STEP / 2, width, SAMPLE_STEP), np.arange(SAMPLE_STEP / 2, height, SAMPLE_STEP)
+    )
+    xy = np.stack([columns.ravel(), rows.ravel()], 1)
+    depth = k["depth"][xy[:, 1].astype(int), xy[:, 0].astype(int)]
+    near = depth < 3000.0  # the sky is the far clip; it has no point to project
+    xy, depth = xy[near], depth[near]
+    points_k = _rays(xy, k["size"], k["focal"]) * depth[:, None]
+    world = points_k @ k["R"].T + k["c"]
+    in_l = (world - l["c"]) @ l["R"]
+    z = -in_l[:, 2]
+    ahead = z > 0.05
+    safe = np.where(ahead, z, 1.0)
+    u = l["focal"] * in_l[:, 0] / safe + l["size"][0] / 2
+    v = -l["focal"] * in_l[:, 1] / safe + l["size"][1] / 2
+    inside = ahead & (u >= 0) & (u < l["size"][0]) & (v >= 0) & (v < l["size"][1])
+    visible = np.zeros(len(xy), dtype=bool)
+    ui, vi = u[inside].astype(int), v[inside].astype(int)
+    visible[inside] = np.abs(l["depth"][vi, ui] - z[inside]) < 0.02 * z[inside] + 0.02
+    total = int(np.count_nonzero(near)) + int(np.count_nonzero(~near))
+    # Of k's surface points that land in l's frame, the fraction l sees at another depth: from one
+    # standpoint nothing is hidden by moving, so this is what changed between the two photographs
+    # (plus the disocclusion a hand-held few centimetres makes at depth edges).
+    shared = int(np.count_nonzero(inside))
+    disagree = int(np.count_nonzero(inside & ~visible))
+    samples = {
+        "xy_k": xy[visible],
+        "xy_l": np.stack([u[visible], v[visible]], 1),
+        "world": world[visible],
+    }
+    overlap = float(np.count_nonzero(visible)) / max(1, total)
+    parallax = None
+    if np.count_nonzero(visible) >= 10:
+        d_k = _unit((samples["world"] - k["c"]) @ k["R"])
+        d_l = _unit((samples["world"] - l["c"]) @ l["R"])
+        best = _kabsch(d_k, d_l)
+        parallax = float(np.percentile(_angles(d_k, d_l @ best.T), 95))
+    return {
+        "overlap": overlap,
+        "shared_view_disagreement": disagree / shared if shared else 0.0,
+        "distance_m": float(np.linalg.norm(k["c"] - l["c"])),
+        "irreducible_parallax_p95_deg": parallax,
+        "samples": samples,
+    }
+
+
+#: Added around a changed part's bounding sphere, metres: a surface touching it counts as on it.
+CHANGE_MARGIN_M = 0.05
+
+
+def _change_spheres(scene: Path, set_entry: dict) -> list[tuple[np.ndarray, float]]:
+    """Bounding spheres of every part the set's change touches, in the product's Y-up world.
+
+    A removed part where it stood; a moved part where it stood and where it was put; an added
+    object where it appeared. Blender's Z-up world maps to Y-up as (x, z, -y).
+    """
+    change = set_entry.get("change")
+    if change is None:
+        return []
+    spec = json.loads((scene / "spec.json").read_text(encoding="utf-8"))
+    objects = {o["id"]: o for o in spec["objects"]}
+    parts = change.get("parts") or [change["object"]]
+    places: list[tuple[list[float], dict]] = [(objects[pid]["location"], objects[pid]) for pid in parts]
+    if change["mode"] == "move":
+        moved = next(c["move"] for c in spec["cameras"] if c["set"] == set_entry["id"] and c.get("move"))
+        places += [(moved[pid], objects[pid]) for pid in parts]
+    spheres = []
+    for location, item in places:
+        if item["shape"] == "box":
+            radius = 0.5 * float(np.linalg.norm(item["size"]))
+        elif item["shape"] == "sphere":
+            radius = item["radius"] * max(item.get("squash", [1.0, 1.0, 1.0]))
+        else:
+            radius = math.hypot(item["radius"], item["height"] / 2)
+        x, y, z = location
+        spheres.append((np.array([x, z, -y], dtype=float), radius + CHANGE_MARGIN_M))
+    return spheres
+
+
+def change_share(k: dict, l: dict, spheres: list[tuple[np.ndarray, float]]) -> float:
+    """Of k's surface points in l's frame, the fraction on a changed part in k's view or l's."""
+    if not spheres:
+        return 0.0
+    width, height = k["size"]
+    columns, rows = np.meshgrid(
+        np.arange(SAMPLE_STEP / 2, width, SAMPLE_STEP), np.arange(SAMPLE_STEP / 2, height, SAMPLE_STEP)
+    )
+    xy = np.stack([columns.ravel(), rows.ravel()], 1)
+    depth = k["depth"][xy[:, 1].astype(int), xy[:, 0].astype(int)]
+    near = depth < 3000.0
+    xy, depth = xy[near], depth[near]
+    world_k = (_rays(xy, k["size"], k["focal"]) * depth[:, None]) @ k["R"].T + k["c"]
+    in_l = (world_k - l["c"]) @ l["R"]
+    z = -in_l[:, 2]
+    ahead = z > 0.05
+    safe = np.where(ahead, z, 1.0)
+    u = l["focal"] * in_l[:, 0] / safe + l["size"][0] / 2
+    v = -l["focal"] * in_l[:, 1] / safe + l["size"][1] / 2
+    inside = ahead & (u >= 0) & (u < l["size"][0]) & (v >= 0) & (v < l["size"][1])
+    if not np.any(inside):
+        return 0.0
+    ui, vi = u[inside].astype(int), v[inside].astype(int)
+    depth_l = l["depth"][vi, ui]
+    rays_l = _rays(np.stack([ui + 0.5, vi + 0.5], 1), l["size"], l["focal"])
+    world_l = (rays_l * depth_l[:, None]) @ l["R"].T + l["c"]
+
+    def on_change(points: np.ndarray) -> np.ndarray:
+        hit = np.zeros(len(points), dtype=bool)
+        for centre, radius in spheres:
+            hit |= np.linalg.norm(points - centre, axis=1) <= radius
+        return hit
+
+    touched = on_change(world_k[inside]) | (on_change(world_l) & (depth_l < 3000.0))
+    return float(np.count_nonzero(touched)) / len(touched)
+
+
+def _grid(opm: bytes) -> tuple[np.ndarray, float, tuple[int, int], tuple[int, int]]:
+    """The point map's model grid of OPM points, as the method reads it."""
+    header_length = int.from_bytes(opm[4:8], "little")
+    header = json.loads(opm[8 : 8 + header_length])
+    width, height = header["modelImage"]["width"], header["modelImage"]["height"]
+    source = (header["sourceImage"]["width"], header["sourceImage"]["height"])
+    section = next(s for s in header["sections"] if s["name"] == "position")
+    points = np.frombuffer(opm, "<f4", section["byteLength"] // 4, section["byteOffset"]).reshape(-1, 3).astype(np.float64)
+    focal = (height / 2) / math.tan(math.radians(header["viewpoint"]["fovYDeg"]) / 2)
+    z = -points[:, 2]
+    u = np.floor(focal * points[:, 0] / z + width / 2).astype(int)
+    v = np.floor(-focal * points[:, 1] / z + height / 2).astype(int)
+    grid = np.full((height, width, 3), np.nan)
+    inside = (z > 0) & (u >= 0) & (u < width) & (v >= 0) & (v < height)
+    grid[v[inside], u[inside]] = points[inside]
+    return grid, focal, (width, height), source
+
+
+def _drawn(grid_bundle: tuple, matrix: tuple, xy_source: np.ndarray) -> np.ndarray:
+    """Scene positions the renderer draws for the given source pixels (NaN where none)."""
+    grid, _focal, model_size, source = grid_bundle
+    columns = np.clip((xy_source[:, 0] * model_size[0] / source[0]).astype(int), 0, model_size[0] - 1)
+    rows = np.clip((xy_source[:, 1] * model_size[1] / source[1]).astype(int), 0, model_size[1] - 1)
+    points = grid[rows, columns]
+    m = np.array(matrix).reshape(4, 4)
+    return points @ m[:3, :3].T + m[:3, 3]
+
+
+def _stats(values: np.ndarray) -> dict | None:
+    values = values[np.isfinite(values)]
+    if len(values) == 0:
+        return None
+    return {
+        "n": int(len(values)),
+        "p50": round(float(np.percentile(values, 50)), 4),
+        "p90": round(float(np.percentile(values, 90)), 4),
+        "p95": round(float(np.percentile(values, 95)), 4),
+        "max": round(float(np.max(values)), 4),
+    }
+
+
+def _exif_focal(jpeg: Path) -> float | None:
+    with Image.open(jpeg) as image:
+        value = image.getexif().get_ifd(0x8769).get(0xA405)
+    return None if value in (None, 0) else float(value)
+
+
+#: The ``exif-perturbed`` arm's bound: each photograph's stated focal length is scaled by a factor
+#: in [1 - PERTURBATION, 1 + PERTURBATION], fixed per photograph by its id. EXIF holds the 35 mm
+#: equivalent in whole millimetres, which alone is up to 2 percent at a phone's 24 to 26 mm, and a
+#: nominal equivalent can differ from the effective one.
+PERTURBATION = 0.03
+
+
+def _stated_focal(jpeg: Path, photo_id: str, arm: str) -> float | None:
+    if arm == "depth-model":
+        return None
+    focal = _exif_focal(jpeg)
+    if focal is None or arm == "exif":
+        return focal
+    unit = int.from_bytes(hashlib.sha256(photo_id.encode()).digest()[:8], "big") / 2**64
+    return focal * (1 + PERTURBATION * (2 * unit - 1))
+
+
+def evaluate_set(scene: Path, truth: dict, set_entry: dict, policy: StandpointPolicy, policy_digest: str, arm: str, extractor, stage_version: int) -> dict:
+    photo_ids = sorted(
+        (pid for pid, cam in truth["cameras"].items() if cam["set"] == set_entry["id"]),
+        key=lambda pid: truth["cameras"][pid]["index"],
+    )
+    inputs = []
+    opms = {}
+    for ordinal, photo_id in enumerate(photo_ids):
+        jpeg = scene / (f"{photo_id}.noexif.jpg" if arm == "depth-model" else f"{photo_id}.jpg")
+        with Image.open(jpeg) as opened:
+            upright, _facts = extract_exif_facts(opened)
+            upright = upright.convert("RGB")
+        opm = (scene / "opm" / f"{photo_id}.opm").read_bytes()
+        opms[ordinal] = opm
+        inputs.append(
+            StandpointInput(
+                ordinal=ordinal,
+                member_ref=str(uuid.uuid5(NAMESPACE, f"member:{photo_id}")),
+                point_map_artifact_ref=str(uuid.uuid5(NAMESPACE, f"opm:{photo_id}")),
+                point_map=opm,
+                image=upright,
+                image_sha256=hashlib.sha256(jpeg.read_bytes()).hexdigest(),
+                exif_focal_35mm=_stated_focal(jpeg, photo_id, arm),
+            )
+        )
+    scene_ref = str(uuid.uuid5(NAMESPACE, f"set:{set_entry['id']}"))
+    started = time.monotonic()
+    record = join_standpoint(
+        scene_ref=scene_ref,
+        inputs=inputs,
+        policy=policy,
+        policy_sha256=policy_digest,
+        stage_version=stage_version,
+        extractor=extractor,
+    )
+    seconds = time.monotonic() - started
+    data = record.to_bytes()
+    parsed = parse_standpoint_record(
+        data,
+        expected_scene_ref=scene_ref,
+        expected_members=[(i.member_ref, i.point_map_artifact_ref, hashlib.sha256(i.point_map).hexdigest()) for i in inputs],
+    )
+    cameras = [_load_camera(scene, truth, pid) for pid in photo_ids]
+    arranged = {} if parsed.arrangement is None else {m.ordinal: m for m in parsed.arrangement.members}
+    matrices = {o: scene_from_opm_row_major(m) for o, m in arranged.items()}
+    grids = {o: _grid(opms[o]) for o in arranged}
+    change = set_entry.get("change")
+    pairs = []
+    for pair in parsed.pairs:
+        k, l = cameras[pair.a], cameras[pair.b]
+        t = truth_pair(k, l)
+        # Both directions: what l added where k saw only sky shows only from l's side.
+        t["shared_view_disagreement"] = max(
+            t["shared_view_disagreement"], truth_pair(l, k)["shared_view_disagreement"]
+        )
+        # Only a pair with the changed photograph in it shows the change: the others see one state.
+        changed_index = 1
+        spheres = _change_spheres(scene, set_entry) if changed_index in (pair.a, pair.b) else []
+        t["change_share"] = max(change_share(k, l, spheres), change_share(l, k, spheres))
+        if t["overlap"] < NO_OVERLAP:
+            klass = "no_overlap"
+        elif t["distance_m"] >= MOVED_M:
+            klass = "moved"
+        elif change is not None and 1 in (pair.a, pair.b):
+            # The change is made in photograph 1 inside its view shared with photograph 0, and
+            # only that pair is guaranteed to show it; photograph 2 onward is tested separately.
+            klass = "changed" if 0 in (pair.a, pair.b) else "joinable_after_change"
+        else:
+            klass = "joinable"
+        row: dict[str, Any] = {
+            "a": pair.a,
+            "b": pair.b,
+            "class": klass,
+            "truth": {key: (round(value, 4) if isinstance(value, float) else value) for key, value in t.items() if key != "samples"},
+            "outcome": pair.outcome,
+            "inliers": pair.inliers,
+            "matches": pair.matches,
+            "changed_ppm": pair.changed_ppm,
+            "translation_mm": pair.translation_mm,
+            "translation_sigma_mm": pair.translation_sigma_mm,
+            "standpoint_residual_millidegrees": pair.standpoint_residual_millidegrees,
+            "residual_millidegrees": pair.residual_millidegrees,
+            "inlier_cells": pair.inlier_cells,
+        }
+        if pair.rotation_ppb is not None:
+            # The pair's own estimate, before the set's solve spreads or drops anything.
+            pairwise = np.array(pair.rotation_ppb, dtype=float).reshape(3, 3) / PARTS_PER_BILLION
+            row["pairwise_rotation_error_deg"] = round(_rotation_angle(pairwise.T @ (k["R"].T @ l["R"])), 4)
+        if pair.a in arranged and pair.b in arranged:
+            a_rot = np.array(arranged[pair.a].scene_from_camera_ppb, dtype=float).reshape(3, 3) / PARTS_PER_BILLION
+            b_rot = np.array(arranged[pair.b].scene_from_camera_ppb, dtype=float).reshape(3, 3) / PARTS_PER_BILLION
+            estimated = a_rot.T @ b_rot
+            true = k["R"].T @ l["R"]
+            row["rotation_error_deg"] = round(_rotation_angle(estimated.T @ true), 4)
+            samples = t["samples"]
+            if len(samples["xy_k"]) >= 10:
+                reading_a = parsed.member(pair.a).reading
+                reading_b = parsed.member(pair.b).reading
+                f_a = reading_a.intrinsics.focal_micropixels / 1e6
+                f_b = reading_b.intrinsics.focal_micropixels / 1e6
+                d_a = _unit(_rays(samples["xy_k"], k["size"], f_a)) @ a_rot.T
+                d_b = _unit(_rays(samples["xy_l"], l["size"], f_b)) @ b_rot.T
+                row["misregistration_deg"] = _stats(_angles(d_a, d_b))
+                drawn_a = _drawn(grids[pair.a], matrices[pair.a], samples["xy_k"])
+                drawn_b = _drawn(grids[pair.b], matrices[pair.b], samples["xy_l"])
+                ratio = np.abs(np.log(np.linalg.norm(drawn_a, axis=1) / np.linalg.norm(drawn_b, axis=1)))
+                row["depth_disagreement_overlap"] = _stats(ratio)
+                # Ownership: nearest centre by frame fraction, the renderer's rule.
+                def fraction(direction, rot, focal, size):
+                    v = direction @ rot
+                    depth = np.maximum(-v[:, 2], 1e-9)
+                    return np.maximum(np.abs(v[:, 0] / depth) / ((size[0] / 2) / focal), np.abs(v[:, 1] / depth) / ((size[1] / 2) / focal))
+                frac_a = fraction(d_a, a_rot, f_a, k["size"])
+                frac_b = fraction(d_a, b_rot, f_b, l["size"])
+                seam = np.abs(frac_a - frac_b) < SEAM_BAND
+                row["depth_disagreement_seam"] = _stats(ratio[seam])
+                true_distance = np.linalg.norm(samples["world"] - k["c"], axis=1)
+                row["depth_error_vs_truth"] = _stats(np.abs(np.log(np.linalg.norm(drawn_a, axis=1) / true_distance)))
+        pairs.append(row)
+    result: dict[str, Any] = {
+        "set": set_entry["id"],
+        "condition": set_entry["condition"],
+        "change": change,
+        "arm": arm,
+        "photographs": len(photo_ids),
+        "seconds": round(seconds, 3),
+        "record_sha256": hashlib.sha256(data).hexdigest(),
+        "refusal": parsed.refusal,
+        "components": [list(c) for c in parsed.components],
+        "members": [
+            {
+                "ordinal": m.ordinal,
+                "outcome": m.outcome,
+                "features": None if m.reading is None else m.reading.features,
+                "intrinsics": None if m.reading is None else m.reading.intrinsics.source,
+                "focal_error_pct": None if m.reading is None else round(100 * (m.reading.intrinsics.focal_micropixels / 1e6 / cameras[m.ordinal]["focal"] - 1), 3),
+            }
+            for m in parsed.members
+        ],
+        "pairs": pairs,
+    }
+    if parsed.arrangement is not None:
+        reference = parsed.arrangement.reference
+        ref_rot = np.array(arranged[reference].scene_from_camera_ppb, dtype=float).reshape(3, 3) / PARTS_PER_BILLION
+        up_est = ref_rot.T @ np.array([0.0, 1.0, 0.0])
+        up_true = cameras[reference]["R"].T @ np.array([0.0, 1.0, 0.0])
+        result["up_error_deg"] = round(float(_angles(up_est[None], up_true[None])[0]), 4)
+        result["up"] = dict(parsed.arrangement.up)
+        result["rotation_solve_max_millidegrees"] = parsed.arrangement.rotation_solve["max_residual_millidegrees"]
+    return result
+
+
+def main(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("split", type=Path)
+    parser.add_argument("policy", type=Path)
+    parser.add_argument("out", type=Path)
+    parser.add_argument("--arm", choices=("exif", "exif-perturbed", "depth-model"), default="exif")
+    parser.add_argument("--only")
+    parser.add_argument("--stage-version", type=int, required=True)
+    args = parser.parse_args(argv)
+    params = json.loads(args.policy.read_text(encoding="utf-8"))
+    policy = StandpointPolicy.from_params(params)
+    digest = sha256_of_canonical(params).hex()
+    extractor = PycolmapSift(max_features=policy.max_features, peak_threshold=policy.peak_threshold, threads=policy.feature_threads)
+    results = []
+    for scene in sorted(p for p in args.split.iterdir() if (p / "truth.json").exists()):
+        truth = json.loads((scene / "truth.json").read_text(encoding="utf-8"))
+        for set_entry in truth["sets"]:
+            if args.only and not set_entry["id"].startswith(args.only):
+                continue
+            result = evaluate_set(scene, truth, set_entry, policy, digest, args.arm, extractor, args.stage_version)
+            results.append(result)
+            outcomes = ", ".join(f"{p['a']}-{p['b']}:{p['class']}->{p['outcome']}" for p in result["pairs"])
+            print(f"{result['set']}: {outcomes}", flush=True)
+    args.out.write_text(json.dumps({"policy_sha256": digest, "stage_version": args.stage_version, "arm": args.arm, "sets": results}, indent=1), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,0 +1,1562 @@
+{
+ "family": "landscape",
+ "seed": 322,
+ "sets": [
+  {
+   "id": "held2-landscape-322-s1",
+   "condition": {
+    "kind": "sweep",
+    "count": 3,
+    "overlap": [
+     0.3,
+     0.55
+    ],
+    "translation_m": 0.0
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-s1-p0",
+    "held2-landscape-322-s1-p1",
+    "held2-landscape-322-s1-p2"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-s2",
+   "condition": {
+    "kind": "sweep",
+    "count": 4,
+    "overlap": [
+     0.15,
+     0.45
+    ],
+    "translation_m": 0.15
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-s2-p0",
+    "held2-landscape-322-s2-p1",
+    "held2-landscape-322-s2-p2",
+    "held2-landscape-322-s2-p3"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-s3",
+   "condition": {
+    "kind": "sweep",
+    "count": 3,
+    "overlap": [
+     0.25,
+     0.5
+    ],
+    "translation_m": 0.3
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-s3-p0",
+    "held2-landscape-322-s3-p1",
+    "held2-landscape-322-s3-p2"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-g1",
+   "condition": {
+    "kind": "grid",
+    "columns": 2,
+    "translation_m": 0.05
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-g1-p0",
+    "held2-landscape-322-g1-p1",
+    "held2-landscape-322-g1-p2",
+    "held2-landscape-322-g1-p3"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-m1",
+   "condition": {
+    "kind": "mixed_lens",
+    "lenses": [
+     "2x",
+     "5x"
+    ],
+    "second_wide": true,
+    "translation_m": 0.1
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-m1-p0",
+    "held2-landscape-322-m1-p1",
+    "held2-landscape-322-m1-p2",
+    "held2-landscape-322-m1-p3"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-p1",
+   "condition": {
+    "kind": "sweep",
+    "count": 3,
+    "portrait": true,
+    "overlap": [
+     0.25,
+     0.5
+    ],
+    "translation_m": 0.1
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-p1-p0",
+    "held2-landscape-322-p1-p1",
+    "held2-landscape-322-p1-p2"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-mv",
+   "condition": {
+    "kind": "moved",
+    "count": 3,
+    "step_m": [
+     1.5,
+     3.0
+    ]
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-mv-p0",
+    "held2-landscape-322-mv-p1",
+    "held2-landscape-322-mv-p2"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-lo",
+   "condition": {
+    "kind": "low_overlap",
+    "count": 2,
+    "overlap": [
+     -0.1,
+     0.06
+    ]
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-lo-p0",
+    "held2-landscape-322-lo-p1"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-c1",
+   "condition": {
+    "kind": "changed",
+    "count": 3,
+    "overlap": [
+     0.35,
+     0.55
+    ],
+    "change": "remove",
+    "translation_m": 0.05
+   },
+   "change": {
+    "mode": "add",
+    "object": "arrival-held2-landscape-322-c1"
+   },
+   "cameras": [
+    "held2-landscape-322-c1-p0",
+    "held2-landscape-322-c1-p1",
+    "held2-landscape-322-c1-p2"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-c2",
+   "condition": {
+    "kind": "changed",
+    "count": 3,
+    "overlap": [
+     0.35,
+     0.55
+    ],
+    "change": "move",
+    "translation_m": 0.05
+   },
+   "change": {
+    "mode": "add",
+    "object": "arrival-held2-landscape-322-c2"
+   },
+   "cameras": [
+    "held2-landscape-322-c2-p0",
+    "held2-landscape-322-c2-p1",
+    "held2-landscape-322-c2-p2"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-c3",
+   "condition": {
+    "kind": "changed",
+    "count": 3,
+    "overlap": [
+     0.35,
+     0.55
+    ],
+    "change": "add",
+    "translation_m": 0.05
+   },
+   "change": {
+    "mode": "add",
+    "object": "arrival-held2-landscape-322-c3"
+   },
+   "cameras": [
+    "held2-landscape-322-c3-p0",
+    "held2-landscape-322-c3-p1",
+    "held2-landscape-322-c3-p2"
+   ]
+  },
+  {
+   "id": "held2-landscape-322-mv2",
+   "condition": {
+    "kind": "moved",
+    "count": 3,
+    "step_m": [
+     1.0,
+     2.0
+    ]
+   },
+   "change": null,
+   "cameras": [
+    "held2-landscape-322-mv2-p0",
+    "held2-landscape-322-mv2-p1",
+    "held2-landscape-322-mv2-p2"
+   ]
+  }
+ ],
+ "cameras": {
+  "held2-landscape-322-s1-p0": {
+   "set": "held2-landscape-322-s1",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.5664014220237732,
+     0.012534390203654766,
+     0.8240342140197754
+    ],
+    [
+     -0.019725119695067406,
+     0.9993917346000671,
+     -0.028759852051734924
+    ],
+    [
+     -0.8238934278488159,
+     -0.03254379332065582,
+     -0.5658096075057983
+    ]
+   ],
+   "centre_world": [
+    0.35058218240737915,
+    2.4432449340820312,
+    -1.3066984415054321
+   ],
+   "depth_file": "render/held2-landscape-322-s1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "dbd775d21455a5f2eb513287168843d26a9acf524cb9cb1c767a8c810cae55b9",
+   "noexif_jpeg_sha256": "4132e30b66b458cf0aded65333bd3d01856a758d5e7f535cdb1e36001b104112",
+   "render_seconds": 10.572
+  },
+  "held2-landscape-322-s1-p1": {
+   "set": "held2-landscape-322-s1",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.13518719375133514,
+     0.039344046264886856,
+     0.9900386333465576
+    ],
+    [
+     0.04799259454011917,
+     0.9977784156799316,
+     -0.046204887330532074
+    ],
+    [
+     -0.9896571040153503,
+     0.0537608340382576,
+     0.13299864530563354
+    ]
+   ],
+   "centre_world": [
+    0.35058218240737915,
+    2.4432449340820312,
+    -1.3066984415054321
+   ],
+   "depth_file": "render/held2-landscape-322-s1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "b3d4dcab5129dd0648530d30c61b736f272daf1e3a0ec82694b00d38f209c4ca",
+   "noexif_jpeg_sha256": "602d585e46638b1029acbde095df6da724be58c74c509de72c859f976b125bb0",
+   "render_seconds": 13.6
+  },
+  "held2-landscape-322-s1-p2": {
+   "set": "held2-landscape-322-s1",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.7003294229507446,
+     -0.07239659875631332,
+     0.7101390361785889
+    ],
+    [
+     0.005265114828944206,
+     0.9953404068946838,
+     0.09627966582775116
+    ],
+    [
+     -0.7138003706932068,
+     -0.06368851661682129,
+     0.6974473595619202
+    ]
+   ],
+   "centre_world": [
+    0.35058218240737915,
+    2.4432449340820312,
+    -1.3066984415054321
+   ],
+   "depth_file": "render/held2-landscape-322-s1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "1a62e963f0b14ce821f1d3dbdaee55fb5df11d6a829ed43c83d645e133832a40",
+   "noexif_jpeg_sha256": "a99cb9d3a7b032713ccaa356adc022a1859b95ccfbd5385ee7d7dbc1a88f79f8",
+   "render_seconds": 19.234
+  },
+  "held2-landscape-322-s2-p0": {
+   "set": "held2-landscape-322-s2",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.0445430725812912,
+     -0.1308945268392563,
+     0.9903951287269592
+    ],
+    [
+     -0.030431702733039856,
+     0.9910968542098999,
+     0.1296186000108719
+    ],
+    [
+     -0.9985438585281372,
+     -0.024365799501538277,
+     -0.048129841685295105
+    ]
+   ],
+   "centre_world": [
+    0.24651981890201569,
+    2.4857537746429443,
+    -1.2228829860687256
+   ],
+   "depth_file": "render/held2-landscape-322-s2-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "5df264f5c9e5bbfca83b7669cc3fe0b2555a51343b271f7963e9d3cc3a2fbc85",
+   "noexif_jpeg_sha256": "43bc8a53800577d956cadc5db700e4730fdf03f6d992f9d9a2fe40a3cda2e818",
+   "render_seconds": 11.518
+  },
+  "held2-landscape-322-s2-p1": {
+   "set": "held2-landscape-322-s2",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.6806196570396423,
+     0.003645653370767832,
+     0.7326278686523438
+    ],
+    [
+     0.004153273068368435,
+     0.9999523758888245,
+     -0.008834334090352058
+    ],
+    [
+     -0.7326251864433289,
+     0.009055624715983868,
+     0.6805720925331116
+    ]
+   ],
+   "centre_world": [
+    0.27397245168685913,
+    2.4855916500091553,
+    -1.1751574277877808
+   ],
+   "depth_file": "render/held2-landscape-322-s2-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "3c5b79e6fdbfbe328e247a2f60cd5137d6bc5adde8adca80a828af69eec68d7e",
+   "noexif_jpeg_sha256": "4fb302e21b7c889a9e8e936466516a3646965dc44eaea3dbbc7286987d999beb",
+   "render_seconds": 10.284
+  },
+  "held2-landscape-322-s2-p2": {
+   "set": "held2-landscape-322-s2",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.9998798966407776,
+     0.0038425521925091743,
+     0.015015321783721447
+    ],
+    [
+     -0.004932295065373182,
+     0.9973031878471375,
+     0.07322607934474945
+    ],
+    [
+     -0.01469345297664404,
+     -0.0732913389801979,
+     0.9972023367881775
+    ]
+   ],
+   "centre_world": [
+    0.3188270032405853,
+    2.48595929145813,
+    -1.1422361135482788
+   ],
+   "depth_file": "render/held2-landscape-322-s2-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "13950c5a31d9a1052437f9d7362e1953a7c9b927ebc5983c06a47e6fa81a2372",
+   "noexif_jpeg_sha256": "c104c5b463b943cc3122a47274b7a1ba98e1ecc070f344f5cb841e43c2369ec6",
+   "render_seconds": 10.385
+  },
+  "held2-landscape-322-s2-p3": {
+   "set": "held2-landscape-322-s2",
+   "index": 3,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.6787516474723816,
+     -0.059720445424318314,
+     -0.7319355607032776
+    ],
+    [
+     0.00507184024900198,
+     0.9970452785491943,
+     -0.07664809376001358
+    ],
+    [
+     0.7343503832817078,
+     0.04831276088953018,
+     0.6770490407943726
+    ]
+   ],
+   "centre_world": [
+    0.28769245743751526,
+    2.490939140319824,
+    -1.2166705131530762
+   ],
+   "depth_file": "render/held2-landscape-322-s2-p3.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "11cc37ae769ec7d9c114ffc7c65949f18b989e89ad13f82904c22cce276147a7",
+   "noexif_jpeg_sha256": "a2ca79638d949584e9ae0eeb6a6d7a911f37e92f3d8718fe581c22757b411216",
+   "render_seconds": 10.191
+  },
+  "held2-landscape-322-s3-p0": {
+   "set": "held2-landscape-322-s3",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.8191820383071899,
+     0.09680330008268356,
+     0.5653051137924194
+    ],
+    [
+     0.0046341298148036,
+     0.9867380857467651,
+     -0.16225451231002808
+    ],
+    [
+     -0.5735148191452026,
+     -0.13029628992080688,
+     -0.8087667226791382
+    ]
+   ],
+   "centre_world": [
+    -1.3116179704666138,
+    2.5338618755340576,
+    -0.4997982978820801
+   ],
+   "depth_file": "render/held2-landscape-322-s3-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "31a9dd7fd647fc53918d2abe7c4424985085447e4820859d883bf14f840115aa",
+   "noexif_jpeg_sha256": "48f753df2ac98cc9eaa3a46eb2d17b6ff5d350091f02b3760a3650eea76b7d64",
+   "render_seconds": 6.558
+  },
+  "held2-landscape-322-s3-p1": {
+   "set": "held2-landscape-322-s3",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.13912908732891083,
+     -0.0566592663526535,
+     0.9886520504951477
+    ],
+    [
+     0.03069321997463703,
+     0.9976354241371155,
+     0.061493437737226486
+    ],
+    [
+     -0.9897984862327576,
+     0.03890043869614601,
+     -0.13706105947494507
+    ]
+   ],
+   "centre_world": [
+    -1.3026853799819946,
+    2.478677988052368,
+    -0.5982893109321594
+   ],
+   "depth_file": "render/held2-landscape-322-s3-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "555c532176e3fa70c894c44277c4118b16089c0c08a565d9fd73be8df2ee2e95",
+   "noexif_jpeg_sha256": "d39fb1e170b7ddd8a149ccaba4b4095c27ab4817606404196b5a357a08221177",
+   "render_seconds": 11.616
+  },
+  "held2-landscape-322-s3-p2": {
+   "set": "held2-landscape-322-s3",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.6512277126312256,
+     -0.07854752242565155,
+     0.754806399345398
+    ],
+    [
+     -0.028148582205176353,
+     0.9914443492889404,
+     0.12745869159698486
+    ],
+    [
+     -0.7583601474761963,
+     -0.10425136238336563,
+     0.6434450745582581
+    ]
+   ],
+   "centre_world": [
+    -1.2838250398635864,
+    2.5255630016326904,
+    -0.5280680060386658
+   ],
+   "depth_file": "render/held2-landscape-322-s3-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "d1cae94cf420e0f55217461e50126edf8561e080dba16c5137a9f77a149b9098",
+   "noexif_jpeg_sha256": "f3e95fab252e3b17d611ec71e3bf32102fd5e3e558ce67430d4896ccbaa87a7f",
+   "render_seconds": 10.271
+  },
+  "held2-landscape-322-g1-p0": {
+   "set": "held2-landscape-322-g1",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.6216924786567688,
+     0.2200142741203308,
+     -0.7517261505126953
+    ],
+    [
+     0.007695294450968504,
+     0.9579764604568481,
+     0.28674352169036865
+    ],
+    [
+     0.7832236289978027,
+     -0.1840510368347168,
+     0.5938736796379089
+    ]
+   ],
+   "centre_world": [
+    0.5719525814056396,
+    2.3893003463745117,
+    -0.2002222090959549
+   ],
+   "depth_file": "render/held2-landscape-322-g1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "093603b57ddec1ffaa144eeec0a0b0fda68f4a5ce5ffa65e9d5163068b7f7543",
+   "noexif_jpeg_sha256": "156e1b66c702ed41794a7b86f8b9bbef7a942943e82f3a39f157658e165ff3d4",
+   "render_seconds": 14.39
+  },
+  "held2-landscape-322-g1-p1": {
+   "set": "held2-landscape-322-g1",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.08332930505275726,
+     0.28780514001846313,
+     -0.9540568590164185
+    ],
+    [
+     0.025684664025902748,
+     0.9576888084411621,
+     0.2866574227809906
+    ],
+    [
+     0.9961910247802734,
+     -0.0006176662282086909,
+     -0.08719572424888611
+    ]
+   ],
+   "centre_world": [
+    0.5729824304580688,
+    2.3848087787628174,
+    -0.17938847839832306
+   ],
+   "depth_file": "render/held2-landscape-322-g1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "12de75baf04cf92786915237f23c37cb97ca184585debb40b5a723f5f5dff1cb",
+   "noexif_jpeg_sha256": "e38dd2b142b24f101588c60a8655be6093aaf1a4de09df1fa0272c54c63556ef",
+   "render_seconds": 11.901
+  },
+  "held2-landscape-322-g1-p2": {
+   "set": "held2-landscape-322-g1",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.6217028498649597,
+     -0.3297119140625,
+     -0.7104756236076355
+    ],
+    [
+     0.005081386771053076,
+     0.9087616801261902,
+     -0.4172844886779785
+    ],
+    [
+     0.7832366824150085,
+     0.2558167576789856,
+     0.566655158996582
+    ]
+   ],
+   "centre_world": [
+    0.5606952905654907,
+    2.3836874961853027,
+    -0.18711501359939575
+   ],
+   "depth_file": "render/held2-landscape-322-g1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "c31626479f694890eb06829f0063df65bb02cca85ee785a538dc1f288966086c",
+   "noexif_jpeg_sha256": "4c8f9831f756bd155c4bd7ba5b21bd47f00cc2bcdbe0f6731bb339ac43804eb6",
+   "render_seconds": 7.831
+  },
+  "held2-landscape-322-g1-p3": {
+   "set": "held2-landscape-322-g1",
+   "index": 3,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.08335679769515991,
+     -0.4158787429332733,
+     -0.9055917859077454
+    ],
+    [
+     -0.0005428356816992164,
+     0.9087733030319214,
+     -0.4172898232936859
+    ],
+    [
+     0.9965196251869202,
+     -0.03429235517978668,
+     -0.07597818225622177
+    ]
+   ],
+   "centre_world": [
+    0.5547325611114502,
+    2.3991739749908447,
+    -0.1752910166978836
+   ],
+   "depth_file": "render/held2-landscape-322-g1-p3.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "119b4a9eb737ff8f03eb2f1738e70d2a3d956f2038d198537276a1b42a98aeca",
+   "noexif_jpeg_sha256": "d493118cf516f0ca1b230d6ad8fe49f4a5ed84897733881a235c0a89c7cb2695",
+   "render_seconds": 9.869
+  },
+  "held2-landscape-322-m1-p0": {
+   "set": "held2-landscape-322-m1",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.992060124874115,
+     -0.02935141697525978,
+     0.12229151278734207
+    ],
+    [
+     0.03727790713310242,
+     0.9973145127296448,
+     -0.0630406066775322
+    ],
+    [
+     -0.12011276930570602,
+     0.06709884107112885,
+     0.9904901385307312
+    ]
+   ],
+   "centre_world": [
+    -0.12012030929327011,
+    2.497648000717163,
+    1.2413501739501953
+   ],
+   "depth_file": "render/held2-landscape-322-m1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "07c6c378f56ccc82e7cb454b977d4a8901340cc93af5947d23eb32e78847b6c3",
+   "noexif_jpeg_sha256": "303ce7d6648d8a47a7ea66832ee2c2f070b2eeec03559dcf82d22b27be69fe78",
+   "render_seconds": 21.024
+  },
+  "held2-landscape-322-m1-p1": {
+   "set": "held2-landscape-322-m1",
+   "index": 1,
+   "lens": "2x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 28.030970112527594,
+   "rotation_world_from_camera": [
+    [
+     0.8956717252731323,
+     -0.0006983872735872865,
+     0.44471532106399536
+    ],
+    [
+     -0.0009001546422950923,
+     0.9999938607215881,
+     0.003383346600458026
+    ],
+    [
+     -0.4447149634361267,
+     -0.0034306803718209267,
+     0.8956655859947205
+    ]
+   ],
+   "centre_world": [
+    -0.12451209872961044,
+    2.495924472808838,
+    1.2611066102981567
+   ],
+   "depth_file": "render/held2-landscape-322-m1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "5fbe6dbc960e63264da2733205334b8ddc75fb6fb4fe62179b5fc2eac42c01d8",
+   "noexif_jpeg_sha256": "6a861b093df35276ddec0571174eb78febfc09f62d51ba222e582d66a84de853",
+   "render_seconds": 24.844
+  },
+  "held2-landscape-322-m1-p2": {
+   "set": "held2-landscape-322-m1",
+   "index": 2,
+   "lens": "5x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 12.346968401455367,
+   "rotation_world_from_camera": [
+    [
+     0.9171251058578491,
+     -0.0028171769808977842,
+     0.39858946204185486
+    ],
+    [
+     0.036916185170412064,
+     0.9962774515151978,
+     -0.07789988070726395
+    ],
+    [
+     -0.3968862295150757,
+     0.08615833520889282,
+     0.9138150811195374
+    ]
+   ],
+   "centre_world": [
+    -0.10344145447015762,
+    2.4935102462768555,
+    1.2256426811218262
+   ],
+   "depth_file": "render/held2-landscape-322-m1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "d5822c63ee0d0477f2f2a23ff7f7bea31aca26bc6d4604bec773bcec9644c406",
+   "noexif_jpeg_sha256": "343cd695b190b87a036dab739a4f0a5b1d37c2f792bf470cc2987d1cbf893f4c",
+   "render_seconds": 10.212
+  },
+  "held2-landscape-322-m1-p3": {
+   "set": "held2-landscape-322-m1",
+   "index": 3,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.82733553647995,
+     -0.08334295451641083,
+     -0.5554906725883484
+    ],
+    [
+     0.017123233526945114,
+     0.992213785648346,
+     -0.1233636736869812
+    ],
+    [
+     0.5614469647407532,
+     0.09255135804414749,
+     0.822320818901062
+    ]
+   ],
+   "centre_world": [
+    -0.14783310890197754,
+    2.4763641357421875,
+    1.2263126373291016
+   ],
+   "depth_file": "render/held2-landscape-322-m1-p3.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "8459468ad54154d28b483eab63e06717eb75d53d2a7187c443eb561d443f539e",
+   "noexif_jpeg_sha256": "4fa566c72be12c36882e643d50003f8b82c0836ce289e754afa2608767bfe77b",
+   "render_seconds": 9.389
+  },
+  "held2-landscape-322-p1-p0": {
+   "set": "held2-landscape-322-p1",
+   "index": 0,
+   "lens": "1x",
+   "width": 768,
+   "height": 1024,
+   "fov_y_deg": 67.29866699741999,
+   "rotation_world_from_camera": [
+    [
+     0.6449000835418701,
+     0.024016723036766052,
+     -0.7638894319534302
+    ],
+    [
+     0.004221679642796516,
+     0.9993789196014404,
+     0.03498460352420807
+    ],
+    [
+     0.7642552256584167,
+     -0.025786470621824265,
+     0.6443982124328613
+    ]
+   ],
+   "centre_world": [
+    0.5492241382598877,
+    2.3494977951049805,
+    -0.3596309721469879
+   ],
+   "depth_file": "render/held2-landscape-322-p1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "12e30015bdb67c00c707b6963a6a7f037df40d14e9d6402e2cb20a9f54d63b70",
+   "noexif_jpeg_sha256": "aad0644eed67c2a922cbfa0b928a29b7076f9e131f4cd0c4de196ae3f2eceba4",
+   "render_seconds": 10.024
+  },
+  "held2-landscape-322-p1-p1": {
+   "set": "held2-landscape-322-p1",
+   "index": 1,
+   "lens": "1x",
+   "width": 768,
+   "height": 1024,
+   "fov_y_deg": 67.29866699741999,
+   "rotation_world_from_camera": [
+    [
+     0.04179735854268074,
+     -0.18147242069244385,
+     -0.9825073480606079
+    ],
+    [
+     -0.016586707904934883,
+     0.9831051826477051,
+     -0.18228846788406372
+    ],
+    [
+     0.9989883899688721,
+     0.023915737867355347,
+     0.03808116912841797
+    ]
+   ],
+   "centre_world": [
+    0.5786997675895691,
+    2.3530991077423096,
+    -0.30495989322662354
+   ],
+   "depth_file": "render/held2-landscape-322-p1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "1575b004b49d51f040223b31c91fb77d5c420999921b54afbe67eeec05902d00",
+   "noexif_jpeg_sha256": "2b09fedfa57584be5b9e208df2a01916d2132333845a56dcf2fe36454df7e10a",
+   "render_seconds": 7.474
+  },
+  "held2-landscape-322-p1-p2": {
+   "set": "held2-landscape-322-p1",
+   "index": 2,
+   "lens": "1x",
+   "width": 768,
+   "height": 1024,
+   "fov_y_deg": 67.29866699741999,
+   "rotation_world_from_camera": [
+    [
+     -0.44731196761131287,
+     0.09287889301776886,
+     -0.889542281627655
+    ],
+    [
+     -0.034664563834667206,
+     0.992045521736145,
+     0.12101275473833084
+    ],
+    [
+     0.8937059640884399,
+     0.08496605604887009,
+     -0.44053423404693604
+    ]
+   ],
+   "centre_world": [
+    0.5629586577415466,
+    2.341203212738037,
+    -0.3765183091163635
+   ],
+   "depth_file": "render/held2-landscape-322-p1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "eab53550370c996e5518876cf234b611026084705ae7462f84a68f73265ed7ae",
+   "noexif_jpeg_sha256": "8ca22a0a0a38e22702396ea1732a3c65a231452c415120c67de61ef2ae00550e",
+   "render_seconds": 8.926
+  },
+  "held2-landscape-322-mv-p0": {
+   "set": "held2-landscape-322-mv",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.12757182121276855,
+     0.050031814724206924,
+     0.990566611289978
+    ],
+    [
+     -0.03187353163957596,
+     0.998417854309082,
+     -0.04632347822189331
+    ],
+    [
+     -0.9913170337677002,
+     -0.025663284584879875,
+     0.12896467745304108
+    ]
+   ],
+   "centre_world": [
+    0.24091076850891113,
+    2.534104824066162,
+    -0.7694322466850281
+   ],
+   "depth_file": "render/held2-landscape-322-mv-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "c6b79fa5f1526a6657b8c0cc66a3119577baf6d1a47f4e43be7ee8c480f1e2fa",
+   "noexif_jpeg_sha256": "7325ed31e41f6744b9d3d5c66a32544052990d66774955c7f917e60462eabd9b",
+   "render_seconds": 8.906
+  },
+  "held2-landscape-322-mv-p1": {
+   "set": "held2-landscape-322-mv",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.4439029395580292,
+     0.001398606225848198,
+     0.8960738182067871
+    ],
+    [
+     -0.008027611300349236,
+     0.9999648332595825,
+     0.0024160100147128105
+    ],
+    [
+     -0.8960389494895935,
+     -0.00826580636203289,
+     0.4438985586166382
+    ]
+   ],
+   "centre_world": [
+    -0.1414625644683838,
+    2.5383973121643066,
+    -3.648620843887329
+   ],
+   "depth_file": "render/held2-landscape-322-mv-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "081927415eaa90ff67fe748dd6c6d00585a22de565a2f3580e04ed680ddfd536",
+   "noexif_jpeg_sha256": "4d64991ee96e087a507228986b59e5e0e524ff6bb601285c00944100387e135e",
+   "render_seconds": 10.112
+  },
+  "held2-landscape-322-mv-p2": {
+   "set": "held2-landscape-322-mv",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.5853353142738342,
+     0.05513545498251915,
+     0.8089144825935364
+    ],
+    [
+     0.004871205426752567,
+     0.9974280595779419,
+     -0.07150933891534805
+    ],
+    [
+     -0.8107766509056091,
+     0.045797329396009445,
+     0.5835613012313843
+    ]
+   ],
+   "centre_world": [
+    0.7468559145927429,
+    2.464754819869995,
+    -6.016888618469238
+   ],
+   "depth_file": "render/held2-landscape-322-mv-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "f0eaf752b737e787fdfa9ac4c28fa690cb1e2d911821e18d57e06956c0064f12",
+   "noexif_jpeg_sha256": "21669e647dab54c6f899c7c32797cd61e5d5881988b595f7d18274053cc799fa",
+   "render_seconds": 11.423
+  },
+  "held2-landscape-322-lo-p0": {
+   "set": "held2-landscape-322-lo",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.2098003625869751,
+     0.14425550401210785,
+     0.9670440554618835
+    ],
+    [
+     0.004837729036808014,
+     0.9888909459114075,
+     -0.14856399595737457
+    ],
+    [
+     -0.9777323007583618,
+     0.03584707900881767,
+     0.2067718207836151
+    ]
+   ],
+   "centre_world": [
+    0.7283557653427124,
+    2.5214920043945312,
+    -0.043451033532619476
+   ],
+   "depth_file": "render/held2-landscape-322-lo-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "998192aca8b9764118182f2a12bd0ca45e9c7c081e84d822afc9bedc0d2c2ede",
+   "noexif_jpeg_sha256": "39a5f25d976008f1b552021d7e371e7ee3474b68a1c4f5763479aeafd3068585",
+   "render_seconds": 8.79
+  },
+  "held2-landscape-322-lo-p1": {
+   "set": "held2-landscape-322-lo",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.9819843769073486,
+     0.009875643067061901,
+     0.1887039691209793
+    ],
+    [
+     0.01445711962878704,
+     0.9917798638343811,
+     -0.12713631987571716
+    ],
+    [
+     -0.18840835988521576,
+     0.12757399678230286,
+     0.9737695455551147
+    ]
+   ],
+   "centre_world": [
+    0.7283557653427124,
+    2.5214920043945312,
+    -0.043451033532619476
+   ],
+   "depth_file": "render/held2-landscape-322-lo-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "3d95537196bd794e904daa39ea92d1bd74cb96846e93c38b3ed487e8dcb31ac0",
+   "noexif_jpeg_sha256": "7248e79172f763c10107f050b8621faa54e11dcb85eb1e08c8ad5124220eef7e",
+   "render_seconds": 13.231
+  },
+  "held2-landscape-322-c1-p0": {
+   "set": "held2-landscape-322-c1",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.04635736718773842,
+     0.045308712869882584,
+     -0.9978968501091003
+    ],
+    [
+     -0.021126050502061844,
+     0.9987918734550476,
+     0.04436793923377991
+    ],
+    [
+     0.9987015128135681,
+     0.019024837762117386,
+     0.04725855588912964
+    ]
+   ],
+   "centre_world": [
+    0.4043819010257721,
+    2.4111077785491943,
+    0.23207418620586395
+   ],
+   "depth_file": "render/held2-landscape-322-c1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "d295d8418c1f2fbec9bc6f7f18afde875b2618bfc65f29fd2e69184f9eb368fc",
+   "noexif_jpeg_sha256": "ede3f4dc56654cc40c7e7731208fba2051ceca608893e623cead7dbe5f5d174f",
+   "render_seconds": 18.551
+  },
+  "held2-landscape-322-c1-p1": {
+   "set": "held2-landscape-322-c1",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.4838540256023407,
+     -0.05852615088224411,
+     -0.8731895685195923
+    ],
+    [
+     -0.01827218569815159,
+     0.9982194304466248,
+     -0.0567813366651535
+    ],
+    [
+     0.8749579787254333,
+     -0.011518795974552631,
+     -0.4840618669986725
+    ]
+   ],
+   "centre_world": [
+    0.4007149636745453,
+    2.4088926315307617,
+    0.26658371090888977
+   ],
+   "depth_file": "render/held2-landscape-322-c1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "a02dfee3f462674c8dd2cffb53e09a39beec0c0fcd23401ad43ffd5a80b1ffb3",
+   "noexif_jpeg_sha256": "77b5df9bc6f4594306b79a37ced424358b668d5f53c811dcf5f5e709222ec94a",
+   "render_seconds": 10.862
+  },
+  "held2-landscape-322-c1-p2": {
+   "set": "held2-landscape-322-c1",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9180164933204651,
+     -0.07501597702503204,
+     -0.389382004737854
+    ],
+    [
+     -0.0026192637160420418,
+     0.9830690026283264,
+     -0.1832168996334076
+    ],
+    [
+     0.3965335786342621,
+     -0.1671762317419052,
+     -0.9026700854301453
+    ]
+   ],
+   "centre_world": [
+    0.42212480306625366,
+    2.4089159965515137,
+    0.24841536581516266
+   ],
+   "depth_file": "render/held2-landscape-322-c1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "0a45a23a83ba10aca2d32d933b174d7c5693470a8fb39ecbad5a13425c1bcc98",
+   "noexif_jpeg_sha256": "7ba6f3e25ce023918281ff31de751b59b017fcad2f56bee2f6fec0a41be4b414",
+   "render_seconds": 6.704
+  },
+  "held2-landscape-322-c2-p0": {
+   "set": "held2-landscape-322-c2",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.999206006526947,
+     -0.01467996183782816,
+     -0.037038277834653854
+    ],
+    [
+     -0.007946094498038292,
+     0.9843949675559998,
+     -0.17579366266727448
+    ],
+    [
+     0.0390409380197525,
+     -0.17535977065563202,
+     -0.9837300181388855
+    ]
+   ],
+   "centre_world": [
+    0.8110844492912292,
+    2.434746265411377,
+    0.26102766394615173
+   ],
+   "depth_file": "render/held2-landscape-322-c2-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "0b75379ea182134d8e018375a48f98933f26fee34994e5a8ebaed3cda2eb4d12",
+   "noexif_jpeg_sha256": "0e00d7e1ec308a9279622dea92fddd115bc13762ba50da953c4a1c6839e99fc8",
+   "render_seconds": 6.061
+  },
+  "held2-landscape-322-c2-p1": {
+   "set": "held2-landscape-322-c2",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.8269823789596558,
+     0.06710002571344376,
+     0.5582093596458435
+    ],
+    [
+     0.010386914014816284,
+     0.9945065975189209,
+     -0.10415737330913544
+    ],
+    [
+     -0.5621318817138672,
+     -0.0803382396697998,
+     -0.8231363892555237
+    ]
+   ],
+   "centre_world": [
+    0.8180368542671204,
+    2.4390177726745605,
+    0.26062101125717163
+   ],
+   "depth_file": "render/held2-landscape-322-c2-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "7f61ad7e99de48afbb85cf2d0592eb8be8c047bce55d316d53f2bffb78716a86",
+   "noexif_jpeg_sha256": "d371fe92a364c7041f1b026cb7a458189b6c14f988d8cf8b4198eed285b2f2ea",
+   "render_seconds": 8.179
+  },
+  "held2-landscape-322-c2-p2": {
+   "set": "held2-landscape-322-c2",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.2211371213197708,
+     0.13441577553749084,
+     0.9659351706504822
+    ],
+    [
+     -0.0285178255289793,
+     0.9891413450241089,
+     -0.14417380094528198
+    ],
+    [
+     -0.9748256802558899,
+     -0.05942855402827263,
+     -0.21490263938903809
+    ]
+   ],
+   "centre_world": [
+    0.8100795745849609,
+    2.442781925201416,
+    0.27671360969543457
+   ],
+   "depth_file": "render/held2-landscape-322-c2-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "cb22690b93bcf8ef04a3a31e6507c8986d93b6da87323c5c84ed6aef6d2d731b",
+   "noexif_jpeg_sha256": "c0e4b806da57ae78571ca492008d1a57531fbbdef60eb24b1310b7d788d4aaea",
+   "render_seconds": 11.114
+  },
+  "held2-landscape-322-c3-p0": {
+   "set": "held2-landscape-322-c3",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.8868873715400696,
+     -0.09840551018714905,
+     -0.4513835608959198
+    ],
+    [
+     0.009806288406252861,
+     0.980840802192688,
+     -0.19456416368484497
+    ],
+    [
+     0.4618816077709198,
+     0.16813009977340698,
+     0.8708602786064148
+    ]
+   ],
+   "centre_world": [
+    -1.167926549911499,
+    2.3853821754455566,
+    -0.4132276773452759
+   ],
+   "depth_file": "render/held2-landscape-322-c3-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "421b179b23f59f4f313a0420cf17777a74de7f185637f709a2c15bf523b0b4cd",
+   "noexif_jpeg_sha256": "6a0a219a4f120c633bfc79ba1cdc4b0f781d5bea4f284d2697808c3d05c63846",
+   "render_seconds": 11.779
+  },
+  "held2-landscape-322-c3-p1": {
+   "set": "held2-landscape-322-c3",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.35443148016929626,
+     -0.16332115232944489,
+     -0.9207087159156799
+    ],
+    [
+     -0.008429069072008133,
+     0.9840308427810669,
+     -0.17779843509197235
+    ],
+    [
+     0.93504399061203,
+     0.07077807933092117,
+     0.3473948538303375
+    ]
+   ],
+   "centre_world": [
+    -1.1604011058807373,
+    2.381355047225952,
+    -0.41221749782562256
+   ],
+   "depth_file": "render/held2-landscape-322-c3-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "ad6985f653ed46b029ad6975faf9100231d642b584a0fdd27fa562ad3cac28db",
+   "noexif_jpeg_sha256": "9fd0696a84919d2cabab2b71bc23d0b634fb381f3c124cf5afe859fabd81b837",
+   "render_seconds": 7.356
+  },
+  "held2-landscape-322-c3-p2": {
+   "set": "held2-landscape-322-c3",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.16780458390712738,
+     -0.04318526014685631,
+     -0.9848739504814148
+    ],
+    [
+     -0.014859507791697979,
+     0.9990373253822327,
+     -0.04127451404929161
+    ],
+    [
+     0.9857082962989807,
+     0.007708688732236624,
+     -0.16828475892543793
+    ]
+   ],
+   "centre_world": [
+    -1.145413875579834,
+    2.380887269973755,
+    -0.42533230781555176
+   ],
+   "depth_file": "render/held2-landscape-322-c3-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "21c60ef07d17e11fa2be6851a3d8d2c2c680a3fe9e1f9db9bf0c4adff2ed8c02",
+   "noexif_jpeg_sha256": "17263242cdfbe6ea40847597d86c67b3f3a0839fd36e3cdbfd36895d95b2983d",
+   "render_seconds": 8.457
+  },
+  "held2-landscape-322-mv2-p0": {
+   "set": "held2-landscape-322-mv2",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9604354500770569,
+     -0.005399459507316351,
+     0.2784503996372223
+    ],
+    [
+     -0.009587268345057964,
+     0.9998604655265808,
+     -0.013680161908268929
+    ],
+    [
+     -0.27833765745162964,
+     -0.01580849103629589,
+     -0.9603531956672668
+    ]
+   ],
+   "centre_world": [
+    -0.03238153085112572,
+    2.444655656814575,
+    1.3304239511489868
+   ],
+   "depth_file": "render/held2-landscape-322-mv2-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "be5dd4872355c7ae9358b2344514d9186f503f30d5c5cb3a387d04eb2b8a9fd3",
+   "noexif_jpeg_sha256": "d9ae2f552cfd6d46952e0f06dd28e311c704db14edd172fb515a5c17f137f718",
+   "render_seconds": 7.731
+  },
+  "held2-landscape-322-mv2-p1": {
+   "set": "held2-landscape-322-mv2",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9248214960098267,
+     -0.03011557087302208,
+     0.37920740246772766
+    ],
+    [
+     0.007575671654194593,
+     0.9952055215835571,
+     0.0975121408700943
+    ],
+    [
+     -0.38032591342926025,
+     0.09305407851934433,
+     -0.9201592803001404
+    ]
+   ],
+   "centre_world": [
+    -1.3365485668182373,
+    2.4209671020507812,
+    1.3503369092941284
+   ],
+   "depth_file": "render/held2-landscape-322-mv2-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "dac513afbf9b870959a0a098e174d6353fa8bfb9dccb484936f57a171ec42cc6",
+   "noexif_jpeg_sha256": "1b247a6deafde8d2521f3cb6badd67b420c3028a9a4743a02e0d19b9ad99fd4d",
+   "render_seconds": 7.204
+  },
+  "held2-landscape-322-mv2-p2": {
+   "set": "held2-landscape-322-mv2",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.7390348315238953,
+     0.03640731796622276,
+     0.6726827025413513
+    ],
+    [
+     -0.013798623345792294,
+     0.9975110292434692,
+     -0.06914755702018738
+    ],
+    [
+     -0.673525869846344,
+     -0.06038455292582512,
+     -0.7366930246353149
+    ]
+   ],
+   "centre_world": [
+    -3.219747304916382,
+    2.3777596950531006,
+    1.0320669412612915
+   ],
+   "depth_file": "render/held2-landscape-322-mv2-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "5d5b9603dcb3f367090b8331b4ccd0c868dac30183206f73e124b96d3e18437e",
+   "noexif_jpeg_sha256": "15afad50263a554dca2bb039d01102258944c004cf3e0d0fca6b9b49d0f8fa01",
+   "render_seconds": 6.494
+  }
+ }
+}

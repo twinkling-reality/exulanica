@@ -1,0 +1,417 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "already_seen_before_this_was_written": [
+   "Every result on the development data (version 1's development and held-out splits), in both arms, with every candidate named in decisions_made_on_the_development_data and with the final method: development/statistics-exif.json and development/statistics-exif-perturbed.json.",
+   "Version 1's own records and results on the same sets.",
+   "The held-out split's plan (its split definition and the planner's object and camera counts) and its render log's timings. No held-out photograph, depth estimate or join output."
+  ],
+  "arms": {
+   "exif": "each photograph states its lens exactly, as the renders were made",
+   "exif-perturbed": "each photograph's stated focal length is scaled by a factor in [0.97, 1.03], fixed per photograph by the sha256 of its id, exactly as version 1's evaluation perturbs it (standpoint_eval.py, PERTURBATION)"
+  },
+  "base_commit": "209b5742",
+  "bound_artifacts": {
+   "development/run-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/development/run-exif-perturbed.json",
+    "sha256": "b6da1101506362b0597c1f5310bf9385ccb06ef01aa435d67ac66dd78ca57496"
+   },
+   "development/run-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/development/run-exif.json",
+    "sha256": "229a2d99b14705cc3c780420d8f19021e4b93043a7baf8b611d6ab65f1515ae4"
+   },
+   "development/statistics-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/development/statistics-exif-perturbed.json",
+    "sha256": "b09c4b14909f371d3adf84df181a2c58e222e887dbe51e498e6199fbcf2918c9"
+   },
+   "development/statistics-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/development/statistics-exif.json",
+    "sha256": "81b73eb406325ca7b39f127330cd7399a8eaf7ae0ca0f7724bf0f73bf880829e"
+   },
+   "development/v1-parity-exif-perturbed.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/development/v1-parity-exif-perturbed.log.txt",
+    "sha256": "eac18b9f61e36f4dd07cfcc71b3d06b7e13064eadf64b4a612139323f6e11d86"
+   },
+   "development/v1-parity-exif.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/development/v1-parity-exif.log.txt",
+    "sha256": "a15dbd63965aa230fd49e862800a27b1992fa34a88b8e0cabff09c1e21965af1"
+   },
+   "development/v1-parity-sources.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/development/v1-parity-sources.txt",
+    "sha256": "d080b132b5fba2065c5a7f8aa0efa69510fdff323aac641bc16e5f1a94f07901"
+   },
+   "held-out/plan.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/held-out/plan.log.txt",
+    "sha256": "feb8677e82d60419bb82835831ad69896a90b34509e29872136af375d49f3471"
+   },
+   "held-out/render.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/held-out/render.log.txt",
+    "sha256": "c69fa04890ff9e5dc5a85b97e8ade1d096a4987c72bbd4e170005820870e75c0"
+   },
+   "splits/held-out-split.json": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/splits/held-out-split.json",
+    "sha256": "e0b2cbf0333d6ae0e27fbeaee6d179769b9a65240a3866547eec23405d4f4588"
+   }
+  },
+  "causes_found_on_the_development_data": {
+   "joinable_courtyard_pairs_refused_as_changed": "All four reproduced exactly (0.0453, 0.1051, 0.0508 and 0.0443 changed). In held-courtyard-112-s3 (1,2), 112-m1 (0,1) and 112-m1 (1,2) the disagreeing clusters are strips one to three tiles wide along a lamp post or trunk edge near the camera, where a hand-held movement of 0.04 to 0.14 m uncovers the far surface beside the near one: the depth model resolves the edge (3.3 m against 21.7 m, the truth 2.95 and 25.5), and the strip is the disocclusion, which no shift of the comparison can line up. In held-courtyard-111-p1 (1,2) the pair's translation estimate was 0.470 m against a true 0.078 m (35 inliers), so the warp misregistered every depth edge; with no translation the same pair disagrees over 0.013, under the threshold. Under the TRUE motion the lamp-post pairs still disagree over 0.054 and 0.037. The courtyards' glass windows (189 of 257 objects in one scene) reflect, but the clusters are not on them.",
+   "moved_and_changed_named_for_each_other": "held-courtyard-112-mv (1,2), cameras 1.69 m apart: all 294 inliers lie at a true inverse range of 0.0342 to 0.0350, one facade about 29 m away, where a step of the moved bound shifts the nearer inliers against the farther by 0.027 degrees. The estimate was 0.39 m (its sigma 9 mm) and the recorded turn 4.1 degrees off; refining from the true rotation converges to the same estimate, so it is the data and not the optimiser. The pair then disagreed over 0.756 of the compared view and was named scene_changed. Across the development pairs, where that bound-sized parallax is under 0.2 degrees the translation estimates were off by up to 3.3 m; from 0.3 degrees the median error was 0.02 m. held-courtyard-112-c2 (0,1), a fountain moved between the photographs: 29 of 247 matches are on the static surroundings, 141 inliers of which 4 are static; the RANSAC locked onto the fountain's motion (rock texture against a striped, repeating facade and paving) and its translation, 1.44 m, named the pair moved. Under version 1's change comparison the fountain's motion leaves 0.171 disagreeing and the true static motion 0.218, so the dense comparison cannot pick the static motion either. The perturbed arm's other cross-names came from translations inflated along the view by a lens stated a few percent off (0.14 to 0.69 m where the camera moved 0.01 to 0.02 m, the residual focal errors 1 to 3 percent), and one moved landscape pair from the depth model's scale (landscapes: model range over true range 0.10 to 0.73 at matched points), which made a 1.82 m walk read as 0.65 m, inside the moved bound.",
+   "up_direction": "Version 1 took each camera's horizontal axis to be level. On version 1's held-out sets its up error was 1.443 degrees at the median, 3.498 at the 95th percentile and 3.970 at worst; version 1's own levelling applied to the TRUE camera rotations of the same joined photographs gave 1.296, 3.534 and 3.928 (correlation 0.89 with the measured errors), and with each camera's roll removed from those true rotations it gave 0.000 everywhere. The renders roll each photograph by a normal amount with a standard deviation of 1.2 degrees, and two to four horizontal axes spanning 30 to 90 degrees of turn amplify it. The cause is the no-roll assumption, not the measured turns."
+  },
+  "changes_from_version_1": [
+   "Up from vertical edges. The interpretation-plane normals of each photograph's strongest edge pixels (the strongest quarter of the gradients after a one-pixel blur, at most 150,000 a photograph, at a long edge of at most 1024 pixels) are turned into the arrangement, and up is the mode of their perpendicular, sought from the camera-axes estimate within 8 degrees with a one-degree Gaussian kernel. Where the density of edges within one degree of perpendicular is under twice the density between five and ten degrees, the camera-axes estimate is kept and the record says so. The record names the method, the evidence ratio, the support and the angle to the camera-axes estimate.",
+   "The final pass refines each pair's rotation and translation with a relative zoom of the second lens, from the rotation-and-translation fit's own solution and on its inliers, held to the stated lens by the focal prior (3 percent), so that a lens the focal refinement could not correct does not read as a step forward. The provisional pass, whose motions start the focal refinement, keeps version 1's fit.",
+   "A pair is named moved only when the estimated movement would shift the 90th percentile inverse depth of its inliers against the 10th by 0.25 degrees (it shows) and |t| - 2 sigma exceeds the moved bound (0.7 m in the depth model's units). The camera counts as having stood still only when a movement of the moved bound would show so and |t| + 2 sigma is within 0.35 m (the focal refinement's bound on a hand-held movement).",
+   "Where the camera stood still, the change is compared under the measured motion and under a pure turn, the smaller deciding, and a refusal is named scene_changed. Under the measured motion, the pixels the movement may uncover beside a depth edge are left out of each tile's comparison: an edge is a step between neighbouring pixels of more than 15 percent of the nearer side's inverse depth, its band as wide as the parallax the movement makes across it plus 2 pixels, at most 16; a tile left with under half its pixels is not compared.",
+   "Any other pair not named moved joins only if a pure turn explains what the photographs share: the turn leaves the matched features within the inlier threshold (0.6 degrees) at the 90th percentile, and the photographs, compared under the turn with every tile, disagree by no more than the change threshold. Otherwise it is refused as insufficient_overlap: what the photographs share does not establish one standpoint.",
+   "The join is numpy only (its Gaussian filter and 4-connected labelling written in numpy; the Gaussian equals scipy's to 6.7e-16 of the largest value on 150 random images). The scene worker's image, built with the server and pose extras, has no scipy, and version 1's join could not be imported there: measured in an environment made from the lock with those two extras only.",
+   "Version 1's parameters still decode to exactly what they computed: every development set's record under version 1's parameters, joined by version 2's final code, equals the bound version 1 run's record byte for byte, in both arms (development/v1-parity-*.log.txt, sources in development/v1-parity-sources.txt)."
+  ],
+  "comparison": "After the version 2 runs, the held-out split is joined once more with version 1's parameters (tests/fixtures/standpoint-v1-params.json, the digest version 1's records bind) through the same code, in both arms, and scored by the same statistics. That comparison is reported and gates nothing.",
+  "decisions_made_on_the_development_data": [
+   "The translation criterion is the parallax a movement would make between the inliers' 10th and 90th percentile inverse depths. A relative inverse-depth spread (10 percent) was tried first and refused to name a 1.8 m move in the test room whose inliers were one wall 5.5 m away (spread 0.077), where the movement is plainly measured. Across the development pairs, where a movement of the moved bound makes under 0.2 degrees there, the estimates were off by up to 3.3 m; from 0.3 degrees the median error was 0.02 m.",
+   "A moved claim asks whether the ESTIMATED movement shows, a still claim whether a movement of the moved bound would: asking the bound's parallax of both refused to name held-courtyard-111-mv (0, 1) moved, estimated 2.33 m against a true 2.44 m, whose inliers make 0.1 degrees for 0.7 m and 0.32 for the 2.33 m estimated.",
+   "The zoom refines the plain fit rather than replacing it: fitted from the RANSAC turn with its inliers chosen again, it found a 17 percent zoom and a 0.7 m step in held-landscape-312-c2 (0, 1), whose camera stood still, on 74 of the 125 matches the plain fit keeps. And the provisional pass keeps version 1's fit: starting the focal refinement from zoomed motions left dev-room-201-g1's lens 3.4 percent off where version 1's start left it 0.1 percent off, and its misregistration 1.29 degrees.",
+   "The depth-edge tolerance marks the band a discontinuity uncovers, per pixel, and compares a tile on its other pixels. Excluding every tile whose 3 x 3 neighbourhood of tiles spanned a large enough inverse-depth range cleared the four courtyard false refusals but, with translations inflated by a mis-stated lens, excluded whole changes (held-courtyard-111-c2 (0, 1), 112-c2 (1, 2)) and dropped a moved landscape pair's disagreement to 0; excluding every tile a band touched still erased the fountain moved in held-courtyard-112-c2 (1, 2) (1.54 percent against 3.02 strict). Occlusion masking by the other photograph's depth missed that change too, and a discontinuity rule with a fixed 2-pixel band left all four false refusals.",
+   "The band's margin is 2 pixels: at 0 and 1, held-courtyard-112-m1 (0, 1) and (1, 2) stayed refused (0.021, 0.0343), where the translation estimate was 0.045 and 0.017 m against a true 0.059 and 0.036; at 3 the fountain change fell to 0.0154 and would have been joined. At 2 the closest changed pair is at 0.023 and the closest joinable one at 0.0171, against the threshold of 0.02: both margins are thin.",
+   "The turn must explain the matched features where no measured movement does: held-courtyard-111-p1 (1, 2), whose translation was estimated at 0.456 m against a true 0.078, passed the dense comparison under a pure turn (0.013) with that turn leaving its 35 inliers 2.36 degrees apart at the 90th percentile, and joined 0.81 degrees misregistered. No pair joined under a measured movement left more than 1.0 degree there.",
+   "Alternatives measured and not taken: a dense displacement field with a robust motion fit (its translation was right on two of six test pairs and off by a factor of 1.9 or more on the other four, with 6 to 57 percent of the tiles agreeing); a spatial-block jackknife of the translation (overlaps are narrow strips, one or two blocks); a second, static group of matches as evidence that the camera stood still (a genuinely moved pair, dev-courtyard-102-mv (0, 1), had a coherent spurious group of 50 matches in 9 cells); an eye-height scale for the depth model (0.82 to 1.90 of truth in the landscapes, up to 3.2 in the rooms)."
+  ],
+  "definitions": {
+   "excess_misregistration": "as version 1: for a pair in one arrangement, the 95th percentile over the pair's true overlap of the angle between the directions at which the two drawn photographs put one true point, seen from the standpoint, minus the 95th percentile the best single turn of the pair's true directions leaves",
+   "joins": "as version 1: joinable pairs sharing 20 percent or more of the view that end in one arrangement",
+   "named": "as version 1: a moved pair is asked for when 20 percent or more of the view is shared, a changed pair when 20 percent or more of the view is shared and unchanged",
+   "names": "the outcomes a class may end in without naming it wrongly: moved -> moved_between_photographs or insufficient_overlap; changed -> scene_changed or insufficient_overlap; joinable -> joined, insufficient_overlap or inconsistent_with_set. Every other outcome is a wrong name, and one in an arrangement is a join.",
+   "pair_class": "from ground truth alone, exactly as version 1 defines it (standpoint_gates.py): no_overlap when under 5 percent of one photograph's sampled pixels are seen by the other; moved when the cameras stood 1 m or more apart; changed when at least 2 percent of the pair's shared view falls on a part the set's change touched, in either photograph, counted only for a pair that includes the changed photograph; joinable otherwise",
+   "seam_depth": "as version 1",
+   "up_error": "for each set that joined: the angle between the arrangement's up and the true up, in the reference photograph's frame (standpoint_eval.py, up_error_deg)"
+  },
+  "development_note": "The development results below are version 2's final code and parameters over all 108 development sets. On the same sets version 1 scored: exif misregistration p95 0.311 and max 0.868 degrees, up 1.518 / 3.930 / 4.296 degrees (p50 / p95 / max), joinable refused as changed 4 of 223, moved named changed 1, changed named moved 1, joins 116 of 160; exif-perturbed misregistration 0.645 and 1.674, up 1.501 / 3.872 / 4.299, joinable refused as moved 1 and as changed 4 of 223, moved named changed 2, changed named moved 1, joins 116 of 160.",
+  "development_results": {
+   "exif": {
+    "changed_in_one_arrangement": 0,
+    "changed_named": [
+     9,
+     12
+    ],
+    "excess_misregistration_millidegrees": {
+     "max": 868,
+     "p50": 43,
+     "p95": 344
+    },
+    "joinable_in_one_arrangement": [
+     117,
+     160
+    ],
+    "joinable_refused_as_changed": [
+     0,
+     223
+    ],
+    "joinable_refused_as_moved": [
+     0,
+     223
+    ],
+    "misnamed": [
+     {
+      "a": 0,
+      "b": 1,
+      "class": "changed",
+      "outcome": "moved_between_photographs",
+      "set": "held-courtyard-112-c2"
+     }
+    ],
+    "moved_in_one_arrangement": 0,
+    "moved_named": [
+     9,
+     18
+    ],
+    "outcomes_by_class": {
+     "changed": {
+      "insufficient_overlap": 6,
+      "moved_between_photographs": 1,
+      "scene_changed": 17
+     },
+     "joinable": {
+      "insufficient_overlap": 71,
+      "joined": 152
+     },
+     "moved": {
+      "insufficient_overlap": 14,
+      "moved_between_photographs": 12
+     },
+     "no_overlap": {
+      "insufficient_overlap": 126,
+      "joined": 2
+     }
+    },
+    "pairs_in_one_arrangement": 171,
+    "seam_depth_ppm": {
+     "max": 522900,
+     "median": 28400,
+     "p90": 187800,
+     "pairs": 171
+    },
+    "up_error_millidegrees": {
+     "max": 6296,
+     "p50": 288,
+     "p95": 982,
+     "sets": 71
+    },
+    "up_methods": {
+     "vertical-edges": 71
+    }
+   },
+   "exif-perturbed": {
+    "changed_in_one_arrangement": 0,
+    "changed_named": [
+     9,
+     12
+    ],
+    "excess_misregistration_millidegrees": {
+     "max": 1674,
+     "p50": 64,
+     "p95": 645
+    },
+    "joinable_in_one_arrangement": [
+     115,
+     160
+    ],
+    "joinable_refused_as_changed": [
+     0,
+     223
+    ],
+    "joinable_refused_as_moved": [
+     0,
+     223
+    ],
+    "misnamed": [
+     {
+      "a": 0,
+      "b": 1,
+      "class": "changed",
+      "outcome": "moved_between_photographs",
+      "set": "held-courtyard-112-c2"
+     }
+    ],
+    "moved_in_one_arrangement": 0,
+    "moved_named": [
+     9,
+     18
+    ],
+    "outcomes_by_class": {
+     "changed": {
+      "insufficient_overlap": 6,
+      "moved_between_photographs": 1,
+      "scene_changed": 17
+     },
+     "joinable": {
+      "insufficient_overlap": 73,
+      "joined": 150
+     },
+     "moved": {
+      "insufficient_overlap": 14,
+      "moved_between_photographs": 12
+     },
+     "no_overlap": {
+      "insufficient_overlap": 126,
+      "joined": 2
+     }
+    },
+    "pairs_in_one_arrangement": 169,
+    "seam_depth_ppm": {
+     "max": 523000,
+     "median": 29600,
+     "p90": 188000,
+     "pairs": 169
+    },
+    "up_error_millidegrees": {
+     "max": 6340,
+     "p50": 276,
+     "p95": 952,
+     "sets": 71
+    },
+    "up_methods": {
+     "vertical-edges": 71
+    }
+   }
+  },
+  "gates": {
+   "arms": {
+    "exif": {
+     "joins": {
+      "min_ppm": 650000
+     },
+     "lines_up": {
+      "max_millidegrees": 1000,
+      "p95_max_millidegrees": 339
+     },
+     "named": {
+      "changed_min_ppm": 700000,
+      "moved_min_ppm": 400000
+     },
+     "names": {
+      "changed_named_moved_max": 0,
+      "joinable_named_changed_max": 0,
+      "joinable_named_moved_max": 0,
+      "moved_named_changed_max": 0
+     },
+     "seam_depth": {
+      "median_max_ppm": 50000,
+      "p90_max_ppm": 250000
+     },
+     "up": {
+      "p50_max_millidegrees": 500,
+      "p95_max_millidegrees": 1500
+     }
+    },
+    "exif-perturbed": {
+     "joins": {
+      "min_ppm": 650000
+     },
+     "lines_up": {
+      "max_millidegrees": 2000,
+      "p95_max_millidegrees": 411
+     },
+     "named": {
+      "changed_min_ppm": 700000,
+      "moved_min_ppm": 400000
+     },
+     "names": {
+      "changed_named_moved_max": 0,
+      "joinable_named_changed_max": 0,
+      "joinable_named_moved_max": 0,
+      "moved_named_changed_max": 0
+     },
+     "seam_depth": {
+      "median_max_ppm": 50000,
+      "p90_max_ppm": 250000
+     },
+     "up": {
+      "p50_max_millidegrees": 500,
+      "p95_max_millidegrees": 1500
+     }
+    }
+   },
+   "judged_by": "standpoint_gates.py (scripts/standpoint_gates.py.txt) over each arm's standpoint_eval.py run of the held-out split, reading these thresholds from this record",
+   "never": "in both arms: no moved pair and no changed pair in one arrangement. These are the gates the design exists for and are not traded against any rate.",
+   "order": "The never gates are judged first; a failure there is a failure of the arm whatever the rest shows. Every other gate is then judged and reported, pass or fail.",
+   "units": "millidegrees for angles; parts per million for a share or a rate; pairs for names",
+   "why": {
+    "joins": "version 1's gate; development 117 and 115 of 160",
+    "lines_up": "no worse than version 1's held-out measurement at the 95th percentile (0.3386 and 0.411 degrees), as the brief for this version states; the maxima are version 1's gates.",
+    "named": "version 2 names a cause only where it is measured, so fewer pairs carry one: on development 9 of 18 moved pairs asked were named moved (version 1: 11, two of them by a translation no feature measured) and 9 of 12 changed pairs were named changed (version 1: 10). The thresholds sit under those rates so that a split with more walks near the bound can still pass, and still refuse a method that names nothing.",
+    "names": "a refusal a person can act on must not send them the wrong way: a moved pair told the scene changed, a changed pair told they moved, or a set taken from one place told either. On development version 2 names one pair wrongly in each arm, a changed pair as moved (the moved fountain, not_covered); version 1 named 2 and 3 wrongly and refused 4 and 5 joinable pairs as changed or moved.",
+    "seam_depth": "version 1's gates",
+    "up": "version 1 was 1.443 degrees at the median and 3.498 at the 95th percentile on its held-out split. On development version 2 is 0.288 and 0.982 (exif), 0.277 and 0.952 (perturbed). The bounds are under half of version 1's median and under half of its 95th percentile. The maximum is reported and not gated: it follows the arrangement's own turns, and on development one set whose pair was joined 5.5 degrees wrongly by version 1 and version 2 alike leaned 6.3 degrees."
+   }
+  },
+  "inputs": {
+   "conditions": "version 1's (its pre-registration, inputs.conditions), and a second moved set per scene, mv2: 3 photographs, each taken 1.0 to 2.0 m sideways of the last and turned a little",
+   "families": "version 1's courtyard, room and landscape",
+   "ground_truth": "per photograph, the renderer's camera rotation, camera centre and planar depth, one truth.json per scene",
+   "hand_held": "as version 1: each camera centre inside a ball whose diameter is the set's translation, and a roll with a standard deviation of 1.2 degrees",
+   "photographs": "as version 1: 1024 x 768 (768 x 1024 portrait), JPEG quality 92, FocalLengthIn35mmFilm in whole millimetres, pinhole, one exposure per scene",
+   "renderer": "Blender 4.5.9, Cycles on the CPU, 32 samples, denoised; the binary checked against the sha256 pinned in assets/characters/makehuman-parametric-v1/source-lock.json before any render; the planner and scene script are version 1's, byte for byte"
+  },
+  "method": {
+   "depth_model": "MoGe-2 ViT-L, Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968, run on each photograph through the depth stage's own encode_point_map by standpoint_depth_pass.py, in a process of its own",
+   "feature_extractor": "COLMAP's SIFT through pycolmap 4.2.0 on the CPU",
+   "frozen": "Between this record and the held-out outcome no source file named here changes and no stage parameter changes. A gate that fails is reported as failed; nothing is tuned against the held-out split, and it is not measured a second time.",
+   "params_note": "The stage's registered parameters (version 2) in exulanica/ingest/stages/__init__.py, whose canonical digest is params_sha256; the development runs carry the same digest.",
+   "params_sha256": "8c3aecf64cbfe38e9cb90e84e4ac07142bced454516621b65b7d9f8c4875d791",
+   "sources_sha256": {
+    "exulanica/ingest/stages/__init__.py": "4da246ac7b18675b1f093cbf05b49c2ac8425f41658f8017ceb21287c0af46d3",
+    "exulanica/ingest/stages/depth.py": "931e59ac2cf5948fc67f2f5952215d1036efbdc3b8eacb51c22ba2afcb4c9aa8",
+    "exulanica/reconstruction/standpoint.py": "aab741cf9f00b4187ccece8e0d8f1250426ccc5015aebcc49d3e58909b232832",
+    "exulanica/reconstruction/standpoint_features.py": "dca0459634a8ae350aa1607c834a2819d8863d141a813407a84e9358487fe232",
+    "exulanica/reconstruction/standpoint_record.py": "9d3165e7c9b4ac2ed05edc8a685fa14be561c1ee0a7ba18a51a11b3de541ea17"
+   },
+   "stage": "scene_standpoint",
+   "stage_version": 2
+  },
+  "not_changed": "Features, matching, the rotation RANSAC and refinement, the overlap test, the moved bound and its two sigmas, the focal refinement, the rotation and scale solves, the change comparison's own thresholds, and the record's shape (exulanica.standpoint-scene/v1).",
+  "not_covered": [
+   "Real photographs. Every input here is synthetic.",
+   "Lens distortion, rolling shutter, motion blur and exposure that differs between photographs.",
+   "Objects that move by themselves between photographs beyond the planted changes.",
+   "A moved object that carries most of the matched features against surroundings that repeat (a textured fountain before a striped facade and paving): the RANSAC takes its motion for the camera's, and version 2 names the pair moved as version 1 did. Measured on development: the dense comparison prefers the object's motion there too (0.171 against 0.218 disagreeing).",
+   "The depth model's metric scale, which the moved and hand-held bounds are stated in: in the landscapes it read distances at 0.10 to 0.73 of true, so a walk there can measure inside the moved bound; version 2 then refuses such a pair as insufficient_overlap rather than as changed, and does not name it moved.",
+   "Photographs that state no focal length: kept apart by the method and absent from both splits."
+  ],
+  "planner_note": "The held-out split was planned and rendered by version 1's planner and scene script, byte for byte the copies version 1's pre-registration binds, with the Blender binary located by STANDPOINT_BLENDER and checked against the pinned sha256.",
+  "profile_note": "Pre-registration for version 2 of the standpoint join (stage scene_standpoint). Written before any depth estimate was made or any join was run on the held-out split below. Version 1's records are docs/evaluation/2026-09-23-standpoint-join-preregistration.json and -outcome.json; version 1's held-out split is spent and is development data here.",
+  "question": "Does version 2 of the standpoint join keep what version 1 measured (no pair taken metres apart or across a change joined; joined photographs lining up within version 1's misregistration) while standing the arrangement within a stated bound of true up, refusing no joinable pair as moved or changed, and never refusing a moved pair as changed or a changed pair as moved?",
+  "scripts": {
+   "scripts/k3lib.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/scripts/k3lib.py.txt",
+    "sha256": "347b268ef2a207c5644861eb338adb1151663dcc1beb48ac85ba831a733deae3"
+   },
+   "scripts/standpoint_blender_scene.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/scripts/standpoint_blender_scene.py.txt",
+    "sha256": "b57bf7852618a712da3783e9cb0e51866ac97820a7ea687037287910fcf7bb01"
+   },
+   "scripts/standpoint_depth_pass.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/scripts/standpoint_depth_pass.py.txt",
+    "sha256": "ade25d4b7585dea89e96bae34668002f03571ea97ad1fccf60c76a35709e4312"
+   },
+   "scripts/standpoint_eval.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/scripts/standpoint_eval.py.txt",
+    "sha256": "514c936cf2573b16662122e76c90611cb4a8b7af9c8c24b70416e008cb0c0083"
+   },
+   "scripts/standpoint_gates.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/scripts/standpoint_gates.py.txt",
+    "sha256": "8b6569d9eef87621684fa1272462ed26a84c1f5476efe3b9002f6f00f53c1cca"
+   },
+   "scripts/standpoint_synthetic_sets.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/scripts/standpoint_synthetic_sets.py.txt",
+    "sha256": "7703f5bb6041581dc696b5d9f33f47e5016a90de1750a5d832d353a69f9125cb"
+   },
+   "scripts/v1_parity.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/scripts/v1_parity.py.txt",
+    "sha256": "0b36fa975913668a4ea2f03773901269949e15c7a33cb366fa9424d82c281b63"
+   }
+  },
+  "splits": {
+   "development": {
+    "definitions": {
+     "v1-development": {
+      "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/splits/development-split.json",
+      "sha256": "36c155d90f05d028e82115acf1d7796edd2889daae1422e08c1efc1bf9b758b8"
+     },
+     "v1-held-out": {
+      "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/splits/held-out-split.json",
+      "sha256": "39c0ffb44aadf962cab4538becf86e696d0a8cfbd611da97ab7d61354899ae03"
+     }
+    },
+    "photographs": 346,
+    "sets": 108,
+    "use": "calibration. Version 1's development split (42 sets, 136 photographs) and version 1's held-out split (66 sets, 210 photographs), whose results version 1's outcome record already published; every result on them was seen, and version 2 was changed against them."
+   },
+   "held_out": {
+    "definition": {
+     "path": "docs/evaluation/artifacts/2026-09-24-standpoint-join-v2/splits/held-out-split.json",
+     "sha256": "e0b2cbf0333d6ae0e27fbeaee6d179769b9a65240a3866547eec23405d4f4588"
+    },
+    "photographs": 228,
+    "seeds": {
+     "courtyard": [
+      121,
+      122
+     ],
+     "landscape": [
+      321,
+      322
+     ],
+     "room": [
+      221,
+      222
+     ]
+    },
+    "sets": 72,
+    "state_when_written": "planned and rendered. No depth estimate made and no join run; its photographs were not looked at.",
+    "use": "measured once, with the frozen method, in both arms"
+   }
+  }
+ },
+ "record_sha256": "53139dd2b981b4d8c994e1e7ae488f247e6d1c1b469ea755cbd9b9e360162fa4"
+}

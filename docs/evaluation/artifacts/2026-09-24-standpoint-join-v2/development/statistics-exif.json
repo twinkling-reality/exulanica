@@ -1,0 +1,117 @@
+{
+ "arm": "exif",
+ "policy_sha256": "8c3aecf64cbfe38e9cb90e84e4ac07142bced454516621b65b7d9f8c4875d791",
+ "stage_version": 2,
+ "statistics": {
+  "outcomes_by_class": {
+   "changed": {
+    "scene_changed": 17,
+    "insufficient_overlap": 6,
+    "moved_between_photographs": 1
+   },
+   "joinable": {
+    "joined": 152,
+    "insufficient_overlap": 71
+   },
+   "moved": {
+    "moved_between_photographs": 12,
+    "insufficient_overlap": 14
+   },
+   "no_overlap": {
+    "insufficient_overlap": 126,
+    "joined": 2
+   }
+  },
+  "misnamed": [
+   {
+    "set": "held-courtyard-112-c2",
+    "a": 0,
+    "b": 1,
+    "class": "changed",
+    "outcome": "moved_between_photographs"
+   }
+  ],
+  "moved_named_changed": 0,
+  "changed_named_moved": 1,
+  "pairs_in_one_arrangement": 171,
+  "excess_misregistration_deg": {
+   "p50": 0.0432,
+   "p95": 0.3438,
+   "max": 0.8683
+  },
+  "worst_pairs": [
+   {
+    "set": "held-landscape-312-s2",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.8683
+   },
+   {
+    "set": "dev-courtyard-102-s3",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.6748
+   },
+   {
+    "set": "held-courtyard-112-s3",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.4964
+   },
+   {
+    "set": "held-room-212-s2",
+    "a": 2,
+    "b": 3,
+    "class": "joinable",
+    "excess_deg": 0.4759
+   },
+   {
+    "set": "held-room-211-s2",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.4679
+   }
+  ],
+  "seam_depth_p50_by_pair": {
+   "n": 171,
+   "median": 0.0284,
+   "p90": 0.1878,
+   "max": 0.5229
+  },
+  "up_error_deg": {
+   "n": 71,
+   "p50": 0.2881,
+   "p95": 0.982,
+   "max": 6.2956
+  },
+  "up_methods": {
+   "vertical-edges": 71
+  },
+  "moved_in_one_arrangement": 0,
+  "moved_named": [
+   9,
+   18
+  ],
+  "changed_in_one_arrangement": 0,
+  "changed_named": [
+   9,
+   12
+  ],
+  "joinable_refused_as_moved": [
+   0,
+   223
+  ],
+  "joinable_refused_as_changed": [
+   0,
+   223
+  ],
+  "joinable_in_one_arrangement": [
+   117,
+   160
+  ]
+ }
+}

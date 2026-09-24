@@ -10,19 +10,20 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import json
 import math
+import subprocess
+import sys
 import uuid
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
 
-#: numpy and scipy arrive with the `reconstruction` extra, which a plain `uv sync` does not install,
-#: and the join and its fixtures import both; unguarded, one import stops the whole collection.
+#: numpy arrives with the `reconstruction` extra, which a plain `uv sync` does not install, and the
+#: join and its fixtures import it; unguarded, one import stops the whole collection.
 pytest.importorskip(
     "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
-)
-pytest.importorskip(
-    "scipy", reason="scipy is absent; install it with `uv sync --extra reconstruction`"
 )
 
 import numpy as np
@@ -53,6 +54,23 @@ ROTATION_TOLERANCE_DEG = 0.2
 
 SPEC = stage("scene_standpoint")
 POLICY = StandpointPolicy.from_params(SPEC.params)
+#: Version 2's parameters. They are not registered, because version 2 failed its pre-registered
+#: gates; its records bind them by digest, which the test below holds this file to.
+V2_PARAMS = json.loads(
+    (Path(__file__).parent / "fixtures" / "standpoint-v2-params.json").read_text(encoding="utf-8")
+)
+V2_POLICY = StandpointPolicy.from_params(V2_PARAMS)
+V2_RECORDS = [
+    json.loads(
+        (
+            Path(__file__).parents[1]
+            / "docs"
+            / "evaluation"
+            / f"2026-09-24-standpoint-join-v2-{kind}.json"
+        ).read_text(encoding="utf-8")
+    )["record"]["method"]
+    for kind in ("preregistration", "outcome")
+]
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +82,21 @@ def extractor() -> PycolmapSift:
     )
 
 
-def _join(extractor, cameras, *, room=None, focals=None, estimated=None, excluded=(), rooms=None):
+def _join(
+    extractor,
+    cameras,
+    *,
+    room=None,
+    focals=None,
+    estimated=None,
+    excluded=(),
+    rooms=None,
+    params=None,
+    supersample=1,
+):
+    """Join renders of ``cameras``; ``params`` are the stage's own unless a test names others,
+    which here are version 2's or derived from them."""
+    params = SPEC.params if params is None else params
     room = room or Room()
     # A phone states its lens: every photograph here does, unless the test says otherwise.
     focals = [focal_35mm(camera) for camera in cameras] if focals is None else focals
@@ -76,6 +108,7 @@ def _join(extractor, cameras, *, room=None, focals=None, estimated=None, exclude
             (rooms or {}).get(ordinal, room),
             camera,
             estimated_fov_y_deg=None if estimated is None else estimated[ordinal],
+            supersample=supersample,
         )
         inputs.append(
             StandpointInput(
@@ -92,9 +125,9 @@ def _join(extractor, cameras, *, room=None, focals=None, estimated=None, exclude
         scene_ref="00000000-0000-4000-8000-000000000001",
         inputs=inputs,
         excluded=excluded,
-        policy=POLICY,
-        policy_sha256=sha256_of_canonical(SPEC.params).hex(),
-        stage_version=SPEC.version,
+        policy=StandpointPolicy.from_params(params),
+        policy_sha256=sha256_of_canonical(params).hex(),
+        stage_version=SPEC.version if params is SPEC.params else V2_RECORDS[0]["stage_version"],
         extractor=extractor,
     )
     return record
@@ -368,3 +401,225 @@ def test_the_renderer_transform_puts_each_photograph_on_its_measured_rays(extrac
         ahead = matrix @ np.array([0.0, 0.0, -5.0, 1.0])
         expected = rotation @ np.array([0.0, 0.0, -5.0]) * arranged.depth_scale_ppm / 1e6
         assert np.allclose(ahead[:3], expected, atol=1e-6)
+
+
+# -- stage version 2 -----------------------------------------------------------------------------
+
+
+def _up_error_deg(record, cameras) -> float:
+    """The angle between the arrangement's up and the true up, in the reference camera's frame."""
+    arranged = {member.ordinal: member for member in record.arrangement.members}
+    reference = record.arrangement.reference
+    rotation = np.array(arranged[reference].scene_from_camera_ppb).reshape(3, 3) / PARTS_PER_BILLION
+    estimated = rotation.T @ np.array([0.0, 1.0, 0.0])
+    true = cameras[reference].rotation.T @ np.array([0.0, 1.0, 0.0])
+    return math.degrees(math.acos(np.clip(estimated @ true, -1, 1)))
+
+
+#: A room with painted pillars along its walls: long straight vertical edges, which a person's
+#: rooms and streets have and the plain room's fine voxel texture does not. The texture is halved so
+#: that the pillars' edges are among the strongest gradients, as a door frame's are in a photograph.
+PILLARED = dataclasses.replace(
+    Room(),
+    boxes=(
+        *Room().boxes,
+        *(
+            Box((x - 0.1, 0.0, z - 0.1), (x + 0.1, 3.0, z + 0.1), (0.2, 0.2, 0.22), plain=True)
+            for x, z in (
+                (-3.2, -4.2),
+                (-1.8, -4.4),
+                (0.4, -4.3),
+                (2.2, -4.4),
+                (3.4, -3.0),
+                (3.5, -1.2),
+                (-3.5, -2.4),
+                (1.2, -3.6),
+            )
+        ),
+    ),
+    texture_contrast=0.5,
+)
+#: Hand-held photographs lean: these roll by a degree or two either way, as the evaluation's do.
+ROLLED = [Camera(0, 3, roll_deg=2.5), Camera(-30, -2, roll_deg=-2.0), Camera(-60, 4, roll_deg=1.5)]
+
+
+def test_version_1_parameters_are_the_evaluated_ones_and_decode_to_what_they_meant():
+    preregistration = json.loads(
+        (
+            Path(__file__).parents[1]
+            / "docs"
+            / "evaluation"
+            / "2026-09-23-standpoint-join-preregistration.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert SPEC.version == 1
+    # The version 2 pre-registration names this file as where version 1's parameters are, so the
+    # file stays, and it must say exactly what the stage entry says.
+    assert (
+        json.loads(
+            (Path(__file__).parent / "fixtures" / "standpoint-v1-params.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        == SPEC.params
+    )
+    assert (
+        sha256_of_canonical(SPEC.params).hex()
+        == preregistration["record"]["method"]["params_sha256"]
+    )
+    # Every version 2 behaviour is off: the fit without a zoom, a moved test with two outcomes,
+    # every tile compared, and up from the cameras' axes.
+    assert POLICY.pair_fit == "rotation-translation"
+    assert POLICY.still_max_translation_m is None
+    assert POLICY.min_translation_parallax_deg is None
+    assert POLICY.change_disocclusion == "none"
+    assert POLICY.up_method == "camera-horizontal-axes" and POLICY.up_edges is None
+
+
+def test_version_2_parameters_are_the_measured_ones():
+    for method in V2_RECORDS:
+        assert sha256_of_canonical(V2_PARAMS).hex() == method["params_sha256"]
+        assert method["stage_version"] == 2 != SPEC.version
+    assert V2_POLICY.pair_fit == "rotation-translation-zoom"
+    assert V2_POLICY.up_method == "vertical-edges"
+
+
+def test_a_policy_naming_a_method_the_join_does_not_know_is_refused():
+    for section, key in (("up", "method"), ("translation", "fit"), ("change", "disocclusion")):
+        params = json.loads(json.dumps(V2_PARAMS))
+        params[section][key] = "something-else"
+        with pytest.raises(ValueError, match="this join knows no"):
+            StandpointPolicy.from_params(params)
+
+
+def test_up_comes_from_the_vertical_edges_when_the_photographs_are_rolled(extractor):
+    record = _join(extractor, ROLLED, room=PILLARED, supersample=4, params=V2_PARAMS)
+    assert record.arrangement.up["method"] == "vertical-edges"
+    assert (
+        record.arrangement.up["vertical_edges_evidence_milli"]
+        >= V2_POLICY.up_edges.min_evidence * 1000
+    )
+    assert _up_error_deg(record, ROLLED) < 0.4
+    # Version 1 takes each camera's own horizontal axis to be level, and leans with the roll.
+    leaning = _join(extractor, ROLLED, room=PILLARED, supersample=4)
+    assert leaning.arrangement.up["method"] == "camera-horizontal-axes"
+    assert _up_error_deg(leaning, ROLLED) > 1.0
+
+
+def test_where_no_vertical_edge_stands_out_up_keeps_the_camera_axes_and_says_so(extractor):
+    # The plain room's texture is fine voxel noise and its few box edges are short: no mode.
+    record = _join(extractor, ROLLED, params=V2_PARAMS)
+    up = record.arrangement.up
+    assert up["method"] == "camera-horizontal-axes"
+    assert up["vertical_edges_evidence_milli"] < V2_POLICY.up_edges.min_evidence * 1000
+    assert up["assumption"] == "each photograph was held without roll"
+
+
+def test_the_far_side_of_a_near_post_uncovered_by_a_hand_held_movement_is_not_a_change(extractor):
+    post = Box((0.55, 0.0, -1.65), (0.62, 3.0, -1.58), (0.95, 0.95, 0.95))
+    room = dataclasses.replace(Room(), boxes=(*Room().boxes, post))
+    # Twenty centimetres between the photographs: a hand-held turn at arm's length.
+    cameras = [Camera(0, 0), Camera(-25, 0, position=(0.2, 1.6, 0.03))]
+    pair = _join(extractor, cameras, room=room, params=V2_PARAMS).pairs[0]
+    assert pair.outcome == "joined", pair
+    # Version 1 compares the strip beside the post that the movement uncovers, and refuses.
+    assert _join(extractor, cameras, room=room).pairs[0].outcome == "scene_changed"
+
+
+def test_a_change_beside_a_movement_past_the_hand_held_bound_is_not_named_a_change(extractor):
+    base = Room()
+    changed = dataclasses.replace(
+        base, boxes=(*base.boxes, Box((-0.9, 0.0, -2.6), (0.3, 1.5, -1.9), (0.9, 0.9, 0.3)))
+    )
+    # Half a metre: more than a hand-held turn moves a camera, less than the moved bound.
+    cameras = [Camera(0, 0), Camera(-30, 0, position=(0.5, 1.6, 0.0))]
+    pair = _join(extractor, cameras, room=base, rooms={1: changed}, params=V2_PARAMS).pairs[0]
+    assert V2_POLICY.still_max_translation_m < math.dist(pair.translation_mm, (0, 0, 0)) / 1000
+    assert pair.outcome == "insufficient_overlap", pair
+    # Version 1 explains the view with that movement and misses the box altogether.
+    assert _join(extractor, cameras, room=base, rooms={1: changed}).pairs[0].outcome == "joined"
+
+
+def test_past_the_hand_held_bound_a_pair_joins_only_if_a_turn_explains_its_features(extractor):
+    # Half a metre with nothing changed: the movement is measured, and it is past the hand-held
+    # bound, so only a pure turn may explain the pair, and in a room a few metres deep it leaves
+    # the matched features degrees apart. The refusal rests on those features, before any
+    # comparison of the photographs is made.
+    cameras = [Camera(0, 0), Camera(-30, 0, position=(0.5, 1.6, 0.0))]
+    pair = _join(extractor, cameras, params=V2_PARAMS).pairs[0]
+    assert pair.outcome == "insufficient_overlap", pair
+    assert pair.standpoint_residual_millidegrees["p90"] > V2_POLICY.inlier_threshold_deg * 1000
+    assert pair.changed_ppm is None
+
+
+def test_a_change_where_no_movement_could_show_is_not_named_a_change(extractor):
+    # One standpoint and a box that appears, with a policy that asks more parallax than the room's
+    # matched points can show: nothing establishes that the camera stood still, so the photographs'
+    # disagreement cannot be told from a movement's, and the pair is refused without a cause.
+    base = Room()
+    changed = dataclasses.replace(
+        base, boxes=(*base.boxes, Box((-0.9, 0.0, -2.6), (0.3, 1.5, -1.9), (0.9, 0.9, 0.3)))
+    )
+    cameras = [Camera(0, 0), Camera(-30, 0)]
+    unmeasurable = json.loads(json.dumps(V2_PARAMS))
+    unmeasurable["translation"]["min_parallax_millidegrees"] = 90_000
+    pair = _join(extractor, cameras, room=base, rooms={1: changed}, params=unmeasurable).pairs[0]
+    assert pair.outcome == "insufficient_overlap", pair
+    assert pair.changed_ppm is not None and pair.changed_ppm > V2_POLICY.max_changed_fraction * 1e6
+
+
+def test_a_pair_whose_translation_is_not_measured_is_never_named_moved(extractor):
+    cameras = [Camera(0, 0), Camera(-12, 0, position=(1.8, 1.6, 0.4))]
+    assert (
+        _join(extractor, cameras, params=V2_PARAMS).pairs[0].outcome == "moved_between_photographs"
+    )
+    # The same photographs, with a policy that asks more parallax than the room's matched points
+    # can show: nothing measures the movement, so nothing may name it, and a pure turn does not
+    # explain the view.
+    unmeasurable = json.loads(json.dumps(V2_PARAMS))
+    unmeasurable["translation"]["min_parallax_millidegrees"] = 90_000
+    pair = _join(extractor, cameras, params=unmeasurable).pairs[0]
+    assert pair.outcome == "insufficient_overlap", pair
+
+
+def test_a_stated_lens_a_few_percent_off_is_not_read_as_a_step_forward():
+    from exulanica.reconstruction.standpoint import _bearings, _refine, _refine_zoom
+
+    # Points about 20 m away over a 60 degree view, one standpoint, the second photograph turned
+    # by ten degrees and its lens stated 4 percent too long.
+    rng = np.random.default_rng(7)
+    size, focal = (1000, 750), 800.0
+    xy_a = rng.uniform((50, 50), (950, 700), size=(300, 2))
+    rays = _bearings(xy_a, size, focal)
+    points = rays * rng.uniform(18.0, 22.0, size=(300, 1))
+    turn = np.array(
+        [[math.cos(0.17), 0, math.sin(0.17)], [0, 1, 0], [-math.sin(0.17), 0, math.cos(0.17)]]
+    )
+    in_b = points @ turn  # b = turn^T a
+    xy_b = np.stack(
+        [focal * in_b[:, 0] / -in_b[:, 2] + 500, -focal * in_b[:, 1] / -in_b[:, 2] + 375], axis=1
+    )
+    inverse = 1.0 / np.linalg.norm(in_b, axis=1)
+    stated = focal * 1.04
+    _r, without_zoom, _c = _refine(rays, _bearings(xy_b, size, stated), inverse, turn, V2_POLICY)
+    _r, with_zoom, _c, zoom = _refine_zoom(rays, xy_b, size, stated, inverse, turn, V2_POLICY)
+    assert np.linalg.norm(without_zoom) > 0.3, "the lens error reads as a step without the zoom"
+    assert np.linalg.norm(with_zoom) < 0.05
+    assert math.exp(zoom) == pytest.approx(1 / 1.04, rel=0.005)
+
+
+def test_the_join_imports_where_the_scene_worker_runs(tmp_path):
+    """The scene worker's image installs pycolmap and its numpy, and no scipy, cv2 or torch."""
+    probe = (
+        "import sys\n"
+        "for name in ('scipy', 'cv2', 'torch'):\n"
+        "    sys.modules[name] = None\n"
+        "import exulanica.reconstruction.standpoint\n"
+        "import exulanica.ingest.standpoint_scenes\n"
+        "print('imported')\n"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=False, cwd=tmp_path
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "imported"

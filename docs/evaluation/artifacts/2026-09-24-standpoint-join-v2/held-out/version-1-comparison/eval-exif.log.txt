@@ -1,0 +1,74 @@
+I20260924 10:07:13.861627 0x1f2cce1c0 sift.cc:765] Creating SIFT CPU feature extractor
+held2-courtyard-121-s1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-courtyard-121-s2: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 0-3:no_overlap->insufficient_overlap, 1-2:joinable->joined, 1-3:no_overlap->insufficient_overlap, 2-3:joinable->joined
+held2-courtyard-121-s3: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-courtyard-121-g1: 0-1:joinable->joined, 0-2:joinable->joined, 0-3:joinable->insufficient_overlap, 1-2:joinable->insufficient_overlap, 1-3:joinable->joined, 2-3:joinable->joined
+held2-courtyard-121-m1: 0-1:joinable->joined, 0-2:joinable->insufficient_overlap, 0-3:joinable->joined, 1-2:joinable->insufficient_overlap, 1-3:joinable->joined, 2-3:joinable->insufficient_overlap
+held2-courtyard-121-p1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-courtyard-121-mv: 0-1:moved->scene_changed, 0-2:moved->moved_between_photographs, 1-2:moved->insufficient_overlap
+held2-courtyard-121-lo: 0-1:no_overlap->insufficient_overlap
+held2-courtyard-121-c1: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-courtyard-121-c2: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-courtyard-121-c3: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-courtyard-121-mv2: 0-1:moved->scene_changed, 0-2:moved->moved_between_photographs, 1-2:moved->moved_between_photographs
+held2-courtyard-122-s1: 0-1:joinable->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->scene_changed
+held2-courtyard-122-s2: 0-1:joinable->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 0-3:no_overlap->insufficient_overlap, 1-2:joinable->scene_changed, 1-3:no_overlap->insufficient_overlap, 2-3:joinable->insufficient_overlap
+held2-courtyard-122-s3: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-courtyard-122-g1: 0-1:joinable->joined, 0-2:joinable->joined, 0-3:joinable->insufficient_overlap, 1-2:joinable->insufficient_overlap, 1-3:joinable->joined, 2-3:joinable->joined
+held2-courtyard-122-m1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 0-3:joinable->joined, 1-2:joinable->insufficient_overlap, 1-3:joinable->insufficient_overlap, 2-3:no_overlap->insufficient_overlap
+held2-courtyard-122-p1: 0-1:joinable->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-courtyard-122-mv: 0-1:moved->moved_between_photographs, 0-2:no_overlap->insufficient_overlap, 1-2:moved->moved_between_photographs
+held2-courtyard-122-lo: 0-1:no_overlap->insufficient_overlap
+held2-courtyard-122-c1: 0-1:changed->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->scene_changed
+held2-courtyard-122-c2: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-courtyard-122-c3: 0-1:changed->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->scene_changed
+held2-courtyard-122-mv2: 0-1:moved->insufficient_overlap, 0-2:moved->insufficient_overlap, 1-2:moved->insufficient_overlap
+held2-landscape-321-s1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-landscape-321-s2: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 0-3:no_overlap->insufficient_overlap, 1-2:joinable->joined, 1-3:no_overlap->insufficient_overlap, 2-3:joinable->joined
+held2-landscape-321-s3: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-landscape-321-g1: 0-1:joinable->joined, 0-2:joinable->joined, 0-3:joinable->insufficient_overlap, 1-2:joinable->insufficient_overlap, 1-3:joinable->joined, 2-3:joinable->insufficient_overlap
+held2-landscape-321-m1: 0-1:joinable->joined, 0-2:no_overlap->joined, 0-3:joinable->joined, 1-2:joinable->joined, 1-3:joinable->joined, 2-3:joinable->insufficient_overlap
+held2-landscape-321-p1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-landscape-321-mv: 0-1:moved->scene_changed, 0-2:moved->moved_between_photographs, 1-2:moved->insufficient_overlap
+held2-landscape-321-lo: 0-1:no_overlap->insufficient_overlap
+held2-landscape-321-c1: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-landscape-321-c2: 0-1:changed->scene_changed, 0-2:joinable->joined, 1-2:joinable_after_change->scene_changed
+held2-landscape-321-c3: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->scene_changed
+held2-landscape-321-mv2: 0-1:moved->moved_between_photographs, 0-2:moved->moved_between_photographs, 1-2:moved->moved_between_photographs
+held2-landscape-322-s1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-landscape-322-s2: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 0-3:no_overlap->insufficient_overlap, 1-2:joinable->joined, 1-3:no_overlap->insufficient_overlap, 2-3:joinable->joined
+held2-landscape-322-s3: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-landscape-322-g1: 0-1:joinable->joined, 0-2:joinable->joined, 0-3:joinable->insufficient_overlap, 1-2:joinable->insufficient_overlap, 1-3:joinable->joined, 2-3:joinable->joined
+held2-landscape-322-m1: 0-1:joinable->joined, 0-2:no_overlap->joined, 0-3:joinable->joined, 1-2:joinable->joined, 1-3:no_overlap->insufficient_overlap, 2-3:no_overlap->insufficient_overlap
+held2-landscape-322-p1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-landscape-322-mv: 0-1:moved->moved_between_photographs, 0-2:moved->insufficient_overlap, 1-2:moved->moved_between_photographs
+held2-landscape-322-lo: 0-1:no_overlap->insufficient_overlap
+held2-landscape-322-c1: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-landscape-322-c2: 0-1:changed->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-landscape-322-c3: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-landscape-322-mv2: 0-1:moved->moved_between_photographs, 0-2:moved->moved_between_photographs, 1-2:moved->moved_between_photographs
+held2-room-221-s1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-room-221-s2: 0-1:joinable->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 0-3:no_overlap->insufficient_overlap, 1-2:joinable->joined, 1-3:no_overlap->insufficient_overlap, 2-3:joinable->joined
+held2-room-221-s3: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-room-221-g1: 0-1:joinable->joined, 0-2:joinable->joined, 0-3:joinable->insufficient_overlap, 1-2:joinable->insufficient_overlap, 1-3:joinable->joined, 2-3:joinable->insufficient_overlap
+held2-room-221-m1: 0-1:joinable->joined, 0-2:joinable->insufficient_overlap, 0-3:joinable->joined, 1-2:no_overlap->insufficient_overlap, 1-3:joinable->joined, 2-3:no_overlap->insufficient_overlap
+held2-room-221-p1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-room-221-mv: 0-1:moved->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:no_overlap->insufficient_overlap
+held2-room-221-lo: 0-1:no_overlap->insufficient_overlap
+held2-room-221-c1: 0-1:changed->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-room-221-c2: 0-1:changed->scene_changed, 0-2:joinable->insufficient_overlap, 1-2:joinable_after_change->insufficient_overlap
+held2-room-221-c3: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-room-221-mv2: 0-1:moved->moved_between_photographs, 0-2:no_overlap->insufficient_overlap, 1-2:moved->insufficient_overlap
+held2-room-222-s1: 0-1:joinable->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->insufficient_overlap
+held2-room-222-s2: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 0-3:no_overlap->insufficient_overlap, 1-2:joinable->joined, 1-3:no_overlap->insufficient_overlap, 2-3:joinable->insufficient_overlap
+held2-room-222-s3: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->insufficient_overlap
+held2-room-222-g1: 0-1:joinable->joined, 0-2:joinable->joined, 0-3:joinable->insufficient_overlap, 1-2:joinable->insufficient_overlap, 1-3:joinable->insufficient_overlap, 2-3:joinable->insufficient_overlap
+held2-room-222-m1: 0-1:joinable->joined, 0-2:joinable->insufficient_overlap, 0-3:joinable->joined, 1-2:joinable->insufficient_overlap, 1-3:joinable->insufficient_overlap, 2-3:no_overlap->insufficient_overlap
+held2-room-222-p1: 0-1:joinable->joined, 0-2:no_overlap->insufficient_overlap, 1-2:joinable->joined
+held2-room-222-mv: 0-1:moved->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:no_overlap->insufficient_overlap
+held2-room-222-lo: 0-1:no_overlap->insufficient_overlap
+held2-room-222-c1: 0-1:changed->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->insufficient_overlap
+held2-room-222-c2: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->joined
+held2-room-222-c3: 0-1:changed->scene_changed, 0-2:no_overlap->insufficient_overlap, 1-2:joinable_after_change->insufficient_overlap
+held2-room-222-mv2: 0-1:moved->insufficient_overlap, 0-2:no_overlap->insufficient_overlap, 1-2:moved->insufficient_overlap
+exit 0

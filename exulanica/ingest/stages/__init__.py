@@ -482,6 +482,11 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "scene_standpoint": StageSpec(
         key="scene_standpoint",
+        # Version 2's paths in exulanica/reconstruction/standpoint.py (up from vertical edges, a
+        # zoom in the pair fit, naming a cause only where it is measured, depth-edge bands) are
+        # selected by its parameters, tests/fixtures/standpoint-v2-params.json. They are not
+        # registered: version 2 failed its pre-registered gates
+        # (docs/evaluation/2026-09-24-standpoint-join-v2-outcome.json).
         version=1,
         output_kind="standpoint_scene",
         # Deterministic in the sense the flag carries (ADR-0017): no model runs here. MoGe-2 ran
