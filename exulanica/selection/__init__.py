@@ -18,7 +18,9 @@ Five modules, and the order is the pipeline:
 *   :mod:`exulanica.selection.answer` is what a model may say, and the validator that refuses the
     rest. A correct, cited answer exists even when the model complies with nothing.
 
-:mod:`exulanica.selection.question` sequences them and owns the two model calls.
+:mod:`exulanica.selection.question` sequences them and composes the answer.
+:mod:`exulanica.selection.planner` proposes the Selection a question asks for, and
+:mod:`exulanica.selection.prompts` holds both prompts.
 """
 
 from exulanica.selection.answer import (

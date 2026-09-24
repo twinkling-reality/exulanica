@@ -1,0 +1,462 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "admission": {
+      "account_authority_basis": "synthetic drawings made by scripts/measure_embedding_placeholders.py from the place proposal experiment's scene generator; no personal photograph",
+      "corpus_class": "synthetic",
+      "granted_roles": [
+        "vision",
+        "embedding"
+      ],
+      "operation": "detect",
+      "purpose": "Vector search measurement on synthetic drawings: signs whose names are saved as places, searched with each placeholder the names become",
+      "route": "POST /personal-admission"
+    },
+    "arms": {
+      "current": "the workspace policy as the product attaches it; no place's use allowed",
+      "released": "every saved place's embedding use allowed through POST /place-name-rights; a reference for what an allowed name gives, never adopted by this measurement",
+      "stable": "the same policy handed a record giving each saved place one placeholder for the whole workspace, in entity id order ([place A] for the first); the alternative"
+    },
+    "gate": {
+      "content_max_loss": "0.05",
+      "end_to_end_place_min_gain": "0.10",
+      "exclusions": "a place the vision stage writes on none of its photographs cannot be saved through the product's naming path, so its queries are left out and reported; with fewer than min_saved_places places saved the run is reported and not scored",
+      "min_saved_places": 4,
+      "rule": "the alternative passes only if, over the place-named queries, its mean vector R-precision exceeds the current redaction's by at least vector_place_min_gain and its mean end-to-end R-precision by at least end_to_end_place_min_gain, and over the content queries neither mean falls by more than content_max_loss. A pass is necessary and not sufficient: the alternative sends a token stable across requests for each place, which lets a provider link the photographs of one withheld place, so adopting it needs the account holder's decision on that.",
+      "vector_place_min_gain": "0.25"
+    },
+    "models": {
+      "embedding": [
+        "Qwen/Qwen3-Embedding-8B"
+      ],
+      "vision": [
+        "MiniMaxAI/MiniMax-M3",
+        "openbmb/MiniCPM-V-4_5"
+      ]
+    },
+    "not_covered": [
+      "Synthetic drawings, English names, six places; captions are what the vision role writes on this corpus, not on personal photographs.",
+      "One run: the vision stage writes each caption once, and every arm embeds the same captions.",
+      "A question asked in words never reaches the query path with a place's name or placeholder: the planner's query has both removed. The place-named queries stand for a plan a person supplies with a place's name typed in it.",
+      "No person is named in the corpus; a person's placeholder is never made stable."
+    ],
+    "places": [
+      {
+        "drawn_name": "QUORLING QUAY",
+        "photographs": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "drawn_name": "RASKETT PIER",
+        "photographs": [
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "drawn_name": "SOLVEN CHAPEL",
+        "photographs": [
+          7,
+          8,
+          9
+        ]
+      },
+      {
+        "drawn_name": "TARNWICK BASIN",
+        "photographs": [
+          10,
+          11,
+          12
+        ]
+      },
+      {
+        "drawn_name": "ULLSBY GARTH",
+        "photographs": [
+          13,
+          14,
+          15
+        ]
+      },
+      {
+        "drawn_name": "VEDDOW MARKET",
+        "photographs": [
+          16,
+          17,
+          18
+        ]
+      }
+    ],
+    "queries": {
+      "content": [
+        {
+          "kinds": [
+            "nameplate",
+            "nameplate_tree_beside"
+          ],
+          "photographs": [
+            1,
+            2,
+            4,
+            5,
+            7,
+            8,
+            10,
+            11,
+            13,
+            14,
+            16,
+            17,
+            20
+          ],
+          "text": "a nameplate on a building"
+        },
+        {
+          "kinds": [
+            "street_sign"
+          ],
+          "photographs": [
+            3,
+            12,
+            19
+          ],
+          "text": "a street sign on a pole"
+        },
+        {
+          "kinds": [
+            "nameplate_tree_beside"
+          ],
+          "photographs": [
+            2,
+            5,
+            8,
+            11,
+            14,
+            17
+          ],
+          "text": "a tree beside a building"
+        },
+        {
+          "kinds": [
+            "park_sign"
+          ],
+          "photographs": [
+            6,
+            15
+          ],
+          "text": "a sign in a park"
+        },
+        {
+          "kinds": [
+            "station_sign"
+          ],
+          "photographs": [
+            9,
+            18
+          ],
+          "text": "a sign at a station"
+        }
+      ],
+      "place_rule": "each template filled with the place's saved name in title case; the right photographs are the place's own three",
+      "place_templates": [
+        "{name} sign",
+        "photographs at {name}"
+      ]
+    },
+    "question": "Whether the per-request placeholder a withheld place's name becomes in text sent for a vector changes which photographs a search finds, against a placeholder stable for each place across the workspace's requests.",
+    "recipe": {
+      "photographs": [
+        {
+          "board_text": "QUORLING QUAY",
+          "bytes": 139862,
+          "captured_at_utc": "2026-07-01T09:30:00Z",
+          "file": "photograph-01-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 1,
+          "place": "QUORLING QUAY",
+          "scene_index": 300,
+          "sha256": "1201fdafb24f807ea97a492758a078bf077102bd64214406906eb8af560a5550"
+        },
+        {
+          "board_text": "QUORLING QUAY",
+          "bytes": 141769,
+          "captured_at_utc": "2026-07-02T09:30:00Z",
+          "file": "photograph-02-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 2,
+          "place": "QUORLING QUAY",
+          "scene_index": 301,
+          "sha256": "8f02e9ffaeda8dd8a0b70bccc091a0ca01f08b6d4971d6650005a843c3beb6e4"
+        },
+        {
+          "board_text": "QUORLING QUAY",
+          "bytes": 136623,
+          "captured_at_utc": "2026-07-03T09:30:00Z",
+          "file": "photograph-03-street_sign.jpg",
+          "kind": "street_sign",
+          "photograph": 3,
+          "place": "QUORLING QUAY",
+          "scene_index": 302,
+          "sha256": "f49236d9cb082a093dd63e7678652009e9398effc513f4b80c8f5c43deb5cb5b"
+        },
+        {
+          "board_text": "RASKETT PIER",
+          "bytes": 138886,
+          "captured_at_utc": "2026-07-04T09:30:00Z",
+          "file": "photograph-04-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 4,
+          "place": "RASKETT PIER",
+          "scene_index": 303,
+          "sha256": "3e492f669b906ea0336c20949221a6940a3fbb090d7f41b0c9a835e712274d5a"
+        },
+        {
+          "board_text": "RASKETT PIER",
+          "bytes": 140209,
+          "captured_at_utc": "2026-07-05T09:30:00Z",
+          "file": "photograph-05-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 5,
+          "place": "RASKETT PIER",
+          "scene_index": 304,
+          "sha256": "d168c5c2097fb5e6551c828397477e0a859f84fd279b7b23e82bbf30f8e9a7ee"
+        },
+        {
+          "board_text": "RASKETT PIER",
+          "bytes": 131156,
+          "captured_at_utc": "2026-07-06T09:30:00Z",
+          "file": "photograph-06-park_sign.jpg",
+          "kind": "park_sign",
+          "photograph": 6,
+          "place": "RASKETT PIER",
+          "scene_index": 305,
+          "sha256": "380410ea1671b58235a8982d5dc3bd2a57bd04029e45a9e55675319681a883a5"
+        },
+        {
+          "board_text": "SOLVEN CHAPEL",
+          "bytes": 139875,
+          "captured_at_utc": "2026-07-07T09:30:00Z",
+          "file": "photograph-07-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 7,
+          "place": "SOLVEN CHAPEL",
+          "scene_index": 306,
+          "sha256": "0a346a02994237f16d7b1881cbc30ac6848efddda92cba9845dd0ffd39ae4a9c"
+        },
+        {
+          "board_text": "SOLVEN CHAPEL",
+          "bytes": 141352,
+          "captured_at_utc": "2026-07-08T09:30:00Z",
+          "file": "photograph-08-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 8,
+          "place": "SOLVEN CHAPEL",
+          "scene_index": 307,
+          "sha256": "4d0d216d1ccb7e47bf1e71ca4e833eb486ef046707453507da6e01dcd1352eb1"
+        },
+        {
+          "board_text": "SOLVEN CHAPEL",
+          "bytes": 135123,
+          "captured_at_utc": "2026-07-09T09:30:00Z",
+          "file": "photograph-09-station_sign.jpg",
+          "kind": "station_sign",
+          "photograph": 9,
+          "place": "SOLVEN CHAPEL",
+          "scene_index": 308,
+          "sha256": "3427c2d991fa94f9677edbd510344f0fac277802a59b9b5ea5daea5b3ecbc881"
+        },
+        {
+          "board_text": "TARNWICK BASIN",
+          "bytes": 139984,
+          "captured_at_utc": "2026-07-10T09:30:00Z",
+          "file": "photograph-10-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 10,
+          "place": "TARNWICK BASIN",
+          "scene_index": 309,
+          "sha256": "8f97fdaa176ca6ce7a5e448e8982b8f44ab6b0fff62583c2814cecd22806a146"
+        },
+        {
+          "board_text": "TARNWICK BASIN",
+          "bytes": 141885,
+          "captured_at_utc": "2026-07-11T09:30:00Z",
+          "file": "photograph-11-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 11,
+          "place": "TARNWICK BASIN",
+          "scene_index": 310,
+          "sha256": "16b0c286d69b0b08aa69576f07a9979069e171b80036f78f8af1ea3b1ac171eb"
+        },
+        {
+          "board_text": "TARNWICK BASIN",
+          "bytes": 136894,
+          "captured_at_utc": "2026-07-12T09:30:00Z",
+          "file": "photograph-12-street_sign.jpg",
+          "kind": "street_sign",
+          "photograph": 12,
+          "place": "TARNWICK BASIN",
+          "scene_index": 311,
+          "sha256": "88cbbb3aed939248c5745c149bc14d75344bb5aaabc23f6f5d0a6bf733072f6d"
+        },
+        {
+          "board_text": "ULLSBY GARTH",
+          "bytes": 138566,
+          "captured_at_utc": "2026-07-13T09:30:00Z",
+          "file": "photograph-13-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 13,
+          "place": "ULLSBY GARTH",
+          "scene_index": 312,
+          "sha256": "85d2e6bd1401ebf9b3e159cf0e5738ad4b572409b6f1c80c0efe6ebfe3c0f25b"
+        },
+        {
+          "board_text": "ULLSBY GARTH",
+          "bytes": 140815,
+          "captured_at_utc": "2026-07-14T09:30:00Z",
+          "file": "photograph-14-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 14,
+          "place": "ULLSBY GARTH",
+          "scene_index": 313,
+          "sha256": "f25fca48332a44fbf32643d3521ad744a9a26e71cad37f0658137c7e4ab113c1"
+        },
+        {
+          "board_text": "ULLSBY GARTH",
+          "bytes": 131147,
+          "captured_at_utc": "2026-07-15T09:30:00Z",
+          "file": "photograph-15-park_sign.jpg",
+          "kind": "park_sign",
+          "photograph": 15,
+          "place": "ULLSBY GARTH",
+          "scene_index": 314,
+          "sha256": "f392c3f98d9ea96ed5390b184dde3a0a2040e3a984b9371431c3807ccf8df237"
+        },
+        {
+          "board_text": "VEDDOW MARKET",
+          "bytes": 140060,
+          "captured_at_utc": "2026-07-16T09:30:00Z",
+          "file": "photograph-16-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 16,
+          "place": "VEDDOW MARKET",
+          "scene_index": 315,
+          "sha256": "4f20331d64ad545672ea4d6edba30c004592b2418d2802b33710b756c7e401e7"
+        },
+        {
+          "board_text": "VEDDOW MARKET",
+          "bytes": 142289,
+          "captured_at_utc": "2026-07-17T09:30:00Z",
+          "file": "photograph-17-nameplate_tree_beside.jpg",
+          "kind": "nameplate_tree_beside",
+          "photograph": 17,
+          "place": "VEDDOW MARKET",
+          "scene_index": 316,
+          "sha256": "1e59517485676cc5c1200550d730a91de0f33168af4409eacfa09578e8b68a12"
+        },
+        {
+          "board_text": "VEDDOW MARKET",
+          "bytes": 135871,
+          "captured_at_utc": "2026-07-18T09:30:00Z",
+          "file": "photograph-18-station_sign.jpg",
+          "kind": "station_sign",
+          "photograph": 18,
+          "place": "VEDDOW MARKET",
+          "scene_index": 317,
+          "sha256": "dcb7dfb269ed0f6b7a96a38248129f17ea6702be741942da773c653a3e4cdfd4"
+        },
+        {
+          "board_text": "WESSOCK GATE",
+          "bytes": 135796,
+          "captured_at_utc": "2026-07-19T09:30:00Z",
+          "file": "photograph-19-street_sign.jpg",
+          "kind": "street_sign",
+          "photograph": 19,
+          "place": null,
+          "scene_index": 318,
+          "sha256": "063533584bcc905210a5653f2a3adbc4e746e0eaa8710e2fc6f7849af3296812"
+        },
+        {
+          "board_text": "YARLOW CROSS",
+          "bytes": 139695,
+          "captured_at_utc": "2026-07-20T09:30:00Z",
+          "file": "photograph-20-nameplate.jpg",
+          "kind": "nameplate",
+          "photograph": 20,
+          "place": null,
+          "scene_index": 319,
+          "sha256": "664cfbfbf24f17ff597901d284ba802d0af29476185153bc5a6552815c543657"
+        },
+        {
+          "board_text": null,
+          "bytes": 132379,
+          "captured_at_utc": "2026-07-21T09:30:00Z",
+          "file": "photograph-21-no_text.jpg",
+          "kind": "no_text",
+          "photograph": 21,
+          "place": null,
+          "scene_index": 320,
+          "sha256": "089c8c9d1770860f876af3f8041a0b1dc3a9c59e091d6dc807bdfe6f886c6a4f"
+        },
+        {
+          "board_text": null,
+          "bytes": 131871,
+          "captured_at_utc": "2026-07-22T09:30:00Z",
+          "file": "photograph-22-no_text.jpg",
+          "kind": "no_text",
+          "photograph": 22,
+          "place": null,
+          "scene_index": 321,
+          "sha256": "73eef46bc4acf3ef86d85c8620e11fa0f9fc985699799fc620d086ebb5981440"
+        },
+        {
+          "board_text": null,
+          "bytes": 132754,
+          "captured_at_utc": "2026-07-23T09:30:00Z",
+          "file": "photograph-23-product.jpg",
+          "kind": "product",
+          "photograph": 23,
+          "place": null,
+          "scene_index": 322,
+          "sha256": "d56967fa3d44662556cc7ecde512a31d3e498b30eb7f00ee8ae5174e102e5e70"
+        },
+        {
+          "board_text": null,
+          "bytes": 141760,
+          "captured_at_utc": "2026-07-24T09:30:00Z",
+          "file": "photograph-24-slogan.jpg",
+          "kind": "slogan",
+          "photograph": 24,
+          "place": null,
+          "scene_index": 323,
+          "sha256": "16b880dcdfc1f71ab3f4eb30984b8ace7f74e5e815a1252ce40ea16380af2d67"
+        }
+      ],
+      "scenes_from": "scene() in scripts/make_place_proposal_d_photographs.py"
+    },
+    "scores": {
+      "end_to_end": "the order the executor returns for SelectionPlan(intent=captures, semantic_query=query) with the arm's query vector",
+      "r_precision": "of the R photographs a query should find, how many are among the first R the search ranks; R is the number it should find",
+      "vector": "photographs ranked by the cosine of the query's vector to each photograph's caption vector as the arm stored it; a photograph with no caption vector ranks last"
+    },
+    "sources_sha256": {
+      "exulanica/epistemics/caption_embeddings.py": "cccd39d8785f0a7faf3cae3b3a4432f8e5c8c2d5a2648cc4f701b70fe0368e3e",
+      "exulanica/epistemics/hosted_requests.py": "7ed306e0845053c39b91bbe69e3e578bf1c908a1fec8ac7fde039e28ead15ece",
+      "exulanica/epistemics/saved_names.py": "1764d12249e02ff521a6859432f2a4edb085b6248a5bc8bd9209d1d07440ac5e",
+      "exulanica/selection/embeddings.py": "d7666d173905a5ac4a07dd494da0760ea14926ec4591958fa4e83e080f39c35f",
+      "exulanica/selection/executor.py": "5e8154d754dc8231b7ff1d5c71ef9209db10fd96746ac66be8a9da0c73143d08",
+      "scripts/make_place_photographs.py": "7acba32366e9a1e695306e3fea05f2487c0bcf3fd5903441ea4dcb9ef9e187b3",
+      "scripts/make_place_proposal_d_photographs.py": "cf15efc114ee4eb6b0cb3c6daa6ebb47de1b4440ecaca3dd50408910c6a4bff9",
+      "scripts/measure_embedding_placeholders.py": "cb9c063924f9fdfc5e5654904c1fdc38d7551a86f9ebd111c5a47ee872309fb0"
+    },
+    "spend": {
+      "bound_usd": "2",
+      "per_run_ceiling_usd": "0.45",
+      "read_from": "the usage the provider reported, as the client's ledger counts it"
+    },
+    "written_before_any_model_call": true
+  },
+  "record_sha256": "230e6de8993f1ecb3e9615a1407b143b181d6771861f5fdcbafe8b18acab34be"
+}

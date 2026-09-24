@@ -105,11 +105,13 @@ class ConfirmedPlace:
     """
 
     entity_id: uuid.UUID
-    #: How the composer is told the place: the request's placeholder for it, ``[place A]``. Set
-    #: when the request's saved names are replaced, and ``None`` in a packet as built, so no packet
-    #: can carry a place's saved name. A place with no saved name has no placeholder and is not
-    #: stated at all.
-    placeholder: str | None = None
+    #: How the composer's request names the place: its saved name, which the boundary every hosted
+    #: request passes sends only under the account holder's right and otherwise writes as the
+    #: request's placeholder, ``[place A]``; or that placeholder itself, where another saved name
+    #: reads as the same words. Set when the request's names are decided
+    #: (:class:`~exulanica.selection.request_names.RequestNames`), and ``None`` in a packet as
+    #: built. A place with no saved name has neither and is not stated at all.
+    reference: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

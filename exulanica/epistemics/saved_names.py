@@ -5,9 +5,9 @@ person is, what a place is called, what an object is. The account holder's rules
 person's name never goes to a hosted model, with or without a right, and that a confirmed place's
 name goes only under a right the account holder grants for that place and that model. Every other
 saved name is found and replaced locally, by this module, in two places: the Companion's own
-requests, which replace every saved name including every place's, and the boundary every hosted
-request passes (:mod:`exulanica.epistemics.hosted_requests`), which leaves a place's name only
-where a right releases it for that request's models:
+requests, which replace every saved name no right can release and leave a place's to the boundary,
+and the boundary every hosted request passes (:mod:`exulanica.epistemics.hosted_requests`), which
+leaves a place's name only where a right releases it for that request's models:
 
 *   **The names to look for** are every name the account holder has saved for any entity. Deleted
     and merged records are included, because a name the account holder once typed is still theirs.

@@ -30,7 +30,6 @@ from exulanica.epistemics.hosted_requests import (
     borrowing,
     no_place_released,
 )
-from exulanica.epistemics.saved_names import saved_names
 from exulanica.identity import IdentityRepository, merge_entities, name_occurrence
 from exulanica.identity.subjects import IdentityError
 from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -42,6 +41,7 @@ from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.plan import Intent, SelectionPlan
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import answer_question, entity_catalogue, propose_plan
+from exulanica.selection.request_names import RequestNames
 from exulanica.store.local import LocalContentAddressedStore
 
 from conftest import (
@@ -215,7 +215,7 @@ def test_the_planner_redacts_a_raw_question_on_its_own(named):
         client,
         f"Show me {PERSON} at {PLACE}",
         entity_catalogue(repository.connection, repository.workspace_id),
-        names=saved_names(repository.connection, repository.workspace_id),
+        names=RequestNames.read(repository.connection, repository.workspace_id),
     )
 
     (planner,) = [json.dumps(request["payload"]) for request in transport.requests]
@@ -225,21 +225,30 @@ def test_the_planner_redacts_a_raw_question_on_its_own(named):
 
 
 def test_no_saved_name_is_sent_to_the_request_classifier(named):
-    """The classifier reads every utterance before the answer path does, so it is redacted too."""
+    """The classifier reads every utterance before the answer path does, so it is redacted too.
+
+    Its call site replaces the person and leaves the place to the boundary, which withholds it:
+    no right was granted.
+    """
     repository, _, session, _ = named
-    client, transport = scripted(reply({"kind": "question"}))
+    utterance = f"make the light warmer where {PERSON} stands outside {PLACE}"
+    client, transport = _client(repository, [reply({"kind": "question"})])
 
     propose_appearance(
-        repository.connection,
-        client,
-        f"make the light warmer where {PERSON} stands outside {PLACE}",
-        session,
-        current=current_reference(),
+        repository.connection, client, utterance, session, current=current_reference()
     )
 
     (classifier,) = [json.dumps(request["payload"]) for request in transport.requests]
     assert not _leaks(classifier), f"sent to the classifier: {_leaks(classifier)}"
     assert "where [person A] stands outside [place A]" in classifier
+    # The call site's half, read before any boundary: the person replaced, the place as saved.
+    recorded, recording = scripted(reply({"kind": "question"}))
+    propose_appearance(
+        repository.connection, recorded, utterance, session, current=current_reference()
+    )
+    (built,) = [json.dumps(request["payload"]) for request in recording.requests]
+    assert "where [person A] stands outside Lantern House" in built
+    assert not [part for part in PERSON.lower().split() if part in built.lower()]
 
 
 @pytest.mark.parametrize("direction", ["person_into_place", "place_into_person"])

@@ -1,0 +1,808 @@
+{
+  "a content Selection found nothing": {
+    "abstention": "UNANSWERABLE_NOT_CAPTURED",
+    "answer": [
+      {
+        "citations": [],
+        "text": "No authorized content matches that confirmed place relationship.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": true,
+    "names": [],
+    "packet": null,
+    "plan": {
+      "capture": null,
+      "content": {
+        "after": null,
+        "scope": "memories_only"
+      },
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "content",
+      "limit": 24,
+      "place": {
+        "ids": [
+          "<id 1>"
+        ]
+      },
+      "semantic_query": null,
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": {
+      "captures": [],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "content",
+      "total_matched": 0
+    }
+  },
+  "a content Selection found rows": {
+    "abstention": null,
+    "answer": [
+      {
+        "citations": [],
+        "text": "Authorized memory evidence: a photograph in your library.",
+        "type": "meta",
+        "value_refs": []
+      },
+      {
+        "citations": [],
+        "text": "Only memory captures can support a personal visit. Imported, authored, and simulated records cannot.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": {
+      "items": [
+        [
+          "TOKEN00001",
+          "authorized_memory",
+          "memory_capture",
+          null
+        ]
+      ],
+      "total_matched": 1
+    },
+    "deterministic": true,
+    "names": [],
+    "packet": null,
+    "plan": {
+      "capture": null,
+      "content": {
+        "after": null,
+        "scope": "memories_only"
+      },
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "content",
+      "limit": 24,
+      "place": {
+        "ids": [
+          "<id 1>"
+        ]
+      },
+      "semantic_query": null,
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": {
+      "captures": [],
+      "content": [
+        [
+          "memory_capture",
+          "<id 2>"
+        ]
+      ],
+      "includes_proposals": false,
+      "intent": "content",
+      "total_matched": 1
+    }
+  },
+  "no right let the packet reach the composer": {
+    "abstention": null,
+    "answer": [
+      {
+        "citations": [],
+        "text": "1 captures match, and I can show you 1.",
+        "type": "meta",
+        "value_refs": [
+          "capture_count",
+          "shown_count"
+        ]
+      },
+      {
+        "citations": [
+          "TOKEN00001",
+          "TOKEN00002",
+          "TOKEN00003",
+          "TOKEN00004"
+        ],
+        "text": "One of them is this photograph.",
+        "type": "historical",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": true,
+    "names": [],
+    "packet": {
+      "citable": true,
+      "items": [
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "A person in a running shirt in front of a building.",
+          "token": "TOKEN00001",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "MARIA ESTRADA RUNNING CLUB",
+          "token": "TOKEN00002",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "LANTERN HOUSE",
+          "token": "TOKEN00003",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "Gullfoss",
+          "token": "TOKEN00004",
+          "trust": "model_inference"
+        }
+      ],
+      "total_matched": 1,
+      "values": [
+        [
+          "capture_count",
+          "1"
+        ],
+        [
+          "shown_count",
+          "1"
+        ],
+        [
+          "date_0",
+          "2026-08-27"
+        ],
+        [
+          "today",
+          "2026-09-23"
+        ]
+      ]
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "running club",
+      "time": []
+    },
+    "rejections": [
+      "model_right_refused: no personal model right names this model"
+    ],
+    "repaired": false,
+    "result": {
+      "captures": [
+        "<id 1>"
+      ],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "captures",
+      "total_matched": 1
+    }
+  },
+  "raises: a supplied plan names an entity nobody has": {
+    "message": "unknown_reference: one or more of the 1 entity ids in this plan is not available",
+    "raises": "SelectionRejected"
+  },
+  "raises: no before_compose check": {
+    "message": "a packet is composed only after a before_compose right check",
+    "raises": "TypeError"
+  },
+  "raises: no client for a question in words": {
+    "message": "a model client is required to plan a question or compose a capture answer",
+    "raises": "ValueError"
+  },
+  "the composer answered": {
+    "abstention": null,
+    "answer": [
+      {
+        "citations": [],
+        "text": "Your photographs show a running club.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "prompt_tokens": 100,
+        "reasoning_tokens": 150,
+        "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "role": "reasoning_cheap",
+        "served_model": "test/model",
+        "usd": "0.00005400",
+        "used_fallback": false
+      }
+    ],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [
+      [
+        "[person A]",
+        "<id 2>"
+      ],
+      [
+        "[place A]",
+        "<id 3>"
+      ]
+    ],
+    "packet": {
+      "citable": true,
+      "items": [
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "A person in a running shirt in front of a building.",
+          "token": "TOKEN00001",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "MARIA ESTRADA RUNNING CLUB",
+          "token": "TOKEN00002",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "LANTERN HOUSE",
+          "token": "TOKEN00003",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "Gullfoss",
+          "token": "TOKEN00004",
+          "trust": "model_inference"
+        }
+      ],
+      "total_matched": 1,
+      "values": [
+        [
+          "capture_count",
+          "1"
+        ],
+        [
+          "shown_count",
+          "1"
+        ],
+        [
+          "date_0",
+          "2026-08-27"
+        ],
+        [
+          "today",
+          "2026-09-23"
+        ]
+      ]
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "running club",
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": {
+      "captures": [
+        "<id 1>"
+      ],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "captures",
+      "total_matched": 1
+    }
+  },
+  "the composer answered after one repair": {
+    "abstention": null,
+    "answer": [
+      {
+        "citations": [],
+        "text": "Your photographs show a running club.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "prompt_tokens": 100,
+        "reasoning_tokens": 150,
+        "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "role": "reasoning_cheap",
+        "served_model": "test/model",
+        "usd": "0.00005400",
+        "used_fallback": false
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "prompt_tokens": 100,
+        "reasoning_tokens": 150,
+        "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "role": "reasoning_cheap",
+        "served_model": "test/model",
+        "usd": "0.00005400",
+        "used_fallback": false
+      }
+    ],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [
+      [
+        "[person A]",
+        "<id 2>"
+      ],
+      [
+        "[place A]",
+        "<id 3>"
+      ]
+    ],
+    "packet": {
+      "citable": true,
+      "items": [
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "A person in a running shirt in front of a building.",
+          "token": "TOKEN00001",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "MARIA ESTRADA RUNNING CLUB",
+          "token": "TOKEN00002",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "LANTERN HOUSE",
+          "token": "TOKEN00003",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "Gullfoss",
+          "token": "TOKEN00004",
+          "trust": "model_inference"
+        }
+      ],
+      "total_matched": 1,
+      "values": [
+        [
+          "capture_count",
+          "1"
+        ],
+        [
+          "shown_count",
+          "1"
+        ],
+        [
+          "date_0",
+          "2026-08-27"
+        ],
+        [
+          "today",
+          "2026-09-23"
+        ]
+      ]
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "running club",
+      "time": []
+    },
+    "rejections": [
+      "clause 0 is a historical claim with no citation. Every statement about the user's past resolves to the original source or it is not made."
+    ],
+    "repaired": true,
+    "result": {
+      "captures": [
+        "<id 1>"
+      ],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "captures",
+      "total_matched": 1
+    }
+  },
+  "the composer failed twice": {
+    "abstention": null,
+    "answer": [
+      {
+        "citations": [],
+        "text": "1 captures match, and I can show you 1.",
+        "type": "meta",
+        "value_refs": [
+          "capture_count",
+          "shown_count"
+        ]
+      },
+      {
+        "citations": [
+          "TOKEN00001",
+          "TOKEN00002",
+          "TOKEN00003",
+          "TOKEN00004"
+        ],
+        "text": "One of them is this photograph.",
+        "type": "historical",
+        "value_refs": []
+      }
+    ],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "prompt_tokens": 100,
+        "reasoning_tokens": 150,
+        "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "role": "reasoning_cheap",
+        "served_model": "test/model",
+        "usd": "0.00005400",
+        "used_fallback": false
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "prompt_tokens": 100,
+        "reasoning_tokens": 150,
+        "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "role": "reasoning_cheap",
+        "served_model": "test/model",
+        "usd": "0.00005400",
+        "used_fallback": false
+      }
+    ],
+    "content_packet": null,
+    "deterministic": true,
+    "names": [
+      [
+        "[person A]",
+        "<id 2>"
+      ],
+      [
+        "[place A]",
+        "<id 3>"
+      ]
+    ],
+    "packet": {
+      "citable": true,
+      "items": [
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "A person in a running shirt in front of a building.",
+          "token": "TOKEN00001",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "MARIA ESTRADA RUNNING CLUB",
+          "token": "TOKEN00002",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "LANTERN HOUSE",
+          "token": "TOKEN00003",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "Gullfoss",
+          "token": "TOKEN00004",
+          "trust": "model_inference"
+        }
+      ],
+      "total_matched": 1,
+      "values": [
+        [
+          "capture_count",
+          "1"
+        ],
+        [
+          "shown_count",
+          "1"
+        ],
+        [
+          "date_0",
+          "2026-08-27"
+        ],
+        [
+          "today",
+          "2026-09-23"
+        ]
+      ]
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "running club",
+      "time": []
+    },
+    "rejections": [
+      "clause 0 is a historical claim with no citation. Every statement about the user's past resolves to the original source or it is not made."
+    ],
+    "repaired": false,
+    "result": {
+      "captures": [
+        "<id 1>"
+      ],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "captures",
+      "total_matched": 1
+    }
+  },
+  "the evidence changed while composing": {
+    "abstention": "UNANSWERABLE_AMBIGUOUS",
+    "answer": [
+      {
+        "citations": [],
+        "text": "The evidence changed while I was answering. Please ask again so I can use the current evidence.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "prompt_tokens": 100,
+        "reasoning_tokens": 150,
+        "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "role": "reasoning_cheap",
+        "served_model": "test/model",
+        "usd": "0.00005400",
+        "used_fallback": false
+      }
+    ],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "running club",
+      "time": []
+    },
+    "rejections": [
+      "evidence_changed_during_composition"
+    ],
+    "repaired": false,
+    "result": null
+  },
+  "the packet held guesses": {
+    "abstention": "UNANSWERABLE_AMBIGUOUS",
+    "answer": [
+      {
+        "citations": [],
+        "text": "That selection includes matches that have not been confirmed, so there is nothing here I can state as fact. Confirm them, or ask again for confirmed matches only.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": {
+      "citable": false,
+      "items": [],
+      "total_matched": 1,
+      "values": []
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "include_proposals",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "running club",
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": {
+      "captures": [
+        "<id 1>"
+      ],
+      "content": [],
+      "includes_proposals": true,
+      "intent": "captures",
+      "total_matched": 1
+    }
+  },
+  "the packet was empty": {
+    "abstention": "UNANSWERABLE_NOT_CAPTURED",
+    "answer": [
+      {
+        "citations": [],
+        "text": "I have no evidence for that. Nothing in your library matches, so there is nothing I could cite.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": {
+      "citable": true,
+      "items": [],
+      "total_matched": 0,
+      "values": [
+        [
+          "capture_count",
+          "0"
+        ],
+        [
+          "shown_count",
+          "0"
+        ],
+        [
+          "today",
+          "2026-09-23"
+        ]
+      ]
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "zebra crossing",
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": {
+      "captures": [],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "captures",
+      "total_matched": 0
+    }
+  },
+  "the planner could not fill the form": {
+    "abstention": "UNANSWERABLE_NOT_UNDERSTOOD",
+    "answer": [
+      {
+        "citations": [],
+        "text": "I could not turn that into a search of your photographs, so I have not looked. Ask it another way and I will try again.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": null,
+    "rejections": [
+      "Qwen/Qwen3-235B-A22B-Instruct-2507 returned JSON that passed the json_schema check and that SelectionPlan refuses, in 1 place(s): <root>: Value error, mode all is a statement about several entities and needs at least two of them; over one entity it is the same query as 'any'. Answer was '{\"intent\": \"captures\", \"entities\": {\"ids\": [\"<id 1>\"], \"mode\": \"all\"}, \"time\": [], \"place\": null, \"capture\": null, \"content\": null, \"epistemic\": \"confirmed\", \"semantic_query\": null, \"limit\": 24}'"
+    ],
+    "repaired": false,
+    "result": null
+  },
+  "the planner named an entity nobody has": {
+    "abstention": "UNANSWERABLE_NOT_UNDERSTOOD",
+    "answer": [
+      {
+        "citations": [],
+        "text": "I could not turn that into a search of your photographs, so I have not looked. Ask it another way and I will try again.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "prompt_tokens": 100,
+        "reasoning_tokens": 150,
+        "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "role": "structured_extraction",
+        "served_model": "test/model",
+        "usd": "0.00014000",
+        "used_fallback": false
+      }
+    ],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": {
+        "ids": [
+          "<id 1>"
+        ],
+        "mode": "any"
+      },
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": null,
+      "time": []
+    },
+    "rejections": [
+      "unknown_reference: one or more of the 1 entity ids in this plan is not available"
+    ],
+    "repaired": false,
+    "result": null
+  }
+}

@@ -53,6 +53,7 @@ import copy
 import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from types import MappingProxyType
 from typing import Any, Final, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -217,7 +218,11 @@ class ModelClient:
         return bound
 
     def _admit(
-        self, role: Role, payload: dict[str, Any], photographs: Iterable[uuid.UUID]
+        self,
+        role: Role,
+        payload: dict[str, Any],
+        photographs: Iterable[uuid.UUID],
+        placeholders: Mapping[uuid.UUID, str] | None = None,
     ) -> dict[str, Any]:
         """The one point every hosted request passes, before the cache key and before the chain.
 
@@ -233,6 +238,12 @@ class ModelClient:
         declared = frozenset(photographs)
         if not all(isinstance(capture, uuid.UUID) for capture in declared):
             raise TypeError("a request declares its photographs by capture id")
+        record = MappingProxyType(dict(placeholders or {}))
+        if not all(
+            isinstance(entity, uuid.UUID) and isinstance(label, str)
+            for entity, label in record.items()
+        ):
+            raise TypeError("a request's placeholders map an entity id to its placeholder")
         texts, instructions, images = request_parts(payload)
         handoff = ModelHandoff.hosted(self._manifest, role)
         for policy in self._policies:
@@ -245,6 +256,7 @@ class ModelClient:
                         instructions=instructions,
                         photographs=declared,
                         images=images,
+                        placeholders=record,
                     )
                 )
             )
@@ -357,6 +369,7 @@ class ModelClient:
         image_prompt_tokens: int = 0,
         use_cache: bool = True,
         photographs: Iterable[uuid.UUID] = (),
+        placeholders: Mapping[uuid.UUID, str] | None = None,
     ) -> ChatResult:
         """One chat completion, routed by role.
 
@@ -366,6 +379,8 @@ class ModelClient:
 
         ``photographs`` names every capture whose bytes or derived text the messages carry. The
         client's policies decide whether they may go; see :mod:`exulanica.models.policy`.
+        ``placeholders`` is the placeholder the caller already gave each entity the messages may
+        name, which a policy writes for a name it withholds.
         """
         role = Role(role)
         resolved_max = self._resolve_max_tokens(role, max_tokens)
@@ -379,6 +394,7 @@ class ModelClient:
                 extra=extra,
             ),
             photographs,
+            placeholders,
         )
 
         key = cache_key(
@@ -463,6 +479,7 @@ class ModelClient:
         image_prompt_tokens: int = 0,
         use_cache: bool = True,
         photographs: Iterable[uuid.UUID] = (),
+        placeholders: Mapping[uuid.UUID, str] | None = None,
     ) -> StructuredResult[T]:
         """The only path by which model output may become canonical state.
 
@@ -488,6 +505,7 @@ class ModelClient:
             image_prompt_tokens=image_prompt_tokens,
             use_cache=use_cache,
             photographs=photographs,
+            placeholders=placeholders,
         )
         # ``chat`` has already refused a body carrying more than one candidate object and
         # validated the survivor against the exact schema it sent, so ``call.payload`` is

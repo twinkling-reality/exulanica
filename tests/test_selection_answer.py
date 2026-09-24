@@ -57,6 +57,7 @@ from exulanica.selection import (
 )
 from exulanica.selection.packet import MAX_PACKET_ITEMS
 from exulanica.selection.question import CallLog, answer_question, compose_answer
+from exulanica.selection.request_names import RequestNames
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.resolve import resolve_original_bytes
 from pydantic import ValidationError
@@ -589,7 +590,7 @@ def test_the_planner_is_offered_the_empty_value_the_schema_actually_accepts():
     assertions fail and somebody has to look at the sentence.
     """
     from exulanica.models.schema import response_format_for
-    from exulanica.selection.question import _PLANNER_SYSTEM
+    from exulanica.selection.prompts import _PLANNER_SYSTEM
 
     properties = response_format_for(SelectionPlan)["json_schema"]["schema"]["properties"]
     nullable = {
@@ -633,7 +634,7 @@ def test_the_planner_is_offered_the_empty_value_the_schema_actually_accepts():
 ])
 def test_planner_content_examples_fit_the_schema(question, terms):
     from exulanica.models.schema import response_format_for
-    from exulanica.selection.question import _PLANNER_SYSTEM, PROMPT_VERSION
+    from exulanica.selection.prompts import _PLANNER_SYSTEM, PROMPT_VERSION
 
     schema = response_format_for(SelectionPlan)["json_schema"]["schema"]
     assert "semantic_query" in schema["properties"]
@@ -652,7 +653,7 @@ def test_the_planner_is_told_a_window_cannot_start_and_end_at_the_same_instant()
     current instant into both ends. The validator is a Pydantic model validator, so the
     schema-enforcing endpoint cannot see it and the refusal lands after the call is paid for.
     """
-    from exulanica.selection.question import _PLANNER_SYSTEM
+    from exulanica.selection.prompts import _PLANNER_SYSTEM
 
     assert "strictly AFTER" in _PLANNER_SYSTEM
     assert "empty window" in _PLANNER_SYSTEM
@@ -667,7 +668,7 @@ def test_the_planner_is_told_when_epistemic_scope_is_not_its_choice():
     answerable question becomes an ``UNANSWERABLE_AMBIGUOUS`` abstention telling the reader to
     confirm matches, about a question that never mentioned confidence.
     """
-    from exulanica.selection.question import _PLANNER_SYSTEM
+    from exulanica.selection.prompts import _PLANNER_SYSTEM
 
     for scope in EpistemicScope:
         assert scope.value in _PLANNER_SYSTEM, f"the prompt does not say when to choose {scope}"
@@ -683,7 +684,7 @@ def test_the_planner_is_told_a_question_about_a_place_is_not_a_content_selection
     that avoided it let the question's verb into the query ("sign say") in up to 5 draws of 5,
     and two examples hold the verbs that still leaked once place questions planned.
     """
-    from exulanica.selection.question import _PLANNER_SYSTEM
+    from exulanica.selection.prompts import _PLANNER_SYSTEM
 
     assert "A question about a named place is one of these two as well" in _PLANNER_SYSTEM
     assert "never for a question about anything visible or written" in _PLANNER_SYSTEM
@@ -696,7 +697,7 @@ def test_the_planner_is_told_an_id_is_only_for_what_the_question_names():
     planner put a catalogue person the question never named into the entity filter, which keeps
     only the photographs of that one person.
     """
-    from exulanica.selection.question import _PLANNER_SYSTEM
+    from exulanica.selection.prompts import _PLANNER_SYSTEM
 
     assert "only the ones the question names" in _PLANNER_SYSTEM
     assert "never pick somebody from the catalogue" in _PLANNER_SYSTEM
@@ -1044,7 +1045,7 @@ def test_the_planner_asks_the_extraction_role_and_the_measurement_says_why(answe
     client = answered.client(
         [HttpResponse(status_code=200, text=json.dumps(chat_body(plan.model_dump_json())))]
     )
-    propose_plan(client, "which photographs?", (), names=())
+    propose_plan(client, "which photographs?", (), names=RequestNames(()))
     called = answered.transport.models_called
     assert called == ["Qwen/Qwen3-235B-A22B-Instruct-2507"], called
 
@@ -1092,7 +1093,7 @@ def test_a_plan_that_breaks_a_rule_the_schema_cannot_express_is_repaired_once(an
             HttpResponse(status_code=200, text=json.dumps(chat_body(good.model_dump_json()))),
         ]
     )
-    plan = propose_plan(client, "which photographs?", (), names=())
+    plan = propose_plan(client, "which photographs?", (), names=RequestNames(()))
     assert plan.intent is Intent.CAPTURES
     assert answered.transport.call_count == 2, "the refusal was never sent back to the model"
 
@@ -1132,7 +1133,7 @@ def test_the_repair_tells_the_planner_which_rule_refused_its_plan(answered):
             HttpResponse(status_code=200, text=json.dumps(chat_body(good.model_dump_json()))),
         ]
     )
-    plan = propose_plan(client, "What does the sign say at [place A]?", (), names=())
+    plan = propose_plan(client, "What does the sign say at [place A]?", (), names=RequestNames(()))
     assert plan == good
     repair = answered.transport.requests[1]["payload"]["messages"][-1]["content"]
     for reason in reasons:
@@ -1169,7 +1170,7 @@ def test_a_plan_that_fails_twice_refuses_rather_than_answering_a_different_quest
         ]
     )
     with pytest.raises(StructuredOutputError):
-        propose_plan(client, "which photographs?", (), names=())
+        propose_plan(client, "which photographs?", (), names=RequestNames(()))
     assert answered.transport.call_count == 2, "it retried more than once, or not at all"
 
 
@@ -1222,7 +1223,7 @@ def test_a_placeholder_is_never_a_search_term_in_any_spelling(query, kept):
         client,
         "Which photographs show Ottilie Brandt?",
         (EntityChoice(person, "person", "Ottilie Brandt"),),
-        names=(SavedName(person, "person", "Ottilie Brandt"),),
+        names=RequestNames((SavedName(person, "person", "Ottilie Brandt"),)),
     )
     assert proposed.semantic_query == kept
     assert proposed.entities is not None and proposed.entities.ids == [person]
@@ -1236,7 +1237,7 @@ def test_a_placeholder_the_request_did_not_assign_is_ordinary_text():
 
     plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query="person a")
     client, _ = _planner_client(plan.model_dump_json())
-    proposed = propose_plan(client, "Which photographs show a person?", (), names=())
+    proposed = propose_plan(client, "Which photographs show a person?", (), names=RequestNames(()))
     assert proposed.semantic_query == "person a"
 
 
@@ -1256,7 +1257,7 @@ def test_a_plan_cut_off_at_the_token_limit_is_asked_for_once_more():
 
     good = SelectionPlan(intent=Intent.CAPTURES, limit=5)
     client, transport = _planner_client(_cut_off(), good.model_dump_json())
-    assert propose_plan(client, "which photographs?", (), names=()) == good
+    assert propose_plan(client, "which photographs?", (), names=RequestNames(())) == good
     assert transport.call_count == 2
     assert "cut off" in transport.requests[1]["payload"]["messages"][-1]["content"]
 
@@ -1268,7 +1269,7 @@ def test_a_plan_cut_off_twice_is_still_raised():
 
     client, transport = _planner_client(_cut_off(), _cut_off())
     with pytest.raises(TruncatedResponseError):
-        propose_plan(client, "which photographs?", (), names=())
+        propose_plan(client, "which photographs?", (), names=RequestNames(()))
     assert transport.call_count == 2
 
 

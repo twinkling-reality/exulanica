@@ -55,11 +55,11 @@ from typing import Annotated, Any, Final, Literal
 import psycopg
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from exulanica.epistemics.saved_names import redact_names, saved_names
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
-from exulanica.selection.question import CallLog, ModelCall
+from exulanica.selection.calls import CallLog, ModelCall
+from exulanica.selection.request_names import RequestNames
 from exulanica.selection.validation import Session
 from exulanica.world import STYLE_REGISTRY, InvalidStyleData, StyleReference, StyleRegistry
 from exulanica.world.registry import ParameterDefinition, ProfileDefinition
@@ -134,7 +134,7 @@ __all__ = [
 PROMPT_VERSION: Final = "proposal-2"
 
 #: How many evidence references the drafter may be shown, and therefore how many it may name.
-#: A bound for the same reason :data:`~exulanica.selection.question.MAX_CATALOGUE` is one: the
+#: A bound for the same reason :data:`~exulanica.selection.planner.MAX_CATALOGUE` is one: the
 #: catalogue goes into a prompt, and the retained volcanic workspace alone binds 210 source
 #: slots. It is also a privacy bound: the drafter sees identifiers and never bytes or captions.
 MAX_REFERENCE_CATALOGUE: Final = 24
@@ -375,12 +375,14 @@ def classify_request(
     utterance: str,
     *,
     log: CallLog | None = None,
+    placeholders: Mapping[uuid.UUID, str] | None = None,
 ) -> tuple[RequestKind, str | None]:
     """Decide whether an utterance is a question or a request to change the world's look.
 
     Returns the kind and the served model that decided it. A failure is a question: the answer
     path is where the utterance was going anyway, and a classifier that cannot answer must not
-    be the reason a person's question goes unanswered.
+    be the reason a person's question goes unanswered. ``placeholders`` is the request's record of
+    the names in ``utterance``, handed to the boundary with the request.
     """
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": _CLASSIFIER_SYSTEM},
@@ -392,6 +394,7 @@ def classify_request(
             messages,
             _Classification,
             prompt_version=PROMPT_VERSION,
+            placeholders=placeholders,
         )
     except (StructuredOutputError, TruncatedResponseError):
         # Not raised onward, and this is the one place in this module that swallows a failure.
@@ -425,6 +428,7 @@ def draft_appearance(
     *,
     registry: StyleRegistry = STYLE_REGISTRY,
     log: CallLog | None = None,
+    placeholders: Mapping[uuid.UUID, str] | None = None,
 ) -> tuple[Mapping[str, Any], str]:
     """Ask the model to fill the bounded form. Returns the raw draft and the served model.
 
@@ -468,6 +472,7 @@ def draft_appearance(
                 messages,
                 schema,
                 prompt_version=PROMPT_VERSION,
+                placeholders=placeholders,
             )
             if log is not None:
                 log.record(drafted.call)
@@ -513,11 +518,13 @@ def propose_appearance(
     against a version the caller has to name anyway when it posts the preview.
     """
     log = CallLog()
-    # No saved name reaches a hosted model: the classifier and the drafter are sent the utterance
-    # with every name the account holder has saved replaced. Neither needs a name to decide
-    # whether an utterance asks to change how the world looks.
-    sent = redact_names(utterance, saved_names(connection, session.workspace_id)).text
-    kind, classified_by = classify_request(client, sent, log=log)
+    # The classifier and the drafter are sent the utterance with every name no right can release
+    # replaced, and a place's name left to the boundary, which sends it only under the account
+    # holder's right for this role. Both requests carry the one record, so each entity is written
+    # one way in both.
+    names = RequestNames.read(connection, session.workspace_id)
+    sent = names.sendable(utterance)
+    kind, classified_by = classify_request(client, sent, log=log, placeholders=names.placeholders)
     if kind is RequestKind.QUESTION:
         return AppearanceOutcome(
             kind=kind, classified_by=classified_by, calls=log.calls
@@ -561,7 +568,13 @@ def propose_appearance(
         )
     try:
         draft, model_id = draft_appearance(
-            client, sent, current, catalogue, registry=registry, log=log
+            client,
+            sent,
+            current,
+            catalogue,
+            registry=registry,
+            log=log,
+            placeholders=names.placeholders,
         )
     except (StructuredOutputError, TruncatedResponseError) as refused:
         return AppearanceOutcome(

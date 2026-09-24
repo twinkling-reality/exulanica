@@ -44,7 +44,7 @@ from exulanica.api.services import Services
 from exulanica.db.migrate import provision_workspace
 from exulanica.db.session import Database
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
-from exulanica.epistemics.hosted_requests import WorkspaceRequestPolicy
+from exulanica.epistemics.hosted_requests import WorkspaceRequestPolicy, no_place_released
 from exulanica.epistemics.saved_names import Redacted
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -56,7 +56,7 @@ from exulanica.models.transport import HttpResponse
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.environment_proposal import (
     EnvironmentOperation,
-    draft_environment_operation,
+    propose_environment_operation,
 )
 from exulanica.selection.plan import Intent, SelectionPlan
 from exulanica.selection.proposal import propose_appearance
@@ -90,7 +90,7 @@ _CLIENT = _PACKAGE / "models" / "client.py"
 #: qualified name. Written from the code, and held to it by
 #: ``test_every_hosted_call_in_the_product_is_a_registered_path``.
 HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
-    "planner": ("exulanica.selection.question", "propose_plan"),
+    "planner": ("exulanica.selection.planner", "propose_plan"),
     "composer": ("exulanica.selection.question", "compose_answer"),
     "request classifier": ("exulanica.selection.proposal", "classify_request"),
     "appearance drafter": ("exulanica.selection.proposal", "draft_appearance"),
@@ -393,13 +393,15 @@ def run_appearance(world: World) -> Witness:
 
 
 def run_environment(world: World) -> Witness:
-    """The environment drafter, handed an utterance nobody replaced anything in."""
+    """The environment drafter, handed the utterance as the environment panel's route hands it."""
     client, transport = world.hosted(
         [_json_reply({"operation": "place_selected_feature"}, Role.STRUCTURED_EXTRACTION)]
     )
-    draft_environment_operation(
+    propose_environment_operation(
+        world.connection,
         client,
         f"put the selected tree where {PERSON} waits outside {PLACE}",
+        world.session,
         [EnvironmentOperation.PLACE_SELECTED_FEATURE],
     )
     return transport
@@ -438,7 +440,9 @@ def run_society(world: World) -> Witness:
         provider,
         client=provider.client.with_policy(
             world.services.request_policy(
-                world.repository.workspace_id, lambda: _lent(world.connection)
+                world.repository.workspace_id,
+                lambda: _lent(world.connection),
+                released_places=no_place_released,
             )
         ),
     )
@@ -477,10 +481,11 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
 
 #: The paths whose call site replaces saved names itself, and the modules it replaces them with.
 CALL_SITE_REPLACES: Mapping[str, tuple[str, ...]] = {
-    "planner": ("exulanica.selection.question",),
-    "composer": ("exulanica.selection.question",),
-    "request classifier": ("exulanica.selection.proposal",),
-    "appearance drafter": ("exulanica.selection.proposal",),
+    "planner": ("exulanica.selection.request_names",),
+    "composer": ("exulanica.selection.request_names",),
+    "request classifier": ("exulanica.selection.request_names",),
+    "appearance drafter": ("exulanica.selection.request_names",),
+    "environment drafter": ("exulanica.selection.request_names",),
 }
 
 

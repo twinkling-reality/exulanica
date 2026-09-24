@@ -3,22 +3,28 @@
 The model fills one field: an operation enum assembled from actions the authoritative
 client/server context supports. Identifiers, source bindings, transforms, origin
 roles, and base digests never enter model output. This module returns a proposal and performs no
-write.
+write. The utterance is sent with every saved name no right can release replaced, and a place's
+name left to the boundary every hosted request passes, which sends it only under the account
+holder's right for this role (:class:`~exulanica.selection.request_names.RequestNames`).
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Final, Literal
 
+import psycopg
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
-from exulanica.selection.question import CallLog, ModelCall
+from exulanica.selection.calls import CallLog, ModelCall
+from exulanica.selection.request_names import RequestNames
+from exulanica.selection.validation import Session
 
 __all__ = [
     "ENVIRONMENT_PROMPT_VERSION",
@@ -26,6 +32,7 @@ __all__ = [
     "EnvironmentProposalDecision",
     "EnvironmentProposalRefusal",
     "draft_environment_operation",
+    "propose_environment_operation",
 ]
 
 ENVIRONMENT_PROMPT_VERSION: Final = "environment-proposal-1"
@@ -90,8 +97,14 @@ def draft_environment_operation(
     client: ModelClient,
     utterance: str,
     operations: Sequence[EnvironmentOperation],
+    *,
+    placeholders: Mapping[uuid.UUID, str] | None = None,
 ) -> EnvironmentProposalDecision:
-    """Select one offered operation, with one repair and no fallback mutation."""
+    """Select one offered operation, with one repair and no fallback mutation.
+
+    ``placeholders`` is the request's record of the names in ``utterance``, handed to the
+    boundary with the request.
+    """
     if not operations:
         return EnvironmentProposalDecision(
             operation=None,
@@ -122,6 +135,7 @@ def draft_environment_operation(
                 messages,
                 schema,
                 prompt_version=ENVIRONMENT_PROMPT_VERSION,
+                placeholders=placeholders,
             )
             log.record(drafted.call)
             value = drafted.value.operation
@@ -162,3 +176,17 @@ def draft_environment_operation(
                 }
             )
     raise AssertionError("unreachable")
+
+
+def propose_environment_operation(
+    connection: psycopg.Connection,
+    client: ModelClient,
+    utterance: str,
+    session: Session,
+    operations: Sequence[EnvironmentOperation],
+) -> EnvironmentProposalDecision:
+    """Draft the operation an utterance asks for, with the utterance's saved names decided first."""
+    names = RequestNames.read(connection, session.workspace_id)
+    return draft_environment_operation(
+        client, names.sendable(utterance), operations, placeholders=names.placeholders
+    )

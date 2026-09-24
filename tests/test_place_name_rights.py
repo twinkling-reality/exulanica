@@ -70,28 +70,14 @@ MIGRATION = (
 
 USES = load_place_name_uses()
 MANIFEST = load_manifest()
-#: The shipped registry offering one more use, a role with a fallback, as a later entry would. It
-#: is how a two-model chain is held to the rule, which is the same for every role.
-_CHAIN_RAW = json.loads(
-    (Path(rights.__file__).with_name("place-name-uses.v1.json")).read_text(encoding="utf-8")
-)
-_CHAIN_RAW["uses"].insert(
-    0,
-    {
-        "role": "structured_extraction",
-        "purpose": "understand what you ask or tell the Companion",
-        "used_by": ["exulanica/selection/question.py"],
-        "honoured_by": ["exulanica.selection.question:propose_plan"],
-    },
-)
-CHAIN_USES = parse_place_name_uses(_CHAIN_RAW)
 #: Every offered role's whole chain at its destination, as the product would hand it over.
 HANDOFFS = {use.role.value: USES.handoff(use, MANIFEST) for use in USES.uses}
 SEARCH = HANDOFFS["embedding"]
-#: A two-model chain, offered only by CHAIN_USES.
-PLANNER = CHAIN_USES.handoff(CHAIN_USES.use("structured_extraction"), MANIFEST)
-#: A role the shipped registry does not offer: it must never be released to.
-COMPOSER = ModelHandoff.hosted(MANIFEST, Role.REASONING_CHEAP)
+#: An offered role with a fallback: how a two-model chain is held to the rule, which is the same
+#: for every role.
+PLANNER = HANDOFFS["structured_extraction"]
+#: Another offered role, never granted in the test that grants the embedding use.
+COMPOSER = HANDOFFS["reasoning_cheap"]
 
 
 @pytest.fixture
@@ -225,14 +211,13 @@ def test_allowing_one_use_releases_the_place_name_to_exactly_that_role(named):
 def test_a_grant_covers_every_model_of_the_chain_and_no_model_beyond_it(named):
     """A request that can reach a model nobody allowed releases nothing, beside allowed ones too."""
     place = named[4]["place"]
-    _grant(named, "structured_extraction", uses=CHAIN_USES)
+    _grant(named, "structured_extraction")
     assert len(PLANNER.identities) > 1, "the planner's role has no fallback to cover"
     events = _events(named)
     assert {(e["model_id"], e["event"]) for e in events} == {
         (identity.model_id, "granted") for identity in PLANNER.identities
     }
-    assert _released(named, PLANNER, uses=CHAIN_USES) == {place}, "the positive control"
-    assert _released(named, PLANNER) == frozenset(), "the shipped registry does not offer it"
+    assert _released(named, PLANNER) == {place}, "the positive control"
 
     unasked = ModelIdentity(
         provider=PLANNER.identities[0].provider,
@@ -241,9 +226,9 @@ def test_a_grant_covers_every_model_of_the_chain_and_no_model_beyond_it(named):
         revision=None,
     )
     wider = ModelHandoff(identities=(*PLANNER.identities, unasked), destination=PLANNER.destination)
-    assert _released(named, wider, uses=CHAIN_USES) == frozenset()
+    assert _released(named, wider) == frozenset()
     elsewhere = ModelHandoff(identities=PLANNER.identities, destination="https://elsewhere.example")
-    assert _released(named, elsewhere, uses=CHAIN_USES) == frozenset()
+    assert _released(named, elsewhere) == frozenset()
 
 
 def test_a_hand_over_that_is_not_one_releases_nothing(named):
@@ -261,14 +246,14 @@ def test_a_hand_over_that_is_not_one_releases_nothing(named):
 
 def test_a_withdrawal_stops_the_name_from_the_next_read_and_keeps_the_grant(named):
     place = named[4]["place"]
-    _grant(named, "structured_extraction", uses=CHAIN_USES)
-    assert _released(named, PLANNER, uses=CHAIN_USES) == {place}, "the positive control"
+    _grant(named, "structured_extraction")
+    assert _released(named, PLANNER) == {place}, "the positive control"
     granted = {(e["model_id"], e["sequence"]): bytes(e["receipt_sha256"]) for e in _events(named)}
 
     _withdraw(named, "structured_extraction")
 
-    assert _released(named, PLANNER, uses=CHAIN_USES) == frozenset()
-    assert _state(named, "structured_extraction", uses=CHAIN_USES) == "withdrawn"
+    assert _released(named, PLANNER) == frozenset()
+    assert _state(named, "structured_extraction") == "withdrawn"
     events = _events(named)
     assert [(e["event"], e["sequence"]) for e in events] == [
         ("granted", 0),
@@ -504,7 +489,9 @@ def test_an_unnamed_place_and_an_unoffered_role_cannot_be_allowed(named):
     with pytest.raises(PlaceNameRightRefused) as refused:
         _grant(named, "embedding", entity=unnamed)
     assert refused.value.reason == "unnamed"
-    for role in ("vision", "reasoning_cheap", "structured_extraction"):
+    unoffered = [role.value for role in Role if USES.use(role.value) is None]
+    assert "vision" in unoffered, "the positive control: the vision stage is never offered"
+    for role in unoffered:
         with pytest.raises(PlaceNameRightRefused) as refused:
             _grant(named, role, notice="anything")
         assert refused.value.reason == "not_offered"

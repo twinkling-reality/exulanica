@@ -20,7 +20,10 @@ carries.
     one, because rewriting fixed instructions would change every prompt for every account holder
     whose saved names are ordinary words;
 *   ``photographs``: the captures whose bytes or derived text the request carries, as the caller
-    declares them, and ``images``: how many image parts it carries.
+    declares them, and ``images``: how many image parts it carries;
+*   ``placeholders``: the placeholder the caller already gave each entity its texts may name, so
+    a name a policy withholds is written the way the caller's other requests about the same
+    question write it. Empty for a caller that keeps no such record.
 
 Text anywhere else in a request, in a caller's extra parameter or in a message field other than
 its content, is refused before any policy is asked, because it is text no policy would be shown.
@@ -35,9 +38,11 @@ account holder's data at all, and it admits no photograph and no image.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Protocol
 
 from exulanica.errors import ExulanicaError, PrivacyAdmissionError
@@ -96,6 +101,10 @@ class HostedRequest:
     instructions: tuple[str, ...]
     photographs: frozenset[uuid.UUID]
     images: int
+    #: Left out of the hash, which every other field supports: a mapping cannot be hashed.
+    placeholders: Mapping[uuid.UUID, str] = dataclasses.field(
+        default_factory=lambda: MappingProxyType({}), hash=False
+    )
 
 
 class HostedRequestPolicy(Protocol):

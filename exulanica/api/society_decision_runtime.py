@@ -9,6 +9,7 @@ import psycopg
 from fastapi import Request
 
 from exulanica.api.dependencies import get_services
+from exulanica.epistemics.hosted_requests import no_place_released
 from exulanica.selection.validation import Session
 from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import UnavailableSocietyInput
@@ -66,13 +67,16 @@ def request_decision(
     else:
         if isinstance(provider, SocietyDecisionProvider):
             # The workspace's rules go with the request; its policy opens its own short read-only
-            # session as the request leaves, so the call itself still holds no connection.
+            # session as the request leaves, so the call itself still holds no connection. A
+            # society decision releases no place's name: no use offers one, and a grant for the
+            # Companion's roles describes the Companion's requests.
             provider = replace(
                 provider,
                 client=provider.client.with_policy(
                     services.request_policy(
                         session.workspace_id,
                         lambda: services.readonly_database.session(session.workspace_id),
+                        released_places=no_place_released,
                     )
                 ),
             )

@@ -3,8 +3,9 @@
 ``tests/test_hosted_boundary.py`` shows that no saved name leaves on any path the product has.
 This file holds the parts that make that true to their contracts: a client with no policy sends
 nothing and says why, policies only accumulate, what is cached is what left, a system message is
-sent as written, a place right releases a place's name to exactly the hand-over it names, and a
-photograph goes only as a declared photograph under its right.
+sent as written, a place right releases a place's name to exactly the hand-over it names, a
+photograph goes only as a declared photograph under its right, and a withheld name is written with
+the placeholder the caller's record gives it, which must be one of its own class and nobody else's.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import json
 import uuid
 
 import pytest
+from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.epistemics.hosted_requests import (
     WorkspaceRequestPolicy,
     borrowing,
@@ -20,6 +22,8 @@ from exulanica.epistemics.hosted_requests import (
 )
 from exulanica.epistemics.saved_names import SavedName, redact_names
 from exulanica.errors import PrivacyAdmissionError
+from exulanica.identity import IdentityRepository, name_occurrence
+from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.models.cache import InMemoryResponseCache
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError
@@ -35,6 +39,7 @@ from exulanica.models.policy import (
 from exulanica.models.transport import HttpResponse
 from pydantic import BaseModel
 
+from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 from test_companion_saved_names import PERSON, _leaks, named
 from test_companion_saved_names import PLACE as PLACE_NAME
@@ -346,3 +351,126 @@ def test_a_saved_name_is_recognised_inside_a_json_document():
     redacted = redact_names(document, [door])
     assert "Blue" not in redacted.text
     assert json.loads(redacted.text) == {"note": "meet at [place A]"}
+
+
+# -- the caller's record of placeholders -----------------------------------------------------------
+
+#: A second place, saved under a longer name than the fixture's place, so the boundary's own order
+#: of recognition, longest form first, numbers it before the fixture's place.
+LONGER_PLACE = "The Old Harbour Lighthouse"
+
+
+def _second_place(repository, store, photo_dir, actor) -> uuid.UUID:
+    """A place saved through the product's naming path, on a photograph of its own."""
+    pipeline = PhotoIngestPipeline(
+        repository, store, vision=CountingVisionModel(payload=DEFAULT_PAYLOAD)
+    )
+    outcome = ingest_observed(
+        pipeline,
+        repository,
+        write_photo(photo_dir, "harbour.jpg", when="2026:08:28 09:00:00"),
+    )
+    assert outcome.error is None, outcome.error
+    occurrence = repository.connection.execute(
+        "select occurrence_id from occurrence where workspace_id=%s and capture_id=%s "
+        "and class='place'",
+        (repository.workspace_id, outcome.capture_id),
+    ).fetchone()
+    assert occurrence is not None, "the second photograph has no place to name"
+    return name_occurrence(
+        IdentityRepository(repository.connection, repository.workspace_id),
+        AssertionWriter(repository.connection, repository.workspace_id),
+        occurrence_id=occurrence["occurrence_id"],
+        display_name=LONGER_PLACE,
+        actor=actor,
+    ).entity_id
+
+
+def _sent(transport) -> str:
+    return transport.requests[-1]["payload"]["messages"][1]["content"]
+
+
+def test_a_withheld_name_is_written_with_the_callers_placeholder(named, photo_dir):
+    """The composer's case: the question names one place and the packet another, longer one.
+
+    With no record the boundary numbers the longer name first, so the composer would read
+    ``[place A]`` for the place the answer's ``names`` give ``[place B]``, and the browser would
+    show the wrong place's name.
+    """
+    repository, store, session, entities = named
+    longer = _second_place(repository, store, photo_dir, session.actor)
+    client, transport = _client(policy=_policy(repository))
+    text = f"Is the runner at {PLACE_NAME}?\n\nThe sign reads {LONGER_PLACE.upper()}."
+
+    client.chat(
+        Role.REASONING_CHEAP,
+        _messages(text),
+        prompt_version="v",
+        placeholders={entities["place"]: "[place A]"},
+    )
+
+    assert _sent(transport) == "Is the runner at [place A]?\n\nThe sign reads [place B]."
+    # Positive control: with no record, the same request numbers the longer name first.
+    client.chat(Role.REASONING_CHEAP, _messages(text), prompt_version="v")
+    assert _sent(transport) == "Is the runner at [place B]?\n\nThe sign reads [place A]."
+    assert longer != entities["place"]
+
+
+def test_two_entities_given_one_label_are_refused_by_name(named):
+    repository, _, _, entities = named
+    client, transport = _client(policy=_policy(repository))
+    record = {entities["place"]: "[place A]", uuid.uuid4(): "[place A]"}
+    with pytest.raises(HostedRequestRefused, match="give two entities one label"):
+        client.chat(
+            Role.STRUCTURED_EXTRACTION,
+            _messages(f"Where is {PLACE_NAME}?"),
+            prompt_version="v",
+            placeholders=record,
+        )
+    assert transport.requests == []
+
+
+def test_a_label_that_is_not_a_placeholder_is_refused_without_being_quoted(named):
+    """A record handing a place its own name as a label would send the name it withholds."""
+    repository, _, _, entities = named
+    client, transport = _client(policy=_policy(repository))
+    with pytest.raises(HostedRequestRefused, match="not a placeholder") as refused:
+        client.chat(
+            Role.STRUCTURED_EXTRACTION,
+            _messages(f"Where is {PLACE_NAME}?"),
+            prompt_version="v",
+            placeholders={entities["place"]: PLACE_NAME},
+        )
+    assert PLACE_NAME not in str(refused.value)
+    assert transport.requests == []
+
+
+def test_a_label_of_another_class_is_refused(named):
+    """A place written as ``[person A]`` would be restored in the browser as a person."""
+    repository, _, _, entities = named
+    client, transport = _client(policy=_policy(repository))
+    with pytest.raises(HostedRequestRefused, match="give a place another class's placeholder"):
+        client.chat(
+            Role.STRUCTURED_EXTRACTION,
+            _messages(f"Where is {PLACE_NAME}?"),
+            prompt_version="v",
+            placeholders={entities["place"]: "[person A]"},
+        )
+    assert transport.requests == []
+
+
+def test_an_entry_for_an_entity_with_no_saved_name_is_dropped_and_its_label_stays_reserved(named):
+    """An entity renamed away between the caller's read and the policy's keeps its label to itself.
+
+    Nothing of it can be withheld, so its entry is not checked against a class it no longer has;
+    and its label is never handed to another entity, because the caller's answer maps it.
+    """
+    repository, _, _, _ = named
+    client, transport = _client(policy=_policy(repository))
+    client.chat(
+        Role.STRUCTURED_EXTRACTION,
+        _messages(f"{PERSON} runs past {PLACE_NAME}"),
+        prompt_version="v",
+        placeholders={uuid.uuid4(): "[place A]"},
+    )
+    assert _sent(transport) == "[person A] runs past [place B]"

@@ -51,7 +51,7 @@ from exulanica.db.migrate import provision_workspace
 from exulanica.db.roles import EXECUTOR_ROLE, provision_runtime_role
 from exulanica.db.session import DATABASE_URL_ENV
 from exulanica.env import env_name
-from exulanica.epistemics.hosted_requests import borrowing
+from exulanica.epistemics.hosted_requests import borrowing, no_place_released
 from exulanica.epistemics.saved_names import Redacted
 from exulanica.ingest import worker_command
 from exulanica.ingest.hosted_policy import photograph_policy
@@ -63,7 +63,12 @@ from exulanica.models.manifest import Manifest, Role, load_manifest
 from exulanica.models.policy import HostedRequest
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
+from exulanica.selection.environment_proposal import (
+    EnvironmentOperation,
+    propose_environment_operation,
+)
 from exulanica.selection.plan import Intent, SelectionPlan
+from exulanica.selection.proposal import propose_appearance
 from fastapi.testclient import TestClient
 
 from conftest import (
@@ -76,6 +81,7 @@ from conftest import (
 from model_fakes import FakeTransport, chat_body
 from test_companion_saved_names import PERSON, PLACE, TEXT, _vector_reply, named
 from test_hosted_boundary import HOSTED_CALL_PATHS
+from test_selection_proposal import _seed_world, current_reference, draft
 from tests_support_api import EVERY_PERMISSION, scratch_database
 
 pytestmark = pytest.mark.postgres
@@ -150,9 +156,10 @@ class Recorder(FakeTransport):
     """Every request as the transport was handed it, and the registered path that sent it.
 
     It answers each role's primary model with a reply that role's caller accepts, so any number of
-    requests can be sent through one instance. ``composer`` replies, when given, are handed out in
-    order instead, which is how a refused answer and its repair are scripted. ``during`` is called
-    with the sending path while each request is in flight.
+    requests can be sent through one instance, and the paths that share the extraction role each
+    with a reply of their own form. ``composer`` replies, when given, are handed out in order
+    instead, which is how a refused answer and its repair are scripted. ``during`` is called with
+    the sending path while each request is in flight.
     """
 
     def __init__(
@@ -175,12 +182,21 @@ class Recorder(FakeTransport):
         }
         if composer is None:
             self.by_model[manifest[Role.REASONING_CHEAP].primary.model_id] = _ANSWERED
+        #: The extraction role's paths other than the planner, each answered in its own form.
+        self.by_path = {
+            "request classifier": _chat(json.dumps({"kind": "appearance"})),
+            "appearance drafter": _chat(json.dumps(draft())),
+            "environment drafter": _chat(json.dumps({"operation": "place_selected_feature"})),
+        }
 
     def post_json(self, url, *, headers, payload, timeout):
         path = _sending_path()
         self.paths.append(path)
         if self.during is not None:
             self.during(path)
+        if path in self.by_path:
+            self.requests.append({"url": url, "headers": dict(headers), "payload": dict(payload)})
+            return self.by_path[path]
         return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
 
     def sent_by(self, path: str) -> list[str]:
@@ -511,13 +527,15 @@ def test_a_query_request_carries_a_place_only_while_allowed_and_no_other_request
 def test_a_place_allowed_for_the_embedding_use_reaches_no_other_roles_request(
     instance, monkeypatch
 ):
-    """With the Companion's own replacement off, the boundary alone keeps it from those roles.
+    """With the Companion's call sites replacing nothing, the boundary alone keeps it from them.
 
     The question is asked in words, so the planner, the query embedding and the composer are each
     sent the place's name by their call sites. The embedding role's request carries it; the
     planner's and the composer's hand-overs were never allowed, so theirs hold it back.
     """
-    monkeypatch.setattr(sys.modules["exulanica.selection.question"], "redact_names", _unreplaced)
+    monkeypatch.setattr(
+        sys.modules["exulanica.selection.request_names"], "redact_names", _unreplaced
+    )
     client, transport = instance.client()
     transport.by_model[MANIFEST[Role.STRUCTURED_EXTRACTION].primary.model_id] = _chat(
         SelectionPlan(
@@ -576,7 +594,7 @@ def test_a_question_asked_in_words_searches_without_the_name_even_while_it_is_al
 
 
 def test_a_society_decision_carries_no_place_allowed_for_the_embedding_use(instance):
-    """The society runtime's policy is the instance's, and a decision is no embedding request."""
+    """The society runtime's policy releases no place's name, whatever its namer allowed."""
     from exulanica.world.society_decisions import SocietyDecisionProvider
 
     client, transport = instance.client()
@@ -586,14 +604,15 @@ def test_a_society_decision_carries_no_place_allowed_for_the_embedding_use(insta
     services = instance.services(client)
     instance.grant()
     provider = SocietyDecisionProvider(client, Role.REASONING_CHEAP, "a" * 64)
-    # Bound as exulanica.api.society_decision_runtime binds it: the instance's policy, on a fresh
-    # read-only session for each judgement.
+    # Bound as exulanica.api.society_decision_runtime binds it: the workspace's policy, releasing
+    # no place's name, on a fresh read-only session for each judgement.
     bound = dataclasses.replace(
         provider,
         client=provider.client.with_policy(
             services.request_policy(
                 instance.workspace_id,
                 lambda: services.readonly_database.session(instance.workspace_id),
+                released_places=no_place_released,
             )
         ),
     )
@@ -670,31 +689,27 @@ def test_a_grant_reaches_only_the_models_and_destination_it_names(instance, hand
 
 
 def test_the_resolver_runs_on_the_routes_read_only_connection_once_per_hand_over(
-    instance, monkeypatch, resolutions
+    instance, resolutions
 ):
     """Only for a request carrying a saved place, once per hand-over in one request, never early.
 
-    The second question's composer is refused once and asked again: two requests to one
-    hand-over, and one read of the right.
+    The first question's query names no place, so its vector request reads nothing, and the sign
+    in its packet names the place, so the composer's hand-over is read once. The second question's
+    composer is refused once and asked again: two requests to one hand-over, and one read.
     """
     client, transport = instance.client(composer=[_ANSWERED, _REFUSED, _ANSWERED])
     services = instance.services(client)
     instance.caption(instance.api_worker(client), instance.photographs[0])
     resolutions.clear()
+    composer = (EXECUTOR_ROLE, frozenset({Role.REASONING_CHEAP.value}))
 
     with instance.http(services) as http:
         instance.ask(http, "running club")
-        assert resolutions == [], "a request carrying no saved place's name read the right"
-        monkeypatch.setattr(
-            sys.modules["exulanica.selection.question"], "redact_names", _unreplaced
-        )
+        assert resolutions == [composer], "a request carrying no saved place's name read the right"
         instance.ask(http, f"running club at {PLACE}")
 
-    assert resolutions == [
-        (EXECUTOR_ROLE, frozenset({EMBEDDING})),
-        (EXECUTOR_ROLE, frozenset({Role.REASONING_CHEAP.value})),
-    ]
-    assert transport.paths[-3:] == ["query embedding", "composer", "composer"]
+    assert resolutions == [composer, (EXECUTOR_ROLE, frozenset({EMBEDDING})), composer]
+    assert transport.paths[-4:] == ["composer", "query embedding", "composer", "composer"]
 
 
 def test_a_stop_commits_while_a_request_is_in_flight_and_holds_the_next_one_back(instance):
@@ -766,8 +781,11 @@ def test_the_vision_stage_releases_no_place_because_no_vision_use_is_offered(ins
         )
         return sent
 
-    instance_policy = instance.services(None).request_policy(
-        instance.workspace_id, borrowing(instance.repository.connection)
+    services = instance.services(None)
+    instance_policy = services.request_policy(
+        instance.workspace_id,
+        borrowing(instance.repository.connection),
+        released_places=services.released_place_names,
     )
     vision_policy = photograph_policy(instance.repository, capture, screening.screening_id)
     assert admitted(instance_policy, Role.EMBEDDING, images=0) == text, "the positive control"
@@ -786,12 +804,76 @@ def _send_a_query(instance: Instance, _client: ModelClient, http: TestClient) ->
     instance.ask(http, f"running club at {PLACE}")
 
 
+def _ask_in_words(instance: Instance, _client: ModelClient, http: TestClient) -> None:
+    """``POST /selection/ask`` with a question in words naming the place: planner and composer."""
+    response = http.post(
+        "/selection/ask",
+        headers=AUTH,
+        json={"question": f"Which photographs show the running club at {PLACE}?"},
+    )
+    assert response.status_code == 200, response.text
+
+
+def _hosted(instance: Instance, client: ModelClient) -> ModelClient:
+    """The client a route sends through, with the instance's policy attached."""
+    hosted = instance.services(client).hosted_model(
+        instance.repository.connection, instance.workspace_id
+    )
+    assert hosted is not None
+    return hosted
+
+
+def _classify(instance: Instance, client: ModelClient, _http: TestClient) -> None:
+    """The appearance path on a workspace with no world: classified, and refused before a draft."""
+    propose_appearance(
+        instance.repository.connection,
+        _hosted(instance, client),
+        f"make the light warmer outside {PLACE}",
+        instance.session,
+        current=None,
+    )
+
+
+def _draft_appearance(instance: Instance, client: ModelClient, _http: TestClient) -> None:
+    """The appearance path on a world with bound evidence: classified, then drafted."""
+    if not instance.repository.connection.execute(
+        "select 1 from world_topology_source where workspace_id=%s limit 1",
+        (instance.workspace_id,),
+    ).fetchone():
+        _seed_world(instance.repository, instance.tmp_path, instance.photo_dir)
+    outcome = propose_appearance(
+        instance.repository.connection,
+        _hosted(instance, client),
+        f"make the light warmer outside {PLACE}",
+        instance.session,
+        current=current_reference(),
+    )
+    assert outcome.proposal is not None, outcome.refusal
+
+
+def _draft_environment(instance: Instance, client: ModelClient, _http: TestClient) -> None:
+    """The environment panel's proposal, as its route hands the drafter an utterance."""
+    decision = propose_environment_operation(
+        instance.repository.connection,
+        _hosted(instance, client),
+        f"put the selected building outside {PLACE}",
+        instance.session,
+        [EnvironmentOperation.PLACE_SELECTED_FEATURE],
+    )
+    assert decision.operation is EnvironmentOperation.PLACE_SELECTED_FEATURE, decision.refusal
+
+
 #: How to send a request down each request path the uses registry may name in ``honoured_by``, as
 #: the product builds that path, with a saved place in its text. A path the registry names and this
 #: does not fails below, so a use cannot be offered until a run shows its paths honouring it.
 HONOURING_RUNS: Mapping[str, Callable[[Instance, ModelClient, TestClient], None]] = {
     "exulanica.epistemics.caption_embeddings:embed_capture": _send_a_caption,
     "exulanica.selection.embeddings:embed_query": _send_a_query,
+    "exulanica.selection.environment_proposal:draft_environment_operation": _draft_environment,
+    "exulanica.selection.proposal:classify_request": _classify,
+    "exulanica.selection.proposal:draft_appearance": _draft_appearance,
+    "exulanica.selection.question:compose_answer": _send_a_query,
+    "exulanica.selection.planner:propose_plan": _ask_in_words,
 }
 
 OFFERED = sorted((use.role.value, path) for use in USES.uses for path in use.honoured_by)

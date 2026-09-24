@@ -33,22 +33,17 @@ RAW = json.loads(REGISTRY.read_text(encoding="utf-8"))
 USES = load_place_name_uses()
 MANIFEST = load_manifest()
 AT = dt.datetime(2026, 9, 23, 12, 0, tzinfo=dt.UTC)
-#: The shipped registry offering one more use, a role with a fallback, as a later entry would. The
-#: rule is the same for every role; this is how a two-model chain is held to it.
-CHAIN_RAW = copy.deepcopy(RAW)
-CHAIN_RAW["uses"].insert(
-    0,
-    {
-        "role": "structured_extraction",
-        "purpose": "understand what you ask or tell the Companion",
-        "used_by": ["exulanica/selection/question.py"],
-        "honoured_by": ["exulanica.selection.question:propose_plan"],
-    },
-)
-CHAIN_USES = parse_place_name_uses(CHAIN_RAW)
-PLANNER_USE = CHAIN_USES.use("structured_extraction")
-PLANNER = CHAIN_USES.handoff(PLANNER_USE, MANIFEST)
-NOTICE = CHAIN_USES.notice(PLANNER_USE, PLANNER)
+#: An offered use whose role has a fallback. The rule is the same for every role; this is how a
+#: two-model chain is held to it.
+PLANNER_USE = USES.use("structured_extraction")
+PLANNER = USES.handoff(PLANNER_USE, MANIFEST)
+NOTICE = USES.notice(PLANNER_USE, PLANNER)
+#: For each offered role, a module known to name it, so the scan below cannot pass empty.
+NAMED_BY = {
+    "embedding": "exulanica/selection/embeddings.py",
+    "reasoning_cheap": "exulanica/selection/question.py",
+    "structured_extraction": "exulanica/selection/proposal.py",
+}
 
 
 def _decision(identity: ModelIdentity, state: str, *, handoff: ModelHandoff = PLANNER):
@@ -70,7 +65,7 @@ def _decision(identity: ModelIdentity, state: str, *, handoff: ModelHandoff = PL
         destination=handoff.destination,
         event="granted",
         decided_at=AT - dt.timedelta(days=1),
-        valid_until=AT - dt.timedelta(seconds=1) if state == "ended" else AT + CHAIN_USES.term,
+        valid_until=AT - dt.timedelta(seconds=1) if state == "ended" else AT + USES.term,
         notice="other words" if state == "notice_changed" else NOTICE,
         naming_holds=state != "name_changed",
     )
@@ -82,10 +77,18 @@ MODEL_STATES = ("allowed", "not_allowed", "withdrawn", "ended", "name_changed", 
 # -- the registry ----------------------------------------------------------------------------------
 
 
-def test_the_shipped_registry_offers_only_the_use_whose_requests_honour_a_release():
-    """The planner, the classifier, the drafters and the composer send no saved name at all."""
-    assert [use.role for use in USES.uses] == [Role.EMBEDDING]
-    for role in ("structured_extraction", "reasoning_cheap", "vision", "depth"):
+def test_the_shipped_registry_offers_each_role_whose_requests_honour_a_release():
+    """Every request of these roles leaves a place's name to the boundary; no other role's does.
+
+    The Companion's call sites replace only the names no right can release. The vision stage's
+    policy releases no place's name and a society decision's releases none, so neither is offered.
+    """
+    assert [use.role for use in USES.uses] == [
+        Role.EMBEDDING,
+        Role.REASONING_CHEAP,
+        Role.STRUCTURED_EXTRACTION,
+    ]
+    for role in ("vision", "depth", "reasoning_mid"):
         assert USES.use(role) is None
     assert USES.term == dt.timedelta(days=90)
 
@@ -122,7 +125,7 @@ def test_each_offered_role_lists_exactly_the_modules_that_name_it():
     The scan is of the ``exulanica`` package for ``Role.<MEMBER>``. ``exulanica/models/`` is left
     out: the manifest defines the roles and the client carries every request, and neither uses a
     role for a purpose of its own. A role named only as a string is not seen, which is why the
-    positive control below requires the scan to find the one module known to call all three.
+    positive control below requires the scan to find, for each role, a module known to name it.
     """
     found: dict[str, set[str]] = {use.role.value: set() for use in USES.uses}
     for path in sorted((ROOT / "exulanica").rglob("*.py")):
@@ -133,7 +136,9 @@ def test_each_offered_role_lists_exactly_the_modules_that_name_it():
         for use in USES.uses:
             if re.search(rf"\bRole\.{use.role.name}\b", text):
                 found[use.role.value].add(relative)
-    assert all("exulanica/selection/question.py" in modules for modules in found.values()), found
+    assert set(found) == set(NAMED_BY), "the known namers and the offered roles differ"
+    for role, module in NAMED_BY.items():
+        assert module in found[role], f"the scan did not find {module} naming {role}"
     for use in USES.uses:
         assert sorted(found[use.role.value]) == list(use.used_by), (
             f"the modules naming {use.role.value} changed; read its purpose sentence "
@@ -190,7 +195,7 @@ def test_the_notice_names_every_model_and_the_host_and_no_place():
         assert "api.tokenfactory.nebius.com" in text
         assert use.purpose in text and "90 days" in text
         assert "{" not in text
-    assert len(PLANNER.identities) == 2 and CHAIN_USES.fallback_joiner in NOTICE
+    assert len(PLANNER.identities) == 2 and USES.fallback_joiner in NOTICE
 
 
 def test_a_notice_is_written_only_for_a_hosted_hand_over_of_its_own_role():
@@ -257,7 +262,7 @@ def test_a_chain_is_allowed_only_when_every_model_is(states):
     assert reading.allowed == (states == ("allowed", "allowed"))
     assert tuple(state for _, state in reading.models) == states
     if reading.allowed:
-        assert reading.since is not None and reading.until == AT + CHAIN_USES.term
+        assert reading.since is not None and reading.until == AT + USES.term
     else:
         assert reading.since is None and reading.until is None
         assert reading.state != "allowed"

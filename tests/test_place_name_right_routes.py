@@ -17,6 +17,7 @@ import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
+from exulanica.consent.place_names import load_place_name_uses
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.identity import IdentityRepository, name_occurrence
 from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -28,6 +29,8 @@ from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, writ
 from tests_support_api import EVERY_PERMISSION, scratch_database
 
 OWNER = "place-name-owner-token-long-enough-to-be-accepted"
+#: Every use the shipped registry offers, in its own order, which is the order a place reads them.
+OFFERED = [use.role.value for use in load_place_name_uses().uses]
 READER = "place-name-reader-token-long-enough-to-be-accepted"
 HOUSEMATE = "place-name-housemate-token-long-enough-to-be-accepted"
 STRANGER = "place-name-stranger-token-long-enough-to-be-accepted"
@@ -139,7 +142,7 @@ def test_a_place_reads_every_use_as_not_allowed_with_the_words_to_allow_it(site)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["entity_id"] == str(site.place) and body["name"] == "Lantern House"
-    assert [each["use"] for each in body["uses"]] == ["embedding"]
+    assert [each["use"] for each in body["uses"]] == OFFERED
     for each in body["uses"]:
         assert each["state"] == "not_allowed" and each["allowed"] is False
         assert each["since"] is None and each["changed_at"] is None
@@ -155,7 +158,10 @@ def test_allowing_and_stopping_one_use_is_recorded_as_decisions_and_read_back(si
     assert allowed.status_code == 201, allowed.text
     embedding = _use(allowed.json(), "embedding")
     assert embedding["state"] == "allowed" and embedding["since"] and embedding["until"]
-    assert [each["use"] for each in allowed.json()["uses"]] == ["embedding"]
+    # One use allowed, and every other still not: a decision is for one use.
+    assert {each["use"]: each["state"] for each in allowed.json()["uses"]} == {
+        use: "allowed" if use == "embedding" else "not_allowed" for use in OFFERED
+    }
     listed = site.call(OWNER, "GET", "/place-name-rights").json()["places"]
     assert [place["entity_id"] for place in listed] == [str(site.place)]
 
@@ -175,8 +181,8 @@ def test_allowing_and_stopping_one_use_is_recorded_as_decisions_and_read_back(si
     [
         ("embedding", "Words nobody was shown.", "notice_changed"),
         ("vision", "Anything.", "not_offered"),
-        # Offered only once the requests it serves honour a release.
-        ("reasoning_cheap", "Anything.", "not_offered"),
+        # A role whose requests do not honour a release is never offered.
+        ("reasoning_mid", "Anything.", "not_offered"),
     ],
 )
 def test_a_grant_the_server_did_not_offer_in_those_words_is_refused(site, use, notice, code):

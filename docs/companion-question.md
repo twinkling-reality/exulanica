@@ -17,10 +17,15 @@ world. [Product direction](product-direction.md) owns its broader role and conti
 ## Request path
 
 The [Selection routes](../exulanica/api/routes/selection.py) expose question planning, answering,
-evidence packets and bounded proposals. The [question implementation](../exulanica/selection/question.py)
-plans, validates, executes, builds a bounded packet, composes and validates the answer, with the
-supported repair path. It records per-question model execution rather than inferring execution
-from the manifest.
+evidence packets and appearance proposals, and the
+[environment proposal route](../exulanica/api/routes/selection_environment.py) proposes the NYC
+environment panel's typed edits. The [question implementation](../exulanica/selection/question.py)
+sequences the path: the [planner](../exulanica/selection/planner.py) proposes a Selection from the
+question, and the question implementation validates and executes it, builds a bounded packet,
+composes and validates the answer, with the supported repair path. Both system prompts and the
+version they are recorded under are in [prompts](../exulanica/selection/prompts.py). The path
+records per-question model execution with [calls](../exulanica/selection/calls.py) rather than
+inferring execution from the manifest.
 
 The browser's `companion-ask-api.ts` calls `POST /selection/ask` and obtains the packet needed to
 resolve citations. The [application composition](../web/packages/app/src/main.ts) connects question,
@@ -114,21 +119,32 @@ product only because the account holder typed it: who a person is, what a place 
 person's name never goes to a hosted model, with or without a right, and a confirmed place name goes
 only under a right the account holder grants for that place and that model. Every hosted request
 passes one boundary that applies the rule, described after the limitations below. The requests this
-section describes also replace every saved name themselves, a place's included, before the request
-is built, with `exulanica/epistemics/saved_names.py`. A saved name is recognised whole,
-case-insensitively and as a whole word; a person's or a voice's name is also recognised by any
-part of at least three letters, because people are named by first name, while other names are
-recognised whole only, because their parts are ordinary words and a saved "Lantern House" must not
-turn "photos of the house" into a filter on one place. Each entity recognised gets a placeholder of its class, `[person A]`,
-`[place A]`, stable for the whole request. The planner's catalogue lists every entity as an id and
-a class, with its placeholder only when the question named it, and never with a name. The question
-the planner, the composer, the request classifier and both drafters are sent is the redacted one,
-and so is every line of packet text, because a saved name can be painted on a building or written
-on a shirt as easily as typed. The answer's `names` field maps each placeholder to its entity so
-the client can restore the name from the account holder's own data. What still works: asking about
-anything by a name the account holder has saved, which is resolved locally and reaches the plan as
-an id. What is lost: the model can no longer pick a person or a place out from a description. Two
-limitations, stated rather than hidden. A name the account holder has not saved cannot be
+section describes also replace, before the request is built, every saved name no right can release:
+a person's, a voice's, an object's, an event's and a conversation's. A place's name is left to the
+boundary, which sends it or withholds it for each request and each hand-over. One record per
+question, `RequestNames` in `exulanica/selection/request_names.py`, reads the saved names once
+through `exulanica/epistemics/saved_names.py` and holds the placeholder each entity it recognises
+is given, and every request of the question hands that record to the boundary, so a place withheld
+from a request is written with the same placeholder in the question, the catalogue and the packet.
+A saved name is recognised whole, case-insensitively and as a whole word; a person's or a voice's
+name is also recognised by any part of at least three letters, because people are named by first
+name, while other names are recognised whole only, because their parts are ordinary words and a
+saved "Lantern House" must not turn "photos of the house" into a filter on one place. Every saved
+name is recognised in one pass, longest first, so a person's first name inside a place's name does
+not break the place's name apart. Each entity recognised gets a placeholder of its class,
+`[person A]`, `[place A]`, stable for the whole question. A place whose whole saved name reads as
+another saved name, as a place called Rose does beside a person saved as Rose Smith, is written by
+its placeholder, given by its id, so the boundary is never left to guess which of the two the words
+mean. The planner's catalogue lists every entity as an id and a class, and an entity the question
+named as the question is sent: a person by its placeholder, a place by its name for the boundary to
+send or withhold. The question the planner, the composer, the request classifier and both drafters
+are sent is prepared the same way, and so is every line of packet text, because a saved name can be
+painted on a building or written on a shirt as easily as typed. The answer's `names` field maps each
+placeholder to its entity so the client can restore the name from the account holder's own data.
+What still works: asking about anything by a name the account holder has saved, which is resolved
+locally and reaches the plan as an id. What is lost: the model can no longer pick a person out from
+a description, nor a place the account holder has not allowed for it. Two limitations, stated
+rather than hidden. A name the account holder has not saved cannot be
 recognised, so it leaves as the text it was typed as. And a saved name that is also an ordinary
 word is replaced wherever that word appears, which for a person includes each part of their name:
 somebody saved as Rose makes "the rose garden" arrive as "the [person A] garden". That is a
@@ -177,20 +193,21 @@ occurrence to that place, and only a person's decision writes a confirmed link
 (`confirmed_needs_a_human` in `exulanica/migrations/0001_spine.sql`). `build_packet` in
 `exulanica/selection/packet.py` keeps that link on the photograph's line as the place's id
 (`ConfirmedPlace`), which adds no line and no token. `_without_names` in
-`exulanica/selection/question.py` gives the place the request's placeholder, by its id and from its
+`exulanica/selection/question.py` names the place from the request's record, by its id and from its
 own saved name alone, and `_render_packet` states it under the photograph's token as
 `user_confirmed_place: [place A]`. The composer's prompt, `selection-7`, says that line is the
 user's confirmation that the photograph was taken there, which supports a historical clause citing
 it, and that it says nothing about what the photograph shows. Without it, each such photograph
 reached the composer as a bare line with no description, and asked which photographs were taken at
 the place, the composer answered that no photograph could be identified as taken there (measured
-under Evidence and limits). The place is always its placeholder on that line: the Companion's call
-sites replace every saved name, a released place's included, and no place-name use is offered to
-the composer's role (`exulanica/consent/place-name-uses.v1.json` offers the embedding role only).
-A person or an object linked the same way is not stated, because telling a hosted model who is in
-a photograph is a decision about people that this path does not make, and a place with no saved
-name has no placeholder and is not stated. `tests/test_companion_place_link.py` holds the line, the
-placeholder given by id, and the absence of the saved name from every request.
+under Evidence and limits). The line names the place as the request names it: by its placeholder,
+or by its saved name where the account holder allowed that place's name for the composer, whose
+role, `reasoning_cheap`, the uses file (`exulanica/consent/place-name-uses.v1.json`) offers for
+writing the Companion's answer. A person or an object linked the same way is not stated, because
+telling a hosted model who is in a photograph is a decision about people that this path does not
+make, and a place with no saved name has no placeholder and is not stated.
+`tests/test_companion_place_link.py` holds the line, the placeholder given by id, and, with no right
+granted, the absence of the saved name from every request.
 
 **Every hosted request passes one boundary.** `ModelClient` in `exulanica/models/client.py` hands
 every request it sends, from `chat`, `structured`, `vision` and `embed` alike, to the policies
@@ -207,6 +224,13 @@ it:
   person's, a voice's, an object's, an event's and a conversation's always, and a place's unless
   the place-name right releases it for every model that request's role can reach, at its
   destination;
+* writes each name it withholds with the placeholder the caller's record gives that entity when the
+  request carries one (`placeholders` on `chat` and `structured`), so the requests of one question
+  name a withheld place one way. It refuses a record that gives two entities one label, gives an
+  entity something that is not a placeholder, or gives an entity another class's placeholder, and it
+  drops an entry for an entity with no saved name and keeps that label reserved. `embed` and
+  `vision` take no record: an embedding request is text for a vector with nothing to restore, and
+  the vision stage sends the product's own instruction and a photograph;
 * checks a current personal model right for every photograph the request names, all or nothing:
   the composer names its packet's captures, the caption pass its capture, and the vision stage its
   photograph; a capture screened under a synthetic or benchmark authority passes as it does
@@ -216,42 +240,48 @@ it:
 syntax trees, requires each to be a registered path with a scripted run, and runs each through the
 code the product runs over a person and a place saved through `name_occurrence` and written on a
 photograph's sign. No request carries either name, system messages included; every request the
-transport recorded was admitted by the policy, text for text; and the four paths whose call site
-replaces names itself hold with that replacement disabled.
+transport recorded was admitted by the policy, text for text; and the five paths whose call site
+prepares names itself hold with that preparation disabled.
 
-**Which requests honour a place right.** Two do, both the embedding role's, and they are the two
-request paths the uses file names (`exulanica/consent/place-name-uses.v1.json`): the caption-vector
-pass and the embedding of a question's query. Both leave their text to the boundary, so a place
-whose right names the embedding role's whole chain at its endpoint reaches their requests by name,
-and a stop holds it back from the next request. The caption pass sends a photograph's text as it
-is stored, so a sign naming an allowed place goes by that name. The query carries a place's name
-only where the query itself names it, as a plan the caller supplies can: a question asked in words
-is planned from text with every saved name replaced, and a placeholder never becomes a search term.
-A decision changes the requests sent after it and no vector already stored: the index is keyed by
-the text as stored, so a caption embedded before a grant is not sent again, and a vector made while
-the name was allowed stays after a stop. The resolver that reads the right, `released_place_names`
-in `exulanica/consent/place_name_rights.py`, is the one every instance runs: `build_services`
-injects it as `Services.released_place_names`, which the routes, the society runtime and the API's
-derivative worker ask, and `exulanica/ingest/worker_command.py` gives it to the standalone worker's
-caption pass. A `Services` built by hand, as most tests build one, keeps the resolver that releases
-nothing. The Companion's own call sites replace every saved name before the boundary sees the text,
-a released place's included, so the planner, the composer, the request classifier and both drafters
-never carry a place's name, and their roles are not offered: the uses file offers a role only where
-its requests honour a release. The vision stage sends the product's own instruction and the
-photograph, and its policy releases no place's name. `tests/test_place_name_release_paths.py` holds
-this at the transport: an allowed place reaches the embedding requests from both workers and through
-the question route and no other role's request, a request to another destination or one that can
-reach a model the grant does not name carries the placeholder, and each path the uses file names is
-run and must carry the name while it is allowed, so a use cannot be offered while inert.
+**Which requests honour a place right.** Every request of a role the uses file offers
+(`exulanica/consent/place-name-uses.v1.json`) leaves a place's name to the boundary, and the file
+names each such request path by module and function: the caption-vector pass and the embedding of a
+question's query for the embedding role, the composer for `reasoning_cheap`, and the planner, the
+request classifier, the appearance drafter and the environment drafter for `structured_extraction`.
+A place whose right names a role's whole chain at its endpoint reaches that role's requests by name,
+and a stop holds it back from the next request; a person's name reaches none of them, with or
+without a right. The caption pass sends a photograph's text as it is stored, so a sign naming an
+allowed place goes by that name. The query carries a place's name only where the query itself names
+it, as a plan the caller supplies can: the planner puts a place the question names in the plan's
+place dimension, by id, and removes both its name and its placeholder from the semantic query, so
+neither becomes a search term. A decision changes the requests sent after it and no vector already
+stored: the index is keyed by the text as stored, so a caption embedded before a grant is not sent
+again, and a vector made while the name was allowed stays after a stop. The resolver that reads the
+right, `released_place_names` in `exulanica/consent/place_name_rights.py`, is the one every instance
+runs: `build_services` injects it as `Services.released_place_names`, which the Companion's routes
+and the API's derivative worker ask, and `exulanica/ingest/worker_command.py` gives it to the
+standalone worker's caption pass. A `Services` built by hand, as most tests build one, keeps the
+resolver that releases nothing. A society decision releases no place's name on whatever role it
+runs: `Services.request_policy` requires the release to be named, and the society runtime names
+`no_place_released`, because a grant for the Companion's roles describes the Companion's requests.
+The vision stage sends the product's own instruction and the photograph, and its policy releases no
+place's name. `tests/test_place_name_release_paths.py` runs each path the uses file names and
+requires it to carry an allowed name, so a use cannot be offered while inert, and holds that a
+request to another destination, or one that can reach a model the grant does not name, carries the
+placeholder. `tests/test_companion_place_release.py` holds that a place allowed for the composer
+reaches the composer's request and no other, that a stop holds the composer's next request back, and
+that no person's name leaves on any registered path with every place use allowed, whether the
+boundary, the call sites or both prepare the names.
+`tests/test_society_decision_place_names_postgres.py` holds the society decision.
 
 **What the boundary does not do.** It never rewrites a system message: a system message is product
 instruction, and rewriting one would put `[person A]` for every "may" in every prompt of somebody
 saved as May. The byte test holds that no system message on any path carries a saved name
-instead. It cannot recognise a name the account holder has not saved. And it assigns placeholders
-per request, in the order it recognises names, so in embedding text `[place A]` is a different
-place in each caption and in each query: a query about one saved place shares that token with every
-caption that holds any saved place. That leaks nothing, and it can pull the wrong photographs into
-vector retrieval; it is not measured, because measuring it needs hosted calls.
+instead. It cannot recognise a name the account holder has not saved. And an embedding request
+carries no record, so the boundary assigns its placeholders per request, in the order it recognises
+names: in embedding text `[place A]` is a different place in each caption and in each query, and a
+query about one withheld place shares that token with every caption that holds any saved place.
+That leaks nothing, and what it costs vector retrieval is measured under Evidence and limits.
 
 ## Execution provenance
 
@@ -368,6 +398,37 @@ photograph, through the boundary above and under a personal model right for the 
 carried a semantic query made one query-vector call each time it was asked, of two prompt tokens,
 taking 7858, 9586 and 10907 ms. Embedding quality, the 0.65 threshold and latency over a large
 corpus are not measured.
+
+**Withheld places in vector search.** One pre-registered measurement compared three things a
+withheld place's name can become in text sent for a vector: the placeholder the boundary assigns
+per request, one placeholder per saved place for the whole workspace (the alternative), and the
+place's name allowed through `POST /place-name-rights` (a reference, never a candidate). Twenty-four
+synthetic drawings went through the product's admission, vision and naming path; the vision stage
+proposed a place on twenty, and the six places drawn on three photographs each were saved. Twelve
+queries named a place and five described content. Each was scored by R-precision, the share of the
+photographs it should find that rank among its first that many, over the caption vectors alone and
+in the order the executor returns:
+
+| Mean R-precision | Per request | Per place | Allowed name |
+| --- | --- | --- | --- |
+| Place-named queries, vectors alone | 0.1667 | 0.7778 | 1.0000 |
+| Place-named queries, as the executor ranks | 0.8889 | 0.9722 | 1.0000 |
+| Content queries, vectors alone | 0.5692 | 0.5205 | 0.5538 |
+| Content queries, as the executor ranks | 0.4897 | 0.4897 | 0.4897 |
+
+The alternative gained 0.6111 over the vectors alone and 0.0833 as the executor ranks, and the
+registered gate asked for 0.25 and 0.10, so the placeholder assigned per request stays. The
+executor's lexical match reads each caption as stored, with the place's name in it, which is the
+likely reason it recovers most of what the vectors lose; that was not measured separately. A pass
+would not have been enough on its own: a placeholder stable across requests lets a provider link
+the photographs of one withheld place, so adopting one needs the account holder's decision. What
+this does not establish: synthetic drawings, English names and six places; one run of captions,
+shared by every arm; and place-named queries that stand for a plan a person supplies, since a
+question asked in words never puts a place's name or placeholder in its query. No person is named
+in the corpus. The run made 191 model calls for 0.03437730 US dollars, from the provider's reported
+usage. The records are `docs/evaluation/2026-09-23-embedding-placeholders-preregistration.json` and
+`docs/evaluation/2026-09-23-embedding-placeholders-outcome.json`, made by
+`scripts/measure_embedding_placeholders.py`.
 
 Changes to this contract require checking the affected route, repository, request-policy and
 browser boundary. Broader continuity, live-model usefulness and personal-source acceptance need

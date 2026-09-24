@@ -23,15 +23,19 @@ the request is about to leave:
 
 Every name that does not go is replaced by a placeholder of its class, the way
 :mod:`exulanica.epistemics.saved_names` replaces it, with labels that are consistent within one
-request and never reuse a label the request already carries. Labels are not kept from one request
-to the next.
+request and never reuse a label the request already carries. A caller that sends several requests
+about one question passes the placeholders it has already given its entities
+(``HostedRequest.placeholders``), and a name withheld here is written as that placeholder, so each
+request, and the answer that comes back, names each entity one way. Each placeholder must be one
+of its entity's own class, and no two entities may share one. Labels this policy gives itself are
+not kept from one request to the next.
 
 **What this does not do.** It never rewrites a system message: those are product instructions,
 and ``tests/test_hosted_boundary.py`` asserts that no saved name is in any of them on every hosted
 call path. It cannot recognise a name the account holder has not saved. And it cannot undo a
-replacement a caller made before the request reached it: the Companion replaces every saved
-name, a released place's included, in what it sends, so a place right is honoured by the requests
-that leave their text to this policy, the caption and query embeddings.
+replacement a caller made before the request reached it: the Companion's call sites replace every
+saved name no right can release and leave a place's to this policy, so a place right is honoured by
+every request of a role it names.
 """
 
 from __future__ import annotations
@@ -149,13 +153,14 @@ class WorkspaceRequestPolicy:
             names = saved_names(connection, self._workspace_id)
             withheld = self._withheld(connection, names, request)
         # A label anywhere in the request, its instructions included, is never handed to another
-        # entity: the reader of the request would take the two for one.
+        # entity: the reader of the request would take the two for one. Nor is one the caller's
+        # record gives an entity this workspace no longer names.
         reserved = frozenset(
             label
             for text in (*request.instructions, *request.texts)
             for label in PLACEHOLDER.findall(text)
-        )
-        placeholders: Mapping[uuid.UUID, str] = {}
+        ) | frozenset(request.placeholders.values())
+        placeholders: Mapping[uuid.UUID, str] = _callers_placeholders(request, names)
         admitted: list[str] = []
         for text in request.texts:
             redacted = redact_names(text, withheld, placeholders, reserved=reserved)
@@ -194,3 +199,33 @@ class WorkspaceRequestPolicy:
                 raise TypeError("a place-name resolver answers with a frozenset of entity ids")
             self._released[handoff] = released
         return self._released[handoff]
+
+
+def _callers_placeholders(
+    request: HostedRequest, names: tuple[SavedName, ...]
+) -> dict[uuid.UUID, str]:
+    """The caller's placeholders for the entities this workspace names, checked.
+
+    Each is a placeholder of its own entity's class, and no two entities share one: a reader of
+    the request would take them for one entity. An entry for an entity with no saved name here is
+    left out, since nothing of it can be withheld, and its label stays reserved.
+    """
+    labels = list(request.placeholders.values())
+    if len(set(labels)) != len(labels):
+        raise HostedRequestRefused("the request's placeholders give two entities one label")
+    classes = {name.entity_id: name.entity_class for name in names}
+    record: dict[uuid.UUID, str] = {}
+    # The refusals never quote a label: one that is not a placeholder may be a name.
+    for entity, label in request.placeholders.items():
+        if PLACEHOLDER.fullmatch(label) is None:
+            raise HostedRequestRefused(
+                "the request's placeholders give an entity something that is not a placeholder"
+            )
+        if entity not in classes:
+            continue
+        if label[1:].split(" ", 1)[0] != classes[entity]:
+            raise HostedRequestRefused(
+                f"the request's placeholders give a {classes[entity]} another class's placeholder"
+            )
+        record[entity] = label
+    return record

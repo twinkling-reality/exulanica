@@ -165,18 +165,23 @@ class Services:
         self,
         workspace_id: uuid.UUID,
         connection: Callable[[], AbstractContextManager[psycopg.Connection]],
+        *,
+        released_places: ReleasedPlaces,
     ) -> WorkspaceRequestPolicy:
         """The workspace's rules for what a hosted request may carry, as this instance applies them.
 
         ``connection`` lends or opens an idle connection scoped to ``workspace_id``; the policy
         reads the saved names, the photograph rights and the place-name rights on it as each
-        request leaves.
+        request leaves. ``released_places`` is required, so every caller states which place names
+        its requests may carry: :attr:`released_place_names` where a use the account holder can
+        allow describes those requests, and ``no_place_released`` everywhere else. A caller that
+        passed nothing would inherit grants made for somebody else's requests.
         """
         return WorkspaceRequestPolicy(
             workspace_id,
             connection=connection,
             photograph_right=photograph_text_right,
-            released_places=self.released_place_names,
+            released_places=released_places,
         )
 
     def hosted_model(
@@ -189,8 +194,12 @@ class Services:
         """
         if self.model_client is None:
             return None
+        # The Companion's routes are this factory's callers, and their requests are the ones the
+        # place-name uses offer: exulanica/consent/place-name-uses.v1.json.
         return self.model_client.with_policy(
-            self.request_policy(workspace_id, borrowing(connection))
+            self.request_policy(
+                workspace_id, borrowing(connection), released_places=self.released_place_names
+            )
         )
 
     def build_society_control_worker(self) -> SocietyControlWorker | None:

@@ -713,3 +713,18 @@ layers = [
   "objects",
   "edit_kinds",
 ]
+
+[[tool.importlinter.contracts]]
+# The Companion's proposal features are siblings of its answer path, not clients of it. Each
+# records its model calls with exulanica.selection.calls and reads saved names through
+# exulanica.selection.request_names, and neither needs anything question.py holds: the sequencing
+# of the planner and the composer, and the module globals tests replace by name. A proposal
+# feature that imported it would depend on the whole answer path to reach a call log. Indirect
+# imports count, so a chain through another module is refused as well.
+name = "The Companion's proposal features do not import its answer path"
+type = "forbidden"
+source_modules = [
+  "exulanica.selection.environment_proposal",
+  "exulanica.selection.proposal",
+]
+forbidden_modules = ["exulanica.selection.question"]
