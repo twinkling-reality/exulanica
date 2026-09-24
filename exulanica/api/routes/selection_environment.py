@@ -22,6 +22,7 @@ from exulanica.api.routes.selection import (
     _execution,
     _require_model,
 )
+from exulanica.api.world_scope import WorldId
 from exulanica.environment import (
     EnvironmentOperationDenied,
     EnvironmentRepository,
@@ -46,6 +47,7 @@ from exulanica.world import (
     UnavailableAsset,
     WorldObjectRepository,
 )
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/selection", tags=["selection"])
 
@@ -147,6 +149,7 @@ def environment_proposal(
     request: Request,
     connection: ReadOnlyConnection,
     session: CurrentSession,
+    world_id: WorldId,
 ) -> EnvironmentProposalResponse:
     client = _require_model(request, connection, session)
     empty_execution = _execution((), (), prompt_version=ENVIRONMENT_PROMPT_VERSION)
@@ -160,7 +163,10 @@ def environment_proposal(
         )
 
     services = get_services(request)
-    objects = WorldObjectRepository(connection, session.workspace_id, store=services.store)
+    require_world(connection, session.workspace_id, world_id)
+    objects = WorldObjectRepository(
+        connection, session.workspace_id, world_id=world_id, store=services.store
+    )
     version = objects.version(body.version_id)
     if version.state_sha256 != body.base_state_sha256:
         return EnvironmentProposalResponse(
