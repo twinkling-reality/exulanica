@@ -59,6 +59,28 @@ export interface PointCloudOptions {
   readonly surface?: boolean;
   /** The viewer's image of the photograph, upright, to colour a surface with. Ignored for points. */
   readonly photograph?: ImageBitmap;
+  /**
+   * A member of a joined standpoint (see `standpoint-scene.ts`): compiles the surface's per-pixel
+   * ownership and its not-captured edge. Honoured only where `surface` is, because both are
+   * decided per fragment of a surface; a member drawn as points keeps its dome flattening and
+   * draws every direction it has.
+   */
+  readonly standpoint?: boolean;
+}
+
+/** What `enableStandpoint` sets: the shared print, and this member's share of the view. */
+export interface StandpointSurface {
+  /** The shared print dome's radius from the standpoint, in world units. */
+  readonly printRadiusWorld: number;
+  /** The standpoint's height above the ground, world units; the dome's floor. 0 for none. */
+  readonly eyeHeightWorld: number;
+  /** This photograph's sideways re-projection onto its own rays (the depth model's focal over its own). */
+  readonly lateral: number;
+  /** The other members this one cedes pixels to, as `StandpointMemberPlan.others` lays them out. */
+  readonly others: Float32Array;
+  readonly otherCount: number;
+  /** The not-captured line's width, as a fraction of the half frame. */
+  readonly edgeFraction: number;
 }
 
 export interface PointCloud {
@@ -91,6 +113,15 @@ export interface PointCloud {
   setCaptureWorld(x: number, y: number, z: number): void;
   /** How flat the relief is, 0 to 1, and whether the visitor is behind the print. */
   setRelief(flatten: number, behind: boolean): void;
+  /**
+   * Draw this map as one member of a joined standpoint: its camera is the standpoint, it flattens
+   * towards the shared dome rather than a print of its own, it does not thin out at its frame's
+   * edges, and (on a standpoint surface) it cedes every direction another member frames nearer to
+   * that member's centre. Returns the camera's local position, as `enableSingleView` does.
+   */
+  enableStandpoint(surface: StandpointSurface): readonly [number, number, number];
+  /** True when this cloud was compiled with the standpoint surface's ownership and edge. */
+  readonly standpointSurface: boolean;
   destroy(): void;
 }
 
@@ -196,11 +227,17 @@ interface ShaderDesc {
   fragmentWGSL?: string;
 }
 
-function buildShaderDesc(blend: boolean, surface = false, photographed = false): ShaderDesc {
+function buildShaderDesc(
+  blend: boolean,
+  surface = false,
+  photographed = false,
+  standpoint = false,
+): ShaderDesc {
   const defines = `${blend ? '#define POINT_BLEND\n' : ''}${surface ? '#define SURFACE\n' : ''}`
-    + `${photographed ? '#define PHOTOGRAPH\n' : ''}`;
+    + `${photographed ? '#define PHOTOGRAPH\n' : ''}${standpoint ? '#define STANDPOINT\n' : ''}`;
   return {
-    uniqueName: `exulanica-point-map${blend ? '-blend' : ''}${surface ? '-surface' : ''}${photographed ? '-photograph' : ''}`,
+    uniqueName: `exulanica-point-map${blend ? '-blend' : ''}${surface ? '-surface' : ''}`
+      + `${photographed ? '-photograph' : ''}${standpoint ? '-standpoint' : ''}`,
     attributes: { ...ATTRIBUTES },
     vertexGLSL: `${defines}${POINT_VERTEX_GLSL}`,
     fragmentGLSL: `${defines}${POINT_FRAGMENT_GLSL}`,
@@ -284,8 +321,9 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
 
   const blend = options.blend ?? false;
   const photographed = surface && options.photograph !== undefined;
+  const standpointSurface = surface && options.standpoint === true;
   const material = new pc.ShaderMaterial(
-    buildShaderDesc(blend, surface, photographed) as ConstructorParameters<typeof pc.ShaderMaterial>[0]);
+    buildShaderDesc(blend, surface, photographed, standpointSurface) as ConstructorParameters<typeof pc.ShaderMaterial>[0]);
   let photographTexture: pc.Texture | null = null;
   if (photographed) {
     const image = options.photograph!;
@@ -330,9 +368,16 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
   // person points are NOT discarded, so people get baked into the geometry as reconstructions
   // instead of rendering as time-anchored presence markers. The scene looks fine. It is lying.
   material.setParameter('uSegState[0]', packSemantics(semantics));
+  // The not-captured line: its width once a standpoint is enabled, its colour from the theme's
+  // absence colour, which is what the proof lens gives an absence too.
+  const standpointEdge = new Float32Array(4);
   const setTheme = (theme: PresentationTheme): void => {
     material.setParameter('uPalette[0]', pointProvenancePalette(theme));
     material.setParameter('uFogColor', [...unitRgb(theme.ground)]);
+    if (standpointSurface) {
+      standpointEdge.set(unitRgb(theme.muted), 1);
+      material.setParameter('uStandpointEdge', standpointEdge);
+    }
     material.update();
   };
   setTheme(options.theme ?? BLUE_HOUR_THEME);
@@ -393,6 +438,7 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     defaultMaxSizePx: options.maxSizePx ?? DEFAULT_MAX_SIZE_PX,
     surface,
     photographed,
+    standpointSurface,
     setTheme,
     setInspection(active) {
       material.setParameter('uFog', [footprint * 0.9, footprint * 3.2, 1.2, active ? 0 : 1]);
@@ -424,6 +470,29 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
       relief[1] = Math.min(1, Math.max(0, flatten));
       relief[2] = behind ? 1 : 0;
       material.setParameter('uRelief', relief);
+    },
+    enableStandpoint(standpoint) {
+      const { position, fovYDeg, aspect } = map.header.viewpoint;
+      const tanY = Math.tan((fovYDeg * Math.PI) / 360);
+      // The frame's tangents are still set, because the photograph's texture and the ownership
+      // test both read them, and its edge margin and enable lane are zero: no member of a joined
+      // standpoint thins out at its edges.
+      material.setParameter('uFrame', [tanY * aspect, tanY, 0, 0]);
+      material.setParameter('uViewpoint', [position[0], position[1], position[2],
+        Math.max(0, standpoint.eyeHeightWorld)]);
+      capture[3] = 1;
+      material.setParameter('uCapture', capture);
+      relief[0] = standpoint.printRadiusWorld > 0 ? standpoint.printRadiusWorld : 1;
+      relief[3] = 1;
+      material.setParameter('uRelief', relief);
+      if (standpointSurface) {
+        material.setParameter('uStandpointSelf', [standpoint.lateral, standpoint.otherCount, 0, 0]);
+        material.setParameter('uStandpointOthers[0]', standpoint.others);
+        standpointEdge[0] = standpoint.edgeFraction;
+        material.setParameter('uStandpointEdge', standpointEdge);
+      }
+      material.update();
+      return [position[0], position[1], position[2]];
     },
     destroy(): void {
       mesh.destroy();

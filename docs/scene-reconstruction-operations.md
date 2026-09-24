@@ -154,6 +154,59 @@ Captures that have ever belonged to a reconstruction scene are omitted from the 
 surviving member back at an invented island origin. Exact bytes for a live point-map artifact remain
 available when another validated scene refers to them.
 
+### Photographs joined from one standpoint
+
+Photographs taken from about one position give pose recovery no parallax, so their scene publishes
+with no member registered. The `scene_standpoint` stage
+([`exulanica/ingest/standpoint_scenes.py`](../exulanica/ingest/standpoint_scenes.py)) measures
+how such photographs were turned relative to one another and writes one `standpoint_scene` artifact
+(`exulanica.standpoint-scene/v1`,
+[`standpoint_record.py`](../exulanica/reconstruction/standpoint_record.py)) that the graph serves
+in place of an unmeasured arrangement. It runs from the scene worker's refresh pass
+(`--standpoints-refresh-seconds`) or on demand with
+`python -m exulanica.ingest.standpoint_scenes --workspace <uuid> [--scene <uuid>]`, where pycolmap is
+installed. It never touches a scene whose pose recovery placed a member.
+
+- **Method.** COLMAP SIFT features per photograph, a rotation-only fit per pair through each
+  photograph's EXIF 35 mm equivalent focal length, a global rotation solve over the set, the focal
+  length refined from the overlaps against a prior on the stated lens, and each photograph's MoGe-2
+  depth brought to one scale on the overlaps
+  ([`standpoint.py`](../exulanica/reconstruction/standpoint.py)). No model runs in this stage; the
+  depth estimates come from the depth stage. Every parameter is in the versioned stage entry in
+  [`exulanica/ingest/stages/__init__.py`](../exulanica/ingest/stages/__init__.py).
+- **Refusal by name.** A pair is joined or refused as `insufficient_overlap`,
+  `moved_between_photographs`, `scene_changed` or `inconsistent_with_set`. A member is `joined`,
+  `not_joined`, or never read: `not_permitted`, `point_map_unreadable`, or `focal_length_unstated`
+  (a photograph that does not state its lens stays a separate photograph, because the depth model's
+  own field-of-view estimate joins visibly wrong). Photographs that overlap nothing stay separate.
+- **Permission and withdrawal.** A member is read only under the permission the depth stage
+  requires for its point map, including a personal model right naming the depth model where the
+  capture needs one, and the question is asked again inside the publication transaction. The graph
+  withholds the whole arrangement when any member it read can no longer be read, and the stage then
+  joins what remains.
+- **Truth status.** The arrangement is an estimate over the members' own depth estimates. It does
+  not change the recorded rung, it is not a camera pose, and its units are the depth model's scale,
+  not measured metres.
+
+The browser draws a joined arrangement as one view from the standpoint
+([`standpoint-scene.ts`](../web/packages/atlas-react/src/playcanvas/standpoint-scene.ts)). Each
+direction belongs to the photograph whose frame centre is nearer, so seams fall where both
+photographs are least stretched. Away from the standpoint every member flattens towards one shared
+print, a dome at the scene's median distance floored at the ground, which holds the parallax error
+within the single-photograph limit and keeps the seams joined. An edge that no other photograph
+continues is drawn as a thin line in the theme's absence colour instead of fading out. Nobody can
+walk round to the far side of anything: only what the photographs saw from the standpoint exists.
+
+MEASURED on synthetic same-standpoint sets with exact ground truth, held-out split of 66 sets and
+210 photographs, both with the stated lens and with the stated lens off by up to 3 percent: every
+pre-registered gate passed. No pair taken metres apart and no pair across a change was joined.
+Joined photographs lined up from the standpoint within 0.34 and 0.41 degrees at the 95th percentile
+beyond their own parallax, and their depths agreed across a seam to a median of 2.4 percent (20
+percent at the 90th percentile). 4 and 5 of 129 joinable pairs were refused as changed or moved.
+The arrangement's up direction was not gated and leans by 1.4 degrees at the median and up to 4.0
+degrees. Records: `docs/evaluation/2026-09-23-standpoint-join-preregistration.json` and
+`docs/evaluation/2026-09-23-standpoint-join-outcome.json`.
+
 ## 5. Recorded rung, displayed rung, and substrate
 
 These are separate facts:

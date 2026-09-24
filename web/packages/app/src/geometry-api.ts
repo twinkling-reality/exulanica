@@ -155,6 +155,18 @@ export function unposedArrangementSentence(frame: SceneDisplayFrame): string {
     + 'each photograph turned to its own heading; no photograph\u2019s position was recovered.';
 }
 
+/**
+ * The frame sentence for photographs joined in the server's measured standpoint arrangement.
+ *
+ * The turn between them is measured; where they stood is one point nobody measured the height or
+ * position of, so it is stood on the ground at eye height; their size is the depth model's.
+ */
+export function standpointArrangementSentence(frame: SceneDisplayFrame): string {
+  return `Standing where they were taken, at ${frame.scale.toPrecision(3)}\u00d7 exhibit scale: the turn `
+    + 'between the photographs is measured from them, their standpoint is placed at eye height, and '
+    + 'sizes are approximate.';
+}
+
 export function displayFrameSentence(frame: SceneDisplayFrame): string {
   const scale = `${frame.scale.toPrecision(3)}× nonmetric exhibit scale`;
   if (frame.upMethod !== 'scene-axes') {
@@ -690,9 +702,13 @@ export class GeometryClient {
         if (!pointMaps.has(islandId)) pointMaps.set(islandId, map);
         loadedForScene += 1;
       }
-      // Rung 3 with no pose: each photograph's own depth, in an arrangement this client derives
-      // and labels as unmeasured. Only when the scene placed nothing, which is the only time the
-      // server sends these; a scene that placed anything keeps its excluded members as photographs.
+      // Rung 3 with no pose: each photograph's own depth. When the server's standpoint record joined
+      // them, in the arrangement it MEASURED, from the transforms it sent; otherwise in one this
+      // client derives and labels as unmeasured. Only when the scene placed nothing, which is the
+      // only time the server sends these; a scene that placed anything keeps its excluded members
+      // as photographs. A joined scene's members outside the arrangement arrive with no depth at
+      // all, so they open as photographs rather than being fanned beside measured ones.
+      const joined = scene.standpoint?.state === 'joined';
       let loadedUnposed = 0;
       const unposedMembers = scene.members.every((member) => member.placement === null)
         ? [...scene.members].sort((a, b) => a.ordinal - b.ordinal)
@@ -701,7 +717,8 @@ export class GeometryClient {
       const unposedLoaded: { captureId: string; artifactId: string; map: PointMap;
         measurement: GeometryLoadMeasurement | null; byteSize: number;
         report: (state: GeometryIssueState, reason: string) => void;
-        photograph: ImageBitmap | null }[] = [];
+        photograph: ImageBitmap | null;
+        standpoint: { readonly sceneFromOpmRowMajor: readonly number[]; readonly depthScale: number } | null }[] = [];
       for (const member of unposedMembers) {
         const unposed = member.unposedPointMap!;
         const report = (state: GeometryIssueState, reason: string): void => {
@@ -737,17 +754,20 @@ export class GeometryClient {
         if (obtained === null) continue;
         const photograph = await this.#photograph(unposed.photograph ?? null, obtained.map, digest, report);
         unposedLoaded.push({ captureId: member.captureId, artifactId: unposed.artifactId, ...obtained,
-          byteSize: reference.byteSize, report, photograph });
+          byteSize: reference.byteSize, report, photograph,
+          standpoint: joined ? member.standpointPlacement ?? null : null });
       }
-      const fan = unmeasuredFan(unposedLoaded.map(({ map }) => ({
+      const fan = joined ? [] : unmeasuredFan(unposedLoaded.map(({ map }) => ({
         position: map.header.viewpoint.position,
         fovYDeg: map.header.viewpoint.fovYDeg,
         aspect: map.header.viewpoint.aspect,
       })));
       unposedLoaded.forEach((loaded, index) => {
-        const sceneFromOpm = fan[index] ?? null;
+        const sceneFromOpm = joined ? loaded.standpoint?.sceneFromOpmRowMajor ?? null : fan[index] ?? null;
         if (sceneFromOpm === null || islandId === null) {
-          loaded.report('unplaced', 'More photographs than one unmeasured arrangement holds; this one opens as a photograph.');
+          loaded.report('unplaced', joined
+            ? 'This photograph is not in the measured arrangement; it opens as a photograph.'
+            : 'More photographs than one unmeasured arrangement holds; this one opens as a photograph.');
           return;
         }
         const placed: PlacedScenePointMap = {
@@ -757,8 +777,9 @@ export class GeometryClient {
           islandId,
           map: loaded.map,
           sceneFromOpmRowMajor: sceneFromOpm,
-          localUnitsToSceneUnits: 1,
-          arrangement: 'unmeasured-fan',
+          // The server's depth scale for a measured member; a fanned member keeps its own units.
+          localUnitsToSceneUnits: joined ? loaded.standpoint?.depthScale ?? 1 : 1,
+          arrangement: joined ? 'standpoint' : 'unmeasured-fan',
           ...(loaded.photograph === null ? {} : { photograph: loaded.photograph }),
         };
         try {
@@ -832,11 +853,19 @@ export class GeometryClient {
 
       // Presentation: one similarity per scene, from its recovered cameras, so the scene stands
       // upright, centred and at walking scale in its region. Receipts and identities are untouched.
+      const standing = joined && sceneCameras.length === 0;
       const samples = sceneCameras.length > 0
         ? sceneCameras.map((camera) => colmapCameraSample(camera.sceneFromCameraRowMajor))
-        : scenePlaced.map((placed) => opmCameraSample(placed.sceneFromOpmRowMajor, placed.map.header.viewpoint.position));
+        : scenePlaced.map((placed) => {
+          const sample = opmCameraSample(placed.sceneFromOpmRowMajor, placed.map.header.viewpoint.position);
+          // A joined standpoint's up is the one its record measured, the scene's +Y. Each camera's
+          // own up leans with its pitch, and their mean would tilt the scene again.
+          return standing ? { ...sample, up: [0, 1, 0] as const } : sample;
+        });
       const corners = [
-        ...scenePlaced.flatMap((placed) => transformedBoxCorners(placed.map.header.bounds, placed.sceneFromOpmRowMajor)),
+        ...scenePlaced.flatMap((placed) => standing
+          ? standpointGroundSamples(placed)
+          : transformedBoxCorners(placed.map.header.bounds, placed.sceneFromOpmRowMajor)),
         ...sceneTrained.flatMap((trained) => transformedBoxCorners(trained.bounds, trained.sceneFromAssetRowMajor)),
       ];
       const frame = sceneDisplayFrame(samples, corners);
@@ -926,6 +955,35 @@ export class GeometryClient {
       signal: supplied === undefined ? deadline : AbortSignal.any([supplied, deadline]),
     });
   }
+}
+
+/** At most this many of one member's points are read for where the ground is. */
+const STANDPOINT_GROUND_SAMPLES = 4096;
+
+/**
+ * Points of a joined standpoint member, in scene axes, for the display frame's ground.
+ *
+ * The drawn points rather than their box: a member pitched down turns its box's far corners
+ * metres below any surface it holds, and the frame would take that for the ground and shrink the
+ * scene to put the standpoint at eye height above it.
+ */
+function standpointGroundSamples(placed: PlacedScenePointMap): [number, number, number][] {
+  const m = placed.sceneFromOpmRowMajor;
+  const position = placed.map.position;
+  const count = Math.floor(position.length / 3);
+  const stride = Math.max(1, Math.floor(count / STANDPOINT_GROUND_SAMPLES));
+  const samples: [number, number, number][] = [];
+  for (let index = 0; index < count; index += stride) {
+    const x = position[index * 3]!;
+    const y = position[index * 3 + 1]!;
+    const z = position[index * 3 + 2]!;
+    samples.push([
+      m[0]! * x + m[1]! * y + m[2]! * z + m[3]!,
+      m[4]! * x + m[5]! * y + m[6]! * z + m[7]!,
+      m[8]! * x + m[9]! * y + m[10]! * z + m[11]!,
+    ]);
+  }
+  return samples;
 }
 
 function monotonicNow(): number {

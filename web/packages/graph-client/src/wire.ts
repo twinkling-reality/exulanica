@@ -12,6 +12,8 @@
  * date, whereas a null has to be handled by whoever received it.
  */
 
+import type { StandpointExclusionReason } from './read-model.js';
+
 export interface AssertionPayload {
   readonly assertion_id: string;
   readonly kind: string;
@@ -145,6 +147,16 @@ export interface ReconstructionScenePayload {
         readonly byte_size: number;
       } | null;
     } | null;
+    /**
+     * Where this member stands in its scene's measured standpoint arrangement: sent only when the
+     * scene's pose placed no photograph and its standpoint record joined this one. The matrix is
+     * `R diag(s l, s l, s)`, applied as it is. Absent from an older server, which reads as null.
+     */
+    readonly standpoint_placement?: {
+      readonly scene_from_opm_row_major: readonly number[];
+      readonly depth_scale: number;
+      readonly lateral_scale: number;
+    } | null;
     readonly placement: {
       readonly artifact_id: string;
       readonly content_sha256: string;
@@ -176,6 +188,27 @@ export interface ReconstructionScenePayload {
    * Absent from older payloads. Treat an absent field as unknown rather than as empty, and draw
    * nothing either way.
    */
+  /**
+   * The scene's standpoint record as it can be used now, or null when it has none. Only `joined`
+   * draws anything; every other state leaves the photographs in the unmeasured arrangement.
+   * Absent from an older server, which reads as null.
+   */
+  readonly standpoint?: {
+    readonly artifact_id: string;
+    readonly content_sha256: string;
+    readonly state: 'joined' | 'nothing_joined' | 'withdrawn' | 'stale' | 'invalid' | 'bytes_missing';
+    readonly member_count: number;
+    readonly joined_member_count: number;
+    readonly reference_capture_id: string | null;
+    readonly rotation_residual_max_millidegrees: number | null;
+    readonly scale_residual_max_ppm: number | null;
+    readonly up_method: string | null;
+    readonly implied_roll_max_millidegrees: number | null;
+    readonly excluded: readonly {
+      readonly capture_id: string;
+      readonly reason: StandpointExclusionReason;
+    }[];
+  } | null;
   readonly generated_geometry?: readonly {
     readonly artifact_id: string;
     readonly receipt_sha256: string | null;

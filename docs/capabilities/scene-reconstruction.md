@@ -18,6 +18,16 @@ does not prove coherent coverage for a new source set. Training a scene is disti
 or integrating a general world-generation model. The usable-place demonstration
 requires an actual source-to-viewer demonstration and visual acceptance.
 
+Several photographs taken from about one spot, turning between shots, join into one view you can
+look around in from where you stood. The turns between them are measured from the photographs, each
+one keeps its own depth estimate, and the join is refused by name when the photographs were taken
+metres apart, overlap too little, or show a changed scene. You cannot walk round to the far side of
+anything, the result has no measured metric scale, and a photograph whose file does not state its
+lens stays a separate photograph. Stepping away from where you stood flattens the view towards a
+print rather than stretching it. The joined view is drawn in a saved world made from your own
+sources; a starter world does not draw photographs as places. See
+[photographs joined from one standpoint](../scene-reconstruction-operations.md#photographs-joined-from-one-standpoint).
+
 Reconstruction does not fill what the camera never saw. A model may not invent a walkable floor,
 an unseen back, or a completed room and present it as recovered geometry. Generated receipts can
 exist as labeled, non-citable metadata; the renderer does not draw those bytes as the place.

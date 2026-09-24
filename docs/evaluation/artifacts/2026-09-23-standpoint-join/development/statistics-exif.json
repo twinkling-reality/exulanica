@@ -1,0 +1,102 @@
+{
+ "arm": "exif",
+ "policy_sha256": "a7a582c038d6408f4fd76cb791e551fdeb4925332e32bb68f64d2f331993bc06",
+ "statistics": {
+  "outcomes_by_class": {
+   "changed": {
+    "scene_changed": 2,
+    "insufficient_overlap": 1
+   },
+   "joinable": {
+    "joined": 65,
+    "insufficient_overlap": 29
+   },
+   "moved": {
+    "moved_between_photographs": 6,
+    "insufficient_overlap": 7
+   },
+   "no_overlap": {
+    "insufficient_overlap": 50,
+    "joined": 1
+   }
+  },
+  "pairs_in_one_arrangement": 76,
+  "excess_misregistration_deg": {
+   "p50": 0.0325,
+   "p95": 0.234,
+   "max": 0.6748
+  },
+  "worst_pairs": [
+   {
+    "set": "dev-courtyard-102-s3",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.6748,
+    "parallax_p95_deg": 0.932,
+    "misregistration_p95_deg": 1.6068
+   },
+   {
+    "set": "dev-room-201-g1",
+    "a": 0,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.4653,
+    "parallax_p95_deg": 0.0339,
+    "misregistration_p95_deg": 0.4992
+   },
+   {
+    "set": "dev-courtyard-101-s3",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.4158,
+    "parallax_p95_deg": 0.7132,
+    "misregistration_p95_deg": 1.129
+   },
+   {
+    "set": "dev-courtyard-102-p1",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.291,
+    "parallax_p95_deg": 0.3146,
+    "misregistration_p95_deg": 0.6056
+   },
+   {
+    "set": "dev-landscape-301-g1",
+    "a": 1,
+    "b": 2,
+    "class": "no_overlap",
+    "excess_deg": 0.215,
+    "parallax_p95_deg": 0.0277,
+    "misregistration_p95_deg": 0.2427
+   }
+  ],
+  "seam_depth_p50_by_pair": {
+   "n": 76,
+   "median": 0.029,
+   "p90": 0.1532,
+   "max": 0.4459
+  },
+  "moved_in_one_arrangement": 0,
+  "moved_named": [
+   5,
+   10
+  ],
+  "changed_in_one_arrangement": 0,
+  "changed_named": [
+   2,
+   2
+  ],
+  "joinable_refused_as_moved_or_changed": [
+   0,
+   94
+  ],
+  "joinable_in_one_arrangement": [
+   53,
+   74
+  ],
+  "joined_with_a_smaller_change_in_view": 0
+ }
+}

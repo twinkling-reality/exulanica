@@ -1,0 +1,120 @@
+{
+ "arm": "exif",
+ "policy_sha256": "a7a582c038d6408f4fd76cb791e551fdeb4925332e32bb68f64d2f331993bc06",
+ "statistics": {
+  "outcomes_by_class": {
+   "changed": {
+    "insufficient_overlap": 4,
+    "scene_changed": 16,
+    "moved_between_photographs": 1
+   },
+   "joinable": {
+    "joined": 85,
+    "insufficient_overlap": 40,
+    "scene_changed": 4
+   },
+   "moved": {
+    "moved_between_photographs": 8,
+    "scene_changed": 1,
+    "insufficient_overlap": 4
+   },
+   "no_overlap": {
+    "insufficient_overlap": 76,
+    "joined": 1
+   }
+  },
+  "pairs_in_one_arrangement": 94,
+  "excess_misregistration_deg": {
+   "p50": 0.0456,
+   "p95": 0.3386,
+   "max": 0.8683
+  },
+  "worst_pairs": [
+   {
+    "set": "held-landscape-312-s2",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.8683,
+    "parallax_p95_deg": 1.7654,
+    "misregistration_p95_deg": 2.6337
+   },
+   {
+    "set": "held-room-212-s2",
+    "a": 2,
+    "b": 3,
+    "class": "joinable",
+    "excess_deg": 0.4759,
+    "parallax_p95_deg": 0.937,
+    "misregistration_p95_deg": 1.4129
+   },
+   {
+    "set": "held-room-211-s2",
+    "a": 0,
+    "b": 1,
+    "class": "joinable",
+    "excess_deg": 0.4679,
+    "parallax_p95_deg": 0.1386,
+    "misregistration_p95_deg": 0.6065
+   },
+   {
+    "set": "held-room-212-p1",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.4054,
+    "parallax_p95_deg": 0.5616,
+    "misregistration_p95_deg": 0.967
+   },
+   {
+    "set": "held-courtyard-112-s2",
+    "a": 1,
+    "b": 2,
+    "class": "joinable",
+    "excess_deg": 0.3611,
+    "parallax_p95_deg": 0.5018,
+    "misregistration_p95_deg": 0.8629
+   }
+  ],
+  "seam_depth_p50_by_pair": {
+   "n": 94,
+   "median": 0.0242,
+   "p90": 0.2036,
+   "max": 0.5238
+  },
+  "moved_in_one_arrangement": 0,
+  "moved_named": [
+   6,
+   8
+  ],
+  "changed_in_one_arrangement": 0,
+  "changed_named": [
+   8,
+   10
+  ],
+  "joinable_refused_as_moved_or_changed": [
+   4,
+   129
+  ],
+  "joinable_in_one_arrangement": [
+   63,
+   86
+  ],
+  "joined_with_a_smaller_change_in_view": 2
+ },
+ "judged": {
+  "verdicts": {
+   "lines_up_p95": true,
+   "lines_up_max": true,
+   "seam_depth_median": true,
+   "seam_depth_p90": true,
+   "moved_never_joined": true,
+   "changed_never_joined": true,
+   "moved_named": true,
+   "changed_named": true,
+   "few_false_refusals": true,
+   "joins": true
+  },
+  "passed": true
+ }
+}

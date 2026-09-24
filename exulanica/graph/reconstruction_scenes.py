@@ -34,6 +34,9 @@ from exulanica.graph.payload import (
     SceneGeometryReferenceRow,
     ScenePointMapPlacementRow,
     SceneRecoveredCameraRow,
+    SceneStandpointExclusionRow,
+    SceneStandpointPlacementRow,
+    SceneStandpointRow,
     SceneUnposedPhotographRow,
     SceneUnposedPointMapRow,
 )
@@ -50,6 +53,14 @@ from exulanica.reconstruction.placement import (
     validate_placement_record,
 )
 from exulanica.reconstruction.scene_gate import validate_scene_gate_decision
+from exulanica.reconstruction.standpoint_record import (
+    PARTS_PER_MILLION,
+    STANDPOINT_KIND,
+    StandpointRecordError,
+    member_refusal,
+    parse_standpoint_record,
+    scene_from_opm_row_major,
+)
 from exulanica.store.base import ContentAddressedStore
 
 __all__ = [
@@ -649,6 +660,14 @@ def _scene_row(
     # Evaluate one fresh read time for this response, exactly as the ordinary geometry descriptor
     # list does, and never let the memo retain an earlier permission answer.
     viewed_at = evaluation_time(connection)
+    # A scene pose placed nothing may have a measured standpoint arrangement instead of the
+    # client's unmeasured one. Read under the same live checks, at the same evaluation time.
+    standpoint, standpoint_placements = (
+        _standpoint(connection, workspace, scene_id, members, references, store, viewed_at)
+        if nothing_registered
+        else (None, {})
+    )
+    joined_standpoint = standpoint is not None and standpoint.state == "joined"
     for member in members:
         capture_ref = str(member.capture_id)
         recovered_camera = (
@@ -656,11 +675,14 @@ def _scene_row(
         )
         placed_member = placed.get(capture_ref)
         if placed_member is None:
+            # A joined arrangement is drawn alone. A member outside it opens as a photograph,
+            # because an unmeasured panel beside measured ones would borrow their authority.
+            in_arrangement = capture_ref in standpoint_placements
             unposed = (
                 _unposed_point_map(
                     connection, workspace, viewed_at, references, artifacts, capture_ref, store
                 )
-                if nothing_registered
+                if nothing_registered and (in_arrangement or not joined_standpoint)
                 else None
             )
             if unposed is not None and unposed.state == "available":
@@ -678,6 +700,11 @@ def _scene_row(
                     person_regions=people.get(capture_ref, []),
                     person_review_state=review_state.get(capture_ref, "unscreened"),
                     recovered_camera=recovered_camera,
+                    standpoint_placement=(
+                        standpoint_placements.get(capture_ref)
+                        if unposed is not None and unposed.state == "available"
+                        else None
+                    ),
                 )
             )
             continue
@@ -726,6 +753,7 @@ def _scene_row(
                 person_regions=people.get(capture_ref, []),
                 person_review_state=review_state.get(capture_ref, "unscreened"),
                 recovered_camera=recovered_camera,
+                standpoint_placement=None,
             )
         )
 
@@ -764,11 +792,28 @@ def _scene_row(
         display_reasons = [
             reason for reason in display_reasons if reason != _POSED_RUNG_THREE_WITHHELD
         ]
-        display_reasons.append(
-            "No photograph's position was recovered, so the recorded rung stays 4. Each "
-            "photograph's own depth is shown unplaced, in an arrangement that is not measured: "
-            "rung 3 needs no pose."
-        )
+        if joined_standpoint and standpoint is not None:
+            display_reasons.append(
+                "No photograph's position was recovered, so the recorded rung stays 4. "
+                f"{standpoint.joined_member_count} of the {standpoint.member_count} photographs "
+                "are joined where they were taken: the turn between them is measured from the "
+                "photographs themselves, and each keeps its own estimated depth, at approximate "
+                "size. Rung 3 needs no pose."
+            )
+            if standpoint.excluded:
+                display_reasons.append(
+                    f"{len(standpoint.excluded)} photograph"
+                    f"{'s do' if len(standpoint.excluded) != 1 else ' does'} not join the others "
+                    "and open as photographs."
+                )
+        else:
+            display_reasons.append(
+                "No photograph's position was recovered, so the recorded rung stays 4. Each "
+                "photograph's own depth is shown unplaced, in an arrangement that is not "
+                "measured: rung 3 needs no pose."
+            )
+            if standpoint is not None and standpoint.state in _STANDPOINT_WITHHELD:
+                display_reasons.append(_STANDPOINT_WITHHELD[standpoint.state])
     if placement_state == "partial":
         display_reasons.append(
             "Some posed point maps are unavailable; the remaining verified maps are displayed."
@@ -823,6 +868,7 @@ def _scene_row(
         trained_geometry=trained,
         members=output_members,
         generated_geometry=generated_geometry_rows(connection, workspace, scene_id, store),
+        standpoint=standpoint,
     )
 
 
@@ -1288,6 +1334,155 @@ def _unposed_point_map(
     )
 
 
+#: What the status line says when a standpoint record exists and is not drawn. Keyed by state.
+_STANDPOINT_WITHHELD: Final = {
+    "nothing_joined": (
+        "These photographs were checked for being taken from one place and no two of them could "
+        "be joined, so they stay unmeasured."
+    ),
+    "withdrawn": (
+        "The measured arrangement of these photographs is withheld until it is joined again, "
+        "because one of them may no longer be used."
+    ),
+    "stale": (
+        "The measured arrangement of these photographs was made for an earlier version of them "
+        "and is not drawn; it is joined again for this one."
+    ),
+    "invalid": "The measured arrangement of these photographs could not be read.",
+    "bytes_missing": "The measured arrangement of these photographs is missing from storage.",
+}
+
+_STANDPOINT: Final = (
+    "select artifact_id, content_sha256 from artifact where workspace_id=%s and scene_id=%s "
+    "and kind=%s and purged_at is null and not needs_repair and content_sha256 is not null "
+    "and byte_size is not null order by created_at desc, artifact_id desc limit 1"
+)
+
+
+def _standpoint(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    scene_id: uuid.UUID,
+    members: list[_Member],
+    references: tuple[_PointMapRef, ...],
+    store: ContentAddressedStore,
+    viewed_at: dt.datetime,
+) -> tuple[SceneStandpointRow | None, dict[str, SceneStandpointPlacementRow]]:
+    """The scene's newest standpoint record, held to this build and to permission now.
+
+    Placements come out only when the record parses canonically, names exactly this build's
+    members in order with exactly the point maps this build's placement record binds, and every
+    member it read may still be read (``asset_point_allows`` now, the check every served point map
+    passes). A member withdrawn after the join withdraws the whole arrangement, because every
+    rotation in it was measured with that member's pixels; the standpoint stage joins what remains.
+    The artifact row itself is read live, so a purge or a deletion reaching the scene removes it.
+    """
+    row = connection.execute(_STANDPOINT, (workspace, scene_id, STANDPOINT_KIND)).fetchone()
+    if row is None:
+        return None, {}
+    base: dict[str, Any] = {
+        "artifact_id": row["artifact_id"],
+        "content_sha256": bytes(row["content_sha256"]).hex(),
+        "member_count": len(members),
+    }
+
+    def withheld(
+        state: Literal["withdrawn", "stale", "invalid", "bytes_missing"],
+    ) -> tuple[SceneStandpointRow, dict[str, SceneStandpointPlacementRow]]:
+        return (
+            SceneStandpointRow(
+                **base,
+                state=state,
+                joined_member_count=0,
+                reference_capture_id=None,
+                rotation_residual_max_millidegrees=None,
+                scale_residual_max_ppm=None,
+                up_method=None,
+                implied_roll_max_millidegrees=None,
+                excluded=[],
+            ),
+            {},
+        )
+
+    try:
+        data = store.get(BlobId(bytes(row["content_sha256"])))
+    except BlobNotFoundError:
+        return withheld("bytes_missing")
+    except IntegrityError:
+        return withheld("invalid")
+    try:
+        record = parse_standpoint_record(data, expected_scene_ref=str(scene_id))
+    except StandpointRecordError:
+        return withheld("invalid")
+    if [member.member_ref for member in record.members] != [
+        str(member.capture_id) for member in members
+    ]:
+        return withheld("stale")
+    live = {reference.capture_ref: reference for reference in references}
+    for member in record.members:
+        if member.point_map_artifact_ref is None:
+            continue
+        bound = live.get(member.member_ref)
+        if bound is None or (bound.artifact_ref, bound.content_sha256) != (
+            member.point_map_artifact_ref,
+            member.point_map_sha256,
+        ):
+            return withheld("stale")
+    for member in record.members:
+        if member.reading is not None and not point_allowed(
+            connection, workspace, uuid.UUID(str(member.point_map_artifact_ref)), viewed_at
+        ):
+            return withheld("withdrawn")
+    excluded = []
+    for member in record.members:
+        reason = member_refusal(record, member.ordinal)
+        if reason is not None:
+            excluded.append(
+                SceneStandpointExclusionRow(capture_id=uuid.UUID(member.member_ref), reason=reason)
+            )
+    arrangement = record.arrangement
+    if arrangement is None:
+        return (
+            SceneStandpointRow(
+                **base,
+                state="nothing_joined",
+                joined_member_count=0,
+                reference_capture_id=None,
+                rotation_residual_max_millidegrees=None,
+                scale_residual_max_ppm=None,
+                up_method=None,
+                implied_roll_max_millidegrees=None,
+                excluded=excluded,
+            ),
+            {},
+        )
+    placements = {
+        record.member(arranged.ordinal).member_ref: SceneStandpointPlacementRow(
+            scene_from_opm_row_major=list(scene_from_opm_row_major(arranged)),
+            depth_scale=arranged.depth_scale_ppm / PARTS_PER_MILLION,
+            lateral_scale=arranged.lateral_scale_ppm / PARTS_PER_MILLION,
+        )
+        for arranged in arrangement.members
+    }
+    roll = arrangement.up.get("implied_roll_millidegrees")
+    return (
+        SceneStandpointRow(
+            **base,
+            state="joined",
+            joined_member_count=len(placements),
+            reference_capture_id=uuid.UUID(record.member(arrangement.reference).member_ref),
+            rotation_residual_max_millidegrees=int(
+                arrangement.rotation_solve["max_residual_millidegrees"]
+            ),
+            scale_residual_max_ppm=int(arrangement.scale_solve["max_residual_ppm"]),
+            up_method=str(arrangement.up.get("method")),
+            implied_roll_max_millidegrees=int(roll["max"]) if isinstance(roll, dict) else None,
+            excluded=excluded,
+        ),
+        placements,
+    )
+
+
 def _viewer_photograph(
     connection: psycopg.Connection,
     workspace: uuid.UUID,
@@ -1426,6 +1621,7 @@ def _fallback(
                 # this photograph, which draws silhouettes rather than pixels.
                 person_regions=[],
                 person_review_state="unscreened",
+                standpoint_placement=None,
             )
             for member in members
         ],
@@ -1434,6 +1630,8 @@ def _fallback(
         # receipt_state that already says this reader could not read the scene: a client that
         # draws generated content at all reads `receipt_state` first.
         generated_geometry=[],
+        # Unreadable receipts name no build, so no standpoint record can be checked against one.
+        standpoint=None,
     )
 
 

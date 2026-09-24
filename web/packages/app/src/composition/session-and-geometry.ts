@@ -30,6 +30,7 @@ import {
   GeometryClient,
   displayFrameSentence,
   regionsByCapture,
+  standpointArrangementSentence,
   unposedArrangementSentence,
   type GeometryIssue,
   type GeometryIssueState,
@@ -463,11 +464,15 @@ export function reconstructionRungsFor(
     const displayedRung = substrate === 'source_photographs' ? 4
       : substrate === 'unposed_point_maps' ? 3 : Math.max(scene.recordedRung ?? 3, 3);
     const reasons = [...scene.displayReasons];
+    // Drawn from the server's standpoint record only when it joined these photographs; the geometry
+    // loader places them from it exactly then, so the two cannot disagree about which was drawn.
+    const measuredArrangement = substrate === 'unposed_point_maps' && scene.standpoint?.state === 'joined';
     const frame = displayFrames.get(scene.sceneId);
     if (frame !== undefined && substrate !== 'source_photographs') {
       // The presentation frame is a layout decision and is said out loud beside the rung.
       reasons.push(
-        substrate === 'unposed_point_maps' ? unposedArrangementSentence(frame) : displayFrameSentence(frame),
+        substrate !== 'unposed_point_maps' ? displayFrameSentence(frame)
+          : measuredArrangement ? standpointArrangementSentence(frame) : unposedArrangementSentence(frame),
       );
     }
     if (notDrawn.has(scene.sceneId)) {
@@ -486,6 +491,7 @@ export function reconstructionRungsFor(
       registeredMemberCount: scene.registeredMemberCount,
       memberCount: scene.memberCount,
       renderingSubstrate: substrate,
+      measuredArrangement,
       reasons: Object.freeze(reasons),
       // What the proof lens reads. `drawn` is already decided above, and passing it rather than
       // letting the panel infer it from the substrate is the point: a scene can have trained

@@ -1,0 +1,13 @@
+rendered held-courtyard-111 in 420.8 s
+rendered held-courtyard-112 in 379.2 s
+rendered held-landscape-311 in 250.5 s
+rendered held-landscape-312 in 281.1 s
+rendered held-room-211 in 534.5 s
+rendered held-room-212 in 523.3 s
+finished held-courtyard-111: 35 photographs
+finished held-courtyard-112: 35 photographs
+finished held-landscape-311: 35 photographs
+finished held-landscape-312: 35 photographs
+finished held-room-211: 35 photographs
+finished held-room-212: 35 photographs
+exit 0

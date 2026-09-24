@@ -116,3 +116,8 @@ export {
 // person-consent branch inserts its own block at exactly that point and the two would conflict
 // over an insertion order neither of them cares about.
 export type { GeneratedGeometryRecord } from './read-model.js';
+export type {
+  StandpointExclusionReason,
+  StandpointPlacementRecord,
+  StandpointRecordState,
+} from './read-model.js';

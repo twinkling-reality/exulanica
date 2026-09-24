@@ -1,0 +1,76 @@
+"""Point maps for every rendered photograph, made exactly as the depth stage makes them.
+
+    HF_HUB_OFFLINE=1 python standpoint_depth_pass.py <split_dir>
+
+For each photograph a scene's truth.json names, opens the JPEG the way intake does
+(``extract_exif_facts``: upright pixels), and calls the depth stage's own
+``encode_point_map`` with the depth stage's own registry parameters and the checkpoint the
+manifest pins for the depth role. Writes ``<scene>/opm/<photo>.opm`` and ``<scene>/opm/depth.json``
+(field of view the model estimated, valid fraction, rung, seconds). Photographs already done are
+skipped by digest, so a rerun costs only what changed.
+
+This process loads torch and must never import pycolmap: the two load incompatible OpenMP
+runtimes on macOS (pyproject.toml, exulanica-scene-worker).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+import time
+from pathlib import Path
+
+from PIL import Image
+
+from exulanica.ingest.exif import extract_exif_facts
+from exulanica.ingest.stages import stage
+from exulanica.ingest.stages.depth import encode_point_map
+from exulanica.ingest.stages.segmentation import DEPTH_ROLE, local_model_role
+from exulanica.reconstruction.moge import MoGeDepthModel
+
+
+def main(split_dir: Path) -> None:
+    spec = stage("depth")
+    pin = local_model_role(DEPTH_ROLE).primary
+    started = time.monotonic()
+    model = MoGeDepthModel(
+        model_id=pin.repo_id, revision=pin.revision, max_edge_px=int(spec.params["max_edge_px"])
+    )
+    load_seconds = time.monotonic() - started
+    print(f"loaded {model.model_id} in {load_seconds:.1f} s", flush=True)
+    for scene in sorted(p for p in split_dir.iterdir() if (p / "truth.json").exists()):
+        truth = json.loads((scene / "truth.json").read_text(encoding="utf-8"))
+        out = scene / "opm"
+        out.mkdir(exist_ok=True)
+        ledger_path = out / "depth.json"
+        ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
+        for photo_id, camera in sorted(truth["cameras"].items()):
+            jpeg = scene / f"{photo_id}.jpg"
+            digest = hashlib.sha256(jpeg.read_bytes()).hexdigest()
+            if ledger.get(photo_id, {}).get("jpeg_sha256") == digest and (out / f"{photo_id}.opm").exists():
+                continue
+            with Image.open(jpeg) as opened:
+                upright, _facts = extract_exif_facts(opened)
+                upright = upright.convert("RGB")
+            begun = time.monotonic()
+            prediction, decision, payload = encode_point_map(model, upright, spec)
+            seconds = time.monotonic() - begun
+            (out / f"{photo_id}.opm").write_bytes(payload)
+            ledger[photo_id] = {
+                "jpeg_sha256": digest,
+                "opm_sha256": hashlib.sha256(payload).hexdigest(),
+                "model_id": prediction.model_id,
+                "fov_y_deg_estimated": round(prediction.fov_y_degrees, 4),
+                "fov_y_deg_true": camera["fov_y_deg"],
+                "valid_fraction": round(prediction.valid_fraction, 4),
+                "rung": decision.as_payload().get("rung"),
+                "seconds": round(seconds, 3),
+            }
+            print(f"{scene.name}/{photo_id}: fov {prediction.fov_y_degrees:.2f} (true {camera['fov_y_deg']:.2f}) valid {prediction.valid_fraction:.3f} {seconds:.2f} s", flush=True)
+            ledger_path.write_text(json.dumps(ledger, indent=1, sort_keys=True), encoding="utf-8")
+    print(json.dumps({"load_seconds": round(load_seconds, 2)}))
+
+
+if __name__ == "__main__":
+    main(Path(sys.argv[1]))

@@ -1,0 +1,520 @@
+{
+ "scenes": [
+  {
+   "name": "dev-courtyard-101",
+   "family": "courtyard",
+   "seed": 101,
+   "sets": [
+    {
+     "id": "dev-courtyard-101-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "dev-courtyard-101-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "dev-courtyard-101-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "dev-courtyard-101-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "dev-courtyard-101-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "dev-courtyard-101-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "dev-courtyard-101-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "dev-courtyard-101-ch",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "remove",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "dev-courtyard-101-p1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "portrait": true,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.1
+     }
+    }
+   ]
+  },
+  {
+   "name": "dev-courtyard-102",
+   "family": "courtyard",
+   "seed": 102,
+   "sets": [
+    {
+     "id": "dev-courtyard-102-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "dev-courtyard-102-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "dev-courtyard-102-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "dev-courtyard-102-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "dev-courtyard-102-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "dev-courtyard-102-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "dev-courtyard-102-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "dev-courtyard-102-ch",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "remove",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "dev-courtyard-102-p1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "portrait": true,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.1
+     }
+    }
+   ]
+  },
+  {
+   "name": "dev-room-201",
+   "family": "room",
+   "seed": 201,
+   "sets": [
+    {
+     "id": "dev-room-201-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "dev-room-201-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "dev-room-201-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "dev-room-201-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "dev-room-201-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "dev-room-201-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.0,
+       1.6
+      ]
+     }
+    },
+    {
+     "id": "dev-room-201-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "dev-room-201-ch",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "move",
+      "translation_m": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "name": "dev-room-202",
+   "family": "room",
+   "seed": 202,
+   "sets": [
+    {
+     "id": "dev-room-202-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "dev-room-202-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "dev-room-202-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "dev-room-202-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "dev-room-202-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "dev-room-202-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.0,
+       1.6
+      ]
+     }
+    },
+    {
+     "id": "dev-room-202-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "dev-room-202-ch",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "move",
+      "translation_m": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "name": "dev-landscape-301",
+   "family": "landscape",
+   "seed": 301,
+   "sets": [
+    {
+     "id": "dev-landscape-301-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "dev-landscape-301-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "dev-landscape-301-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "dev-landscape-301-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "dev-landscape-301-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "dev-landscape-301-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "dev-landscape-301-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "dev-landscape-301-ch",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "add",
+      "translation_m": 0.05
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -18347,6 +18347,16 @@
         "type": "null"
        }
       ]
+     },
+     "standpoint_placement": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SceneStandpointPlacementRow"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,
@@ -18359,7 +18369,8 @@
      "unposed_point_map",
      "exclusion_reason",
      "person_regions",
-     "person_review_state"
+     "person_review_state",
+     "standpoint_placement"
     ],
     "title": "ReconstructionSceneMemberRow",
     "description": "One immutable member and its exact placement or explicit exclusion."
@@ -18519,6 +18530,16 @@
       },
       "type": "array",
       "title": "Generated Geometry"
+     },
+     "standpoint": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SceneStandpointRow"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,
@@ -18541,7 +18562,8 @@
      "hidden_person_count",
      "masked_member_count",
      "members",
-     "generated_geometry"
+     "generated_geometry",
+     "standpoint"
     ],
     "title": "ReconstructionSceneRow",
     "description": "A durable multi-photograph scene with recorded and deliverable state kept separate."
@@ -20498,6 +20520,177 @@
      "stale_inputs"
     ],
     "title": "SceneSegmentsView"
+   },
+   "SceneStandpointExclusionRow": {
+    "properties": {
+     "capture_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Capture Id"
+     },
+     "reason": {
+      "type": "string",
+      "enum": [
+       "insufficient_overlap",
+       "moved_between_photographs",
+       "scene_changed",
+       "inconsistent_with_set",
+       "not_permitted",
+       "point_map_unreadable",
+       "focal_length_unstated"
+      ],
+      "title": "Reason"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "capture_id",
+     "reason"
+    ],
+    "title": "SceneStandpointExclusionRow",
+    "description": "A member photograph the arrangement does not hold, and why, in a stable code."
+   },
+   "SceneStandpointPlacementRow": {
+    "properties": {
+     "scene_from_opm_row_major": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array",
+      "title": "Scene From Opm Row Major"
+     },
+     "depth_scale": {
+      "type": "number",
+      "title": "Depth Scale"
+     },
+     "lateral_scale": {
+      "type": "number",
+      "title": "Lateral Scale"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "scene_from_opm_row_major",
+     "depth_scale",
+     "lateral_scale"
+    ],
+    "title": "SceneStandpointPlacementRow",
+    "description": "Where one member stands in its scene's standpoint arrangement: measured, not derived.\n\nOnly for a scene whose pose recovered no photograph and whose standpoint record joined this\nmember (``exulanica/reconstruction/standpoint_record.py``). The matrix acts on raw OPM positions\nand is ``R diag(s l, s l, s)``: the photograph turned to face the way it faced, its depth at the\nscene's scale ``s``, and its sideways extent re-projected onto the photograph's own rays by\n``l``. Every member's camera stands at the scene origin, which is the standpoint. Not a\nsimilarity when ``l`` is not 1, so a reader applies the matrix as it is and nothing else."
+   },
+   "SceneStandpointRow": {
+    "properties": {
+     "artifact_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Artifact Id"
+     },
+     "content_sha256": {
+      "type": "string",
+      "title": "Content Sha256"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "joined",
+       "nothing_joined",
+       "withdrawn",
+       "stale",
+       "invalid",
+       "bytes_missing"
+      ],
+      "title": "State"
+     },
+     "member_count": {
+      "type": "integer",
+      "title": "Member Count"
+     },
+     "joined_member_count": {
+      "type": "integer",
+      "title": "Joined Member Count"
+     },
+     "reference_capture_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reference Capture Id"
+     },
+     "rotation_residual_max_millidegrees": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rotation Residual Max Millidegrees"
+     },
+     "scale_residual_max_ppm": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scale Residual Max Ppm"
+     },
+     "up_method": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Up Method"
+     },
+     "implied_roll_max_millidegrees": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Implied Roll Max Millidegrees"
+     },
+     "excluded": {
+      "items": {
+       "$ref": "#/components/schemas/SceneStandpointExclusionRow"
+      },
+      "type": "array",
+      "title": "Excluded"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "artifact_id",
+     "content_sha256",
+     "state",
+     "member_count",
+     "joined_member_count",
+     "reference_capture_id",
+     "rotation_residual_max_millidegrees",
+     "scale_residual_max_ppm",
+     "up_method",
+     "implied_roll_max_millidegrees",
+     "excluded"
+    ],
+    "title": "SceneStandpointRow",
+    "description": "The scene's standpoint record as it can be used now.\n\n``joined`` means the arrangement is drawn and its members carry placements. Every other state\ndraws nothing from it, and the scene's photographs keep the unmeasured arrangement:\n``nothing_joined`` is a record that found no two photographs to join, ``withdrawn`` is a record\none of whose read members may no longer be used (every rotation in it was measured with that\nmember's pixels), ``stale`` is a record of an earlier build or point map, and ``invalid`` and\n``bytes_missing`` are what they say. The residuals are the record's own, for the status line."
    },
    "SceneTrainedGeometryRow": {
     "properties": {

@@ -117,6 +117,37 @@ def _refresh_segments(worker: SceneReconstructionWorker, stream: Any) -> None:
     )
 
 
+def _refresh_standpoints(worker: SceneReconstructionWorker, stream: Any) -> None:
+    """Join the unplaced scenes no standpoint record answers for yet; say so if any.
+
+    Silent when nothing was due, and a failure to look is reported and survived, for the reasons
+    `_refresh_segments` gives: a standpoint is an arrangement over a scene that is complete without
+    one, and the worker's job is the scenes.
+    """
+    try:
+        results = worker.refresh_standpoint_scenes()
+    except Exception as error:
+        _emit(
+            stream,
+            "standpoints_refresh_failed",
+            failure_class=type(error).__name__,
+            message=str(error),
+        )
+        return
+    if not results:
+        return
+    counts: dict[str, int] = {}
+    for result in results:
+        action = str(result.get("action"))
+        counts[action] = counts.get(action, 0) + 1
+    _emit(
+        stream,
+        "standpoints_refreshed",
+        scenes=len(results),
+        **{action.replace("-", "_"): count for action, count in sorted(counts.items())},
+    )
+
+
 def _worker_data_directory(environment: Mapping[str, str]) -> Path:
     """Keep pycolmap source paths stable after its executor changes directories."""
     return resolve_data_dir(environment).resolve()
@@ -176,6 +207,15 @@ def main(
             "completed after their segments were lifted; 0 turns it off"
         ),
     )
+    parser.add_argument(
+        "--standpoints-refresh-seconds",
+        type=float,
+        default=300.0,
+        help=(
+            "how often an idle worker joins the scenes pose placed no photograph of, where no "
+            "standpoint record answers for their current photographs; 0 turns it off"
+        ),
+    )
     args = parser.parse_args(argv)
     output = stream or sys.stdout
     environment = os.environ if environ is None else environ
@@ -201,11 +241,14 @@ def main(
 
     previous = {signum: signal.signal(signum, stop) for signum in (signal.SIGTERM, signal.SIGINT)}
     refreshing = args.segments_refresh_seconds > 0
+    joining = args.standpoints_refresh_seconds > 0
     try:
         if args.once:
             outcomes = worker.drain_observed()
             if refreshing and not requested.is_set():
                 _refresh_segments(worker, output)
+            if joining and not requested.is_set():
+                _refresh_standpoints(worker, output)
             _emit(
                 output,
                 "stopped",
@@ -216,6 +259,7 @@ def main(
             )
             return 1 if any(outcome.status == "failed" for outcome in outcomes) else 0
         refresh_at = time.monotonic()
+        join_at = time.monotonic()
         while not requested.is_set():
             outcomes = worker.drain_observed()
             if any(outcome.status == "failed" for outcome in outcomes):
@@ -224,6 +268,9 @@ def main(
             if refreshing and not requested.is_set() and time.monotonic() >= refresh_at:
                 _refresh_segments(worker, output)
                 refresh_at = time.monotonic() + args.segments_refresh_seconds
+            if joining and not requested.is_set() and time.monotonic() >= join_at:
+                _refresh_standpoints(worker, output)
+                join_at = time.monotonic() + args.standpoints_refresh_seconds
             requested.wait(args.poll_seconds)
     finally:
         for signum, handler in previous.items():

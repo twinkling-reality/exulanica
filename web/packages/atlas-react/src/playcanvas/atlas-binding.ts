@@ -141,6 +141,12 @@ import { defaultSemanticsFor } from './semantics.js';
 export { reliefFor } from './point-cloud.js';
 import { reliefFor } from './point-cloud.js';
 import {
+  STANDPOINT_EDGE_FRACTION,
+  planStandpoint,
+  type StandpointMemberPlan,
+  type StandpointPlan,
+} from './standpoint-scene.js';
+import {
   createAuthoredPointMaps,
   type AuthoredPointMapPlacement,
   type AuthoredPointMaps,
@@ -1024,10 +1030,27 @@ export class AtlasBinding {
         trainedScenes.push({ island, entity, asset, geometry });
       }
 
+      // A measured standpoint's members are drawn as one view, so they are planned together: each
+      // member's share of the directions, one print for all of them, one parallax rate. A set the
+      // shaders cannot hold is not drawn in 3D at all rather than drawn with a seam doubled.
+      const standpointMembers = (pointMapsByIsland.get(island.islandId) ?? [])
+        .filter((pointMap) => pointMap.arrangement === 'standpoint');
+      let standpointPlan: StandpointPlan | null = null;
+      try {
+        standpointPlan = standpointMembers.length > 0 ? planStandpoint(standpointMembers) : null;
+      } catch {
+        standpointPlan = null;
+      }
       for (const pointMap of pointMapsByIsland.get(island.islandId) ?? []) {
+        const standpoint = pointMap.arrangement === 'standpoint'
+          ? standpointPlan?.members.get(pointMap.artifactId) ?? null : null;
+        if (pointMap.arrangement === 'standpoint' && (standpoint === null || standpointPlan === null)) continue;
         const entity = new pc.Entity(`point-map:${pointMap.artifactId}`);
-        applyScenePointMapPlacement(entity, pointMap);
-        if (pointMap.arrangement === 'unmeasured-fan') standOnTheGround(entity, pointMap, island, navigationWorld);
+        if (standpoint !== null) applyStandpointTransform(entity, pointMap.sceneFromOpmRowMajor, standpoint);
+        else applyScenePointMapPlacement(entity, pointMap);
+        if (pointMap.arrangement === 'unmeasured-fan' || standpoint !== null) {
+          standOnTheGround(entity, pointMap, island, navigationWorld);
+        }
         const map = pointMap.map;
         const cloud = createPointCloud({
           device,
@@ -1038,7 +1061,8 @@ export class AtlasBinding {
           ...(options.blend === undefined ? {} : { blend: options.blend }),
           // One photograph's own view reads as its surface, not as dots. Posed maps overlap one
           // another from many cameras, so they stay points.
-          surface: pointMap.arrangement === 'unmeasured-fan',
+          surface: pointMap.arrangement === 'unmeasured-fan' || standpoint !== null,
+          standpoint: standpoint !== null,
           ...(pointMap.photograph === undefined ? {} : { photograph: pointMap.photograph }),
           theme,
         });
@@ -1046,9 +1070,22 @@ export class AtlasBinding {
         entity.addComponent('render', { meshInstances: [instance] });
         islandEntity.addChild(entity);
         const depths = pointMap.arrangement === 'unmeasured-fan' ? singleViewDepths(map) : null;
-        const printDepth = depths === null ? 0
+        // A standpoint member's print is the shared dome, at the plan's radius along its own axis:
+        // local z is scaled by its depth scale, and the island scales everything after that.
+        const printDepth = standpoint !== null && standpointPlan !== null
+          ? standpointPlan.printRadius / standpoint.transform.depth
+          : depths === null ? 0
           : printDepthAboveGround(entity, island, navigationWorld, map, depths.median);
-        const eye = depths === null ? null : cloud.enableSingleView(printDepth);
+        const eye = standpoint !== null && standpointPlan !== null
+          ? cloud.enableStandpoint({
+              printRadiusWorld: standpointPlan.printRadius * island.placement.scale,
+              eyeHeightWorld: navigationWorld.eyeHeight,
+              lateral: standpoint.transform.lateral / standpoint.transform.depth,
+              others: standpoint.others,
+              otherCount: standpoint.otherCount,
+              edgeFraction: STANDPOINT_EDGE_FRACTION,
+            })
+          : depths === null ? null : cloud.enableSingleView(printDepth);
         const worldScale = entity.getLocalScale().x * island.placement.scale;
 
         visuals.push({
@@ -1058,7 +1095,10 @@ export class AtlasBinding {
           pointMap,
           singleViewLocal: eye === null ? null : new pc.Vec3(eye[0], eye[1], eye[2]),
           printLocal: eye === null ? null : new pc.Vec3(eye[0], eye[1], eye[2] - printDepth),
-          parallaxPerUnit: depths === null ? 0 : (1 / depths.nearest - 1 / depths.furthest) / worldScale,
+          // Every member of a standpoint shares one rate, so all of them flatten together.
+          parallaxPerUnit: standpoint !== null && standpointPlan !== null
+            ? standpointPlan.parallaxPerUnit / island.placement.scale
+            : depths === null ? 0 : (1 / depths.nearest - 1 / depths.furthest) / worldScale,
           uIsland: new Float32Array([
             1,
             cloud.footprintRadiusLocal,
@@ -2938,6 +2978,21 @@ function standOnTheGround(
   const lift = (ground.height + navigationWorld.eyeHeight - camera.y) / island.placement.scale;
   const at = entity.getLocalPosition();
   entity.setLocalPosition(at.x, at.y + lift, at.z);
+}
+
+/**
+ * A standpoint member's transform, `R diag(a, a, b)` as the server sent it: PlayCanvas composes
+ * local scale before local rotation, which is exactly that order, so the entity carries it as it is.
+ */
+function applyStandpointTransform(
+  entity: pc.Entity,
+  m: readonly number[],
+  member: StandpointMemberPlan,
+): void {
+  const [x, y, z, w] = member.transform.rotation;
+  entity.setLocalPosition(m[3]!, m[7]!, m[11]!);
+  entity.setLocalRotation(new pc.Quat(x, y, z, w));
+  entity.setLocalScale(member.transform.lateral, member.transform.lateral, member.transform.depth);
 }
 
 function applyScenePointMapPlacement(entity: pc.Entity, value: PlacedScenePointMap): void {

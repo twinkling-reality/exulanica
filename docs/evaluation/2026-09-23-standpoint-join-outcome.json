@@ -1,0 +1,284 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "artifact_notes": {
+   "held-out/depth.log.txt": "the depth pass's log with the checkout's absolute location replaced by <worktree>; the replaced text appears only in Python warnings naming the files that raised them"
+  },
+  "bound_artifacts": {
+   "held-out/depth.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/depth.log.txt",
+    "sha256": "f71119f8b1c7af09d31360a12850f7ea943bcc703e658dcfce2137a6dd7b9b79"
+   },
+   "held-out/depth/held-courtyard-111.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/depth/held-courtyard-111.json",
+    "sha256": "0cdc7cb950d1dc757b470f1411829026a764efc0afd3f6302db357fbdcc85d1d"
+   },
+   "held-out/depth/held-courtyard-112.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/depth/held-courtyard-112.json",
+    "sha256": "fae8732c63217eab29cf08719d25ae7a1d6d1a251107e9dd20ea3a7459dbea8f"
+   },
+   "held-out/depth/held-landscape-311.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/depth/held-landscape-311.json",
+    "sha256": "ab304e710a9a14fbcc2bbff94047e091414030a9e31c1bf2e7d8cbe81ce7c3bf"
+   },
+   "held-out/depth/held-landscape-312.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/depth/held-landscape-312.json",
+    "sha256": "79dcd131586a01b836a084c4db2988e8b75183b4d933efc2128764c923da3119"
+   },
+   "held-out/depth/held-room-211.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/depth/held-room-211.json",
+    "sha256": "ca7ed8c8256578c351839650c0c003d88712212fe34e616b1f4316b827ef6487"
+   },
+   "held-out/depth/held-room-212.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/depth/held-room-212.json",
+    "sha256": "c68b4641e269f5ce970eb3d7a26084bd4ee5a8babe4863a6a34b312ddf5697f6"
+   },
+   "held-out/eval-exif-perturbed.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/eval-exif-perturbed.log.txt",
+    "sha256": "74d09953258bf8676bb45f25dfccc1314d3014befbe6dff9c69cb633abc8ee4c"
+   },
+   "held-out/eval-exif.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/eval-exif.log.txt",
+    "sha256": "f915aee05de70582dc56ac5b6ee12ea13b333a179cb1223d71bf4893f26789b8"
+   },
+   "held-out/render.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/render.log.txt",
+    "sha256": "3cada8b988b9196a2a1943970696c7af53d1a041a49747a83cea9b27d796a959"
+   },
+   "held-out/run-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/run-exif-perturbed.json",
+    "sha256": "f97f0180f543f6883cc549396e7ffdba77ebf2f1e510da207402eebced291068"
+   },
+   "held-out/run-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/run-exif.json",
+    "sha256": "ff1ab4f07df93d03084c528021e4c6f8dcf34ec6e79c2d0fcfd589ff250a87d2"
+   },
+   "held-out/statistics-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/statistics-exif-perturbed.json",
+    "sha256": "34cc8a7d40bf96b3244fbbf09e2e5c808327dd4c1578ab7ad3583b49e06750bf"
+   },
+   "held-out/statistics-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/statistics-exif.json",
+    "sha256": "e9bd2a9dc95901c0874d310782ba5edf669e0bb7d3db7c4803f0fcfd000c91b2"
+   },
+   "held-out/truth/held-courtyard-111.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/truth/held-courtyard-111.json",
+    "sha256": "3ed738819cd96d9511757e6afcf1703506bb2bf44ebecc5abb82cadc7e4c1b8a"
+   },
+   "held-out/truth/held-courtyard-112.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/truth/held-courtyard-112.json",
+    "sha256": "44d4cb86fe9267f686e6a92ba4c8000722f5251d2e5c322f3cb0d8b29cbdc7b8"
+   },
+   "held-out/truth/held-landscape-311.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/truth/held-landscape-311.json",
+    "sha256": "4f6e1c95b03f7c1f84db9bef0f1edd58b8c4571b76b27b246f1d1a080a3c0d1c"
+   },
+   "held-out/truth/held-landscape-312.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/truth/held-landscape-312.json",
+    "sha256": "84c2c2bee298ce741acff6ee4935e842837fb4c22dae4114c7222063ebb2e9f8"
+   },
+   "held-out/truth/held-room-211.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/truth/held-room-211.json",
+    "sha256": "5ccb7d2345ffcdd13f43782b8f67c1cc2acb68e3a025d0d19c6cf4af7b617fb8"
+   },
+   "held-out/truth/held-room-212.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/held-out/truth/held-room-212.json",
+    "sha256": "3b2635d3621276e63e6d7db8086cab6853c952486b0145cb1513365cdb7c695d"
+   }
+  },
+  "execution": {
+   "depth": "MoGe-2 through the product's MoGeDepthModel, which chose this Mac's Metal (MPS) device; no remote or paid compute",
+   "features": "pycolmap 4.2.0 SIFT on the CPU",
+   "machine": "Apple M5 Max, macOS 26.7",
+   "scripts": "the pre-registration's frozen .py.txt copies, run as they are bound"
+  },
+  "findings": [
+   "Refused under another name, never joined. Moved pairs refused as scene_changed: held-courtyard-112-mv (1, 2), 1.69 m apart, in the exif arm; held-courtyard-112-mv (0, 2), 3.23 m apart, and held-landscape-311-mv (0, 1), 1.82 m apart, in the perturbed arm. A changed pair refused as moved_between_photographs in both arms: held-courtyard-112-c2 (0, 1), where a fountain was moved between the photographs and its matched features agree with a movement of the camera.",
+   "Joinable pairs refused as scene_changed, in both arms, all in the courtyards: held-courtyard-111-p1 (1, 2), held-courtyard-112-s3 (1, 2) and held-courtyard-112-m1 (0, 1) and (1, 2), with 4.4 to 10.5 percent (exif) and 3.1 to 9.3 percent (perturbed) of the compared view disagreeing where nothing changed; their cause is not established here. The perturbed arm also refused held-landscape-311-c3 (1, 2) as moved_between_photographs, 5 of 129 in all.",
+   "Two joinable pairs joined with a changed part in a sliver of their shared view (0.03 and 0.35 percent of it, under the 2 percent that makes a pair changed): held-courtyard-111-c1 (1, 2) and held-courtyard-112-c3 (1, 2).",
+   {
+    "up_direction": {
+     "exif": {
+      "max_millidegrees": 3970,
+      "p50_millidegrees": 1429,
+      "p95_millidegrees": 3497,
+      "sets": 44
+     },
+     "exif-perturbed": {
+      "max_millidegrees": 3888,
+      "p50_millidegrees": 1426,
+      "p95_millidegrees": 3409,
+      "sets": 43
+     },
+     "note": "the angle between the arrangement's up and the true up, per set that joined; not gated. A few degrees of lean is visible on a horizon."
+    }
+   },
+   "The refined focal lengths of joined photographs were within 0.21 percent of the true lens at the median in the exif arm and 0.44 percent in the perturbed arm, whose stated lenses were off by up to 3 percent; 2.0 and 2.9 percent at worst.",
+   "A set of 3 or 4 photographs joined in 3.3 s at the median and 16 s at most, one process per arm, on a machine other work was loading to a load average near 28. An observation, not a budgeted timing."
+  ],
+  "held_out": {
+   "exif": {
+    "changed_in_one_arrangement": 0,
+    "changed_named": [
+     8,
+     10
+    ],
+    "excess_misregistration_millidegrees": {
+     "max": 868,
+     "p50": 46,
+     "p95": 339
+    },
+    "joinable_in_one_arrangement": [
+     63,
+     86
+    ],
+    "joinable_refused_as_moved_or_changed": [
+     4,
+     129
+    ],
+    "joined_with_a_smaller_change_in_view": 2,
+    "judged": {
+     "passed": true,
+     "verdicts": {
+      "changed_named": true,
+      "changed_never_joined": true,
+      "few_false_refusals": true,
+      "joins": true,
+      "lines_up_max": true,
+      "lines_up_p95": true,
+      "moved_named": true,
+      "moved_never_joined": true,
+      "seam_depth_median": true,
+      "seam_depth_p90": true
+     }
+    },
+    "moved_in_one_arrangement": 0,
+    "moved_named": [
+     6,
+     8
+    ],
+    "outcomes_by_class": {
+     "changed": {
+      "insufficient_overlap": 4,
+      "moved_between_photographs": 1,
+      "scene_changed": 16
+     },
+     "joinable": {
+      "insufficient_overlap": 40,
+      "joined": 85,
+      "scene_changed": 4
+     },
+     "moved": {
+      "insufficient_overlap": 4,
+      "moved_between_photographs": 8,
+      "scene_changed": 1
+     },
+     "no_overlap": {
+      "insufficient_overlap": 76,
+      "joined": 1
+     }
+    },
+    "pairs_in_one_arrangement": 94,
+    "seam_depth_ppm": {
+     "max": 523800,
+     "median": 24200,
+     "p90": 203600,
+     "pairs": 94
+    }
+   },
+   "exif-perturbed": {
+    "changed_in_one_arrangement": 0,
+    "changed_named": [
+     8,
+     10
+    ],
+    "excess_misregistration_millidegrees": {
+     "max": 919,
+     "p50": 76,
+     "p95": 411
+    },
+    "joinable_in_one_arrangement": [
+     63,
+     86
+    ],
+    "joinable_refused_as_moved_or_changed": [
+     5,
+     129
+    ],
+    "joined_with_a_smaller_change_in_view": 2,
+    "judged": {
+     "passed": true,
+     "verdicts": {
+      "changed_named": true,
+      "changed_never_joined": true,
+      "few_false_refusals": true,
+      "joins": true,
+      "lines_up_max": true,
+      "lines_up_p95": true,
+      "moved_named": true,
+      "moved_never_joined": true,
+      "seam_depth_median": true,
+      "seam_depth_p90": true
+     }
+    },
+    "moved_in_one_arrangement": 0,
+    "moved_named": [
+     5,
+     8
+    ],
+    "outcomes_by_class": {
+     "changed": {
+      "insufficient_overlap": 4,
+      "moved_between_photographs": 1,
+      "scene_changed": 16
+     },
+     "joinable": {
+      "insufficient_overlap": 40,
+      "joined": 84,
+      "moved_between_photographs": 1,
+      "scene_changed": 4
+     },
+     "moved": {
+      "insufficient_overlap": 4,
+      "moved_between_photographs": 7,
+      "scene_changed": 2
+     },
+     "no_overlap": {
+      "insufficient_overlap": 76,
+      "joined": 1
+     }
+    },
+    "pairs_in_one_arrangement": 93,
+    "seam_depth_ppm": {
+     "max": 524500,
+     "median": 24600,
+     "p90": 202700,
+     "pairs": 93
+    }
+   }
+  },
+  "held_out_note": "Angles in millidegrees and depth ratios (|log|) in parts per million, rounded from the bound statistics files, which are the gates script's exact output.",
+  "method": {
+   "params_sha256": "a7a582c038d6408f4fd76cb791e551fdeb4925332e32bb68f64d2f331993bc06",
+   "sources_note": "every digest equals the pre-registration's, checked when this record was written",
+   "sources_sha256": {
+    "exulanica/ingest/stages/__init__.py": "ff72e1afe338db95e271f59db46b56828f2e974214a0c06fc0c14084b3016b52",
+    "exulanica/ingest/stages/depth.py": "931e59ac2cf5948fc67f2f5952215d1036efbdc3b8eacb51c22ba2afcb4c9aa8",
+    "exulanica/reconstruction/standpoint.py": "a53940f573ae7bf172a375263ea4cb28d72cdab3e4b874d08afb8261ed852588",
+    "exulanica/reconstruction/standpoint_features.py": "dca0459634a8ae350aa1607c834a2819d8863d141a813407a84e9358487fe232",
+    "exulanica/reconstruction/standpoint_record.py": "9d3165e7c9b4ac2ed05edc8a685fa14be561c1ee0a7ba18a51a11b3de541ea17"
+   }
+  },
+  "not_covered": [
+   "Everything the pre-registration lists under not_covered.",
+   "How the joined arrangement looks in the product's world: that is the browser evidence, recorded apart from this measurement."
+  ],
+  "preregistration": {
+   "path": "docs/evaluation/2026-09-23-standpoint-join-preregistration.json",
+   "record_sha256": "aa2d87053f8fc4255126257cddc271c6681ac7b93773134c97dc21b24b546543"
+  },
+  "profile_note": "Outcome of the standpoint join's pre-registered measurement on the held-out split, made once with the frozen method in both arms.",
+  "verdict": "PASSED EVERY PRE-REGISTERED GATE IN BOTH ARMS. No pair of photographs taken metres apart and no pair across a change was ever joined. Joined photographs lined up from the standpoint to within 0.34 degrees (exif) and 0.41 degrees (exif-perturbed) at the 95th percentile beyond the parallax their own movement made, 0.87 and 0.92 degrees at worst; their depths agreed at the hand-over to a median of 2.4 percent. 63 of 86 joinable pairs sharing a fifth of the view were joined, and 4 (5 perturbed) of 129 joinable pairs were refused as changed or moved when they were neither."
+ },
+ "record_sha256": "d178dfaef7b4f42ee35e5c10904be69887aa4fd16a4c3898c5e5a95271ee5eeb"
+}

@@ -76,6 +76,11 @@ export interface ReconstructionRungDisclosure {
   readonly registeredMemberCount: number;
   readonly memberCount: number;
   readonly renderingSubstrate: RenderingSubstrate;
+  /**
+   * True when unposed depth is drawn in the server's measured standpoint arrangement rather than
+   * in the one this browser derives. Absent reads as the unmeasured one.
+   */
+  readonly measuredArrangement?: boolean;
   readonly reasons: readonly string[];
   /** How many people in this scene are not being drawn, and across how many photographs. */
   readonly hiddenPersonCount?: number;
@@ -207,7 +212,9 @@ export function buildStatus(input: StatusInput): HTMLElement {
     const substrate = scene.renderingSubstrate === 'posed_point_maps'
       ? 'posed point maps'
       : scene.renderingSubstrate === 'unposed_point_maps'
-        ? 'each photograph\u2019s own depth, in an unmeasured arrangement'
+        ? scene.measuredArrangement === true
+          ? 'photographs joined where they were taken, each with its own depth; the turn between them is measured'
+          : 'each photograph\u2019s own depth, in an unmeasured arrangement'
         : scene.renderingSubstrate === 'gaussian_splats' ? 'trained Gaussian reconstruction' : 'source photographs';
     details.append(
       el('summary', {

@@ -29,18 +29,25 @@ router = APIRouter(prefix="/graph", tags=["graph"])
 def withhold_scene_geometry(scene: ReconstructionSceneRow) -> ReconstructionSceneRow:
     """A denied scene keeps its review identity and loses every piece of geometry it carried.
 
-    Three member fields carry geometry: a measured placement, an unposed point map offered when
-    nothing was placed, and a recovered camera. All three go, together with the trained scene.
+    Four member fields carry geometry: a measured placement, an unposed point map offered when
+    nothing was placed, its place in a measured standpoint arrangement, and a recovered camera.
+    All four go, together with the trained scene and the standpoint arrangement's summary.
     """
     return scene.model_copy(
         update={
             "members": [
                 member.model_copy(
-                    update={"placement": None, "unposed_point_map": None, "recovered_camera": None}
+                    update={
+                        "placement": None,
+                        "unposed_point_map": None,
+                        "standpoint_placement": None,
+                        "recovered_camera": None,
+                    }
                 )
                 for member in scene.members
             ],
             "trained_geometry": None,
+            "standpoint": None,
             "placement_state": "unavailable",
             "rendering_substrate": "source_photographs",
             "displayed_rung": 4,

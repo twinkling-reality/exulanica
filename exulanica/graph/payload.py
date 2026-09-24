@@ -225,6 +225,67 @@ class SceneUnposedPointMapRow(BaseModel):
     photograph: SceneUnposedPhotographRow | None
 
 
+class SceneStandpointPlacementRow(BaseModel):
+    """Where one member stands in its scene's standpoint arrangement: measured, not derived.
+
+    Only for a scene whose pose recovered no photograph and whose standpoint record joined this
+    member (``exulanica/reconstruction/standpoint_record.py``). The matrix acts on raw OPM positions
+    and is ``R diag(s l, s l, s)``: the photograph turned to face the way it faced, its depth at the
+    scene's scale ``s``, and its sideways extent re-projected onto the photograph's own rays by
+    ``l``. Every member's camera stands at the scene origin, which is the standpoint. Not a
+    similarity when ``l`` is not 1, so a reader applies the matrix as it is and nothing else.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    scene_from_opm_row_major: list[float]
+    depth_scale: float
+    lateral_scale: float
+
+
+class SceneStandpointExclusionRow(BaseModel):
+    """A member photograph the arrangement does not hold, and why, in a stable code."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    capture_id: uuid.UUID
+    reason: Literal[
+        "insufficient_overlap",
+        "moved_between_photographs",
+        "scene_changed",
+        "inconsistent_with_set",
+        "not_permitted",
+        "point_map_unreadable",
+        "focal_length_unstated",
+    ]
+
+
+class SceneStandpointRow(BaseModel):
+    """The scene's standpoint record as it can be used now.
+
+    ``joined`` means the arrangement is drawn and its members carry placements. Every other state
+    draws nothing from it, and the scene's photographs keep the unmeasured arrangement:
+    ``nothing_joined`` is a record that found no two photographs to join, ``withdrawn`` is a record
+    one of whose read members may no longer be used (every rotation in it was measured with that
+    member's pixels), ``stale`` is a record of an earlier build or point map, and ``invalid`` and
+    ``bytes_missing`` are what they say. The residuals are the record's own, for the status line.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: uuid.UUID
+    content_sha256: str
+    state: Literal["joined", "nothing_joined", "withdrawn", "stale", "invalid", "bytes_missing"]
+    member_count: int
+    joined_member_count: int
+    reference_capture_id: uuid.UUID | None
+    rotation_residual_max_millidegrees: int | None
+    scale_residual_max_ppm: int | None
+    up_method: str | None
+    implied_roll_max_millidegrees: int | None
+    excluded: list[SceneStandpointExclusionRow]
+
+
 class SceneRecoveredCalibrationRow(BaseModel):
     model_config = ConfigDict(extra="forbid")
     model: str
@@ -307,6 +368,9 @@ class ReconstructionSceneMemberRow(BaseModel):
     person_regions: list[MemberPersonRegionRow]
     person_review_state: Literal["unscreened", "screened", "stale"]
     recovered_camera: SceneRecoveredCameraRow | None = None
+    #: Without a default, following this file's rule: a member row assembled without deciding
+    #: whether its scene's measured arrangement holds it would silently draw it unmeasured.
+    standpoint_placement: SceneStandpointPlacementRow | None
 
 
 class SceneTrainingQualityRow(BaseModel):
@@ -420,6 +484,9 @@ class ReconstructionSceneRow(BaseModel):
     #: is the one thing a viewer must always be able to trust: it means nothing was generated, not
     #: that nobody looked.
     generated_geometry: list[SceneGeneratedGeometryRow]
+    #: Without a default, following this file's rule. Null when the scene has no standpoint
+    #: record, which is also every scene whose pose placed a photograph.
+    standpoint: SceneStandpointRow | None
 
 
 class GraphPayload(BaseModel):

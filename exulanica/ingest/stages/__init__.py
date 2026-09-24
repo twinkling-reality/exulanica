@@ -478,6 +478,74 @@ STAGES: Final[dict[str, StageSpec]] = {
             "citable": False,
         },
     ),
+    "scene_standpoint": StageSpec(
+        key="scene_standpoint",
+        version=1,
+        output_kind="standpoint_scene",
+        # Deterministic in the sense the flag carries (ADR-0017): no model runs here. MoGe-2 ran
+        # in the depth stage and this reads its point maps; COLMAP's SIFT was measured to repeat
+        # exactly, and every random draw comes from `ransac_seed` and the pair. A differing record
+        # for one key is a fault worth an event. See exulanica/reconstruction/standpoint.py.
+        deterministic=True,
+        # Every value is decided by the standpoint evaluation record, which says for each one what
+        # it was measured against; a change re-keys every standpoint scene.
+        params={
+            "profile": "exulanica.standpoint-scene/v1",
+            "features": {
+                "contract": "pycolmap-sift",
+                "max_edge_px": 1600,
+                "max_features": 4096,
+                "peak_threshold_ppm": 4000,
+                "threads": 4,
+            },
+            "matching": {"ratio_milli": 800},
+            "rotation": {
+                "ransac_iterations": 2000,
+                "ransac_seed": 20260923,
+                "ransac_threshold_millidegrees": 1000,
+                "candidate_window_millidegrees": 5000,
+                "inlier_threshold_millidegrees": 600,
+                "refine_iterations": 12,
+            },
+            "overlap": {"min_inliers": 30, "coverage_grid": 4, "min_inlier_cells": 3},
+            "translation": {"max_mm": 700, "confidence_sigmas": 2},
+            "change": {
+                "method": "registered-appearance",
+                "long_edge_px": 320,
+                "tile_px": 8,
+                "blur_milli_px": 1000,
+                "zncc_min_milli": 500,
+                "flat_sigma_milli": 3000,
+                "flat_delta_milli": 15000,
+                "search_base_px": 1,
+                "search_max_px": 4,
+                "depth_uncertainty_milli": 300,
+                "min_cluster_tiles": 3,
+                "max_changed_ppm": 20000,
+            },
+            "set": {"max_edge_residual_millidegrees": 1500},
+            "intrinsics": {
+                "precedence": ["exif-35mm-equivalent"],
+                "exif_plausible_mm": [8, 1200],
+                "unstated": "keep-apart",
+                "refine": {
+                    "prior_sigma_ppm": 30000,
+                    "min_inliers": 60,
+                    "max_translation_mm": 350,
+                    "matches_per_pair": 200,
+                    "iterations": 10,
+                    "noise_millidegrees": 100,
+                },
+            },
+            "up": {
+                "method": "camera-horizontal-axes",
+                "min_spread_ppm": 20000,
+            },
+            "scale": {"gauge": "geometric-mean-of-member-depth-scales"},
+            "promotes_rung": False,
+            "citable": False,
+        },
+    ),
     "scene_group": StageSpec(
         key="scene_group",
         version=1,

@@ -1,0 +1,162 @@
+"""The standpoint join's pre-registered statistics, computed from one standpoint_eval.py run.
+
+    python standpoint_gates.py <run.json> [<preregistration.json>]
+
+With a pre-registration record, every gate it states is judged with the thresholds it states, read
+from the record rather than restated here. Without one, the statistics are printed only, which is
+how the development split informed the thresholds before the record was written.
+
+A pair's class is decided from ground truth alone, never from the method's outcome:
+
+* ``no_overlap``: under NO_OVERLAP of photograph a's sampled pixels are seen by photograph b;
+* ``moved``: the two cameras stood MOVED_M or more apart;
+* ``changed``: at least CHANGED_SHARE of the pair's shared view falls on a part the set's change
+  touched (standpoint_eval.change_share: the part's bounding sphere, in either photograph, and
+  only for a pair with the changed photograph in it);
+* ``joinable``: every other pair.
+
+"In one arrangement" means both photographs were joined; a record holds one arrangement.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from collections import Counter
+from typing import Any
+
+import numpy as np
+
+NO_OVERLAP = 0.05
+MOVED_M = 1.0
+CHANGED_SHARE = 0.02
+#: Pairs this much of whose view is shared are the ones a naming or joining rate is asked of. For
+#: a changed pair, what counts is the share that did not change: a change over most of the overlap
+#: leaves too little in common to be named anything but too little overlap.
+SHARED_ENOUGH = 0.20
+
+
+def classify(set_entry: dict[str, Any], pair: dict[str, Any]) -> str:
+    truth = pair["truth"]
+    if truth["overlap"] < NO_OVERLAP:
+        return "no_overlap"
+    if truth["distance_m"] >= MOVED_M:
+        return "moved"
+    if truth["change_share"] >= CHANGED_SHARE:
+        return "changed"
+    return "joinable"
+
+
+def statistics(run: dict[str, Any]) -> dict[str, Any]:
+    arranged_excess: list[float] = []
+    arranged_rows: list[dict[str, Any]] = []
+    seam_p50: list[float] = []
+    outcomes: dict[str, Counter] = {}
+    moved_arranged = changed_arranged = 0
+    moved_named = moved_asked = changed_named = changed_asked = 0
+    joinable_asked = joinable_arranged = 0
+    joinable_total = joinable_misnamed = 0
+    small_change_joined = 0
+    for set_result in run["sets"]:
+        joined = {m["ordinal"] for m in set_result["members"] if m["outcome"] == "joined"}
+        for pair in set_result["pairs"]:
+            klass = classify(set_result, pair)
+            outcomes.setdefault(klass, Counter())[pair["outcome"]] += 1
+            together = pair["a"] in joined and pair["b"] in joined
+            shared = pair["truth"]["overlap"] >= SHARED_ENOUGH
+            if together and pair.get("misregistration_deg"):
+                parallax = pair["truth"]["irreducible_parallax_p95_deg"] or 0.0
+                excess = pair["misregistration_deg"]["p95"] - parallax
+                arranged_excess.append(excess)
+                arranged_rows.append(
+                    {"set": set_result["set"], "a": pair["a"], "b": pair["b"], "class": klass,
+                     "excess_deg": round(excess, 4), "parallax_p95_deg": round(parallax, 4),
+                     "misregistration_p95_deg": pair["misregistration_deg"]["p95"]}
+                )
+            if together and pair.get("depth_disagreement_seam"):
+                seam_p50.append(pair["depth_disagreement_seam"]["p50"])
+            if klass == "moved":
+                moved_arranged += together
+                if shared:
+                    moved_asked += 1
+                    moved_named += pair["outcome"] == "moved_between_photographs"
+            elif klass == "changed":
+                changed_arranged += together
+                unchanged = pair["truth"]["overlap"] * (1 - pair["truth"]["change_share"])
+                if unchanged >= SHARED_ENOUGH:
+                    changed_asked += 1
+                    changed_named += pair["outcome"] == "scene_changed"
+            elif klass == "joinable":
+                small_change_joined += together and pair["truth"]["change_share"] > 0
+                joinable_total += 1
+                joinable_misnamed += pair["outcome"] in ("moved_between_photographs", "scene_changed")
+                if shared:
+                    joinable_asked += 1
+                    joinable_arranged += together
+    excess = np.array(arranged_excess) if arranged_excess else np.zeros(1)
+    seams = np.array(seam_p50) if seam_p50 else np.zeros(1)
+    return {
+        "outcomes_by_class": {k: dict(v) for k, v in sorted(outcomes.items())},
+        "pairs_in_one_arrangement": len(arranged_excess),
+        "excess_misregistration_deg": {
+            "p50": round(float(np.percentile(excess, 50)), 4),
+            "p95": round(float(np.percentile(excess, 95)), 4),
+            "max": round(float(excess.max()), 4),
+        },
+        "worst_pairs": sorted(arranged_rows, key=lambda row: -row["excess_deg"])[:5],
+        "seam_depth_p50_by_pair": {
+            "n": len(seam_p50),
+            "median": round(float(np.median(seams)), 4),
+            "p90": round(float(np.percentile(seams, 90)), 4),
+            "max": round(float(seams.max()), 4),
+        },
+        "moved_in_one_arrangement": int(moved_arranged),
+        "moved_named": [moved_named, moved_asked],
+        "changed_in_one_arrangement": int(changed_arranged),
+        "changed_named": [changed_named, changed_asked],
+        "joinable_refused_as_moved_or_changed": [joinable_misnamed, joinable_total],
+        "joinable_in_one_arrangement": [joinable_arranged, joinable_asked],
+        "joined_with_a_smaller_change_in_view": int(small_change_joined),
+    }
+
+
+def judge(stats: dict[str, Any], all_gates: dict[str, Any], arm: str) -> dict[str, Any]:
+    """Every gate the pre-registration states for this arm, with the threshold the record states."""
+    gates = all_gates["arms"][arm]
+    def rate(pair: list[int]) -> float | None:
+        return None if pair[1] == 0 else pair[0] / pair[1]
+
+    # The record holds integers (a digest input may hold no float): millidegrees and parts per million.
+    degrees = lambda value: value / 1000  # noqa: E731
+    share = lambda value: value / 1_000_000  # noqa: E731
+    verdicts = {
+        "lines_up_p95": stats["excess_misregistration_deg"]["p95"]
+        <= degrees(gates["lines_up"]["p95_max_millidegrees"]),
+        "lines_up_max": stats["excess_misregistration_deg"]["max"]
+        <= degrees(gates["lines_up"]["max_millidegrees"]),
+        "seam_depth_median": stats["seam_depth_p50_by_pair"]["median"]
+        <= share(gates["seam_depth"]["median_max_ppm"]),
+        "seam_depth_p90": stats["seam_depth_p50_by_pair"]["p90"] <= share(gates["seam_depth"]["p90_max_ppm"]),
+        "moved_never_joined": stats["moved_in_one_arrangement"] == 0,
+        "changed_never_joined": stats["changed_in_one_arrangement"] == 0,
+        "moved_named": (rate(stats["moved_named"]) or 0.0) >= share(gates["named"]["moved_min_ppm"]),
+        "changed_named": (rate(stats["changed_named"]) or 0.0) >= share(gates["named"]["changed_min_ppm"]),
+        "few_false_refusals": (rate(stats["joinable_refused_as_moved_or_changed"]) or 0.0)
+        <= share(gates["false_refusals"]["max_ppm"]),
+        "joins": (rate(stats["joinable_in_one_arrangement"]) or 0.0) >= share(gates["joins"]["min_ppm"]),
+    }
+    return {"verdicts": verdicts, "passed": all(verdicts.values())}
+
+
+def main(argv: list[str]) -> None:
+    run = json.loads(open(argv[0], encoding="utf-8").read())
+    stats = statistics(run)
+    out: dict[str, Any] = {"arm": run["arm"], "policy_sha256": run["policy_sha256"], "statistics": stats}
+    if len(argv) > 1:
+        prereg = json.loads(open(argv[1], encoding="utf-8").read())["record"]
+        out["judged"] = judge(stats, prereg["gates"], run["arm"])
+    print(json.dumps(out, indent=1))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

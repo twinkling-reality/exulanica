@@ -53,6 +53,9 @@ def test_once_mode_sweeps_scratch_and_reports_scene_outcomes(monkeypatch):
                 SimpleNamespace(status="cancelled"),
             ]
 
+        def refresh_standpoint_scenes(self):
+            return []
+
         def refresh_scene_segments(self):
             return []
 
@@ -103,6 +106,9 @@ def test_a_scoped_worker_reports_its_jobs_at_startup_and_refuses_an_empty_scope(
         def drain_observed(self):
             return []
 
+        def refresh_standpoint_scenes(self):
+            return []
+
         def refresh_scene_segments(self):
             return []
 
@@ -138,6 +144,9 @@ class _RefreshingWorker:
 
     def drain_observed(self):
         return [SimpleNamespace(status="succeeded")]
+
+    def refresh_standpoint_scenes(self):
+        return []
 
     def refresh_scene_segments(self):
         self.refreshes += 1

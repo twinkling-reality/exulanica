@@ -1,0 +1,904 @@
+{
+ "scenes": [
+  {
+   "name": "held-courtyard-111",
+   "family": "courtyard",
+   "seed": 111,
+   "sets": [
+    {
+     "id": "held-courtyard-111-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "held-courtyard-111-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "held-courtyard-111-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "held-courtyard-111-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-courtyard-111-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-courtyard-111-p1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "portrait": true,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-courtyard-111-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "held-courtyard-111-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "held-courtyard-111-c1",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "remove",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-courtyard-111-c2",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "move",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-courtyard-111-c3",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "add",
+      "translation_m": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "name": "held-courtyard-112",
+   "family": "courtyard",
+   "seed": 112,
+   "sets": [
+    {
+     "id": "held-courtyard-112-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "held-courtyard-112-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "held-courtyard-112-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "held-courtyard-112-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-courtyard-112-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-courtyard-112-p1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "portrait": true,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-courtyard-112-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "held-courtyard-112-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "held-courtyard-112-c1",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "remove",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-courtyard-112-c2",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "move",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-courtyard-112-c3",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "add",
+      "translation_m": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "name": "held-room-211",
+   "family": "room",
+   "seed": 211,
+   "sets": [
+    {
+     "id": "held-room-211-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "held-room-211-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "held-room-211-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "held-room-211-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-room-211-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-room-211-p1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "portrait": true,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-room-211-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "held-room-211-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "held-room-211-c1",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "remove",
+      "translation_m": 0.05,
+      "candidate_depth_m": [
+       1.0,
+       6.0
+      ],
+      "add_distance_m": [
+       1.6,
+       2.6
+      ],
+      "add_size_m": [
+       0.8,
+       0.9,
+       1.1
+      ]
+     }
+    },
+    {
+     "id": "held-room-211-c2",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "move",
+      "translation_m": 0.05,
+      "candidate_depth_m": [
+       1.0,
+       6.0
+      ],
+      "add_distance_m": [
+       1.6,
+       2.6
+      ],
+      "add_size_m": [
+       0.8,
+       0.9,
+       1.1
+      ]
+     }
+    },
+    {
+     "id": "held-room-211-c3",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "add",
+      "translation_m": 0.05,
+      "candidate_depth_m": [
+       1.0,
+       6.0
+      ],
+      "add_distance_m": [
+       1.6,
+       2.6
+      ],
+      "add_size_m": [
+       0.8,
+       0.9,
+       1.1
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "held-room-212",
+   "family": "room",
+   "seed": 212,
+   "sets": [
+    {
+     "id": "held-room-212-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "held-room-212-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "held-room-212-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "held-room-212-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-room-212-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-room-212-p1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "portrait": true,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-room-212-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "held-room-212-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "held-room-212-c1",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "remove",
+      "translation_m": 0.05,
+      "candidate_depth_m": [
+       1.0,
+       6.0
+      ],
+      "add_distance_m": [
+       1.6,
+       2.6
+      ],
+      "add_size_m": [
+       0.8,
+       0.9,
+       1.1
+      ]
+     }
+    },
+    {
+     "id": "held-room-212-c2",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "move",
+      "translation_m": 0.05,
+      "candidate_depth_m": [
+       1.0,
+       6.0
+      ],
+      "add_distance_m": [
+       1.6,
+       2.6
+      ],
+      "add_size_m": [
+       0.8,
+       0.9,
+       1.1
+      ]
+     }
+    },
+    {
+     "id": "held-room-212-c3",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "add",
+      "translation_m": 0.05,
+      "candidate_depth_m": [
+       1.0,
+       6.0
+      ],
+      "add_distance_m": [
+       1.6,
+       2.6
+      ],
+      "add_size_m": [
+       0.8,
+       0.9,
+       1.1
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "held-landscape-311",
+   "family": "landscape",
+   "seed": 311,
+   "sets": [
+    {
+     "id": "held-landscape-311-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "held-landscape-311-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "held-landscape-311-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "held-landscape-311-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-landscape-311-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-landscape-311-p1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "portrait": true,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-landscape-311-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "held-landscape-311-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "held-landscape-311-c1",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "remove",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-landscape-311-c2",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "move",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-landscape-311-c3",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "add",
+      "translation_m": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "name": "held-landscape-312",
+   "family": "landscape",
+   "seed": 312,
+   "sets": [
+    {
+     "id": "held-landscape-312-s1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.3,
+       0.55
+      ],
+      "translation_m": 0.0
+     }
+    },
+    {
+     "id": "held-landscape-312-s2",
+     "condition": {
+      "kind": "sweep",
+      "count": 4,
+      "overlap": [
+       0.15,
+       0.45
+      ],
+      "translation_m": 0.15
+     }
+    },
+    {
+     "id": "held-landscape-312-s3",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.3
+     }
+    },
+    {
+     "id": "held-landscape-312-g1",
+     "condition": {
+      "kind": "grid",
+      "columns": 2,
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-landscape-312-m1",
+     "condition": {
+      "kind": "mixed_lens",
+      "lenses": [
+       "2x",
+       "5x"
+      ],
+      "second_wide": true,
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-landscape-312-p1",
+     "condition": {
+      "kind": "sweep",
+      "count": 3,
+      "portrait": true,
+      "overlap": [
+       0.25,
+       0.5
+      ],
+      "translation_m": 0.1
+     }
+    },
+    {
+     "id": "held-landscape-312-mv",
+     "condition": {
+      "kind": "moved",
+      "count": 3,
+      "step_m": [
+       1.5,
+       3.0
+      ]
+     }
+    },
+    {
+     "id": "held-landscape-312-lo",
+     "condition": {
+      "kind": "low_overlap",
+      "count": 2,
+      "overlap": [
+       -0.1,
+       0.06
+      ]
+     }
+    },
+    {
+     "id": "held-landscape-312-c1",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "remove",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-landscape-312-c2",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "move",
+      "translation_m": 0.05
+     }
+    },
+    {
+     "id": "held-landscape-312-c3",
+     "condition": {
+      "kind": "changed",
+      "count": 3,
+      "overlap": [
+       0.35,
+       0.55
+      ],
+      "change": "add",
+      "translation_m": 0.05
+     }
+    }
+   ]
+  }
+ ]
+}

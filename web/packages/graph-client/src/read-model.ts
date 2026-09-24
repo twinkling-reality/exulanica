@@ -425,6 +425,8 @@ export interface ReconstructionSceneMemberRecord {
   readonly placement: ReconstructionPointMapRecord | null;
   /** Present only when the scene placed nothing; see `UnposedPointMapRecord`. */
   readonly unposedPointMap?: UnposedPointMapRecord | null;
+  /** This member's place in the scene's measured standpoint arrangement, when it has one. */
+  readonly standpointPlacement?: StandpointPlacementRecord | null;
   readonly exclusionReason: string | null;
   readonly personRegions: readonly PersonRegionRecord[];
   /**
@@ -435,6 +437,44 @@ export interface ReconstructionSceneMemberRecord {
    * opposite answers.
    */
   readonly personReviewState: PersonReviewState;
+}
+
+/** Why a photograph is not in its scene's joined standpoint, as the server names it. */
+export type StandpointExclusionReason =
+  | 'insufficient_overlap'
+  | 'moved_between_photographs'
+  | 'scene_changed'
+  | 'inconsistent_with_set'
+  | 'not_permitted'
+  | 'point_map_unreadable'
+  | 'focal_length_unstated';
+
+/**
+ * Where a member stands in its scene's measured standpoint arrangement.
+ *
+ * The matrix is the server's `R diag(s l, s l, s)`: turned as the photograph was measured to be
+ * turned, its depth at the scene's scale `s`, its sideways extent re-projected onto its own rays by
+ * `l`. Every member's camera is at the scene origin, which is the standpoint.
+ */
+export interface StandpointPlacementRecord {
+  readonly sceneFromOpmRowMajor: readonly number[];
+  readonly depthScale: number;
+  readonly lateralScale: number;
+}
+
+/** A scene's standpoint record as the server can use it now. Only `joined` draws anything. */
+export interface StandpointRecordState {
+  readonly artifactId: string;
+  readonly contentSha256: string;
+  readonly state: 'joined' | 'nothing_joined' | 'withdrawn' | 'stale' | 'invalid' | 'bytes_missing';
+  readonly memberCount: number;
+  readonly joinedMemberCount: number;
+  readonly referenceCaptureId: string | null;
+  readonly rotationResidualMaxMillidegrees: number | null;
+  readonly scaleResidualMaxPpm: number | null;
+  readonly upMethod: string | null;
+  readonly impliedRollMaxMillidegrees: number | null;
+  readonly excluded: readonly { readonly captureId: string; readonly reason: StandpointExclusionReason }[];
 }
 
 /** One receipt-backed reconstruction scene, distinct from a presentation island or scene group. */
@@ -461,6 +501,8 @@ export interface ReconstructionSceneRecord {
   readonly maskedMemberCount: number;
   readonly members: readonly ReconstructionSceneMemberRecord[];
   readonly trainedGeometry?: TrainedGeometryRecord | null;
+  /** The scene's measured standpoint arrangement, or null when it has no standpoint record. */
+  readonly standpoint?: StandpointRecordState | null;
   /**
    * What a world model imagined for this scene. Never merged into `trainedGeometry`.
    *

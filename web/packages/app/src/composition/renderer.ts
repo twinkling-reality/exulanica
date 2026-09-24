@@ -198,7 +198,8 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   for (const visual of atlas.binding.islands) {
     actualRendering.set(
       visual.pointMap.sceneId,
-      visual.pointMap.arrangement === 'unmeasured-fan' ? 'unposed_point_maps' : 'posed_point_maps',
+      visual.pointMap.arrangement === 'unmeasured-fan' || visual.pointMap.arrangement === 'standpoint'
+        ? 'unposed_point_maps' : 'posed_point_maps',
     );
   }
   for (const visual of atlas.binding.trainedScenes) actualRendering.set(visual.geometry.sceneId, 'gaussian_splats');

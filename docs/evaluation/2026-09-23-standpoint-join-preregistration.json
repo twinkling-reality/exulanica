@@ -1,0 +1,251 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "already_seen_before_this_was_written": [
+   "Every development result, in both arms, with the frozen method: development/statistics-exif.json and development/statistics-exif-perturbed.json.",
+   "exif arm on development: excess misregistration p50 0.033, p95 0.234, max 0.675 degrees over 76 pairs in one arrangement; seam depth median 0.029, p90 0.153; no moved or changed pair joined; moved named 5 of 10, changed named 2 of 2; 0 of 94 joinable pairs refused as moved or changed; 53 of 74 joinable pairs joined.",
+   "exif-perturbed arm on development: excess misregistration p50 0.060, p95 0.845, max 1.674 degrees; seam depth median 0.030, p90 0.157; the refusal and join counts are those of the exif arm.",
+   "The held-out split's plan (which change each changed set received) and its render log's timings. No held-out photograph, depth estimate or join output."
+  ],
+  "arms": {
+   "exif": "each photograph states its lens exactly, as the renders were made",
+   "exif-perturbed": "each photograph's stated focal length is scaled by a factor in [0.97, 1.03], fixed per photograph by the sha256 of its id (standpoint_eval.py, PERTURBATION). EXIF holds the 35 mm equivalent in whole millimetres, which at a phone's 24 to 26 mm is up to 2 percent alone, and a nominal equivalent can differ from the effective one."
+  },
+  "base_commit": "0d3d38dd",
+  "bound_artifacts": {
+   "development/run-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/run-exif-perturbed.json",
+    "sha256": "d6267986b5e42662c2e2b58304c93336bdb628c9268b6df68456589552169214"
+   },
+   "development/run-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/run-exif.json",
+    "sha256": "799646706ef5bc28abb19d51f81abf47ff254797045fd4d8e529ad3763017087"
+   },
+   "development/statistics-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/statistics-exif-perturbed.json",
+    "sha256": "eb1e0fff0c4c4c3ddac8d86580ae9fa5157ec8c37d5c42841c96dd67a167f231"
+   },
+   "development/statistics-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/statistics-exif.json",
+    "sha256": "4950d5f7cfce738ffbb1f21c0da151f1339e43cb01e8334d141735ef07ce559d"
+   },
+   "development/truth/dev-courtyard-101.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/truth/dev-courtyard-101.json",
+    "sha256": "23472df07db7575b30c3e3176c05e695a58944bad4dfbc962d6248e6cade5555"
+   },
+   "development/truth/dev-courtyard-102.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/truth/dev-courtyard-102.json",
+    "sha256": "5dde8fc0609473d2b01d89a8e9f64964a5e5bac9d9e57abd1598e5995de2fe7a"
+   },
+   "development/truth/dev-landscape-301.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/truth/dev-landscape-301.json",
+    "sha256": "6a4aef849fe87e6c72711f043dddf860f1939508896be374309371c19008f620"
+   },
+   "development/truth/dev-room-201.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/truth/dev-room-201.json",
+    "sha256": "a944a2b4d378eb52b7ac58e2059daaa1ee06371a341c33b8b7c2f5417f6a9239"
+   },
+   "development/truth/dev-room-202.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/development/truth/dev-room-202.json",
+    "sha256": "53fc49f7e74c9a4f6b9ddc72441bdfa721d6f099e8cd6f353f72bd6240965264"
+   },
+   "splits/development-split.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/splits/development-split.json",
+    "sha256": "36c155d90f05d028e82115acf1d7796edd2889daae1422e08c1efc1bf9b758b8"
+   },
+   "splits/held-out-split.json": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/splits/held-out-split.json",
+    "sha256": "39c0ffb44aadf962cab4538becf86e696d0a8cfbd611da97ab7d61354899ae03"
+   }
+  },
+  "decisions_made_on_the_development_split": [
+   "Changes are recognised by comparing the photographs' appearance after carrying one into the other through the measured turn, movement and depth, not by comparing the depth model's depths: measured on development, the depth comparison scored changed pairs 2 to 5.5 percent and unchanged ones up to 54 percent, so no threshold separated them, while the appearance comparison scored the changed pairs 6 and 9 percent and every unchanged joined pair 0.",
+   "A pair records the turn that lines its photographs up from one point, fitted without translation, rather than the camera's own turn from the fit with translation: the camera's turn misaligned one room pair by 4.7 degrees of parallax the arrangement cannot draw, and let another trade 1.9 degrees of turn for a spurious translation.",
+   "A photograph that states no focal length is kept apart before anything is matched, named focal_length_unstated. Joined through the depth model's own field of view instead, development pairs misregistered by 0.8 degrees at the median beyond their parallax and 4.3 degrees at worst, and 20 unchanged pairs were refused as moved or changed.",
+   "The stated focal length is refined from the overlaps, with a translation per pair so a hand-held movement is not taken for a lens, from pairs of 60 or more matched features whose provisional movement is under 350 mm, held to the stated value by a 3 percent prior. Without it, a 3 percent error in the stated lens raised the excess misregistration's p95 from 0.23 to 1.30 degrees and refused 6 unchanged pairs.",
+   "The planner's added object is placed inside a room at a room's size; on development it landed outside the walls and was never seen."
+  ],
+  "definitions": {
+   "excess_misregistration": "for a pair in one arrangement: the 95th percentile, over the pair's true overlap, of the angle between the directions at which the two drawn photographs put one true point, seen from the standpoint; minus the 95th percentile the best single turn of the pair's true directions leaves, which is the parallax a hand-held movement made and no turn removes",
+   "false_refusal": "a joinable pair refused as moved_between_photographs or scene_changed",
+   "in_one_arrangement": "both photographs of the pair joined; a record holds one arrangement",
+   "joins": "joinable pairs sharing 20 percent or more of the view that end in one arrangement",
+   "named": "a moved pair is asked for when 20 percent or more of the view is shared, a changed pair when 20 percent or more of the view is shared and unchanged; named means its record outcome is moved_between_photographs, or scene_changed",
+   "pair_class": "from ground truth alone (standpoint_gates.py): no_overlap when under 5 percent of one photograph's sampled pixels are seen by the other; moved when the cameras stood 1 m or more apart; changed when at least 2 percent of the pair's shared view falls on a part the set's change touched, in either photograph (the part's bounding sphere plus 5 cm, counted only for a pair that includes the changed photograph); joinable otherwise",
+   "seam_depth": "for a pair in one arrangement: the median, over the samples where the renderer's ownership rule hands the view from one photograph to the other (frame fractions within 0.03), of |log| of the ratio between the two drawn surfaces' distances"
+  },
+  "gates": {
+   "arms": {
+    "exif": {
+     "false_refusals": {
+      "max_ppm": 50000
+     },
+     "joins": {
+      "min_ppm": 650000
+     },
+     "lines_up": {
+      "max_millidegrees": 1000,
+      "p95_max_millidegrees": 500
+     },
+     "named": {
+      "changed_min_ppm": 750000,
+      "moved_min_ppm": 500000
+     },
+     "seam_depth": {
+      "median_max_ppm": 50000,
+      "p90_max_ppm": 250000
+     }
+    },
+    "exif-perturbed": {
+     "false_refusals": {
+      "max_ppm": 50000
+     },
+     "joins": {
+      "min_ppm": 650000
+     },
+     "lines_up": {
+      "max_millidegrees": 2000,
+      "p95_max_millidegrees": 1000
+     },
+     "named": {
+      "changed_min_ppm": 750000,
+      "moved_min_ppm": 500000
+     },
+     "seam_depth": {
+      "median_max_ppm": 50000,
+      "p90_max_ppm": 250000
+     }
+    }
+   },
+   "judged_by": "standpoint_gates.py over each arm's standpoint_eval.py run, reading these thresholds from this record",
+   "never": "in both arms: no moved pair and no changed pair in one arrangement. These two are the gates the design exists for and are not traded against any rate.",
+   "order": "the never gates are judged first; a failure there is a failure of the arm whatever the rest shows. Every other gate is then judged and reported, pass or fail.",
+   "units": "millidegrees for angles; parts per million for a ratio, a share or a rate. The seam depth thresholds are on |log| of a distance ratio: 50,000 ppm is 0.05.",
+   "why": {
+    "false_refusals": "a set taken from one place must not be told it moved or changed",
+    "joins": "the development rate was 72 percent; what is not joined is kept apart as photographs, stated, and is never drawn wrong",
+    "lines_up": "half a degree is about 12 pixels across a 1600 pixel, 67 degree phone view: a seam a person sees only by looking for it. The perturbed arm is allowed twice that, because a lens stated a few percent off moves directions near a frame's edge by as much and the join can only refine it where overlaps constrain it.",
+    "named": "a refusal a person can act on says why; half of moved pairs is the development rate, and the rest are refused for too little overlap, which is also true",
+    "seam_depth": "away from the standpoint every photograph flattens towards one print, and surfaces that disagree by a quarter at the hand-over part visibly there"
+   }
+  },
+  "inputs": {
+   "conditions": {
+    "changed": "a sweep of 3 with an object removed, moved or added between photographs 0 and 1, inside their shared view; translation 0.05 m. Where the scene offers no object to remove or move within both frames, the planner adds one instead.",
+    "grid": "two rows of two, overlapping sideways and vertically; translation 0.05 m",
+    "low_overlap": "2 photographs turned so they share at most a sliver",
+    "mixed_lens": "a 1x photograph, 2x and 5x photographs within it, and a second 1x turned beside it; translation 0.1 m",
+    "moved": "3 photographs, each taken 1.5 to 3 m sideways of the last and turned a little",
+    "portrait": "a sweep of 3 portrait photographs; translation 0.1 m",
+    "sweep": "3 or 4 photographs turned in a row, neighbouring overlap drawn per set; hand-held translation 0, 0.15 or 0.3 m"
+   },
+   "families": {
+    "courtyard": "an open square among building facades, trees, benches, planters and paving, under open sky",
+    "landscape": "open ground with rocks, trees and a hut, with a distant horizon",
+    "room": "an enclosed room a few metres across with furniture, textured walls and floor"
+   },
+   "ground_truth": "Per photograph, the renderer's camera rotation, camera centre and planar depth, written to one truth.json per scene with each JPEG's sha256",
+   "hand_held": "Within a set, each camera centre is offset inside a ball whose diameter is the set's translation, and each photograph rolls by a normal amount with a standard deviation of 1.2 degrees",
+   "photographs": "1024 x 768 pixels (768 x 1024 in portrait sets), JPEG at quality 92. Each states FocalLengthIn35mmFilm in whole millimetres: 26 for the 1x lens, 52 for 2x, 120 for 5x. A pinhole camera: no lens distortion, one exposure for every photograph of a scene.",
+   "renderer": "Blender 4.5.9, Cycles on the CPU, 32 samples, denoised, the AgX Punchy look; the binary is checked against the sha256 pinned in assets/characters/makehuman-parametric-v1/source-lock.json before any render"
+  },
+  "method": {
+   "depth_model": "MoGe-2 ViT-L, Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968, run on each photograph through the depth stage's own encode_point_map by standpoint_depth_pass.py, in a process of its own",
+   "feature_extractor": "COLMAP's SIFT through pycolmap 4.2.0 on the CPU",
+   "frozen": "Between this record and the held-out outcome no source file named above changes and no stage parameter changes. A gate that fails is reported as failed; nothing is tuned against the held-out split, and it is not measured a second time.",
+   "params_note": "The stage's registered parameters in exulanica/ingest/stages/__init__.py, whose canonical digest is params_sha256; the development runs below carry the same digest.",
+   "params_sha256": "a7a582c038d6408f4fd76cb791e551fdeb4925332e32bb68f64d2f331993bc06",
+   "sources_sha256": {
+    "exulanica/ingest/stages/__init__.py": "ff72e1afe338db95e271f59db46b56828f2e974214a0c06fc0c14084b3016b52",
+    "exulanica/ingest/stages/depth.py": "931e59ac2cf5948fc67f2f5952215d1036efbdc3b8eacb51c22ba2afcb4c9aa8",
+    "exulanica/reconstruction/standpoint.py": "a53940f573ae7bf172a375263ea4cb28d72cdab3e4b874d08afb8261ed852588",
+    "exulanica/reconstruction/standpoint_features.py": "dca0459634a8ae350aa1607c834a2819d8863d141a813407a84e9358487fe232",
+    "exulanica/reconstruction/standpoint_record.py": "9d3165e7c9b4ac2ed05edc8a685fa14be561c1ee0a7ba18a51a11b3de541ea17"
+   },
+   "stage": "scene_standpoint",
+   "stage_version": 1
+  },
+  "not_covered": [
+   "Real photographs. Every input here is synthetic; a person's own photographs are for a session with that person present.",
+   "Lens distortion, rolling shutter, motion blur and exposure that differs between photographs: the renders are pinhole images with one exposure per scene.",
+   "Objects that move by themselves between photographs (people, vehicles, leaves, water) beyond the planted changes.",
+   "The up direction of the arrangement is measured and reported, not gated.",
+   "Photographs that state no focal length: kept apart by the method, checked by tests/test_standpoint_method.py, and absent from both splits.",
+   "Metric scale: sizes are the depth model's own scale, and nothing here measures them."
+  ],
+  "planner_note": "The held-out split was rendered by the planner with the Blender binary located by a path written into the script; the bound copy reads that location from the STANDPOINT_BLENDER environment variable instead and is otherwise the script that rendered. The binary is the same either way: the planner refuses any other sha256.",
+  "profile_note": "Pre-registration for the standpoint join: several photographs taken from one place, joined into one arrangement by the turn measured between them. Written before any depth estimate was made or any join was run on the held-out split below.",
+  "question": "Do photographs taken from one standpoint, turned and hand-held, line up from that standpoint when joined; do their depths agree where one photograph's share of the view hands over to another's; and is a set that cannot be joined (the camera walked between photographs, the scene changed, too little is shared) refused, by name, and never joined?",
+  "scripts": {
+   "scripts/standpoint_blender_scene.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/scripts/standpoint_blender_scene.py.txt",
+    "sha256": "b57bf7852618a712da3783e9cb0e51866ac97820a7ea687037287910fcf7bb01"
+   },
+   "scripts/standpoint_depth_pass.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/scripts/standpoint_depth_pass.py.txt",
+    "sha256": "ade25d4b7585dea89e96bae34668002f03571ea97ad1fccf60c76a35709e4312"
+   },
+   "scripts/standpoint_eval.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/scripts/standpoint_eval.py.txt",
+    "sha256": "37dcc2b1f1b8385161c73037755db4c1370708329fe676e920d3811a12550729"
+   },
+   "scripts/standpoint_gates.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/scripts/standpoint_gates.py.txt",
+    "sha256": "f1249451c54ba0a74026cb2cf46b118df2d70b73b3cc50d3a6c40ee74b45f5bd"
+   },
+   "scripts/standpoint_synthetic_sets.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/scripts/standpoint_synthetic_sets.py.txt",
+    "sha256": "7703f5bb6041581dc696b5d9f33f47e5016a90de1750a5d832d353a69f9125cb"
+   }
+  },
+  "splits": {
+   "development": {
+    "definition": {
+     "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/splits/development-split.json",
+     "sha256": "36c155d90f05d028e82115acf1d7796edd2889daae1422e08c1efc1bf9b758b8"
+    },
+    "photographs": 136,
+    "seeds": {
+     "courtyard": [
+      101,
+      102
+     ],
+     "landscape": [
+      301
+     ],
+     "room": [
+      201,
+      202
+     ]
+    },
+    "sets": 42,
+    "use": "calibration. Every result on it was seen, and the method and its parameters were changed against it (decisions_made_on_the_development_split)."
+   },
+   "held_out": {
+    "definition": {
+     "path": "docs/evaluation/artifacts/2026-09-23-standpoint-join/splits/held-out-split.json",
+     "sha256": "39c0ffb44aadf962cab4538becf86e696d0a8cfbd611da97ab7d61354899ae03"
+    },
+    "photographs": 210,
+    "seeds": {
+     "courtyard": [
+      111,
+      112
+     ],
+     "landscape": [
+      311,
+      312
+     ],
+     "room": [
+      211,
+      212
+     ]
+    },
+    "sets": 66,
+    "state_when_written": "planned and rendered. No depth estimate made and no join run; its photographs were not looked at.",
+    "use": "measured once, with the frozen method, in both arms"
+   }
+  }
+ },
+ "record_sha256": "aa2d87053f8fc4255126257cddc271c6681ac7b93773134c97dc21b24b546543"
+}

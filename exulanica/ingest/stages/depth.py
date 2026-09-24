@@ -33,7 +33,7 @@ from exulanica.ingest.model_rights import (
 )
 from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.ingest.report import IngestOutcome
-from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
+from exulanica.ingest.stages import StageSpec, idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
 from exulanica.reconstruction import (
     DepthModel,
@@ -47,7 +47,7 @@ from exulanica.reconstruction import (
 )
 from exulanica.reconstruction.moge import MoGeDepthModel
 
-__all__ = ["model_handoff", "run"]
+__all__ = ["encode_point_map", "model_handoff", "run"]
 
 
 def model_handoff(model: DepthModel) -> ModelHandoff | None:
@@ -161,58 +161,7 @@ def run(
         ],
         input_blob=blob_id,
     ) as recorder:
-        prediction = model.predict(source)
-        points = build_point_map(
-            prediction,
-            source,
-            max_depth_step=int(spec.params["max_depth_step_milli"]) / 1000,
-        )
-        decision = decide_rung(
-            prediction,
-            min_valid_fraction=int(spec.params["min_valid_fraction_milli"]) / 1000,
-        )
-        payload = encode_opm(
-            points,
-            generator=prediction.model_id,
-            viewpoint=Viewpoint(
-                fov_y_degrees=prediction.fov_y_degrees,
-                # The SOURCE camera's aspect, not the model's working resolution.
-                #
-                # CORRECTED 2026-09-03. This read `prediction.width / prediction.height`, and both
-                # validators check the declared aspect against `sourceImage`, which is the source
-                # photograph's own dimensions. A model that downscales to a longest edge rounds to
-                # whole pixels, so a 3:2 photograph became 512x341 and declared 1.5015 against a
-                # source of 1.5, and every validator refused it. Measured: 1280x960 passed and both
-                # 1500x1000 and 3000x2000 raised "viewpoint.aspect does not match sourceImage", so
-                # the depth stage could reconstruct nothing but exactly 4:3 sources.
-                #
-                # The frustum this field describes is the camera that took the photograph, and the
-                # only faithful statement of its shape is the photograph's own dimensions. The
-                # vertical field of view beside it comes from the model because it is what the
-                # model recovered, and a resize preserves it; the aspect does not come from the
-                # model because a rounded working grid is an implementation detail of inference.
-                aspect=source.width / max(1, source.height),
-            ),
-            source_size=source.size,
-            # The grid the points were unprojected from, which OPM/2 states beside the
-            # photograph rather than leaving to be inferred from a point count (ADR-0010 D6).
-            # The two differ by the model's own rounding and both are facts the renderer needs:
-            # the source frustum places the camera, and the model lattice is what a load-time
-            # tangent frame is estimated on.
-            model_size=(prediction.width, prediction.height),
-            # What `build_point_map` actually put in the alpha channel. Support and not
-            # confidence: it is a spacing ratio, which is coverage, counted rather than believed.
-            # Declared rather than left for a renderer to infer from the presence of a statistics
-            # key, which is the format flag nobody declared as one that ADR-0010 D5 closes.
-            color_alpha="support",
-            # Carried from the model rather than assumed. A map that is not metric produces a
-            # region that is not metric, and a spatial question over it refuses with a stated
-            # reason instead of estimating a distance.
-            metric=prediction.metric,
-        )
-        # Refuse malformed bytes before they can become a durable artifact. The browser validates
-        # again at its trust boundary, but that is not a reason to publish something it will reject.
-        validate_opm(payload)
+        prediction, decision, payload = encode_point_map(model, source, spec)
         with writes.committed_writes() as pending:
             result = writes.persist_artifact(
                 spec=spec,
@@ -245,6 +194,69 @@ def run(
             _record_rung(writes, capture_id, image_span_id, decision, result, prediction, ledger)
     # `persist_artifact` already recorded the stage as run. Appending it here as well is what
     # printed "depth+depth" in the command line's per-file summary.
+
+
+def encode_point_map(
+    model: DepthModel, source: Image.Image, spec: StageSpec
+) -> tuple[DepthPrediction, RungDecision, bytes]:
+    """One photograph's point map, as this stage publishes it: predicted, built, encoded, checked.
+
+    Separate from :func:`run` so that anything measuring what this stage produces calls this and
+    not a retyped copy of it; the standpoint evaluation does.
+    """
+    prediction = model.predict(source)
+    points = build_point_map(
+        prediction,
+        source,
+        max_depth_step=int(spec.params["max_depth_step_milli"]) / 1000,
+    )
+    decision = decide_rung(
+        prediction,
+        min_valid_fraction=int(spec.params["min_valid_fraction_milli"]) / 1000,
+    )
+    payload = encode_opm(
+        points,
+        generator=prediction.model_id,
+        viewpoint=Viewpoint(
+            fov_y_degrees=prediction.fov_y_degrees,
+            # The SOURCE camera's aspect, not the model's working resolution.
+            #
+            # CORRECTED 2026-09-03. This read `prediction.width / prediction.height`, and both
+            # validators check the declared aspect against `sourceImage`, which is the source
+            # photograph's own dimensions. A model that downscales to a longest edge rounds to
+            # whole pixels, so a 3:2 photograph became 512x341 and declared 1.5015 against a
+            # source of 1.5, and every validator refused it. Measured: 1280x960 passed and both
+            # 1500x1000 and 3000x2000 raised "viewpoint.aspect does not match sourceImage", so
+            # the depth stage could reconstruct nothing but exactly 4:3 sources.
+            #
+            # The frustum this field describes is the camera that took the photograph, and the
+            # only faithful statement of its shape is the photograph's own dimensions. The
+            # vertical field of view beside it comes from the model because it is what the
+            # model recovered, and a resize preserves it; the aspect does not come from the
+            # model because a rounded working grid is an implementation detail of inference.
+            aspect=source.width / max(1, source.height),
+        ),
+        source_size=source.size,
+        # The grid the points were unprojected from, which OPM/2 states beside the
+        # photograph rather than leaving to be inferred from a point count (ADR-0010 D6).
+        # The two differ by the model's own rounding and both are facts the renderer needs:
+        # the source frustum places the camera, and the model lattice is what a load-time
+        # tangent frame is estimated on.
+        model_size=(prediction.width, prediction.height),
+        # What `build_point_map` actually put in the alpha channel. Support and not
+        # confidence: it is a spacing ratio, which is coverage, counted rather than believed.
+        # Declared rather than left for a renderer to infer from the presence of a statistics
+        # key, which is the format flag nobody declared as one that ADR-0010 D5 closes.
+        color_alpha="support",
+        # Carried from the model rather than assumed. A map that is not metric produces a
+        # region that is not metric, and a spatial question over it refuses with a stated
+        # reason instead of estimating a distance.
+        metric=prediction.metric,
+    )
+    # Refuse malformed bytes before they can become a durable artifact. The browser validates
+    # again at its trust boundary, but that is not a reason to publish something it will reject.
+    validate_opm(payload)
+    return prediction, decision, payload
 
 
 def _record_rung(

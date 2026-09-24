@@ -1,5 +1,6 @@
 import type { IslandId } from '@exulanica/atlas-core';
 import type { PointMap } from './opm.js';
+import { standpointTransform } from './standpoint-transform.js';
 
 /** One verified OPM artifact placed into a shared reconstruction-scene frame. */
 export interface PlacedScenePointMap {
@@ -13,9 +14,11 @@ export interface PlacedScenePointMap {
   /**
    * How the transform was obtained. `recovered` (the default when absent) is a placement fitted
    * to recovered cameras; `unmeasured-fan` is an arrangement the client derived because pose
-   * recovered no photograph, and nothing about it is a position anyone stood at.
+   * recovered no photograph, and nothing about it is a position anyone stood at; `standpoint` is
+   * the server's measured arrangement of photographs taken from one spot (see
+   * `standpoint-scene.ts`), every camera at the scene origin and turned as it was measured to be.
    */
-  readonly arrangement?: 'recovered' | 'unmeasured-fan';
+  readonly arrangement?: 'recovered' | 'unmeasured-fan' | 'standpoint';
   /**
    * The viewer's image of the photograph, upright, for an unmeasured map drawn as a surface: the
    * surface takes its colour from here, looked up through the photograph's own camera, instead of
@@ -24,8 +27,17 @@ export interface PlacedScenePointMap {
   readonly photograph?: ImageBitmap;
 }
 
-/** Refuse matrices whose producer-side affine and finite guarantees were lost on the wire. */
+/**
+ * Refuse matrices whose producer-side affine and finite guarantees were lost on the wire.
+ *
+ * A standpoint member's matrix is not a similarity when its sideways re-projection is not 1, so
+ * it is held to its own promised shape instead: `standpointTransform` refuses anything else.
+ */
 export function validateScenePointMapPlacement(value: PlacedScenePointMap): void {
+  if (value.arrangement === 'standpoint') {
+    standpointTransform(value.sceneFromOpmRowMajor);
+    return;
+  }
   validateSceneTransform(value.sceneFromOpmRowMajor, value.localUnitsToSceneUnits);
 }
 
@@ -99,10 +111,15 @@ export function scenePointMapViewpoint(
   return opmPointInScene(value, value.map.header.viewpoint.position);
 }
 
-/** The direction that camera looked, in the scene frame; OPM cameras look along local -Z. */
+/**
+ * The direction that camera looked, in the scene frame; OPM cameras look along local -Z.
+ *
+ * Normalised rather than divided by the declared scale, which is the same answer for a similarity
+ * and the right one for a standpoint member, whose depth axis carries its own scale.
+ */
 export function scenePointMapForward(value: PlacedScenePointMap): readonly [number, number, number] {
   validateScenePointMapPlacement(value);
   const m = value.sceneFromOpmRowMajor;
-  const s = value.localUnitsToSceneUnits;
-  return [-m[2]! / s, -m[6]! / s, -m[10]! / s];
+  const length = Math.hypot(m[2]!, m[6]!, m[10]!);
+  return [-m[2]! / length, -m[6]! / length, -m[10]! / length];
 }

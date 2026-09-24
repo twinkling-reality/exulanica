@@ -109,6 +109,8 @@ class SceneReconstructionWorker:
         # The state each scene was last lifted again for, by `refresh_scene_segments`, whatever
         # became of it. One entry per scene, so a long-lived worker holds no more than it has.
         self._segments_attempted: dict[uuid.UUID, object] = {}
+        # The same for `refresh_standpoint_scenes`: the input digest each scene was last joined for.
+        self._standpoints_attempted: dict[uuid.UUID, bytes] = {}
 
     def request_stop(self) -> None:
         self._stop.set()
@@ -206,6 +208,69 @@ class SceneReconstructionWorker:
                     try:
                         result = publish_scene_segments(
                             repository, self._store, item.scene_id, trigger="reprocess"
+                        )
+                    except Exception as error:
+                        result = {
+                            "scene_id": str(item.scene_id),
+                            "action": "failed",
+                            "failure_class": type(error).__name__,
+                            "message": str(error),
+                        }
+                    results.append({**result, "due": item.reason})
+        return results
+
+    def refresh_standpoint_scenes(self) -> list[dict[str, Any]]:
+        """Join every unplaced scene whose current inputs no standpoint record answers for.
+
+        See `exulanica/ingest/standpoint_scenes.py`. Each join opens its own `reprocess` run, and a
+        failure is recorded there and reported here rather than raised. A scene is attempted at
+        most once for each input state, so a join that fails the same way every time is not
+        repeated on every pass; a permission that changes either way is a new state. A job-scoped
+        worker does none of this, because it was started for its named jobs and nothing else.
+        """
+        if self._job_ids is not None:
+            return []
+        from exulanica.ingest.stages import stage
+        from exulanica.ingest.standpoint_scenes import (
+            publish_standpoint_scene,
+            scenes_due_standpoint,
+        )
+        from exulanica.reconstruction.standpoint import StandpointPolicy
+        from exulanica.reconstruction.standpoint_features import PycolmapSift
+        from exulanica.reconstruction.standpoint_record import STANDPOINT_STAGE
+
+        policy = StandpointPolicy.from_params(stage(STANDPOINT_STAGE).params)
+        extractor = PycolmapSift(
+            max_features=policy.max_features,
+            peak_threshold=policy.peak_threshold,
+            threads=policy.feature_threads,
+        )
+        results: list[dict[str, Any]] = []
+        for workspace_id in sorted(self._workspaces, key=str):
+            if self._stop.is_set():
+                break
+            with self._database.session(workspace_id) as connection:
+                repository = IngestRepository(connection, workspace_id)
+                due = [
+                    item
+                    for item in scenes_due_standpoint(
+                        repository, self._store, extractor_identity=extractor.identity
+                    )
+                    if self._standpoints_attempted.get(item.scene_id) != item.input_digest
+                ]
+                if due:
+                    repository.register_stages(STAGES)
+                for item in due:
+                    if self._stop.is_set():
+                        break
+                    self._standpoints_attempted[item.scene_id] = item.input_digest
+                    try:
+                        result = publish_standpoint_scene(
+                            repository,
+                            self._store,
+                            item.scene_id,
+                            extractor=extractor,
+                            trigger="reprocess",
                         )
                     except Exception as error:
                         result = {

@@ -40,11 +40,21 @@
  *   uLens         vec4  xyz proof-tier colour, w tint strength; all zero is the lens switched off
  *   uExposure     float display gain, never per point
  *   uFrame        vec4  x tan half horizontal fov, y tan half vertical fov, z edge margin, w enabled
- *   uViewpoint    vec4  xyz the photograph's camera in the local frame
+ *   uViewpoint    vec4  xyz the photograph's camera in the local frame, w for a joined standpoint
+ *                       the camera's height above the ground in world units (0 is no floor)
  *   uCapture      vec4  xyz that camera in world space, w enabled
- *   uRelief       vec4  x the print depth, y how flat (0 relief, 1 a flat print), z 1 when seen
- *                       from behind the print, w unused
+ *   uRelief       vec4  x the print depth (for a joined standpoint the print dome's radius in world
+ *                       units), y how flat (0 relief, 1 a flat print), z 1 when seen from behind
+ *                       the print, w 1 for a joined standpoint's dome, 0 for one photograph's plane
  *   uPhotograph   sampler2D  the viewer's image of the photograph (PHOTOGRAPH surfaces only)
+ *
+ * STANDPOINT, a define a joined standpoint's surfaces set (see `standpoint-scene.ts`), adds:
+ *
+ *   uStandpointSelf      vec4  x this photograph's sideways re-projection, y how many others follow
+ *   uStandpointOthers[21] vec4 seven blocks of three rows: the rotation from this camera into
+ *                             another member's, with that member's horizontal and vertical frame
+ *                             tangents in the first two rows' w
+ *   uStandpointEdge      vec4  x the not-captured line's width as a frame fraction, yzw its colour
  *
  * DATA_VIEW, a define only the data view material sets (see `data-view/points.ts`), adds:
  *
@@ -119,7 +129,7 @@ varying float vFogAmount;
 varying float vSurvive;
 varying float vPresence;
 #endif
-#ifdef PHOTOGRAPH
+#if defined(PHOTOGRAPH) || defined(STANDPOINT)
 varying vec3 vLocal;
 #endif
 #ifdef DATA_VIEW
@@ -170,6 +180,18 @@ void main(void) {
     if (uCapture.w > 0.5) {
         vec3 fromEye = aPosition - uViewpoint.xyz;
         local = uViewpoint.xyz + fromEye / mix(1.0, max(-fromEye.z, 0.001) / uRelief.x, uRelief.y);
+        // A joined standpoint's members all flatten towards ONE dome instead of each towards its
+        // own print plane, measured in world distance so every member's scales are already in it,
+        // and floored at the ground: a ray that meets the ground before the dome flattens to the
+        // ground. Photographs flattened towards one surface stay joined at their seams.
+        if (uRelief.w > 0.5) {
+            vec3 ray = mat3(matrix_model) * fromEye;
+            float range = max(length(ray), 0.001);
+            float reach = uRelief.x;
+            float down = -ray.y / range;
+            if (down > 0.0 && uViewpoint.w > 0.0) reach = min(reach, uViewpoint.w / down);
+            local = uViewpoint.xyz + fromEye / mix(1.0, range / reach, uRelief.y);
+        }
     }
     vec4 worldPos = matrix_model * vec4(local, 1.0);
     float viewDist = length(worldPos.xyz - view_position);
@@ -205,7 +227,7 @@ void main(void) {
     // two decisions travel to the fragment stage and are made there, per pixel. See depth-surface.ts.
     vSurvive = survive;
     vPresence = presenceOnly;
-#ifdef PHOTOGRAPH
+#if defined(PHOTOGRAPH) || defined(STANDPOINT)
     vLocal = aPosition;
 #endif
 #else
@@ -322,6 +344,11 @@ uniform vec4 uDataViewLook;
 varying float vDataBand;
 varying float vDataGain;
 #endif
+#if defined(PHOTOGRAPH) || defined(STANDPOINT)
+uniform vec4 uFrame;
+uniform vec4 uViewpoint;
+varying vec3 vLocal;
+#endif
 #ifdef PHOTOGRAPH
 /**
  * The viewer's image of the photograph, and the camera it was taken through. Each pixel of the
@@ -329,9 +356,11 @@ varying float vDataGain;
  * photograph from where it was taken and the photograph's colour on its surface from anywhere else.
  */
 uniform sampler2D uPhotograph;
-uniform vec4 uFrame;
-uniform vec4 uViewpoint;
-varying vec3 vLocal;
+#endif
+#ifdef STANDPOINT
+uniform vec4 uStandpointSelf;
+uniform vec4 uStandpointOthers[21];
+uniform vec4 uStandpointEdge;
 #endif
 
 void main(void) {
@@ -344,6 +373,35 @@ void main(void) {
     // spends on whole points, spent against a hash of this pixel's cell so it does not crawl.
     if (fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453) > vSurvive) discard;
     float soft = 1.0;
+#ifdef STANDPOINT
+    // Which photograph of a joined standpoint draws this direction: the one whose own frame centre
+    // is nearer, as a fraction of each frame. Flattening moves a point along its own ray, so the
+    // direction, and therefore the owner, is the same from every viewpoint and at every flatness.
+    vec3 fromOwnEye = vLocal - uViewpoint.xyz;
+    float ownAhead = max(-fromOwnEye.z, 0.001);
+    float ownFraction = max(abs(fromOwnEye.x) / (ownAhead * uFrame.x),
+        abs(fromOwnEye.y) / (ownAhead * uFrame.y));
+    vec3 ownRay = normalize(vec3(fromOwnEye.xy * uStandpointSelf.x, fromOwnEye.z));
+    bool continued = false;
+    for (int other = 0; other < 7; other++) {
+        if (float(other) >= uStandpointSelf.y) break;
+        vec4 row0 = uStandpointOthers[other * 3];
+        vec4 row1 = uStandpointOthers[other * 3 + 1];
+        vec4 row2 = uStandpointOthers[other * 3 + 2];
+        vec3 there = vec3(dot(row0.xyz, ownRay), dot(row1.xyz, ownRay), dot(row2.xyz, ownRay));
+        float thereAhead = -there.z;
+        if (thereAhead <= 0.0) continue;
+        float thereFraction = max(abs(there.x) / (thereAhead * row0.w),
+            abs(there.y) / (thereAhead * row1.w));
+        if (thereFraction < 1.0) {
+            continued = true;
+            if (thereFraction < ownFraction) discard;
+        }
+    }
+    // Where no other photograph continues the view, this frame's edge is the edge of what was
+    // captured, and it is drawn as a thin line rather than left to read as more photograph.
+    bool edgeOfCapture = !continued && ownFraction > 1.0 - uStandpointEdge.x;
+#endif
 #else
     // Soft round edges. A square point sprite reads as a pixel grid, which is the one thing the
     // dissolving boundary must not look like.
@@ -385,6 +443,9 @@ void main(void) {
             (1.0 - seen.y / (along * uFrame.y)) * 0.5)).rgb;
 #endif
         rgb = mix(base, base * tint.rgb, tint.a);
+#ifdef STANDPOINT
+        if (edgeOfCapture) rgb = uStandpointEdge.yzw;
+#endif
 
         // Unconfirmed points breathe: a slow, low-amplitude luminance drift, phase-offset by the
         // provenance slot so inference and external do not pulse in lockstep.
@@ -520,6 +581,17 @@ fn vertexMain(input : VertexInput) -> VertexOutput {
     if (uniform.uCapture.w > 0.5) {
         let fromEye : vec3f = aPosition - uniform.uViewpoint.xyz;
         local = uniform.uViewpoint.xyz + fromEye / mix(1.0, max(-fromEye.z, 0.001) / uniform.uRelief.x, uniform.uRelief.y);
+        // A joined standpoint's dome, floored at the ground, exactly as in the GLSL path.
+        if (uniform.uRelief.w > 0.5) {
+            let ray : vec3f = (uniform.matrix_model * vec4f(fromEye, 0.0)).xyz;
+            let range : f32 = max(length(ray), 0.001);
+            var reach : f32 = uniform.uRelief.x;
+            let down : f32 = -ray.y / range;
+            if (down > 0.0 && uniform.uViewpoint.w > 0.0) {
+                reach = min(reach, uniform.uViewpoint.w / down);
+            }
+            local = uniform.uViewpoint.xyz + fromEye / mix(1.0, range / reach, uniform.uRelief.y);
+        }
     }
     let worldPos : vec4f = uniform.matrix_model * vec4f(local, 1.0);
     let viewDist : f32 = length(worldPos.xyz - uniform.view_position);

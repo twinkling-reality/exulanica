@@ -226,6 +226,24 @@ export function adaptSnapshot(
         renderingSubstrate: row.rendering_substrate,
         hiddenPersonCount: row.hidden_person_count ?? 0,
         maskedMemberCount: row.masked_member_count ?? 0,
+        standpoint: row.standpoint == null
+          ? null
+          : {
+              artifactId: row.standpoint.artifact_id,
+              contentSha256: row.standpoint.content_sha256,
+              state: row.standpoint.state,
+              memberCount: row.standpoint.member_count,
+              joinedMemberCount: row.standpoint.joined_member_count,
+              referenceCaptureId: row.standpoint.reference_capture_id,
+              rotationResidualMaxMillidegrees: row.standpoint.rotation_residual_max_millidegrees,
+              scaleResidualMaxPpm: row.standpoint.scale_residual_max_ppm,
+              upMethod: row.standpoint.up_method,
+              impliedRollMaxMillidegrees: row.standpoint.implied_roll_max_millidegrees,
+              excluded: row.standpoint.excluded.map((item) => ({
+                captureId: item.capture_id,
+                reason: item.reason,
+              })),
+            },
         members: row.members.map((member) => ({
           captureId: member.capture_id,
           ordinal: member.ordinal,
@@ -273,6 +291,13 @@ export function adaptSnapshot(
                       contentSha256: member.unposed_point_map.photograph.content_sha256,
                       byteSize: member.unposed_point_map.photograph.byte_size,
                     },
+              },
+          standpointPlacement: member.standpoint_placement == null
+            ? null
+            : {
+                sceneFromOpmRowMajor: member.standpoint_placement.scene_from_opm_row_major,
+                depthScale: member.standpoint_placement.depth_scale,
+                lateralScale: member.standpoint_placement.lateral_scale,
               },
           placement: member.placement === null
             ? null
