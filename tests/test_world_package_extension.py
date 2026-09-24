@@ -36,6 +36,7 @@ from exulanica.world.objects import (
 from exulanica.world_package import authored
 from exulanica.world_package.cli import main
 from exulanica.world_package.diff import diff_packages
+from exulanica.world_package.extension_formats import AUTHORED_WORLD_1_0
 from exulanica.world_package.package import (
     MANIFEST_PATH,
     PROFILE_VERSION,
@@ -158,6 +159,7 @@ def _sections(*, behaviour: bool = True, removed: bool = False) -> dict[str, Any
         "version_id": _urn("alternate-version", "one"),
     }
     return authored.build_sections(
+        AUTHORED_WORLD_1_0,
         versions=[version],
         source_snapshots=[
             {
@@ -183,7 +185,7 @@ def _sections(*, behaviour: bool = True, removed: bool = False) -> dict[str, Any
             }
         ],
         behaviours=[MOTION] if behaviour else [],
-        withheld_versions=0,
+        withheld=(),
     )
 
 

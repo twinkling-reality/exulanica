@@ -26,7 +26,8 @@ from exulanica.world.edit_kinds import (
     edit_kind,
     kinds_of,
 )
-from exulanica.world_package import authored, environments
+from exulanica.world_package import extension_formats
+from exulanica.world_package.export_partition import PlaneVersion, plan_export
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "exulanica" / "migrations"
@@ -165,37 +166,45 @@ def test_the_live_schema_agrees_with_the_registry(repository):
 # -- the package verifiers -----------------------------------------------------------------------
 
 
-def test_each_package_verifier_admits_only_registered_kinds_with_their_subjects():
-    """The verifiers are closed lists of a frozen extension format, so they may hold fewer."""
-    families = {
-        authored: {
-            EditSubject.OBJECT: authored._OBJECT_EDITS,
-            EditSubject.ELEMENT: authored._ELEMENT_EDITS,
-        },
-        environments: {
-            EditSubject.OBJECT: environments._OBJECT_EDITS,
-            EditSubject.ELEMENT: environments._ELEMENT_EDITS,
-            EditSubject.ENVIRONMENT_INSTANCE: environments._ENVIRONMENT_EDITS,
-        },
-    }
-    for verifier, by_subject in families.items():
-        admitted = frozenset().union(*by_subject.values()) | {UNDO}
-        assert admitted == verifier._EDIT_KINDS, verifier.__name__
-        assert admitted.issubset(LOG_KINDS), verifier.__name__
-        for subject, names in by_subject.items():
-            assert names.issubset(kinds_of(subject)), (verifier.__name__, subject)
+def test_each_extension_format_admits_only_registered_kinds_with_their_subjects():
+    """The formats are closed lists of frozen extension versions, so they may hold fewer."""
+    assert extension_formats.UNDO == UNDO
+    for format_ in extension_formats.FORMATS:
+        assert format_.admitted_kinds.issubset(LOG_KINDS), format_.key
+        for subject, names in format_.edit_kinds.items():
+            assert names.issubset(kinds_of(EditSubject(subject))), (format_.key, subject)
 
 
-def test_every_kind_no_verifier_admits_is_withheld_by_the_projector():
-    """A kind neither extension names must be withheld, or a signed package fails its verifier.
+def test_every_kind_no_format_admits_is_withheld_by_name():
+    """A kind no extension format admits is withheld from every export, and the plan names it.
 
-    Read from the projector's withholding queries, which name those kinds today. Moving those
-    queries onto the registry changes where this looks, not what it requires.
+    Read from the export plan the projector follows, one version carrying the kind under every
+    combination of formats a request can hold. The projector names no kind itself.
     """
-    projector = (ROOT / "exulanica" / "world_package" / "projector.py").read_text()
-    exported = authored._EDIT_KINDS | environments._EDIT_KINDS
-    for name in sorted(LOG_KINDS - exported):
-        assert f"'{name}'" in projector, f"{name} is neither exported nor withheld"
+    admitted = frozenset().union(*(f.admitted_kinds for f in extension_formats.FORMATS))
+    unadmitted = sorted(LOG_KINDS - admitted)
+    assert unadmitted, "every registered kind is admitted: nothing here is exercised"
+    families = {f.family for f in extension_formats.FORMATS}
+    choices = [{family} for family in sorted(families)] + [families]
+    requests = [
+        [f for f in extension_formats.FORMATS if f.family in chosen and f.version == version]
+        for version in sorted({f.version for f in extension_formats.FORMATS})
+        for chosen in choices
+    ]
+    for name in unadmitted:
+        carrying = PlaneVersion(
+            "carrying",
+            None,
+            source_invalidated=False,
+            chain_kinds=frozenset({name}),
+            chain_subjects=frozenset({edit_kind(name).subject}),
+        )
+        for requested in requests:
+            plan = plan_export([carrying], requested)
+            assert all("carrying" not in ids for ids in plan.exported.values()), (name, requested)
+            assert not plan.unrequested, (name, requested)
+            names = {w.names for counted in plan.withheld.values() for w in counted}
+            assert names <= {(name,)}, (name, requested)
 
 
 # -- the repository ------------------------------------------------------------------------------

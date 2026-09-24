@@ -18,6 +18,8 @@ from exulanica.world.environment_instances import (
 )
 from exulanica.world.objects import ObjectOrigin, Transform
 from exulanica.world_package import authored, environments
+from exulanica.world_package.export_partition import PlaneVersion, plan_export
+from exulanica.world_package.extension_formats import AUTHORED_WORLD_1_0, ENVIRONMENT_INSTANCES_1_0
 from exulanica.world_package.package import PackageError, import_check_package, verify_package
 
 from test_world_package_extension import (
@@ -121,6 +123,7 @@ def _environment_sections(*, availability: str = "available") -> dict[str, objec
         "version_id": _urn("alternate-version", "env"),
     }
     return environments.build_sections(
+        ENVIRONMENT_INSTANCES_1_0,
         versions=[version],
         source_snapshots=[
             {
@@ -133,7 +136,7 @@ def _environment_sections(*, availability: str = "available") -> dict[str, objec
         ],
         assets=[],
         behaviours=[],
-        withheld_versions=0,
+        withheld=(),
     )
 
 
@@ -229,9 +232,10 @@ def test_a_loader_without_the_environment_capability_is_told_to_omit_not_infer(
     assert extension["load"] == "not loaded"
     assert environments.EXTENSION_CAPABILITY in extension["unsupported_capabilities"]
     assert "1 alternate version(s) and 1 present environment instance(s)" in extension["not_loaded"]
-    assert "rather than infer objects from exulanica-wmp-ext-authored-world@1.0" in extension[
-        "not_loaded"
-    ]
+    assert (
+        "rather than infer objects from exulanica-wmp-ext-authored-world@1.0"
+        in extension["not_loaded"]
+    )
 
 
 def test_a_loader_with_the_environment_capability_loads_and_names_unavailable_instances(
@@ -257,12 +261,24 @@ def _export_row(
     parent: str | None = None,
     environment_bearing: bool = False,
     source_invalidated: bool = False,
-) -> environments.ExportVersion:
-    return environments.ExportVersion(
+) -> PlaneVersion:
+    return PlaneVersion(
         version_id=version_id,
         parent_version_id=parent,
-        environment_bearing=environment_bearing,
         source_invalidated=source_invalidated,
+        state_sections=(
+            frozenset({"environment_instances"}) if environment_bearing else frozenset()
+        ),
+    )
+
+
+def _plan(*rows: PlaneVersion):
+    plan = plan_export(rows, [AUTHORED_WORLD_1_0, ENVIRONMENT_INSTANCES_1_0])
+    return (
+        plan.exported[authored.EXTENSION_KEY],
+        plan.exported[environments.EXTENSION_KEY],
+        len(plan.withheld[authored.EXTENSION_KEY]),
+        len(plan.withheld[environments.EXTENSION_KEY]),
     )
 
 
@@ -275,16 +291,14 @@ def test_partition_keeps_schema_v1_siblings_in_authored_world_and_closes_parent_
         "pulled-child",
         "unrelated",
     )
-    authored_ids, env_ids, authored_withheld, env_withheld = environments.partition_export_versions(
-        (
-            _export_row(parent),
-            _export_row(child, parent=parent, environment_bearing=True),
-            _export_row(sibling),
-            _export_row(native, environment_bearing=True),
-            _export_row(pulled, parent=native),
-            _export_row(unrelated, environment_bearing=True, source_invalidated=True),
-            _export_row("gone", source_invalidated=True),
-        )
+    authored_ids, env_ids, authored_withheld, env_withheld = _plan(
+        _export_row(parent),
+        _export_row(child, parent=parent, environment_bearing=True),
+        _export_row(sibling),
+        _export_row(native, environment_bearing=True),
+        _export_row(pulled, parent=native),
+        _export_row(unrelated, environment_bearing=True, source_invalidated=True),
+        _export_row("gone", source_invalidated=True),
     )
     assert authored_ids == (parent, sibling)
     assert env_ids == (parent, child, native, pulled)
@@ -294,13 +308,11 @@ def test_partition_keeps_schema_v1_siblings_in_authored_world_and_closes_parent_
 
 def test_partition_copies_a_multi_hop_schema_v1_ancestor_chain_into_both_sets():
     grandparent, parent, child, sibling = "grandparent", "parent", "child", "sibling"
-    authored_ids, env_ids, authored_withheld, env_withheld = environments.partition_export_versions(
-        (
-            _export_row(grandparent),
-            _export_row(parent, parent=grandparent),
-            _export_row(child, parent=parent, environment_bearing=True),
-            _export_row(sibling),
-        )
+    authored_ids, env_ids, authored_withheld, env_withheld = _plan(
+        _export_row(grandparent),
+        _export_row(parent, parent=grandparent),
+        _export_row(child, parent=parent, environment_bearing=True),
+        _export_row(sibling),
     )
     assert authored_ids == (grandparent, parent, sibling)
     assert env_ids == (grandparent, parent, child)
@@ -309,8 +321,8 @@ def test_partition_copies_a_multi_hop_schema_v1_ancestor_chain_into_both_sets():
 
 
 def test_partition_omits_authored_ids_when_every_kept_version_is_environment_bearing():
-    authored_ids, env_ids, authored_withheld, env_withheld = environments.partition_export_versions(
-        (_export_row("only", environment_bearing=True),)
+    authored_ids, env_ids, authored_withheld, env_withheld = _plan(
+        _export_row("only", environment_bearing=True)
     )
     assert authored_ids == ()
     assert env_ids == ("only",)
@@ -339,6 +351,7 @@ def _lineage_sections() -> dict[str, object]:
     }
     child["parent_version_id"] = parent_id
     return environments.build_sections(
+        ENVIRONMENT_INSTANCES_1_0,
         versions=[parent, child],
         source_snapshots=[
             {
@@ -351,7 +364,7 @@ def _lineage_sections() -> dict[str, object]:
         ],
         assets=[],
         behaviours=[],
-        withheld_versions=0,
+        withheld=(),
     )
 
 

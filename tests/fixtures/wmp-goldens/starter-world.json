@@ -1,0 +1,6101 @@
+{
+ "base": {
+  "appearance/style.json": {
+   "capability_mapping": {
+    "garden-density": "detail.ecology",
+    "glass": "material.transmission",
+    "horizon-softness": "atmosphere.softness",
+    "relationship-energy": "relationships.energy",
+    "source-depth": "interface.depth",
+    "source-hue": "interface.hue",
+    "source-light": "interface.light",
+    "source-warmth": "interface.warmth",
+    "surface-finish": "surface.finish",
+    "vitality": "world.vitality",
+    "world-tempo": "motion.tempo"
+   },
+   "global": {
+    "parameters": {
+     "garden-density": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.70a3d70a3d70ap-1"
+     },
+     "glass": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.851eb851eb852p-1"
+     },
+     "horizon-softness": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.d70a3d70a3d71p-2"
+     },
+     "relationship-energy": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.5c28f5c28f5c3p-1"
+     },
+     "source-depth": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.70a3d70a3d70ap-2"
+     },
+     "source-hue": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.3333333333333p-1"
+     },
+     "source-light": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.b851eb851eb85p-1"
+     },
+     "source-warmth": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.851eb851eb852p-3"
+     },
+     "surface-finish": "source-paper",
+     "vitality": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.a3d70a3d70a3dp-1"
+     },
+     "world-tempo": 1
+    },
+    "profile_id": "origin-landscape",
+    "profile_version": 1
+   },
+   "lineage": {
+    "parent_version_id": null,
+    "revision": 0,
+    "rollback_target_version_id": null,
+    "version_id": "urn:exulanica:wmp:style:<urn:1>"
+   },
+   "origin": null,
+   "origin_reference": null,
+   "profile": "exulanica-adaptive-style-projection-v1",
+   "proposal_provenance": {
+    "model_id": null,
+    "prompt_version": null,
+    "reference_ids": [],
+    "refines_proposal_id": null
+   },
+   "recipe_binding": {
+    "availability": "product",
+    "capabilityMapping": {
+     "garden-density": "detail.ecology",
+     "glass": "material.transmission",
+     "horizon-softness": "atmosphere.softness",
+     "relationship-energy": "relationships.energy",
+     "source-depth": "interface.depth",
+     "source-hue": "interface.hue",
+     "source-light": "interface.light",
+     "source-warmth": "interface.warmth",
+     "surface-finish": "surface.finish",
+     "vitality": "world.vitality",
+     "world-tempo": "motion.tempo"
+    },
+    "frontendCommit": "55b123627314d328fba3850eb607d8a7682a8cad",
+    "modules": [
+     "aeroheart-optics-v1",
+     "registered-surface-v1",
+     "bounded-tempo-v1",
+     "source-light-v1"
+    ],
+    "origin": "authored",
+    "profileId": "origin-landscape",
+    "profileVersion": 1,
+    "schemaVersion": 1
+   },
+   "regions": [],
+   "registry": [
+    {
+     "capability_key": "detail.ecology",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.70a3d70a3d70ap-1"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "garden-density",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.999999999999ap-5"
+     }
+    },
+    {
+     "capability_key": "material.transmission",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.851eb851eb852p-1"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "glass",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.999999999999ap-5"
+     }
+    },
+    {
+     "capability_key": "atmosphere.softness",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.d70a3d70a3d71p-2"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "horizon-softness",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.999999999999ap-5"
+     }
+    },
+    {
+     "capability_key": "relationships.energy",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.5c28f5c28f5c3p-1"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "relationship-energy",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.999999999999ap-5"
+     }
+    },
+    {
+     "capability_key": "interface.depth",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.70a3d70a3d70ap-2"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "source-depth",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.47ae147ae147bp-7"
+     }
+    },
+    {
+     "capability_key": "interface.hue",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.3333333333333p-1"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "source-hue",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.47ae147ae147bp-7"
+     }
+    },
+    {
+     "capability_key": "interface.light",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.b851eb851eb85p-1"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "source-light",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.47ae147ae147bp-7"
+     }
+    },
+    {
+     "capability_key": "interface.warmth",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.851eb851eb852p-3"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "source-warmth",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.47ae147ae147bp-7"
+     }
+    },
+    {
+     "capability_key": "surface.finish",
+     "capability_version": 1,
+     "choice_values": [
+      "source-paper",
+      "clear-lens"
+     ],
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": "source-paper",
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": null,
+     "minimum_value": null,
+     "parameter_key": "surface-finish",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": null
+    },
+    {
+     "capability_key": "world.vitality",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.a3d70a3d70a3dp-1"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "vitality",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.999999999999ap-5"
+     }
+    },
+    {
+     "capability_key": "motion.tempo",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": 1,
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.4000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.8000000000000p-1"
+     },
+     "parameter_key": "world-tempo",
+     "profile_id": "origin-landscape",
+     "profile_version": 1,
+     "status": "supported",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.999999999999ap-5"
+     }
+    },
+    {
+     "capability_key": "detail.contours",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.199999999999ap-1"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "contour-density",
+     "profile_id": "survey-relief",
+     "profile_version": 1,
+     "status": "experimental",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.999999999999ap-4"
+     }
+    },
+    {
+     "capability_key": "material.technical-contrast",
+     "capability_version": 1,
+     "choice_values": null,
+     "compatibility_key": "atlas-topology-v1",
+     "default_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.6666666666666p-1"
+     },
+     "fallback_profile_id": "origin-landscape",
+     "fallback_profile_version": 1,
+     "maximum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.0000000000000p+0"
+     },
+     "minimum_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x0.0p+0"
+     },
+     "parameter_key": "technical-contrast",
+     "profile_id": "survey-relief",
+     "profile_version": 1,
+     "status": "experimental",
+     "step_value": {
+      "@type": "exulanica:IEEE754Binary64",
+      "hex": "0x1.999999999999ap-4"
+     }
+    }
+   ],
+   "registry_modules": [
+    {
+     "application_order": 0,
+     "capability_key": "world.vitality",
+     "capability_version": 1,
+     "module_id": "aeroheart-optics-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 0,
+     "capability_key": "material.transmission",
+     "capability_version": 1,
+     "module_id": "aeroheart-optics-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 0,
+     "capability_key": "relationships.energy",
+     "capability_version": 1,
+     "module_id": "aeroheart-optics-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 0,
+     "capability_key": "detail.ecology",
+     "capability_version": 1,
+     "module_id": "aeroheart-optics-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 0,
+     "capability_key": "atmosphere.softness",
+     "capability_version": 1,
+     "module_id": "aeroheart-optics-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 1,
+     "capability_key": "surface.finish",
+     "capability_version": 1,
+     "module_id": "registered-surface-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 2,
+     "capability_key": "motion.tempo",
+     "capability_version": 1,
+     "module_id": "bounded-tempo-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 3,
+     "capability_key": "interface.hue",
+     "capability_version": 1,
+     "module_id": "source-light-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 3,
+     "capability_key": "interface.warmth",
+     "capability_version": 1,
+     "module_id": "source-light-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 3,
+     "capability_key": "interface.depth",
+     "capability_version": 1,
+     "module_id": "source-light-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 3,
+     "capability_key": "interface.light",
+     "capability_version": 1,
+     "module_id": "source-light-v1",
+     "profile_id": "origin-landscape",
+     "profile_version": 1
+    },
+    {
+     "application_order": 0,
+     "capability_key": "detail.contours",
+     "capability_version": 1,
+     "module_id": "survey-relief-response-v1",
+     "profile_id": "survey-relief",
+     "profile_version": 1
+    },
+    {
+     "application_order": 0,
+     "capability_key": "material.technical-contrast",
+     "capability_version": 1,
+     "module_id": "survey-relief-response-v1",
+     "profile_id": "survey-relief",
+     "profile_version": 1
+    }
+   ],
+   "state": "current",
+   "topology_sha256": "<sha256:1>"
+  },
+  "deletion/tombstones.json": {
+   "items": [
+    {
+     "blocklist_hash": false,
+     "effective_at": "<time:1>",
+     "interval": null,
+     "purge_state": "pending",
+     "requested_at": "<time:1>",
+     "scope": "capture",
+     "target": {
+      "assertion_id": null,
+      "capture_id": "urn:exulanica:wmp:capture:<urn:2>",
+      "entity_id": null,
+      "track_key": null
+     },
+     "tombstone_id": "urn:exulanica:wmp:tombstone:<urn:3>"
+    }
+   ],
+   "omitted": [
+    "deletion rationale",
+    "requesting actor"
+   ],
+   "profile": "exulanica-deletion-tombstones-v1"
+  },
+  "evaluation/results.json": {
+   "items": [
+    {
+     "input_sha256": "<sha256:2>",
+     "report": {
+      "metric": "fixture",
+      "passed": true,
+      "suite": "rich-world"
+     },
+     "report_id": "evaluation-report:0"
+    }
+   ],
+   "profile": "exulanica-evaluation-report-projection-v1",
+   "state": "included",
+   "unavailable_reason": null
+  },
+  "evidence/descriptors.json": {
+   "items": [
+    {
+     "address": {
+      "content_sha256": "<sha256:3>",
+      "end_ns": 1,
+      "start_ns": 0,
+      "track_key": "img"
+     },
+     "modality": "still_image",
+     "region": null,
+     "span_digest_sha256": "<sha256:4>",
+     "span_id": "urn:exulanica:wmp:span:<urn:4>"
+    },
+    {
+     "address": {
+      "content_sha256": "<sha256:5>",
+      "end_ns": 1,
+      "start_ns": 0,
+      "track_key": "img"
+     },
+     "modality": "still_image",
+     "region": null,
+     "span_digest_sha256": "<sha256:6>",
+     "span_id": "urn:exulanica:wmp:span:<urn:5>"
+    },
+    {
+     "address": {
+      "content_sha256": "<sha256:7>",
+      "end_ns": 1,
+      "start_ns": 0,
+      "track_key": "img"
+     },
+     "modality": "still_image",
+     "region": null,
+     "span_digest_sha256": "<sha256:8>",
+     "span_id": "urn:exulanica:wmp:span:<urn:6>"
+    }
+   ],
+   "profile": "exulanica-evidence-descriptors-v1"
+  },
+  "external/fetch.json": {
+   "items": [
+    {
+     "authorization": "not carried in package",
+     "byte_size": 2075,
+     "content_sha256": "<sha256:7>",
+     "media_type": "image/jpeg",
+     "ni_uri": "ni:///sha-256;rtifBVgdX9nHoZvJelR4DCk9zXr_W340nMyakK3OoN8",
+     "retrieval": "requires an authorized content-addressed resolver",
+     "state": "externally-held"
+    },
+    {
+     "authorization": "not carried in package",
+     "byte_size": 2075,
+     "content_sha256": "<sha256:5>",
+     "media_type": "image/jpeg",
+     "ni_uri": "ni:///sha-256;dDqnBNW8m1cLMNbGwjEzmLnLdexIRk-xbS9eD_KNSKs",
+     "retrieval": "requires an authorized content-addressed resolver",
+     "state": "externally-held"
+    },
+    {
+     "authorization": "not carried in package",
+     "byte_size": 2075,
+     "content_sha256": "<sha256:3>",
+     "media_type": "image/jpeg",
+     "ni_uri": "ni:///sha-256;aFtPT9e-_Ikw4aUG_X0XiFHFxjbntmXjGN5tx5ENndc",
+     "retrieval": "requires an authorized content-addressed resolver",
+     "state": "externally-held"
+    }
+   ],
+   "profile": "exulanica-external-fetch-reference-v1"
+  },
+  "interaction/policy.json": {
+   "profile": "exulanica-interaction-policy-projection-v1",
+   "reason": "no current reviewed interaction policy",
+   "state": "unavailable"
+  },
+  "memory/graph.json": {
+   "assertions": [
+    {
+     "asserted_at": "<time:2>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:7>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": "<time:3>",
+     "predicate": "captured_at",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:8>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:6>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:4>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:9>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": "<time:5>",
+     "predicate": "captured_at",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:10>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:5>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:6>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:11>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": "<time:7>",
+     "predicate": "captured_at",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:12>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:4>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:2>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:13>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": "Exulanica TestCam 1",
+     "predicate": "device_model_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:8>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:6>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:4>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:14>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": "Exulanica TestCam 1",
+     "predicate": "device_model_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:10>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:5>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:6>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:15>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": "Exulanica TestCam 1",
+     "predicate": "device_model_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:12>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:4>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:2>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:16>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": {
+      "h": 100,
+      "w": 160
+     },
+     "predicate": "pixel_size_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:8>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:6>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:4>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:17>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": {
+      "h": 100,
+      "w": 160
+     },
+     "predicate": "pixel_size_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:10>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:5>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:6>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:18>",
+     "external_source": null,
+     "kind": "capture",
+     "object_ref": null,
+     "object_value": {
+      "h": 100,
+      "w": 160
+     },
+     "predicate": "pixel_size_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:12>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:4>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:8>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:19>",
+     "external_source": null,
+     "kind": "inference",
+     "object_ref": null,
+     "object_value": {
+      "metric": true,
+      "model_id": "flat-plane-double",
+      "point_map_artifact": "<uuid:1>",
+      "reason": "a per-image point map with real depth relief, seen from where the camera stood",
+      "rung": 3,
+      "valid_fraction": {
+       "@type": "exulanica:IEEE754Binary64",
+       "hex": "0x1.0000000000000p+0"
+      }
+     },
+     "predicate": "reconstruction_rung_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:capture:<urn:8>",
+      "type": "capture"
+     },
+     "supersedes": null,
+     "support_span_ids": [
+      "urn:exulanica:wmp:span:<urn:6>"
+     ],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:9>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:20>",
+     "external_source": null,
+     "kind": "user",
+     "object_ref": null,
+     "object_value": "Rosa Lindqvist",
+     "predicate": "name_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:entity:<urn:21>",
+      "type": "entity"
+     },
+     "supersedes": null,
+     "support_span_ids": [],
+     "valid_time": null
+    },
+    {
+     "asserted_at": "<time:10>",
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:22>",
+     "external_source": null,
+     "kind": "user",
+     "object_ref": null,
+     "object_value": null,
+     "predicate": "name_is",
+     "status": "active",
+     "subject_ref": {
+      "id": "urn:exulanica:wmp:entity:<urn:23>",
+      "type": "entity"
+     },
+     "supersedes": "urn:exulanica:wmp:assertion:<urn:24>",
+     "support_span_ids": [],
+     "valid_time": null,
+     "withheld": {
+      "object_value": "the person withdrew; their saved name is not exported"
+     }
+    }
+   ],
+   "captures": [
+    {
+     "capture_id": "urn:exulanica:wmp:capture:<urn:12>",
+     "content_sha256": "<sha256:3>",
+     "created_at": "<time:6>",
+     "started_at": "<time:11>"
+    },
+    {
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "content_sha256": "<sha256:5>",
+     "created_at": "<time:4>",
+     "started_at": "<time:12>"
+    },
+    {
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "content_sha256": "<sha256:7>",
+     "created_at": "<time:2>",
+     "started_at": "<time:13>"
+    }
+   ],
+   "entities": [
+    {
+     "class": "person",
+     "display_name": "Rosa Lindqvist",
+     "entity_id": "urn:exulanica:wmp:entity:<urn:21>",
+     "merged_into": null
+    },
+    {
+     "class": "person",
+     "display_name": null,
+     "entity_id": "urn:exulanica:wmp:entity:<urn:23>",
+     "merged_into": null,
+     "withheld": {
+      "display_name": "the person withdrew; their saved name is not exported"
+     }
+    }
+   ],
+   "links": [],
+   "occurrences": [],
+   "profile": "exulanica-semantic-graph-projection-v1"
+  },
+  "policy/export.json": {
+   "authorization": {
+    "claim": "not carried in package",
+    "meaning": "The signature proves package bytes and key possession, not that the signer was authorized to export them."
+   },
+   "consent": {
+    "records": "excluded",
+    "state": "must be enforced by the source system before projection"
+   },
+   "export": {
+    "external_media_references": "digest-only; authorized resolver required",
+    "included": [
+     "compatible semantic graph",
+     "reconstruction descriptors",
+     "current topology, layout, placement, and neighborhood",
+     "current appearance and interaction policy",
+     "pipeline provenance",
+     "explicit evaluation state",
+     "deletion tombstones"
+    ],
+    "profile": "exulanica-wmp-default-exclusion-v1",
+    "raw_payloads": "excluded"
+   },
+   "generated_content": {
+    "declaration": "pipeline provenance identifies model-backed events when recorded",
+    "present": false
+   },
+   "profile": "exulanica-export-policy-and-content-declaration-v1"
+  },
+  "provenance/events.json": {
+   "items": [
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": "<time:14>",
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:25>",
+     "input_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:26>"
+     ],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:15>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:27>"
+     ],
+     "params_sha256": "<sha256:9>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:28>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 10,
+     "stage": {
+      "key": "depth",
+      "version": 2
+     },
+     "started_at": "<time:16>",
+     "trigger": "ingest",
+     "type": "stage_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": "<time:17>",
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:30>",
+     "input_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:26>"
+     ],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:18>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:31>"
+     ],
+     "params_sha256": "<sha256:10>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:32>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 4,
+     "stage": {
+      "key": "rendition",
+      "version": 2
+     },
+     "started_at": "<time:19>",
+     "trigger": "ingest",
+     "type": "stage_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": "<time:20>",
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:33>",
+     "input_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:34>"
+     ],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:21>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:35>"
+     ],
+     "params_sha256": "<sha256:10>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:36>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 8,
+     "stage": {
+      "key": "rendition",
+      "version": 2
+     },
+     "started_at": "<time:22>",
+     "trigger": "ingest",
+     "type": "stage_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": "<time:23>",
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:38>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:24>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:26>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:39>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:40>",
+     "run_status": "succeeded",
+     "sequence": 5,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": "<time:25>",
+     "trigger": "ingest",
+     "type": "stage_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": "<time:26>",
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:41>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:27>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:34>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:42>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 5,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": "<time:28>",
+     "trigger": "ingest",
+     "type": "stage_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:12>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": "<time:29>",
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:43>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:30>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:44>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:45>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:46>",
+     "run_status": "succeeded",
+     "sequence": 5,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": "<time:31>",
+     "trigger": "ingest",
+     "type": "stage_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": "unavailable",
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:47>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:32>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:12>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 10,
+     "stage": {
+      "key": "person_regions",
+      "version": 1
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "stage_unavailable"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": "unavailable",
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:48>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:33>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:9>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 11,
+     "stage": {
+      "key": "depth",
+      "version": 2
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "stage_unavailable"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": "unavailable",
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:49>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:34>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:13>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 11,
+     "stage": {
+      "key": "segmentation",
+      "version": 2
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "stage_unavailable"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": "unavailable",
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:50>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:35>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:13>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 12,
+     "stage": {
+      "key": "segmentation",
+      "version": 2
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "stage_unavailable"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": "unavailable",
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:51>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:36>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:14>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 5,
+     "stage": {
+      "key": "vision",
+      "version": 3
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "stage_unavailable"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": "unavailable",
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:52>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:37>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:12>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 6,
+     "stage": {
+      "key": "person_regions",
+      "version": 1
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "stage_unavailable"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": "unavailable",
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:53>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:38>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:14>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 9,
+     "stage": {
+      "key": "vision",
+      "version": 3
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "stage_unavailable"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:32>",
+     "input_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:26>"
+     ],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:39>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:10>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 2,
+     "stage": {
+      "key": "rendition",
+      "version": 2
+     },
+     "started_at": "<time:19>",
+     "trigger": "ingest",
+     "type": "stage_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:36>",
+     "input_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:34>"
+     ],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:40>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:10>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 6,
+     "stage": {
+      "key": "rendition",
+      "version": 2
+     },
+     "started_at": "<time:22>",
+     "trigger": "ingest",
+     "type": "stage_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:28>",
+     "input_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:26>"
+     ],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:41>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:9>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 7,
+     "stage": {
+      "key": "depth",
+      "version": 2
+     },
+     "started_at": "<time:16>",
+     "trigger": "ingest",
+     "type": "stage_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:54>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:42>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:55>",
+      "urn:exulanica:wmp:artifact:<urn:56>",
+      "urn:exulanica:wmp:artifact:<urn:57>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:40>",
+     "run_status": "succeeded",
+     "sequence": 4,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "assertion_emitted"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:58>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:43>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:59>",
+      "urn:exulanica:wmp:artifact:<urn:60>",
+      "urn:exulanica:wmp:artifact:<urn:61>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 4,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "assertion_emitted"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:12>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:62>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:44>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:63>",
+      "urn:exulanica:wmp:artifact:<urn:64>",
+      "urn:exulanica:wmp:artifact:<urn:65>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:46>",
+     "run_status": "succeeded",
+     "sequence": 4,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "assertion_emitted"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:66>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:2>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:26>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:39>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:40>",
+     "run_status": "succeeded",
+     "sequence": 3,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "artifact_written"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:67>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:4>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:34>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:42>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 3,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "artifact_written"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:12>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:68>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:6>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:44>"
+     ],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:45>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:46>",
+     "run_status": "succeeded",
+     "sequence": 3,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "artifact_written"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:69>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:45>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:31>"
+     ],
+     "params_sha256": "<sha256:10>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:32>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 3,
+     "stage": {
+      "key": "rendition",
+      "version": 2
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "artifact_written"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:70>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:46>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:35>"
+     ],
+     "params_sha256": "<sha256:10>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:36>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 7,
+     "stage": {
+      "key": "rendition",
+      "version": 2
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "artifact_written"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:71>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:8>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:27>"
+     ],
+     "params_sha256": "<sha256:9>",
+     "parent_event_id": "urn:exulanica:wmp:pipeline-event:<urn:28>",
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 8,
+     "stage": {
+      "key": "depth",
+      "version": 2
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "artifact_written"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:72>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:8>",
+     "output_artifact_ids": [
+      "urn:exulanica:wmp:artifact:<urn:73>"
+     ],
+     "params_sha256": "<sha256:9>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 9,
+     "stage": {
+      "key": "depth",
+      "version": 2
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "assertion_emitted"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:39>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:47>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:40>",
+     "run_status": "succeeded",
+     "sequence": 2,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": "<time:25>",
+     "trigger": "ingest",
+     "type": "stage_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:42>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:48>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 2,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": "<time:28>",
+     "trigger": "ingest",
+     "type": "stage_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:12>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:45>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:49>",
+     "output_artifact_ids": [],
+     "params_sha256": "<sha256:11>",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:46>",
+     "run_status": "succeeded",
+     "sequence": 2,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "started_at": "<time:31>",
+     "trigger": "ingest",
+     "type": "stage_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:74>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:50>",
+     "output_artifact_ids": [],
+     "params_sha256": "9df92c99063a923e",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 1,
+     "stage": {
+      "key": null,
+      "version": null
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "run_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:75>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:51>",
+     "output_artifact_ids": [],
+     "params_sha256": "baf16c0dd54b3b5f",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:40>",
+     "run_status": "succeeded",
+     "sequence": 1,
+     "stage": {
+      "key": null,
+      "version": null
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "run_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:76>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:52>",
+     "output_artifact_ids": [],
+     "params_sha256": "baf16c0dd54b3b5f",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 1,
+     "stage": {
+      "key": null,
+      "version": null
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "run_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:12>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:77>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:53>",
+     "output_artifact_ids": [],
+     "params_sha256": "baf16c0dd54b3b5f",
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:46>",
+     "run_status": "succeeded",
+     "sequence": 1,
+     "stage": {
+      "key": null,
+      "version": null
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "run_started"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:78>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:54>",
+     "output_artifact_ids": [],
+     "params_sha256": null,
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:29>",
+     "run_status": "succeeded",
+     "sequence": 12,
+     "stage": {
+      "key": null,
+      "version": null
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "run_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:10>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:79>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:55>",
+     "output_artifact_ids": [],
+     "params_sha256": null,
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:37>",
+     "run_status": "succeeded",
+     "sequence": 13,
+     "stage": {
+      "key": null,
+      "version": null
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "run_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:8>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:80>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:56>",
+     "output_artifact_ids": [],
+     "params_sha256": null,
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:40>",
+     "run_status": "succeeded",
+     "sequence": 6,
+     "stage": {
+      "key": null,
+      "version": null
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "run_succeeded"
+    },
+    {
+     "attempt": 1,
+     "capture_id": "urn:exulanica:wmp:capture:<urn:12>",
+     "cost": null,
+     "duration_ms": "<duration_ms>",
+     "ended_at": null,
+     "error_class": null,
+     "event_id": "urn:exulanica:wmp:pipeline-event:<urn:81>",
+     "input_artifact_ids": [],
+     "max_attempts": null,
+     "model_ref": null,
+     "models_tried": null,
+     "occurred_at": "<time:57>",
+     "output_artifact_ids": [],
+     "params_sha256": null,
+     "parent_event_id": null,
+     "run_id": "urn:exulanica:wmp:pipeline-run:<urn:46>",
+     "run_status": "succeeded",
+     "sequence": 6,
+     "stage": {
+      "key": null,
+      "version": null
+     },
+     "started_at": null,
+     "trigger": "ingest",
+     "type": "run_succeeded"
+    }
+   ],
+   "omitted": [
+    "host",
+    "error message",
+    "artifact payloads"
+   ],
+   "profile": "exulanica-pipeline-ledger-projection-v1"
+  },
+  "provenance/package.json": {
+   "export_policy": {
+    "external_media_references": "digest-only; authorized resolver required",
+    "included": [
+     "compatible semantic graph",
+     "reconstruction descriptors",
+     "current topology, layout, placement, and neighborhood",
+     "current appearance and interaction policy",
+     "pipeline provenance",
+     "explicit evaluation state",
+     "deletion tombstones"
+    ],
+    "profile": "exulanica-wmp-default-exclusion-v1",
+    "raw_payloads": "excluded"
+   },
+   "parent_merkle_root_sha256": "<sha256:15>",
+   "profile": "exulanica-package-lineage-v1",
+   "snapshot_consistency": "PostgreSQL REPEATABLE READ"
+  },
+  "reconstruction/artifacts.json": {
+   "items": [
+    {
+     "artifact_id": "urn:exulanica:wmp:artifact:<urn:35>",
+     "byte_size": 2172,
+     "content_sha256": "<sha256:16>",
+     "input_sha256": "<sha256:17>",
+     "integrity": "recorded",
+     "kind": "rendition",
+     "params_sha256": "<sha256:10>",
+     "scene": null,
+     "stage": {
+      "key": "rendition",
+      "version": 2
+     },
+     "state": "available-by-authorized-digest-resolver",
+     "superseded_by": null
+    },
+    {
+     "artifact_id": "urn:exulanica:wmp:artifact:<urn:31>",
+     "byte_size": 2172,
+     "content_sha256": "<sha256:16>",
+     "input_sha256": "<sha256:18>",
+     "integrity": "recorded",
+     "kind": "rendition",
+     "params_sha256": "<sha256:10>",
+     "scene": null,
+     "stage": {
+      "key": "rendition",
+      "version": 2
+     },
+     "state": "available-by-authorized-digest-resolver",
+     "superseded_by": null
+    },
+    {
+     "artifact_id": "urn:exulanica:wmp:artifact:<urn:26>",
+     "byte_size": 518,
+     "content_sha256": "<sha256:19>",
+     "input_sha256": "<sha256:20>",
+     "integrity": "recorded",
+     "kind": "probe",
+     "params_sha256": "<sha256:11>",
+     "scene": null,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "state": "available-by-authorized-digest-resolver",
+     "superseded_by": null
+    },
+    {
+     "artifact_id": "urn:exulanica:wmp:artifact:<urn:34>",
+     "byte_size": 518,
+     "content_sha256": "<sha256:21>",
+     "input_sha256": "<sha256:20>",
+     "integrity": "recorded",
+     "kind": "probe",
+     "params_sha256": "<sha256:11>",
+     "scene": null,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "state": "available-by-authorized-digest-resolver",
+     "superseded_by": null
+    },
+    {
+     "artifact_id": "urn:exulanica:wmp:artifact:<urn:44>",
+     "byte_size": 518,
+     "content_sha256": "<sha256:22>",
+     "input_sha256": "<sha256:20>",
+     "integrity": "recorded",
+     "kind": "probe",
+     "params_sha256": "<sha256:11>",
+     "scene": null,
+     "stage": {
+      "key": "intake",
+      "version": 1
+     },
+     "state": "available-by-authorized-digest-resolver",
+     "superseded_by": null
+    },
+    {
+     "artifact_id": "urn:exulanica:wmp:artifact:<urn:27>",
+     "byte_size": 52352,
+     "content_sha256": "<sha256:23>",
+     "input_sha256": "<sha256:24>",
+     "integrity": "recorded",
+     "kind": "point_map",
+     "params_sha256": "<sha256:9>",
+     "scene": null,
+     "stage": {
+      "key": "depth",
+      "version": 2
+     },
+     "state": "available-by-authorized-digest-resolver",
+     "superseded_by": null
+    }
+   ],
+   "payload_bytes": "excluded",
+   "profile": "exulanica-reconstruction-descriptors-v1",
+   "quality_measurements": {
+    "reason": "quality payload bytes are excluded; recorded claims and artifact descriptors remain available",
+    "state": "descriptors-only"
+   },
+   "rung_claims": [
+    {
+     "assertion_id": "urn:exulanica:wmp:assertion:<urn:19>",
+     "evidence_support": [
+      "urn:exulanica:wmp:span:<urn:6>"
+     ],
+     "subject": "urn:exulanica:wmp:capture:<urn:8>",
+     "value": {
+      "metric": true,
+      "model_id": "flat-plane-double",
+      "point_map_artifact": "<uuid:1>",
+      "reason": "a per-image point map with real depth relief, seen from where the camera stood",
+      "rung": 3,
+      "valid_fraction": {
+       "@type": "exulanica:IEEE754Binary64",
+       "hex": "0x1.0000000000000p+0"
+      }
+     }
+    }
+   ],
+   "scenes": []
+  },
+  "wmp/profile.json": {
+   "@context": {
+    "cr": "http://mlcommons.org/croissant/",
+    "dct": "http://purl.org/dc/terms/",
+    "exulanica": "https://exulanica.local/ns/world-memory-package/1/",
+    "rai": "http://mlcommons.org/croissant/RAI/",
+    "schema": "https://schema.org/"
+   },
+   "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+   "@type": "schema:CreativeWork",
+   "canonicalization": {
+    "base": "RFC 8785",
+    "floats": "prohibited; source binary floating-point values use exact tagged hexadecimal strings",
+    "profile": "exulanica-canonical-json/no-float-v1"
+   },
+   "compatibilityReferences": [
+    "http://mlcommons.org/croissant/1.0",
+    "http://mlcommons.org/croissant/RAI/1.0",
+    "https://www.rfc-editor.org/rfc/rfc8785",
+    "https://www.rfc-editor.org/rfc/rfc8032"
+   ],
+   "conformsTo": [
+    "https://www.researchobject.org/ro-crate/1.2/"
+   ],
+   "defaultPayloadPolicy": {
+    "excluded": [
+     "raw media",
+     "credentials",
+     "biometric templates",
+     "embeddings",
+     "private conversations",
+     "model internals",
+     "training intermediates",
+     "executable UI code",
+     "remote executable bindings"
+    ],
+    "externalMediaReference": "content digest and authorization-dependent resolver requirement only"
+   },
+   "merkle": {
+    "leaf": "sha256('exulanica-wmp-leaf-v1\\0' || utf8(path) || '\\0' || sha256(file))",
+    "node": "sha256('exulanica-wmp-node-v1\\0' || left || right)",
+    "oddNode": "duplicate final child",
+    "pathOrder": "Unicode code point order"
+   },
+   "name": "Exulanica World Memory Package Profile",
+   "signature": {
+    "algorithm": "Ed25519",
+    "payload": [
+     "profile_version",
+     "manifest_sha256",
+     "merkle_root_sha256"
+    ]
+   },
+   "version": "exulanica-wmp-1.0"
+  },
+  "world/layout.json": {
+   "layout_version": 1,
+   "regions": [
+    {
+     "creation_ordinal": 0,
+     "region_id": "region:starter"
+    }
+   ],
+   "schema_version": 1
+  },
+  "world/neighborhood.json": {
+   "layout_version": 1,
+   "neighborhood_version": 1,
+   "neighborhoods": [
+    {
+     "neighborhood_id": "neighborhood:starter",
+     "region_ids": [
+      "region:starter"
+     ]
+    }
+   ],
+   "schema_version": 1
+  },
+  "world/placement.json": {
+   "coordinate_unit": "millimetre",
+   "destinations": [
+    {
+     "destination_id": "destination:region:starter",
+     "x_mm": 0,
+     "y_mm": 0,
+     "z_mm": 4000
+    }
+   ],
+   "elements": [
+    {
+     "element_id": "element:starter-ground",
+     "scale_milli": 1000,
+     "x_mm": 0,
+     "y_mm": 0,
+     "yaw_microradians": 0,
+     "z_mm": 0
+    }
+   ],
+   "schema_version": 1
+  },
+  "world/structure.json": {
+   "composer": {
+    "key": "authored-starter-world",
+    "version": 1
+   },
+   "digests": {
+    "graph_sha256": "<sha256:25>",
+    "layout_sha256": "<sha256:26>",
+    "neighborhood_sha256": "<sha256:27>",
+    "placement_sha256": "<sha256:28>",
+    "reconstruction_sha256": "<sha256:29>",
+    "snapshot_sha256": "<sha256:30>",
+    "topology_sha256": "<sha256:1>"
+   },
+   "invalidated": false,
+   "lineage": {
+    "parent_snapshot_id": null,
+    "revision": 0,
+    "snapshot_id": "urn:exulanica:wmp:structure:<urn:82>"
+   },
+   "package_projection": {
+    "compatibility": {
+     "composer_key": "authored-starter-world",
+     "composer_version": 1,
+     "fixed_point_coordinate_unit": "millimetre"
+    },
+    "input_snapshots": {
+     "graph_sha256": "<sha256:25>",
+     "reconstruction_sha256": "<sha256:29>"
+    },
+    "parent_snapshot_id": null,
+    "profile": "https://exulanica.local/profiles/spatial-authority/1",
+    "revision": 0,
+    "sections": [
+     {
+      "path": "world/topology.json",
+      "sha256": "<sha256:1>"
+     },
+     {
+      "path": "world/layout.json",
+      "sha256": "<sha256:26>"
+     },
+     {
+      "path": "world/placement.json",
+      "sha256": "<sha256:28>"
+     },
+     {
+      "path": "world/neighborhood.json",
+      "sha256": "<sha256:27>"
+     }
+    ],
+    "snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+    "snapshot_sha256": "<sha256:30>"
+   },
+   "profile": "exulanica-spatial-authority-projection-v1",
+   "state": "current"
+  },
+  "world/topology.json": {
+   "dependencies": [],
+   "elements": [
+    {
+     "attachment": null,
+     "collision": {
+      "kind": "none"
+     },
+     "element_id": "element:starter-ground",
+     "evidence": {
+      "kind": "none"
+     },
+     "lineage": {
+      "recipe_key": "region.authored-starter",
+      "recipe_version": 1,
+      "slot_key": "ground"
+     },
+     "module": {
+      "key": "region.authored-ground",
+      "requested_key": "region.authored-ground",
+      "version": 2
+     },
+     "owner": {
+      "id": "region:starter",
+      "kind": "region"
+     },
+     "streaming_key": "builtin:region.authored-ground@2"
+    }
+   ],
+   "navigation": {
+    "agent_radius_mm": 300,
+    "destinations": [
+     {
+      "destination_id": "destination:region:starter",
+      "region_id": "region:starter",
+      "required": true
+     }
+    ],
+    "edges": [],
+    "maximum_slope_millidegrees": 15000
+   },
+   "regions": [
+    {
+     "region_id": "region:starter"
+    }
+   ],
+   "schema_version": 1,
+   "world_id": "world:authored:<uuid:2>"
+  }
+ },
+ "documents": {
+  "003a74dfcfc15e3a": {
+   "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.0",
+   "asset_bytes": "not embedded: each asset is a SHA-256 content reference an authorized resolver must supply",
+   "base_profile": "exulanica-wmp-1.0",
+   "coordinate_space": "region_local: compose each object transform with its region's placement in world/placement.json",
+   "counts": {
+    "alternate_versions": 1,
+    "authored_objects": 1,
+    "authored_objects_present": 1,
+    "withheld_versions": 3
+   },
+   "extension": "exulanica-wmp-ext-authored-world",
+   "extension_version": "1.0",
+   "required_loader_capabilities": [
+    "asset-media:model/gltf-binary",
+    "asset-resolution:sha256-content-address",
+    "behaviour:motion.bounded-path@1",
+    "wmp-extension:exulanica-wmp-ext-authored-world@1.0"
+   ],
+   "runtime_code": "not carried: a behaviour is a reviewed identifier with bounded parameters, and a runtime that does not support it must show it as unsupported",
+   "sections": {
+    "assets": "extensions/authored-world-1.0/assets.json",
+    "behaviours": "extensions/authored-world-1.0/behaviours.json",
+    "versions": "extensions/authored-world-1.0/versions.json"
+   }
+  },
+  "0e0a8a2f434e7d0e": {
+   "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.0",
+   "asset_bytes": "not embedded: each reviewed object asset is a SHA-256 content reference an authorized resolver must supply",
+   "availability": "stated beside each instance and not part of state_sha256; a blob disappearing must not pretend the person authored a new version",
+   "base_profile": "exulanica-wmp-1.0",
+   "coordinate_space": "region_local: compose each instance and object transform with its region's placement in world/placement.json",
+   "counts": {
+    "alternate_versions": 0,
+    "authored_objects": 0,
+    "authored_objects_present": 0,
+    "environment_instances": 0,
+    "environment_instances_present": 0,
+    "withheld_versions": 1
+   },
+   "delta": "the environment-inclusive authored delta: schema version 2 when environment_instances are present, schema version 1 when they are not. This directory is not extensions/authored-world-1.0",
+   "extension": "exulanica-wmp-ext-environment-instances",
+   "extension_version": "1.0",
+   "omission": "a receiver that does not declare this extension must omit these versions and must not infer objects from exulanica-wmp-ext-authored-world@1.0 as the whole authored state",
+   "required_loader_capabilities": [
+    "wmp-extension:exulanica-wmp-ext-environment-instances@1.0"
+   ],
+   "runtime_code": "not carried: a behaviour is a reviewed identifier with bounded parameters, and a runtime that does not support it must show it as unsupported",
+   "sections": {
+    "assets": "extensions/environment-instances-1.0/assets.json",
+    "behaviours": "extensions/environment-instances-1.0/behaviours.json",
+    "versions": "extensions/environment-instances-1.0/versions.json"
+   },
+   "source_bytes": "not embedded: each environment source, render and index is a SHA-256 content reference an authorized resolver must supply",
+   "source_rights": "not granted: a signed package does not transfer compose, export or reuse rights on a pinned environment source"
+  },
+  "137409ef617a49b2": {
+   "@context": "https://w3id.org/ro/crate/1.2/context",
+   "@graph": [
+    {
+     "@id": "ro-crate-metadata.json",
+     "@type": "CreativeWork",
+     "about": {
+      "@id": "./"
+     },
+     "conformsTo": {
+      "@id": "https://w3id.org/ro/crate/1.2"
+     }
+    },
+    {
+     "@id": "./",
+     "@type": "Dataset",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/1.0"
+     },
+     "description": "A signed, privacy-bounded projection of compatible Exulanica world memory state.",
+     "hasPart": [
+      {
+       "@id": "appearance/style.json"
+      },
+      {
+       "@id": "deletion/tombstones.json"
+      },
+      {
+       "@id": "evaluation/results.json"
+      },
+      {
+       "@id": "evidence/descriptors.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.1/assets.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.1/behaviours.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.1/extension.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.1/versions.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/assets.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/behaviours.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/extension.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/versions.json"
+      },
+      {
+       "@id": "external/fetch.json"
+      },
+      {
+       "@id": "interaction/policy.json"
+      },
+      {
+       "@id": "memory/graph.json"
+      },
+      {
+       "@id": "policy/export.json"
+      },
+      {
+       "@id": "provenance/events.json"
+      },
+      {
+       "@id": "provenance/package.json"
+      },
+      {
+       "@id": "reconstruction/artifacts.json"
+      },
+      {
+       "@id": "wmp/profile.json"
+      },
+      {
+       "@id": "world/layout.json"
+      },
+      {
+       "@id": "world/neighborhood.json"
+      },
+      {
+       "@id": "world/placement.json"
+      },
+      {
+       "@id": "world/structure.json"
+      },
+      {
+       "@id": "world/topology.json"
+      }
+     ],
+     "name": "Exulanica World Memory Package"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "Versioned requirements for World Memory Package 1.0.",
+     "name": "Exulanica World Memory Package Profile 1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "#responsible-ai-boundary",
+     "@type": "Dataset",
+     "about": {
+      "@id": "./"
+     },
+     "citeAs": "Exulanica World Memory Package",
+     "description": "A Croissant 1.0 and RAI 1.0 compatibility node for the package privacy boundary.",
+     "http://mlcommons.org/croissant/RAI/dataLimitations": [
+      "Raw media and sensitive runtime material are excluded by default.",
+      "A package signature proves integrity, not export authorization."
+     ],
+     "http://mlcommons.org/croissant/RAI/personalSensitiveInformation": "Compatible world metadata may describe personal memories; authorization remains external to this portable package.",
+     "http://mlcommons.org/croissant/isLiveDataset": false,
+     "http://purl.org/dc/terms/conformsTo": [
+      "http://mlcommons.org/croissant/1.0",
+      "http://mlcommons.org/croissant/RAI/1.0"
+     ],
+     "license": "Apache-2.0",
+     "name": "Responsible AI and privacy boundary",
+     "url": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.1",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying alternate versions, authored objects, behaviour references and the edits that give a placed object a behaviour, change it or take it away.",
+     "name": "Exulanica WMP authored-world extension 1.1",
+     "version": "1.1"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying environment-inclusive authored state and environment instance availability.",
+     "name": "Exulanica WMP environment-instances extension 1.0",
+     "version": "1.0"
+    },
+    {
+     "@id": "appearance/style.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "appearance/style.json",
+     "sha256": "<sha256:37>"
+    },
+    {
+     "@id": "deletion/tombstones.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "deletion/tombstones.json",
+     "sha256": "<sha256:38>"
+    },
+    {
+     "@id": "evaluation/results.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evaluation/results.json",
+     "sha256": "<sha256:39>"
+    },
+    {
+     "@id": "evidence/descriptors.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evidence/descriptors.json",
+     "sha256": "<sha256:40>"
+    },
+    {
+     "@id": "extensions/authored-world-1.1/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.1/assets.json",
+     "sha256": "<sha256:41>"
+    },
+    {
+     "@id": "extensions/authored-world-1.1/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.1/behaviours.json",
+     "sha256": "<sha256:42>"
+    },
+    {
+     "@id": "extensions/authored-world-1.1/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.1"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.1/extension.json",
+     "sha256": "<sha256:43>"
+    },
+    {
+     "@id": "extensions/authored-world-1.1/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.1/versions.json",
+     "sha256": "<sha256:44>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/assets.json",
+     "sha256": "<sha256:45>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/behaviours.json",
+     "sha256": "<sha256:46>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.0"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/extension.json",
+     "sha256": "<sha256:47>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/versions.json",
+     "sha256": "<sha256:48>"
+    },
+    {
+     "@id": "external/fetch.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "external/fetch.json",
+     "sha256": "<sha256:49>"
+    },
+    {
+     "@id": "interaction/policy.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "interaction/policy.json",
+     "sha256": "<sha256:50>"
+    },
+    {
+     "@id": "memory/graph.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "memory/graph.json",
+     "sha256": "<sha256:51>"
+    },
+    {
+     "@id": "policy/export.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "policy/export.json",
+     "sha256": "<sha256:52>"
+    },
+    {
+     "@id": "provenance/events.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/events.json",
+     "sha256": "<sha256:53>"
+    },
+    {
+     "@id": "provenance/package.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/package.json",
+     "sha256": "<sha256:54>"
+    },
+    {
+     "@id": "reconstruction/artifacts.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "reconstruction/artifacts.json",
+     "sha256": "<sha256:55>"
+    },
+    {
+     "@id": "wmp/profile.json",
+     "@type": "File",
+     "encodingFormat": "application/ld+json",
+     "name": "wmp/profile.json",
+     "sha256": "<sha256:56>"
+    },
+    {
+     "@id": "world/layout.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/layout.json",
+     "sha256": "<sha256:26>"
+    },
+    {
+     "@id": "world/neighborhood.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/neighborhood.json",
+     "sha256": "<sha256:27>"
+    },
+    {
+     "@id": "world/placement.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/placement.json",
+     "sha256": "<sha256:28>"
+    },
+    {
+     "@id": "world/structure.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/structure.json",
+     "sha256": "<sha256:57>"
+    },
+    {
+     "@id": "world/topology.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/topology.json",
+     "sha256": "<sha256:1>"
+    }
+   ]
+  },
+  "14e3a76efce68e20": {
+   "@context": "https://w3id.org/ro/crate/1.2/context",
+   "@graph": [
+    {
+     "@id": "ro-crate-metadata.json",
+     "@type": "CreativeWork",
+     "about": {
+      "@id": "./"
+     },
+     "conformsTo": {
+      "@id": "https://w3id.org/ro/crate/1.2"
+     }
+    },
+    {
+     "@id": "./",
+     "@type": "Dataset",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/1.0"
+     },
+     "description": "A signed, privacy-bounded projection of compatible Exulanica world memory state.",
+     "hasPart": [
+      {
+       "@id": "appearance/style.json"
+      },
+      {
+       "@id": "deletion/tombstones.json"
+      },
+      {
+       "@id": "evaluation/results.json"
+      },
+      {
+       "@id": "evidence/descriptors.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/assets.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/behaviours.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/extension.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/versions.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/assets.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/behaviours.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/extension.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/versions.json"
+      },
+      {
+       "@id": "external/fetch.json"
+      },
+      {
+       "@id": "interaction/policy.json"
+      },
+      {
+       "@id": "memory/graph.json"
+      },
+      {
+       "@id": "policy/export.json"
+      },
+      {
+       "@id": "provenance/events.json"
+      },
+      {
+       "@id": "provenance/package.json"
+      },
+      {
+       "@id": "reconstruction/artifacts.json"
+      },
+      {
+       "@id": "wmp/profile.json"
+      },
+      {
+       "@id": "world/layout.json"
+      },
+      {
+       "@id": "world/neighborhood.json"
+      },
+      {
+       "@id": "world/placement.json"
+      },
+      {
+       "@id": "world/structure.json"
+      },
+      {
+       "@id": "world/topology.json"
+      }
+     ],
+     "name": "Exulanica World Memory Package"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "Versioned requirements for World Memory Package 1.0.",
+     "name": "Exulanica World Memory Package Profile 1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "#responsible-ai-boundary",
+     "@type": "Dataset",
+     "about": {
+      "@id": "./"
+     },
+     "citeAs": "Exulanica World Memory Package",
+     "description": "A Croissant 1.0 and RAI 1.0 compatibility node for the package privacy boundary.",
+     "http://mlcommons.org/croissant/RAI/dataLimitations": [
+      "Raw media and sensitive runtime material are excluded by default.",
+      "A package signature proves integrity, not export authorization."
+     ],
+     "http://mlcommons.org/croissant/RAI/personalSensitiveInformation": "Compatible world metadata may describe personal memories; authorization remains external to this portable package.",
+     "http://mlcommons.org/croissant/isLiveDataset": false,
+     "http://purl.org/dc/terms/conformsTo": [
+      "http://mlcommons.org/croissant/1.0",
+      "http://mlcommons.org/croissant/RAI/1.0"
+     ],
+     "license": "Apache-2.0",
+     "name": "Responsible AI and privacy boundary",
+     "url": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying alternate versions, authored objects and behaviour references.",
+     "name": "Exulanica WMP authored-world extension 1.0",
+     "version": "1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying environment-inclusive authored state and environment instance availability.",
+     "name": "Exulanica WMP environment-instances extension 1.0",
+     "version": "1.0"
+    },
+    {
+     "@id": "appearance/style.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "appearance/style.json",
+     "sha256": "<sha256:35>"
+    },
+    {
+     "@id": "deletion/tombstones.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "deletion/tombstones.json",
+     "sha256": "<sha256:36>"
+    },
+    {
+     "@id": "evaluation/results.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evaluation/results.json",
+     "sha256": "<sha256:37>"
+    },
+    {
+     "@id": "evidence/descriptors.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evidence/descriptors.json",
+     "sha256": "<sha256:38>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/assets.json",
+     "sha256": "<sha256:39>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/behaviours.json",
+     "sha256": "<sha256:40>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.0"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/extension.json",
+     "sha256": "<sha256:41>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/versions.json",
+     "sha256": "<sha256:42>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/assets.json",
+     "sha256": "<sha256:43>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/behaviours.json",
+     "sha256": "<sha256:44>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.0"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/extension.json",
+     "sha256": "<sha256:45>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/versions.json",
+     "sha256": "<sha256:46>"
+    },
+    {
+     "@id": "external/fetch.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "external/fetch.json",
+     "sha256": "<sha256:47>"
+    },
+    {
+     "@id": "interaction/policy.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "interaction/policy.json",
+     "sha256": "<sha256:48>"
+    },
+    {
+     "@id": "memory/graph.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "memory/graph.json",
+     "sha256": "<sha256:49>"
+    },
+    {
+     "@id": "policy/export.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "policy/export.json",
+     "sha256": "<sha256:50>"
+    },
+    {
+     "@id": "provenance/events.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/events.json",
+     "sha256": "<sha256:51>"
+    },
+    {
+     "@id": "provenance/package.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/package.json",
+     "sha256": "<sha256:52>"
+    },
+    {
+     "@id": "reconstruction/artifacts.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "reconstruction/artifacts.json",
+     "sha256": "<sha256:53>"
+    },
+    {
+     "@id": "wmp/profile.json",
+     "@type": "File",
+     "encodingFormat": "application/ld+json",
+     "name": "wmp/profile.json",
+     "sha256": "<sha256:54>"
+    },
+    {
+     "@id": "world/layout.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/layout.json",
+     "sha256": "<sha256:26>"
+    },
+    {
+     "@id": "world/neighborhood.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/neighborhood.json",
+     "sha256": "<sha256:27>"
+    },
+    {
+     "@id": "world/placement.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/placement.json",
+     "sha256": "<sha256:28>"
+    },
+    {
+     "@id": "world/structure.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/structure.json",
+     "sha256": "<sha256:55>"
+    },
+    {
+     "@id": "world/topology.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/topology.json",
+     "sha256": "<sha256:1>"
+    }
+   ]
+  },
+  "1c4c8d0ecde845a1": {
+   "items": [
+    {
+     "asset_key": "cc0.marker-cube",
+     "byte_size": 780,
+     "content_sha256": "<sha256:31>",
+     "licence_id": "CC0-1.0",
+     "licence_sha256": "<sha256:32>",
+     "media_type": "model/gltf-binary",
+     "ni_uri": "ni:///sha-256;tBKJrBBUjPaY1GoVIGyqjnRLC4APSsKSYMmfGNi4Mdk",
+     "retrieval": "requires an authorized content-addressed resolver",
+     "summary": "A half-metre cube resting on the ground plane.",
+     "title": "Marker cube"
+    }
+   ],
+   "profile": "exulanica-wmp-ext-authored-world-assets-v1"
+  },
+  "21fdd9982ae5e957": {
+   "@context": "https://w3id.org/ro/crate/1.2/context",
+   "@graph": [
+    {
+     "@id": "ro-crate-metadata.json",
+     "@type": "CreativeWork",
+     "about": {
+      "@id": "./"
+     },
+     "conformsTo": {
+      "@id": "https://w3id.org/ro/crate/1.2"
+     }
+    },
+    {
+     "@id": "./",
+     "@type": "Dataset",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/1.0"
+     },
+     "description": "A signed, privacy-bounded projection of compatible Exulanica world memory state.",
+     "hasPart": [
+      {
+       "@id": "appearance/style.json"
+      },
+      {
+       "@id": "deletion/tombstones.json"
+      },
+      {
+       "@id": "evaluation/results.json"
+      },
+      {
+       "@id": "evidence/descriptors.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.1/assets.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.1/behaviours.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.1/extension.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.1/versions.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/assets.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/behaviours.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/extension.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/versions.json"
+      },
+      {
+       "@id": "external/fetch.json"
+      },
+      {
+       "@id": "interaction/policy.json"
+      },
+      {
+       "@id": "memory/graph.json"
+      },
+      {
+       "@id": "policy/export.json"
+      },
+      {
+       "@id": "provenance/events.json"
+      },
+      {
+       "@id": "provenance/package.json"
+      },
+      {
+       "@id": "reconstruction/artifacts.json"
+      },
+      {
+       "@id": "wmp/profile.json"
+      },
+      {
+       "@id": "world/layout.json"
+      },
+      {
+       "@id": "world/neighborhood.json"
+      },
+      {
+       "@id": "world/placement.json"
+      },
+      {
+       "@id": "world/structure.json"
+      },
+      {
+       "@id": "world/topology.json"
+      }
+     ],
+     "name": "Exulanica World Memory Package"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "Versioned requirements for World Memory Package 1.0.",
+     "name": "Exulanica World Memory Package Profile 1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "#responsible-ai-boundary",
+     "@type": "Dataset",
+     "about": {
+      "@id": "./"
+     },
+     "citeAs": "Exulanica World Memory Package",
+     "description": "A Croissant 1.0 and RAI 1.0 compatibility node for the package privacy boundary.",
+     "http://mlcommons.org/croissant/RAI/dataLimitations": [
+      "Raw media and sensitive runtime material are excluded by default.",
+      "A package signature proves integrity, not export authorization."
+     ],
+     "http://mlcommons.org/croissant/RAI/personalSensitiveInformation": "Compatible world metadata may describe personal memories; authorization remains external to this portable package.",
+     "http://mlcommons.org/croissant/isLiveDataset": false,
+     "http://purl.org/dc/terms/conformsTo": [
+      "http://mlcommons.org/croissant/1.0",
+      "http://mlcommons.org/croissant/RAI/1.0"
+     ],
+     "license": "Apache-2.0",
+     "name": "Responsible AI and privacy boundary",
+     "url": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.1",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying alternate versions, authored objects, behaviour references and the edits that give a placed object a behaviour, change it or take it away.",
+     "name": "Exulanica WMP authored-world extension 1.1",
+     "version": "1.1"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.1",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying environment-inclusive authored state, environment instance availability and the edits that give a placed object a behaviour, change it or take it away.",
+     "name": "Exulanica WMP environment-instances extension 1.1",
+     "version": "1.1"
+    },
+    {
+     "@id": "appearance/style.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "appearance/style.json",
+     "sha256": "<sha256:44>"
+    },
+    {
+     "@id": "deletion/tombstones.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "deletion/tombstones.json",
+     "sha256": "<sha256:45>"
+    },
+    {
+     "@id": "evaluation/results.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evaluation/results.json",
+     "sha256": "<sha256:46>"
+    },
+    {
+     "@id": "evidence/descriptors.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evidence/descriptors.json",
+     "sha256": "<sha256:47>"
+    },
+    {
+     "@id": "extensions/authored-world-1.1/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.1/assets.json",
+     "sha256": "<sha256:48>"
+    },
+    {
+     "@id": "extensions/authored-world-1.1/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.1/behaviours.json",
+     "sha256": "<sha256:49>"
+    },
+    {
+     "@id": "extensions/authored-world-1.1/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.1"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.1/extension.json",
+     "sha256": "<sha256:50>"
+    },
+    {
+     "@id": "extensions/authored-world-1.1/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.1/versions.json",
+     "sha256": "<sha256:51>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/assets.json",
+     "sha256": "<sha256:52>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/behaviours.json",
+     "sha256": "<sha256:53>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.1"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/extension.json",
+     "sha256": "<sha256:54>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/versions.json",
+     "sha256": "<sha256:55>"
+    },
+    {
+     "@id": "external/fetch.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "external/fetch.json",
+     "sha256": "<sha256:56>"
+    },
+    {
+     "@id": "interaction/policy.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "interaction/policy.json",
+     "sha256": "<sha256:57>"
+    },
+    {
+     "@id": "memory/graph.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "memory/graph.json",
+     "sha256": "<sha256:58>"
+    },
+    {
+     "@id": "policy/export.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "policy/export.json",
+     "sha256": "<sha256:59>"
+    },
+    {
+     "@id": "provenance/events.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/events.json",
+     "sha256": "<sha256:60>"
+    },
+    {
+     "@id": "provenance/package.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/package.json",
+     "sha256": "<sha256:61>"
+    },
+    {
+     "@id": "reconstruction/artifacts.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "reconstruction/artifacts.json",
+     "sha256": "<sha256:62>"
+    },
+    {
+     "@id": "wmp/profile.json",
+     "@type": "File",
+     "encodingFormat": "application/ld+json",
+     "name": "wmp/profile.json",
+     "sha256": "<sha256:63>"
+    },
+    {
+     "@id": "world/layout.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/layout.json",
+     "sha256": "<sha256:26>"
+    },
+    {
+     "@id": "world/neighborhood.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/neighborhood.json",
+     "sha256": "<sha256:27>"
+    },
+    {
+     "@id": "world/placement.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/placement.json",
+     "sha256": "<sha256:28>"
+    },
+    {
+     "@id": "world/structure.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/structure.json",
+     "sha256": "<sha256:64>"
+    },
+    {
+     "@id": "world/topology.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/topology.json",
+     "sha256": "<sha256:1>"
+    }
+   ]
+  },
+  "261ec895397399cb": {
+   "items": [
+    {
+     "behaviour_key": "motion.bounded-path",
+     "behaviour_version": 1,
+     "parameters": {
+      "axis": {
+       "choices": [
+        "x",
+        "y",
+        "z"
+       ],
+       "default": "x",
+       "kind": "choice"
+      },
+      "easing": {
+       "choices": [
+        "linear",
+        "smooth"
+       ],
+       "default": "smooth",
+       "kind": "choice"
+      },
+      "period_milliseconds": {
+       "default": 4000,
+       "kind": "integer",
+       "maximum": 60000,
+       "minimum": 500
+      },
+      "travel_mm": {
+       "default": 1000,
+       "kind": "integer",
+       "maximum": 10000,
+       "minimum": 100
+      }
+     },
+     "summary": "Bounded reversing travel along one axis, with renderer trigger, stop and reset controls."
+    }
+   ],
+   "profile": "exulanica-wmp-ext-environment-instances-behaviours-v1"
+  },
+  "39bfd8ad7d4455ba": {
+   "@context": "https://w3id.org/ro/crate/1.2/context",
+   "@graph": [
+    {
+     "@id": "ro-crate-metadata.json",
+     "@type": "CreativeWork",
+     "about": {
+      "@id": "./"
+     },
+     "conformsTo": {
+      "@id": "https://w3id.org/ro/crate/1.2"
+     }
+    },
+    {
+     "@id": "./",
+     "@type": "Dataset",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/1.0"
+     },
+     "description": "A signed, privacy-bounded projection of compatible Exulanica world memory state.",
+     "hasPart": [
+      {
+       "@id": "appearance/style.json"
+      },
+      {
+       "@id": "deletion/tombstones.json"
+      },
+      {
+       "@id": "evaluation/results.json"
+      },
+      {
+       "@id": "evidence/descriptors.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/assets.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/behaviours.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/extension.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/versions.json"
+      },
+      {
+       "@id": "external/fetch.json"
+      },
+      {
+       "@id": "interaction/policy.json"
+      },
+      {
+       "@id": "memory/graph.json"
+      },
+      {
+       "@id": "policy/export.json"
+      },
+      {
+       "@id": "provenance/events.json"
+      },
+      {
+       "@id": "provenance/package.json"
+      },
+      {
+       "@id": "reconstruction/artifacts.json"
+      },
+      {
+       "@id": "wmp/profile.json"
+      },
+      {
+       "@id": "world/layout.json"
+      },
+      {
+       "@id": "world/neighborhood.json"
+      },
+      {
+       "@id": "world/placement.json"
+      },
+      {
+       "@id": "world/structure.json"
+      },
+      {
+       "@id": "world/topology.json"
+      }
+     ],
+     "name": "Exulanica World Memory Package"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "Versioned requirements for World Memory Package 1.0.",
+     "name": "Exulanica World Memory Package Profile 1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "#responsible-ai-boundary",
+     "@type": "Dataset",
+     "about": {
+      "@id": "./"
+     },
+     "citeAs": "Exulanica World Memory Package",
+     "description": "A Croissant 1.0 and RAI 1.0 compatibility node for the package privacy boundary.",
+     "http://mlcommons.org/croissant/RAI/dataLimitations": [
+      "Raw media and sensitive runtime material are excluded by default.",
+      "A package signature proves integrity, not export authorization."
+     ],
+     "http://mlcommons.org/croissant/RAI/personalSensitiveInformation": "Compatible world metadata may describe personal memories; authorization remains external to this portable package.",
+     "http://mlcommons.org/croissant/isLiveDataset": false,
+     "http://purl.org/dc/terms/conformsTo": [
+      "http://mlcommons.org/croissant/1.0",
+      "http://mlcommons.org/croissant/RAI/1.0"
+     ],
+     "license": "Apache-2.0",
+     "name": "Responsible AI and privacy boundary",
+     "url": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying alternate versions, authored objects and behaviour references.",
+     "name": "Exulanica WMP authored-world extension 1.0",
+     "version": "1.0"
+    },
+    {
+     "@id": "appearance/style.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "appearance/style.json",
+     "sha256": "<sha256:35>"
+    },
+    {
+     "@id": "deletion/tombstones.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "deletion/tombstones.json",
+     "sha256": "<sha256:36>"
+    },
+    {
+     "@id": "evaluation/results.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evaluation/results.json",
+     "sha256": "<sha256:37>"
+    },
+    {
+     "@id": "evidence/descriptors.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evidence/descriptors.json",
+     "sha256": "<sha256:38>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/assets.json",
+     "sha256": "<sha256:39>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/behaviours.json",
+     "sha256": "<sha256:40>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.0"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/extension.json",
+     "sha256": "<sha256:41>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/versions.json",
+     "sha256": "<sha256:42>"
+    },
+    {
+     "@id": "external/fetch.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "external/fetch.json",
+     "sha256": "<sha256:43>"
+    },
+    {
+     "@id": "interaction/policy.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "interaction/policy.json",
+     "sha256": "<sha256:44>"
+    },
+    {
+     "@id": "memory/graph.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "memory/graph.json",
+     "sha256": "<sha256:45>"
+    },
+    {
+     "@id": "policy/export.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "policy/export.json",
+     "sha256": "<sha256:46>"
+    },
+    {
+     "@id": "provenance/events.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/events.json",
+     "sha256": "<sha256:47>"
+    },
+    {
+     "@id": "provenance/package.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/package.json",
+     "sha256": "<sha256:48>"
+    },
+    {
+     "@id": "reconstruction/artifacts.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "reconstruction/artifacts.json",
+     "sha256": "<sha256:49>"
+    },
+    {
+     "@id": "wmp/profile.json",
+     "@type": "File",
+     "encodingFormat": "application/ld+json",
+     "name": "wmp/profile.json",
+     "sha256": "<sha256:50>"
+    },
+    {
+     "@id": "world/layout.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/layout.json",
+     "sha256": "<sha256:26>"
+    },
+    {
+     "@id": "world/neighborhood.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/neighborhood.json",
+     "sha256": "<sha256:27>"
+    },
+    {
+     "@id": "world/placement.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/placement.json",
+     "sha256": "<sha256:28>"
+    },
+    {
+     "@id": "world/structure.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/structure.json",
+     "sha256": "<sha256:51>"
+    },
+    {
+     "@id": "world/topology.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/topology.json",
+     "sha256": "<sha256:1>"
+    }
+   ]
+  },
+  "40f65d0f76b03138": {
+   "@context": "https://w3id.org/ro/crate/1.2/context",
+   "@graph": [
+    {
+     "@id": "ro-crate-metadata.json",
+     "@type": "CreativeWork",
+     "about": {
+      "@id": "./"
+     },
+     "conformsTo": {
+      "@id": "https://w3id.org/ro/crate/1.2"
+     }
+    },
+    {
+     "@id": "./",
+     "@type": "Dataset",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/1.0"
+     },
+     "description": "A signed, privacy-bounded projection of compatible Exulanica world memory state.",
+     "hasPart": [
+      {
+       "@id": "appearance/style.json"
+      },
+      {
+       "@id": "deletion/tombstones.json"
+      },
+      {
+       "@id": "evaluation/results.json"
+      },
+      {
+       "@id": "evidence/descriptors.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/assets.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/behaviours.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/extension.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.0/versions.json"
+      },
+      {
+       "@id": "external/fetch.json"
+      },
+      {
+       "@id": "interaction/policy.json"
+      },
+      {
+       "@id": "memory/graph.json"
+      },
+      {
+       "@id": "policy/export.json"
+      },
+      {
+       "@id": "provenance/events.json"
+      },
+      {
+       "@id": "provenance/package.json"
+      },
+      {
+       "@id": "reconstruction/artifacts.json"
+      },
+      {
+       "@id": "wmp/profile.json"
+      },
+      {
+       "@id": "world/layout.json"
+      },
+      {
+       "@id": "world/neighborhood.json"
+      },
+      {
+       "@id": "world/placement.json"
+      },
+      {
+       "@id": "world/structure.json"
+      },
+      {
+       "@id": "world/topology.json"
+      }
+     ],
+     "name": "Exulanica World Memory Package"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "Versioned requirements for World Memory Package 1.0.",
+     "name": "Exulanica World Memory Package Profile 1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "#responsible-ai-boundary",
+     "@type": "Dataset",
+     "about": {
+      "@id": "./"
+     },
+     "citeAs": "Exulanica World Memory Package",
+     "description": "A Croissant 1.0 and RAI 1.0 compatibility node for the package privacy boundary.",
+     "http://mlcommons.org/croissant/RAI/dataLimitations": [
+      "Raw media and sensitive runtime material are excluded by default.",
+      "A package signature proves integrity, not export authorization."
+     ],
+     "http://mlcommons.org/croissant/RAI/personalSensitiveInformation": "Compatible world metadata may describe personal memories; authorization remains external to this portable package.",
+     "http://mlcommons.org/croissant/isLiveDataset": false,
+     "http://purl.org/dc/terms/conformsTo": [
+      "http://mlcommons.org/croissant/1.0",
+      "http://mlcommons.org/croissant/RAI/1.0"
+     ],
+     "license": "Apache-2.0",
+     "name": "Responsible AI and privacy boundary",
+     "url": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying environment-inclusive authored state and environment instance availability.",
+     "name": "Exulanica WMP environment-instances extension 1.0",
+     "version": "1.0"
+    },
+    {
+     "@id": "appearance/style.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "appearance/style.json",
+     "sha256": "<sha256:31>"
+    },
+    {
+     "@id": "deletion/tombstones.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "deletion/tombstones.json",
+     "sha256": "<sha256:32>"
+    },
+    {
+     "@id": "evaluation/results.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evaluation/results.json",
+     "sha256": "<sha256:33>"
+    },
+    {
+     "@id": "evidence/descriptors.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evidence/descriptors.json",
+     "sha256": "<sha256:34>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/assets.json",
+     "sha256": "<sha256:35>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/behaviours.json",
+     "sha256": "<sha256:36>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.0"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/extension.json",
+     "sha256": "<sha256:37>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.0/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.0/versions.json",
+     "sha256": "<sha256:38>"
+    },
+    {
+     "@id": "external/fetch.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "external/fetch.json",
+     "sha256": "<sha256:39>"
+    },
+    {
+     "@id": "interaction/policy.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "interaction/policy.json",
+     "sha256": "<sha256:40>"
+    },
+    {
+     "@id": "memory/graph.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "memory/graph.json",
+     "sha256": "<sha256:41>"
+    },
+    {
+     "@id": "policy/export.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "policy/export.json",
+     "sha256": "<sha256:42>"
+    },
+    {
+     "@id": "provenance/events.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/events.json",
+     "sha256": "<sha256:43>"
+    },
+    {
+     "@id": "provenance/package.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/package.json",
+     "sha256": "<sha256:44>"
+    },
+    {
+     "@id": "reconstruction/artifacts.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "reconstruction/artifacts.json",
+     "sha256": "<sha256:45>"
+    },
+    {
+     "@id": "wmp/profile.json",
+     "@type": "File",
+     "encodingFormat": "application/ld+json",
+     "name": "wmp/profile.json",
+     "sha256": "<sha256:46>"
+    },
+    {
+     "@id": "world/layout.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/layout.json",
+     "sha256": "<sha256:26>"
+    },
+    {
+     "@id": "world/neighborhood.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/neighborhood.json",
+     "sha256": "<sha256:27>"
+    },
+    {
+     "@id": "world/placement.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/placement.json",
+     "sha256": "<sha256:28>"
+    },
+    {
+     "@id": "world/structure.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/structure.json",
+     "sha256": "<sha256:47>"
+    },
+    {
+     "@id": "world/topology.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/topology.json",
+     "sha256": "<sha256:1>"
+    }
+   ]
+  },
+  "4beda2be09492e93": {
+   "items": [
+    {
+     "created_at": "<time:60>",
+     "delta": {
+      "element_overrides": [],
+      "environment_instances": [
+       {
+        "instance_id": "environment:fair",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "source": {
+         "admission_id": "<uuid:3>",
+         "anchor": {
+          "coordinate_scale": 1000,
+          "coordinates": [
+           10,
+           20,
+           0
+          ],
+          "frame_name": "nyc-grid"
+         },
+         "bounds": {
+          "coordinate_scale": 1000,
+          "coordinates": [
+           0,
+           0,
+           0,
+           100000,
+           100000,
+           10000
+          ],
+          "frame_name": "nyc-grid",
+          "kind": "bbox"
+         },
+         "frame": {
+          "altitude_reference": "NAVD88",
+          "axis_order": [
+           "east",
+           "north",
+           "height"
+          ],
+          "crs": "EPSG:6539",
+          "horizontal_unit": "metre",
+          "name": "nyc-grid",
+          "orientation": "right-handed",
+          "vertical_unit": "metre"
+         },
+         "index": null,
+         "place_id": "<uuid:4>",
+         "render_asset": {
+          "asset_id": "<uuid:5>",
+          "content_sha256": "<sha256:35>",
+          "receipt_sha256": "<sha256:36>"
+         },
+         "selection": {
+          "feature_id": null,
+          "kind": "whole_asset",
+          "render_batch_id": null
+         },
+         "source": {
+          "content_sha256": "<sha256:37>",
+          "receipt_sha256": "<sha256:38>"
+         }
+        },
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 0,
+         "y_mm": 0,
+         "yaw_microradians": 0,
+         "z_mm": 0
+        }
+       }
+      ],
+      "objects": [
+       {
+        "asset_sha256": "<sha256:31>",
+        "behaviour": {
+         "behaviour_key": "motion.bounded-path",
+         "behaviour_version": 1,
+         "parameters": {
+          "axis": "y",
+          "easing": "linear",
+          "period_milliseconds": 3000,
+          "travel_mm": 600
+         }
+        },
+        "object_id": "object:flag",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 1200,
+         "y_mm": 0,
+         "yaw_microradians": 785398,
+         "z_mm": -450
+        }
+       }
+      ],
+      "schema_version": 2
+     },
+     "edit_seq": 3,
+     "edits": [
+      {
+       "base_state_sha256": "<sha256:33>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:85>",
+       "edit_seq": 1,
+       "element_id": null,
+       "environment_instance_id": "environment:fair",
+       "kind": "add_environment",
+       "object_id": null,
+       "recorded_at": "<time:61>",
+       "result_state_sha256": "<sha256:39>",
+       "undone_edit_id": null
+      },
+      {
+       "base_state_sha256": "<sha256:39>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:86>",
+       "edit_seq": 2,
+       "element_id": null,
+       "environment_instance_id": null,
+       "kind": "add_object",
+       "object_id": "object:flag",
+       "recorded_at": "<time:62>",
+       "result_state_sha256": "<sha256:40>",
+       "undone_edit_id": null
+      },
+      {
+       "base_state_sha256": "<sha256:40>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:87>",
+       "edit_seq": 3,
+       "element_id": null,
+       "environment_instance_id": null,
+       "kind": "set_object_behaviour",
+       "object_id": "object:flag",
+       "recorded_at": "<time:63>",
+       "result_state_sha256": "<sha256:41>",
+       "undone_edit_id": null
+      }
+     ],
+     "environment_availability": [
+      {
+       "availability": "available",
+       "instance_id": "environment:fair"
+      }
+     ],
+     "origin": "authored",
+     "parent_version_id": null,
+     "source_snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "state_sha256": "<sha256:41>",
+     "style_version_id": null,
+     "title": "Starter fair",
+     "version_id": "urn:exulanica:wmp:alternate-version:<urn:88>"
+    }
+   ],
+   "profile": "exulanica-wmp-ext-environment-instances-versions-v2",
+   "source_snapshots": [
+    {
+     "current": true,
+     "element_ids": [
+      "element:starter-ground"
+     ],
+     "region_ids": [
+      "region:starter"
+     ],
+     "snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "snapshot_sha256": "<sha256:30>"
+    }
+   ],
+   "withheld": {
+    "reasons": [],
+    "rule": "counted and not named: a version is withheld when a committed deletion invalidated its source snapshot, when it or a version it was branched from carries an edit kind this extension version does not admit, or holds a delta section it does not carry; names are those kinds or sections",
+    "versions": 0
+   }
+  },
+  "4e700d74f6dfd34c": {
+   "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.1",
+   "asset_bytes": "not embedded: each asset is a SHA-256 content reference an authorized resolver must supply",
+   "base_profile": "exulanica-wmp-1.0",
+   "coordinate_space": "region_local: compose each object transform with its region's placement in world/placement.json",
+   "counts": {
+    "alternate_versions": 2,
+    "authored_objects": 2,
+    "authored_objects_present": 2,
+    "withheld_versions": 2
+   },
+   "extension": "exulanica-wmp-ext-authored-world",
+   "extension_version": "1.1",
+   "required_loader_capabilities": [
+    "asset-media:model/gltf-binary",
+    "asset-resolution:sha256-content-address",
+    "behaviour:motion.bounded-path@1",
+    "wmp-extension:exulanica-wmp-ext-authored-world@1.1"
+   ],
+   "runtime_code": "not carried: a behaviour is a reviewed identifier with bounded parameters, and a runtime that does not support it must show it as unsupported",
+   "sections": {
+    "assets": "extensions/authored-world-1.1/assets.json",
+    "behaviours": "extensions/authored-world-1.1/behaviours.json",
+    "versions": "extensions/authored-world-1.1/versions.json"
+   }
+  },
+  "510760e9351382a5": {
+   "items": [
+    {
+     "created_at": "<time:58>",
+     "delta": {
+      "element_overrides": [],
+      "objects": [
+       {
+        "asset_sha256": "<sha256:31>",
+        "behaviour": {
+         "behaviour_key": "motion.bounded-path",
+         "behaviour_version": 1,
+         "parameters": {
+          "axis": "y",
+          "easing": "linear",
+          "period_milliseconds": 3000,
+          "travel_mm": 600
+         }
+        },
+        "object_id": "object:lantern",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 1200,
+         "y_mm": 0,
+         "yaw_microradians": 785398,
+         "z_mm": -450
+        }
+       }
+      ],
+      "schema_version": 1
+     },
+     "edit_seq": 1,
+     "edits": [
+      {
+       "base_state_sha256": "<sha256:33>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:83>",
+       "edit_seq": 1,
+       "element_id": null,
+       "kind": "add_object",
+       "object_id": "object:lantern",
+       "recorded_at": "<time:59>",
+       "result_state_sha256": "<sha256:34>",
+       "undone_edit_id": null
+      }
+     ],
+     "origin": "authored",
+     "parent_version_id": null,
+     "source_snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "state_sha256": "<sha256:34>",
+     "style_version_id": null,
+     "title": "Starter lantern",
+     "version_id": "urn:exulanica:wmp:alternate-version:<urn:84>"
+    }
+   ],
+   "profile": "exulanica-wmp-ext-authored-world-versions-v1",
+   "source_snapshots": [
+    {
+     "current": true,
+     "element_ids": [
+      "element:starter-ground"
+     ],
+     "region_ids": [
+      "region:starter"
+     ],
+     "snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "snapshot_sha256": "<sha256:30>"
+    }
+   ],
+   "withheld": {
+    "invalidated_source_versions": 3,
+    "reason": "a committed deletion invalidated the source snapshot; the version is not exported"
+   }
+  },
+  "56d2a4f999d85863": {
+   "@context": "https://w3id.org/ro/crate/1.2/context",
+   "@graph": [
+    {
+     "@id": "ro-crate-metadata.json",
+     "@type": "CreativeWork",
+     "about": {
+      "@id": "./"
+     },
+     "conformsTo": {
+      "@id": "https://w3id.org/ro/crate/1.2"
+     }
+    },
+    {
+     "@id": "./",
+     "@type": "Dataset",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/1.0"
+     },
+     "description": "A signed, privacy-bounded projection of compatible Exulanica world memory state.",
+     "hasPart": [
+      {
+       "@id": "appearance/style.json"
+      },
+      {
+       "@id": "deletion/tombstones.json"
+      },
+      {
+       "@id": "evaluation/results.json"
+      },
+      {
+       "@id": "evidence/descriptors.json"
+      },
+      {
+       "@id": "external/fetch.json"
+      },
+      {
+       "@id": "interaction/policy.json"
+      },
+      {
+       "@id": "memory/graph.json"
+      },
+      {
+       "@id": "policy/export.json"
+      },
+      {
+       "@id": "provenance/events.json"
+      },
+      {
+       "@id": "provenance/package.json"
+      },
+      {
+       "@id": "reconstruction/artifacts.json"
+      },
+      {
+       "@id": "wmp/profile.json"
+      },
+      {
+       "@id": "world/layout.json"
+      },
+      {
+       "@id": "world/neighborhood.json"
+      },
+      {
+       "@id": "world/placement.json"
+      },
+      {
+       "@id": "world/structure.json"
+      },
+      {
+       "@id": "world/topology.json"
+      }
+     ],
+     "name": "Exulanica World Memory Package"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "Versioned requirements for World Memory Package 1.0.",
+     "name": "Exulanica World Memory Package Profile 1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "#responsible-ai-boundary",
+     "@type": "Dataset",
+     "about": {
+      "@id": "./"
+     },
+     "citeAs": "Exulanica World Memory Package",
+     "description": "A Croissant 1.0 and RAI 1.0 compatibility node for the package privacy boundary.",
+     "http://mlcommons.org/croissant/RAI/dataLimitations": [
+      "Raw media and sensitive runtime material are excluded by default.",
+      "A package signature proves integrity, not export authorization."
+     ],
+     "http://mlcommons.org/croissant/RAI/personalSensitiveInformation": "Compatible world metadata may describe personal memories; authorization remains external to this portable package.",
+     "http://mlcommons.org/croissant/isLiveDataset": false,
+     "http://purl.org/dc/terms/conformsTo": [
+      "http://mlcommons.org/croissant/1.0",
+      "http://mlcommons.org/croissant/RAI/1.0"
+     ],
+     "license": "Apache-2.0",
+     "name": "Responsible AI and privacy boundary",
+     "url": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "appearance/style.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "appearance/style.json",
+     "sha256": "<sha256:31>"
+    },
+    {
+     "@id": "deletion/tombstones.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "deletion/tombstones.json",
+     "sha256": "<sha256:32>"
+    },
+    {
+     "@id": "evaluation/results.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evaluation/results.json",
+     "sha256": "<sha256:33>"
+    },
+    {
+     "@id": "evidence/descriptors.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evidence/descriptors.json",
+     "sha256": "<sha256:34>"
+    },
+    {
+     "@id": "external/fetch.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "external/fetch.json",
+     "sha256": "<sha256:35>"
+    },
+    {
+     "@id": "interaction/policy.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "interaction/policy.json",
+     "sha256": "<sha256:36>"
+    },
+    {
+     "@id": "memory/graph.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "memory/graph.json",
+     "sha256": "<sha256:37>"
+    },
+    {
+     "@id": "policy/export.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "policy/export.json",
+     "sha256": "<sha256:38>"
+    },
+    {
+     "@id": "provenance/events.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/events.json",
+     "sha256": "<sha256:39>"
+    },
+    {
+     "@id": "provenance/package.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/package.json",
+     "sha256": "<sha256:40>"
+    },
+    {
+     "@id": "reconstruction/artifacts.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "reconstruction/artifacts.json",
+     "sha256": "<sha256:41>"
+    },
+    {
+     "@id": "wmp/profile.json",
+     "@type": "File",
+     "encodingFormat": "application/ld+json",
+     "name": "wmp/profile.json",
+     "sha256": "<sha256:42>"
+    },
+    {
+     "@id": "world/layout.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/layout.json",
+     "sha256": "<sha256:26>"
+    },
+    {
+     "@id": "world/neighborhood.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/neighborhood.json",
+     "sha256": "<sha256:27>"
+    },
+    {
+     "@id": "world/placement.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/placement.json",
+     "sha256": "<sha256:28>"
+    },
+    {
+     "@id": "world/structure.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/structure.json",
+     "sha256": "<sha256:43>"
+    },
+    {
+     "@id": "world/topology.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/topology.json",
+     "sha256": "<sha256:1>"
+    }
+   ]
+  },
+  "57c434061d296f21": {
+   "@context": "https://w3id.org/ro/crate/1.2/context",
+   "@graph": [
+    {
+     "@id": "ro-crate-metadata.json",
+     "@type": "CreativeWork",
+     "about": {
+      "@id": "./"
+     },
+     "conformsTo": {
+      "@id": "https://w3id.org/ro/crate/1.2"
+     }
+    },
+    {
+     "@id": "./",
+     "@type": "Dataset",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/1.0"
+     },
+     "description": "A signed, privacy-bounded projection of compatible Exulanica world memory state.",
+     "hasPart": [
+      {
+       "@id": "appearance/style.json"
+      },
+      {
+       "@id": "deletion/tombstones.json"
+      },
+      {
+       "@id": "evaluation/results.json"
+      },
+      {
+       "@id": "evidence/descriptors.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/assets.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/behaviours.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/extension.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/versions.json"
+      },
+      {
+       "@id": "external/fetch.json"
+      },
+      {
+       "@id": "interaction/policy.json"
+      },
+      {
+       "@id": "memory/graph.json"
+      },
+      {
+       "@id": "policy/export.json"
+      },
+      {
+       "@id": "provenance/events.json"
+      },
+      {
+       "@id": "provenance/package.json"
+      },
+      {
+       "@id": "reconstruction/artifacts.json"
+      },
+      {
+       "@id": "wmp/profile.json"
+      },
+      {
+       "@id": "world/layout.json"
+      },
+      {
+       "@id": "world/neighborhood.json"
+      },
+      {
+       "@id": "world/placement.json"
+      },
+      {
+       "@id": "world/structure.json"
+      },
+      {
+       "@id": "world/topology.json"
+      }
+     ],
+     "name": "Exulanica World Memory Package"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "Versioned requirements for World Memory Package 1.0.",
+     "name": "Exulanica World Memory Package Profile 1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "#responsible-ai-boundary",
+     "@type": "Dataset",
+     "about": {
+      "@id": "./"
+     },
+     "citeAs": "Exulanica World Memory Package",
+     "description": "A Croissant 1.0 and RAI 1.0 compatibility node for the package privacy boundary.",
+     "http://mlcommons.org/croissant/RAI/dataLimitations": [
+      "Raw media and sensitive runtime material are excluded by default.",
+      "A package signature proves integrity, not export authorization."
+     ],
+     "http://mlcommons.org/croissant/RAI/personalSensitiveInformation": "Compatible world metadata may describe personal memories; authorization remains external to this portable package.",
+     "http://mlcommons.org/croissant/isLiveDataset": false,
+     "http://purl.org/dc/terms/conformsTo": [
+      "http://mlcommons.org/croissant/1.0",
+      "http://mlcommons.org/croissant/RAI/1.0"
+     ],
+     "license": "Apache-2.0",
+     "name": "Responsible AI and privacy boundary",
+     "url": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.1",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying environment-inclusive authored state, environment instance availability and the edits that give a placed object a behaviour, change it or take it away.",
+     "name": "Exulanica WMP environment-instances extension 1.1",
+     "version": "1.1"
+    },
+    {
+     "@id": "appearance/style.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "appearance/style.json",
+     "sha256": "<sha256:41>"
+    },
+    {
+     "@id": "deletion/tombstones.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "deletion/tombstones.json",
+     "sha256": "<sha256:42>"
+    },
+    {
+     "@id": "evaluation/results.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evaluation/results.json",
+     "sha256": "<sha256:43>"
+    },
+    {
+     "@id": "evidence/descriptors.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evidence/descriptors.json",
+     "sha256": "<sha256:44>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/assets.json",
+     "sha256": "<sha256:45>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/behaviours.json",
+     "sha256": "<sha256:46>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.1"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/extension.json",
+     "sha256": "<sha256:47>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/versions.json",
+     "sha256": "<sha256:48>"
+    },
+    {
+     "@id": "external/fetch.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "external/fetch.json",
+     "sha256": "<sha256:49>"
+    },
+    {
+     "@id": "interaction/policy.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "interaction/policy.json",
+     "sha256": "<sha256:50>"
+    },
+    {
+     "@id": "memory/graph.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "memory/graph.json",
+     "sha256": "<sha256:51>"
+    },
+    {
+     "@id": "policy/export.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "policy/export.json",
+     "sha256": "<sha256:52>"
+    },
+    {
+     "@id": "provenance/events.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/events.json",
+     "sha256": "<sha256:53>"
+    },
+    {
+     "@id": "provenance/package.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/package.json",
+     "sha256": "<sha256:54>"
+    },
+    {
+     "@id": "reconstruction/artifacts.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "reconstruction/artifacts.json",
+     "sha256": "<sha256:55>"
+    },
+    {
+     "@id": "wmp/profile.json",
+     "@type": "File",
+     "encodingFormat": "application/ld+json",
+     "name": "wmp/profile.json",
+     "sha256": "<sha256:56>"
+    },
+    {
+     "@id": "world/layout.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/layout.json",
+     "sha256": "<sha256:26>"
+    },
+    {
+     "@id": "world/neighborhood.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/neighborhood.json",
+     "sha256": "<sha256:27>"
+    },
+    {
+     "@id": "world/placement.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/placement.json",
+     "sha256": "<sha256:28>"
+    },
+    {
+     "@id": "world/structure.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/structure.json",
+     "sha256": "<sha256:57>"
+    },
+    {
+     "@id": "world/topology.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/topology.json",
+     "sha256": "<sha256:1>"
+    }
+   ]
+  },
+  "59cc19628128af1c": {
+   "items": [
+    {
+     "asset_key": "cc0.marker-cube",
+     "byte_size": 780,
+     "content_sha256": "<sha256:31>",
+     "licence_id": "CC0-1.0",
+     "licence_sha256": "<sha256:32>",
+     "media_type": "model/gltf-binary",
+     "ni_uri": "ni:///sha-256;tBKJrBBUjPaY1GoVIGyqjnRLC4APSsKSYMmfGNi4Mdk",
+     "retrieval": "requires an authorized content-addressed resolver",
+     "summary": "A half-metre cube resting on the ground plane.",
+     "title": "Marker cube"
+    }
+   ],
+   "profile": "exulanica-wmp-ext-environment-instances-assets-v1"
+  },
+  "72e715462a3cbb0d": {
+   "items": [
+    {
+     "created_at": "<time:58>",
+     "delta": {
+      "element_overrides": [],
+      "objects": [
+       {
+        "asset_sha256": "<sha256:31>",
+        "behaviour": {
+         "behaviour_key": "motion.bounded-path",
+         "behaviour_version": 1,
+         "parameters": {
+          "axis": "y",
+          "easing": "linear",
+          "period_milliseconds": 3000,
+          "travel_mm": 600
+         }
+        },
+        "object_id": "object:lantern",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 1200,
+         "y_mm": 0,
+         "yaw_microradians": 785398,
+         "z_mm": -450
+        }
+       }
+      ],
+      "schema_version": 1
+     },
+     "edit_seq": 1,
+     "edits": [
+      {
+       "base_state_sha256": "<sha256:33>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:83>",
+       "edit_seq": 1,
+       "element_id": null,
+       "kind": "add_object",
+       "object_id": "object:lantern",
+       "recorded_at": "<time:59>",
+       "result_state_sha256": "<sha256:34>",
+       "undone_edit_id": null
+      }
+     ],
+     "origin": "authored",
+     "parent_version_id": null,
+     "source_snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "state_sha256": "<sha256:34>",
+     "style_version_id": null,
+     "title": "Starter lantern",
+     "version_id": "urn:exulanica:wmp:alternate-version:<urn:84>"
+    },
+    {
+     "created_at": "<time:60>",
+     "delta": {
+      "element_overrides": [],
+      "objects": [
+       {
+        "asset_sha256": "<sha256:31>",
+        "behaviour": {
+         "behaviour_key": "motion.bounded-path",
+         "behaviour_version": 1,
+         "parameters": {
+          "axis": "z",
+          "easing": "smooth",
+          "period_milliseconds": 9000,
+          "travel_mm": 1500
+         }
+        },
+        "object_id": "object:kite",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 1200,
+         "y_mm": 0,
+         "yaw_microradians": 785398,
+         "z_mm": -450
+        }
+       }
+      ],
+      "schema_version": 1
+     },
+     "edit_seq": 2,
+     "edits": [
+      {
+       "base_state_sha256": "<sha256:33>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:85>",
+       "edit_seq": 1,
+       "element_id": null,
+       "kind": "add_object",
+       "object_id": "object:kite",
+       "recorded_at": "<time:61>",
+       "result_state_sha256": "<sha256:35>",
+       "undone_edit_id": null
+      },
+      {
+       "base_state_sha256": "<sha256:35>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:86>",
+       "edit_seq": 2,
+       "element_id": null,
+       "kind": "set_object_behaviour",
+       "object_id": "object:kite",
+       "recorded_at": "<time:62>",
+       "result_state_sha256": "<sha256:36>",
+       "undone_edit_id": null
+      }
+     ],
+     "origin": "authored",
+     "parent_version_id": null,
+     "source_snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "state_sha256": "<sha256:36>",
+     "style_version_id": null,
+     "title": "Starter kite",
+     "version_id": "urn:exulanica:wmp:alternate-version:<urn:87>"
+    }
+   ],
+   "profile": "exulanica-wmp-ext-authored-world-versions-v2",
+   "source_snapshots": [
+    {
+     "current": true,
+     "element_ids": [
+      "element:starter-ground"
+     ],
+     "region_ids": [
+      "region:starter"
+     ],
+     "snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "snapshot_sha256": "<sha256:30>"
+    }
+   ],
+   "withheld": {
+    "reasons": [
+     {
+      "names": [
+       "add_point_map"
+      ],
+      "reason": "edit_kind_not_admitted",
+      "versions": 2
+     }
+    ],
+    "rule": "counted and not named: a version is withheld when a committed deletion invalidated its source snapshot, when it or a version it was branched from carries an edit kind this extension version does not admit, or holds a delta section it does not carry; names are those kinds or sections",
+    "versions": 2
+   }
+  },
+  "731524e0b668d978": {
+   "items": [],
+   "profile": "exulanica-wmp-ext-environment-instances-behaviours-v1"
+  },
+  "73560c29d7bb1f63": {
+   "items": [],
+   "profile": "exulanica-wmp-ext-environment-instances-versions-v1",
+   "source_snapshots": [],
+   "withheld": {
+    "invalidated_source_versions": 1,
+    "reason": "a committed deletion invalidated the source snapshot; the version is not exported"
+   }
+  },
+  "7503dff5692106f7": {
+   "items": [
+    {
+     "behaviour_key": "motion.bounded-path",
+     "behaviour_version": 1,
+     "parameters": {
+      "axis": {
+       "choices": [
+        "x",
+        "y",
+        "z"
+       ],
+       "default": "x",
+       "kind": "choice"
+      },
+      "easing": {
+       "choices": [
+        "linear",
+        "smooth"
+       ],
+       "default": "smooth",
+       "kind": "choice"
+      },
+      "period_milliseconds": {
+       "default": 4000,
+       "kind": "integer",
+       "maximum": 60000,
+       "minimum": 500
+      },
+      "travel_mm": {
+       "default": 1000,
+       "kind": "integer",
+       "maximum": 10000,
+       "minimum": 100
+      }
+     },
+     "summary": "Bounded reversing travel along one axis, with renderer trigger, stop and reset controls."
+    }
+   ],
+   "profile": "exulanica-wmp-ext-authored-world-behaviours-v1"
+  },
+  "75051485be7cc0b7": {
+   "items": [
+    {
+     "created_at": "<time:58>",
+     "delta": {
+      "element_overrides": [],
+      "objects": [
+       {
+        "asset_sha256": "<sha256:31>",
+        "behaviour": {
+         "behaviour_key": "motion.bounded-path",
+         "behaviour_version": 1,
+         "parameters": {
+          "axis": "y",
+          "easing": "linear",
+          "period_milliseconds": 3000,
+          "travel_mm": 600
+         }
+        },
+        "object_id": "object:lantern",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 1200,
+         "y_mm": 0,
+         "yaw_microradians": 785398,
+         "z_mm": -450
+        }
+       }
+      ],
+      "schema_version": 1
+     },
+     "edit_seq": 1,
+     "edits": [
+      {
+       "base_state_sha256": "<sha256:33>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:83>",
+       "edit_seq": 1,
+       "element_id": null,
+       "kind": "add_object",
+       "object_id": "object:lantern",
+       "recorded_at": "<time:59>",
+       "result_state_sha256": "<sha256:34>",
+       "undone_edit_id": null
+      }
+     ],
+     "origin": "authored",
+     "parent_version_id": null,
+     "source_snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "state_sha256": "<sha256:34>",
+     "style_version_id": null,
+     "title": "Starter lantern",
+     "version_id": "urn:exulanica:wmp:alternate-version:<urn:84>"
+    }
+   ],
+   "profile": "exulanica-wmp-ext-authored-world-versions-v1",
+   "source_snapshots": [
+    {
+     "current": true,
+     "element_ids": [
+      "element:starter-ground"
+     ],
+     "region_ids": [
+      "region:starter"
+     ],
+     "snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "snapshot_sha256": "<sha256:30>"
+    }
+   ],
+   "withheld": {
+    "invalidated_source_versions": 4,
+    "reason": "a committed deletion invalidated the source snapshot; the version is not exported"
+   }
+  },
+  "833677fa537bca8b": {
+   "items": [],
+   "profile": "exulanica-wmp-ext-environment-instances-assets-v1"
+  },
+  "94dda8f9d86d39ff": {
+   "items": [
+    {
+     "created_at": "<time:58>",
+     "delta": {
+      "element_overrides": [],
+      "environment_instances": [
+       {
+        "instance_id": "environment:fair",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "source": {
+         "admission_id": "<uuid:3>",
+         "anchor": {
+          "coordinate_scale": 1000,
+          "coordinates": [
+           10,
+           20,
+           0
+          ],
+          "frame_name": "nyc-grid"
+         },
+         "bounds": {
+          "coordinate_scale": 1000,
+          "coordinates": [
+           0,
+           0,
+           0,
+           100000,
+           100000,
+           10000
+          ],
+          "frame_name": "nyc-grid",
+          "kind": "bbox"
+         },
+         "frame": {
+          "altitude_reference": "NAVD88",
+          "axis_order": [
+           "east",
+           "north",
+           "height"
+          ],
+          "crs": "EPSG:6539",
+          "horizontal_unit": "metre",
+          "name": "nyc-grid",
+          "orientation": "right-handed",
+          "vertical_unit": "metre"
+         },
+         "index": null,
+         "place_id": "<uuid:4>",
+         "render_asset": {
+          "asset_id": "<uuid:5>",
+          "content_sha256": "<sha256:33>",
+          "receipt_sha256": "<sha256:34>"
+         },
+         "selection": {
+          "feature_id": null,
+          "kind": "whole_asset",
+          "render_batch_id": null
+         },
+         "source": {
+          "content_sha256": "<sha256:35>",
+          "receipt_sha256": "<sha256:36>"
+         }
+        },
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 0,
+         "y_mm": 0,
+         "yaw_microradians": 0,
+         "z_mm": 0
+        }
+       }
+      ],
+      "objects": [
+       {
+        "asset_sha256": "<sha256:31>",
+        "behaviour": {
+         "behaviour_key": "motion.bounded-path",
+         "behaviour_version": 1,
+         "parameters": {
+          "axis": "y",
+          "easing": "linear",
+          "period_milliseconds": 3000,
+          "travel_mm": 600
+         }
+        },
+        "object_id": "object:flag",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 1200,
+         "y_mm": 0,
+         "yaw_microradians": 785398,
+         "z_mm": -450
+        }
+       }
+      ],
+      "schema_version": 2
+     },
+     "edit_seq": 3,
+     "edits": [
+      {
+       "base_state_sha256": "<sha256:37>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:83>",
+       "edit_seq": 1,
+       "element_id": null,
+       "environment_instance_id": "environment:fair",
+       "kind": "add_environment",
+       "object_id": null,
+       "recorded_at": "<time:59>",
+       "result_state_sha256": "<sha256:38>",
+       "undone_edit_id": null
+      },
+      {
+       "base_state_sha256": "<sha256:38>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:84>",
+       "edit_seq": 2,
+       "element_id": null,
+       "environment_instance_id": null,
+       "kind": "add_object",
+       "object_id": "object:flag",
+       "recorded_at": "<time:60>",
+       "result_state_sha256": "<sha256:39>",
+       "undone_edit_id": null
+      },
+      {
+       "base_state_sha256": "<sha256:39>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:85>",
+       "edit_seq": 3,
+       "element_id": null,
+       "environment_instance_id": null,
+       "kind": "set_object_behaviour",
+       "object_id": "object:flag",
+       "recorded_at": "<time:61>",
+       "result_state_sha256": "<sha256:40>",
+       "undone_edit_id": null
+      }
+     ],
+     "environment_availability": [
+      {
+       "availability": "available",
+       "instance_id": "environment:fair"
+      }
+     ],
+     "origin": "authored",
+     "parent_version_id": null,
+     "source_snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "state_sha256": "<sha256:40>",
+     "style_version_id": null,
+     "title": "Starter fair",
+     "version_id": "urn:exulanica:wmp:alternate-version:<urn:86>"
+    }
+   ],
+   "profile": "exulanica-wmp-ext-environment-instances-versions-v2",
+   "source_snapshots": [
+    {
+     "current": true,
+     "element_ids": [
+      "element:starter-ground"
+     ],
+     "region_ids": [
+      "region:starter"
+     ],
+     "snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "snapshot_sha256": "<sha256:30>"
+    }
+   ],
+   "withheld": {
+    "reasons": [],
+    "rule": "counted and not named: a version is withheld when a committed deletion invalidated its source snapshot, when it or a version it was branched from carries an edit kind this extension version does not admit, or holds a delta section it does not carry; names are those kinds or sections",
+    "versions": 0
+   }
+  },
+  "a04146591eb8cd96": {
+   "items": [
+    {
+     "created_at": "<time:63>",
+     "delta": {
+      "element_overrides": [],
+      "environment_instances": [
+       {
+        "instance_id": "environment:fair",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "source": {
+         "admission_id": "<uuid:3>",
+         "anchor": {
+          "coordinate_scale": 1000,
+          "coordinates": [
+           10,
+           20,
+           0
+          ],
+          "frame_name": "nyc-grid"
+         },
+         "bounds": {
+          "coordinate_scale": 1000,
+          "coordinates": [
+           0,
+           0,
+           0,
+           100000,
+           100000,
+           10000
+          ],
+          "frame_name": "nyc-grid",
+          "kind": "bbox"
+         },
+         "frame": {
+          "altitude_reference": "NAVD88",
+          "axis_order": [
+           "east",
+           "north",
+           "height"
+          ],
+          "crs": "EPSG:6539",
+          "horizontal_unit": "metre",
+          "name": "nyc-grid",
+          "orientation": "right-handed",
+          "vertical_unit": "metre"
+         },
+         "index": null,
+         "place_id": "<uuid:4>",
+         "render_asset": {
+          "asset_id": "<uuid:5>",
+          "content_sha256": "<sha256:37>",
+          "receipt_sha256": "<sha256:38>"
+         },
+         "selection": {
+          "feature_id": null,
+          "kind": "whole_asset",
+          "render_batch_id": null
+         },
+         "source": {
+          "content_sha256": "<sha256:39>",
+          "receipt_sha256": "<sha256:40>"
+         }
+        },
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 0,
+         "y_mm": 0,
+         "yaw_microradians": 0,
+         "z_mm": 0
+        }
+       }
+      ],
+      "objects": [
+       {
+        "asset_sha256": "<sha256:31>",
+        "behaviour": {
+         "behaviour_key": "motion.bounded-path",
+         "behaviour_version": 1,
+         "parameters": {
+          "axis": "y",
+          "easing": "linear",
+          "period_milliseconds": 3000,
+          "travel_mm": 600
+         }
+        },
+        "object_id": "object:flag",
+        "origin": {
+         "kind": "authored",
+         "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+         "coordinate_space": "region_local",
+         "coordinate_unit": "millimetre",
+         "scale_milli": 1000,
+         "x_mm": 1200,
+         "y_mm": 0,
+         "yaw_microradians": 785398,
+         "z_mm": -450
+        }
+       }
+      ],
+      "schema_version": 2
+     },
+     "edit_seq": 3,
+     "edits": [
+      {
+       "base_state_sha256": "<sha256:33>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:88>",
+       "edit_seq": 1,
+       "element_id": null,
+       "environment_instance_id": "environment:fair",
+       "kind": "add_environment",
+       "object_id": null,
+       "recorded_at": "<time:64>",
+       "result_state_sha256": "<sha256:41>",
+       "undone_edit_id": null
+      },
+      {
+       "base_state_sha256": "<sha256:41>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:89>",
+       "edit_seq": 2,
+       "element_id": null,
+       "environment_instance_id": null,
+       "kind": "add_object",
+       "object_id": "object:flag",
+       "recorded_at": "<time:65>",
+       "result_state_sha256": "<sha256:42>",
+       "undone_edit_id": null
+      },
+      {
+       "base_state_sha256": "<sha256:42>",
+       "edit_id": "urn:exulanica:wmp:alternate-edit:<urn:90>",
+       "edit_seq": 3,
+       "element_id": null,
+       "environment_instance_id": null,
+       "kind": "set_object_behaviour",
+       "object_id": "object:flag",
+       "recorded_at": "<time:66>",
+       "result_state_sha256": "<sha256:43>",
+       "undone_edit_id": null
+      }
+     ],
+     "environment_availability": [
+      {
+       "availability": "available",
+       "instance_id": "environment:fair"
+      }
+     ],
+     "origin": "authored",
+     "parent_version_id": null,
+     "source_snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "state_sha256": "<sha256:43>",
+     "style_version_id": null,
+     "title": "Starter fair",
+     "version_id": "urn:exulanica:wmp:alternate-version:<urn:91>"
+    }
+   ],
+   "profile": "exulanica-wmp-ext-environment-instances-versions-v2",
+   "source_snapshots": [
+    {
+     "current": true,
+     "element_ids": [
+      "element:starter-ground"
+     ],
+     "region_ids": [
+      "region:starter"
+     ],
+     "snapshot_id": "urn:exulanica:wmp:structure:<urn:82>",
+     "snapshot_sha256": "<sha256:30>"
+    }
+   ],
+   "withheld": {
+    "reasons": [],
+    "rule": "counted and not named: a version is withheld when a committed deletion invalidated its source snapshot, when it or a version it was branched from carries an edit kind this extension version does not admit, or holds a delta section it does not carry; names are those kinds or sections",
+    "versions": 0
+   }
+  },
+  "a4c9a5fc0fd9ed8f": {
+   "@context": "https://w3id.org/ro/crate/1.2/context",
+   "@graph": [
+    {
+     "@id": "ro-crate-metadata.json",
+     "@type": "CreativeWork",
+     "about": {
+      "@id": "./"
+     },
+     "conformsTo": {
+      "@id": "https://w3id.org/ro/crate/1.2"
+     }
+    },
+    {
+     "@id": "./",
+     "@type": "Dataset",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/1.0"
+     },
+     "description": "A signed, privacy-bounded projection of compatible Exulanica world memory state.",
+     "hasPart": [
+      {
+       "@id": "appearance/style.json"
+      },
+      {
+       "@id": "deletion/tombstones.json"
+      },
+      {
+       "@id": "evaluation/results.json"
+      },
+      {
+       "@id": "evidence/descriptors.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/assets.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/behaviours.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/extension.json"
+      },
+      {
+       "@id": "extensions/authored-world-1.0/versions.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/assets.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/behaviours.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/extension.json"
+      },
+      {
+       "@id": "extensions/environment-instances-1.1/versions.json"
+      },
+      {
+       "@id": "external/fetch.json"
+      },
+      {
+       "@id": "interaction/policy.json"
+      },
+      {
+       "@id": "memory/graph.json"
+      },
+      {
+       "@id": "policy/export.json"
+      },
+      {
+       "@id": "provenance/events.json"
+      },
+      {
+       "@id": "provenance/package.json"
+      },
+      {
+       "@id": "reconstruction/artifacts.json"
+      },
+      {
+       "@id": "wmp/profile.json"
+      },
+      {
+       "@id": "world/layout.json"
+      },
+      {
+       "@id": "world/neighborhood.json"
+      },
+      {
+       "@id": "world/placement.json"
+      },
+      {
+       "@id": "world/structure.json"
+      },
+      {
+       "@id": "world/topology.json"
+      }
+     ],
+     "name": "Exulanica World Memory Package"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "Versioned requirements for World Memory Package 1.0.",
+     "name": "Exulanica World Memory Package Profile 1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "#responsible-ai-boundary",
+     "@type": "Dataset",
+     "about": {
+      "@id": "./"
+     },
+     "citeAs": "Exulanica World Memory Package",
+     "description": "A Croissant 1.0 and RAI 1.0 compatibility node for the package privacy boundary.",
+     "http://mlcommons.org/croissant/RAI/dataLimitations": [
+      "Raw media and sensitive runtime material are excluded by default.",
+      "A package signature proves integrity, not export authorization."
+     ],
+     "http://mlcommons.org/croissant/RAI/personalSensitiveInformation": "Compatible world metadata may describe personal memories; authorization remains external to this portable package.",
+     "http://mlcommons.org/croissant/isLiveDataset": false,
+     "http://purl.org/dc/terms/conformsTo": [
+      "http://mlcommons.org/croissant/1.0",
+      "http://mlcommons.org/croissant/RAI/1.0"
+     ],
+     "license": "Apache-2.0",
+     "name": "Responsible AI and privacy boundary",
+     "url": "https://exulanica.local/profiles/world-memory-package/1.0",
+     "version": "exulanica-wmp-1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.0",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying alternate versions, authored objects and behaviour references.",
+     "name": "Exulanica WMP authored-world extension 1.0",
+     "version": "1.0"
+    },
+    {
+     "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.1",
+     "@type": [
+      "CreativeWork",
+      "Profile"
+     ],
+     "description": "An optional, separately versioned extension to World Memory Package 1.0 carrying environment-inclusive authored state, environment instance availability and the edits that give a placed object a behaviour, change it or take it away.",
+     "name": "Exulanica WMP environment-instances extension 1.1",
+     "version": "1.1"
+    },
+    {
+     "@id": "appearance/style.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "appearance/style.json",
+     "sha256": "<sha256:42>"
+    },
+    {
+     "@id": "deletion/tombstones.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "deletion/tombstones.json",
+     "sha256": "<sha256:43>"
+    },
+    {
+     "@id": "evaluation/results.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evaluation/results.json",
+     "sha256": "<sha256:44>"
+    },
+    {
+     "@id": "evidence/descriptors.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "evidence/descriptors.json",
+     "sha256": "<sha256:45>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/assets.json",
+     "sha256": "<sha256:46>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/behaviours.json",
+     "sha256": "<sha256:47>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.0"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/extension.json",
+     "sha256": "<sha256:48>"
+    },
+    {
+     "@id": "extensions/authored-world-1.0/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/authored-world-1.0/versions.json",
+     "sha256": "<sha256:49>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/assets.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/assets.json",
+     "sha256": "<sha256:50>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/behaviours.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/behaviours.json",
+     "sha256": "<sha256:51>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/extension.json",
+     "@type": "File",
+     "conformsTo": {
+      "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.1"
+     },
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/extension.json",
+     "sha256": "<sha256:52>"
+    },
+    {
+     "@id": "extensions/environment-instances-1.1/versions.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "extensions/environment-instances-1.1/versions.json",
+     "sha256": "<sha256:53>"
+    },
+    {
+     "@id": "external/fetch.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "external/fetch.json",
+     "sha256": "<sha256:54>"
+    },
+    {
+     "@id": "interaction/policy.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "interaction/policy.json",
+     "sha256": "<sha256:55>"
+    },
+    {
+     "@id": "memory/graph.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "memory/graph.json",
+     "sha256": "<sha256:56>"
+    },
+    {
+     "@id": "policy/export.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "policy/export.json",
+     "sha256": "<sha256:57>"
+    },
+    {
+     "@id": "provenance/events.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/events.json",
+     "sha256": "<sha256:58>"
+    },
+    {
+     "@id": "provenance/package.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "provenance/package.json",
+     "sha256": "<sha256:59>"
+    },
+    {
+     "@id": "reconstruction/artifacts.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "reconstruction/artifacts.json",
+     "sha256": "<sha256:60>"
+    },
+    {
+     "@id": "wmp/profile.json",
+     "@type": "File",
+     "encodingFormat": "application/ld+json",
+     "name": "wmp/profile.json",
+     "sha256": "<sha256:61>"
+    },
+    {
+     "@id": "world/layout.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/layout.json",
+     "sha256": "<sha256:26>"
+    },
+    {
+     "@id": "world/neighborhood.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/neighborhood.json",
+     "sha256": "<sha256:27>"
+    },
+    {
+     "@id": "world/placement.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/placement.json",
+     "sha256": "<sha256:28>"
+    },
+    {
+     "@id": "world/structure.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/structure.json",
+     "sha256": "<sha256:62>"
+    },
+    {
+     "@id": "world/topology.json",
+     "@type": "File",
+     "encodingFormat": "application/json",
+     "name": "world/topology.json",
+     "sha256": "<sha256:1>"
+    }
+   ]
+  },
+  "d0788195e30691a8": {
+   "@id": "https://exulanica.local/profiles/world-memory-package/extensions/authored-world/1.0",
+   "asset_bytes": "not embedded: each asset is a SHA-256 content reference an authorized resolver must supply",
+   "base_profile": "exulanica-wmp-1.0",
+   "coordinate_space": "region_local: compose each object transform with its region's placement in world/placement.json",
+   "counts": {
+    "alternate_versions": 1,
+    "authored_objects": 1,
+    "authored_objects_present": 1,
+    "withheld_versions": 4
+   },
+   "extension": "exulanica-wmp-ext-authored-world",
+   "extension_version": "1.0",
+   "required_loader_capabilities": [
+    "asset-media:model/gltf-binary",
+    "asset-resolution:sha256-content-address",
+    "behaviour:motion.bounded-path@1",
+    "wmp-extension:exulanica-wmp-ext-authored-world@1.0"
+   ],
+   "runtime_code": "not carried: a behaviour is a reviewed identifier with bounded parameters, and a runtime that does not support it must show it as unsupported",
+   "sections": {
+    "assets": "extensions/authored-world-1.0/assets.json",
+    "behaviours": "extensions/authored-world-1.0/behaviours.json",
+    "versions": "extensions/authored-world-1.0/versions.json"
+   }
+  },
+  "d1faca1b997ff2a7": {
+   "@id": "https://exulanica.local/profiles/world-memory-package/extensions/environment-instances/1.1",
+   "asset_bytes": "not embedded: each reviewed object asset is a SHA-256 content reference an authorized resolver must supply",
+   "availability": "stated beside each instance and not part of state_sha256; a blob disappearing must not pretend the person authored a new version",
+   "base_profile": "exulanica-wmp-1.0",
+   "coordinate_space": "region_local: compose each instance and object transform with its region's placement in world/placement.json",
+   "counts": {
+    "alternate_versions": 1,
+    "authored_objects": 1,
+    "authored_objects_present": 1,
+    "environment_instances": 1,
+    "environment_instances_present": 1,
+    "withheld_versions": 0
+   },
+   "delta": "the environment-inclusive authored delta: schema version 2 when environment_instances are present, schema version 1 when they are not. This directory is not extensions/authored-world-1.1",
+   "extension": "exulanica-wmp-ext-environment-instances",
+   "extension_version": "1.1",
+   "omission": "a receiver that does not declare this extension must omit these versions and must not infer objects from exulanica-wmp-ext-authored-world@1.1 as the whole authored state",
+   "required_loader_capabilities": [
+    "asset-media:model/gltf-binary",
+    "asset-resolution:sha256-content-address",
+    "behaviour:motion.bounded-path@1",
+    "environment-source:sha256-content-address",
+    "wmp-extension:exulanica-wmp-ext-environment-instances@1.1"
+   ],
+   "runtime_code": "not carried: a behaviour is a reviewed identifier with bounded parameters, and a runtime that does not support it must show it as unsupported",
+   "sections": {
+    "assets": "extensions/environment-instances-1.1/assets.json",
+    "behaviours": "extensions/environment-instances-1.1/behaviours.json",
+    "versions": "extensions/environment-instances-1.1/versions.json"
+   },
+   "source_bytes": "not embedded: each environment source, render and index is a SHA-256 content reference an authorized resolver must supply",
+   "source_rights": "not granted: a signed package does not transfer compose, export or reuse rights on a pinned environment source"
+  }
+ },
+ "exports": {
+  "authored-world-1.0": {
+   "files": {
+    "extensions/authored-world-1.0/assets.json": "1c4c8d0ecde845a1",
+    "extensions/authored-world-1.0/behaviours.json": "7503dff5692106f7",
+    "extensions/authored-world-1.0/extension.json": "d0788195e30691a8",
+    "extensions/authored-world-1.0/versions.json": "75051485be7cc0b7",
+    "ro-crate-metadata.json": "39bfd8ad7d4455ba"
+   }
+  },
+  "authored-world-1.0 + authored-world-1.1": {
+   "refused": "request one version of each extension, not authored-world-1.0 and authored-world-1.1"
+  },
+  "authored-world-1.0 + authored-world-1.1 + environment-instances-1.0": {
+   "refused": "request one version of each extension, not authored-world-1.0 and authored-world-1.1"
+  },
+  "authored-world-1.0 + authored-world-1.1 + environment-instances-1.0 + environment-instances-1.1": {
+   "refused": "request one version of each extension, not authored-world-1.0 and authored-world-1.1"
+  },
+  "authored-world-1.0 + authored-world-1.1 + environment-instances-1.1": {
+   "refused": "request one version of each extension, not authored-world-1.0 and authored-world-1.1"
+  },
+  "authored-world-1.0 + environment-instances-1.0": {
+   "files": {
+    "extensions/authored-world-1.0/assets.json": "1c4c8d0ecde845a1",
+    "extensions/authored-world-1.0/behaviours.json": "7503dff5692106f7",
+    "extensions/authored-world-1.0/extension.json": "003a74dfcfc15e3a",
+    "extensions/authored-world-1.0/versions.json": "510760e9351382a5",
+    "extensions/environment-instances-1.0/assets.json": "833677fa537bca8b",
+    "extensions/environment-instances-1.0/behaviours.json": "731524e0b668d978",
+    "extensions/environment-instances-1.0/extension.json": "0e0a8a2f434e7d0e",
+    "extensions/environment-instances-1.0/versions.json": "73560c29d7bb1f63",
+    "ro-crate-metadata.json": "14e3a76efce68e20"
+   }
+  },
+  "authored-world-1.0 + environment-instances-1.0 + environment-instances-1.1": {
+   "refused": "request one version of each extension, not environment-instances-1.0 and environment-instances-1.1"
+  },
+  "authored-world-1.0 + environment-instances-1.1": {
+   "files": {
+    "extensions/authored-world-1.0/assets.json": "1c4c8d0ecde845a1",
+    "extensions/authored-world-1.0/behaviours.json": "7503dff5692106f7",
+    "extensions/authored-world-1.0/extension.json": "003a74dfcfc15e3a",
+    "extensions/authored-world-1.0/versions.json": "510760e9351382a5",
+    "extensions/environment-instances-1.1/assets.json": "59cc19628128af1c",
+    "extensions/environment-instances-1.1/behaviours.json": "261ec895397399cb",
+    "extensions/environment-instances-1.1/extension.json": "d1faca1b997ff2a7",
+    "extensions/environment-instances-1.1/versions.json": "4beda2be09492e93",
+    "ro-crate-metadata.json": "a4c9a5fc0fd9ed8f"
+   }
+  },
+  "authored-world-1.1": {
+   "refused": "authored-world-1.1 cannot export versions whose state includes environment instances or environment edits; request environment-instances-1.1 rather than omit them or emit schema version 2 under the 1.1 extension name"
+  },
+  "authored-world-1.1 + environment-instances-1.0": {
+   "files": {
+    "extensions/authored-world-1.1/assets.json": "1c4c8d0ecde845a1",
+    "extensions/authored-world-1.1/behaviours.json": "7503dff5692106f7",
+    "extensions/authored-world-1.1/extension.json": "4e700d74f6dfd34c",
+    "extensions/authored-world-1.1/versions.json": "72e715462a3cbb0d",
+    "extensions/environment-instances-1.0/assets.json": "833677fa537bca8b",
+    "extensions/environment-instances-1.0/behaviours.json": "731524e0b668d978",
+    "extensions/environment-instances-1.0/extension.json": "0e0a8a2f434e7d0e",
+    "extensions/environment-instances-1.0/versions.json": "73560c29d7bb1f63",
+    "ro-crate-metadata.json": "137409ef617a49b2"
+   }
+  },
+  "authored-world-1.1 + environment-instances-1.0 + environment-instances-1.1": {
+   "refused": "request one version of each extension, not environment-instances-1.0 and environment-instances-1.1"
+  },
+  "authored-world-1.1 + environment-instances-1.1": {
+   "files": {
+    "extensions/authored-world-1.1/assets.json": "1c4c8d0ecde845a1",
+    "extensions/authored-world-1.1/behaviours.json": "7503dff5692106f7",
+    "extensions/authored-world-1.1/extension.json": "4e700d74f6dfd34c",
+    "extensions/authored-world-1.1/versions.json": "72e715462a3cbb0d",
+    "extensions/environment-instances-1.1/assets.json": "59cc19628128af1c",
+    "extensions/environment-instances-1.1/behaviours.json": "261ec895397399cb",
+    "extensions/environment-instances-1.1/extension.json": "d1faca1b997ff2a7",
+    "extensions/environment-instances-1.1/versions.json": "a04146591eb8cd96",
+    "ro-crate-metadata.json": "21fdd9982ae5e957"
+   }
+  },
+  "environment-instances-1.0": {
+   "files": {
+    "extensions/environment-instances-1.0/assets.json": "833677fa537bca8b",
+    "extensions/environment-instances-1.0/behaviours.json": "731524e0b668d978",
+    "extensions/environment-instances-1.0/extension.json": "0e0a8a2f434e7d0e",
+    "extensions/environment-instances-1.0/versions.json": "73560c29d7bb1f63",
+    "ro-crate-metadata.json": "40f65d0f76b03138"
+   }
+  },
+  "environment-instances-1.0 + environment-instances-1.1": {
+   "refused": "request one version of each extension, not environment-instances-1.0 and environment-instances-1.1"
+  },
+  "environment-instances-1.1": {
+   "files": {
+    "extensions/environment-instances-1.1/assets.json": "59cc19628128af1c",
+    "extensions/environment-instances-1.1/behaviours.json": "261ec895397399cb",
+    "extensions/environment-instances-1.1/extension.json": "d1faca1b997ff2a7",
+    "extensions/environment-instances-1.1/versions.json": "94dda8f9d86d39ff",
+    "ro-crate-metadata.json": "57c434061d296f21"
+   }
+  },
+  "no extension": {
+   "files": {
+    "ro-crate-metadata.json": "56d2a4f999d85863"
+   }
+  }
+ }
+}

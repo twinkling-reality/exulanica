@@ -35,6 +35,12 @@ refuses when an environment-bearing version would otherwise be kept. Dual export
 an authored-world directory that lists zero versions while this directory holds the versions
 that were moved.
 
+**Two versions.** Environment-instances 1.1 admits ``set_object_behaviour``, like authored-world
+1.1, and counts the versions it withholds by reason; its declaration names authored-world 1.1
+where 1.0's names authored-world 1.0. Every function here takes the
+:class:`~exulanica.world_package.extension_formats.ExtensionFormat` it builds or checks, and
+:mod:`exulanica.world_package.export_partition` decides which versions each one writes.
+
 **What is pure here.** This module imports nothing that opens a database. The digest is
 re-derived with :func:`exulanica.canonical.canonical_json` alone.
 """
@@ -50,28 +56,39 @@ from exulanica.world_package.authored import (
     ASSET_RESOLUTION_CAPABILITY,
     ASSET_RETRIEVAL,
     EMPTY_DELTA_SHA256,
-    WITHHELD_REASON,
     ExtensionError,
     delta_sha256,
     ni_uri,
+    verify_withheld,
+    withheld_section,
+)
+from exulanica.world_package.extension_formats import (
+    AUTHORED_WORLD_1_0,
+    ENVIRONMENT_INSTANCES_1_0,
+    UNDO,
+    ExtensionFormat,
+    counterpart,
 )
 
-EXTENSION_NAME: Final = "exulanica-wmp-ext-environment-instances"
-EXTENSION_VERSION: Final = "1.0"
-EXTENSION_KEY: Final = "environment-instances-1.0"
-EXTENSION_DIR: Final = f"extensions/{EXTENSION_KEY}"
-EXTENSION_PROFILE_ID: Final = (
-    "https://exulanica.local/profiles/world-memory-package/extensions/"
-    "environment-instances/1.0"
-)
+#: The family whose directory this one is not, and whose objects a receiver must not take for
+#: the whole authored state.
+AUTHORED_WORLD: Final = AUTHORED_WORLD_1_0.family
+
+#: The 1.0 names, which the command line, the 1.0 directory and earlier callers use. Every
+#: function below takes the version it builds or checks.
+EXTENSION_NAME: Final = ENVIRONMENT_INSTANCES_1_0.name
+EXTENSION_VERSION: Final = ENVIRONMENT_INSTANCES_1_0.version
+EXTENSION_KEY: Final = ENVIRONMENT_INSTANCES_1_0.key
+EXTENSION_DIR: Final = ENVIRONMENT_INSTANCES_1_0.directory
+EXTENSION_PROFILE_ID: Final = ENVIRONMENT_INSTANCES_1_0.profile_id
 BASE_PROFILE: Final = "exulanica-wmp-1.0"
-DECLARATION_PATH: Final = f"{EXTENSION_DIR}/extension.json"
-VERSIONS_PATH: Final = f"{EXTENSION_DIR}/versions.json"
-ASSETS_PATH: Final = f"{EXTENSION_DIR}/assets.json"
-BEHAVIOURS_PATH: Final = f"{EXTENSION_DIR}/behaviours.json"
-EXTENSION_PATHS: Final = frozenset({DECLARATION_PATH, VERSIONS_PATH, ASSETS_PATH, BEHAVIOURS_PATH})
+DECLARATION_PATH: Final = ENVIRONMENT_INSTANCES_1_0.declaration_path
+VERSIONS_PATH: Final = ENVIRONMENT_INSTANCES_1_0.section_path("versions")
+ASSETS_PATH: Final = ENVIRONMENT_INSTANCES_1_0.section_path("assets")
+BEHAVIOURS_PATH: Final = ENVIRONMENT_INSTANCES_1_0.section_path("behaviours")
+EXTENSION_PATHS: Final = ENVIRONMENT_INSTANCES_1_0.paths
 
-EXTENSION_CAPABILITY: Final = f"wmp-extension:{EXTENSION_NAME}@{EXTENSION_VERSION}"
+EXTENSION_CAPABILITY: Final = ENVIRONMENT_INSTANCES_1_0.capability
 ENVIRONMENT_SOURCE_CAPABILITY: Final = "environment-source:sha256-content-address"
 
 ASSET_BYTES: Final = (
@@ -98,36 +115,38 @@ AVAILABILITY_RULE: Final = (
     "stated beside each instance and not part of state_sha256; a blob disappearing must not "
     "pretend the person authored a new version"
 )
-DELTA_RULE: Final = (
-    "the environment-inclusive authored delta: schema version 2 when environment_instances "
-    "are present, schema version 1 when they are not. This directory is not "
-    "extensions/authored-world-1.0"
-)
-OMISSION_RULE: Final = (
-    "a receiver that does not declare this extension must omit these versions and must not "
-    "infer objects from exulanica-wmp-ext-authored-world@1.0 as the whole authored state"
-)
 
-_VERSIONS_PROFILE: Final = "exulanica-wmp-ext-environment-instances-versions-v1"
-_ASSETS_PROFILE: Final = "exulanica-wmp-ext-environment-instances-assets-v1"
-_BEHAVIOURS_PROFILE: Final = "exulanica-wmp-ext-environment-instances-behaviours-v1"
+
+def delta_rule(format_: ExtensionFormat) -> str:
+    """What the exported delta is, naming the authored-world directory of the same version."""
+    return (
+        "the environment-inclusive authored delta: schema version 2 when environment_instances "
+        "are present, schema version 1 when they are not. This directory is not "
+        f"{counterpart(AUTHORED_WORLD, format_.version).directory}"
+    )
+
+
+def omission_rule(format_: ExtensionFormat) -> str:
+    """What a receiver without this extension must do, naming authored-world of the same version."""
+    authored_world = counterpart(AUTHORED_WORLD, format_.version)
+    return (
+        "a receiver that does not declare this extension must omit these versions and must not "
+        f"infer objects from {authored_world.name}@{authored_world.version} as the whole "
+        "authored state"
+    )
+
+
+DELTA_RULE: Final = delta_rule(ENVIRONMENT_INSTANCES_1_0)
+OMISSION_RULE: Final = omission_rule(ENVIRONMENT_INSTANCES_1_0)
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _HEX32 = re.compile(r"^[0-9a-f]{32}$")
 _URN = re.compile(r"^urn:exulanica:wmp:(?P<kind>[a-z-]+):[0-9a-f]{64}$")
 _OBJECT_ID = re.compile("^[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?$")
-_UUID = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-)
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _AVAILABILITIES: Final = frozenset(
     {"available", "unavailable_bytes", "withdrawn", "binding_drift", "unknown"}
 )
-_OBJECT_EDITS: Final = frozenset({"add_object", "move_object", "remove_object"})
-_ELEMENT_EDITS: Final = frozenset({"suppress_element", "transform_element"})
-_ENVIRONMENT_EDITS: Final = frozenset(
-    {"add_environment", "move_environment", "remove_environment"}
-)
-_EDIT_KINDS: Final = _OBJECT_EDITS | _ELEMENT_EDITS | _ENVIRONMENT_EDITS | frozenset({"undo"})
 _MAX_YAW: Final = 6_283_185
 _MAX_SCALE: Final = 1_000_000
 _MAX_TRANSLATION: Final = 1_000_000_000
@@ -147,143 +166,21 @@ class EnvironmentInstances:
     behaviours: Mapping[tuple[str, int], Mapping[str, Any]]
     source_snapshots: Mapping[str, Mapping[str, Any]]
     withheld_versions: int
-
-
-@dataclass(frozen=True, slots=True)
-class ExportVersion:
-    """One live alternate version, enough to place it in a lineage-closed export."""
-
-    version_id: object
-    parent_version_id: object | None
-    environment_bearing: bool
-    source_invalidated: bool
-    #: Carries a placed depth estimate from a photograph, which neither profile can write.
-    #:
-    #: A package is a portable copy of a world. A photo point map's whole identity is a chain of
-    #: receipts inside the workspace it lives in: the personal authority, the human review and the
-    #: depth right that the owner can end at any moment. Writing one into a crate that leaves this
-    #: machine would carry a reading of somebody's home past the only place their withdrawal can
-    #: reach it. Exporting that is a decision, not a projection, so until it is taken these
-    #: versions are withheld and counted, exactly as an invalidated source is, and every version
-    #: branched from one goes with it.
-    point_map_bearing: bool = False
-    #: Its edit chain carries ``set_object_behaviour``. See :data:`BEHAVIOUR_EDIT_WITHHELD`.
-    behaviour_edit_bearing: bool = False
-
-
-#: Why a version whose edit chain carries ``set_object_behaviour`` is not exported, and neither is
-#: any version branched from it.
-#:
-#: The edit kinds of authored-world 1.0 and of this extension are closed lists, and that edit is in
-#: neither, so writing the chain would sign a package their verifiers refuse. A branch carries no
-#: such edit of its own, but its parent pointer must resolve in the directory that holds it, and
-#: the parent is not there. An object placed with a behaviour by ``add_object`` is inside both
-#: lists and exports as before; only the later edit that gives, changes or takes away a behaviour
-#: is withheld. The package counts these versions in its existing ``withheld`` total, which has no
-#: field for another reason.
-BEHAVIOUR_EDIT_WITHHELD: Final = (
-    "the edit chain carries set_object_behaviour, which no exported edit kind names; the version "
-    "and every version branched from it are not exported"
-)
-
-
-def partition_export_versions(
-    versions: Sequence[ExportVersion],
-) -> tuple[tuple[object, ...], tuple[object, ...], int, int]:
-    """Split versions between authored-world 1.0 and this extension without breaking lineage.
-
-    ``environment_ids`` is lineage-closed: every kept environment-bearing version, every kept
-    ancestor a parent pointer in that set needs, and every kept descendant that cannot live in
-    authored-world 1.0 because an ancestor is environment-bearing. Schema version 2 is never
-    assigned here; a schema-v1 ancestor keeps its honest document when the projector writes it.
-
-    ``authored_ids`` is the kept schema-v1 subset whose ancestor chain is also schema-v1. Those
-    versions may also appear in ``environment_ids`` when a descendant needs them as a parent.
-    Invalidated sources, versions carrying a placed depth estimate or a behaviour edit, and every
-    version branched from one of those two, are counted on the side that would have exported them
-    and are not named.
-    """
-    by_id = {item.version_id: item for item in versions}
-
-    def withheld_with_its_lineage(item: ExportVersion) -> bool:
-        """Whether this version, or any version it was branched from, cannot be written.
-
-        A branch copies its parent's state and not its parent's chain, so it can hold no placed
-        estimate and carry no behaviour edit of its own and still name a parent that is withheld.
-        A parent pointer must resolve in the directory that holds it, so the branch goes with the
-        parent. An invalidated source needs no such walk: a branch shares its parent's source.
-        """
-        seen = {item.version_id}
-        cursor: ExportVersion | None = item
-        while cursor is not None:
-            if cursor.point_map_bearing or cursor.behaviour_edit_bearing:
-                return True
-            parent_id = cursor.parent_version_id
-            if parent_id is None or parent_id in seen:
-                return False
-            seen.add(parent_id)
-            cursor = by_id.get(parent_id)
-        return False
-
-    authored_withheld = 0
-    environment_withheld = 0
-    kept: list[ExportVersion] = []
-    for item in versions:
-        if item.source_invalidated or withheld_with_its_lineage(item):
-            if item.environment_bearing:
-                environment_withheld += 1
-            else:
-                authored_withheld += 1
-            continue
-        kept.append(item)
-    kept_ids = {item.version_id for item in kept}
-    environment_native = {item.version_id for item in kept if item.environment_bearing}
-
-    def kept_ancestors(version_id: object) -> set[object]:
-        found: set[object] = set()
-        seen = {version_id}
-        cursor = by_id[version_id].parent_version_id
-        while cursor is not None and cursor not in seen:
-            seen.add(cursor)
-            if cursor in kept_ids:
-                found.add(cursor)
-            parent = by_id.get(cursor)
-            if parent is None:
-                break
-            cursor = parent.parent_version_id
-        return found
-
-    environment_ids = set(environment_native)
-    for native_id in environment_native:
-        environment_ids.update(kept_ancestors(native_id))
-    for item in kept:
-        if item.version_id not in environment_ids and (
-            kept_ancestors(item.version_id) & environment_native
-        ):
-            environment_ids.add(item.version_id)
-    authored_ids = tuple(
-        item.version_id
-        for item in kept
-        if not item.environment_bearing
-        and not (kept_ancestors(item.version_id) & environment_native)
-    )
-    return (
-        authored_ids,
-        tuple(item.version_id for item in kept if item.version_id in environment_ids),
-        authored_withheld,
-        environment_withheld,
-    )
+    #: The extension version these sections were checked against.
+    format: ExtensionFormat
 
 
 def required_loader_capabilities(
-    versions: Iterable[Mapping[str, Any]], assets: Mapping[str, Mapping[str, Any]]
+    format_: ExtensionFormat,
+    versions: Iterable[Mapping[str, Any]],
+    assets: Mapping[str, Mapping[str, Any]],
 ) -> list[str]:
     """What a loader must support to present every instance and object this extension exports.
 
     A removed instance or object is part of the state digest and is not drawn, so it requires
     nothing. Availability is not a capability: withdrawn and unavailable instances stay named.
     """
-    required = {EXTENSION_CAPABILITY}
+    required = {format_.capability}
     for version in versions:
         delta = version["delta"]
         for obj in delta["objects"]:
@@ -303,6 +200,7 @@ def required_loader_capabilities(
 
 
 def declaration(
+    format_: ExtensionFormat,
     versions: Sequence[Mapping[str, Any]],
     assets: Mapping[str, Mapping[str, Any]],
     *,
@@ -315,7 +213,7 @@ def declaration(
         for instance in version["delta"].get("environment_instances", ())
     ]
     return {
-        "@id": EXTENSION_PROFILE_ID,
+        "@id": format_.profile_id,
         "asset_bytes": ASSET_BYTES,
         "availability": AVAILABILITY_RULE,
         "base_profile": BASE_PROFILE,
@@ -330,16 +228,14 @@ def declaration(
             ),
             "withheld_versions": withheld_versions,
         },
-        "delta": DELTA_RULE,
-        "extension": EXTENSION_NAME,
-        "extension_version": EXTENSION_VERSION,
-        "omission": OMISSION_RULE,
-        "required_loader_capabilities": required_loader_capabilities(versions, assets),
+        "delta": delta_rule(format_),
+        "extension": format_.name,
+        "extension_version": format_.version,
+        "omission": omission_rule(format_),
+        "required_loader_capabilities": required_loader_capabilities(format_, versions, assets),
         "runtime_code": RUNTIME_CODE,
         "sections": {
-            "assets": ASSETS_PATH,
-            "behaviours": BEHAVIOURS_PATH,
-            "versions": VERSIONS_PATH,
+            section: format_.section_path(section) for section in format_.section_profiles
         },
         "source_bytes": SOURCE_BYTES,
         "source_rights": SOURCE_RIGHTS,
@@ -347,68 +243,73 @@ def declaration(
 
 
 def build_sections(
+    format_: ExtensionFormat,
     *,
     versions: Sequence[Mapping[str, Any]],
     source_snapshots: Sequence[Mapping[str, Any]],
     assets: Sequence[Mapping[str, Any]],
     behaviours: Sequence[Mapping[str, Any]],
-    withheld_versions: int,
+    withheld: Sequence[tuple[str, Sequence[str]]],
 ) -> dict[str, dict[str, Any]]:
-    """Assemble the four extension documents in the one order the verifier accepts."""
+    """Assemble the four extension documents in the one order the verifier accepts.
+
+    ``withheld`` holds one ``(reason, names)`` pair for every version this extension counts and
+    does not carry.
+    """
     ordered_versions = sorted(versions, key=lambda item: item["version_id"])
     ordered_assets = sorted(assets, key=lambda item: item["content_sha256"])
     by_digest = {item["content_sha256"]: item for item in ordered_assets}
     return {
-        ASSETS_PATH: {"items": ordered_assets, "profile": _ASSETS_PROFILE},
-        BEHAVIOURS_PATH: {
+        format_.section_path("assets"): {
+            "items": ordered_assets,
+            "profile": format_.section_profiles["assets"],
+        },
+        format_.section_path("behaviours"): {
             "items": sorted(
                 behaviours, key=lambda item: (item["behaviour_key"], item["behaviour_version"])
             ),
-            "profile": _BEHAVIOURS_PROFILE,
+            "profile": format_.section_profiles["behaviours"],
         },
-        DECLARATION_PATH: declaration(
-            ordered_versions, by_digest, withheld_versions=withheld_versions
+        format_.declaration_path: declaration(
+            format_, ordered_versions, by_digest, withheld_versions=len(withheld)
         ),
-        VERSIONS_PATH: {
+        format_.section_path("versions"): {
             "items": ordered_versions,
-            "profile": _VERSIONS_PROFILE,
+            "profile": format_.section_profiles["versions"],
             "source_snapshots": sorted(source_snapshots, key=lambda item: item["snapshot_id"]),
-            "withheld": {
-                "invalidated_source_versions": withheld_versions,
-                "reason": WITHHELD_REASON,
-            },
+            "withheld": withheld_section(format_, withheld),
         },
     }
 
 
 def verify_environment_instances(
-    files: Mapping[str, Any], inventory: Iterable[str]
+    format_: ExtensionFormat, files: Mapping[str, Any], inventory: Iterable[str]
 ) -> EnvironmentInstances:
-    """Check the extension against its rules and against the 1.0 structure it sits beside."""
-    present = {path for path in inventory if path.startswith(f"{EXTENSION_DIR}/")}
-    if present != EXTENSION_PATHS:
+    """Check the extension against its version's rules and against the 1.0 structure beside it."""
+    directory = format_.directory
+    versions_path = format_.section_path("versions")
+    present = {path for path in inventory if path.startswith(f"{directory}/")}
+    if present != format_.paths:
         raise EnvironmentExtensionError(
-            f"{EXTENSION_DIR} must hold exactly {sorted(EXTENSION_PATHS)}, found {sorted(present)}"
+            f"{directory} must hold exactly {sorted(format_.paths)}, found {sorted(present)}"
         )
-    assets = _verify_assets(files[ASSETS_PATH])
-    behaviours = _verify_behaviours(files[BEHAVIOURS_PATH])
-    document = _mapping(files[VERSIONS_PATH], VERSIONS_PATH)
-    _exact(document, {"items", "profile", "source_snapshots", "withheld"}, VERSIONS_PATH)
-    if document["profile"] != _VERSIONS_PROFILE:
-        raise EnvironmentExtensionError(f"{VERSIONS_PATH}: unknown section profile")
-    snapshots = _verify_source_snapshots(document["source_snapshots"], files)
-    withheld = _mapping(document["withheld"], f"{VERSIONS_PATH}/withheld")
-    _exact(withheld, {"invalidated_source_versions", "reason"}, f"{VERSIONS_PATH}/withheld")
-    withheld_count = withheld["invalidated_source_versions"]
-    if not _natural(withheld_count) or withheld["reason"] != WITHHELD_REASON:
-        raise EnvironmentExtensionError(f"{VERSIONS_PATH}/withheld is malformed")
-    versions = _list(document["items"], f"{VERSIONS_PATH}/items")
-    _sorted_unique([_mapping(v, VERSIONS_PATH).get("version_id") for v in versions], "versions")
+    assets = _verify_assets(format_, files[format_.section_path("assets")])
+    behaviours = _verify_behaviours(format_, files[format_.section_path("behaviours")])
+    document = _mapping(files[versions_path], versions_path)
+    _exact(document, {"items", "profile", "source_snapshots", "withheld"}, versions_path)
+    if document["profile"] != format_.section_profiles["versions"]:
+        raise EnvironmentExtensionError(f"{versions_path}: unknown section profile")
+    snapshots = _verify_source_snapshots(format_, document["source_snapshots"], files)
+    withheld_count = verify_withheld(
+        format_, document["withheld"], f"{versions_path}/withheld", EnvironmentExtensionError
+    )
+    versions = _list(document["items"], f"{versions_path}/items")
+    _sorted_unique([_mapping(v, versions_path).get("version_id") for v in versions], "versions")
     by_id = {version["version_id"]: version for version in versions}
     referenced_assets: set[str] = set()
     referenced_behaviours: set[tuple[str, int]] = set()
     for version in versions:
-        _verify_version(version, by_id, snapshots, assets, behaviours)
+        _verify_version(format_, version, by_id, snapshots, assets, behaviours)
         for obj in version["delta"]["objects"]:
             referenced_assets.add(obj["asset_sha256"])
             if obj["behaviour"] is not None:
@@ -417,22 +318,23 @@ def verify_environment_instances(
                 )
     if referenced_assets != set(assets):
         raise EnvironmentExtensionError(
-            f"{ASSETS_PATH} must list exactly the assets an object references"
+            f"{format_.section_path('assets')} must list exactly the assets an object references"
         )
     if referenced_behaviours != set(behaviours):
         raise EnvironmentExtensionError(
-            f"{BEHAVIOURS_PATH} must list exactly the behaviours an object references"
+            f"{format_.section_path('behaviours')} must list exactly the behaviours an object "
+            "references"
         )
     referenced_snapshots = {version["source_snapshot_id"] for version in versions}
     if referenced_snapshots != set(snapshots):
         raise EnvironmentExtensionError(
-            f"{VERSIONS_PATH}: source_snapshots must be exactly those a version names"
+            f"{versions_path}: source_snapshots must be exactly those a version names"
         )
-    expected = declaration(versions, assets, withheld_versions=withheld_count)
-    if files[DECLARATION_PATH] != expected:
+    expected = declaration(format_, versions, assets, withheld_versions=withheld_count)
+    if files[format_.declaration_path] != expected:
         raise EnvironmentExtensionError(
-            f"{DECLARATION_PATH} does not match the sections it declares; a declaration that "
-            "understates what a loader needs would let a runtime drop content silently"
+            f"{format_.declaration_path} does not match the sections it declares; a declaration "
+            "that understates what a loader needs would let a runtime drop content silently"
         )
     return EnvironmentInstances(
         declaration=expected,
@@ -441,6 +343,7 @@ def verify_environment_instances(
         behaviours=behaviours,
         source_snapshots=snapshots,
         withheld_versions=withheld_count,
+        format=format_,
     )
 
 
@@ -448,22 +351,23 @@ def loader_report(world: EnvironmentInstances, capabilities: frozenset[str]) -> 
     """Name every part of the extension a loader with ``capabilities`` cannot present.
 
     Nothing here runs a loader. A loader without this capability must omit these versions and
-    must not treat authored-world 1.0 objects as the whole authored state.
+    must not treat the authored-world objects of the same version as the whole authored state.
     """
     required = world.declaration["required_loader_capabilities"]
     unsupported = sorted(set(required) - capabilities)
     counts = world.declaration["counts"]
-    if EXTENSION_CAPABILITY not in capabilities:
+    if world.format.capability not in capabilities:
         return {
             "instances_not_drawable": [],
             "instances_unavailable": [],
             "load": "not loaded",
             "not_loaded": (
-                f"this loader does not declare {EXTENSION_CAPABILITY}, so "
+                f"this loader does not declare {world.format.capability}, so "
                 f"{counts['alternate_versions']} alternate version(s) and "
                 f"{counts['environment_instances_present']} present environment instance(s) "
                 "in this package are not loaded; the loader must say so rather than infer "
-                "objects from exulanica-wmp-ext-authored-world@1.0 as the whole authored state"
+                f"objects from {_authored_capability_name(world.format)} as the whole authored "
+                "state"
             ),
             "objects_not_drawable": [],
             "objects_with_unsupported_behaviour": [],
@@ -536,15 +440,21 @@ def loader_report(world: EnvironmentInstances, capabilities: frozenset[str]) -> 
     }
 
 
-def _verify_assets(value: Any) -> dict[str, Mapping[str, Any]]:
-    document = _mapping(value, ASSETS_PATH)
-    _exact(document, {"items", "profile"}, ASSETS_PATH)
-    if document["profile"] != _ASSETS_PROFILE:
-        raise EnvironmentExtensionError(f"{ASSETS_PATH}: unknown section profile")
-    items = _list(document["items"], ASSETS_PATH)
+def _authored_capability_name(format_: ExtensionFormat) -> str:
+    authored_world = counterpart(AUTHORED_WORLD, format_.version)
+    return f"{authored_world.name}@{authored_world.version}"
+
+
+def _verify_assets(format_: ExtensionFormat, value: Any) -> dict[str, Mapping[str, Any]]:
+    assets_path = format_.section_path("assets")
+    document = _mapping(value, assets_path)
+    _exact(document, {"items", "profile"}, assets_path)
+    if document["profile"] != format_.section_profiles["assets"]:
+        raise EnvironmentExtensionError(f"{assets_path}: unknown section profile")
+    items = _list(document["items"], assets_path)
     digests = []
     for item in items:
-        item = _mapping(item, ASSETS_PATH)
+        item = _mapping(item, assets_path)
         _exact(
             item,
             {
@@ -559,7 +469,7 @@ def _verify_assets(value: Any) -> dict[str, Mapping[str, Any]]:
                 "summary",
                 "title",
             },
-            ASSETS_PATH,
+            assets_path,
         )
         digest = item["content_sha256"]
         if (
@@ -575,24 +485,27 @@ def _verify_assets(value: Any) -> dict[str, Mapping[str, Any]]:
             )
         ):
             raise EnvironmentExtensionError(
-                f"{ASSETS_PATH}: asset {item.get('asset_key')!r} is malformed"
+                f"{assets_path}: asset {item.get('asset_key')!r} is malformed"
             )
         digests.append(digest)
     _sorted_unique(digests, "assets")
     return {item["content_sha256"]: item for item in items}
 
 
-def _verify_behaviours(value: Any) -> dict[tuple[str, int], Mapping[str, Any]]:
-    document = _mapping(value, BEHAVIOURS_PATH)
-    _exact(document, {"items", "profile"}, BEHAVIOURS_PATH)
-    if document["profile"] != _BEHAVIOURS_PROFILE:
-        raise EnvironmentExtensionError(f"{BEHAVIOURS_PATH}: unknown section profile")
-    items = _list(document["items"], BEHAVIOURS_PATH)
+def _verify_behaviours(
+    format_: ExtensionFormat, value: Any
+) -> dict[tuple[str, int], Mapping[str, Any]]:
+    behaviours_path = format_.section_path("behaviours")
+    document = _mapping(value, behaviours_path)
+    _exact(document, {"items", "profile"}, behaviours_path)
+    if document["profile"] != format_.section_profiles["behaviours"]:
+        raise EnvironmentExtensionError(f"{behaviours_path}: unknown section profile")
+    items = _list(document["items"], behaviours_path)
     keys: list[tuple[str, int]] = []
     for item in items:
-        item = _mapping(item, BEHAVIOURS_PATH)
+        item = _mapping(item, behaviours_path)
         _exact(
-            item, {"behaviour_key", "behaviour_version", "parameters", "summary"}, BEHAVIOURS_PATH
+            item, {"behaviour_key", "behaviour_version", "parameters", "summary"}, behaviours_path
         )
         if (
             not isinstance(item["behaviour_key"], str)
@@ -600,17 +513,17 @@ def _verify_behaviours(value: Any) -> dict[tuple[str, int], Mapping[str, Any]]:
             or item["behaviour_version"] < 1
             or not isinstance(item["summary"], str)
         ):
-            raise EnvironmentExtensionError(f"{BEHAVIOURS_PATH}: behaviour is malformed")
-        parameters = _mapping(item["parameters"], BEHAVIOURS_PATH)
+            raise EnvironmentExtensionError(f"{behaviours_path}: behaviour is malformed")
+        parameters = _mapping(item["parameters"], behaviours_path)
         for name, bound in parameters.items():
-            _verify_bound(item["behaviour_key"], name, bound)
+            _verify_bound(behaviours_path, item["behaviour_key"], name, bound)
         keys.append((item["behaviour_key"], item["behaviour_version"]))
     _sorted_unique(keys, "behaviours")
     return {(item["behaviour_key"], item["behaviour_version"]): item for item in items}
 
 
-def _verify_bound(behaviour: str, name: str, bound: Any) -> None:
-    where = f"{BEHAVIOURS_PATH}: {behaviour} parameter {name}"
+def _verify_bound(behaviours_path: str, behaviour: str, name: str, bound: Any) -> None:
+    where = f"{behaviours_path}: {behaviour} parameter {name}"
     bound = _mapping(bound, where)
     kind = bound.get("kind")
     if kind == "integer":
@@ -642,25 +555,28 @@ def _verify_bound(behaviour: str, name: str, bound: Any) -> None:
         raise EnvironmentExtensionError(f"{where}: unreviewed parameter kind {kind!r}")
 
 
-def _verify_source_snapshots(value: Any, files: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
-    items = _list(value, f"{VERSIONS_PATH}/source_snapshots")
+def _verify_source_snapshots(
+    format_: ExtensionFormat, value: Any, files: Mapping[str, Any]
+) -> dict[str, Mapping[str, Any]]:
+    versions_path = format_.section_path("versions")
+    items = _list(value, f"{versions_path}/source_snapshots")
     structure = files.get("world/structure.json")
     topology = files.get("world/topology.json")
     ids = []
     current = []
     for item in items:
-        item = _mapping(item, VERSIONS_PATH)
+        item = _mapping(item, versions_path)
         _exact(
             item,
             {"current", "element_ids", "region_ids", "snapshot_id", "snapshot_sha256"},
-            f"{VERSIONS_PATH}/source_snapshots",
+            f"{versions_path}/source_snapshots",
         )
         if (
             not _urn_of(item["snapshot_id"], "structure")
             or not _hex64(item["snapshot_sha256"])
             or not isinstance(item["current"], bool)
         ):
-            raise EnvironmentExtensionError(f"{VERSIONS_PATH}: a source snapshot is malformed")
+            raise EnvironmentExtensionError(f"{versions_path}: a source snapshot is malformed")
         _sorted_unique(item["region_ids"], "source snapshot region_ids", strings=True)
         _sorted_unique(item["element_ids"], "source snapshot element_ids", strings=True)
         if item["current"]:
@@ -669,7 +585,7 @@ def _verify_source_snapshots(value: Any, files: Mapping[str, Any]) -> dict[str, 
     _sorted_unique(ids, "source snapshots")
     if len(current) > 1:
         raise EnvironmentExtensionError(
-            f"{VERSIONS_PATH}: more than one source snapshot claims to be current"
+            f"{versions_path}: more than one source snapshot claims to be current"
         )
     for item in current:
         structure = _mapping(structure, "world/structure.json")
@@ -683,13 +599,14 @@ def _verify_source_snapshots(value: Any, files: Mapping[str, Any]) -> dict[str, 
             != item["element_ids"]
         ):
             raise EnvironmentExtensionError(
-                f"{VERSIONS_PATH}: the current source snapshot disagrees with world/structure.json "
+                f"{versions_path}: the current source snapshot disagrees with world/structure.json "
                 "or world/topology.json"
             )
     return {item["snapshot_id"]: item for item in items}
 
 
 def _verify_version(
+    format_: ExtensionFormat,
     version: Mapping[str, Any],
     by_id: Mapping[str, Mapping[str, Any]],
     snapshots: Mapping[str, Mapping[str, Any]],
@@ -712,8 +629,9 @@ def _verify_version(
             "title",
             "version_id",
         },
-        VERSIONS_PATH,
+        format_.section_path("versions"),
     )
+    versions_path = format_.section_path("versions")
     name = version["version_id"]
     if (
         not _urn_of(name, "alternate-version")
@@ -728,11 +646,11 @@ def _verify_version(
             and not _urn_of(version["style_version_id"], "style")
         )
     ):
-        raise EnvironmentExtensionError(f"{VERSIONS_PATH}: version {name} is malformed")
+        raise EnvironmentExtensionError(f"{versions_path}: version {name} is malformed")
     source = snapshots.get(version["source_snapshot_id"])
     if source is None:
         raise EnvironmentExtensionError(
-            f"{VERSIONS_PATH}: version {name} names a source snapshot not listed"
+            f"{versions_path}: version {name} names a source snapshot not listed"
         )
     parent = version["parent_version_id"]
     if parent is not None:
@@ -741,7 +659,7 @@ def _verify_version(
             or by_id[parent]["source_snapshot_id"] != version["source_snapshot_id"]
         ):
             raise EnvironmentExtensionError(
-                f"{VERSIONS_PATH}: version {name} names a parent not in this package or on "
+                f"{versions_path}: version {name} names a parent not in this package or on "
                 "another source snapshot"
             )
         seen = {name}
@@ -749,11 +667,11 @@ def _verify_version(
         while cursor is not None:
             if cursor in seen:
                 raise EnvironmentExtensionError(
-                    f"{VERSIONS_PATH}: version lineage has a cycle at {name}"
+                    f"{versions_path}: version lineage has a cycle at {name}"
                 )
             seen.add(cursor)
             cursor = by_id[cursor]["parent_version_id"]
-    delta = _mapping(version["delta"], f"{VERSIONS_PATH}/{name}/delta")
+    delta = _mapping(version["delta"], f"{versions_path}/{name}/delta")
     schema = delta.get("schema_version")
     if schema == 1:
         _exact(delta, {"element_overrides", "objects", "schema_version"}, f"{name}/delta")
@@ -767,17 +685,17 @@ def _verify_version(
         instances = _list(delta["environment_instances"], f"{name}/delta/environment_instances")
         if not instances:
             raise EnvironmentExtensionError(
-                f"{VERSIONS_PATH}: version {name} schema version 2 requires environment_instances"
+                f"{versions_path}: version {name} schema version 2 requires environment_instances"
             )
     else:
         raise EnvironmentExtensionError(
-            f"{VERSIONS_PATH}: version {name} has an unknown delta schema"
+            f"{versions_path}: version {name} has an unknown delta schema"
         )
     objects = _list(delta["objects"], f"{name}/delta/objects")
     _sorted_unique([_mapping(o, name).get("object_id") for o in objects], "objects", strings=True)
     regions = set(source["region_ids"])
     for obj in objects:
-        _verify_object(name, obj, regions, assets, behaviours)
+        _verify_object(versions_path, name, obj, regions, assets, behaviours)
     overrides = _list(delta["element_overrides"], f"{name}/delta/element_overrides")
     _sorted_unique(
         [_mapping(o, name).get("element_id") for o in overrides], "element overrides", strings=True
@@ -791,31 +709,32 @@ def _verify_version(
             or (not override["suppressed"] and override["transform"] is None)
         ):
             raise EnvironmentExtensionError(
-                f"{VERSIONS_PATH}: version {name} has a malformed override"
+                f"{versions_path}: version {name} has a malformed override"
             )
         if override["transform"] is not None:
             _verify_transform(name, override["transform"])
     instance_ids = [_mapping(item, name).get("instance_id") for item in instances]
     _sorted_unique(instance_ids, "environment instances", strings=True)
     for instance in instances:
-        _verify_instance(name, instance, regions)
+        _verify_instance(versions_path, name, instance, regions)
     if delta_sha256(delta) != version["state_sha256"]:
         raise EnvironmentExtensionError(
-            f"{VERSIONS_PATH}: version {name} state_sha256 does not re-derive from its "
+            f"{versions_path}: version {name} state_sha256 does not re-derive from its "
             "environment-inclusive delta"
         )
-    _verify_availability(name, version["environment_availability"], instance_ids)
-    _verify_edits(version)
+    _verify_availability(versions_path, name, version["environment_availability"], instance_ids)
+    _verify_edits(format_, version)
 
 
 def _verify_object(
+    versions_path: str,
     version: str,
     obj: Any,
     regions: set[str],
     assets: Mapping[str, Mapping[str, Any]],
     behaviours: Mapping[tuple[str, int], Mapping[str, Any]],
 ) -> None:
-    where = f"{VERSIONS_PATH}: version {version} object"
+    where = f"{versions_path}: version {version} object"
     obj = _mapping(obj, where)
     _exact(
         obj,
@@ -867,8 +786,8 @@ def _verify_object(
             )
 
 
-def _verify_instance(version: str, instance: Any, regions: set[str]) -> None:
-    where = f"{VERSIONS_PATH}: version {version} environment instance"
+def _verify_instance(versions_path: str, version: str, instance: Any, regions: set[str]) -> None:
+    where = f"{versions_path}: version {version} environment instance"
     instance = _mapping(instance, where)
     _exact(
         instance,
@@ -974,7 +893,9 @@ def _verify_source(where: str, value: Any) -> None:
         raise EnvironmentExtensionError(f"{where} feature placement is malformed")
 
 
-def _verify_availability(version: str, value: Any, instance_ids: Sequence[Any]) -> None:
+def _verify_availability(
+    versions_path: str, version: str, value: Any, instance_ids: Sequence[Any]
+) -> None:
     items = _list(value, f"{version}/environment_availability")
     seen: list[str] = []
     for item in items:
@@ -982,22 +903,23 @@ def _verify_availability(version: str, value: Any, instance_ids: Sequence[Any]) 
         _exact(item, {"availability", "instance_id"}, f"{version}/environment_availability")
         if item["availability"] not in _AVAILABILITIES or not isinstance(item["instance_id"], str):
             raise EnvironmentExtensionError(
-                f"{VERSIONS_PATH}: version {version} environment availability is malformed"
+                f"{versions_path}: version {version} environment availability is malformed"
             )
         seen.append(item["instance_id"])
     if seen != list(instance_ids):
         raise EnvironmentExtensionError(
-            f"{VERSIONS_PATH}: version {version} environment_availability must name exactly "
+            f"{versions_path}: version {version} environment_availability must name exactly "
             "the exported instances, in the same order"
         )
 
 
-def _verify_edits(version: Mapping[str, Any]) -> None:
+def _verify_edits(format_: ExtensionFormat, version: Mapping[str, Any]) -> None:
+    versions_path = format_.section_path("versions")
     name = version["version_id"]
     edits = _list(version["edits"], f"{name}/edits")
     if len(edits) != version["edit_seq"]:
         raise EnvironmentExtensionError(
-            f"{VERSIONS_PATH}: version {name} edit_seq disagrees with its edits"
+            f"{versions_path}: version {name} edit_seq disagrees with its edits"
         )
     previous = EMPTY_DELTA_SHA256 if version["parent_version_id"] is None else None
     seen: set[str] = set()
@@ -1022,43 +944,43 @@ def _verify_edits(version: Mapping[str, Any]) -> None:
         kind = edit["kind"]
         subject_ok = (
             (
-                kind in _OBJECT_EDITS
+                kind in format_.kinds_changing("object")
                 and isinstance(edit["object_id"], str)
                 and edit["element_id"] is None
                 and edit["environment_instance_id"] is None
             )
             or (
-                kind in _ELEMENT_EDITS
+                kind in format_.kinds_changing("element")
                 and isinstance(edit["element_id"], str)
                 and edit["object_id"] is None
                 and edit["environment_instance_id"] is None
             )
             or (
-                kind in _ENVIRONMENT_EDITS
+                kind in format_.kinds_changing("environment_instance")
                 and isinstance(edit["environment_instance_id"], str)
                 and edit["object_id"] is None
                 and edit["element_id"] is None
             )
-            or kind == "undo"
+            or kind == UNDO
         )
         if (
             edit["edit_seq"] != index
-            or kind not in _EDIT_KINDS
+            or kind not in format_.admitted_kinds
             or not subject_ok
             or not _urn_of(edit["edit_id"], "alternate-edit")
             or edit["edit_id"] in seen
             or not _hex64(edit["base_state_sha256"])
             or not _hex64(edit["result_state_sha256"])
             or not isinstance(edit["recorded_at"], str)
-            or (kind == "undo") != (edit["undone_edit_id"] is not None)
+            or (kind == UNDO) != (edit["undone_edit_id"] is not None)
             or (edit["undone_edit_id"] is not None and edit["undone_edit_id"] not in seen)
         ):
             raise EnvironmentExtensionError(
-                f"{VERSIONS_PATH}: version {name} edit {index} is malformed"
+                f"{versions_path}: version {name} edit {index} is malformed"
             )
         if previous is not None and edit["base_state_sha256"] != previous:
             raise EnvironmentExtensionError(
-                f"{VERSIONS_PATH}: version {name} edit {index} was not made against the state "
+                f"{versions_path}: version {name} edit {index} was not made against the state "
                 "before it"
             )
         previous = edit["result_state_sha256"]
@@ -1070,7 +992,7 @@ def _verify_edits(version: Mapping[str, Any]) -> None:
     )
     if final is not None and final != version["state_sha256"]:
         raise EnvironmentExtensionError(
-            f"{VERSIONS_PATH}: version {name} edit chain does not end at its exported state"
+            f"{versions_path}: version {name} edit chain does not end at its exported state"
         )
 
 

@@ -5,13 +5,16 @@ Status: **PROFILE `exulanica-wmp-1.0`, EXIT-GATED**.
 **Creative-world state:** [product-direction.md](product-direction.md#package-and-api-boundaries)
 asks for authored state and behaviour references without changing the 1.0 profile. Objects,
 overrides and schema-version-1 deltas are carried by an optional, separately versioned
-extension, `exulanica-wmp-ext-authored-world` 1.0, specified in
+extension, `exulanica-wmp-ext-authored-world`, in versions 1.0 and 1.1, specified in
 [its own section below](#authored-world-extension-10). Environment-inclusive authored state
-is a second optional extension, `exulanica-wmp-ext-environment-instances` 1.0, specified in
-[Environment-instances extension 1.0](#environment-instances-extension-10). The 1.0 profile,
-its eighteen required paths and its signature payload are unchanged, and a package written
-without either extension is byte for byte what the projector wrote before the extensions
-existed, apart from the names a withdrawn person's rows withhold (see
+is a second optional extension, `exulanica-wmp-ext-environment-instances`, also in versions 1.0
+and 1.1, specified in [Environment-instances extension 1.0](#environment-instances-extension-10).
+Version 1.1 of each also carries the edits that give a placed object a behaviour, change it or
+take it away, so a world with motion exports whole. One rule decides which alternate versions
+an extension carries ([Which versions an extension carries](#which-versions-an-extension-carries)).
+The 1.0 profile, its eighteen required paths and its signature payload are unchanged, and a
+package written without either extension is byte for byte what the projector wrote before the
+extensions existed, apart from the names a withdrawn person's rows withhold (see
 [Inventory and privacy boundary](#inventory-and-privacy-boundary)).
 
 The World Memory Package (WMP) is a signed projection of one PostgreSQL snapshot. It is not the
@@ -36,6 +39,7 @@ rights, carry missing asset bytes or establish a runnable import.
 - [Integrity format](#integrity-format)
 - [Commands](#commands)
 - [Exit evidence](#exit-evidence)
+- [Which versions an extension carries](#which-versions-an-extension-carries)
 - [Authored-world extension 1.0](#authored-world-extension-10)
 - [Environment-instances extension 1.0](#environment-instances-extension-10)
 - [Explicit training dataset profile](#explicit-training-dataset-profile)
@@ -132,8 +136,8 @@ explicitly.
 
 ```text
 exulanica-wmp project --workspace UUID --actor UUID --private-key KEY --output DIRECTORY
-                      [--extension authored-world-1.0]
-                      [--extension environment-instances-1.0]
+                      [--extension authored-world-1.0 | authored-world-1.1]
+                      [--extension environment-instances-1.0 | environment-instances-1.1]
 exulanica-wmp verify DIRECTORY
 exulanica-wmp inspect DIRECTORY
 exulanica-wmp diff BEFORE_DIRECTORY AFTER_DIRECTORY
@@ -142,6 +146,7 @@ exulanica-wmp import-check DIRECTORY [--loader-capability CAPABILITY ...]
                            [--supported-interaction-capability KEY@VERSION ...]
 ```
 
+`project` takes at most one version of each extension and refuses a request for two.
 `verify`, `inspect`, `diff`, and `import-check` do not open PostgreSQL. Diff output reports semantic
 JSON pointers and before/after value hashes, not the values themselves. `import-check` never mutates
 a live world; absent receiver capability declarations produce `indeterminate`, not a fabricated
@@ -165,11 +170,48 @@ unchanged re-export, and deletion followed by a new root and semantic removed-st
 backend PostgreSQL suite, Ruff, migration count, and import boundaries are run before that exit
 commit; those command results, not this status sentence alone, are the exit gate.
 
+## Which versions an extension carries
+
+A version is written into an extension only when it and every version it was branched from fit
+that extension version's format: every edit kind in their edit chains is one the version admits,
+and every delta section their state holds or their chains change is one it carries. The formats
+are data in [`extension_formats.py`](../exulanica/world_package/extension_formats.py), each
+version's closed list of edit kinds stated once. [`export_partition.py`](../exulanica/world_package/export_partition.py)
+decides from those lists and from the edit-kind registry
+([`edit_kinds.py`](../exulanica/world/edit_kinds.py)), which says which subject each kind
+changes; the projection itself names no edit kind. A kind the product gains later is in no
+format, so every version whose lineage carries it is withheld until an extension version admits
+it (a 1.1 package names the kind among its reasons), and a kind the registry does not hold
+refuses the export by name.
+`tests/test_world_package_export_partition.py` adds a kind to a copy of the registry and shows
+it withheld.
+
+| Extension versions | Edit kinds admitted beyond 1.0 | How withheld versions are counted |
+| --- | --- | --- |
+| authored-world 1.0, environment-instances 1.0 | none | One total, `withheld.invalidated_source_versions`, under a deletion's reason whatever withheld them |
+| authored-world 1.1, environment-instances 1.1 | `set_object_behaviour` | By reason: `source_invalidated`, `edit_kind_not_admitted` or `section_not_carried`, each with the kinds or sections it names |
+
+No version carries a placed photograph point map (the `add_point_map`, `move_point_map` and
+`remove_point_map` edits and the `point_map_instances` section). A placed estimate is a reading
+of somebody's home bound to a right its owner can end, and a package that leaves the machine is
+beyond the reach of that withdrawal, so exporting one is a decision rather than a projection:
+those versions, and every version branched from one, are withheld and counted. A withheld version
+is never named: its title, identifier and state stay out of the package.
+
+A version goes to the smallest extension family that carries every section its lineage needs:
+authored-world for objects and overrides alone, environment-instances when environment
+instances are involved. A family that was not requested is judged by its format of the version
+that was, so a request for 1.0 behaves exactly as it did before 1.1 existed. A kept version that
+only an unrequested family can hold refuses the export and names the extension to request.
+`tests/fixtures/wmp-goldens` pins every file of a rich fixture world, and every refusal, under
+every combination of extension versions.
+
 ## Authored-world extension 1.0
 
-Status: **OPT-IN EXTENSION `exulanica-wmp-ext-authored-world` 1.0**. Implementation: `exulanica/world_package/authored.py` (sections,
-verifier rules, loader report), `projector.py` (`_authored_world`), `package.py` (extension
-discovery and `import-check`). It carries the state [world-objects-contract.md](world-objects-contract.md)
+Status: **OPT-IN EXTENSION `exulanica-wmp-ext-authored-world` 1.0 AND 1.1**. Implementation:
+`exulanica/world_package/authored.py` (sections, verifier rules and loader report for both
+versions), `extension_projection.py` (the projection), `package.py` (extension discovery and
+`import-check`). It carries the state [world-objects-contract.md](world-objects-contract.md)
 defines: alternate versions, their authored objects and source-element overrides, and the reviewed
 asset and behaviour references those objects make.
 
@@ -205,7 +247,9 @@ behaviour key, version and parameters. Ids are pseudonymised with the same
 `sha256("alternate-version:" + uuid)`: a holder of the version id can match it, and the package
 alone does not reveal it.
 
-The extension is added only when `project` is given `--extension authored-world-1.0`. With it, the
+The extension is added only when `project` is given `--extension authored-world-1.0`, or
+`--extension authored-world-1.1`, which writes `extensions/authored-world-1.1/` with the same four
+files and the differences [the rule above](#which-versions-an-extension-carries) names. With it, the
 eighteen 1.0 payloads are unchanged except `ro-crate-metadata.json`, which gains the four files in
 `hasPart`, one `Profile` node for the extension, and a `conformsTo` on `extension.json`. The crate
 root still conforms to the 1.0 profile alone, because a 1.0 verifier requires exactly that value.
@@ -219,15 +263,18 @@ The export receipt's `export_policy` records the extension; the package root doe
   invalid exactly when its source snapshot carries a `world_structure_invalidation` row. The
   projector already withdraws a scene when one member is deleted, and an authored delta posed in the
   regions of withdrawn structure is the same kind of claim, so such a version is withheld and only
-  counted (`withheld.invalidated_source_versions`), never named. The authored work survives in the
-  database and in `GET /world/versions`. Invalidation is per source snapshot and a branch shares its
-  parent's source, so no exported version names a withheld parent.
-- **Versions whose edit chain changes a behaviour.** Neither this extension's closed list of edit
-  kinds nor the environment-instances extension's names `set_object_behaviour`, the edit that gives
-  a placed object a behaviour, replaces it or takes it away, so a version whose chain carries one,
-  and every version branched from it, is withheld and counted in
-  `withheld.invalidated_source_versions`, the package's one withheld total, while a behaviour named
-  when the object was added is part of `add_object` and exports with the object.
+  counted (`withheld.invalidated_source_versions`, or `source_invalidated` in 1.1), never named.
+  The authored work survives in the database and in `GET /world/versions`. Invalidation is per
+  source snapshot and a branch shares its parent's source, so no exported version names a
+  withheld parent.
+- **Under 1.0, versions whose edit chain changes a behaviour.** The 1.0 closed lists of edit kinds
+  do not name `set_object_behaviour`, the edit that gives a placed object a behaviour, changes it
+  or takes it away, so under 1.0 a version whose chain carries one, and every version branched from
+  it, is withheld and counted in `withheld.invalidated_source_versions`, the 1.0 package's one
+  withheld total. Version 1.1 admits the edit and exports those versions: each object carries the
+  reviewed behaviour and parameters the database stores, and the chain names every behaviour edit.
+  A behaviour named when the object was added is part of `add_object` and exports with the object
+  under either version.
 - **Asset bytes and runtime code.** An asset is a digest an authorized resolver supplies; a
   behaviour is an identifier with bounded parameters. Embedding reviewed CC0 bytes would be a new,
   separately versioned opt-in, and this version refuses any file it does not name.
@@ -257,6 +304,10 @@ the exported state; the source snapshot marked `current` disagrees with `world/s
 `world/topology.json`; the sections list assets, behaviours or snapshots nothing references; or
 `extension.json` does not match what the sections require. The digest is re-derived with the
 canonical JSON rule alone, not with the product's domain code, and a test holds the two equal.
+A 1.1 verifier also admits `set_object_behaviour` in a chain, and refuses a `withheld` section
+whose reasons are out of order or repeated, fall outside the three reasons, name a kind or
+section for a deletion or none for the other two, count no version, or do not add up to its
+total. The same chain under 1.0 is refused at the behaviour edit.
 
 Any other directory under `extensions/` must carry an `extension.json` naming its extension,
 version, base profile and required loader capabilities, or the package is refused. An extension
@@ -271,7 +322,7 @@ without their prefix and are merged in.
 | --- | --- |
 | `style-profile:<id>@<version>` | the appearance is current (unchanged 1.0 rule) |
 | `interaction:<key>@<version>` | the interaction policy is current (unchanged 1.0 rule) |
-| `wmp-extension:exulanica-wmp-ext-authored-world@1.0` | the extension is present |
+| `wmp-extension:exulanica-wmp-ext-authored-world@1.0` or `@1.1` | that version of the extension is present |
 | `asset-resolution:sha256-content-address` | any object that is not removed exists |
 | `asset-media:model/gltf-binary` | such an object's asset has that media type |
 | `behaviour:motion.bounded-path@1` | such an object carries that behaviour |
@@ -295,6 +346,12 @@ under `objects_with_unsupported_behaviour`, to be shown present with the behavio
 unsupported, the milestone's "unsupported behavior fails visibly". `import-check` runs no loader: a
 declared capability is the loader's claim, and the answer is a comparison of that claim with the
 signed content.
+
+A verified package and one a loader can run are separate answers. `verify` checks a moving
+object's behaviour against its reviewed bounds and says loading was not assessed; only
+`import-check` answers for a loader. One that does not declare `behaviour:motion.bounded-path@1`
+gets the moving objects under `objects_with_unsupported_behaviour`, and one that declares
+authored-world 1.0 and not 1.1 gets `not loaded` with what it leaves behind.
 
 ### What a signed package does and does not guarantee
 
@@ -326,6 +383,12 @@ deterministic), and shows the extension changes only `ro-crate-metadata.json` am
 `tests/test_world_package_extension_postgres.py` round-trips one alternate version holding one object
 from live PostgreSQL through a signed package and reads it back with a loader that lacks the
 extension and one that has it, and shows a version whose source was deleted is withheld.
+`tests/test_world_package_motion_postgres.py` round-trips a world with motion under 1.1 (the
+object's stored behaviour, every behaviour edit in the chain, a branch that took the motion
+away, an environment version with motion under environment-instances 1.1), answers three loader
+declarations, and shows a verifier that knows only 1.0 naming 1.1 as not checked.
+`tests/test_world_package_behaviour_extension.py` refuses the same chain under 1.0 and holds the
+1.1 `withheld` rules.
 
 [evaluation/2026-09-11-developer-proof.json](evaluation/2026-09-11-developer-proof.json) retains the
 same proof on the reference copy: a package projected from the version the second client edited,
@@ -335,11 +398,15 @@ byte-identical in every file including the signature.
 
 ## Environment-instances extension 1.0
 
-Status: **OPT-IN EXTENSION `exulanica-wmp-ext-environment-instances` 1.0**. Implementation:
-`exulanica/world_package/environments.py` (sections, verifier rules, loader report, lineage
-partition), `projector.py` (`_environment_instances`), `package.py` (extension discovery and
-`import-check`). It carries the environment-inclusive authored state
-[world-objects-contract.md](world-objects-contract.md) section 11 defines: alternate versions
+Status: **OPT-IN EXTENSION `exulanica-wmp-ext-environment-instances` 1.0 AND 1.1**.
+Implementation: `exulanica/world_package/environments.py` (sections, verifier rules and loader
+report for both versions), `export_partition.py` (the lineage partition),
+`extension_projection.py` (the projection), `package.py` (extension discovery and
+`import-check`). Version 1.1 differs from 1.0 as
+[Which versions an extension carries](#which-versions-an-extension-carries) states, and its
+declaration names authored-world 1.1 where 1.0's names authored-world 1.0. It carries the
+environment-inclusive authored state [world-objects-contract.md](world-objects-contract.md)
+section 11 defines: alternate versions
 whose current delta includes `environment_instances`, or whose edit chain names an environment
 edit, together with the objects and overrides those versions still hold, the schema-v1
 ancestors those parent pointers require, and schema-v1 descendants that cannot live in
@@ -437,7 +504,7 @@ authored-world 1.0 directory it does know. This directory is then named as not c
 
 | Capability | Required when |
 | --- | --- |
-| `wmp-extension:exulanica-wmp-ext-environment-instances@1.0` | the extension is present |
+| `wmp-extension:exulanica-wmp-ext-environment-instances@1.0` or `@1.1` | that version of the extension is present |
 | `environment-source:sha256-content-address` | any environment instance that is not removed exists |
 | `asset-resolution:sha256-content-address` | any object that is not removed exists |
 | `asset-media:model/gltf-binary` | such an object's asset has that media type |

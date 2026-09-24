@@ -629,24 +629,27 @@ def test_a_branch_copies_only_the_estimates_it_may_still_draw(placed):
 
 def test_a_package_export_withholds_a_world_holding_a_placed_estimate(placed):
     """A crate leaves this machine, and a withdrawal here cannot reach it there."""
-    from exulanica.world_package.environments import ExportVersion, partition_export_versions
+    from exulanica.world_package.export_partition import PlaneVersion, plan_export
+    from exulanica.world_package.extension_formats import FORMATS
 
     kept_id, withheld_id = uuid.uuid4(), uuid.uuid4()
-    authored, environment, authored_withheld, environment_withheld = partition_export_versions(
+    plan = plan_export(
         (
-            ExportVersion(kept_id, None, environment_bearing=False, source_invalidated=False),
-            ExportVersion(
+            PlaneVersion(kept_id, None, source_invalidated=False),
+            PlaneVersion(
                 withheld_id,
                 None,
-                environment_bearing=False,
                 source_invalidated=False,
-                point_map_bearing=True,
+                chain_kinds=frozenset({"add_point_map"}),
+                state_sections=frozenset({"point_map_instances"}),
             ),
-        )
+        ),
+        [f for f in FORMATS if f.version == "1.0"],
     )
+    authored, environment = plan.exported.values()
     assert authored == (kept_id,)
     assert withheld_id not in authored and withheld_id not in environment
-    assert (authored_withheld, environment_withheld) == (1, 0)
+    assert [len(counted) for counted in plan.withheld.values()] == [1, 0]
 
 
 # -- who may place one ----------------------------------------------------------------------------
@@ -862,23 +865,31 @@ def test_a_branch_of_a_withheld_estimate_goes_with_it_and_the_package_verifies(p
 
 
 def test_the_partition_withholds_every_branch_of_an_estimate_and_keeps_its_ancestors():
-    from exulanica.world_package.environments import ExportVersion, partition_export_versions
+    from exulanica.world_package.export_partition import PlaneVersion, plan_export
+    from exulanica.world_package.extension_formats import FORMATS
 
     root, holder, branch, grandchild = (uuid.uuid4() for _ in range(4))
-    authored, environment, authored_withheld, environment_withheld = partition_export_versions(
+    plan = plan_export(
         (
-            ExportVersion(root, None, environment_bearing=False, source_invalidated=False),
-            ExportVersion(
+            PlaneVersion(root, None, source_invalidated=False),
+            PlaneVersion(
                 holder,
                 root,
-                environment_bearing=False,
                 source_invalidated=False,
-                point_map_bearing=True,
+                chain_kinds=frozenset({"add_point_map"}),
+                state_sections=frozenset({"point_map_instances"}),
             ),
-            ExportVersion(branch, holder, environment_bearing=False, source_invalidated=False),
-            ExportVersion(grandchild, branch, environment_bearing=True, source_invalidated=False),
-        )
+            PlaneVersion(branch, holder, source_invalidated=False),
+            PlaneVersion(
+                grandchild,
+                branch,
+                source_invalidated=False,
+                state_sections=frozenset({"environment_instances"}),
+            ),
+        ),
+        [f for f in FORMATS if f.version == "1.0"],
     )
+    authored, environment = plan.exported.values()
     assert authored == (root,)
     assert environment == ()
-    assert (authored_withheld, environment_withheld) == (2, 1)
+    assert [len(counted) for counted in plan.withheld.values()] == [2, 1]

@@ -1,11 +1,12 @@
-"""A version whose edit chain gives, changes or takes away a behaviour is withheld from export.
+"""Under the 1.0 formats, a version whose chain changes a behaviour is withheld from export.
 
 The edit kinds of authored-world 1.0 and of environment-instances 1.0 are closed lists, and
 ``set_object_behaviour`` is in neither. Writing such a chain would sign a package those verifiers
 refuse, so the version is withheld and counted, as a version holding a placed depth estimate is,
 and so is every version branched from it, whose parent pointer could not resolve. A behaviour
 named when the object was added is inside 1.0 and still exports; the rest of the package is the
-same bytes it was before the withheld version existed.
+same bytes it was before the withheld version existed. The 1.1 formats admit the edit, and
+``test_world_package_motion_postgres.py`` exports the same versions under them.
 """
 
 from __future__ import annotations
@@ -16,10 +17,12 @@ from pathlib import Path
 import pytest
 from exulanica.world.objects import AuthoredObject, ObjectBehaviour, ObjectOrigin, Transform
 from exulanica.world_package import authored, environments, verify_package
-from exulanica.world_package.environments import (
-    ExportVersion,
-    partition_export_versions,
+from exulanica.world_package.export_partition import (
+    REASON_KIND_NOT_ADMITTED,
+    PlaneVersion,
+    plan_export,
 )
+from exulanica.world_package.extension_formats import AUTHORED_WORLD_1_0, ENVIRONMENT_INSTANCES_1_0
 
 from test_world_package_extension_postgres import (
     CUBE,
@@ -126,25 +129,30 @@ def test_undoing_a_behaviour_edit_does_not_make_its_version_exportable(repositor
 
 def test_the_partition_withholds_a_behaviour_edit_lineage_and_keeps_its_ancestors():
     root, edited, child, grandchild, sibling = (uuid.uuid4() for _ in range(5))
-    authored_ids, environment_ids, authored_withheld, environment_withheld = (
-        partition_export_versions(
-            (
-                ExportVersion(root, None, environment_bearing=False, source_invalidated=False),
-                ExportVersion(
-                    edited,
-                    root,
-                    environment_bearing=False,
-                    source_invalidated=False,
-                    behaviour_edit_bearing=True,
-                ),
-                ExportVersion(child, edited, environment_bearing=True, source_invalidated=False),
-                ExportVersion(
-                    grandchild, child, environment_bearing=False, source_invalidated=False
-                ),
-                ExportVersion(sibling, root, environment_bearing=False, source_invalidated=False),
-            )
-        )
+    environment = frozenset({"environment_instances"})
+    plan = plan_export(
+        (
+            PlaneVersion(root, None, source_invalidated=False),
+            PlaneVersion(
+                edited,
+                root,
+                source_invalidated=False,
+                chain_kinds=frozenset({"add_object", "set_object_behaviour"}),
+            ),
+            PlaneVersion(child, edited, source_invalidated=False, state_sections=environment),
+            PlaneVersion(grandchild, child, source_invalidated=False),
+            PlaneVersion(sibling, root, source_invalidated=False),
+        ),
+        [AUTHORED_WORLD_1_0, ENVIRONMENT_INSTANCES_1_0],
     )
-    assert authored_ids == (root, sibling)
-    assert environment_ids == ()
-    assert (authored_withheld, environment_withheld) == (2, 1)
+    assert plan.exported[authored.EXTENSION_KEY] == (root, sibling)
+    assert plan.exported[environments.EXTENSION_KEY] == ()
+    counted = {key: [each.version_id for each in values] for key, values in plan.withheld.items()}
+    assert counted == {
+        authored.EXTENSION_KEY: [edited, grandchild],
+        environments.EXTENSION_KEY: [child],
+    }
+    for withheld in plan.withheld.values():
+        assert {(w.reason, w.names) for w in withheld} == {
+            (REASON_KIND_NOT_ADMITTED, ("set_object_behaviour",))
+        }

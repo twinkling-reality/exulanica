@@ -12,9 +12,8 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from exulanica.world_package.authored import EXTENSION_KEY
 from exulanica.world_package.diff import diff_packages
-from exulanica.world_package.environments import EXTENSION_KEY as ENVIRONMENT_EXTENSION_KEY
+from exulanica.world_package.extension_formats import FORMATS
 from exulanica.world_package.package import (
     PackageError,
     import_check_package,
@@ -42,8 +41,9 @@ def _parser() -> argparse.ArgumentParser:
         "--extension",
         action="append",
         default=[],
-        choices=[EXTENSION_KEY, ENVIRONMENT_EXTENSION_KEY],
-        help="add an optional, separately versioned extension; 1.0 payloads are unchanged",
+        choices=[format_.key for format_ in FORMATS],
+        help="add an optional, separately versioned extension, one version of each; 1.0 payloads "
+        "are unchanged",
     )
 
     decision = commands.add_parser(

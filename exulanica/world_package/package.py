@@ -33,14 +33,12 @@ from exulanica.errors import ExulanicaError
 from exulanica.materials.workspace import WORKSPACE_LICENCE_ID
 from exulanica.world_package import environments as environment_ext
 from exulanica.world_package.authored import (
-    EXTENSION_KEY,
-    EXTENSION_NAME,
-    EXTENSION_VERSION,
     AuthoredWorld,
     ExtensionError,
     loader_report,
     verify_authored_world,
 )
+from exulanica.world_package.extension_formats import FORMATS
 
 PROFILE_VERSION: Final = "exulanica-wmp-1.0"
 PROFILE_ID: Final = "https://exulanica.local/profiles/world-memory-package/1.0"
@@ -146,6 +144,21 @@ _FORBIDDEN_KEYS: Final = frozenset(
     }
 )
 _PRIVATE_KEY_MARKER: Final = "-----BEGIN PRIVATE KEY-----"
+
+#: Every extension version this verifier checks, by the name and version ``extension.json`` states.
+_KNOWN_FORMATS: Final = {(format_.name, format_.version): format_ for format_ in FORMATS}
+#: How each family is checked, and the field of :class:`ExtensionFinding` its result goes in.
+#: A family missing here stops the import, because a format nothing can check would otherwise be
+#: reported as checked.
+_EXTENSION_VERIFIERS: Final = {
+    "authored-world": (verify_authored_world, "authored_world"),
+    "environment-instances": (
+        environment_ext.verify_environment_instances,
+        "environment_instances",
+    ),
+}
+if {format_.family for format_ in FORMATS} != set(_EXTENSION_VERIFIERS):
+    raise ValueError("every extension family needs exactly one verifier")
 
 
 class PackageError(ExulanicaError):
@@ -520,54 +533,8 @@ def _verify_extensions(
                 f"version, base profile {PROFILE_VERSION} and required loader capabilities"
             )
         name, version = header["extension"], header["extension_version"]
-        if (name, version) == (EXTENSION_NAME, EXTENSION_VERSION):
-            if directory != EXTENSION_KEY:
-                raise PackageError(f"{name}@{version} must sit at extensions/{EXTENSION_KEY}")
-            try:
-                world = verify_authored_world(files, paths)
-            except ExtensionError as error:
-                raise PackageError(str(error)) from error
-            except (KeyError, TypeError, AttributeError, ValueError) as error:
-                raise PackageError(f"extensions/{directory} is malformed: {error!r}") from error
-            findings.append(
-                ExtensionFinding(
-                    extension=name,
-                    extension_version=version,
-                    directory=f"extensions/{directory}",
-                    rules_checked=True,
-                    required_loader_capabilities=tuple(
-                        world.declaration["required_loader_capabilities"]
-                    ),
-                    authored_world=world,
-                )
-            )
-        elif (name, version) == (
-            environment_ext.EXTENSION_NAME,
-            environment_ext.EXTENSION_VERSION,
-        ):
-            if directory != environment_ext.EXTENSION_KEY:
-                raise PackageError(
-                    f"{name}@{version} must sit at extensions/{environment_ext.EXTENSION_KEY}"
-                )
-            try:
-                world = environment_ext.verify_environment_instances(files, paths)
-            except ExtensionError as error:
-                raise PackageError(str(error)) from error
-            except (KeyError, TypeError, AttributeError, ValueError) as error:
-                raise PackageError(f"extensions/{directory} is malformed: {error!r}") from error
-            findings.append(
-                ExtensionFinding(
-                    extension=name,
-                    extension_version=version,
-                    directory=f"extensions/{directory}",
-                    rules_checked=True,
-                    required_loader_capabilities=tuple(
-                        world.declaration["required_loader_capabilities"]
-                    ),
-                    environment_instances=world,
-                )
-            )
-        else:
+        format_ = _KNOWN_FORMATS.get((name, version))
+        if format_ is None:
             findings.append(
                 ExtensionFinding(
                     extension=name,
@@ -582,6 +549,28 @@ def _verify_extensions(
                     ),
                 )
             )
+            continue
+        if directory != format_.key:
+            raise PackageError(f"{name}@{version} must sit at extensions/{format_.key}")
+        verify, field = _EXTENSION_VERIFIERS[format_.family]
+        try:
+            world = verify(format_, files, paths)
+        except ExtensionError as error:
+            raise PackageError(str(error)) from error
+        except (KeyError, TypeError, AttributeError, ValueError) as error:
+            raise PackageError(f"extensions/{directory} is malformed: {error!r}") from error
+        findings.append(
+            ExtensionFinding(
+                extension=name,
+                extension_version=version,
+                directory=f"extensions/{directory}",
+                rules_checked=True,
+                required_loader_capabilities=tuple(
+                    world.declaration["required_loader_capabilities"]
+                ),
+                **{field: world},
+            )
+        )
     return tuple(findings)
 
 
