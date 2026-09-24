@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**101 documents** in the public catalog.
+**102 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -210,4 +210,5 @@ a record's original status is not proof of the implementation's present capabili
 | [0023-epistemically-typed-world-memory](adr/0023-epistemically-typed-world-memory.md) | ADR-0023: World memory is epistemically typed state, not a privileged representation |
 | [0024-declared-coordinate-quantum](adr/0024-declared-coordinate-quantum.md) | ADR-0024: Integer coordinates at a declared quantum |
 | [0025-a-doorway-is-a-notch-in-the-building](adr/0025-a-doorway-is-a-notch-in-the-building.md) | ADR-0025: A recessed doorway is a notch in the building, not a hollow inside it |
+| [0026-a-restore-carries-every-withdrawal](adr/0026-a-restore-carries-every-withdrawal.md) | ADR-0026: A restore carries every withdrawal a person made, not only their deletions |
 | [gsplat-training-and-recorded-rung](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and recorded scene rung are separate decisions |
