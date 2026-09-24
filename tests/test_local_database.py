@@ -121,7 +121,7 @@ def test_the_conventional_temporary_directories_are_refused():
 
 def test_a_database_under_the_test_servers_directory_is_refused_by_that_name(machine):
     """The test directory is inside the temporary one; its own refusal says more, so it wins."""
-    target = base_for_test_servers() / "lane-orimera-0123456789ab"
+    target = base_for_test_servers() / "lane-exulanica-0123456789ab"
 
     result = cli("init", "--directory", target)
 

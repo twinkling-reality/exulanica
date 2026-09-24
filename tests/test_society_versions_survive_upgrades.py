@@ -20,6 +20,7 @@ from exulanica.grammar.catalogs import catalog_digest, load_catalog
 from exulanica.grammar.errors import CatalogError
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import society_catalogs, society_composition
+from exulanica.world.asset_kinds import AssetKind
 from exulanica.world.assets import ReviewedAsset, reviewed_assets, seed_reviewed_assets
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, load_routine_model
@@ -50,6 +51,7 @@ living = living_postgres.living
 objects_api = living_postgres.objects_api
 BENCH = ReviewedAsset(
     asset_key="cc0.marker-bench",
+    kind=AssetKind.OBJECT,
     title="Marker bench",
     summary="A reviewed asset added after societies were stored, for this test only.",
     payload=b"glTF-bench-standing-in-for-a-new-reviewed-asset",
