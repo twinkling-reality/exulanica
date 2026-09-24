@@ -13,10 +13,10 @@
  */
 
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
-import type { SocietyEvent } from '../society-api.js';
+import { SOCIETY_EVENT_WINDOW, type SocietyEvent } from '../society-api.js';
 
-/** The events endpoint returns at most this many, newest first (`society_events` in the API). */
-export const EVENT_WINDOW = 256;
+/** The events endpoint returns at most this many, newest first (`SOCIETY_EVENT_WINDOW`). */
+export const EVENT_WINDOW = SOCIETY_EVENT_WINDOW;
 
 type Point = readonly [number, number];
 

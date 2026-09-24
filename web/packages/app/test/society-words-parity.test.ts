@@ -1,12 +1,14 @@
-// The page restates two server facts to put them in words: the playback speeds the server
-// accepts, and the reason codes its society engine records. Each copy is held to its source here.
+// The page restates three server facts: the playback speeds the server accepts, the reason codes its
+// society engine records, and how many events one read returns. Each copy is held to its source here.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PLAYBACK_SPEEDS } from '../src/society-control-api.js';
+import { SOCIETY_EVENT_WINDOW } from '../src/society-api.js';
 import { REASON_WORDS } from '../src/ui/world-inhabitants.js';
 
 const WORLD = new URL('../../../../exulanica/world/', import.meta.url);
 const python = (name: string): string => readFileSync(new URL(name, WORLD), 'utf8');
+const API_SNAPSHOT = new URL('../../../../tests/snapshots/api-openapi.json', import.meta.url);
 
 describe('the page\'s copies of society facts', () => {
   it('offers exactly the speeds the server accepts', () => {
@@ -21,5 +23,15 @@ describe('the page\'s copies of society facts', () => {
     expect(sources).toContain('"restore_need"');
     const stale = Object.keys(REASON_WORDS).filter((code) => !sources.includes(`"${code}"`));
     expect(stale, 'reason codes with words that no society module records').toEqual([]);
+  });
+
+  it('reads events in windows exactly as large as the events route allows', () => {
+    const snapshot = JSON.parse(readFileSync(API_SNAPSHOT, 'utf8')) as {
+      paths: Record<string, { get?: { parameters?: { name: string; schema?: { maximum?: number } }[] } }>;
+    };
+    const route = snapshot.paths['/world/versions/{version_id}/society/events'];
+    expect(route, 'the events route in tests/snapshots/api-openapi.json').toBeDefined();
+    const limit = route!.get?.parameters?.find((parameter) => parameter.name === 'limit');
+    expect(limit?.schema?.maximum, 'the events route\'s limit maximum').toBe(SOCIETY_EVENT_WINDOW);
   });
 });

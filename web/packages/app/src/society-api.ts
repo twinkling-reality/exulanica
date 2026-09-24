@@ -17,6 +17,13 @@ import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import { DEFAULT_SOCIETY_ENGINE, societyEngine, type SocietyEngineProfile } from './society-engines.js';
 import { openWorldPath } from './world-scope.js';
 
+/**
+ * The most events one read returns, newest first: the events route's own maximum (its `limit`
+ * query in `exulanica/api/routes/society.py`). `test/society-words-parity.test.ts` holds it to the
+ * route as the API snapshot records it.
+ */
+export const SOCIETY_EVENT_WINDOW = 256;
+
 export interface SocietySnapshot {
   readonly societyId: string;
   readonly versionId: string;
@@ -575,7 +582,7 @@ export class SocietyClient {
   async events(snapshot: SocietySnapshot): Promise<readonly SocietyEvent[]> {
     return this.transport.getJson<unknown>(
       this.path(snapshot.versionId, '/events'),
-      { limit: '256' },
+      { limit: String(SOCIETY_EVENT_WINDOW) },
     ).then(value => parseSocietyEvents(value, snapshot));
   }
 
