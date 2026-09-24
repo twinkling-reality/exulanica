@@ -10,6 +10,8 @@ setup mistake a person can make on their own machine. So the rules are these:
 *   **Test servers and real data are kept apart by construction.** Every data directory this
     command creates carries a marker, and ``scripts/test_postgres.py`` refuses to serve, start or
     sweep a directory that holds one. This command refuses the test servers' base directory.
+    ``adopt`` gives the marker to a durable cluster made some other way, and only after a backup
+    of it has been proven to restore (:mod:`~exulanica.db.local.adopt`).
 *   **Backups are proven, not assumed.** Each backup is a ``pg_dump`` with its SHA-256 and a
     manifest of row counts taken in the dump's own snapshot (:mod:`~exulanica.db.local.backup`).
     ``stop`` takes one. ``verify`` restores one into a scratch server and compares the counts.

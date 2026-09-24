@@ -29,6 +29,23 @@ class Refusal(StrEnum):
     EXISTING_DATA = "existing-data"
     #: The directory holds no data directory this command created.
     NOT_A_LOCAL_DATABASE = "not-a-local-database"
+    #: The directory to adopt holds no PostgreSQL data directory at ``data/``.
+    NO_DATA_DIRECTORY = "no-data-directory"
+    #: The data directory to adopt already carries a local database's marker.
+    ALREADY_A_LOCAL_DATABASE = "already-a-local-database"
+    #: The data directory to adopt, or the directory holding it, belongs to another account.
+    OTHER_OWNER = "other-owner"
+    #: A server with durability off, which is how a test server runs, runs on the data directory.
+    TEST_SERVER_RUNNING = "test-server-running"
+    #: The cluster's own settings turn ``fsync`` or ``full_page_writes`` off.
+    DURABILITY_OFF = "durability-off"
+    #: The owner role is not the cluster's bootstrap superuser, or cannot connect without a
+    #: password over the loopback interface.
+    OWNER_ROLE = "owner-role"
+    #: The cluster holds no database by the name given.
+    NO_SUCH_DATABASE = "no-such-database"
+    #: The database lacks a migration this code expects, and adopting never migrates.
+    MIGRATIONS_MISSING = "migrations-missing"
     #: No PostgreSQL 18 or newer server binaries were found.
     POSTGRES_MISSING = "postgres-missing"
     #: The port the server needs is held by another process.

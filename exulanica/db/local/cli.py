@@ -4,8 +4,9 @@ A command of its own rather than a subcommand of ``exulanica-db``, because the t
 different questions. ``exulanica-db`` brings a database it is given a URL for, on any host, to the
 schema and roles this code expects, in the one correct order, and takes no arguments so there is
 no second way to ask. This command owns a PostgreSQL cluster on this machine: where its files
-live, starting and stopping it, backing it up, proving a backup restores, restoring one, and
-upgrading it. It runs ``exulanica-db``'s provisioning as one step of ``init`` and ``upgrade``.
+live, starting and stopping it, backing it up, proving a backup restores, restoring one,
+upgrading it, and adopting one it did not create (:mod:`~exulanica.db.local.adopt`). It runs
+``exulanica-db``'s provisioning as one step of ``init`` and ``upgrade``.
 
 Every command names the directory it works on, and nothing has a default location. See
 :mod:`exulanica.db.local` for the rules, and ``docs/development-setup.md`` for a walk-through.
@@ -25,6 +26,7 @@ from psycopg import sql
 
 from exulanica.db.account_roles import ACCOUNT_ROLE
 from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV
+from exulanica.db.local.adopt import adopt
 from exulanica.db.local.backup import (
     Backup,
     check_digest,
@@ -273,6 +275,16 @@ def _upgrade(arguments: argparse.Namespace, stream: TextIO) -> None:
     upgrade(LocalDatabase.open(arguments.directory), stream)
 
 
+def _adopt(arguments: argparse.Namespace, stream: TextIO) -> None:
+    adopt(
+        arguments.directory,
+        database_name=arguments.database,
+        owner=arguments.owner_role or bootstrap_user(),
+        port=arguments.port,
+        stream=stream,
+    )
+
+
 def _port(text: str) -> int:
     port = int(text)
     if port not in _PORTS:
@@ -348,6 +360,35 @@ def build_parser() -> argparse.ArgumentParser:
             "Back up, rehearse the pending migrations on a scratch copy, migrate, back up again.",
             _upgrade,
         )
+    )
+
+    adopting = command(
+        "adopt",
+        "Take on a durable cluster this command did not create: check it, back it up, prove "
+        "the backup restores, record its port, then mark it. Never migrates, changes "
+        "authentication or moves the data.",
+        _adopt,
+    )
+    adopting.add_argument(
+        "--directory",
+        type=Path,
+        required=True,
+        help="The directory holding the cluster's data/; its backups begin in backups/ beside it.",
+    )
+    adopting.add_argument(
+        "--database", default=DATABASE_NAME, help="The database that holds the schema."
+    )
+    adopting.add_argument(
+        "--owner-role",
+        help="The cluster's bootstrap superuser; the account running this command by default.",
+    )
+    adopting.add_argument(
+        "--port",
+        type=_port,
+        help=(
+            "The port it serves the application on; by default the one it runs on, or was last "
+            "started on, or its settings name."
+        ),
     )
     return parser
 

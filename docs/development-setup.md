@@ -234,6 +234,7 @@ uv run exulanica-local-db backup --directory ~/Exulanica/database
 uv run exulanica-local-db verify --directory ~/Exulanica/database   # restores the newest backup to check it
 uv run exulanica-local-db upgrade --directory ~/Exulanica/database  # backup, rehearsal, migration, backup
 uv run exulanica-local-db restore --directory ~/Exulanica/restored <backup>.pgdump
+uv run exulanica-local-db adopt --directory ~/Exulanica/database    # take on a cluster made another way
 ```
 
 - **Where it lives.** The directory holds `data/`, `backups/` and `server.log`. `init` and
@@ -258,6 +259,21 @@ uv run exulanica-local-db restore --directory ~/Exulanica/restored <backup>.pgdu
   runs at boot, and migrates the real database only after that rehearsal passes. A failed
   rehearsal leaves the database untouched. A migration that fails after a passing rehearsal
   leaves the server stopped and names the backup to restore.
+- **Adopt.** `adopt` takes on a durable cluster another tool made, which carries no marker
+  ([`adopt.py`](../exulanica/db/local/adopt.py)). `--directory` names the directory that holds its
+  `data/`, and the command's backups begin in `backups/` beside it; backups another tool took
+  elsewhere stay where they are, because this command can neither verify nor restore a dump
+  without its own manifest. Before anything is written, it refuses a location the other commands
+  refuse, a `data/` that is not a data directory or already carries the marker, another PostgreSQL
+  major version, a directory another account owns, a server running with `fsync` or
+  `full_page_writes` off, as the test servers run, and settings that turn either off. It connects
+  as the bootstrap superuser (`--owner-role`) without a password over the loopback interface, and
+  refuses a database (`--database`) that lacks a migration this code has or records one it lacks.
+  Then it backs up, proves the backup restores into a scratch server, records the port the
+  cluster serves on in its own settings when they do not name it (`--port`, or else the port it
+  runs on or was last started on), and writes the marker last, so a failed step leaves none. It
+  never migrates, changes authentication or moves the data; a running server keeps running, and a
+  stopped one is started only on a private port and stopped again.
 
 A refusal prints `refused (<name>)` and exits 2; a step that was attempted and failed prints
 `failed (<name>)` and exits 1. The names are listed in

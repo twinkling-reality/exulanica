@@ -230,8 +230,15 @@ def _file_name(reason: str) -> str:
     return f"{stamp}-{slug}{DUMP_SUFFIX}"
 
 
-def take_backup(database: LocalDatabase, port: int, reason: str) -> Backup:
-    """Dump the database the server on ``port`` holds, with its digest and manifest."""
+def take_backup(
+    database: LocalDatabase, port: int, reason: str, *, service_port: int | None = None
+) -> Backup:
+    """Dump the database the server on ``port`` holds, with its digest and manifest.
+
+    ``service_port`` is the port the database serves the application on, recorded so a restore
+    can serve on it too. It is the cluster's configured port unless the caller states it: an
+    adoption backs up before it records the port in the cluster's settings, so it says which.
+    """
     database.backups.mkdir(mode=0o700, parents=True, exist_ok=True)
     dump = database.backups / _file_name(reason)
     partial = dump.with_name(dump.name + ".partial")
@@ -280,7 +287,9 @@ def take_backup(database: LocalDatabase, port: int, reason: str) -> Backup:
         "database": database.database_name,
         "owner_role": owner["owner"],
         "server": identity,
-        "service_port": database.cluster.configured_port(),
+        "service_port": (
+            service_port if service_port is not None else database.cluster.configured_port()
+        ),
         "migrations": versions,
         "row_counts": counts,
         "roles": roles,

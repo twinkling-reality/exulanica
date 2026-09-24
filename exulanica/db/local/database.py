@@ -233,8 +233,9 @@ class LocalDatabase:
             raise LocalDatabaseRefused(
                 Refusal.NOT_A_LOCAL_DATABASE,
                 f"{self.root} holds no data directory exulanica-local-db created: there is no "
-                f"{self.marker}. Create one with `exulanica-local-db init`, or restore a backup "
-                "into an empty directory with `exulanica-local-db restore`.",
+                f"{self.marker}. Create one with `exulanica-local-db init`, restore a backup "
+                "into an empty directory with `exulanica-local-db restore`, or take on an "
+                "existing cluster with `exulanica-local-db adopt`.",
             )
         try:
             marker = json.loads(self.marker.read_text(encoding="utf-8"))
