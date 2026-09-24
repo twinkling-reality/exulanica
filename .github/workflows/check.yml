@@ -24,16 +24,35 @@ jobs:
         image: pgvector/pgvector:0.8.6-pg18
         env:
           POSTGRES_PASSWORD: postgres
+          # The suite logs in as the non-superuser roles it provisions, by name and with no
+          # password of their own, exactly as it does on the private servers
+          # scripts/test_postgres.py starts with initdb --auth=trust. Under the image's default
+          # password authentication every such login is refused. This server holds nothing but
+          # the suite's throwaway schemas and is reachable only from this job.
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The visual gate tests resolve the commits their evaluation records were measured
+          # at, so a shallow clone fails them for a reason that is not about the code.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
       - run: uv python install 3.11
+      # tests/test_restore_replay.py dumps and restores with PostgreSQL 18's pg_dump and psql,
+      # found in /usr/lib/postgresql/18/bin. The runner image carries an older client, and an
+      # older pg_dump refuses a newer server rather than dumping it.
+      - name: install the PostgreSQL 18 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install --yes postgresql-client-18
       # A superuser connection, because the harness creates and drops throwaway schemas and
       # installs extensions. tests/test_row_level_security.py provisions its own non-superuser
       # roles and asserts they are not superusers before it asserts anything else.
@@ -44,8 +63,13 @@ jobs:
           PGPASSWORD: postgres
       - run: uv run ruff check .
       - run: uv run lint-imports
+      # Phase 1 of scripts/run_backend_suite.py: every test except those marked reference_copy.
+      # Those check the frontier preflight's pinned endpoint, the retained reference copy on
+      # port 5433, which exists only on the machine that holds the retained data; the runner's
+      # phase 2 runs them there. tests/test_ci_workflow.py fails when this selection stops being
+      # the runner's phase 1, in either direction.
       - name: pytest
-        run: uv run pytest
+        run: uv run pytest -m "not reference_copy"
         env:
           EXULANICA_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/exulanica_spine_test
           # The whole reason this job exists. Without it a broken server silently skips the 19
@@ -60,6 +84,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          # The workspace's packageManager field names the pnpm version. The action reads
+          # ./package.json unless told otherwise, and the repository root has none.
+          package_json_file: web/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
