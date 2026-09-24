@@ -242,6 +242,7 @@
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
         "role": "reasoning_cheap",
         "served_model": "test/model",
+        "served_model_unavailable": null,
         "usd": "0.00005400",
         "used_fallback": false
       }
@@ -352,6 +353,7 @@
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
         "role": "reasoning_cheap",
         "served_model": "test/model",
+        "served_model_unavailable": null,
         "usd": "0.00005400",
         "used_fallback": false
       },
@@ -363,6 +365,7 @@
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
         "role": "reasoning_cheap",
         "served_model": "test/model",
+        "served_model_unavailable": null,
         "usd": "0.00005400",
         "used_fallback": false
       }
@@ -489,6 +492,7 @@
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
         "role": "reasoning_cheap",
         "served_model": "test/model",
+        "served_model_unavailable": null,
         "usd": "0.00005400",
         "used_fallback": false
       },
@@ -500,6 +504,7 @@
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
         "role": "reasoning_cheap",
         "served_model": "test/model",
+        "served_model_unavailable": null,
         "usd": "0.00005400",
         "used_fallback": false
       }
@@ -612,6 +617,7 @@
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
         "role": "reasoning_cheap",
         "served_model": "test/model",
+        "served_model_unavailable": null,
         "usd": "0.00005400",
         "used_fallback": false
       }
@@ -775,6 +781,7 @@
         "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
         "role": "structured_extraction",
         "served_model": "test/model",
+        "served_model_unavailable": null,
         "usd": "0.00014000",
         "used_fallback": false
       }
@@ -824,6 +831,7 @@
         "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
         "role": "structured_extraction",
         "served_model": "test/model",
+        "served_model_unavailable": null,
         "usd": "0.00014000",
         "used_fallback": false
       }
