@@ -8,6 +8,11 @@ must refuse, written in the shape ``POST /selection/ask`` returns.
 from __future__ import annotations
 
 import pytest
+
+pytest.importorskip(
+    "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+)
+
 from scripts.measure_companion_place_link import blob_id, score
 
 PLACE = "0190a000-0000-7000-8000-00000000000b"
