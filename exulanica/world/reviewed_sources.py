@@ -70,7 +70,7 @@ _READ = (
     "and p.source_sha256=c.blob_sha256 and p.screening_method='human_review' "
     "and p.eligibility_state='eligible' and p.reviewed_by is not null "
     "where c.workspace_id=%(workspace)s and c.deleted_at is null "
-    "and (%(capture)s::uuid is null or c.capture_id=%(capture)s::uuid) "
+    "and (%(captures)s::uuid[] is null or c.capture_id=any(%(captures)s::uuid[])) "
     "and (%(span)s::uuid is null or s.span_id=%(span)s::uuid) "
     "and not tombstone_blocks_capture(c.workspace_id,c.capture_id) "
     "and not tombstone_blocks_span(c.workspace_id,s.blob_sha256,s.track_key,"
@@ -88,6 +88,7 @@ def reviewed_personal_sources(
     reviewed_for: uuid.UUID | None,
     store: ContentAddressedStore | None,
     capture_id: uuid.UUID | None = None,
+    capture_ids: Sequence[uuid.UUID] | None = None,
     evidence_span_id: uuid.UUID | None = None,
 ) -> tuple[ReviewedSource, ...]:
     """Every photograph the rule admits for ``reviewed_for``, oldest capture id first.
@@ -96,21 +97,29 @@ def reviewed_personal_sources(
     anyone's in the workspace, which is how a world asks whether a photograph may still be drawn.
 
     ``capture_id`` and ``evidence_span_id`` narrow the read to one exact photograph and span, which
-    is how an attach asks about the one it names. With no store, no viewer bytes are available.
+    is how an attach asks about the one it names; ``capture_ids`` narrows it to the photographs a
+    world's slots hold. With no store, no viewer bytes are available, so none is looked for.
     """
+    if capture_id is not None and capture_ids is not None:
+        raise TypeError("narrow the read by capture_id or by capture_ids, not both")
+    captures = [capture_id] if capture_id is not None else capture_ids
     rows = connection.execute(
         _READ,
         {
             "reviewed_for": reviewed_for,
             "workspace": workspace_id,
-            "capture": capture_id,
+            "captures": list(captures) if captures is not None else None,
             "span": evidence_span_id,
         },
     ).fetchall()
     found = []
     for row in rows:
         source_sha256 = bytes(row["source_sha256"])
-        selected = selected_image(connection, workspace_id, source_sha256, row["evaluated_at"])
+        selected = (
+            selected_image(connection, workspace_id, source_sha256, row["evaluated_at"])
+            if store is not None
+            else None
+        )
         found.append(
             ReviewedSource(
                 capture_id=row["capture_id"],
@@ -157,7 +166,7 @@ def lapsed_personal_captures(
     admitted = {
         source.capture_id
         for source in reviewed_personal_sources(
-            connection, workspace_id, reviewed_for=None, store=None
+            connection, workspace_id, reviewed_for=None, store=None, capture_ids=sorted(personal)
         )
     }
     return frozenset(personal - admitted)
