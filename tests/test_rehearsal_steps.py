@@ -364,3 +364,231 @@ def test_a_runner_may_not_report_a_step_as_not_available():
     reported = next(step for step in document["steps"] if step["id"] == runnable["id"])
     assert reported["status"] == "failed"
     assert "which a runner may not report" in reported["reason"]
+
+
+def _all_passing(steps: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {step["id"]: _passing(step) for step in steps["steps"] if "not_available" not in step}
+
+
+def test_the_stand_in_review_is_stated_once_and_every_gate_resting_on_it_is_qualified():
+    """The human review is the rehearsal driver's stand-in, said once, and never a plain pass.
+
+    The step list states the stand-in once, and the step that records the review gives it. Every
+    step that rests on it through what it requires carries its statement in the result, and every
+    gate one of those steps serves reports ``passed_on_stand_in`` with the stand-in's qualification
+    where it would otherwise pass. A gate no such step serves still passes plainly.
+    """
+    stand_in = STEPS["stand_ins"]["human-review"]
+    assert "rehearsal driver" in stand_in["reviewer_name"]
+    assert "not a person's review" in stand_in["reviewer_name"]
+    assert "stands in for a person's review" in stand_in["statement"]
+    givers = [step["id"] for step in STEPS["steps"] if step.get("stand_in") == "human-review"]
+    assert givers[0] == "review-photographs-in-app"
+    resting = steplist.stand_ins_of(STEPS)
+    for identifier in (
+        "wait-for-depth-and-grouping",
+        "make-world-from-photographs",
+        "ask-grounded-question",
+        "companion-proposes-appearance-change",
+        "return-to-made-world",
+    ):
+        assert resting[identifier] == ["human-review"], identifier
+    assert resting["name-world"] == [] and resting["confirm-proposed-place"] == []
+
+    document = resultdoc.assemble(STEPS, GATES, _all_passing(STEPS), {}, _run_block())
+    jsonschema.validate(document, json.loads((REHEARSAL / "result.schema.json").read_text()))
+    by_id = {step["id"]: step for step in document["steps"]}
+    assert by_id["make-world-from-photographs"]["stand_ins"] == [
+        {"key": "human-review", "statement": stand_in["statement"]}
+    ]
+    assert by_id["name-world"]["stand_ins"] == []
+    gates = {gate["gate"]: gate for gate in document["gates"]}
+    companion = gates["milestone:Companion interaction"]
+    assert companion["status"] == "passed_on_stand_in"
+    assert companion["qualification"] == [stand_in["gate_qualification"]]
+    assert gates["milestone:Durable creation"]["status"] == "passed"
+    assert gates["milestone:Durable creation"]["qualification"] == []
+    # A gate that fails or cannot be reached keeps that status and names the stand-in, and its
+    # qualification, which speaks of a pass, is empty.
+    assert gates["milestone:Personal-media path"]["status"] == "not_available"
+    assert gates["milestone:Personal-media path"]["stand_ins"] == ["human-review"]
+    assert gates["milestone:Personal-media path"]["qualification"] == []
+
+
+def test_a_stand_in_no_step_gives_or_a_step_giving_an_unstated_one_is_not_well_formed():
+    found = _problems_with(lambda s: _step(s, "review-photographs-in-app").pop("stand_in"))
+    assert "stand-in 'human-review' is stated and no step gives it" not in found  # the refusal step
+    found = _problems_with(lambda s: [step.pop("stand_in", None) for step in s["steps"]])
+    assert "stand-in 'human-review' is stated and no step gives it" in found
+    found = _problems_with(lambda s: _step(s, "review-photographs-in-app").update(stand_in="x"))
+    assert "review-photographs-in-app: gives the stand-in 'x', which is not stated" in found
+    found = _problems_with(lambda s: s["stand_ins"]["human-review"].update(reviewer_name=" "))
+    assert "stand-in 'human-review' does not state its reviewer_name" in found
+
+
+def test_a_result_that_drops_the_stand_in_from_a_passing_gate_is_refused_by_the_schema():
+    document = resultdoc.assemble(STEPS, GATES, _all_passing(STEPS), {}, _run_block())
+    schema = json.loads((REHEARSAL / "result.schema.json").read_text())
+    companion = next(g for g in document["gates"] if g["gate"] == "milestone:Companion interaction")
+    # Its status and its qualification both dropped: only the stand-in list is left to say it.
+    companion["status"] = "passed"
+    companion["qualification"] = []
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(document, schema)
+
+
+def test_the_personal_path_reviews_waits_makes_and_the_companion_moves_into_the_made_world():
+    """Review, the depth and grouping wait and making the world come in order in the photos session;
+    every Companion step rests on the made world; the return reopens it and reviews once more."""
+    ids = [step["id"] for step in STEPS["steps"]]
+    path = [
+        "review-photographs-in-app",
+        "wait-for-depth-and-grouping",
+        "make-world-from-photographs",
+    ]
+    assert (
+        ids[ids.index("confirm-proposed-place") + 1 : ids.index("confirm-proposed-place") + 4]
+        == path
+    )
+    assert all(_step(STEPS, i)["session"] == "photos" for i in path)
+    for earlier, later in zip(["confirm-proposed-place", *path], path, strict=False):
+        assert earlier in _step(STEPS, later)["requires"], later
+    closure: dict[str, set[str]] = {}
+    for step in STEPS["steps"]:
+        closure[step["id"]] = set(step.get("requires", []))
+        for required in step.get("requires", []):
+            closure[step["id"]] |= closure[required]
+    companion = [s["id"] for s in STEPS["steps"] if s.get("session") == "companion"]
+    assert companion and all("make-world-from-photographs" in closure[i] for i in companion)
+    returning = [s["id"] for s in STEPS["steps"] if s.get("session") == "return"]
+    assert returning == [
+        "returning-user-reopens",
+        "return-to-made-world",
+        "made-world-refuses-new-photograph",
+    ]
+    refusal = _step(STEPS, "made-world-refuses-new-photograph")
+    assert refusal["stand_in"] == "human-review"
+    assert refusal["parameters"]["refusal"] == "personal_world_already_made"
+    make = _step(STEPS, "make-world-from-photographs")
+    assert {o["id"] for o in make["expect"]["api"]} == {
+        "offer-read",
+        "composed-as-read",
+        "entry-saved",
+    }
+    assert {o["id"] for o in make["expect"]["page"]} == {
+        "offer-shown",
+        "world-opens",
+        "list-offers-refusal",
+    }
+
+
+def test_the_companion_session_allows_each_utterance_every_deadline_the_page_waits_for_it():
+    """The Companion budget is derived from the page's own deadlines, read from its source.
+
+    Each hosted Companion step is one utterance; the page waits for its appearance classification
+    and then for its answer, each as long as its constant in the application's source says. The
+    session's allowance must cover all of them in turn, and the driver reads the same constants
+    at run time (``rehearse.page_deadlines``), so the two cannot drift apart unnoticed.
+    """
+    deadlines = REHEARSE.page_deadlines(ROOT, STEPS["runtime"]["answer_deadlines"])
+    assert set(deadlines) == set(STEPS["runtime"]["answer_deadlines"]["constants"])
+    assert all(ms > 0 for ms in deadlines.values())
+    session = next(s for s in STEPS["sessions"] if s["id"] == "companion")
+    utterances = [
+        s for s in STEPS["steps"] if s.get("session") == "companion" and s.get("hosted_model")
+    ]
+    assert len(utterances) == 3
+    assert session["budget_seconds"] * 1000 >= len(utterances) * sum(deadlines.values())
+    for name, ms in deadlines.items():
+        assert f"{name} {ms // 1000} s" in session["budget_reason"], name
+    missing = copy.deepcopy(STEPS["runtime"]["answer_deadlines"])
+    missing["constants"] = ["NO_SUCH_TIMEOUT_MS"]
+    with pytest.raises(REHEARSE.Refused, match="states no plain integer NO_SUCH_TIMEOUT_MS"):
+        REHEARSE.page_deadlines(ROOT, missing)
+
+
+def test_no_scene_job_exists_for_the_rehearsal_photographs_as_the_scene_step_states():
+    """The scene-geometry statement rests on the photographs' capture times, read from the data.
+
+    Grouped with the grouping stage's own parameters, the photos session's drawings fall into
+    groups too small for the pose policy, which is why no scene job exists and the scene worker
+    has nothing to claim. A drawing moved into one group with the others makes a group the
+    policy selects, so the check can fail.
+    """
+    import datetime as dt
+
+    from exulanica.ingest.scene_selection import SceneGroupPosePolicy
+    from exulanica.ingest.scenes import group_captures
+    from exulanica.ingest.stages import stage
+
+    params = stage("scene_group").params
+
+    def groups(inputs: list[dict[str, Any]]) -> list[Any]:
+        captures = sorted(
+            (
+                {
+                    "capture_id": index,
+                    "utc_instant": dt.datetime.strptime(
+                        f"{p['captured']} {p['utc_offset']}", "%Y:%m:%d %H:%M:%S %z"
+                    ).isoformat(),
+                }
+                for index, p in enumerate(inputs)
+            ),
+            key=lambda capture: capture["utc_instant"],
+        )
+        found, ungrouped = group_captures(
+            captures,
+            max_time_gap_s=int(params["max_time_gap_s"]),
+            max_distance_m=int(params["max_distance_m"]),
+        )
+        assert ungrouped == 0
+        return found
+
+    policy = SceneGroupPosePolicy()
+    photos = next(s for s in STEPS["sessions"] if s["id"] == "photos")["inputs"]["photographs"]
+    assert all(policy.selection_record(group) is None for group in groups(photos))
+    together = [dict(p, captured=photos[0]["captured"]) for p in photos]
+    assert any(policy.selection_record(group) is not None for group in groups(together))
+    statement = _step(STEPS, "reconstruct-scene-geometry")["not_available"]
+    assert "at least three photographs" in statement
+    assert policy.minimum_member_count == 3
+
+
+def test_the_derivative_worker_is_the_production_command_with_its_depth_model():
+    """The worker the rehearsal starts is main's console script, configured as its code reads."""
+    import tomllib
+
+    from exulanica.ingest import worker_command
+
+    worker = STEPS["runtime"]["derivative_worker"]
+    scripts = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["scripts"]
+    assert scripts[worker["command"]] == "exulanica.ingest.worker_command:main"
+    environment = worker["environment"]
+    assert environment[worker_command.DEPTH_MODEL_ENV] == "moge"
+    assert worker_command.DEPTH_DEVICE_ENV in environment
+    assert worker["startup_seconds"] > 0 and worker["stop_seconds"] > 0
+
+
+#: The steps whose handlers wait for derivative jobs (waitForJobs in handlers.mjs), each with its
+#: own bound: a step without one waited for nothing and read the jobs before they ended.
+JOB_WAITING_STEPS = (
+    "grant-model-rights-in-app",
+    "wait-for-depth-and-grouping",
+    "photo-jobs-end-cleanly",
+    "made-world-refuses-new-photograph",
+)
+
+
+def test_every_wait_the_steps_declare_has_a_bound_and_a_reason():
+    handlers = (REHEARSAL / "handlers.mjs").read_text()
+    assert handlers.count("await waitForJobs(ctx,") == len(JOB_WAITING_STEPS)
+    for identifier in JOB_WAITING_STEPS:
+        parameters = _step(STEPS, identifier)["parameters"]
+        assert parameters["job_wait_seconds"] > 0, identifier
+        assert parameters["job_wait_reason"].strip(), identifier
+    for step in STEPS["steps"]:
+        for name, value in step.get("parameters", {}).items():
+            if name.endswith(("_seconds", "_ms", "_milliseconds")):
+                stem = name.rsplit("_", 1)[0]
+                assert isinstance(value, int) and value > 0, (step["id"], name)
+                assert step["parameters"].get(f"{stem}_reason", "").strip(), (step["id"], name)

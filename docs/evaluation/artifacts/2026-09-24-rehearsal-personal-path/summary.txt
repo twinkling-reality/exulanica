@@ -1,0 +1,53 @@
+STEP                                         STATUS          REASON
+clean-start                                  passed          
+access-gate                                  passed          
+enter-owned-starter                          passed          
+read-about-this-place                        passed          
+name-world                                   passed          
+explore-walk                                 passed          
+place-reviewed-object                        passed          
+move-object                                  passed          
+inspect-object                               passed          
+give-bounded-motion                          passed          
+trigger-stop-reset                           passed          
+refuse-unsupported-behaviour                 passed          
+creation-survives-reload                     passed          
+undo-last-change                             passed          
+change-appearance                            passed          
+appearance-survives-reload                   passed          
+restore-original-appearance                  passed          
+open-close-photo-intake                      passed          
+upload-synthetic-photographs                 passed          
+authorize-admission-in-app                   passed          
+grant-model-rights-in-app                    passed          
+confirm-proposed-place                       passed          
+review-photographs-in-app                    passed          
+wait-for-depth-and-grouping                  passed          
+make-world-from-photographs                  passed          
+photo-jobs-end-cleanly                       failed          did not hold: every-job-succeeded
+ask-grounded-question                        failed          did not hold: citation-offered
+open-cited-photograph                        not_reachable   requires ask-grounded-question, which was failed
+unanswerable-question-abstains               not_reachable   requires ask-grounded-question, which was failed
+companion-proposes-appearance-change         failed          did not hold: proposal-drafted, proposal-offered, proposal-ready-in-customize
+developer-client-walkthrough                 passed          
+returning-user-reopens                       passed          
+return-to-made-world                         passed          
+made-world-refuses-new-photograph            passed          
+reconstruct-scene-geometry                   not_available   What this rehearsal runs, and what it cannot. It runs main's production derivative worker with its depth model (runtime.derivative_worker: MoGe-2 on this machin
+observe-a-person-and-footage                 not_available   A person's use of the experience and the demonstration footage are observed and recorded by a person; this rehearsal keeps a screenshot of each step as its own 
+
+GATE                                         STATUS              FIRST FAILURE (OWNER AREA)
+milestone:World entry                        passed_on_stand_in  
+                                             Passed on a review the rehearsal driver gave in place of a person; it is not a person's review.
+milestone:Durable creation                   passed              
+milestone:Inspection                         passed              
+milestone:Bounded interaction                passed              
+milestone:Companion interaction              failed              ask-grounded-question (Companion answers: exulanica/selection/question.py, web/packages/app/src/composition/companion.ts and web/packages/app/src/ui/companion-speech.ts)
+milestone:Developer proof                    passed              
+milestone:Personal-media path                failed              photo-jobs-end-cleanly (the derivative worker and its stages: exulanica/ingest/worker.py, exulanica/ingest/pipeline.py and exulanica/ingest/stages)
+delivery:Usable environment                  passed              
+delivery:Meaningful action                   failed              ask-grounded-question (Companion answers: exulanica/selection/question.py, web/packages/app/src/composition/companion.ts and web/packages/app/src/ui/companion-speech.ts)
+delivery:Persistence                         passed_on_stand_in  
+                                             Passed on a review the rehearsal driver gave in place of a person; it is not a person's review.
+delivery:Independent use                     passed              
+delivery:Release rehearsal                   not_available       

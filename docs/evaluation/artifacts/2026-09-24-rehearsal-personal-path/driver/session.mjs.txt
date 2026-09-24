@@ -1,0 +1,186 @@
+// One page session of the rehearsal: one headless Chrome, one page, the steps its plan names.
+//
+//   node scripts/rehearsal/session.mjs PLAN.json      (written by rehearse.py)
+//   node scripts/rehearsal/session.mjs --list-handlers
+//
+// For every step, in order: a step whose required step did not pass, or a hosted-model step once
+// the run's reported spend reaches its bound, is reported not_reachable with that reason; a step
+// with no registered handler is reported not_reachable by name. Otherwise its handler performs the
+// person's action in the page and reports each observable the step list declares, and the step's
+// evidence is its own: the /api/ requests the page made while it ran, the API reads the handler
+// made with the run's synthetic token, console errors and screenshots. The session writes
+// session.json after every step, so a session that ends early still reports what it reached, and
+// it stops itself at the plan's time allowance.
+//
+// The synthetic token is read from the launcher's token file into memory, typed into the product's
+// credential gate and sent as a bearer header by the direct API reads. It is never written.
+
+import { createHash } from 'node:crypto';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+import { open } from './cdp.mjs';
+import { HANDLERS } from './handlers.mjs';
+import { addUsd, compareUsd } from './usd.mjs';
+
+if (process.argv[2] === '--list-handlers') {
+  console.log(JSON.stringify(Object.keys(HANDLERS).sort()));
+  process.exit(0);
+}
+
+const plan = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const out = plan.out;
+const runDirectory = join(out, '..', '..');
+const token = readFileSync(plan.runtime.token_file, 'utf8').trim();
+const statuses = { ...plan.statuses };
+const report = {
+  session: plan.session.id,
+  started_at: new Date().toISOString(),
+  finished_at: null,
+  chrome_argv: null,
+  facts: { ...plan.facts },
+  outcomes: {},
+  unreached: {},
+};
+let spent = plan.runtime.spend_reported_usd;
+let page = null;
+let current = null;
+
+function write() {
+  writeFileSync(join(out, 'session.json'), `${JSON.stringify(report, null, 2)}\n`);
+}
+
+async function finish(code, reason) {
+  for (const step of plan.steps) {
+    if (!(step.id in report.outcomes)) {
+      report.unreached[step.id] = step.id === current ? `${reason} (during this step)` : reason;
+    }
+  }
+  report.finished_at = new Date().toISOString();
+  write();
+  if (page !== null) await page.close().catch(() => null);
+  rmSync(join(out, 'chrome-profile'), { recursive: true, force: true });
+  process.exit(code);
+}
+
+const allowanceMs = plan.session.budget_seconds * 1000;
+setTimeout(() => {
+  void finish(124, `the session's time allowance of ${plan.session.budget_seconds} s ran out`);
+}, allowanceMs).unref();
+process.on('SIGTERM', () => { void finish(143, 'the orchestrator stopped the session'); });
+
+function blocked(step) {
+  for (const required of step.requires ?? []) {
+    if (statuses[required] !== 'passed') {
+      return `requires ${required}, which ${statuses[required] ? `was ${statuses[required]}` : 'did not run'}`;
+    }
+  }
+  if (step.hosted_model) {
+    if (!plan.runtime.hosted_model) return 'no hosted model is configured for this run (pass --model-env)';
+    if (compareUsd(spent, plan.runtime.spend_bound_usd) >= 0) {
+      return `reported hosted spend reached the run's bound of ${plan.runtime.spend_bound_usd} USD`;
+    }
+  }
+  if (HANDLERS[step.id] === undefined) return 'no browser handler is registered for it';
+  return null;
+}
+
+function context(step, evidence, observations) {
+  const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+  return {
+    page,
+    step,
+    facts: report.facts,
+    parameters: step.parameters ?? {},
+    runtime: plan.runtime,
+    token,
+    /** Record one declared observable: whether it held, and what was seen. */
+    observe(id, ok, observed) {
+      observations.push({ id, ok: Boolean(ok), observed: observed ?? null });
+      return Boolean(ok);
+    },
+    note(text) { evidence.notes.push(text); },
+    /** Hosted spend this step's actions caused, as the product reported it (a decimal string). */
+    spend(usd) {
+      evidence.spend_usd = addUsd(evidence.spend_usd ?? '0', usd);
+      spent = addUsd(spent, usd);
+    },
+    async screenshot(name, scope) {
+      const index = String(Object.keys(report.outcomes).length + 1).padStart(2, '0');
+      const shot = await page.screenshot(join(runDirectory, 'screens'), `${plan.session.id}-${index}-${step.id}-${name}`);
+      evidence.screenshots.push({ file: relative(runDirectory, shot.file), sha256: sha256(shot.bytes), scope });
+      return shot;
+    },
+    /** A direct read or write with the run's token, recorded with its status and body. */
+    async api(method, path, body) {
+      const response = await fetch(`${plan.runtime.api_base}${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json',
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      const text = await response.text();
+      let parsed = text;
+      try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+      evidence.api.push({ method, path, request_body: body ?? null, status: response.status,
+        response_body: typeof parsed === 'string' ? parsed.slice(0, 4000) : parsed });
+      return { status: response.status, body: parsed };
+    },
+  };
+}
+
+try {
+  page = await open({
+    port: plan.runtime.browser_port,
+    profile: join(out, 'chrome-profile'),
+    appOrigin: new URL(plan.runtime.app_url).origin,
+    flags: plan.runtime.chrome_flags,
+  });
+  report.chrome_argv = page.argv;
+  for (const step of plan.steps) {
+    current = step.id;
+    const reason = blocked(step);
+    if (reason !== null) {
+      report.outcomes[step.id] = { status: 'not_reachable', reason };
+      statuses[step.id] = 'not_reachable';
+      write();
+      continue;
+    }
+    const evidence = { screenshots: [], api: [], network: [], console: [], notes: [] };
+    const observations = [];
+    const started = new Date().toISOString();
+    page.label(step.id);
+    let status = 'passed';
+    let failure = null;
+    try {
+      await HANDLERS[step.id](context(step, evidence, observations));
+      const broken = observations.filter((o) => !o.ok).map((o) => o.id);
+      if (broken.length > 0) {
+        status = 'failed';
+        failure = `did not hold: ${broken.join(', ')}`;
+      }
+    } catch (error) {
+      status = 'failed';
+      failure = String(error?.stack ?? error).split('\n').slice(0, 4).join(' | ');
+    }
+    if (status === 'failed') {
+      await context(step, evidence, observations)
+        .screenshot('at-failure', 'the page when the step failed').catch(() => null);
+    }
+    evidence.network = await page.traffic(step.id);
+    evidence.console = page.console(step.id);
+    const { spend_usd: spendUsd, ...kept } = evidence;
+    report.outcomes[step.id] = {
+      status, reason: failure, observations, evidence: kept,
+      ...(spendUsd === undefined ? {} : { spend_usd: spendUsd }),
+      started_at: started, finished_at: new Date().toISOString(),
+    };
+    statuses[step.id] = status;
+    write();
+    console.log(`${status.toUpperCase()} ${step.id}${failure ? `: ${failure.slice(0, 300)}` : ''}`);
+  }
+  current = null;
+  await finish(0, 'the session ended before this step');
+} catch (error) {
+  await finish(1, `the page session failed: ${String(error?.message ?? error).slice(0, 400)}`);
+}
