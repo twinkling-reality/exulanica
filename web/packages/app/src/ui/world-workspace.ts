@@ -70,11 +70,16 @@ export function buildWorldWorkspace(parts: {
     text: 'Development preview. Synthetic and recorded content is not saved and does not establish model or deployment evidence.',
     hidden: !parts.preview,
   });
+  const camera = el('div', {
+    class: 'world-panel-camera',
+    'aria-label': 'World camera controls',
+    hidden: parts.camera.length === 0,
+  }, [...parts.camera]);
   const details = addPanel('details', 'About this place', [
     previewNotice,
     parts.source,
     parts.reason,
-    el('div', { class: 'world-panel-camera', 'aria-label': 'World camera controls' }, [...parts.camera]),
+    camera,
     ...parts.tools,
   ]);
   const authoring = addPanel('authoring', 'Create', [
@@ -147,6 +152,11 @@ export function buildWorldWorkspace(parts: {
     setNearby(count: number, saidElsewhere = false) {
       nearbyState.hidden = count > 0 || saidElsewhere;
       nearbyState.textContent = 'No people are in the nearby display. Move through the world to explore.';
+    },
+    /** The camera controls the open world offers, laid out; the group is hidden while it holds none. */
+    setCamera(controls: readonly HTMLElement[]) {
+      camera.replaceChildren(...controls);
+      camera.hidden = controls.length === 0;
     },
     openPanel(name: 'nearby' | 'authoring' | 'details') { open(name); },
     inspect() { if (active !== 'inspection') open('inspection'); },

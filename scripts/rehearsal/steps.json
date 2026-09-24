@@ -1,6 +1,6 @@
 {
   "profile": "exulanica.rehearsal-steps/v1",
-  "version": 2,
+  "version": 3,
   "about": "The first demonstration, as a person does it in the application, one step per action. Each step names the gates of docs/product-direction.md it serves, the results that must be observable after it, and the owner area a failure routes to. scripts/rehearsal/rehearse.py runs it; tests/test_rehearsal_steps.py holds it to the gates that document states.",
   "gate_sources": [
     {"key": "milestone", "document": "docs/product-direction.md", "heading": "First milestone", "form": "table"},
@@ -92,17 +92,22 @@
     {
       "id": "read-about-this-place",
       "session": "arrival",
-      "action": "Open Place & view and read what About this place says the open world is.",
+      "action": "Open Place & view and read what About this place says the open world is and which camera views it offers.",
       "gates": ["milestone:World entry", "delivery:Usable environment"],
       "requires": ["enter-owned-starter"],
       "parameters": {
         "never_says": ["building forms", "sidewalks", "BUILDING footprints"],
-        "never_says_reason": "What only an owned district's admitted sources give it; an authored starter has none of them."
+        "never_says_reason": "What only an owned district's admitted sources give it; an authored starter has none of them.",
+        "never_offers": ["City overview", "Street level", "Third person (C)", "First person (C)", "Third-person framing"],
+        "never_offers_reason": "Views only a district or a map reference carries out. An authored starter has neither, so asking for one there changes nothing on the screen.",
+        "offers": ["Camera framing", "Movement assistance"],
+        "offers_reason": "The sections every world offers, for turning the view and walking hands-free. Finding them shows the panel's controls were read, so finding none of a district's views is an observation and not an empty read."
       },
-      "owner_area": "the About panel: web/packages/app/src/world-about.ts, the world.about sentences in web/packages/app/src/ui/copy.ts, and web/packages/app/src/composition/environment-selection.ts",
+      "owner_area": "the About panel: web/packages/app/src/world-about.ts, the world.about sentences in web/packages/app/src/ui/copy.ts, and web/packages/app/src/composition/environment-selection.ts; which camera views a kind of world offers: worldViews in web/packages/atlas-react/src/playcanvas/world-kind.ts",
       "expect": {
         "page": [
-          {"id": "about-states-the-world", "says": "About this place names the open world as the kind of scene the API holds for it (an authored starter), and makes none of an owned district's claims."}
+          {"id": "about-states-the-world", "says": "About this place names the open world as the kind of scene the API holds for it (an authored starter), and makes none of an owned district's claims."},
+          {"id": "starter-offers-no-district-views", "says": "About this place offers the camera framing and movement assistance sections, and none of the views only a district or a map reference carries out: no City overview, Street level, third-person camera or third-person framing."}
         ]
       }
     },

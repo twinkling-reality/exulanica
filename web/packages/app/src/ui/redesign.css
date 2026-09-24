@@ -73,6 +73,7 @@
 #shell .world-panel summary { padding: 8px 0; font-size: 13px; line-height: 1.5; }
 #shell .world-panel details { margin-top: 18px; padding-top: 10px; }
 #shell .world-panel-camera { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0; padding: 12px 0; border-block: 1px solid var(--edge); }
+#shell .world-panel-camera[hidden] { display: none; }
 #shell .world-help { margin-top: 20px; color: var(--ink-soft); }
 #shell .world-preview-notice { padding: 10px 12px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink-soft); font-size: 12px; }
 #shell .living-world-inspector h3 { font: 300 26px/1.2 var(--ui-font-display); margin: 4px 0 14px; letter-spacing: -.03em; }

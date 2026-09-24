@@ -126,18 +126,26 @@ def test_the_gate_reader_refuses_a_missing_or_empty_section(tmp_path):
 
 
 def test_the_about_panel_is_read_after_the_starter_and_nothing_waits_on_it():
-    """What About this place says is its own step, so a wrong sentence fails that step alone.
+    """What About this place says and offers is its own step, so a wrong panel fails it alone.
 
     Nearly every later step requires the starter step, so an observable inside it would leave them
-    all unreachable when the sentence is wrong. The About step comes straight after the starter,
-    names what a starter must never claim, and no step requires it.
+    all unreachable when the panel is wrong. The About step comes straight after the starter,
+    names what a starter must never claim and which views it must never offer, names sections
+    every world offers so an empty read cannot pass, and no step requires it.
     """
     ids = [step["id"] for step in STEPS["steps"]]
     about = _step(STEPS, "read-about-this-place")
+    parameters = about["parameters"]
     assert ids.index("read-about-this-place") == ids.index("enter-owned-starter") + 1
     assert about["requires"] == ["enter-owned-starter"]
-    assert [o["id"] for o in about["expect"]["page"]] == ["about-states-the-world"]
-    assert about["parameters"]["never_says"] and about["parameters"]["never_says_reason"].strip()
+    assert [o["id"] for o in about["expect"]["page"]] == [
+        "about-states-the-world",
+        "starter-offers-no-district-views",
+    ]
+    assert parameters["never_says"] and parameters["never_says_reason"].strip()
+    assert parameters["never_offers"] and parameters["never_offers_reason"].strip()
+    assert parameters["offers"] and parameters["offers_reason"].strip()
+    assert not set(parameters["offers"]) & set(parameters["never_offers"])
     waiting = [s["id"] for s in STEPS["steps"] if "read-about-this-place" in s.get("requires", [])]
     assert waiting == []
     assert len([s for s in STEPS["steps"] if "enter-owned-starter" in s.get("requires", [])]) > 1

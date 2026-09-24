@@ -116,6 +116,35 @@ export function authoredRegionOf(kind: WorldKind): AuthoredRegion | null {
 }
 
 /**
+ * The camera views a person can ask this kind of world for, besides turning the view and
+ * walking, which every world carries out.
+ *
+ * Asking a world for a view it does not carry out changes nothing on the screen, so the app
+ * offers each view only where this says the world has it. `test/binding/world-views.test.ts`
+ * holds both halves against the binding for every kind: an offered view moves the camera, and a
+ * withheld one leaves it where it was.
+ */
+export interface WorldViews {
+  /**
+   * An overview from above and a stance at street level. A district frames both on its own
+   * buildings and a Google reference on its fixed city viewpoints; a world with neither has
+   * nothing to frame them on.
+   */
+  readonly cityViews: boolean;
+  /**
+   * A camera behind the person's drawn figure, at a chosen distance. Only a district switches to
+   * it; on any other ground the view stays first person, where a distance has nothing to set.
+   */
+  readonly thirdPerson: boolean;
+}
+
+/** The views this kind of world carries out, read from its ground and its reference only. */
+export function worldViews(kind: WorldKind): WorldViews {
+  const district = kind.ground.form === 'owned-district';
+  return Object.freeze({ cityViews: district || kind.google !== null, thirdPerson: district });
+}
+
+/**
  * How far this renderer carries a person across a ground that states no extent.
  *
  * MEASURED, not chosen. A position reaches the GPU as a 32-bit float, and the render origin only

@@ -7,8 +7,10 @@ import {
   NEAR_CHARACTER_BUDGET,
   NYCSemanticOverlay,
   NYC_REFERENCE_FRAME,
+  worldViews,
   type OwnedSocietyState,
   type NYCLocalFeature,
+  type WorldViews,
 } from '@exulanica/atlas-react/playcanvas';
 import { nycOpenDataAdmissionId } from '../config.js';
 import type { Credentials } from '../config.js';
@@ -166,7 +168,8 @@ export function mountEnvironmentSelection(
   for(const [value,text] of [['walk','Walk forward'],['run','Run forward'],['off','Stop moving']] as const){
     const button=el('button',{type:'button',text});button.addEventListener('click',()=>{deps.state.atlas?.binding.setWalkAssist(value);movementStatus.textContent=value==='off'?'Stopped.':`${text}. Escape or Stop moving ends assistance.`;});movement.append(button);
   }
-  const framing=el('details',{},[el('summary',{text:'Camera framing'}),cameraFraming,turnView]);
+  // The framing select joins this section only in a world with a third-person camera (`offerViews`).
+  const framing=el('details',{},[el('summary',{text:'Camera framing'}),turnView]);
   const memoryLayer = el('label', { class: 'environment-selection-layer' }, [
     el('input', { type: 'checkbox' }),
     document.createTextNode(' Compose memory layer'),
@@ -206,7 +209,8 @@ export function mountEnvironmentSelection(
     root, preview: deps.env.preview, title, fixture, source, selected, reason,
     onOpen: () => deps.onPanelOpen?.(),
     inspector: inspector.root, inhabitants: inhabitantsList,
-    camera: [overview, street, cameraToggle],
+    // Offered once the renderer has decided what kind of world is open (`offerViews`).
+    camera: [],
     tools: [memoryLayer, framing, movement], authoring: editDetails,
   });
 
@@ -335,6 +339,20 @@ export function mountEnvironmentSelection(
 
   overview.addEventListener('click', () => deps.state.atlas?.binding.setCityView('overview'));
   street.addEventListener('click', () => deps.state.atlas?.binding.setCityView('street'));
+  /**
+   * Offer the camera views this world carries out, and no other: a control for a view the world
+   * does not have changes nothing on the screen. Decided by the kind of world the renderer drew,
+   * never by its name, as the sentence above them is. Turning the view and movement assistance
+   * work in every world and are always offered.
+   */
+  const offerViews = (views: WorldViews): void => {
+    workspace.setCamera([
+      ...(views.cityViews ? [overview, street] : []),
+      ...(views.thirdPerson ? [cameraToggle] : []),
+    ]);
+    if (views.thirdPerson) framing.insertBefore(cameraFraming, turnView);
+    else cameraFraming.remove();
+  };
   const memoryCheckbox = memoryLayer.querySelector('input') as HTMLInputElement;
   const reflectMemoryLayer = (visible: boolean): void => {
     memoryCheckbox.checked = visible;
@@ -1418,7 +1436,10 @@ export function mountEnvironmentSelection(
 
   async function attach(): Promise<void> {
     const kind = deps.state.atlas?.worldKind;
-    if (kind !== undefined) source.textContent = aboutWorld(kind);
+    if (kind !== undefined) {
+      source.textContent = aboutWorld(kind);
+      offerViews(worldViews(kind));
+    }
     const entry = deps.state.activeWorldEntry;
     if (!deps.env.preview && entry?.authoredScene != null) {
       try {

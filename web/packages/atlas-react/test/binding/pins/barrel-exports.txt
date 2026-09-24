@@ -130,4 +130,5 @@ validateSogBundle
 validateTrainedSceneGeometry
 wgs84ToEcef
 worldFieldBufferShape
+worldViews
 yawMicroradiansOf

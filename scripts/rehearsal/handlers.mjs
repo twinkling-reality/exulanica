@@ -153,11 +153,27 @@ async function readAboutThisPlace(ctx) {
   await page.waitFor(`document.getElementById('world-panel-details')?.checkVisibility() ?? false`, 10_000, 'About this place');
   const about = await page.waitFor(`(() => { const t = document.querySelector('#world-panel-details .environment-selection-source')?.textContent.trim();
     return t ? t : null; })()`, 10_000, 'the About sentence').catch(() => '');
-  await ctx.screenshot('about', 'About this place on the starter world');
   const text = about.toLowerCase();
   const claims = ctx.parameters.never_says.filter((words) => text.includes(words.toLowerCase()));
   ctx.observe('about-states-the-world', names.length > 0 && text.includes(names.toLowerCase()) && claims.length === 0,
     { about, names, district_claims_made: claims });
+  // Every control the panel offers, by the name a person reads. One inside a closed section is
+  // offered (it is a click away); one under a hidden element is not. Camera framing is opened so
+  // the screenshot shows what it holds.
+  const offered = await page.evaluate(`(() => {
+    const panel = document.getElementById('world-panel-details');
+    const hidden = (node) => { for (; node && node !== panel; node = node.parentElement) if (node.hidden) return true; return false; };
+    for (const section of panel.querySelectorAll('details')) {
+      if (section.querySelector(':scope > summary')?.textContent.trim() === 'Camera framing') section.open = true;
+    }
+    return [...panel.querySelectorAll('button, select, summary')].filter((control) => !hidden(control))
+      .map((control) => control.getAttribute('aria-label') ?? control.textContent.trim());
+  })()`).catch(() => []);
+  await ctx.screenshot('about', 'About this place on the starter world: what it says and the camera views it offers');
+  const districtViews = ctx.parameters.never_offers.filter((name) => offered.includes(name));
+  const missing = ctx.parameters.offers.filter((name) => !offered.includes(name));
+  ctx.observe('starter-offers-no-district-views', districtViews.length === 0 && missing.length === 0,
+    { offered, district_views_offered: districtViews, every_world_sections_missing: missing });
   await page.click(BUTTON('Close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
 }
 
