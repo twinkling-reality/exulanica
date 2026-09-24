@@ -57,14 +57,15 @@ checkpoints loaded in this process. `None` means the caller cannot state the mod
 which is refused whenever a right is required.
 
 The function resolves a candidate right for each identity, then decides everything in one
-evaluation inside the same final read check the environment and graph read paths use: the global
-asset read lock, a read-only transaction and one evaluation instant. The screening must still
-permit these bytes to be looked at (`asset_observation_allows`, a lock-free statement of
-`privacy_screening_allows_observation`), and each identity must be named by a current right
-(`personal_model_right_allows`). A grant or withdrawal cannot commit while that check holds the
-lock, so a withdrawal is either seen or refused until the check finishes. The lock is released
-before the model is called. Call the function immediately before handing the bytes over, after
-they are read and verified; geometry callers still ask `require_privacy_screening` first.
+evaluation inside the same final read check the environment and graph read paths use,
+[`final_read_check`](../exulanica/db/read_check.py): the global asset read lock, a read-only
+transaction and one evaluation instant. The screening must still permit these bytes to be looked at
+(`asset_observation_allows`, a lock-free statement of `privacy_screening_allows_observation`), and
+each identity must be named by a current right (`personal_model_right_allows`). A grant or
+withdrawal cannot commit while that check holds the lock, so a withdrawal is either seen or refused
+until the check finishes. The lock is released before the model is called. Call the function
+immediately before handing the bytes over, after they are read and verified; geometry callers still
+ask `require_privacy_screening` first.
 
 It raises `PrivacyAdmissionError` when the screening no longer holds, and `ModelRightRefused` (a
 subclass) otherwise, with `reason` one of `undeclared`, `missing`, `expired`, `withdrawn`,

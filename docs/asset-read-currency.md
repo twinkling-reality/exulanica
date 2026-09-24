@@ -69,11 +69,12 @@ buffered embedded geometry after closing the metadata snapshot. Successful graph
 and evidence/geometry bytes carry no-store cache policy. Each evidence range request reauthorizes;
 point-map and trained routes keep their existing whole-body/Accept-Ranges-none behavior.
 
-The final check takes only the global asset barrier, never a training, privacy or object-purge lock.
-It performs no store read, streaming or network operation while holding that barrier. Writers that
-committed before it acquired the barrier are visible. A writer or expiry ordered afterward affects
-later requests and cannot retract the already-authorized response. Network completion is not the
-linearization point. Buffers are local to the request, not transferable permission tokens.
+The final check, [`final_read_check`](../exulanica/db/read_check.py), takes only the global asset
+barrier, never a training, privacy or object-purge lock. It performs no store read, streaming or
+network operation while holding that barrier. Writers that committed before it acquired the barrier
+are visible. A writer or expiry ordered afterward affects later requests and cannot retract the
+already-authorized response. Network completion is not the linearization point. Buffers are local to
+the request, not transferable permission tokens.
 
 Dependency mutations take the shared side of the global barrier with **try-lock**, retaining it
 through commit. If a reader already owns the exclusive barrier, mutation raises retryable 40001
