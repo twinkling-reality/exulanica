@@ -44,10 +44,16 @@ import type {
   RecoveredSceneCamera,
   GoogleTilesConfig,
 } from '@exulanica/atlas-react/playcanvas';
-import { AtlasBinding } from '@exulanica/atlas-react/playcanvas';
+import { AtlasBinding, describeWorldKind, type WorldKind } from '@exulanica/atlas-react/playcanvas';
 
 export interface MountedAtlas {
   readonly binding: AtlasBinding;
+  /**
+   * What kind of world the binding draws: its ground and any reference over it. Decided by the
+   * renderer's own `describeWorldKind` over the very options the binding was created from, so a
+   * surface that says what this world is cannot disagree with what is drawn.
+   */
+  readonly worldKind: WorldKind;
   readonly placements: readonly PlacementCheck[];
   dispose(): void;
 }
@@ -86,7 +92,7 @@ export async function mountAtlas(
   },
   beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
-  const binding = await AtlasBinding.create({
+  const options: Parameters<typeof AtlasBinding.create>[0] = {
     canvas,
     overlayParent,
     scene,
@@ -124,7 +130,9 @@ export async function mountAtlas(
             ? {}
             : { reducedMotion: presentation.reducedMotion }),
         }),
-  });
+  };
+  const worldKind = describeWorldKind(options);
+  const binding = await AtlasBinding.create(options);
   canvas.dataset.worldProfile = binding.composedWorld.profileId;
   canvas.dataset.worldTopology = binding.topology.topologyDigest;
   canvas.dataset.worldModules = String(binding.topology.instances.length);
@@ -161,6 +169,7 @@ export async function mountAtlas(
 
   return {
     binding,
+    worldKind,
     placements: binding.verifyPlacements(),
     dispose: () => {
       window.removeEventListener('resize', onResize);

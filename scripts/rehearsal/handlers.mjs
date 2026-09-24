@@ -140,6 +140,27 @@ async function enterOwnedStarter(ctx) {
   { entries: after.entries.length, entry: pick(after.entry, ['entry_id', 'authored_version_id', 'authored_state_sha256', 'authored_edit_seq']) });
 }
 
+/**
+ * Place & view's About panel names the open world. The words it must use are the API's own name
+ * for the scene the saved world holds (`authored-starter` read as "authored starter"), so the check
+ * holds the page to the data rather than to a copy of the product's sentence.
+ */
+async function readAboutThisPlace(ctx) {
+  const { page } = ctx;
+  const { entry } = await savedWorld(ctx);
+  const names = String(entry?.authored_scene?.kind ?? '').replace(/-/g, ' ');
+  await chooseMenu(page, 'world');
+  await page.waitFor(`document.getElementById('world-panel-details')?.checkVisibility() ?? false`, 10_000, 'About this place');
+  const about = await page.waitFor(`(() => { const t = document.querySelector('#world-panel-details .environment-selection-source')?.textContent.trim();
+    return t ? t : null; })()`, 10_000, 'the About sentence').catch(() => '');
+  await ctx.screenshot('about', 'About this place on the starter world');
+  const text = about.toLowerCase();
+  const claims = ctx.parameters.never_says.filter((words) => text.includes(words.toLowerCase()));
+  ctx.observe('about-states-the-world', names.length > 0 && text.includes(names.toLowerCase()) && claims.length === 0,
+    { about, names, district_claims_made: claims });
+  await page.click(BUTTON('Close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
+}
+
 async function nameWorld(ctx) {
   const { page } = ctx;
   const { title } = ctx.parameters;
@@ -838,6 +859,7 @@ export const HANDLERS = Object.freeze({
   'access-gate': accessGate,
   'returning-user-reopens': returningUserReopens,
   'enter-owned-starter': inWorld(enterOwnedStarter),
+  'read-about-this-place': inWorld(readAboutThisPlace),
   'name-world': inWorld(nameWorld),
   'explore-walk': inWorld(exploreWalk),
   'place-reviewed-object': inWorld(placeReviewedObject),

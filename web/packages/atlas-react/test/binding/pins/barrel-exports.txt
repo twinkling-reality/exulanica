@@ -65,6 +65,7 @@ crs84IntegerToLocal
 decodeOpm
 defaultSemanticsFor
 describeLook
+describeWorldKind
 designedLook
 drawLook
 ecefToGoogleLocal

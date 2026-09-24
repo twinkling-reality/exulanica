@@ -187,10 +187,11 @@ export type {
   PlacementCheck,
   ProofLensColor,
 } from './atlas-binding.js';
-export type { AuthoredGround, AuthoredRegion } from './world-kind.js';
+export type { AuthoredGround, AuthoredRegion, WorldGround, WorldKind } from './world-kind.js';
 export {
   AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M,
   authoredGroundSurface,
+  describeWorldKind,
   endlessAuthoredNavigation,
 } from './world-kind.js';
 export {

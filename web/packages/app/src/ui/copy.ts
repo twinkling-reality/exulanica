@@ -299,6 +299,34 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'provenance.unreadableNamed':
     '{model} read the question in {duration} and could not turn it into a search of your '
     + 'photographs.',
+
+  // -- what the About panel says the open world is ----------------------------------------
+  //
+  // One sentence per ground the renderer can stand a world on, chosen by the ground's form in
+  // `world-about.ts`, never by a world's name. Each is true of every world of that form: both
+  // authored forms are starter worlds (module versions 1 and 2), and neither ground is rebuilt from
+  // photographs or map data. A bounded starter states its own size.
+  'world.about.authored-endless':
+    'An authored starter world on open ground with no edge. The ground is authored, not rebuilt '
+    + 'from photographs or map data.',
+  'world.about.authored-flat':
+    'An authored starter world on bounded ground, {width} m by {depth} m. The ground is authored, '
+    + 'not rebuilt from photographs or map data.',
+  'world.about.scene-regions':
+    'A world laid out from your photographs. Each region is drawn only as far as its photographs '
+    + 'support.',
+  'world.about.owned-district':
+    'Source-backed building forms and sidewalks. Surface details are provisional.',
+  'world.about.generated-tile':
+    'A generated street tile, opened for development evaluation. Its streets and building forms '
+    + 'are generated, not recorded from a real place.',
+  // Said after the ground's sentence when a Google photorealistic reference is drawn over it.
+  'world.about.reference': 'A photorealistic map reference is drawn over it for looking only.',
+  // A district's geographic view, with its memory layer composed over it or kept apart.
+  'world.about.district-memory-shown':
+    'City and memory layers are intentionally composed. Purple memory forms are not city semantics.',
+  'world.about.district-memory-hidden':
+    'Official BUILDING footprints. Memory and fantasy layers are separate from the geographic view.',
 });
 
 /**

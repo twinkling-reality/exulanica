@@ -50,6 +50,7 @@ import {
   type InhabitedObject,
 } from '../ui/world-inhabitants.js';
 import { buildWorldWorkspace } from '../ui/world-workspace.js';
+import { aboutWorld, aboutWorldLayers } from '../world-about.js';
 import '../ui/living-world-inspector.css';
 import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
 import {
@@ -133,10 +134,9 @@ export function mountEnvironmentSelection(
   });
   const inspector = createLivingWorldInspector();
   const title = el('h2', { text: 'NYC Open Data' });
-  const source = el('p', {
-    class: 'environment-selection-source',
-    text: 'Source-backed building forms and sidewalks. Surface details are provisional.',
-  });
+  // Says what the open world is once the renderer has decided it (see `attach`); nothing is
+  // claimed before then, because a sentence written here would describe one kind of world for all.
+  const source = el('p', { class: 'environment-selection-source' });
   const selected = el('p', {
     class: 'environment-selection-selected',
     text: 'Aim at a building and press E to inspect its source.',
@@ -338,9 +338,8 @@ export function mountEnvironmentSelection(
   const memoryCheckbox = memoryLayer.querySelector('input') as HTMLInputElement;
   const reflectMemoryLayer = (visible: boolean): void => {
     memoryCheckbox.checked = visible;
-    source.textContent = visible
-      ? 'City and memory layers are intentionally composed. Purple memory forms are not city semantics.'
-      : 'Official BUILDING footprints. Memory and fantasy layers are separate from the geographic view.';
+    const kind = deps.state.atlas?.worldKind;
+    source.textContent = kind === undefined ? '' : aboutWorldLayers(kind, visible);
   };
   memoryCheckbox.addEventListener('change', () => {
     deps.state.atlas?.binding.setMemoryLayerVisible(memoryCheckbox.checked);
@@ -1418,6 +1417,8 @@ export function mountEnvironmentSelection(
   }
 
   async function attach(): Promise<void> {
+    const kind = deps.state.atlas?.worldKind;
+    if (kind !== undefined) source.textContent = aboutWorld(kind);
     const entry = deps.state.activeWorldEntry;
     if (!deps.env.preview && entry?.authoredScene != null) {
       try {
