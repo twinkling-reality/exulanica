@@ -733,7 +733,7 @@ function liveMount(preview = false, living = false, interpretation: unknown = un
   let playback: SocietyPlaybackControl = {
     societyId:'society',versionId:'version',persisted:true,revision:0,mode:'paused',speed:1,
     tickIntervalMs:1000,currentTick:0,stateSha256:'1'.repeat(64),nextDueAt:null,reason:null,
-    playEligible:true,playIneligibleReason:null,
+    playEligible:true,playIneligibleReason:null,hostPlayback:null,
   };
   const societyControlClient = {
     read:vi.fn(async()=>playback),

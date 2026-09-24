@@ -411,7 +411,9 @@ remain authoritative and can remove both geometry and the record.
 
 In an authenticated configured world, the same panel can read persisted society state and controls,
 show saved play/pause and 1x/2x/4x settings, advance one simulated minute while paused, and inspect
-recorded activity/event references. The development preview instead plays an explicitly labeled
+recorded activity/event references. In a person's own saved world those controls are in People
+nearby, beside the inhabitants, and are offered only where the host plays that world; World
+details points there instead of repeating them. The development preview instead plays an explicitly labeled
 recording and is not persistence or model evidence. The backend also accepts typed user requests for
 an inhabitant to go to or perform a canonical target, but no browser control issues those
 requests. Selecting a destination or inhabitant for inspection must not be described as directing it.

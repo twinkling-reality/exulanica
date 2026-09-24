@@ -953,8 +953,25 @@ society and creates nothing; the People nearby panel says when nobody lives ther
 inhabitants need, and offers "Bring in inhabitants", which is the creation request above. Once
 they live there, the panel lists every object with what the consumed input says of it (somewhere
 to rest or visit, out of reach, or not yet noticed until the next simulated minute), and "Advance
-one minute" performs one control step. A chosen inhabitant's panel carries one request per usable
-place. Every request names the saved world. The placement of this panel is provisional.
+one minute" performs one control step while the world is paused. A chosen inhabitant's panel
+carries one request per usable place. Every request names the saved world. The placement of this
+panel is provisional.
+
+The same panel holds the world's only Play, Pause and pace controls; About points to them. Play
+is offered only where the control read's `host_playback.running` says this host plays the world;
+otherwise the panel shows the server's own `reason` and keeps "Advance one minute". While a world
+plays, the page reads the control about every two seconds (half the effective interval when that
+is shorter, never more often than every 500 ms) and reads the society only when the control's
+tick differs from the one drawn (`web/packages/app/src/composition/environment-selection.ts`).
+Minutes the page did not read are rebuilt, for drawing only, from the paths their event
+documents record (`society-unread-minutes.ts`); a minute the bounded event window cannot vouch
+for is not rebuilt. After the person places or moves an object while people are there, one line
+says the simulated minute that notices it: the server's current tick plus one, confirmed once a
+state consumes a later input. The inspector's top lines say who the person is, what they are
+doing and why, turning the engine's reason codes into words and naming places by the titles of
+the person's objects (`inhabitantWords` in `web/packages/app/src/ui/world-inhabitants.ts`); a
+code it has no words for is shown by name. The recorded explanation and bindings stay in its
+details.
 
 In the owned district the control is implemented and unit-tested
 (`web/packages/app/test/society-directed-action.test.ts`,
@@ -1132,8 +1149,19 @@ The app draws the whole population by distance: up to 24 nearest outdoor
 inhabitants as full characters (the native character runtime's resident limit) and every other
 outdoor inhabitant within 700 m as a simple instanced figure of the same identity, one draw call
 per palette. Indoor inhabitants are counted, not drawn. People at the same position are all drawn
-there. A v4 inhabitant walks its recorded path from the start of the interval at its recorded
-speed and stops where the path ends; nothing is interpolated off the path. The development
+there. A v4 inhabitant walks the recorded path at its recorded `walk_speed_mm_per_tick`, one
+tick's worth per interval, and stops where the path ends. A v2 state records only a bound,
+`movement_budget_mm_per_tick`, which is usually far longer than the path a person walks in a
+tick; a v2 person therefore walks what they have left evenly until the next tick is expected (the
+interval plus the caller's start lag), never faster than 1.5 times the bound's own pace, so
+nobody sprints and then stands. Nothing is interpolated off the path. Each later tick's path is
+appended to what the person has still to walk when it starts where that ends, so a walk through
+several minutes does not stop between them, and a caller that learns of ticks late passes that
+delay as a start lag. A v4 person behind catches up along the path at most 1.5 times their speed;
+anyone moved without walking (a path that starts elsewhere, unread minutes, more than two ticks
+of walking waiting, no recorded path, or an older state) is named with its reason rather than
+moved silently (`CrowdJump` in `web/packages/atlas-react/src/playcanvas/society/types.ts`). A
+state without a pace is eased along its path over the interval. The development
 preview plays a recording made by the real engine over the committed Flatiron input
 (`scripts/record_living_society.py`), with every frame bound to its state digest.
 

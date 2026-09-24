@@ -7,7 +7,15 @@ import { CharacterHost } from '../character/host.js';
 import { inhabitantRenderable } from '../character/inhabitant.js';
 import type { CharacterPose } from '../character/renderable.js';
 import type { FarAppearance } from '../character/far.js';
-import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState, SocietyInhabitantSnapshot } from './types.js';
+import type {
+  CrowdJump,
+  CrowdJumpReason,
+  CrowdRenderable,
+  CrowdRenderableFactory,
+  CrowdTiming,
+  OwnedSocietyState,
+  SocietyInhabitantSnapshot,
+} from './types.js';
 
 /**
  * The whole synthetic population, drawn by distance.
@@ -18,9 +26,20 @@ import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState, Societ
  * because interiors are not rendered. Two people standing on the same point are both drawn
  * there: where a society puts people is the simulation's occupancy rule, not the renderer's.
  *
- * Motion follows the recorded path only. A v4 inhabitant walks from the start of the tick at its
- * own recorded speed and stops where the path ends; an older snapshot without a speed is eased
- * along its path over the whole interval. No position is invented between path points.
+ * Motion follows the recorded path only. A v4 inhabitant records its own walking speed
+ * (`walk_speed_mm_per_tick`) and walks at it, one tick's worth per interval, stopping where the
+ * recorded path ends. A v2 state records only a bound, how far anybody may walk in a tick
+ * (`movement_budget_mm_per_tick`), and a person's recorded path is usually much shorter: walking
+ * it at the bound would cover it in a fraction of the interval and stand for the rest, a burst.
+ * So a v2 person walks what they have still to walk evenly over the interval and the caller's
+ * start lag, when the next tick's path is expected, never faster than `CATCH_UP_SPEED_LIMIT` times
+ * the bound's own pace. Each later snapshot's path is appended to what the person has still to walk
+ * when it starts where that ends, so a person walking through several minutes never stops between
+ * them; a v4 person behind catches up along the recorded path at most `CATCH_UP_SPEED_LIMIT` times
+ * their speed. Anything else, a path that starts somewhere the person was not, minutes this crowd
+ * never saw, or more waiting than can be caught up, moves the person without walking, and every
+ * such move is a named jump (`jumps`) rather than a silent one. An older snapshot without a pace is
+ * eased along its path over the whole interval. No position is invented between path points.
  * Everyone faces the way their recorded path last took them and keeps that facing when they
  * stop, in either form, so a person first drawn in full after arriving, or again after a spell
  * in the far form, faces as their far figure did.
@@ -65,13 +84,25 @@ export interface CrowdCounts {
   readonly drawn: number;
 }
 
+type Point = readonly [number, number];
+
 interface Walker {
   readonly id: string;
-  readonly path: readonly (readonly [number, number])[];
+  /** What this person has still to walk, from where they were drawn when it was last extended. */
+  readonly route: readonly Point[];
   readonly lengths: readonly number[];
   readonly total: number;
-  /** Metres per interval, or null when the snapshot records no speed. */
-  readonly speed: number | null;
+  /** Metres of `route` walked so far. */
+  walked: number;
+  /** Metres one tick allows, as the state records it, or null when it records no pace. */
+  readonly budget: number | null;
+  /**
+   * For a v2 person, metres per millisecond: what they have still to walk spread evenly until the
+   * next tick is expected. Null for a v4 person, who walks at their own recorded speed.
+   */
+  readonly rate: number | null;
+  /** When a person standing still starts the walk just read, in the caller's clock. */
+  readonly startsAtMs: number;
   readonly indoors: boolean;
   /** The activity the state says this person is performing, or null when it names none. */
   readonly activity: string | null;
@@ -88,6 +119,20 @@ interface Walker {
 const NEAR_LIMIT = NEAR_INHABITANT_BUDGET;
 const REFRESH_METRES = 4;
 const DEFAULT_INTERVAL_MS = 1_850;
+/** Two recorded points this close are one point: the state's unit is the millimetre. */
+const SAME_POINT_METRES = 0.001;
+/**
+ * The fastest a person behind their recorded walk is drawn, as a multiple of their own pace. Half
+ * again a walking pace still reads as walking briskly; beyond it a recorded walk would read as
+ * running, which no state says anybody does.
+ */
+const CATCH_UP_SPEED_LIMIT = 1.5;
+/**
+ * The most recorded walking that may wait for a person, in ticks: the tick being walked and the one
+ * just read. More would keep them walking in the past for longer than a tick, so they are carried
+ * forward along their own path to the last tick's walk instead, as a named jump.
+ */
+const BEHIND_LIMIT_TICKS = 2;
 /**
  * The nearest 4 are posed every frame, the next 8 every second frame and the rest every third.
  * Measured in the development preview at 1440x900: an abstract figure's pose costs about 0.53 ms of
@@ -103,9 +148,22 @@ interface PoseSlot {
   pendingSeconds: number;
 }
 
-function polyline(path: readonly (readonly [number, number])[]): { lengths: number[]; total: number } {
+function polyline(path: readonly Point[]): { lengths: number[]; total: number } {
   const lengths = path.slice(1).map((p, i) => Math.hypot(p[0] - path[i]![0], p[1] - path[i]![1]));
   return { lengths, total: lengths.reduce((a, b) => a + b, 0) };
+}
+
+const apart = (a: Point, b: Point): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+/** The part of a walker's route not yet walked, starting where it is drawn. */
+function remainder(walker: Walker): Point[] {
+  const rest: Point[] = [walker.position];
+  let covered = 0;
+  for (let i = 0; i < walker.lengths.length; i += 1) {
+    covered += walker.lengths[i]!;
+    if (covered > walker.walked) rest.push(walker.route[i + 1]!);
+  }
+  return rest;
 }
 
 /** Facing in radians about +Y with -Z forward, the renderable's convention; held when not moving. */
@@ -132,8 +190,13 @@ export class SocietyCrowd {
   private tick = -1;
   private startedAtMs = 0;
   private intervalMs = DEFAULT_INTERVAL_MS;
+  private startLagMs = 0;
+  /** Whether anybody still has recorded walking to present. */
   private moving = false;
   private lastFrameMs = 0;
+  /** Up to when every paced walker has been walked, in the caller's clock. */
+  private lastWalkMs = 0;
+  private jumpsRead: readonly CrowdJump[] = [];
   private observer: readonly [number, number] | null = null;
   private selectedId: string | null = null;
   /** The native runtime's own flag, read once per frame by `nativeFrames`. */
@@ -163,27 +226,41 @@ export class SocietyCrowd {
   set(
     state: OwnedSocietyState,
     observer?: readonly [number, number],
-    options: { readonly intervalMs?: number; readonly nowMs?: number } = {},
+    options: CrowdTiming = {},
   ): CrowdCounts {
     const scope = `${state.society_id ?? 'preview'}:${state.branch_id ?? ''}`;
     if (scope !== this.scope) this.releaseNear();
-    const consecutive = scope === this.scope && state.tick === this.tick + 1;
+    const continuing = scope === this.scope && this.state !== null;
+    const consecutive = continuing && state.tick === this.tick + 1;
+    const later = continuing && state.tick > this.tick;
+    const unreadTicks = later ? state.tick - this.tick - 1 : 0;
+    const nowMs = options.nowMs ?? performance.now();
+    // Everyone is walked up to now first, so what is appended joins where they are drawn.
+    if (continuing) this.place(nowMs, 0, false, false);
+    // A person without a pace starts again from wherever the snapshot says; a paced person's
+    // own jumps say when they do.
     if (!consecutive) {
-      this.discontinuity = true;
-      for (const id of this.near.keys()) this.fresh.add(id);
+      for (const [id, walker] of this.walkers) {
+        if (walker.budget !== null && continuing) continue;
+        this.discontinuity = true;
+        if (this.near.has(id)) this.fresh.add(id);
+      }
+      if (!continuing) this.discontinuity = true;
     }
     this.scope = scope;
     this.tick = state.tick;
     this.state = state;
     if (observer) this.observer = observer;
     this.intervalMs = Math.max(1, options.intervalMs ?? DEFAULT_INTERVAL_MS);
-    this.startedAtMs = options.nowMs ?? performance.now();
-    this.lastFrameMs = this.startedAtMs;
+    this.startLagMs = Math.max(0, options.startLagMs ?? 0);
+    this.startedAtMs = nowMs;
+    this.lastFrameMs = nowMs;
+    this.lastWalkMs = nowMs;
     // Whether this snapshot records paths is read from the snapshot: every engine that reads its
     // input writes each person's path, and a legacy state carries none, so no profile is listed here.
     const pathful = state.inhabitants.every((person) => Array.isArray(person.motion_path_mm));
     const walkers = new Map<string, Walker>();
-    let moving = false;
+    const jumps: CrowdJump[] = [];
     for (const person of state.inhabitants) {
       if (person.synthetic !== true) continue;
       if (person.support_z_mm !== undefined && person.support_z_mm !== null) {
@@ -193,30 +270,73 @@ export class SocietyCrowd {
       }
       const end = [person.position_mm[0] / 1000, person.position_mm[1] / 1000] as const;
       const recorded = person.motion_path_mm?.map(([x, z]) => [x / 1000, z / 1000] as const);
-      // Snapshots without a supported path, or out of sequence, jump to the recorded position.
-      const path = pathful && consecutive && recorded?.length ? recorded : [end];
-      const { lengths, total } = polyline(path);
-      const previous = this.walkers.get(person.id);
+      const previous = continuing ? this.walkers.get(person.id) : undefined;
+      const pace = person.walk_speed_mm_per_tick ?? state.movement_budget_mm_per_tick;
+      const budget = pace === undefined ? null : pace / 1000;
+      // A recorded speed is walked at; a recorded bound is only a bound (see the class comment).
+      const spread = budget !== null && person.walk_speed_mm_per_tick === undefined;
+      let route: readonly Point[];
+      let walked = 0;
+      let startsAtMs = nowMs;
+      const jump = (reason: CrowdJumpReason, metres: number) => {
+        if (metres <= SAME_POINT_METRES) return;
+        jumps.push({ inhabitantId: person.id, reason, tick: state.tick, unreadTicks, metres });
+        if (this.near.has(person.id)) this.fresh.add(person.id);
+        this.discontinuity = true;
+      };
+      if (budget === null) {
+        // Snapshots without a pace, without a supported path, or out of sequence, jump to the
+        // recorded position.
+        route = pathful && consecutive && recorded?.length ? recorded : [end];
+      } else if (previous === undefined) {
+        // Never drawn before: the person appears where the state says they are.
+        route = [end];
+      } else if (!later) {
+        route = [end];
+        jump('not-newer', apart(previous.position, end));
+      } else if (!pathful || !recorded?.length) {
+        route = [end];
+        jump('no-recorded-path', apart(previous.position, end));
+      } else if (apart(recorded[0]!, previous.route[previous.route.length - 1]!) <= SAME_POINT_METRES) {
+        route = [...remainder(previous), ...recorded.slice(1)];
+        const standing = previous.walked >= previous.total;
+        // A spread walk already lasts until the next tick is expected, so it starts at once.
+        startsAtMs = standing && !spread ? nowMs + this.startLagMs : spread ? nowMs : previous.startsAtMs;
+      } else {
+        route = recorded;
+        startsAtMs = spread ? nowMs : nowMs + this.startLagMs;
+        jump(consecutive ? 'path-starts-elsewhere' : 'minutes-not-read', apart(previous.position, recorded[0]!));
+      }
+      const { lengths, total } = polyline(route);
+      if (budget !== null && total - walked > budget * BEHIND_LIMIT_TICKS) {
+        const skipped = total - walked - budget;
+        walked += skipped;
+        jump('too-far-behind', skipped);
+      }
       const walker: Walker = {
         id: person.id,
-        path,
+        route,
         lengths,
         total,
-        speed: person.walk_speed_mm_per_tick === undefined ? null : person.walk_speed_mm_per_tick / 1000,
+        walked,
+        budget,
+        rate: spread
+          ? Math.min((total - walked) / (this.intervalMs + this.startLagMs), (CATCH_UP_SPEED_LIMIT * budget!) / this.intervalMs)
+          : null,
+        startsAtMs,
         indoors: person.indoors === true,
         activity: stateActivity(person),
-        position: path[0]!,
+        position: sampleMotionPath(route, total === 0 ? 1 : walked / total),
         facing: previous?.facing ?? 0,
-        arrived: total === 0,
+        arrived: walked >= total,
       };
-      moving ||= total > 0;
       walkers.set(person.id, walker);
     }
     this.walkers = walkers;
-    this.moving = moving;
+    this.jumpsRead = jumps;
     if (this.selectedId && !walkers.has(this.selectedId)) this.selectedId = null;
     this.assignDetail();
-    this.place(this.startedAtMs, 1 / 60, false);
+    this.place(nowMs, 1 / 60, false);
     return this.counts;
   }
 
@@ -250,6 +370,7 @@ export class SocietyCrowd {
     this.scope = '';
     this.tick = -1;
     this.moving = false;
+    this.jumpsRead = [];
     this.observer = null;
     this.selectedId = null;
     this.discontinuity = true;
@@ -260,8 +381,21 @@ export class SocietyCrowd {
     this.far.destroy();
   }
 
+  /**
+   * Whether anybody is still walking. A person without a recorded pace walks for one interval from
+   * the snapshot; a paced person walks until the route read so far is walked.
+   */
   get animating(): boolean {
-    return this.state !== null && this.moving && performance.now() - this.startedAtMs < this.intervalMs;
+    if (this.state === null || !this.moving) return false;
+    for (const walker of this.walkers.values()) {
+      if (walker.budget !== null && !walker.arrived) return true;
+    }
+    return performance.now() - this.startedAtMs < this.intervalMs;
+  }
+
+  /** Every person the latest snapshot moved without walking, and why; empty when nobody. */
+  get jumps(): readonly CrowdJump[] {
+    return this.jumpsRead;
   }
 
   get counts(): CrowdCounts {
@@ -446,21 +580,38 @@ export class SocietyCrowd {
     this.farIds = ranked.filter(({ w, d }) => !nearIds.has(w.id) && d <= this.farRadius).map(({ w }) => w.id);
   }
 
-  private place(nowMs: number, dt: number, reduced: boolean): void {
+  private place(nowMs: number, dt: number, reduced: boolean, draw = true): void {
     const elapsed = reduced ? Number.POSITIVE_INFINITY : Math.max(0, nowMs - this.startedAtMs);
     const fraction = Math.min(1, elapsed / this.intervalMs);
     const eased = fraction * fraction * (3 - 2 * fraction);
+    const walkedFrom = this.lastWalkMs;
+    if (!reduced) this.lastWalkMs = Math.max(this.lastWalkMs, nowMs);
+    let moving = false;
     for (const walker of this.walkers.values()) {
-      let position = walker.path[walker.path.length - 1]!;
-      let travelled = 1;
-      if (walker.total > 0 && Number.isFinite(elapsed)) {
-        travelled = walker.speed === null ? eased : Math.min(1, (fraction * walker.speed) / walker.total);
-        position = sampleMotionPath(walker.path, travelled);
+      if (walker.total > 0) {
+        if (reduced) walker.walked = walker.total;
+        else if (walker.budget === null) walker.walked = eased * walker.total;
+        else {
+          const walking = nowMs - Math.max(walkedFrom, walker.startsAtMs);
+          if (walking > 0 && walker.rate !== null) {
+            walker.walked = Math.min(walker.total, walker.walked + walker.rate * walking);
+          } else if (walking > 0) {
+            const pace = walker.budget / this.intervalMs;
+            // Behind by more than a tick and the wait for the next, the person walks faster.
+            const behindMs = (walker.total - walker.walked) / pace;
+            const speed = pace * Math.min(CATCH_UP_SPEED_LIMIT, Math.max(1, behindMs / (this.intervalMs + this.startLagMs)));
+            walker.walked = Math.min(walker.total, walker.walked + speed * walking);
+          }
+        }
       }
+      const position = walker.total > 0 ? sampleMotionPath(walker.route, walker.walked / walker.total) : walker.route[0]!;
       walker.facing = heading(walker.position, position, walker.facing);
       walker.position = position;
-      walker.arrived = travelled >= 1;
+      walker.arrived = walker.walked >= walker.total;
+      moving ||= !walker.arrived;
     }
+    this.moving = moving;
+    if (!draw) return;
     this.frame += 1;
     for (const [id, renderable] of this.near) {
       const walker = this.walkers.get(id)!;

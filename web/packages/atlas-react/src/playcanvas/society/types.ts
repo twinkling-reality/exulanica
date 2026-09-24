@@ -75,6 +75,11 @@ export interface OwnedSocietyState {
   readonly input_sha256?: string;
   readonly routine?: SocietyRoutineBinding;
   readonly tick: number;
+  /**
+   * v2: how far anybody may walk in one tick, in millimetres, as the state recorded it at creation
+   * (`movement_budget_mm_per_tick`). Absent means the state records no pace, not that nobody walks.
+   */
+  readonly movement_budget_mm_per_tick?: number;
   /** V4 simulated duration of one tick. Absent profiles do not imply zero. */
   readonly tick_seconds?: number;
   readonly start_minute_of_day?: number;
@@ -84,6 +89,48 @@ export interface OwnedSocietyState {
 }
 
 export type CrowdDetail = 'near' | 'far';
+
+/**
+ * Why a person was drawn somewhere without walking there. Every such move is named, never silent:
+ * - `minutes-not-read`: simulated minutes passed that this view never read, and the path recorded
+ *   for the latest one does not start where the person was drawn;
+ * - `path-starts-elsewhere`: the next minute's recorded path starts somewhere other than where the
+ *   previous one ended, as when people are brought back at new starting places;
+ * - `too-far-behind`: more recorded walking is waiting than can be caught up, so the person is
+ *   carried forward along their own recorded path;
+ * - `no-recorded-path`: the state records where the person is and no path for how they got there;
+ * - `not-newer`: the state is not later than the one drawn, so the person is drawn where it says.
+ */
+export type CrowdJumpReason =
+  | 'minutes-not-read'
+  | 'path-starts-elsewhere'
+  | 'too-far-behind'
+  | 'no-recorded-path'
+  | 'not-newer';
+
+export interface CrowdJump {
+  readonly inhabitantId: string;
+  readonly reason: CrowdJumpReason;
+  /** The tick of the state that caused the jump. */
+  readonly tick: number;
+  /** Ticks between the last state drawn and this one, less the one being drawn (0 when none). */
+  readonly unreadTicks: number;
+  /** How far the drawn person moved without walking, in metres. */
+  readonly metres: number;
+}
+
+/** How one snapshot is presented over time. */
+export interface CrowdTiming {
+  /** Real milliseconds one simulated tick takes to present: the host's effective interval. */
+  readonly intervalMs?: number;
+  readonly nowMs?: number;
+  /**
+   * How long a standing person waits before starting a newly recorded walk, in real milliseconds.
+   * A caller that learns of each tick some time after it happens passes that delay, so the next
+   * tick's path has arrived before this one is walked to its end and nobody stops between minutes.
+   */
+  readonly startLagMs?: number;
+}
 
 export interface InhabitantIdentity {
   readonly societyId: string;

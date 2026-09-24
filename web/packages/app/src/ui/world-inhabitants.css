@@ -24,3 +24,23 @@
 #shell .world-inhabitants h4 { margin: 16px 0 8px; font-size: 13px; }
 #shell .world-inhabitants button { margin: 0 8px 16px 0; }
 #shell .world-inhabitants-places { margin: 0 0 16px; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+/* Play or Pause, and the pace beside it: one row of controls where the people are. */
+#shell .world-inhabitants-pace {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 16px 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+#shell .world-inhabitants-pace select {
+  min-height: 38px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  font-size: 13px;
+}
+#shell .world-inhabitants-playback,
+#shell .world-inhabitants-notice { margin: 0 0 12px; font-size: 13px; line-height: 1.5; }

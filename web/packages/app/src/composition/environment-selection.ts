@@ -34,6 +34,7 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { createLiveSociety, type LiveSociety, type LiveSocietyView } from './live-society.js';
+import { unreadMinutes } from './society-unread-minutes.js';
 import { SocietyDistrictClient, type SocietyDistrictPlacement, type SocietyDistrictView } from '../society-district-api.js';
 import {
   EnvironmentSelectionClient,
@@ -50,8 +51,11 @@ import {
 } from '../ui/society-directed-action.js';
 import {
   buildWorldInhabitants,
+  inhabitantWords,
   placeRows,
   type InhabitedObject,
+  type MovedWithoutWalking,
+  type Noticing,
 } from '../ui/world-inhabitants.js';
 import { buildWorldWorkspace } from '../ui/world-workspace.js';
 import { aboutWorld, aboutWorldLayers } from '../world-about.js';
@@ -80,6 +84,14 @@ const ACTIVITY_LABELS: Readonly<Record<string, string>> = {
   stay_home: 'at home', work: 'working',
 };
 const activityLabel = (kind: string): string => ACTIVITY_LABELS[kind] ?? kind.replaceAll('_', ' ');
+/**
+ * While a world plays on its own the page reads its playback control about every two seconds, a
+ * cheap read, and reads the society only when the control says the tick moved. A pace faster than
+ * that is read at half its interval, so a minute is rarely missed, and never more often than every
+ * half second, so a fast pace cannot become a stream of requests.
+ */
+const CONTROL_POLL_MS = 2_000;
+const CONTROL_POLL_FLOOR_MS = 500;
 
 export interface EnvironmentSelectionDependencies {
   readonly env: AppEnvironment;
@@ -237,13 +249,22 @@ export function mountEnvironmentSelection(
   refreshSociety.addEventListener('click', () => void (async () => {
     await refreshDistrict(); await refreshPlayback(true);
   })());
+  const liveHelp = el('p', { text: 'Play, pause, change speed, or advance one simulated minute. Authored edits affect the next step. Restoring objects retains earlier simulation history.' });
   const liveControls = el('details', { hidden: deps.env.preview }, [
     el('summary', { text: 'Living world simulation' }),
     liveStatus,
     playbackStatus,
-    el('p', { text: 'Play, pause, change speed, or advance one simulated minute. Authored edits affect the next step. Restoring objects retains earlier simulation history.' }),
+    liveHelp,
     playbackMode, playbackSpeed, advanceSociety, refreshSociety,
   ]);
+  /**
+   * In a saved world, Play, Pause and pace live beside the people, in People nearby; this section
+   * says where they are rather than offering a second set.
+   */
+  function pointToPeopleNearby(): void {
+    liveHelp.textContent = 'Play, pause and pace are in People nearby, beside the inhabitants.';
+    for (const node of [playbackStatus, playbackMode, playbackSpeed, advanceSociety]) node.remove();
+  }
   const representation = buildRepresentationInspector(() => deps.state.atlas?.binding ?? null, {
     starterGround: () => {
       const scene = deps.state.activeWorldEntry?.authoredScene;
@@ -325,7 +346,18 @@ export function mountEnvironmentSelection(
     // The person's own requests; the server records each as one minute of the world's history.
     onSendAway: () => void changePresence('away'),
     onBringBack: () => void changePresence('here'),
+    onPlay: () => void configurePlayback('playing'),
+    onPause: () => void configurePlayback('paused'),
+    onPace: (speed) => void configurePlayback(societyControl?.mode ?? 'paused', speed),
   });
+  /** How long the last poll's reads took, measured here: the crowd waits that long plus the poll. */
+  let readRoundMs = 0;
+  /** Changed by every request the person makes, so a poll that was already out cannot undo it. */
+  let controlEpoch = 0;
+  /** Everyone the last drawn minutes moved without walking, as the crowd named them. */
+  let moved: readonly MovedWithoutWalking[] = [];
+  /** The object last placed or moved while people were here, and the input it arrived in. */
+  let noticing: (Noticing & { readonly afterInputSeq: number }) | null = null;
   let previewState: OwnedSocietyState | null = null;
   let recording: LivingSocietyRecording | null = null;
   let recordingFrame = 0;
@@ -503,14 +535,25 @@ export function mountEnvironmentSelection(
     // Resting is the simulation's state. A catalog person sits on the ground in front of the
     // place; the abstract figure stands.
     const resting = v2 && inhabitant.action?.kind === 'rest' && inhabitant.action.status === 'active';
+    // In a person's own world the top says who this is, what they are doing and why, in words,
+    // naming places by the titles of the person's objects; the recorded details stay below.
+    const words = savedWorld !== null && v2 && society?.places
+      ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places))
+      : null;
     inspector.show({
       subject: id,
-      title: inhabitant.display_name ?? `Synthetic ${inhabitant.role ?? 'inhabitant'}`,
-      description: 'A fictional inhabitant of this world. This is not a remembered person.',
-      activity: v2
-        ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ' Drawn sitting on the ground in front of the place.' : ''}`
-        : 'No persisted goal or action is available in this preview or legacy society.',
+      title: words?.who ?? inhabitant.display_name ?? `Synthetic ${inhabitant.role ?? 'inhabitant'}`,
+      description: words?.what ?? 'A fictional inhabitant of this world. This is not a remembered person.',
+      activity: words !== null
+        ? `${words.doing} ${words.why}`
+        : v2
+          ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ' Drawn sitting on the ground in front of the place.' : ''}`
+          : 'No persisted goal or action is available in this preview or legacy society.',
       details: [
+        ...(words !== null ? [
+          ['Recorded explanation', inhabitant.explanation?.summary ?? 'Unavailable'],
+          ...(resting ? [['Drawn as', 'Sitting on the ground in front of the place.'] as const] : []),
+        ] as const : []),
         ['Plane / origin', 'Simulation · synthetic'],
         ['Visibility', crowd()?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
         ['Current activity', v2 && inhabitant.action ? `${inhabitant.action.kind} · ${inhabitant.action.status}: ${inhabitant.action.reason}` : 'Unavailable'],
@@ -532,6 +575,24 @@ export function mountEnvironmentSelection(
       ],
     });
     if (savedWorld !== null && v2) addSavedWorldActions();
+  }
+
+  /**
+   * After an edit, the object it placed or moved while people are here: they notice it at the next
+   * simulated minute, which is the server's current tick plus one, and the input that minute
+   * consumes is later than the one the drawn state consumed.
+   */
+  function noticeChangedObject(before: ReadonlyMap<string, InhabitedObject>): void {
+    const snapshot = liveSociety?.view.snapshot ?? null;
+    if (snapshot === null || snapshot.presence.status !== 'here' || snapshot.places === null) return;
+    const objects = savedObjects() ?? [];
+    const changed = objects.find((object) => {
+      const held = before.get(object.objectId);
+      return held === undefined || held.xMm !== object.xMm || held.zMm !== object.zMm;
+    });
+    if (changed === undefined) return;
+    const label = placeRows(objects, snapshot.places).find((row) => row.object.objectId === changed.objectId)?.label ?? changed.title;
+    noticing = { label, minute: snapshot.currentTick + 1, noticed: false, afterInputSeq: snapshot.places.inputSeq };
   }
 
   /** The person's objects, as the inhabitants panel names and places them. */
@@ -1137,18 +1198,52 @@ export function mountEnvironmentSelection(
       .filter((person) => (person.motion_path_mm?.length ?? 0) > 1).length ?? 0;
     inhabitantsPanel.render({
       society: view, objects: savedObjects(), walked, advanceBlocked: advanceBlocked(),
+      playback: { control: societyControl, busy: controlBusy }, moved, noticing,
     });
+  }
+
+  /** How long between control reads while this world plays: see `CONTROL_POLL_MS`. */
+  function pollDelayMs(): number {
+    const interval = societyControl?.hostPlayback?.intervalMs ?? societyControl?.tickIntervalMs ?? CONTROL_POLL_MS;
+    return Math.max(CONTROL_POLL_FLOOR_MS, Math.min(CONTROL_POLL_MS, interval / 2));
   }
 
   function scheduleControlPoll(): void {
     stopControlPoll();
     if (phase === 'disposed' || societyControl?.mode !== 'playing') return;
-    controlTimer = window.setTimeout(() => void refreshPlayback(true),
-      Math.max(500, societyControl.tickIntervalMs));
+    // A saved world is read on its own only where its host plays it; a district as before.
+    if (savedWorld !== null && societyControl.hostPlayback?.running !== true) return;
+    controlTimer = window.setTimeout(() => void (savedWorld !== null ? pollPlayback() : refreshPlayback(true)),
+      savedWorld !== null ? pollDelayMs() : Math.max(CONTROL_POLL_FLOOR_MS, societyControl.tickIntervalMs));
+  }
+
+  /**
+   * One background read while a saved world plays: the control, and the society only when the
+   * control's tick is not the one drawn. It never disables a control the person could be using.
+   */
+  async function pollPlayback(): Promise<void> {
+    controlTimer = null;
+    if (phase === 'disposed' || current === null || controlBusy) return;
+    const epoch = controlEpoch;
+    const started = performance.now();
+    try {
+      const read = await controlClient.read(current.versionId);
+      if ((phase as string) === 'disposed' || epoch !== controlEpoch) return;
+      societyControl = read;
+      if (read.currentTick !== liveSociety?.view.snapshot?.currentTick) await liveSociety?.refresh();
+      readRoundMs = performance.now() - started;
+    } catch (error) {
+      if ((phase as string) === 'disposed' || epoch !== controlEpoch) return;
+      societyControl = null;
+      playbackStatus.textContent = `Playback controls unavailable. ${error instanceof Error ? error.message : 'The request failed.'}`;
+    } finally {
+      if ((phase as string) !== 'disposed' && epoch === controlEpoch) { reflectPlayback(); scheduleControlPoll(); }
+    }
   }
 
   async function refreshPlayback(refreshSocietyState = false): Promise<void> {
     if (phase === 'disposed' || deps.env.preview || current === null || controlBusy) return;
+    controlEpoch += 1;
     stopControlPoll(); controlBusy = true; reflectPlayback();
     try {
       if (refreshSocietyState) await liveSociety?.refresh();
@@ -1166,6 +1261,7 @@ export function mountEnvironmentSelection(
   ): Promise<void> {
     const control = societyControl;
     if (phase === 'disposed' || control === null || controlBusy) return;
+    controlEpoch += 1;
     stopControlPoll(); controlBusy = true; reflectPlayback();
     try {
       societyControl = await controlClient.configure(
@@ -1185,6 +1281,7 @@ export function mountEnvironmentSelection(
     const snapshot = liveSociety?.view.snapshot;
     if (phase === 'disposed' || control === null || snapshot === null || snapshot === undefined
       || controlBusy || control.mode !== 'paused') return;
+    controlEpoch += 1;
     stopControlPoll(); controlBusy = true; reflectPlayback();
     try {
       if (savedWorld === null && !await refreshDistrict()) {
@@ -1297,7 +1394,9 @@ export function mountEnvironmentSelection(
   async function afterAuthoredEdit(versionId: string): Promise<void> {
     if (savedWorld !== null) {
       if (phase === 'disposed' || versionId !== savedWorld.versionId || !liveSociety) return;
+      const before = new Map((savedObjects() ?? []).map((object) => [object.objectId, object]));
       await readSavedVersion();
+      noticeChangedObject(before);
       await liveSociety.afterAuthoredEdit();
       renderInhabitantsPanel();
       return;
@@ -1362,10 +1461,17 @@ export function mountEnvironmentSelection(
       delete canvas.dataset.societyRendered;
       delete canvas.dataset.societyTick;
     } else {
-      // Event and status updates must not restart the interpolation of the same state.
-      if (renderedSnapshot?.stateSha256 !== society.stateSha256 || renderedSnapshot?.societyId !== society.societyId) {
-        runtime.setSociety(society.state, [atlas!.controls.state.x, atlas!.controls.state.z]);
+      // Event and status updates must not restart the interpolation of the same state. A state
+      // that skips minutes waits for its events, which record how people walked them.
+      const skips = renderedSnapshot !== null && renderedSnapshot.societyId === society.societyId
+        && society.currentTick > renderedSnapshot.currentTick + 1;
+      const waitForEvents = skips && !view.eventsAvailable && view.status === 'loading';
+      if (!waitForEvents && (renderedSnapshot?.stateSha256 !== society.stateSha256 || renderedSnapshot?.societyId !== society.societyId)) {
+        drawSavedWorldMinutes(runtime, society, skips && view.eventsAvailable ? view.events : null);
         renderedSnapshot = society;
+        if (noticing !== null && !noticing.noticed && (society.places?.inputSeq ?? 0) > noticing.afterInputSeq) {
+          noticing = { ...noticing, noticed: true };
+        }
       }
       canvas.dataset.societyPopulation = String(society.populationSize);
       canvas.dataset.societyRendered = String(runtime.drawnInhabitantCount);
@@ -1378,6 +1484,35 @@ export function mountEnvironmentSelection(
     reflectNearby();
     reflectPlayback();
     atlas?.invalidate();
+  }
+
+  /**
+   * Hand the crowd a saved world's new state, walked at the host's pace. Minutes the page never
+   * read are walked first where the events record them; the crowd names anyone it could not walk.
+   */
+  function drawSavedWorldMinutes(
+    runtime: NonNullable<NonNullable<SessionState['atlas']>['binding']['authoredSociety']>,
+    next: SocietySnapshot,
+    events: LiveSocietyView['events'] | null,
+  ): void {
+    const control = societyControl;
+    const playing = control?.mode === 'playing' && control.hostPlayback?.running === true;
+    const intervalMs = control?.hostPlayback?.intervalMs ?? control?.tickIntervalMs;
+    const timing = {
+      ...(intervalMs === undefined ? {} : { intervalMs }),
+      // Playing, each minute is learnt of up to one poll and one read late; stepped by hand, at once.
+      startLagMs: playing ? pollDelayMs() + readRoundMs : 0,
+    };
+    const observer = [deps.state.atlas!.binding.controls.state.x, deps.state.atlas!.binding.controls.state.z] as const;
+    const shown = renderedSnapshot?.societyId === next.societyId ? renderedSnapshot.state : null;
+    const unread = shown !== null && events !== null ? unreadMinutes(shown, next.state, events) : [];
+    // One line per person, however many of the minutes moved them: the latest reason stands.
+    const named = new Map<string, MovedWithoutWalking>();
+    for (const minute of [...unread, next.state]) {
+      runtime.setSociety(minute, observer, timing);
+      for (const jump of runtime.societyJumps ?? []) named.set(jump.inhabitantId, jump);
+    }
+    moved = [...named.values()];
   }
 
   async function readSavedVersion(): Promise<void> {
@@ -1411,6 +1546,7 @@ export function mountEnvironmentSelection(
   async function attachSavedWorld(entry: NonNullable<SessionState['activeWorldEntry']>): Promise<void> {
     const scene = entry.authoredScene!;
     savedWorld = { worldId: entry.worldId, versionId: entry.authoredVersionId, regionId: scene.region.regionId };
+    pointToPeopleNearby();
     root.dataset['state'] = 'ready';
     workspace.setAvailability(true);
     const heading = workspace.nearby.firstElementChild;

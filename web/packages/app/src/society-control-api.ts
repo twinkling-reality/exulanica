@@ -12,7 +12,21 @@ import { parseSociety, type SocietySnapshot } from './society-api.js';
 import { openWorldPath } from './world-scope.js';
 
 export type SocietyPlaybackMode = 'paused' | 'playing';
-export type SocietyPlaybackSpeed = 1 | 2 | 4;
+/** The speeds the server accepts (`SPEEDS` in `exulanica/world/society_controls.py`). */
+export const PLAYBACK_SPEEDS = [1, 2, 4] as const;
+export type SocietyPlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
+
+/**
+ * Whether this host plays the world on its own (`host_playback`). `running` means the host's
+ * playback worker is alive and plays this workspace, whatever mode is saved; `intervalMs` is the
+ * real time one simulated minute takes, the host's base interval divided by the speed; `reason` is
+ * the server's own sentence for why it does not play, null while it does.
+ */
+export interface HostPlayback {
+  readonly running: boolean;
+  readonly intervalMs: number;
+  readonly reason: string | null;
+}
 
 export interface SocietyPlaybackControl {
   readonly societyId: string;
@@ -28,6 +42,8 @@ export interface SocietyPlaybackControl {
   readonly reason: string | null;
   readonly playEligible: boolean;
   readonly playIneligibleReason: string | null;
+  /** Whether this host plays the world; null for a server that does not say. */
+  readonly hostPlayback: HostPlayback | null;
 }
 
 const object = (value: unknown): Record<string, unknown> => {
@@ -39,12 +55,28 @@ const object = (value: unknown): Record<string, unknown> => {
 const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 const integer = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 
+const HOST_PLAYBACK_KEYS = ['interval_ms', 'reason', 'running'];
+
+/** The host's statement, exactly: a reason when and only when it does not play. */
+function parseHostPlayback(value: unknown): HostPlayback | null {
+  if (value === undefined) return null;
+  const held = object(value);
+  if (Object.keys(held).sort().join() !== HOST_PLAYBACK_KEYS.join()
+    || typeof held['running'] !== 'boolean' || !integer(held['interval_ms']) || held['interval_ms'] === 0
+    || (held['running'] ? held['reason'] !== null : !text(held['reason']))) {
+    throw new Error('Invalid society playback response');
+  }
+  return Object.freeze({
+    running: held['running'], intervalMs: held['interval_ms'] as number, reason: held['reason'] as string | null,
+  });
+}
+
 export function parseSocietyControl(value: unknown, versionId: string): SocietyPlaybackControl {
   const row = object(value);
   if (row['profile'] !== 'exulanica.society-control/v1' || row['branch_id'] !== versionId
     || !text(row['society_id']) || typeof row['persisted'] !== 'boolean'
     || !integer(row['revision']) || !['paused', 'playing'].includes(String(row['mode']))
-    || ![1, 2, 4].includes(row['speed'] as number) || !integer(row['tick_interval_ms'])
+    || !(PLAYBACK_SPEEDS as readonly unknown[]).includes(row['speed']) || !integer(row['tick_interval_ms'])
     || row['interval_semantics'] !== 'minimum_wait_after_batch_completion'
     || !integer(row['current_tick']) || !text(row['state_sha256'])
     || !/^[0-9a-f]{64}$/.test(row['state_sha256'] as string)
@@ -62,6 +94,7 @@ export function parseSocietyControl(value: unknown, versionId: string): SocietyP
     stateSha256: row['state_sha256'] as string, nextDueAt: row['next_due_at'] as string | null,
     reason: row['reason'] as string | null, playEligible: row['play_eligible'] as boolean,
     playIneligibleReason: row['play_ineligible_reason'] as string | null,
+    hostPlayback: parseHostPlayback(row['host_playback']),
   });
 }
 

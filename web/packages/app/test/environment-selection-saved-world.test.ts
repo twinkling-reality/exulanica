@@ -41,9 +41,12 @@ const society = (tick: number, firstRests = false): SocietySnapshot => parseSoci
   state: { profile: 'exulanica-society/v2', society_id: 'society', branch_id: 'version', tick, input_seq: 1,
     input_sha256: 'b'.repeat(64), inhabitants: Array.from({ length: 100 }, (_, i) => ({
       id: `person-${i}`, synthetic: true, position_mm: [2000, 4000], display_name: `Person ${i}`, role: 'steward',
-      goal: null, route: null, motion_path_mm: [[2000, 4000]],
+      goal: firstRests && i === 0
+        ? { kind: 'rest', target_id: 'authored:version:object-near:rest', reason: 'remembered_target_selected' }
+        : null,
+      route: null, motion_path_mm: [[2000, 4000]],
       action: firstRests && i === 0
-        ? { kind: 'rest', status: 'active', target_id: 'authored:version:object-near:rest', remaining_ticks: 2, reason: 'directed_rest' }
+        ? { kind: 'rest', status: 'active', target_id: 'authored:version:object-near:rest', remaining_ticks: 2, reason: 'arrived_at_access_node' }
         : { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'awaiting_goal' },
       explanation: { summary: firstRests && i === 0 ? 'Person 0 (simulated) rests at the plate.' : `Person ${i} (simulated) waits.`, event_ids: [] } })) },
   places: {
@@ -173,9 +176,18 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     for (let i = 0; i < 6; i += 1) await settle();
     expect(controlClient.step).toHaveBeenCalledTimes(1);
     expect(panel().querySelector('.world-inhabitants-summary')?.textContent).toMatch(/Simulated minute 1\./);
+    // The top says who, what now and why in words, naming the place by the object's title.
+    const inspector = mounted.root.querySelector<HTMLElement>('.living-world-inspector')!;
+    expect(inspector.querySelector('h3')?.textContent).toBe('Person 0');
+    expect(inspector.querySelector('p')?.textContent).toBe(
+      'A simulated steward, invented for this world: not anyone you know, and nothing they do is a memory.');
+    expect(inspector.querySelector('.living-world-activity')?.textContent)
+      .toBe('Resting at Marker plate 1, 2 more simulated minutes. Because you asked them to go there.');
+    // The recorded explanation and how the person is drawn stay below, in the details.
+    const details = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
+    expect(details).toContainEqual(['Recorded explanation', 'Person 0 (simulated) rests at the plate.']);
     // Resting is what the simulation says; a catalog person sits on the ground in front of the place.
-    expect(mounted.root.querySelector('.living-world-activity')?.textContent)
-      .toBe('Person 0 (simulated) rests at the plate. Drawn sitting on the ground in front of the place.');
+    expect(details).toContainEqual(['Drawn as', 'Sitting on the ground in front of the place.']);
     mounted.dispose();
   });
 });

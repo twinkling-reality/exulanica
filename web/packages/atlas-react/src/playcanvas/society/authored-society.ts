@@ -1,7 +1,7 @@
 import * as pc from 'playcanvas';
 import type { NativeCharacterFrame } from '../native-character-runtime.js';
 import { SocietyCrowd, type CrowdCounts } from './crowd.js';
-import type { OwnedSocietyState } from './types.js';
+import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
 
 /**
  * The inhabitants of a saved world, drawn over its authored region.
@@ -33,9 +33,14 @@ export class AuthoredRegionSociety {
   setSociety(
     state: OwnedSocietyState,
     observer?: readonly [number, number],
-    options?: { readonly intervalMs?: number },
+    options?: CrowdTiming,
   ): number {
     return this.crowd.set(state, observer, options).drawn;
+  }
+
+  /** Everyone the latest snapshot moved without walking, and why (`SocietyCrowd.jumps`). */
+  get societyJumps(): readonly CrowdJump[] {
+    return this.crowd.jumps;
   }
 
   /** Release the population without inventing an authoritative snapshot. */
