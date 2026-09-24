@@ -49,8 +49,10 @@ The pure engine and PostgreSQL lifecycle have synthetic fixture coverage. The co
 personal-world demonstration additionally needs the server composition/rights adapter, accepted
 authored edits, shared selection, renderer presentation and grounded Companion integration.
 A fixture establishes mechanics, not personal relevance or visual acceptance. Default operation
-remains manual. A separately hosted, explicitly enabled playback worker can advance a saved
-playing v2/v3 society under the bounded lease policy below; persistence alone starts no worker.
+remains manual. A host can make the API's playback worker advance a saved playing society whose
+engine the table below lets it play, for the workspaces its environment lists or, with accounts,
+for every account-owned workspace, under the bounded lease policy below; persistence alone starts
+no worker.
 
 Implementation:
 
@@ -820,12 +822,12 @@ Playback is separate from engine versions and deterministic simulation time. Mig
 forced row-level security. It depends on the existing society tables and workspace guards, not
 migration 0058's account tables. No stored v1/v2/v3 states, seeds, input digests or event histories
 are rewritten. A missing control row means virtual paused state, revision 0. Reading, importing a
-module, creating a society or configuring play never starts a worker. The host must register the
-router, supply its existing input authorizer and manage worker startup/shutdown. It can explicitly
-configure a fixed workspace allowlist, or opt into fresh discovery of active account-owned
-workspaces through the isolated account role. Account-wide discovery is off by default and refuses
-startup without configured accounts and the reviewed current-input runtime. There are no model
-calls in the worker.
+module, creating a society or configuring play never starts a worker. The API starts one when its
+environment lists workspaces (`EXULANICA_SOCIETY_CONTROL_WORKSPACES`, a JSON array of workspace
+ids) or opts into fresh discovery of active account-owned workspaces through the isolated account
+role (`EXULANICA_SOCIETY_CONTROL_WORKER`); `docs/deployment.md` lists the settings and their
+refusals. Account-wide discovery is off by default and refuses startup without configured
+accounts and the reviewed current-input runtime. There are no model calls in the worker.
 
 The authenticated base route is `/world/versions/{version_id}/society/control`:
 
@@ -839,6 +841,13 @@ The authenticated base route is `/world/versions/{version_id}/society/control`:
   final receipt commit and polling overhead, and is not an end-to-end delivery-rate promise.
   `play_eligible` and `play_ineligible_reason` describe engine eligibility only;
   current source authority is checked when configuring play and executing a batch.
+  `host_playback` is `{running, interval_ms, reason}`: `running` is true when this instance's
+  worker thread is alive and its last workspace snapshot names this workspace, whatever the saved
+  mode, so a paused world reads true when Play would advance it; `interval_ms` is the saved base
+  divided by the speed while playing and the host's current base divided by the speed while
+  paused, which is what Play adopts; `reason` is null while running and otherwise one of the
+  sentences in `HOST_PLAYBACK_REFUSALS` (`exulanica/api/society_control_worker.py`). The `PUT`
+  answer and the `control` inside a step answer carry it too.
 - `PUT` accepts only `{base_revision, mode: "playing" | "paused", speed: 1 | 2 | 4}`. Successful
   configuration increments the control revision and cancels any pending claim. Stale revision
   returns 409. Unknown/foreign branches are indistinguishable 404s. Invalid input types are 422;
@@ -862,9 +871,11 @@ simulation compare-and-swap operation and workspace edit lock, serializing autho
 manual or model-decision reservations through the existing domain boundary.
 
 Speed is a playback multiplier, never a real-time claim: a simulated tick still represents 60
-simulated seconds. The host default base wait is 1,000 ms; 1x/2x/4x request minimum waits of
-1,000/500/250 ms after batch completion. Computation, polling and contention add time. The host
-may configure a base of 1,000–60,000 whole milliseconds divisible by four. Each configuration
+simulated seconds. The host default base wait is 8,000 ms; 1x/2x/4x request minimum waits of
+8,000/4,000/2,000 ms after batch completion. Computation, polling and contention add time. The
+default is measured (`docs/evaluation/2026-09-24-living-world-pace.json`): at it a median walking
+minute shows as 1.26 m/s at 1x. The host may configure a base of 1,000 to 60,000 whole
+milliseconds divisible by four with `EXULANICA_SOCIETY_TICK_INTERVAL_MS`. Each configuration
 receipt retains the chosen base; changing deployment defaults does not silently rewrite saved
 controls. A subsequent user configuration adopts the host's current base. Renderers may interpolate
 between committed positions, but must not fabricate future goals, actions or positions as evidence.

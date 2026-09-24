@@ -39,6 +39,7 @@ from fastapi.routing import APIRoute
 from exulanica.api.dependencies import readonly_connection, scoped_connection
 from exulanica.api.permissions import Authentication, Public, Requires, rule_for
 from exulanica.api.routes import mounted_routes
+from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS
 
 __all__ = [
     "DATABASE_ROLES",
@@ -70,7 +71,9 @@ def routing_only_application() -> FastAPI:
     from exulanica.api.app import create_app
 
     services = SimpleNamespace(
-        society_decision_provider=None, society_base_tick_interval_ms=1000, society_runtime=None
+        society_decision_provider=None,
+        society_base_tick_interval_ms=DEFAULT_BASE_TICK_INTERVAL_MS,
+        society_runtime=None,
     )
     return create_app(services, verify=False)  # type: ignore[arg-type]
 

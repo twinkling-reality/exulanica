@@ -64,6 +64,13 @@ from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores, tile_store
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society_composition import REVIEWED_REACH_MM, reviewed_affordance_registry
+from exulanica.world.society_controls import (
+    BASE_TICK_INTERVAL_DIVISOR,
+    BASE_TICK_INTERVAL_MAX_MS,
+    BASE_TICK_INTERVAL_MIN_MS,
+    DEFAULT_BASE_TICK_INTERVAL_MS,
+    validate_settings,
+)
 from exulanica.world.texture_assets import load_material_catalog
 
 if TYPE_CHECKING:
@@ -76,7 +83,10 @@ __all__ = [
     "READONLY_DATABASE_URL_ENV",
     "SOCIETY_AUTHORED_WORLDS_ENV",
     "SOCIETY_CONTROL_WORKER_ENV",
+    "SOCIETY_CONTROL_WORKSPACES_ENV",
+    "SOCIETY_TICK_INTERVAL_MS_ENV",
     "Services",
+    "SocietySettingRefused",
     "build_services",
 ]
 
@@ -95,6 +105,38 @@ DERIVATIVE_WORKER_ENV: Final = env_name("DERIVATIVE_WORKER")
 #: Account-wide society playback remains off unless the host opts in. Static
 #: ``society_control_workspaces`` remain an independent, narrower enablement path.
 SOCIETY_CONTROL_WORKER_ENV: Final = env_name("SOCIETY_CONTROL_WORKER")
+
+#: A JSON array of workspace ids whose playing societies this instance advances, with no
+#: accounts. Absent or ``[]`` plays none. Independent of the account-wide switch above.
+SOCIETY_CONTROL_WORKSPACES_ENV: Final = env_name("SOCIETY_CONTROL_WORKSPACES")
+
+#: The base wait between simulated minutes, in whole milliseconds, within the bounds
+#: ``exulanica.world.society_controls`` declares. Absent means its declared default.
+SOCIETY_TICK_INTERVAL_MS_ENV: Final = env_name("SOCIETY_TICK_INTERVAL_MS")
+
+#: Every way a society setting is refused at startup, by the name the refusal carries.
+SOCIETY_SETTING_REFUSALS: Final = {
+    "society_control_worker_not_boolean": "must be an explicit boolean",
+    "society_control_workspaces_not_json": "must be a JSON array of workspace ids",
+    "society_control_workspaces_not_array": "must be a JSON array of workspace ids",
+    "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
+    "society_control_workspaces_duplicate": "names a workspace more than once",
+    "society_tick_interval_not_integer": "must be a whole number of milliseconds",
+    "society_tick_interval_out_of_bounds": (
+        f"must be {BASE_TICK_INTERVAL_MIN_MS} to {BASE_TICK_INTERVAL_MAX_MS} milliseconds and "
+        f"divisible by {BASE_TICK_INTERVAL_DIVISOR}, so every speed divides it exactly"
+    ),
+}
+
+
+class SocietySettingRefused(ValueError):
+    """A society setting in the environment that startup refuses, named by ``code``."""
+
+    def __init__(self, code: str, variable: str) -> None:
+        super().__init__(f"{code}: {variable} {SOCIETY_SETTING_REFUSALS[code]}")
+        self.code = code
+        self.variable = variable
+
 
 #: A JSON file of host registrations for saved worlds, each naming the place its society binds.
 #: Optional: a person can bring inhabitants into a saved world of their own without one, and the
@@ -146,10 +188,12 @@ class Services:
     #: Dedicated account persistence and verified Google browser sessions, when configured.
     accounts: AccountRuntime | None = None
     #: Explicit host allowlist. Empty leaves automatic society playback disabled.
+    #: ``build_services`` reads it from ``EXULANICA_SOCIETY_CONTROL_WORKSPACES``.
     society_control_workspaces: tuple[uuid.UUID, ...] = ()
     #: Explicit host opt-in to discover all currently active account-owned workspaces.
     runs_society_control_worker: bool = False
-    society_base_tick_interval_ms: int = 1000
+    #: ``build_services`` reads it from ``EXULANICA_SOCIETY_TICK_INTERVAL_MS``.
+    society_base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS
     #: The place-name right's resolver, asked by every workspace policy this instance attaches
     #: whether a confirmed place's name may go to a hand-over. ``build_services`` injects the
     #: right's own (``exulanica.consent.place_name_rights``); the one that releases nothing is
@@ -270,8 +314,9 @@ class Services:
             notes.append(
                 "a person can bring inhabitants into a saved world of their own, and nothing "
                 "else does: no world holds a society until its owner asks for one. "
-                f"{SOCIETY_CONTROL_WORKER_ENV} is off, so a society advances only when "
-                "somebody advances it, one simulated minute at a time."
+                f"{SOCIETY_CONTROL_WORKER_ENV} is off and {SOCIETY_CONTROL_WORKSPACES_ENV} names "
+                "no workspace, so a society advances only when somebody advances it, one "
+                "simulated minute at a time."
             )
         if self.runs_derivative_worker:
             notes.append(
@@ -377,6 +422,12 @@ def build_services(
         society_runtime=_society_runtime(store, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
+        society_control_workspaces=_society_control_workspaces(
+            env_get("SOCIETY_CONTROL_WORKSPACES", environ)
+        ),
+        society_base_tick_interval_ms=_society_tick_interval_ms(
+            env_get("SOCIETY_TICK_INTERVAL_MS", environ)
+        ),
         restore_state_path=(
             Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
         ),
@@ -481,7 +532,65 @@ def _explicitly_enabled(value: str | None) -> bool:
         return False
     if normalized in ("1", "true", "on", "yes"):
         return True
-    raise ValueError(f"{SOCIETY_CONTROL_WORKER_ENV} must be an explicit boolean")
+    raise SocietySettingRefused("society_control_worker_not_boolean", SOCIETY_CONTROL_WORKER_ENV)
+
+
+def _society_control_workspaces(value: str | None) -> tuple[uuid.UUID, ...]:
+    """The workspaces this instance plays without accounts, or a named refusal.
+
+    Absence plays none. Anything present must be exactly a JSON array of distinct workspace ids:
+    an instance that half-read a list it was given would play some worlds and silently not others.
+    """
+    if value is None or not value.strip():
+        return ()
+    try:
+        document = json.loads(value)
+    except json.JSONDecodeError:
+        raise SocietySettingRefused(
+            "society_control_workspaces_not_json", SOCIETY_CONTROL_WORKSPACES_ENV
+        ) from None
+    if not isinstance(document, list):
+        raise SocietySettingRefused(
+            "society_control_workspaces_not_array", SOCIETY_CONTROL_WORKSPACES_ENV
+        )
+    workspaces: list[uuid.UUID] = []
+    for entry in document:
+        try:
+            if not isinstance(entry, str):
+                raise ValueError(entry)
+            workspaces.append(uuid.UUID(entry))
+        except ValueError:
+            raise SocietySettingRefused(
+                "society_control_workspaces_not_uuid", SOCIETY_CONTROL_WORKSPACES_ENV
+            ) from None
+    if len(set(workspaces)) != len(workspaces):
+        raise SocietySettingRefused(
+            "society_control_workspaces_duplicate", SOCIETY_CONTROL_WORKSPACES_ENV
+        )
+    return tuple(workspaces)
+
+
+def _society_tick_interval_ms(value: str | None) -> int:
+    """The host's base wait between simulated minutes, or a named refusal.
+
+    Absence is the declared default. The bounds are the playback module's own, asked rather than
+    restated, so a control saved under this base is one that module accepts.
+    """
+    if value is None or not value.strip():
+        return DEFAULT_BASE_TICK_INTERVAL_MS
+    text = value.strip()
+    if not text.isascii() or not text.isdigit():
+        raise SocietySettingRefused(
+            "society_tick_interval_not_integer", SOCIETY_TICK_INTERVAL_MS_ENV
+        )
+    interval = int(text)
+    try:
+        validate_settings("paused", 1, interval)
+    except ValueError:
+        raise SocietySettingRefused(
+            "society_tick_interval_out_of_bounds", SOCIETY_TICK_INTERVAL_MS_ENV
+        ) from None
+    return interval
 
 
 def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -493,6 +602,8 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         DATA_DIR_ENV,
         DERIVATIVE_WORKER_ENV,
         SOCIETY_CONTROL_WORKER_ENV,
+        SOCIETY_CONTROL_WORKSPACES_ENV,
+        SOCIETY_TICK_INTERVAL_MS_ENV,
         API_TOKENS_ENV,
         "NEBIUS_API_KEY",
         "EXULANICA_GOOGLE_CLIENT_ID",

@@ -8,6 +8,7 @@ from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
 from exulanica.db.roles import provision_runtime_role
+from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS
 from fastapi.testclient import TestClient
 
 from conftest import scratch_role_database
@@ -88,7 +89,7 @@ def test_authenticated_controls_reload_cas_and_manual_step(runtime_world, contro
     saved = api.client.put(path, headers=api.headers, json=body)
     assert saved.status_code == 200, saved.text
     assert api.get(path).json() == saved.json()
-    assert saved.json()["tick_interval_ms"] == 500
+    assert saved.json()["tick_interval_ms"] == DEFAULT_BASE_TICK_INTERVAL_MS // 2
     assert api.client.put(path, headers=api.headers, json=body).status_code == 409
     step = dict(base_revision=1, base_tick=0, base_state_sha256=before["state_sha256"])
     assert api.post(steps, step).json()["detail"] == "pause_before_manual_step"

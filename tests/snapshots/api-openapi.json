@@ -2059,7 +2059,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "title": "Response Read Control World Versions  Version Id  Society Control Get"
+         "$ref": "#/components/schemas/ControlRead"
         }
        }
       }
@@ -2137,7 +2137,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "title": "Response Configure Control World Versions  Version Id  Society Control Put"
+         "$ref": "#/components/schemas/ControlRead"
         }
        }
       }
@@ -14011,6 +14011,165 @@
     ],
     "title": "ContentView"
    },
+   "ControlRead": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.society-control/v1",
+      "title": "Profile"
+     },
+     "society_id": {
+      "type": "string",
+      "title": "Society Id"
+     },
+     "branch_id": {
+      "type": "string",
+      "title": "Branch Id"
+     },
+     "persisted": {
+      "type": "boolean",
+      "title": "Persisted"
+     },
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "mode": {
+      "type": "string",
+      "enum": [
+       "playing",
+       "paused"
+      ],
+      "title": "Mode"
+     },
+     "speed": {
+      "type": "integer",
+      "title": "Speed"
+     },
+     "base_tick_interval_ms": {
+      "type": "integer",
+      "title": "Base Tick Interval Ms"
+     },
+     "tick_interval_ms": {
+      "type": "integer",
+      "title": "Tick Interval Ms"
+     },
+     "interval_semantics": {
+      "type": "string",
+      "const": "minimum_wait_after_batch_completion",
+      "title": "Interval Semantics"
+     },
+     "last_batch_execution": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LastBatchExecution"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "simulated_seconds_per_tick": {
+      "type": "integer",
+      "title": "Simulated Seconds Per Tick"
+     },
+     "max_catchup_ticks": {
+      "type": "integer",
+      "title": "Max Catchup Ticks"
+     },
+     "next_due_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Due At"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "lease_expires_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lease Expires At"
+     },
+     "last_event_seq": {
+      "type": "integer",
+      "title": "Last Event Seq"
+     },
+     "current_tick": {
+      "type": "integer",
+      "title": "Current Tick"
+     },
+     "state_sha256": {
+      "type": "string",
+      "title": "State Sha256"
+     },
+     "play_ineligible_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Play Ineligible Reason"
+     },
+     "play_eligible": {
+      "type": "boolean",
+      "title": "Play Eligible"
+     },
+     "host_playback": {
+      "$ref": "#/components/schemas/HostPlayback"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "society_id",
+     "branch_id",
+     "persisted",
+     "revision",
+     "mode",
+     "speed",
+     "base_tick_interval_ms",
+     "tick_interval_ms",
+     "interval_semantics",
+     "last_batch_execution",
+     "simulated_seconds_per_tick",
+     "max_catchup_ticks",
+     "next_due_at",
+     "reason",
+     "lease_expires_at",
+     "last_event_seq",
+     "current_tick",
+     "state_sha256",
+     "play_ineligible_reason",
+     "play_eligible",
+     "host_playback"
+    ],
+    "title": "ControlRead",
+    "description": "``exulanica.society-control/v1`` as the routes return it. Undeclared keys fail loudly."
+   },
    "CorrectionBody": {
     "properties": {
      "answer_text": {
@@ -16071,6 +16230,38 @@
     ],
     "title": "HistoryRow"
    },
+   "HostPlayback": {
+    "properties": {
+     "running": {
+      "type": "boolean",
+      "title": "Running"
+     },
+     "interval_ms": {
+      "type": "integer",
+      "title": "Interval Ms"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "running",
+     "interval_ms",
+     "reason"
+    ],
+    "title": "HostPlayback",
+    "description": "Whether this host advances this world on its own, and how often it would."
+   },
    "IntakeAccepted": {
     "properties": {
      "batch_id": {
@@ -16918,6 +17109,40 @@
     "title": "InvalidPair"
    },
    "JsonValue": {},
+   "LastBatchExecution": {
+    "properties": {
+     "event_seq": {
+      "type": "integer",
+      "title": "Event Seq"
+     },
+     "receipt_sha256": {
+      "type": "string",
+      "title": "Receipt Sha256"
+     },
+     "executed_ticks": {
+      "type": "integer",
+      "title": "Executed Ticks"
+     },
+     "execution_duration_ms": {
+      "type": "integer",
+      "title": "Execution Duration Ms"
+     },
+     "completed_at": {
+      "type": "string",
+      "title": "Completed At"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "event_seq",
+     "receipt_sha256",
+     "executed_ticks",
+     "execution_duration_ms",
+     "completed_at"
+    ],
+    "title": "LastBatchExecution"
+   },
    "LinkRequest": {
     "properties": {
      "occurrence_id": {

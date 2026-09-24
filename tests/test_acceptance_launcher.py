@@ -88,6 +88,9 @@ def test_up_parses_every_flag_and_defaults_to_slot_zero_without_them():
             "--model",
             "--no-derivative-worker",
             "--production",
+            "--society-playback",
+            "--society-tick-interval-ms",
+            "8000",
         ]
     )
 
@@ -98,6 +101,8 @@ def test_up_parses_every_flag_and_defaults_to_slot_zero_without_them():
         False,
     )
     assert plain.no_derivative_worker is False
+    assert (plain.society_playback, plain.society_tick_interval_ms) == (False, None)
+    assert (full.society_playback, full.society_tick_interval_ms) == (True, 8000)
     assert (full.slot, full.reuse_database, full.model, full.production) == (3, True, True, True)
     assert full.no_derivative_worker is True
 
@@ -311,7 +316,9 @@ def test_the_development_server_alone_carries_the_synthetic_token(tmp_path):
     ]
 
 
-def _api_environment(model: bool, environ: dict[str, str]) -> dict[str, str]:
+def _api_environment(
+    model: bool, environ: dict[str, str], society_playback: dict[str, str] | None = None
+) -> dict[str, str]:
     exports = {
         "EXULANICA_DATABASE_URL": "postgresql://exulanica_app@localhost:19200/exulanica",
         "EXULANICA_READONLY_DATABASE_URL": "postgresql://exulanica_ro@localhost:19200/exulanica",
@@ -323,6 +330,7 @@ def _api_environment(model: bool, environ: dict[str, str]) -> dict[str, str]:
         data_dir=Path("run/data"),
         model=model,
         derivative_worker=False,
+        society_playback=society_playback or {},
         environ=environ,
     )
 
@@ -346,6 +354,80 @@ def test_the_api_gets_the_model_and_its_bound_only_with_model():
         assert environment["EXULANICA_DATA_DIR"] == "run/data"
         assert environment["EXULANICA_DERIVATIVE_WORKER"] == "off"
         assert json.loads(environment["EXULANICA_API_TOKENS"]) == {"token": {"permissions": []}}
+
+
+_SOCIETY_VARIABLES = ("EXULANICA_SOCIETY_CONTROL_WORKSPACES", "EXULANICA_SOCIETY_TICK_INTERVAL_MS")
+
+
+def test_society_playback_is_off_unless_asked_and_then_plays_the_runs_workspace_alone():
+    # Settings in the caller's shell never reach the API: only the flag turns playback on.
+    shell = {
+        "EXULANICA_SOCIETY_CONTROL_WORKSPACES": '["00000000-0000-0000-0000-000000000001"]',
+        "EXULANICA_SOCIETY_TICK_INTERVAL_MS": "4000",
+        "EXULANICA_SOCIETY_CONTROL_WORKER": "on",
+    }
+    off = _api_environment(False, shell, LAUNCH.society_playback_environment(None, None))
+    assert not [name for name in off if name.startswith("EXULANICA_SOCIETY_")]
+
+    workspace = "11111111-2222-3333-4444-555555555555"
+    listed = LAUNCH.society_playback_environment(workspace, None)
+    at_default = _api_environment(False, shell, listed)
+    assert json.loads(at_default["EXULANICA_SOCIETY_CONTROL_WORKSPACES"]) == [workspace]
+    assert "EXULANICA_SOCIETY_TICK_INTERVAL_MS" not in at_default
+    assert "EXULANICA_SOCIETY_CONTROL_WORKER" not in at_default
+
+    stated = _api_environment(False, {}, LAUNCH.society_playback_environment(workspace, 8000))
+    assert {name: stated[name] for name in _SOCIETY_VARIABLES} == {
+        "EXULANICA_SOCIETY_CONTROL_WORKSPACES": json.dumps([workspace]),
+        "EXULANICA_SOCIETY_TICK_INTERVAL_MS": "8000",
+    }
+
+
+def test_an_interval_without_playback_is_refused_before_anything_starts(tmp_path, temporary):
+    assert (
+        _refusal(LAUNCH.society_playback_environment, None, 8000)
+        == "society-interval-without-playback"
+    )
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(
+        ["up", "--worktree", str(worktree), "--society-tick-interval-ms", "8000"]
+    )
+    assert _refusal(LAUNCH.up, arguments) == "society-interval-without-playback"
+    assert not list(temporary.iterdir())
+
+
+def _readyz(**check) -> bytes:
+    return json.dumps({"ok": True, "checks": {"society_playback": check}}).encode()
+
+
+def test_a_playback_run_needs_readiness_to_report_its_one_workspace_played():
+    played = {
+        "ok": True,
+        "configured": True,
+        "running": True,
+        "base_tick_interval_ms": 8000,
+        "listed_workspaces": 1,
+        "account_discovery": False,
+    }
+    assert LAUNCH.society_playback_readiness(_readyz(**played)) == played
+    for wrong in (
+        {**played, "running": False},
+        {**played, "listed_workspaces": 0},
+        {**played, "listed_workspaces": 2},
+        {**played, "account_discovery": True},
+        {"ok": True, "configured": False, "running": False},
+    ):
+        assert (
+            _refusal(LAUNCH.society_playback_readiness, _readyz(**wrong))
+            == "society-playback-not-running"
+        )
+    assert (
+        _refusal(LAUNCH.society_playback_readiness, b"not json") == "society-playback-not-running"
+    )
+    assert (
+        _refusal(LAUNCH.society_playback_readiness, b'{"checks": {}}')
+        == "society-playback-not-running"
+    )
 
 
 # -- what the launcher states --------------------------------------------------------------------

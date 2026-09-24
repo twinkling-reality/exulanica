@@ -11,7 +11,7 @@ import pytest
 from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.world.society import StaleSocietyState, UnavailableSocietyInput, UnknownSociety
 from exulanica.world.society_control_repository import SocietyControlRepository
-from exulanica.world.society_controls import LeaseLost
+from exulanica.world.society_controls import BASE_TICK_INTERVAL_MIN_MS, LeaseLost
 from psycopg.errors import CheckViolation
 
 import test_society_runtime as helpers
@@ -20,6 +20,11 @@ from tests_support_api import scratch_database
 
 runtime_world = helpers.runtime_world
 pytestmark = pytest.mark.postgres
+
+
+#: The base every control here is saved under: the fastest a host may state, so that a control
+#: made a few seconds overdue owes more minutes than one batch may run.
+BASE_MS = BASE_TICK_INTERVAL_MIN_MS
 
 
 def authorizer(w, connection):
@@ -34,6 +39,7 @@ def controls(w, connection=None):
         connection,
         w["workspace"],
         world_id=w["version"].world_id,
+        base_tick_interval_ms=BASE_MS,
         input_authorizer=authorizer(w, connection),
     )
 
@@ -42,7 +48,10 @@ def take_claim(w, connection=None):
     """The workspace's next due claim, whichever world holds it, with ``controls``' authority."""
     connection = connection or w["connection"]
     return SocietyControlRepository.claim_in_workspace(
-        connection, w["workspace"], input_authorizer=authorizer(w, connection)
+        connection,
+        w["workspace"],
+        input_authorizer=authorizer(w, connection),
+        base_tick_interval_ms=BASE_MS,
     )
 
 
@@ -102,11 +111,15 @@ def test_saved_controls_bounded_worker_local_failure_and_replay(
     assert default["revision"] == 0 and not default["persisted"] and default["mode"] == "paused"
     assert take_claim(w) is None
     settings = save(w, speed=4)
-    assert settings["tick_interval_ms"] == 250 and settings["simulated_seconds_per_tick"] == 60
+    assert settings["tick_interval_ms"] == BASE_MS // 4
+    assert settings["simulated_seconds_per_tick"] == 60
     add_far(w)  # One unsupported destination must not pause a healthy district.
     overdue(w)
     worker = SocietyControlWorker(
-        scratch_database(spine_schema[1]), runtime=w["runtime"], workspaces=[w["workspace"]]
+        scratch_database(spine_schema[1]),
+        runtime=w["runtime"],
+        workspaces=[w["workspace"]],
+        base_tick_interval_ms=BASE_MS,
     )
     result = worker.run_once(w["workspace"])
     receipt = result["receipt"]
@@ -330,7 +343,10 @@ def test_recorded_control_cadence_measurement(runtime_world, spine_schema):
     create(w)
     save(w)
     worker = SocietyControlWorker(
-        scratch_database(spine_schema[1]), runtime=w["runtime"], workspaces=[w["workspace"]]
+        scratch_database(spine_schema[1]),
+        runtime=w["runtime"],
+        workspaces=[w["workspace"]],
+        base_tick_interval_ms=BASE_MS,
     )
     samples = []
     for _ in range(12):

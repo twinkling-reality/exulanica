@@ -140,6 +140,11 @@ def _account_check(services: Services) -> dict[str, Any]:
 
 
 def _society_check(request: Request, services: Services) -> dict[str, Any]:
+    """Whether the playback worker runs, at what base wait, and for how many workspaces.
+
+    A count and never the ids: readiness is unauthenticated, and which workspaces a host plays
+    is a fact about those workspaces.
+    """
     if not services.society_control_enabled:
         return {"ok": True, "configured": False, "running": False}
     thread = getattr(request.app.state, "society_control_thread", None)
@@ -151,6 +156,9 @@ def _society_check(request: Request, services: Services) -> dict[str, Any]:
         "configured": True,
         "running": running,
         **health,
+        "base_tick_interval_ms": services.society_base_tick_interval_ms,
+        "listed_workspaces": len(services.society_control_workspaces),
+        "account_discovery": services.runs_society_control_worker,
         "proves": "worker liveness and last round status; no promised simulation delivery rate",
     }
 

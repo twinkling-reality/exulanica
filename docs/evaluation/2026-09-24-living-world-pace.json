@@ -1,0 +1,702 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifacts": {
+      "directory": "docs/evaluation/artifacts/2026-09-24-living-world-pace",
+      "files": [
+        {
+          "byte_size": 31724,
+          "is": "this script as it ran; copy it to a .py name to run it",
+          "path": "docs/evaluation/artifacts/2026-09-24-living-world-pace/measure_living_world_pace.py.txt",
+          "sha256": "331b33a98d0d788bd3dc16a4d167f69b679f06253fb875f0a61019d324137c36"
+        },
+        {
+          "byte_size": 202675,
+          "is": "each world's per-minute walking, using and standing counts and the length of every walking minute, keyed objects/seed, as canonical JSON",
+          "path": "docs/evaluation/artifacts/2026-09-24-living-world-pace/series.json",
+          "sha256": "e74dd59b02f904283c5d25ca812bce3386fb73499dcf9a1ff29bca4e5afeccca"
+        }
+      ]
+    },
+    "how_to_rerun": "uv run python scripts/measure_living_world_pace.py --write",
+    "inputs": {
+      "declared_default_base_ms": 8000,
+      "new_object_asset": "cc0.marker-cube",
+      "new_object_at_tick": 60,
+      "new_object_radius_mm": 9000,
+      "object_counts": [
+        4,
+        8
+      ],
+      "population": 8,
+      "profile": "exulanica-society/v2",
+      "ring_radius_mm": 6000,
+      "seeds": [
+        "7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+        "e373bfb343fb9252b49bd363a000b9ab720b0c35c9168b2583374cfdd20355c9",
+        "904c813de96626ff61a947da370c5fdc287be51955e1688eb8b152df8f1bc454",
+        "595686aba032b63fe81c9d437612d12f4a4e9f37f9166ff4c7ddd4bdacc3c26b",
+        "12728396fe786bbb9ce9079d83ad49fe028b2a1914847fde1a2edceb26223789",
+        "e939242707f6837166c56686e94297104c07a9a356615f41680a03dd4f42c540",
+        "f52e92ea2b596c68c26fb52cc83a7e9b70bff8dd1396175ccf63def712f7cc81",
+        "4aba960e49928b0e69869f6055cc01acadc5d2a1e48916d9774b669bc19b682d",
+        "8872c62a1278905fc8041225f3425994c8ee81d04b0c9ae60fcba3e2fd3e6c6f",
+        "33ebdd4fbb7ecdd85c913ce261d190711c57f6442adec990e1831e95f572a773",
+        "c51f86893e76cabfc4999f2b8d6c9af4a1483a1e6068b75fd6fb5f77032cc456",
+        "7bc43c3257781c0e89440b507b7e997c335aa08f8e099a95a5d59eb8a77126c4"
+      ],
+      "ticks": 120,
+      "use_kinds": [
+        "rest",
+        "visit"
+      ],
+      "worker_bases_ms": [
+        1000,
+        4000,
+        8000
+      ],
+      "worker_ticks": 30
+    },
+    "measured": {
+      "later_object": {
+        "4": {
+          "asset_key": "cc0.marker-cube",
+          "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+          "object_id": "object:placed-later",
+          "x_mm": 6364,
+          "yaw_microradians": 3926991,
+          "z_mm": 6364
+        },
+        "8": {
+          "asset_key": "cc0.marker-cube",
+          "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+          "object_id": "object:placed-later",
+          "x_mm": 8315,
+          "yaw_microradians": 3534292,
+          "z_mm": 3444
+        }
+      },
+      "layout": {
+        "4": [
+          {
+            "asset_key": "cc0.marker-cube",
+            "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "object_id": "object:01",
+            "x_mm": 6000,
+            "yaw_microradians": 3141593,
+            "z_mm": 0
+          },
+          {
+            "asset_key": "cc0.marker-pillar",
+            "asset_sha256": "b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737",
+            "object_id": "object:02",
+            "x_mm": 0,
+            "yaw_microradians": 4712389,
+            "z_mm": 6000
+          },
+          {
+            "asset_key": "cc0.marker-plate",
+            "asset_sha256": "19425a058c19d4009392093e770c7f115a68d020b67e0bdce83abdad4b5a2f6e",
+            "object_id": "object:03",
+            "x_mm": -6000,
+            "yaw_microradians": 0,
+            "z_mm": 0
+          },
+          {
+            "asset_key": "cc0.marker-cube",
+            "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "object_id": "object:04",
+            "x_mm": 0,
+            "yaw_microradians": 1570796,
+            "z_mm": -6000
+          }
+        ],
+        "8": [
+          {
+            "asset_key": "cc0.marker-cube",
+            "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "object_id": "object:01",
+            "x_mm": 6000,
+            "yaw_microradians": 3141593,
+            "z_mm": 0
+          },
+          {
+            "asset_key": "cc0.marker-pillar",
+            "asset_sha256": "b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737",
+            "object_id": "object:02",
+            "x_mm": 4243,
+            "yaw_microradians": 3926991,
+            "z_mm": 4243
+          },
+          {
+            "asset_key": "cc0.marker-plate",
+            "asset_sha256": "19425a058c19d4009392093e770c7f115a68d020b67e0bdce83abdad4b5a2f6e",
+            "object_id": "object:03",
+            "x_mm": 0,
+            "yaw_microradians": 4712389,
+            "z_mm": 6000
+          },
+          {
+            "asset_key": "cc0.marker-cube",
+            "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "object_id": "object:04",
+            "x_mm": -4243,
+            "yaw_microradians": 5497787,
+            "z_mm": 4243
+          },
+          {
+            "asset_key": "cc0.marker-pillar",
+            "asset_sha256": "b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737",
+            "object_id": "object:05",
+            "x_mm": -6000,
+            "yaw_microradians": 0,
+            "z_mm": 0
+          },
+          {
+            "asset_key": "cc0.marker-plate",
+            "asset_sha256": "19425a058c19d4009392093e770c7f115a68d020b67e0bdce83abdad4b5a2f6e",
+            "object_id": "object:06",
+            "x_mm": -4243,
+            "yaw_microradians": 785398,
+            "z_mm": -4243
+          },
+          {
+            "asset_key": "cc0.marker-cube",
+            "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "object_id": "object:07",
+            "x_mm": 0,
+            "yaw_microradians": 1570796,
+            "z_mm": -6000
+          },
+          {
+            "asset_key": "cc0.marker-pillar",
+            "asset_sha256": "b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737",
+            "object_id": "object:08",
+            "x_mm": 4243,
+            "yaw_microradians": 2356194,
+            "z_mm": -4243
+          }
+        ]
+      },
+      "runs": [
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+          "state_sha256": "4b32d86ba80ecf3fad1dbdb7f841f31b70ea74bc89d4d62497be7d4a0a99cf2a",
+          "wall_seconds_milli": 5795
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "e373bfb343fb9252b49bd363a000b9ab720b0c35c9168b2583374cfdd20355c9",
+          "state_sha256": "daeb0fe886e8418cc57c7cd08275574f3f4c23fd148d94386ab3081f8b46b98f",
+          "wall_seconds_milli": 5869
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "904c813de96626ff61a947da370c5fdc287be51955e1688eb8b152df8f1bc454",
+          "state_sha256": "932cbf0d99c51af559c83da9236cd6c2d06faf792f164cb33a51b91cce0986e2",
+          "wall_seconds_milli": 5885
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "595686aba032b63fe81c9d437612d12f4a4e9f37f9166ff4c7ddd4bdacc3c26b",
+          "state_sha256": "4c26b55dfc3fa016cb122a8688f24781008944f2f1ada0c1160745ee977d32c6",
+          "wall_seconds_milli": 6251
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "12728396fe786bbb9ce9079d83ad49fe028b2a1914847fde1a2edceb26223789",
+          "state_sha256": "09c92776336f8ed67030effa7548eaec8d27070bd25c5d435b0b4549fc6f895a",
+          "wall_seconds_milli": 5735
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "e939242707f6837166c56686e94297104c07a9a356615f41680a03dd4f42c540",
+          "state_sha256": "ed0ae2f0f9b9664a5b5b9f603060b406ce65e12a1c43ac15c70cce9d4da240c8",
+          "wall_seconds_milli": 5650
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "f52e92ea2b596c68c26fb52cc83a7e9b70bff8dd1396175ccf63def712f7cc81",
+          "state_sha256": "796a56ae9b80c87c8e1e5fd1ed4cff3c3e0275166056bc00564f955db82adcf8",
+          "wall_seconds_milli": 5543
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "4aba960e49928b0e69869f6055cc01acadc5d2a1e48916d9774b669bc19b682d",
+          "state_sha256": "3d4635fdb33328f7652eca000f3d309886460e7788672eb58245297b0008b3f4",
+          "wall_seconds_milli": 5669
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "8872c62a1278905fc8041225f3425994c8ee81d04b0c9ae60fcba3e2fd3e6c6f",
+          "state_sha256": "0cc7a70959e2aa0b832f0126a1d6eff0106e420654b4d749a9221d60c9891077",
+          "wall_seconds_milli": 5590
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "33ebdd4fbb7ecdd85c913ce261d190711c57f6442adec990e1831e95f572a773",
+          "state_sha256": "cc0b492fb5365f6f2c98a3fb100f4305a4b85892e081c638c9af3e2ed9596c3d",
+          "wall_seconds_milli": 5993
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "c51f86893e76cabfc4999f2b8d6c9af4a1483a1e6068b75fd6fb5f77032cc456",
+          "state_sha256": "26db98707fe72ec7d0049edd168d8a5957b270668d137c75a562da2df215fc9b",
+          "wall_seconds_milli": 5425
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 4,
+          "seed": "7bc43c3257781c0e89440b507b7e997c335aa08f8e099a95a5d59eb8a77126c4",
+          "state_sha256": "4d0ecb6314c2dff5a3bbc682daa504936aaa72171d23fd0f826550ddc824c668",
+          "wall_seconds_milli": 5404
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+          "state_sha256": "a5a3dc72ad1b36f014125a035e10caaa5f12dc63e81dd3a5622766143701f285",
+          "wall_seconds_milli": 5717
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "e373bfb343fb9252b49bd363a000b9ab720b0c35c9168b2583374cfdd20355c9",
+          "state_sha256": "3c2f37f49e9360326e445e73d6f130f866d041896d4d3631452a338e0cec0692",
+          "wall_seconds_milli": 5942
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "904c813de96626ff61a947da370c5fdc287be51955e1688eb8b152df8f1bc454",
+          "state_sha256": "52395d5b929dff7a880d628f5614aa05314d4cff400a6a7d2e8a19a3bdeda148",
+          "wall_seconds_milli": 5757
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "595686aba032b63fe81c9d437612d12f4a4e9f37f9166ff4c7ddd4bdacc3c26b",
+          "state_sha256": "4cb085c20d562e71b1d1f31a9e4b7fe32e4607b07af699e0cedd19358e44beb0",
+          "wall_seconds_milli": 6524
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "12728396fe786bbb9ce9079d83ad49fe028b2a1914847fde1a2edceb26223789",
+          "state_sha256": "5d85cef209ec9a92e8a9b211fc52ede60aa3a6c8ae7291b540ec34298270a1bf",
+          "wall_seconds_milli": 7471
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "e939242707f6837166c56686e94297104c07a9a356615f41680a03dd4f42c540",
+          "state_sha256": "a35f6a83a3f9eaf779512d9a45fd6f8b50e892d696de1d936c0052299ee6c99d",
+          "wall_seconds_milli": 6840
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "f52e92ea2b596c68c26fb52cc83a7e9b70bff8dd1396175ccf63def712f7cc81",
+          "state_sha256": "5619820933bd3d119801c16ca08d772349331a2c0cbc0d2f55fc13b9842ac1b1",
+          "wall_seconds_milli": 6727
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "4aba960e49928b0e69869f6055cc01acadc5d2a1e48916d9774b669bc19b682d",
+          "state_sha256": "bcfd3c8d6d5f60c9c6bd2bc8cc690d1b81e755c5f6134319483849392aee3bbd",
+          "wall_seconds_milli": 6685
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "8872c62a1278905fc8041225f3425994c8ee81d04b0c9ae60fcba3e2fd3e6c6f",
+          "state_sha256": "b2a8d5a9d5e46aaa5ccf818347a1fc38b7cbc6a3d77983c2cc47920636ad78f0",
+          "wall_seconds_milli": 6686
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "33ebdd4fbb7ecdd85c913ce261d190711c57f6442adec990e1831e95f572a773",
+          "state_sha256": "4ad8dbe42479dd11ba295ae939ffd34a687d90518060ae52374e23508cf23f3b",
+          "wall_seconds_milli": 7615
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "c51f86893e76cabfc4999f2b8d6c9af4a1483a1e6068b75fd6fb5f77032cc456",
+          "state_sha256": "5026ec787247b4c67a54132ef77a0c143206fc37eef06e14b1c749976d36c035",
+          "wall_seconds_milli": 8114
+        },
+        {
+          "minutes_until_targeted": 1,
+          "minutes_until_used": 2,
+          "new_object_first_minute": 61,
+          "objects": 8,
+          "seed": "7bc43c3257781c0e89440b507b7e997c335aa08f8e099a95a5d59eb8a77126c4",
+          "state_sha256": "a16a7bc17b0f37fa94d6a19c2f5dcff0f7f90e9f6651e72a91c6e4f04d050cd8",
+          "wall_seconds_milli": 9515
+        }
+      ],
+      "workers": [
+        {
+          "base_tick_interval_ms": 1000,
+          "claims": {
+            "4": 30,
+            "8": 30
+          },
+          "last_batch_execution_ms": [
+            55,
+            57
+          ],
+          "minutes_advanced": 60,
+          "speed": 1,
+          "wall_seconds_milli": 37401,
+          "warmup_minutes": 2,
+          "worlds": 2,
+          "written": {
+            "world_society": {
+              "deleted": 0,
+              "inserted": 0,
+              "updated": 60
+            },
+            "world_society_control": {
+              "deleted": 0,
+              "inserted": 0,
+              "updated": 240
+            },
+            "world_society_control_event": {
+              "deleted": 0,
+              "inserted": 120,
+              "updated": 0
+            },
+            "world_society_event": {
+              "deleted": 0,
+              "inserted": 702,
+              "updated": 0
+            },
+            "world_society_transition": {
+              "deleted": 0,
+              "inserted": 60,
+              "updated": 0
+            }
+          }
+        },
+        {
+          "base_tick_interval_ms": 4000,
+          "claims": {
+            "4": 30,
+            "8": 30
+          },
+          "last_batch_execution_ms": [
+            37,
+            40
+          ],
+          "minutes_advanced": 60,
+          "speed": 1,
+          "wall_seconds_milli": 122969,
+          "warmup_minutes": 2,
+          "worlds": 2,
+          "written": {
+            "world_society": {
+              "deleted": 0,
+              "inserted": 0,
+              "updated": 60
+            },
+            "world_society_control": {
+              "deleted": 0,
+              "inserted": 0,
+              "updated": 240
+            },
+            "world_society_control_event": {
+              "deleted": 0,
+              "inserted": 120,
+              "updated": 0
+            },
+            "world_society_event": {
+              "deleted": 0,
+              "inserted": 702,
+              "updated": 0
+            },
+            "world_society_transition": {
+              "deleted": 0,
+              "inserted": 60,
+              "updated": 0
+            }
+          }
+        },
+        {
+          "base_tick_interval_ms": 8000,
+          "claims": {
+            "4": 30,
+            "8": 30
+          },
+          "last_batch_execution_ms": [
+            60,
+            67
+          ],
+          "minutes_advanced": 60,
+          "speed": 1,
+          "wall_seconds_milli": 245119,
+          "warmup_minutes": 2,
+          "worlds": 2,
+          "written": {
+            "world_society": {
+              "deleted": 0,
+              "inserted": 0,
+              "updated": 60
+            },
+            "world_society_control": {
+              "deleted": 0,
+              "inserted": 0,
+              "updated": 240
+            },
+            "world_society_control_event": {
+              "deleted": 0,
+              "inserted": 120,
+              "updated": 0
+            },
+            "world_society_event": {
+              "deleted": 0,
+              "inserted": 702,
+              "updated": 0
+            },
+            "world_society_transition": {
+              "deleted": 0,
+              "inserted": 60,
+              "updated": 0
+            }
+          }
+        }
+      ]
+    },
+    "measured_with_sha256": "331b33a98d0d788bd3dc16a4d167f69b679f06253fb875f0a61019d324137c36",
+    "profile": "exulanica.living-world-pace/v1",
+    "summary": {
+      "by_object_count": {
+        "4": {
+          "minutes_until_new_object_targeted": {
+            "max": 1,
+            "median_milli": 1000,
+            "min": 1
+          },
+          "minutes_until_new_object_used": {
+            "max": 2,
+            "median_milli": 2000,
+            "min": 2
+          },
+          "new_object_never_used_within_minutes": {
+            "minutes": 60,
+            "worlds": 0
+          },
+          "person_minutes": 11520,
+          "share_of_person_minutes_milli": {
+            "standing": 0,
+            "using": 502,
+            "walking": 497
+          },
+          "walked_mm_per_walking_minute": {
+            "max": 22350,
+            "median_milli": 14045000,
+            "min": 2960
+          },
+          "walking_per_minute": {
+            "max": 8,
+            "median_milli": 3000,
+            "min": 0
+          },
+          "walking_per_minute_mean_milli": 3976,
+          "worlds": 12
+        },
+        "8": {
+          "minutes_until_new_object_targeted": {
+            "max": 1,
+            "median_milli": 1000,
+            "min": 1
+          },
+          "minutes_until_new_object_used": {
+            "max": 2,
+            "median_milli": 2000,
+            "min": 2
+          },
+          "new_object_never_used_within_minutes": {
+            "minutes": 60,
+            "worlds": 0
+          },
+          "person_minutes": 11520,
+          "share_of_person_minutes_milli": {
+            "standing": 0,
+            "using": 503,
+            "walking": 496
+          },
+          "walked_mm_per_walking_minute": {
+            "max": 24350,
+            "median_milli": 8383000,
+            "min": 4141
+          },
+          "walking_per_minute": {
+            "max": 8,
+            "median_milli": 2000,
+            "min": 0
+          },
+          "walking_per_minute_mean_milli": 3972,
+          "worlds": 12
+        }
+      },
+      "inferred_walking_pace_on_screen": {
+        "by_base": {
+          "1000": {
+            "1": 10045,
+            "2": 20090,
+            "4": 40180
+          },
+          "4000": {
+            "1": 2511,
+            "2": 5022,
+            "4": 10045
+          },
+          "8000": {
+            "1": 1256,
+            "2": 2511,
+            "4": 5022
+          }
+        },
+        "median_walked_mm": 10045,
+        "rule": "A renderer walks each recorded path over the effective interval, so a path of the median walked length appears at median_walked_mm / effective interval.",
+        "unit": "millimetres a second, by base interval then speed"
+      },
+      "worker_writes": [
+        {
+          "base_tick_interval_ms": 1000,
+          "claims": 60,
+          "minutes_advanced": 60,
+          "rows": {
+            "deleted": 0,
+            "inserted": 882,
+            "updated": 300
+          },
+          "rows_per_simulated_hour_per_world": {
+            "deleted": 0,
+            "inserted": 882,
+            "updated": 300
+          },
+          "rows_per_wall_hour_per_world": {
+            "deleted": 0,
+            "inserted": 42448,
+            "updated": 14438
+          },
+          "simulated_minutes_per_wall_hour_per_world": 2887,
+          "worlds": 2
+        },
+        {
+          "base_tick_interval_ms": 4000,
+          "claims": 60,
+          "minutes_advanced": 60,
+          "rows": {
+            "deleted": 0,
+            "inserted": 882,
+            "updated": 300
+          },
+          "rows_per_simulated_hour_per_world": {
+            "deleted": 0,
+            "inserted": 882,
+            "updated": 300
+          },
+          "rows_per_wall_hour_per_world": {
+            "deleted": 0,
+            "inserted": 12910,
+            "updated": 4391
+          },
+          "simulated_minutes_per_wall_hour_per_world": 878,
+          "worlds": 2
+        },
+        {
+          "base_tick_interval_ms": 8000,
+          "claims": 60,
+          "minutes_advanced": 60,
+          "rows": {
+            "deleted": 0,
+            "inserted": 882,
+            "updated": 300
+          },
+          "rows_per_simulated_hour_per_world": {
+            "deleted": 0,
+            "inserted": 882,
+            "updated": 300
+          },
+          "rows_per_wall_hour_per_world": {
+            "deleted": 0,
+            "inserted": 6476,
+            "updated": 2203
+          },
+          "simulated_minutes_per_wall_hour_per_world": 440,
+          "worlds": 2
+        }
+      ]
+    },
+    "tree": {
+      "diff_head_sha256": "2fde9072b971776631dcfe1731fcc8443b3a846630b86fea0f97971d8b0751e3",
+      "head": "ee91fa491d42857e49a90c2922dd007d1abbb16b"
+    },
+    "written_at": "2026-09-24T17:46:51+00:00"
+  },
+  "record_sha256": "f51ff0345b9697eab5789d9fffeafd9ea275917c1b5b52c2e05e29afc66d036d"
+}

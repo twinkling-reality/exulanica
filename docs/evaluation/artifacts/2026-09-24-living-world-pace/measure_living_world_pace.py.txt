@@ -1,0 +1,768 @@
+#!/usr/bin/env python3
+"""Measure how alive a person's saved world is while it plays, and what playing it writes.
+
+    uv run python scripts/measure_living_world_pace.py [--write] [--base-tick-interval-ms MS ...]
+
+**The question.** A person makes a starter world, places objects, brings in inhabitants and
+presses Play. What do they see, minute by minute, and what does the host pay for it? Four numbers
+answer it: how many people walk in a simulated minute, how many minutes pass before somebody uses
+an object the person places while the world is inhabited, what share of person-minutes is spent
+standing, and how many database rows the playback worker writes per simulated hour. This is not a
+model measurement: nothing here calls a model, and the engine is deterministic, so a rerun on the
+same tree reproduces every behaviour number exactly.
+
+**The run** is the product, in process, over a private PostgreSQL made for it and removed after
+(``scripts/test_postgres.py``), provisioned as the setup guide says, with the API connecting as
+the non-owner runtime role. Every world is made through the routes a browser calls: ``POST
+/world-entries/starter``, ``POST /world/versions/{id}/objects`` for each object and ``POST
+/world/versions/{id}/society`` with the v2 profile ("Bring in inhabitants"). Each world lives in a
+workspace of its own, so no two compete for one claim.
+
+*   **Behaviour.** For each object count in ``OBJECT_COUNTS`` and each of ``SEED_COUNT`` seeds, a
+    world is advanced ``TICKS`` simulated minutes through ``POST .../society/control/steps``, the
+    same deterministic step the playback worker executes, reading every state it commits. Just
+    before minute ``NEW_OBJECT_AT_TICK`` is advanced, one more object is placed through the same
+    object route. A person *walks* in a minute when the path the state records for that minute
+    has more than one point; *uses* an object when, without walking, their action is one of the
+    planner's timed affordances (``DURATIONS``); and *stands* otherwise. The three are exclusive
+    and cover every person-minute.
+*   **Writes.** One world per object count, with the first seed, is played by the real playback
+    worker (``EXULANICA_SOCIETY_CONTROL_WORKSPACES`` naming both workspaces) at the host's base
+    wait, speed 1, until each has advanced ``WORKER_TICKS`` minutes. PostgreSQL's own per-table
+    counters (``pg_stat_user_tables``) are read before the worker starts and after it stops, with
+    every other writer closed, so the difference is what playback alone wrote.
+
+The object layout is a rule, not a drawing: object ``k`` of ``n`` stands on a ring of radius
+``RING_RADIUS_MM`` at angle ``2*pi*k/n``, turned to face the centre, and the reviewed assets are
+used in turn in the order the reviewed registry lists them. The object placed later stands at
+``NEW_OBJECT_RADIUS_MM`` between the first two ring objects and is the asset ``NEW_OBJECT_ASSET``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import datetime as dt
+import hashlib
+import io
+import itertools
+import json
+import math
+import os
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any, Final
+
+ROOT: Final = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.world.society_authored_ground import (  # noqa: E402
+    AUTHORED_GROUND_POPULATION,
+    DECLARED_HALF_EXTENT_MM,
+)
+from exulanica.world.society_controls import (  # noqa: E402
+    DEFAULT_BASE_TICK_INTERVAL_MS,
+    SPEEDS,
+)
+from exulanica.world.society_planner import DURATIONS, PURPOSEFUL_PROFILE  # noqa: E402
+
+RECORD: Final = ROOT / "docs" / "evaluation" / "2026-09-24-living-world-pace.json"
+#: Where the record keeps the exact bytes of this script as it ran, inert as text.
+ARTIFACTS: Final = ROOT / "docs" / "evaluation" / "artifacts" / "2026-09-24-living-world-pace"
+AS_RUN: Final = ARTIFACTS / "measure_living_world_pace.py.txt"
+#: Every world's minute-by-minute counts and walked lengths, as canonical JSON, which the record
+#: binds by digest rather than carrying.
+SERIES: Final = ARTIFACTS / "series.json"
+PROFILE: Final = "exulanica.living-world-pace/v1"
+
+#: The two starters the question names: a sparse one and a furnished one.
+OBJECT_COUNTS: Final = (4, 8)
+#: Seeds per object count. The first is the one the browser sends when a person brings in
+#: inhabitants (``web/packages/app/src/society-api.ts``); the rest are derived by ``seeds()``.
+SEED_COUNT: Final = 12
+BROWSER_SEED: Final = "7a" * 32
+#: Two simulated hours: long enough for every inhabitant's need to cross the rest threshold.
+TICKS: Final = 120
+#: Halfway, once the population has settled into its routine.
+NEW_OBJECT_AT_TICK: Final = 60
+#: Half the declared walkable half-extent, so every ring object has lattice all round it.
+RING_RADIUS_MM: Final = DECLARED_HALF_EXTENT_MM // 2
+#: Three quarters of the half-extent: inside the walkable square, apart from the ring.
+NEW_OBJECT_RADIUS_MM: Final = DECLARED_HALF_EXTENT_MM * 3 // 4
+#: A visit affordance, which any person without a goal may choose at once; a rest affordance
+#: waits for a need threshold and would measure the need curve rather than noticing.
+NEW_OBJECT_ASSET: Final = "cc0.marker-cube"
+NEW_OBJECT_ID: Final = "object:placed-later"
+#: Minutes the worker plays each measured world: enough claims for a stable per-minute figure.
+WORKER_TICKS: Final = 30
+#: Minutes each world plays before counting starts: its first claim follows Play, and counting
+#: from the second leaves no setup write in the window.
+WORKER_WARMUP_TICKS: Final = 2
+#: The control events route's own cap, enough to hold every claim of the counted window.
+EVENT_WINDOW: Final = 128
+#: A bound on waiting for the worker, not a timing claim.
+WORKER_DEADLINE_SECONDS: Final = 1800
+#: How long PostgreSQL may take to fold closed backends' counters into its statistics.
+STATISTICS_SETTLE_SECONDS: Final = 2
+MICRORADIANS: Final = 1_000_000
+FULL_TURN_MICRORADIANS: Final = 6_283_185
+MILLI: Final = 1000
+MINUTES_PER_HOUR: Final = 60
+MS_PER_HOUR: Final = 3_600_000
+
+
+def seeds() -> list[str]:
+    derived = (
+        hashlib.sha256(f"{PROFILE}/seed/{index}".encode()).hexdigest()
+        for index in range(1, SEED_COUNT)
+    )
+    return [BROWSER_SEED, *derived]
+
+
+def ring(count: int, assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The objects of a starter with ``count`` of them, by the layout rule above."""
+    placed = []
+    for index in range(count):
+        angle = 2 * math.pi * index / count
+        placed.append(
+            _object(
+                f"object:{index + 1:02d}",
+                assets[index % len(assets)],
+                RING_RADIUS_MM,
+                angle,
+            )
+        )
+    return placed
+
+
+def new_object(count: int, by_key: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    return _object(NEW_OBJECT_ID, by_key[NEW_OBJECT_ASSET], NEW_OBJECT_RADIUS_MM, math.pi / count)
+
+
+def _object(object_id: str, asset: dict[str, Any], radius: int, angle: float) -> dict[str, Any]:
+    facing = round(((angle + math.pi) % (2 * math.pi)) * MICRORADIANS)
+    return {
+        "object_id": object_id,
+        "asset_key": asset["asset_key"],
+        "asset_sha256": asset["content_sha256"],
+        "x_mm": round(radius * math.cos(angle)),
+        "z_mm": round(radius * math.sin(angle)),
+        "yaw_microradians": min(facing, FULL_TURN_MICRORADIANS),
+    }
+
+
+# -- reading a state ------------------------------------------------------------------------------
+
+
+def person_minute(person: dict[str, Any]) -> str:
+    """``walking``, ``using`` or ``standing``, exclusively, for one person in one minute."""
+    if len(person["motion_path_mm"]) > 1:
+        return "walking"
+    action = person["action"]
+    if action["kind"] in DURATIONS and action["status"] in ("active", "completed"):
+        return "using"
+    return "standing"
+
+
+def walked_mm(person: dict[str, Any]) -> int:
+    """How far a person's recorded path for the minute runs, in whole millimetres."""
+    path = person["motion_path_mm"]
+    return round(sum(math.dist(a, b) for a, b in itertools.pairwise(path)))
+
+
+def uses(person: dict[str, Any], object_id: str) -> bool:
+    target = person["target"]
+    return (
+        person_minute(person) == "using"
+        and target is not None
+        and _target_object(target) == object_id
+    )
+
+
+def targets(person: dict[str, Any], object_id: str) -> bool:
+    target = person["target"]
+    return target is not None and _target_object(target) == object_id
+
+
+def _target_object(target: dict[str, Any]) -> str:
+    if "object_id" not in target:
+        raise SystemExit(f"a v2 target names no object_id: {sorted(target)}")
+    return target["object_id"]
+
+
+# -- the run --------------------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _database() -> Iterator[dict[str, str]]:
+    """A private PostgreSQL made for this run, provisioned as the setup guide says, then removed."""
+    from test_postgres import remove_test_server, start_test_server
+
+    from exulanica.db.cli import provision
+    from exulanica.db.roles import EXECUTOR_ROLE, RUNTIME_ROLE
+
+    server, owner = start_test_server("livingpace")
+    try:
+        previous = os.environ.get("EXULANICA_DATABASE_URL")
+        os.environ["EXULANICA_DATABASE_URL"] = owner
+        try:
+            provision(io.StringIO())
+        finally:
+            if previous is None:
+                os.environ.pop("EXULANICA_DATABASE_URL", None)
+            else:
+                os.environ["EXULANICA_DATABASE_URL"] = previous
+        database = owner.rsplit("/", 1)[1]
+        yield {
+            "owner": owner,
+            "runtime": server.url(database, RUNTIME_ROLE),
+            "readonly": server.url(database, EXECUTOR_ROLE),
+        }
+    finally:
+        remove_test_server(server)
+
+
+class Api:
+    """One workspace's authenticated calls through the application, refusing any failure."""
+
+    def __init__(self, http: Any, token: str) -> None:
+        self.http = http
+        self.headers = {"Authorization": f"Bearer {token}"}
+
+    def __call__(self, method: str, route: str, expected: int = 200, **kwargs: Any) -> Any:
+        response = self.http.request(method, route, headers=self.headers, **kwargs)
+        if response.status_code != expected:
+            raise SystemExit(f"{method} {route} answered {response.status_code}: {response.text}")
+        return response.json()
+
+
+def make_world(api: Api, objects: list[dict[str, Any]], seed: str) -> dict[str, Any]:
+    entry = api("POST", "/world-entries/starter", json={"title": "Living world pace"})
+    world = {
+        "version": entry["authored_version_id"],
+        "scope": {"world_id": entry["world_id"]},
+        "region": entry["authored_scene"]["region"]["region_id"],
+    }
+    for placed in objects:
+        place(api, world, placed)
+    api(
+        "POST",
+        f"/world/versions/{world['version']}/society",
+        params=world["scope"],
+        json={"region_id": world["region"], "seed": seed, "profile": PURPOSEFUL_PROFILE},
+    )
+    return world
+
+
+def place(api: Api, world: dict[str, Any], placed: dict[str, Any]) -> None:
+    route = f"/world/versions/{world['version']}"
+    base = api("GET", route, params=world["scope"])["state_sha256"]
+    api(
+        "POST",
+        route + "/objects",
+        expected=201,
+        params=world["scope"],
+        json={
+            "base_state_sha256": base,
+            "object_id": placed["object_id"],
+            "asset_sha256": placed["asset_sha256"],
+            "region_id": world["region"],
+            "transform": {
+                "x_mm": placed["x_mm"],
+                "y_mm": 0,
+                "z_mm": placed["z_mm"],
+                "yaw_microradians": placed["yaw_microradians"],
+                "scale_milli": MILLI,
+            },
+            "origin_role": "fictional",
+        },
+    )
+
+
+def behave(api: Api, world: dict[str, Any], later: dict[str, Any]) -> dict[str, Any]:
+    """Advance one world ``TICKS`` minutes by control steps, reading every state it commits."""
+    society = f"/world/versions/{world['version']}/society"
+    control = api("GET", society + "/control", params=world["scope"])
+    state = api("GET", society, params=world["scope"])
+    minutes: list[dict[str, int]] = []
+    walks: list[int] = []
+    first_target = first_use = None
+    placed_before = None
+    for _ in range(TICKS):
+        if state["current_tick"] == NEW_OBJECT_AT_TICK:
+            place(api, world, later)
+            placed_before = state["current_tick"] + 1
+        stepped = api(
+            "POST",
+            society + "/control/steps",
+            params=world["scope"],
+            json={
+                "base_revision": control["revision"],
+                "base_tick": state["current_tick"],
+                "base_state_sha256": state["state_sha256"],
+            },
+        )
+        control, state = stepped["control"], stepped["society"]
+        people = state["state"]["inhabitants"]
+        counts = {"walking": 0, "using": 0, "standing": 0}
+        for person in people:
+            counts[person_minute(person)] += 1
+            if person_minute(person) == "walking":
+                walks.append(walked_mm(person))
+        minutes.append({"tick": state["current_tick"], **counts})
+        if placed_before is not None:
+            if first_target is None and any(targets(p, NEW_OBJECT_ID) for p in people):
+                first_target = state["current_tick"]
+            if first_use is None and any(uses(p, NEW_OBJECT_ID) for p in people):
+                first_use = state["current_tick"]
+    if placed_before is None:
+        raise SystemExit("the later object was never placed")
+    return {
+        "minutes": minutes,
+        "walked_mm": walks,
+        "new_object_first_minute": placed_before,
+        "minutes_until_targeted": None
+        if first_target is None
+        else first_target - placed_before + 1,
+        "minutes_until_used": None if first_use is None else first_use - placed_before + 1,
+        "state_sha256": state["state_sha256"],
+    }
+
+
+def _counters(owner: str) -> dict[str, dict[str, int]]:
+    import psycopg
+
+    with psycopg.connect(owner, autocommit=True) as connection:
+        connection.execute("select pg_stat_clear_snapshot()")
+        rows = connection.execute(
+            "select relname, n_tup_ins, n_tup_upd, n_tup_del from pg_stat_user_tables"
+        ).fetchall()
+    return {name: {"inserted": i, "updated": u, "deleted": d} for name, i, u, d in rows}
+
+
+def _snapshot(owner: str, workspaces: list[uuid.UUID]) -> dict[str, Any]:
+    """Every table's write counters, the minutes each measured world holds and its last control
+    event, taken when no batch committed between the first and last read of them."""
+    import psycopg
+
+    query = (
+        "select s.workspace_id, s.current_tick, c.last_event_seq from world_society s "
+        "join world_society_control c using (workspace_id, society_id) "
+        "where s.workspace_id = any(%s) order by s.workspace_id"
+    )
+    with psycopg.connect(owner, autocommit=True) as connection:
+        while True:
+            first = connection.execute(query, (workspaces,)).fetchall()
+            counters = _counters(owner)
+            if connection.execute(query, (workspaces,)).fetchall() == first:
+                break
+    return {
+        "counters": counters,
+        "minutes": sum(row[1] for row in first),
+        "claim_seq": {row[0]: row[2] for row in first},
+    }
+
+
+def _written(before: dict, after: dict) -> dict[str, dict[str, int]]:
+    written = {}
+    for table, counts in after.items():
+        prior = before.get(table, {"inserted": 0, "updated": 0, "deleted": 0})
+        delta = {key: counts[key] - prior[key] for key in counts}
+        if any(delta.values()):
+            written[table] = delta
+    return written
+
+
+def run(bases: list[int]) -> dict[str, Any]:
+    import psycopg
+    from fastapi.testclient import TestClient
+
+    from exulanica.api.app import create_app
+    from exulanica.api.authorisation import API_TOKENS_ENV
+    from exulanica.api.permissions import Permission
+    from exulanica.api.services import (
+        DATA_DIR_ENV,
+        DERIVATIVE_WORKER_ENV,
+        READONLY_DATABASE_URL_ENV,
+        build_services,
+    )
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.db.session import DATABASE_URL_ENV
+
+    arms = [(count, seed) for count in OBJECT_COUNTS for seed in seeds()]
+    worker_arms = [(base, count, seeds()[0]) for base in bases for count in OBJECT_COUNTS]
+    grants = {
+        key: {"id": uuid.uuid4(), "actor": uuid.uuid4(), "token": f"pace-{uuid.uuid4().hex}"}
+        for key in [*arms, *(("worker", *arm) for arm in worker_arms)]
+    }
+    data_dir = Path(tempfile.mkdtemp(prefix="living-world-pace-"))
+
+    with _database() as urls:
+        with psycopg.connect(urls["owner"], autocommit=True) as owner:
+            for grant in grants.values():
+                provision_workspace(owner, grant["id"])
+
+        def environ(**extra: str) -> dict[str, str]:
+            return {
+                DATABASE_URL_ENV: urls["runtime"],
+                READONLY_DATABASE_URL_ENV: urls["readonly"],
+                DATA_DIR_ENV: str(data_dir),
+                DERIVATIVE_WORKER_ENV: "off",
+                API_TOKENS_ENV: json.dumps(
+                    {
+                        grant["token"]: {
+                            "workspace_id": str(grant["id"]),
+                            "actor": str(grant["actor"]),
+                            "permissions": [str(permission) for permission in Permission],
+                        }
+                        for grant in grants.values()
+                    }
+                ),
+                **extra,
+            }
+
+        runs = []
+        worker_worlds = {}
+        with TestClient(create_app(build_services(environ()), verify=False)) as http:
+            assets = Api(http, grants[arms[0]]["token"])("GET", "/world/assets")
+            reviewed = [asset for asset in assets if asset["placeable"]]
+            by_key = {asset["asset_key"]: asset for asset in reviewed}
+            for count, seed in arms:
+                api = Api(http, grants[(count, seed)]["token"])
+                world = make_world(api, ring(count, reviewed), seed)
+                started = time.monotonic()
+                outcome = behave(api, world, new_object(count, by_key))
+                runs.append(
+                    {
+                        "objects": count,
+                        "seed": seed,
+                        "wall_seconds_milli": round((time.monotonic() - started) * MILLI),
+                        **outcome,
+                    }
+                )
+                print(
+                    f"{count} objects, seed {seed[:8]}: used after "
+                    f"{outcome['minutes_until_used']} min",
+                    flush=True,
+                )
+            for base, count, seed in worker_arms:
+                api = Api(http, grants[("worker", base, count, seed)]["token"])
+                worker_worlds[(base, count)] = (
+                    api.headers,
+                    make_world(api, ring(count, reviewed), seed),
+                )
+            layout = {count: ring(count, reviewed) for count in OBJECT_COUNTS}
+            later = {count: new_object(count, by_key) for count in OBJECT_COUNTS}
+
+        workers = [
+            play(
+                base,
+                {count: worker_worlds[(base, count)] for count in OBJECT_COUNTS},
+                {
+                    count: grants[("worker", base, count, seeds()[0])]["id"]
+                    for count in OBJECT_COUNTS
+                },
+                environ,
+                urls["owner"],
+            )
+            for base in bases
+        ]
+
+    return {
+        "layout": {str(count): placed for count, placed in layout.items()},
+        "later_object": {str(count): placed for count, placed in later.items()},
+        "runs": runs,
+        "workers": workers,
+    }
+
+
+def play(
+    base_tick_interval_ms: int,
+    worlds: dict[int, tuple[dict, dict]],
+    workspaces: dict[int, uuid.UUID],
+    environ: Any,
+    owner: str,
+) -> dict[str, Any]:
+    """Play ``worlds`` with the real worker at ``base_tick_interval_ms`` and count its writes."""
+    from fastapi.testclient import TestClient
+
+    from exulanica.api.app import create_app
+    from exulanica.api.services import (
+        SOCIETY_CONTROL_WORKSPACES_ENV,
+        SOCIETY_TICK_INTERVAL_MS_ENV,
+        build_services,
+    )
+
+    listed = list(workspaces.values())
+    playing = environ(
+        **{
+            SOCIETY_CONTROL_WORKSPACES_ENV: json.dumps([str(w) for w in listed]),
+            SOCIETY_TICK_INTERVAL_MS_ENV: str(base_tick_interval_ms),
+        }
+    )
+    with TestClient(create_app(build_services(playing), verify=False)) as http:
+
+        def control(headers: dict, world: dict, suffix: str = "", **params: Any) -> Any:
+            society = f"/world/versions/{world['version']}/society/control{suffix}"
+            read = http.get(society, headers=headers, params={**world["scope"], **params})
+            if read.status_code != 200:
+                raise SystemExit(f"{society} answered {read.status_code}: {read.text}")
+            return read.json()
+
+        # Play is pressed here, under the worker, so no world starts overdue.
+        for headers, world in worlds.values():
+            read = control(headers, world)
+            pressed = http.put(
+                f"/world/versions/{world['version']}/society/control",
+                headers=headers,
+                params=world["scope"],
+                json={"base_revision": read["revision"], "mode": "playing", "speed": 1},
+            )
+            if pressed.status_code != 200:
+                raise SystemExit(f"Play answered {pressed.status_code}: {pressed.text}")
+
+        def reach(minutes: int) -> None:
+            deadline = time.monotonic() + WORKER_DEADLINE_SECONDS
+            while any(control(h, w)["current_tick"] < minutes for h, w in worlds.values()):
+                if time.monotonic() > deadline:
+                    raise SystemExit(f"the worker did not reach {minutes} minutes")
+                time.sleep(base_tick_interval_ms / MILLI / 2)
+
+        # Counting starts after the first claim of each world, which follows Play.
+        reach(WORKER_WARMUP_TICKS)
+        before = _snapshot(owner, listed)
+        started = time.monotonic()
+        reach(WORKER_WARMUP_TICKS + WORKER_TICKS)
+        after = _snapshot(owner, listed)
+        wall = time.monotonic() - started
+        reads = {count: control(h, w) for count, (h, w) in worlds.items()}
+        events = {
+            count: control(h, w, "/events", limit=EVENT_WINDOW)["events"]
+            for count, (h, w) in worlds.items()
+        }
+    claims = {
+        str(count): sum(
+            1
+            for event in events[count]
+            if event["kind"] == "claimed"
+            and event["event_seq"] > before["claim_seq"][workspaces[count]]
+        )
+        for count in worlds
+    }
+    return {
+        "base_tick_interval_ms": base_tick_interval_ms,
+        "speed": 1,
+        "worlds": len(worlds),
+        "minutes_advanced": after["minutes"] - before["minutes"],
+        "warmup_minutes": WORKER_WARMUP_TICKS,
+        "claims": claims,
+        "last_batch_execution_ms": [
+            read["last_batch_execution"]["execution_duration_ms"]
+            for read in reads.values()
+            if read["last_batch_execution"] is not None
+        ],
+        "wall_seconds_milli": round(wall * MILLI),
+        "written": _written(before["counters"], after["counters"]),
+    }
+
+
+# -- summarising ----------------------------------------------------------------------------------
+
+
+def spread(values: list[int]) -> dict[str, int]:
+    ordered = sorted(values)
+    return {
+        "min": ordered[0],
+        "median_milli": round(statistics.median(ordered) * MILLI),
+        "max": ordered[-1],
+    }
+
+
+def summarise(measured: dict[str, Any]) -> dict[str, Any]:
+    arms = {}
+    for count in OBJECT_COUNTS:
+        runs = [run for run in measured["runs"] if run["objects"] == count]
+        person_minutes = sum(
+            m["walking"] + m["using"] + m["standing"] for run in runs for m in run["minutes"]
+        )
+        share = {
+            kind: sum(m[kind] for run in runs for m in run["minutes"]) * MILLI // person_minutes
+            for kind in ("walking", "using", "standing")
+        }
+        used = [run["minutes_until_used"] for run in runs if run["minutes_until_used"] is not None]
+        arms[str(count)] = {
+            "worlds": len(runs),
+            "walked_mm_per_walking_minute": spread([w for run in runs for w in run["walked_mm"]]),
+            "person_minutes": person_minutes,
+            "walking_per_minute": spread([m["walking"] for run in runs for m in run["minutes"]]),
+            "walking_per_minute_mean_milli": sum(
+                m["walking"] for run in runs for m in run["minutes"]
+            )
+            * MILLI
+            // (len(runs) * TICKS),
+            "share_of_person_minutes_milli": share,
+            "minutes_until_new_object_used": spread(used) if used else None,
+            "new_object_never_used_within_minutes": {
+                "minutes": TICKS - NEW_OBJECT_AT_TICK,
+                "worlds": len(runs) - len(used),
+            },
+            "minutes_until_new_object_targeted": spread(
+                [r["minutes_until_targeted"] for r in runs if r["minutes_until_targeted"]]
+            )
+            if any(r["minutes_until_targeted"] for r in runs)
+            else None,
+        }
+    walked = [w for run in measured["runs"] for w in run["walked_mm"]]
+    median_walked = statistics.median(walked)
+    return {
+        "by_object_count": arms,
+        "worker_writes": [_writes(worker) for worker in measured["workers"]],
+        "inferred_walking_pace_on_screen": {
+            "rule": (
+                "A renderer walks each recorded path over the effective interval, so a path of "
+                "the median walked length appears at median_walked_mm / effective interval."
+            ),
+            "median_walked_mm": round(median_walked),
+            "by_base": {
+                str(worker["base_tick_interval_ms"]): {
+                    str(speed): round(
+                        median_walked * MILLI * speed / worker["base_tick_interval_ms"]
+                    )
+                    for speed in SPEEDS
+                }
+                for worker in measured["workers"]
+            },
+            "unit": "millimetres a second, by base interval then speed",
+        },
+    }
+
+
+def _writes(worker: dict[str, Any]) -> dict[str, Any]:
+    minutes = worker["minutes_advanced"]
+    rows = {
+        kind: sum(delta[kind] for delta in worker["written"].values())
+        for kind in ("inserted", "updated", "deleted")
+    }
+    wall_ms = worker["wall_seconds_milli"]
+    return {
+        "base_tick_interval_ms": worker["base_tick_interval_ms"],
+        "worlds": worker["worlds"],
+        "minutes_advanced": minutes,
+        "claims": sum(worker["claims"].values()),
+        "rows": rows,
+        "rows_per_simulated_hour_per_world": {
+            kind: value * MINUTES_PER_HOUR // minutes for kind, value in rows.items()
+        },
+        "simulated_minutes_per_wall_hour_per_world": minutes
+        * MS_PER_HOUR
+        // (wall_ms * worker["worlds"]),
+        "rows_per_wall_hour_per_world": {
+            kind: value * MS_PER_HOUR // (wall_ms * worker["worlds"])
+            for kind, value in rows.items()
+        },
+    }
+
+
+def tree() -> dict[str, str]:
+    def git(*arguments: str) -> bytes:
+        return subprocess.run(["git", *arguments], cwd=ROOT, capture_output=True, check=True).stdout
+
+    return {
+        "head": git("rev-parse", "HEAD").decode().strip(),
+        "diff_head_sha256": hashlib.sha256(git("diff", "HEAD", "--binary")).hexdigest(),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--write", action="store_true", help=f"write {RECORD.name}")
+    parser.add_argument(
+        "--base-tick-interval-ms",
+        type=int,
+        action="append",
+        help="a host base wait the worker plays at; repeat for several (default: the declared "
+        "default alone)",
+    )
+    arguments = parser.parse_args()
+    # The bytes that run, read before anything else can change the file.
+    as_run = Path(__file__).read_bytes()
+    if arguments.write and (RECORD.exists() or ARTIFACTS.exists()):
+        raise SystemExit(f"{RECORD.name} or its artifacts exist; a record is written once")
+    bases = arguments.base_tick_interval_ms or [DEFAULT_BASE_TICK_INTERVAL_MS]
+    measured = run(bases)
+    summary = summarise(measured)
+    # The per-minute series leave the record for an artifact it binds by digest.
+    series = {
+        f"{run['objects']}/{run['seed']}": {
+            "minutes": run.pop("minutes"),
+            "walked_mm": run.pop("walked_mm"),
+        }
+        for run in measured["runs"]
+    }
+    series_bytes = canonical_json(series)
+    body = {
+        "profile": PROFILE,
+        "written_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+        "measured_with_sha256": hashlib.sha256(as_run).hexdigest(),
+        "artifacts": {
+            "directory": ARTIFACTS.relative_to(ROOT).as_posix(),
+            "files": [
+                {
+                    "path": AS_RUN.relative_to(ROOT).as_posix(),
+                    "byte_size": len(as_run),
+                    "sha256": hashlib.sha256(as_run).hexdigest(),
+                    "is": "this script as it ran; copy it to a .py name to run it",
+                },
+                {
+                    "path": SERIES.relative_to(ROOT).as_posix(),
+                    "byte_size": len(series_bytes),
+                    "sha256": hashlib.sha256(series_bytes).hexdigest(),
+                    "is": "each world's per-minute walking, using and standing counts and the "
+                    "length of every walking minute, keyed objects/seed, as canonical JSON",
+                },
+            ],
+        },
+        "how_to_rerun": "uv run python scripts/measure_living_world_pace.py --write",
+        "tree": tree(),
+        "inputs": {
+            "profile": PURPOSEFUL_PROFILE,
+            "population": AUTHORED_GROUND_POPULATION,
+            "object_counts": list(OBJECT_COUNTS),
+            "seeds": seeds(),
+            "ticks": TICKS,
+            "new_object_at_tick": NEW_OBJECT_AT_TICK,
+            "new_object_asset": NEW_OBJECT_ASSET,
+            "ring_radius_mm": RING_RADIUS_MM,
+            "new_object_radius_mm": NEW_OBJECT_RADIUS_MM,
+            "use_kinds": sorted(DURATIONS),
+            "worker_ticks": WORKER_TICKS,
+            "worker_bases_ms": bases,
+            "declared_default_base_ms": DEFAULT_BASE_TICK_INTERVAL_MS,
+        },
+        "summary": summary,
+        "measured": measured,
+    }
+    print(json.dumps(body["summary"], indent=2))
+    if arguments.write:
+        document = {
+            "profile": "exulanica.digest-bound-record/v1",
+            "record": body,
+            "record_sha256": hashlib.sha256(canonical_json(body)).hexdigest(),
+        }
+        ARTIFACTS.mkdir(parents=True)
+        AS_RUN.write_bytes(as_run)
+        SERIES.write_bytes(series_bytes)
+        RECORD.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"wrote {RECORD.relative_to(ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

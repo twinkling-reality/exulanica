@@ -19,6 +19,7 @@ from exulanica.world.society import (
 )
 from exulanica.world.society_controls import (
     CONTROL_PROFILE,
+    DEFAULT_BASE_TICK_INTERVAL_MS,
     EVENT_PROFILE,
     LEASE_SECONDS,
     MAX_CATCHUP_TICKS,
@@ -45,7 +46,7 @@ class SocietyControlRepository:
         *,
         world_id: str,
         input_authorizer: Callable[[uuid.UUID, dict], None] | None = None,
-        base_tick_interval_ms: int = 1000,
+        base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS,
     ) -> None:
         validate_settings("paused", 1, base_tick_interval_ms)
         self.connection, self.workspace_id = connection, workspace_id
@@ -308,7 +309,7 @@ class SocietyControlRepository:
         workspace_id: uuid.UUID,
         *,
         input_authorizer: Callable[[uuid.UUID, dict], None] | None = None,
-        base_tick_interval_ms: int = 1000,
+        base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS,
     ) -> ControlClaim | None:
         """Lease the oldest due playing society in this workspace, whichever world holds it.
 

@@ -245,5 +245,8 @@ def test_dynamic_playback_opt_in_participates_in_readiness(tmp_path):
         "running": False,
         "failed_rounds": 0,
         "last_round_failed": False,
+        "base_tick_interval_ms": configured.society_base_tick_interval_ms,
+        "listed_workspaces": 0,
+        "account_discovery": True,
         "proves": "worker liveness and last round status; no promised simulation delivery rate",
     }

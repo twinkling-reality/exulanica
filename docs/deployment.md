@@ -465,7 +465,6 @@ Google sign-in is optional. All six settings are required together:
 | `EXULANICA_GOOGLE_RETURN_URIS` | JSON array of exact permitted post-login URLs |
 | `EXULANICA_ACCOUNT_BROWSER_ORIGINS` | JSON array of permitted HTTPS browser origins |
 | `EXULANICA_ACCOUNT_DATABASE_URL` | Dedicated authentication role on the application's database/schema |
-| `EXULANICA_SOCIETY_CONTROL_WORKER` | Explicit account-wide playback-worker opt-in: absent/`off` disables it; `true`/`yes`/`on`/`1` enables current account-owned workspace discovery |
 
 Migration 0058 creates six pre-workspace account tables. An administrator explicitly provisions
 `exulanica_accounts` using `exulanica.db.account_roles.provision_account_role`; application startup
@@ -507,14 +506,32 @@ retention cleanup, request rate limits and live Google acceptance remain separat
 Access logs must redact callback query values, cookies and CSRF tokens.
 
 Migration 0059 adds saved society controls and their event receipts. Automatic playback is off
-by default. A host can construct `Services` with a reviewed `society_runtime`, an explicit
-`society_control_workspaces` allowlist and `society_base_tick_interval_ms` (default 1000), or
-enable account-wide discovery with `EXULANICA_SOCIETY_CONTROL_WORKER`. The normal
-environment-based service loader does not load reviewed district runtime bindings, so the
-environment switch alone cannot create a usable playback deployment.
+by default. A host turns it on from its environment; `build_services` reads these settings and
+stops startup on a malformed value with a named code from `SOCIETY_SETTING_REFUSALS` in
+`exulanica/api/services.py`:
+
+| Variable | Purpose |
+| --- | --- |
+| `EXULANICA_SOCIETY_CONTROL_WORKSPACES` | JSON array of workspace ids whose playing societies this instance advances, with no accounts needed. Absent or `[]` plays none; a malformed id or a repeated one is refused |
+| `EXULANICA_SOCIETY_TICK_INTERVAL_MS` | The base wait between simulated minutes, in whole milliseconds: 1,000 to 60,000 and divisible by 4, so every speed divides it exactly. Absent means the declared default, 8,000 |
+| `EXULANICA_SOCIETY_CONTROL_WORKER` | Account-wide discovery: absent/`off` disables it; `true`/`yes`/`on`/`1` also plays every current account-owned workspace, and needs accounts configured |
+
+A listed workspace and the discovered ones are played together. Every instance can play a
+person's saved world with no host registration, because the society binds a place derived from
+the world itself, so these settings alone make a working playback deployment. The default base is
+measured (`docs/evaluation/2026-09-24-living-world-pace.json`, from
+`scripts/measure_living_world_pace.py`): a person in a saved world walks a median 10.0 m in a
+walking minute and a renderer walks each recorded path over the effective interval, so 8,000 ms
+shows 1.26 m/s at 1x, inside the ordinary walking speeds the society policy states, and still
+leaves 2,000 ms between minutes at 4x. Playing writes about 882 inserted and 300 updated rows per
+simulated hour for each playing world whatever the pace, which is about 6,500 inserted rows a wall
+hour at the default and 1x, against about 42,000 at a 1,000 ms base.
 The API starts this explicitly configured worker only after schema/restore validation, stops new
 claims on shutdown and waits for an active batch to finish or roll back. Readiness reports its
-thread and latest completed round; this does not promise a simulation delivery rate.
+thread and latest completed round, the base wait, how many workspaces are listed (never which)
+and whether account discovery is on; this does not promise a simulation delivery rate. The
+control read carries `host_playback`: whether this instance plays that world (`running`), the
+effective wait it would use (`interval_ms`) and, when it does not play it, the reason in words.
 The 1/2/4 settings divide the minimum wait after completion; execution and polling add latency.
 Play/pause/step endpoints and recovery semantics are in the [society contract](synthetic-society-contract.md).
 The authenticated world UI connects these endpoints to saved play/pause state, 1x/2x/4x speed,
@@ -525,9 +542,10 @@ advances simulation time.
 Migration 0060 adds typed, append-only society action requests and their exact transition
 consumption bindings. The API can record `go_to` or `perform` for a current v2/v3 inhabitant and
 canonical target, then the next ordinary step applies or records a deterministic disposition.
-Recording a request neither moves a character nor starts playback. The current browser world does
-not expose this request surface, so it remains an API foundation rather than a demonstrated
-end-user control.
+Recording a request neither moves a character nor starts playback. The browser offers it as one
+control on a chosen inhabitant (`web/packages/app/src/ui/society-directed-action.ts`) when the
+society's engine takes directed actions, which `exulanica/world/society-engines.v1.json` states;
+a living v4 society refuses the control with that reason.
 
 ### 5.1.1 The three roles, and why the purger has its own
 

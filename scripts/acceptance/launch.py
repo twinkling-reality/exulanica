@@ -3,6 +3,7 @@
 
     python3 scripts/acceptance/launch.py up     --worktree PATH [--slot N] [--reuse-database]
                                                 [--model] [--no-derivative-worker] [--production]
+                                                [--society-playback [--society-tick-interval-ms MS]]
     python3 scripts/acceptance/launch.py status --worktree PATH
     python3 scripts/acceptance/launch.py down   --worktree PATH
 
@@ -25,12 +26,19 @@ imports the code it starts.
     content-addressed store in the run directory and no Google configuration. With ``--model``
     it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST`` and ``EXULANICA_BUDGET_USD``
     from this process's environment, and refuses without any of them: a run with a model always
-    states the bound the API enforces. Nothing writes the key anywhere.
+    states the bound the API enforces. Nothing writes the key anywhere. With
+    ``--society-playback`` the API also plays the synthetic workspace's societies on their own
+    (``EXULANICA_SOCIETY_CONTROL_WORKSPACES`` names that workspace alone), at the host's declared
+    base wait or at ``--society-tick-interval-ms``, which the API validates. Without it the API
+    plays nothing.
 5.  Serves the application on the slot's app port. By default that is the Vite development server,
     with the synthetic token built in as ``VITE_EXULANICA_TOKEN``. With ``--production`` it is a
     ``vite build`` into the run directory, made in a clean environment with no ``VITE_`` variable,
     served by ``vite preview``; the page then asks for the token, which is in the run directory's
     ``token`` file. Either way ``/api`` is proxied to the API through ``EXULANICA_API_URL``.
+
+With ``--society-playback``, ``up`` refuses unless the API's readiness says its playback worker runs
+for exactly one listed workspace, and records the base wait that readiness states.
 
 ``down`` stops only what this launcher started, checked by process id and command line, and never
 deletes a database cluster or a run record. Run state lives in the system temporary directory.
@@ -144,6 +152,8 @@ REFUSALS = {
     "no-state": "nothing this launcher started is recorded for the checkout",
     "pg-ctl-missing": "the checkout is gone and the recorded pg_ctl cannot stop its server",
     "command-failed": "a command the run needs exited non-zero",
+    "society-interval-without-playback": "--society-tick-interval-ms needs --society-playback",
+    "society-playback-not-running": "the API's readiness does not report playback of the workspace",
 }
 
 
@@ -240,6 +250,40 @@ def model_environment(environ: Mapping[str, str] | None = None) -> dict[str, str
     return passed
 
 
+def society_playback_environment(
+    workspace_id: str | None, tick_interval_ms: int | None
+) -> dict[str, str]:
+    """What ``--society-playback`` hands the API: the run's own workspace and, when stated, the
+    base wait. The API validates both at startup; with no workspace it plays nothing."""
+    if workspace_id is None:
+        if tick_interval_ms is not None:
+            refuse(
+                "society-interval-without-playback", REFUSALS["society-interval-without-playback"]
+            )
+        return {}
+    environment = {"EXULANICA_SOCIETY_CONTROL_WORKSPACES": json.dumps([workspace_id])}
+    if tick_interval_ms is not None:
+        environment["EXULANICA_SOCIETY_TICK_INTERVAL_MS"] = str(tick_interval_ms)
+    return environment
+
+
+def society_playback_readiness(readyz: bytes) -> dict[str, object]:
+    """The playback readiness check of a ``--society-playback`` run, or a refusal saying why not.
+
+    The run plays one workspace, its own, and never discovers accounts."""
+    try:
+        check = json.loads(readyz)["checks"]["society_playback"]
+    except (ValueError, KeyError, TypeError):
+        refuse("society-playback-not-running", readyz[:REFUSAL_EXCERPT_CHARACTERS].decode())
+    if not (
+        check.get("running") is True
+        and check.get("listed_workspaces") == 1
+        and check.get("account_discovery") is False
+    ):
+        refuse("society-playback-not-running", json.dumps(check)[:REFUSAL_EXCERPT_CHARACTERS])
+    return check
+
+
 def api_environment(
     *,
     exports: Mapping[str, str],
@@ -247,6 +291,7 @@ def api_environment(
     data_dir: Path,
     model: bool,
     derivative_worker: bool,
+    society_playback: Mapping[str, str],
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
@@ -264,6 +309,7 @@ def api_environment(
     if not derivative_worker:
         # Absence means on, so the production shape, a separately started worker, is spelled.
         environment["EXULANICA_DERIVATIVE_WORKER"] = "off"
+    environment.update(society_playback)
     return environment
 
 
@@ -508,6 +554,8 @@ def up(arguments: argparse.Namespace) -> None:
     python = check_toolchain(worktree)
     if arguments.model:
         model_environment()  # refuse before anything starts, not after the database has
+    if not arguments.society_playback:
+        society_playback_environment(None, arguments.society_tick_interval_ms)  # likewise
     directory = state_dir(worktree)
     state_file = directory / "state.json"
     if state_file.exists():
@@ -618,6 +666,10 @@ def up(arguments: argparse.Namespace) -> None:
         data_dir=data_dir,
         model=arguments.model,
         derivative_worker=not arguments.no_derivative_worker,
+        society_playback=society_playback_environment(
+            workspace_id if arguments.society_playback else None,
+            arguments.society_tick_interval_ms,
+        ),
     )
     api_log = logs / "api.log"
     api_pid = spawn(
@@ -632,6 +684,7 @@ def up(arguments: argparse.Namespace) -> None:
             "embedding_partition": partition,
             "derivative_worker": "off" if arguments.no_derivative_worker else "in-process",
             "model": bool(arguments.model),
+            "society_playback": bool(arguments.society_playback),
             "budget_usd": environment.get("EXULANICA_BUDGET_USD"),
             "actor": actor,
             "permissions": list(PERMISSIONS),
@@ -651,6 +704,14 @@ def up(arguments: argparse.Namespace) -> None:
         "healthz": [status, body.decode(errors="replace")],
         "readyz": [ready_status, ready_body.decode(errors="replace")],
     }
+    if arguments.society_playback:
+        check = society_playback_readiness(ready_body)
+        state["society_playback"] = {
+            "workspace_id": workspace_id,
+            "base_tick_interval_ms": check.get("base_tick_interval_ms"),
+            "readyz": check,
+        }
+        write_state(state_file, state)
     probe_status, probe_body = wait_http(
         f"{api_url(chosen)}/world-entries",
         TOKEN_PROBE_SECONDS,
@@ -670,7 +731,8 @@ def up(arguments: argparse.Namespace) -> None:
     else:
         serve_development(worktree, chosen, token, logs, state, state_file)
     shown = ("worktree", "tree", "ports", "run_dir", "workspace_id", "api_imported_exulanica_from")
-    print(json.dumps({key: state[key] for key in (*shown, "api_health", "app")}, indent=2))
+    extra = ("society_playback",) if arguments.society_playback else ()
+    print(json.dumps({key: state[key] for key in (*shown, "api_health", "app", *extra)}, indent=2))
     print(f"app: http://localhost:{chosen['vite']}/  token file: {token_file}")
 
 
@@ -779,7 +841,7 @@ def status(arguments: argparse.Namespace) -> None:
     state = json.loads(state_file.read_text())
     for name, pid in state["pids"].items():
         print(f"{name}: pid {pid} {'alive' if command_of(pid) else 'gone'}")
-    shown = ("tree", "ports", "run_dir", "workspace_id", "database")
+    shown = ("tree", "ports", "run_dir", "workspace_id", "database", "society_playback")
     print(json.dumps({key: state.get(key) for key in shown}, indent=2))
 
 
@@ -845,6 +907,18 @@ def build_parser() -> argparse.ArgumentParser:
                 "--production",
                 action="store_true",
                 help="serve a production build with vite preview instead of the development server",
+            )
+            command.add_argument(
+                "--society-playback",
+                action="store_true",
+                help="the API advances this run's workspace's playing societies on its own "
+                "(default: it advances nothing)",
+            )
+            command.add_argument(
+                "--society-tick-interval-ms",
+                type=int,
+                help="with --society-playback, the host's base wait between simulated minutes "
+                "(default: the API's declared default)",
             )
     return parser
 

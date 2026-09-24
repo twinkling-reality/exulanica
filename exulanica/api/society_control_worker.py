@@ -13,9 +13,49 @@ from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
 from exulanica.selection.validation import Session
 from exulanica.world.society_control_repository import SocietyControlRepository
-from exulanica.world.society_controls import LeaseLost, validate_settings
+from exulanica.world.society_controls import (
+    DEFAULT_BASE_TICK_INTERVAL_MS,
+    LeaseLost,
+    validate_settings,
+)
 
 _LOG = logging.getLogger(__name__)
+
+#: Why this host does not advance a workspace's playing societies on its own, by code, in the
+#: words a person reads beside the playback control.
+HOST_PLAYBACK_REFUSALS = {
+    "no_playback_worker": (
+        "This server does not advance worlds on their own. Advance one simulated minute at a time."
+    ),
+    "playback_worker_stopped": (
+        "This server's playback has stopped, so this world does not advance on its own until "
+        "the server is restarted. Advance one simulated minute at a time."
+    ),
+    "workspace_not_played": (
+        "This server advances other worlds on their own, not this one. Advance one simulated "
+        "minute at a time."
+    ),
+}
+
+
+def host_playback_refusal(
+    worker: SocietyControlWorker | None,
+    thread: threading.Thread | None,
+    workspace: uuid.UUID,
+) -> str | None:
+    """Why this host does not play ``workspace``, by a code of ``HOST_PLAYBACK_REFUSALS``, or None.
+
+    It plays a workspace when its worker thread is alive and the worker's last authority snapshot
+    names the workspace. The snapshot is the one the worker's own rounds use, so a workspace that
+    account discovery drops stops being played here in the same round it stops being claimed.
+    """
+    if worker is None:
+        return "no_playback_worker"
+    if thread is None or not thread.is_alive():
+        return "playback_worker_stopped"
+    if workspace not in worker.workspaces:
+        return "workspace_not_played"
+    return None
 
 
 class SocietyControlWorker:
@@ -26,7 +66,7 @@ class SocietyControlWorker:
         runtime: SocietyRuntime,
         workspaces: Iterable[uuid.UUID],
         workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
-        base_tick_interval_ms: int = 1000,
+        base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS,
     ) -> None:
         validate_settings("paused", 1, base_tick_interval_ms)
         self.database, self.runtime = database, runtime
