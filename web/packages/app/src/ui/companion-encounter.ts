@@ -238,11 +238,14 @@ export function buildCompanionEncounter(
         action.label,
       ]);
     }
+    // The key cap stays visible beside the words and is left out of the button's accessible name.
     const button = el('button', {
       type: 'button',
       class: 'companion-prompt-action companion-prompt-button',
-      text: action.label,
-    });
+    }, [
+      ...(action.key === undefined ? [] : [el('b', { text: action.key, 'aria-hidden': 'true' })]),
+      action.label,
+    ]);
     button.addEventListener('click', () => options.onFirstUseAction?.(action));
     return button;
   };

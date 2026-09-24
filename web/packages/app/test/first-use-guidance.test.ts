@@ -24,7 +24,7 @@ describe('what the product says to somebody who has just arrived', () => {
       statement: 'This is your world. Nothing is in it yet.',
       actions: [
         { label: 'Start building', activate: 'summon-companion' },
-        { key: 'Esc', label: 'Dismiss' },
+        { key: 'Esc', label: 'Dismiss', activate: 'dismiss' },
       ],
     });
   });

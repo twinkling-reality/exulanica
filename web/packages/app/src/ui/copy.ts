@@ -303,6 +303,29 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     '{model} read the question in {duration} and could not turn it into a search of your '
     + 'photographs.',
 
+  // -- the controls attached to the live world, and its photo drawer --------------------------
+  'worldControls.label': 'World controls',
+  'worldControls.title': 'World title',
+  'worldControls.save': 'Save',
+  'worldControls.saving': 'Saving…',
+  'worldControls.saved': 'Saved',
+  'worldControls.saveFailed': 'Could not save. Reload if this world changed elsewhere.',
+  'worldControls.world': 'World',
+  'worldControls.openWorld': 'Open World menu',
+  'worldControls.addObject': 'Add object',
+  'worldControls.addPhotos': 'Add photos',
+  'photosDrawer.kicker': 'World sources',
+  'photosDrawer.title': 'Add photos',
+  'photosDrawer.return': 'Return to world',
+
+  // -- what somebody who has just arrived is told (`first-use-guidance.ts`) -----------------
+  'firstUse.welcome': 'This is your world. Nothing is in it yet.',
+  'firstUse.startBuilding': 'Start building',
+  'firstUse.dismiss': 'Dismiss',
+  'firstUse.orientation': 'Look around with the mouse.',
+  'firstUse.walk': 'Walk',
+  'firstUse.callCompanion': 'Call your Companion',
+
   // -- what the About panel says the open world is ----------------------------------------
   //
   // One sentence per ground the renderer can stand a world on, chosen by the ground's form in

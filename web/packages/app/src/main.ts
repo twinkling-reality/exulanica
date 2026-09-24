@@ -660,8 +660,11 @@ async function mount(): Promise<void> {
       shellState.primary === 'menu' || shellState.primary === 'options' ||
       shellState.primary === 'controls' || shellState.primary === 'character' ||
       shellState.primary === 'experiment' || shellState.primary === 'photos',
-    onFirstUseAction: (action) => {
-      if (action.activate === 'summon-companion') runFirstUseAction();
+    onFirstUseAction: ({ activate }) => {
+      if (activate === 'summon-companion') runFirstUseAction();
+      // What Escape does on the welcome (composition/input-modes.ts), from a real control.
+      else if (activate === 'dismiss') finishFirstUse();
+      else if (activate !== undefined) throw new Error(`no first-use action ${activate satisfies never}`);
     },
     ...(placeNames === undefined ? {} : { placeNames }),
     ...(isAuthoredStarter ? {

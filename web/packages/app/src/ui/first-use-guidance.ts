@@ -1,3 +1,5 @@
+import { say } from './copy.js';
+
 export const FIRST_USE_GUIDANCE_KEY = 'exulanica.atlas.first-use.v3';
 
 /** What the retired four-state orientation wrote. A device that finished it is not greeted again. */
@@ -9,8 +11,12 @@ export type FirstUseMode = 'traverse' | 'converse';
 export interface FirstUsePromptAction {
   readonly label: string;
   readonly key?: string;
-  /** A real surface action. Key-labelled entries remain orientation, never simulated controls. */
-  readonly activate?: 'summon-companion';
+  /**
+   * A real control and what it does. With `key` as well, the key cap names the key that already
+   * does the same thing; the control calls the action itself and never simulates the key. An entry
+   * without `activate` is orientation text, never a control.
+   */
+  readonly activate?: 'summon-companion' | 'dismiss';
 }
 
 export interface FirstUsePrompt {
@@ -96,20 +102,21 @@ export function createFirstUseGuidance(
 
   const welcome: FirstUsePrompt = Object.freeze({
     kind: 'welcome',
-    statement: 'This is your world. Nothing is in it yet.',
+    statement: say('firstUse.welcome'),
     actions: Object.freeze([
-      { label: 'Start building', activate: 'summon-companion' as const },
-      { key: 'Esc', label: 'Dismiss' },
+      { label: say('firstUse.startBuilding'), activate: 'summon-companion' as const },
+      { key: 'Esc', label: say('firstUse.dismiss'), activate: 'dismiss' as const },
     ]),
   });
 
   const orientation: FirstUsePrompt = Object.freeze({
     kind: 'orientation',
-    statement: 'Look around with the mouse.',
+    statement: say('firstUse.orientation'),
+    // Text only: the pointer is locked while this shows, so nothing on it could be clicked.
     actions: Object.freeze([
-      { key: 'W A S D', label: 'Walk' },
-      { key: 'X', label: 'Call your Companion' },
-      { key: 'Esc', label: 'Dismiss' },
+      { key: 'W A S D', label: say('firstUse.walk') },
+      { key: 'X', label: say('firstUse.callCompanion') },
+      { key: 'Esc', label: say('firstUse.dismiss') },
     ]),
   });
 

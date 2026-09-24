@@ -67,6 +67,32 @@ describe('world-owned interface style contract', () => {
     );
   });
 
+  it('scrolls the photo drawer beneath its header, never under it', () => {
+    const rule = (selector: string): string => {
+      const found = [...redesignStyles.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^}]*)\}/g)]
+        .filter((match) => match[1]?.trim() === selector);
+      expect(found, selector).toHaveLength(1);
+      return found[0]?.[2] ?? '';
+    };
+    // The drawer itself does not scroll: its header and body are stacked in it.
+    const drawer = rule('#shell .photos-drawer');
+    expect(drawer).toMatch(/overflow:\s*hidden/);
+    expect(drawer).toMatch(/flex-direction:\s*column/);
+    // Only the body scrolls, so its scrollport starts where the header ends.
+    const body = rule('#shell .photos-drawer-body');
+    expect(body).toMatch(/overflow:\s*auto/);
+    expect(body).toMatch(/min-height:\s*0/);
+    // A focus ring at the body's top edge stays inside it, sized from the ring's own tokens.
+    expect(body).toMatch(
+      /scroll-padding-block:\s*calc\(var\(--focus-ring-width\) \+ var\(--focus-ring-offset\)\)/,
+    );
+    expect(redesignStyles).toMatch(
+      /:focus-visible \{ outline: var\(--focus-ring-width\) solid var\(--focus\); outline-offset: var\(--focus-ring-offset\); \}/,
+    );
+    expect(rule('#shell .photos-drawer-header')).not.toMatch(/position:\s*sticky|margin:\s*-/);
+    expect(redesignStyles).not.toMatch(/\.photos-drawer[^{]*\{[^}]*position:\s*sticky/);
+  });
+
   it('defines one open Companion arrival animation', () => {
     const allStyles = [baseStyles, redesignStyles, companionStyles].join('\n');
     const animatedOpenRules = allStyles.match(

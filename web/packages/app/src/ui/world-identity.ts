@@ -1,4 +1,5 @@
 import type { SavedWorldEntry } from '../world-entry-api.js';
+import { say } from './copy.js';
 import { el } from './dom.js';
 
 export interface WorldIdentity {
@@ -21,24 +22,24 @@ export function buildWorldIdentity(deps: {
   let current = deps.entry;
   let saving = false;
   const title = el('input', {
-    type: 'text', maxlength: 200, value: current.title, 'aria-label': 'World title',
+    type: 'text', maxlength: 200, value: current.title, 'aria-label': say('worldControls.title'),
   }) as HTMLInputElement;
-  const save = el('button', { type: 'submit', class: 'world-title-save', text: 'Save' });
+  const save = el('button', { type: 'submit', class: 'world-title-save', text: say('worldControls.save') });
   const status = el('span', {
     class: 'world-title-status', role: 'status', 'aria-live': 'polite',
   });
   const form = el('form', { class: 'world-title-form' }, [title, save, status]);
   const photos = el('button', {
-    type: 'button', class: 'world-add-photos', text: 'Add photos',
+    type: 'button', class: 'world-add-photos', text: say('worldControls.addPhotos'),
   });
   const addObject = el('button', {
-    type: 'button', class: 'world-add-object', text: 'Add object',
+    type: 'button', class: 'world-add-object', text: say('worldControls.addObject'),
   });
   const world = el('button', {
-    type: 'button', class: 'world-open-menu', text: 'World',
-    'aria-label': 'Open World menu',
+    type: 'button', class: 'world-open-menu', text: say('worldControls.world'),
+    'aria-label': say('worldControls.openWorld'),
   });
-  const root = el('aside', { class: 'world-identity', 'aria-label': 'World controls' }, [
+  const root = el('aside', { class: 'world-identity', 'aria-label': say('worldControls.label') }, [
     form,
     world,
     addObject,
@@ -47,19 +48,20 @@ export function buildWorldIdentity(deps: {
 
   const close = el('button', {
     type: 'button', class: 'photos-drawer-close',
-    'aria-label': 'Return to world', text: 'Return to world',
+    'aria-label': say('photosDrawer.return'), text: say('photosDrawer.return'),
   });
   const photosDrawer = el('section', {
     class: 'photos-drawer', 'aria-labelledby': 'photos-drawer-title', hidden: true,
   }, [
     el('header', { class: 'photos-drawer-header' }, [
       el('div', {}, [
-        el('p', { class: 'overlay-kicker', text: 'World sources' }),
-        el('h2', { id: 'photos-drawer-title', text: 'Add photos' }),
+        el('p', { class: 'overlay-kicker', text: say('photosDrawer.kicker') }),
+        el('h2', { id: 'photos-drawer-title', text: say('photosDrawer.title') }),
       ]),
       close,
     ]),
-    deps.personalIntake,
+    // The body scrolls and the header does not, so nothing scrolled or focused lands under it.
+    el('div', { class: 'photos-drawer-body' }, [deps.personalIntake]),
   ]);
 
   const reflect = (): void => {
@@ -84,14 +86,14 @@ export function buildWorldIdentity(deps: {
     const candidate = title.value.trim();
     if (saving || candidate.length === 0 || candidate === current.title) return;
     saving = true;
-    status.textContent = 'Saving…';
+    status.textContent = say('worldControls.saving');
     reflect();
     void deps.rename(candidate).then((entry) => {
       current = entry;
       title.value = entry.title;
-      status.textContent = 'Saved';
+      status.textContent = say('worldControls.saved');
     }).catch(() => {
-      status.textContent = 'Could not save. Reload if this world changed elsewhere.';
+      status.textContent = say('worldControls.saveFailed');
     }).finally(() => {
       saving = false;
       reflect();

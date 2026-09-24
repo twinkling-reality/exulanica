@@ -4,6 +4,7 @@ import type { Turn, TurnOption } from '@exulanica/companion-runtime';
 import { AskUnavailable, type CompanionAnswer } from '../src/companion-ask-api.js';
 import { buildCompanionPanel } from '../src/ui/companion-panel.js';
 import { say } from '../src/ui/copy.js';
+import { createFirstUseGuidance } from '../src/ui/first-use-guidance.js';
 
 /**
  * The rules the Companion's panel carries, checked against what actually renders.
@@ -408,6 +409,25 @@ describe('nothing stands on screen until it is called', () => {
       label: 'Start building', activate: 'summon-companion',
     });
     expect(panel.root.querySelector('.companion-speech')).toBeNull();
+  });
+
+  it('offers Dismiss on the welcome as a real control with its key cap, and none while walking', () => {
+    const onFirstUseAction = vi.fn();
+    const panel = buildCompanionPanel(NOOP, { onFirstUseAction });
+    const guidance = createFirstUseGuidance({ getItem: () => null, setItem: () => undefined });
+    panel.setFirstUsePrompt(guidance.prompt('converse'));
+    const dismiss = [...panel.root.querySelectorAll<HTMLButtonElement>('button.companion-prompt-button')]
+      .find((button) => button.textContent?.includes('Dismiss'));
+    expect(dismiss?.type).toBe('button');
+    expect(dismiss?.querySelector('b')?.textContent).toBe('Esc');
+    expect(dismiss?.querySelector('b')?.getAttribute('aria-hidden')).toBe('true');
+    dismiss?.click();
+    expect(onFirstUseAction).toHaveBeenCalledWith({ key: 'Esc', label: 'Dismiss', activate: 'dismiss' });
+
+    // The orientation shows while the pointer is locked, so its Esc stays words, not a control.
+    panel.setFirstUsePrompt(guidance.prompt('traverse'));
+    expect(panel.root.querySelector('button')).toBeNull();
+    expect(panel.root.querySelector('.companion-prompt-actions')?.textContent).toContain('EscDismiss');
   });
 
   it('renders the unnamed Companion call as one compact instruction', () => {

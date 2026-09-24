@@ -57,6 +57,10 @@ describe('world identity controls', () => {
     identity.setPhotosVisible(true);
     expect(identity.photosDrawer.hidden).toBe(false);
     expect(identity.photosDrawer.contains(intake)).toBe(true);
+    // The header is the drawer's sibling of the scrolling body, never inside what scrolls.
+    const body = identity.photosDrawer.querySelector('.photos-drawer-body');
+    expect(body?.contains(intake)).toBe(true);
+    expect(body?.contains(identity.photosDrawer.querySelector('.photos-drawer-header'))).toBe(false);
   });
 
   it('returns from the photo workspace to the world canvas with an explicit destination label', () => {
