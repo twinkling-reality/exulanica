@@ -533,6 +533,24 @@ Destruction is the separate cascade this section describes, and it has not been 
 maps yet; what holds today is that nothing serves them. A map published before the binding existed
 is unaffected, because nothing here invents a right for a photograph processed before rights did.
 
+**Where a person gives a model right.** In the photo drawer, each right is its own tick, unticked,
+beside the notice the server states for it. Authorizing processing offers the three rights a
+grounded Companion answer needs: the vision model, which is sent a copy of each photograph, reduced
+if it is large, with the people in it visible, because it is the model that finds them; the
+embedding model, which is sent the descriptions made from it; and the composer, which is sent the
+descriptions and dates of the photographs a question finds. Recording the human review offers the
+depth estimate. `GET /personal-admission` states every offered right in `model_right_offers`: its
+notice, filled from [`model-right-uses.v1.json`](../exulanica/ingest/model-right-uses.v1.json) with
+the host and every model of the role's chain, and the words that stop it. The browser keeps no copy
+of any of them, sends the notice back unchanged, and the server refuses any other text (rule P6). A
+role the app does not offer, such as a local segmentation role, is granted through the route only
+with no notice, as it was before any hosted role had words. Each saved photograph lists every role
+given over it with the end of its recorded term, and one stop per role, which withdraws every
+current right of that role over that photograph, because a request to the role can reach every model
+of its chain. A right granted through the API before its role had stated words keeps its own terms
+until its term or authority ends or the person stops it, and the drawer says it was allowed without
+the wording shown.
+
 **What leaves for a hosted model is decided at one point.** Every request the product sends to a
 hosted model passes the policies attached to its `ModelClient` before anything else is done with
 it, and a client with no policy refuses to send (`exulanica/models/client.py`,

@@ -154,19 +154,26 @@ a depth model nor a geometry segmenter. Hosted vision still requires the deploym
 model client and spending guard; admission does not create a spending authorization.
 
 The optional `model_rights` list (at most eight entries, default empty) is how the account holder
-lets models receive the admitted photographs. Each entry is `{"role": ..., "valid_until": ...}`
-naming a role the manifest states: a hosted role such as `vision` or `embedding`, or a local role
-(`object_segmentation`, `open_vocabulary_detection`, `depth`). The server records one right per
+lets models receive the admitted photographs. Each entry is
+`{"role": ..., "valid_until": ..., "notice": ...}` naming a role the manifest states: a hosted role
+such as `vision` or `embedding`, or a local role (`object_segmentation`,
+`open_vocabulary_detection`, `depth`). `GET /personal-admission` states, in `model_right_offers`,
+each role the app offers, with the notice a person reads before allowing it and `offered_with`, the
+admission the app offers it with: `review` for `depth`, `detect` for `vision`, `embedding` and
+`reasoning_cheap`. An offered role's entry must carry that notice exactly, and any other text, or
+none, is refused; any other role is granted only with no notice. The server records one right per
 member for every model the role can reach, under that member's new personal authority, granted by
-the session actor at `recorded_at`. Each role appears once, and each term must end in the future
-and no later than the authority. `depth` names the MoGe checkpoint the manifest pins as
-`local_roles.depth`, the one the derivative worker loads. The whole list is validated before any
-receipt is written. Each response receipt carries
-`model_right_ids` and `model_rights` (identity, destination, term and receipt digest, never the
-purpose). A batch that names no role records no right, and the worker then sends its photographs to
-no model. A replay with the same `request_id` reports each granted right as `current` or `ended`,
-and `GET /personal-admission` lists the rights the actor granted over each source. Neither answer is
-a permission. `POST /personal-admission/model-rights/{right_id}/withdraw` ends one right.
+the session actor at `recorded_at`, and the authority's scope records each role's term and notice.
+Each role appears once, and each term must end in the future and no later than the authority.
+`depth` names the MoGe checkpoint the manifest pins as `local_roles.depth`, the one the derivative
+worker loads. The whole list is validated before any receipt is written. Each response receipt
+carries `model_right_ids` and `model_rights` (identity, destination, term and receipt digest, never
+the purpose). A batch that names no role records no right, and the worker then sends its photographs
+to no model. A replay with the same `request_id` reports each granted right as `current` or `ended`,
+and `GET /personal-admission` lists the rights the actor granted over each source, each with
+`notice_current`, true only when the server states words for the right's role and the right was
+granted against exactly those words. Neither answer is a permission.
+`POST /personal-admission/model-rights/{right_id}/withdraw` ends one right.
 
 For `review`, supply `reviewed_by_name`, `attestation`, and either `no-person` or `confirmed-regions`
 on every member. The attestation must exactly read:
