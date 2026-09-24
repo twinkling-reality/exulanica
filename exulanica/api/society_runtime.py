@@ -29,6 +29,7 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from exulanica.canonical import canonical_json
+from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.db.session import set_workspace
 from exulanica.environment.admission import MAX_ENVIRONMENT_PAYLOAD_BYTES
 from exulanica.environment.district_geometry import DistrictGeometry, segment_blocked
@@ -260,7 +261,12 @@ class SocietyRuntime:
             (str(session.workspace_id),),
         )
         if assets:
-            connection.execute("select asset_read_lock()")
+            lock_asset_reads_until_commit(
+                connection,
+                outside=(
+                    "a society's inputs are locked only inside the transaction that records them"
+                ),
+            )
 
     def _version(
         self, connection: psycopg.Connection, session: Session, binding: SocietyRuntimeBinding
@@ -948,7 +954,12 @@ class SocietyRuntime:
             ).fetchone()
             if row is None or not society_engine(row["engine_version"]).takes_inputs:
                 return
-            connection.execute("select asset_read_lock()")
+            lock_asset_reads_until_commit(
+                connection,
+                outside=(
+                    "an accepted edit reaches a society only inside the transaction that records it"
+                ),
+            )
             genesis = connection.execute(
                 "select document->>'profile' as profile from world_society_input "
                 "where workspace_id=%s and society_id=%s and input_seq=1",

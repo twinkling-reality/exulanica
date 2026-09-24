@@ -28,8 +28,16 @@ A busy lock is waited for. A caller that will not wait passes ``wait=False`` or 
 ``lock_timeout``; either way a busy lock is refused with :class:`AssetReadLockBusy`, the read-only
 transaction is rolled back, and nothing has been read.
 
-``tests/test_final_read_check.py`` refuses a module that takes the lock inside a read-only
-transaction by hand, and lists the modules that take it inside a writer's own transaction instead.
+**A writer's own last question** is the other use of the same lock. A writer that asks a permission
+again just before it commits (an authored edit's source authority, a society's inputs, a standpoint
+record) takes the lock inside its own write transaction, through
+:func:`lock_asset_reads_until_commit`, after any lock it takes first (the workspace lock first,
+always). A withdrawal then either committed before the question and is seen by it, or waits until
+the write commits. Outside an open transaction the lock would end with its own statement and
+protect nothing, so that is refused with :class:`NotInsideAWrite`.
+
+``tests/test_final_read_check.py`` refuses a module other than this one that names the lock, so
+both uses are made here and nowhere else.
 """
 
 from __future__ import annotations
@@ -42,7 +50,13 @@ from typing import Final
 import psycopg
 from psycopg.pq import TransactionStatus
 
-__all__ = ["AssetReadLockBusy", "ConnectionNotIdle", "final_read_check"]
+__all__ = [
+    "AssetReadLockBusy",
+    "ConnectionNotIdle",
+    "NotInsideAWrite",
+    "final_read_check",
+    "lock_asset_reads_until_commit",
+]
 
 #: How a check that will not wait says so, for its own transaction only. PostgreSQL states
 #: ``lock_timeout`` in whole milliseconds and reads zero as "wait for ever", so one millisecond is
@@ -63,6 +77,13 @@ class AssetReadLockBusy(psycopg.errors.LockNotAvailable):
 
     A :class:`~psycopg.errors.LockNotAvailable`, which is what a session ``lock_timeout`` raises
     here without this class, so a caller catching that catches this.
+    """
+
+
+class NotInsideAWrite(ValueError):
+    """The connection holds no open transaction, so the lock would end with its own statement.
+
+    A :class:`ValueError`, like :class:`ConnectionNotIdle`, carrying the caller's own sentence.
     """
 
 
@@ -91,3 +112,17 @@ def final_read_check(
                 "the asset read lock is busy and this check does not wait for it"
             ) from busy
         yield connection.execute("select statement_timestamp() as at").fetchone()["at"]
+
+
+def lock_asset_reads_until_commit(connection: psycopg.Connection, *, outside: str) -> None:
+    """Take the global asset read lock inside the caller's open write transaction, until it ends.
+
+    Call it after every lock the write takes first and immediately before the last question the
+    write asks, so that no withdrawal commits between that question and the write's commit. A busy
+    lock is waited for, as the write's other locks are. ``outside`` is the sentence
+    :class:`NotInsideAWrite` carries when the connection has no open transaction, naming what the
+    caller writes; nothing is sent then.
+    """
+    if connection.info.transaction_status != TransactionStatus.INTRANS:
+        raise NotInsideAWrite(outside)
+    connection.execute("select asset_read_lock()")

@@ -29,6 +29,7 @@ from typing import Any
 import psycopg
 
 from exulanica.canonical import canonical_json
+from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
@@ -444,7 +445,12 @@ class EnvironmentSourceAuthority:
             self._require_bytes(row["source_sha256"], row["render_sha256"], index_digest)
 
     def final_authorization(self, instance: EnvironmentInstance) -> None:
-        self.connection.execute("select asset_read_lock()")
+        lock_asset_reads_until_commit(
+            self.connection,
+            outside=(
+                "an environment instance is authorized only inside the transaction that writes it"
+            ),
+        )
         self.require_current(instance, require_bytes=False, validate_feature_bytes=False)
 
     def availability(self, instance: EnvironmentInstance) -> str:

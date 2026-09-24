@@ -35,6 +35,7 @@ from typing import Any
 
 import psycopg
 
+from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.reconstruction.validation import (
@@ -293,7 +294,12 @@ class PointMapSourceAuthority:
         while this runs, so it is either seen here or it waits, and an edit that committed against
         a permission that ended mid-transaction cannot exist.
         """
-        self.connection.execute("select asset_read_lock()")
+        lock_asset_reads_until_commit(
+            self.connection,
+            outside=(
+                "a photograph's point map is authorized only inside the transaction that writes it"
+            ),
+        )
         self.require_current(instance)
 
     def require_current(self, instance: PointMapInstance) -> None:

@@ -50,6 +50,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.canonical import canonical_json
+from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.reconstruction.standpoint_record import STANDPOINT_KIND, STANDPOINT_STAGE
 
 if TYPE_CHECKING:
@@ -490,7 +491,10 @@ def _join_and_write(
         # The final check: under the global asset read lock, every member the join read is asked
         # again, in the transaction that writes the record. A withdrawal that committed while the
         # join ran is seen here, and one that has not committed yet waits for this to finish.
-        repository.connection.execute("select asset_read_lock()")
+        lock_asset_reads_until_commit(
+            repository.connection,
+            outside="a standpoint record is published only inside the transaction that writes it",
+        )
         for state in _member_states(
             repository, uuid.UUID(outcome["job_id"]), _placement(store, placement_sha256)
         ):

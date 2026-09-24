@@ -6,12 +6,15 @@ waited for when the caller will not wait, whether it tells the helper or sets it
 timeout. What each caller does under the check is held in
 ``tests/test_final_read_check_callers.py``.
 
-Then the ratchet, in the style of ``tests/test_workspace_lock.py``. A module that takes
-``asset_read_lock()`` inside a read-only transaction by hand fails, and so does a module that
-restates the key the lock takes. Taking the lock inside a writer's own transaction is a different
-act, and the modules that do it are listed with their reasons and counts; the list may only shrink.
-What the scan cannot see is SQL assembled from fragments that never spell the function's name,
-which is why the helper, not a copy, is the way a module makes the check.
+Then the writer's half: :func:`lock_asset_reads_until_commit` refuses a connection with no open
+transaction, where the lock would end with its own statement, and inside one holds the lock until
+the write commits, so a check made meanwhile waits or is refused.
+
+Then the ratchet, in the style of ``tests/test_workspace_lock.py``. A module other than the helper
+that names ``asset_read_lock()`` fails, whether it takes the lock for a read check or inside a
+writer's own transaction, and so does a module that restates the key the lock takes. What the scan
+cannot see is SQL assembled from fragments that never spell the function's name, which is why the
+helper, not a copy, is the way a module takes the lock.
 """
 
 from __future__ import annotations
@@ -25,7 +28,13 @@ from collections.abc import Iterator
 import psycopg
 import pytest
 from exulanica.db import read_check
-from exulanica.db.read_check import AssetReadLockBusy, ConnectionNotIdle, final_read_check
+from exulanica.db.read_check import (
+    AssetReadLockBusy,
+    ConnectionNotIdle,
+    NotInsideAWrite,
+    final_read_check,
+    lock_asset_reads_until_commit,
+)
 from psycopg.pq import TransactionStatus
 
 from test_final_read_check_callers import OPENING, WILL_NOT_WAIT, Recording
@@ -34,20 +43,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 HELPER = "exulanica/db/read_check.py"
 MIGRATION = ROOT / "exulanica/migrations/0041_guard_asset_reads_with_current_permission.sql"
 
-#: Modules that take ``asset_read_lock()`` by hand, with how many times. Each takes it inside a
-#: writer's own transaction, not as a final read check. May only shrink.
-IN_A_WRITERS_TRANSACTION = {
-    # An authored edit asks its source authority again under the lock, inside the edit's own
-    # transaction, after the edit's rows are written and immediately before it commits.
-    "exulanica/world/environment_source_authority.py": 1,
-    "exulanica/world/point_map_source_authority.py": 1,
-    # A society input is recorded in its writer's transaction, under the workspace lock first and
-    # the asset read lock second, the order every writer that takes both keeps.
-    "exulanica/api/society_runtime.py": 2,
-}
-
 #: The sentence the helper's refusal carries in these tests.
 NOT_IDLE = "a test read is checked only on an idle connection"
+
+#: The sentence the writer's refusal carries in these tests.
+OUTSIDE = "a test write is locked only inside the transaction that writes it"
 
 #: A bound on every statement while another connection holds the lock, so that a check which waits
 #: when told not to fails with QueryCanceled instead of hanging the run.
@@ -196,12 +196,44 @@ def test_a_session_that_will_not_wait_is_given_the_same_refusal(ingest_spine):
     assert repository.connection.info.transaction_status == TransactionStatus.IDLE
 
 
+# -- the writer's half ---------------------------------------------------------------------------
+
+
+def test_a_write_with_no_open_transaction_is_refused_before_anything_is_sent(ingest_spine):
+    connection = ingest_spine[0].connection
+    recording = Recording(connection)
+    assert connection.info.transaction_status == TransactionStatus.IDLE
+    with pytest.raises(NotInsideAWrite) as refused:
+        lock_asset_reads_until_commit(recording, outside=OUTSIDE)
+    assert isinstance(refused.value, ValueError)
+    assert str(refused.value) == OUTSIDE
+    assert recording.statements == []
+
+
+def test_a_writers_lock_is_held_until_its_transaction_ends(ingest_spine):
+    """A check made while the write is open is refused when it will not wait, and passes after."""
+    repository, open_another = ingest_spine
+    writer = open_another()
+    recording = Recording(writer.connection)
+    with recording.transaction():
+        lock_asset_reads_until_commit(recording, outside=OUTSIDE)
+        with (
+            pytest.raises(AssetReadLockBusy),
+            final_read_check(repository.connection, not_idle=NOT_IDLE, wait=False),
+        ):
+            pytest.fail("the check read while a write held the lock")
+    assert recording.statements == ["BEGIN", OPENING[2], "COMMIT"]
+    with final_read_check(repository.connection, not_idle=NOT_IDLE, wait=False) as at:
+        assert isinstance(at, dt.datetime)
+
+
 # -- the ratchet -----------------------------------------------------------------------------------
 
 
-def test_only_a_writers_own_transaction_takes_the_lock_by_hand():
+def test_no_module_but_the_helper_takes_the_lock():
+    """A read check and a writer's own last question are both made through the helper."""
     found = {name: count for name, tree in _modules() if (count := _takes_the_lock(tree))}
-    assert found == IN_A_WRITERS_TRANSACTION
+    assert found == {}
 
 
 def test_no_module_takes_the_lock_inside_a_read_only_transaction_by_hand():
