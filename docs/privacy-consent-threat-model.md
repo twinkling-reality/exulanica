@@ -570,7 +570,7 @@ decision means is stated once, in [`exulanica/consent/place_names.py`](../exulan
 
 | Term | Rule |
 | --- | --- |
-| What is offered | One use per hosted model role whose requests can honour a release, declared in [`place-name-uses.v1.json`](../exulanica/consent/place-name-uses.v1.json) with its purpose and the request paths that honour it; an offered use names at least one. It offers the embedding role, which indexes the descriptions of photographs and searches them. The Companion's planner, request classifier, drafters and composer replace every saved name before they send anything, so their roles are not offered. A role absent from that file never receives a place name |
+| What is offered | One use per hosted model role whose requests can honour a release, declared in [`place-name-uses.v1.json`](../exulanica/consent/place-name-uses.v1.json) with its purpose and the request paths that honour it; an offered use names at least one. It offers three: the embedding role, which indexes the descriptions of photographs and searches them; `reasoning_cheap`, which writes the Companion's answer; and `structured_extraction`, which reads what the account holder types to the Companion to plan a search, tell a question from a request to change the world, and draft the change. A society decision and the vision stage release no place's name, so neither is a use. A role absent from that file never receives a place name |
 | What is decided | One use at a time, meaning every model of that role's chain at the manifest's endpoint, because a request to the role can reach the fallback as well as the primary. It is stored per place, model identity and destination |
 | Default | Not allowed. A place with no decision releases nothing, and so does a request that names a model outside the chain it allowed, another destination, or the models of two roles |
 | Record | Append-only events in `place_name_right_event`, forced row-level security. Each allow and each stop is a new row after the last one for its place, model and destination, carrying the digest of the one before it (rule P5). The database refuses an update, a deletion, a row out of sequence and a stop with no grant before it |
@@ -599,19 +599,23 @@ place, and the places a Companion answer is about, show each use with its notice
 sentence and one button, "Allow" or "Stop sending".
 
 **What it does not do.** A grant sends nothing by itself: it lets a place's name stay in a request
-the product sends anyway, and only in a request that honours a release. Those are the two request
-paths the uses file names for the embedding role: the caption-vector pass and the embedding of a
-question's query. Every instance is built with the resolver above, which `build_services`
-([`exulanica/api/services.py`](../exulanica/api/services.py)) gives to the routes, the society
-runtime and the API's derivative worker; the standalone derivative worker gives its caption pass
-the same one ([`exulanica/ingest/worker_command.py`](../exulanica/ingest/worker_command.py)). The
-Companion's planner, request classifier, drafters and composer replace every saved name before
-they send, a released place's included, so a grant never reaches their requests, and the vision
-stage's policy releases no place's name, because no vision use is offered
+the product sends anyway, and only in a request that honours a release. Those are the request paths
+the uses file names for each offered role: the caption-vector pass and the embedding of a question's
+query for the embedding role, the composer for `reasoning_cheap`, and the planner, the request
+classifier and the two drafters for `structured_extraction`. The Companion's call sites replace
+every name no right can release, a person's among them, and leave a place's name to the boundary,
+with one placeholder record per question. Every instance is built with the resolver above, which
+`build_services` ([`exulanica/api/services.py`](../exulanica/api/services.py)) gives to the
+Companion's routes and the API's derivative worker; the standalone derivative worker gives its
+caption pass the same one
+([`exulanica/ingest/worker_command.py`](../exulanica/ingest/worker_command.py)). A society decision
+releases no place's name: `Services.request_policy` requires the release to be named, and the
+society runtime names `no_place_released`. The vision stage's policy releases no place's name,
+because no vision use is offered
 ([`exulanica/ingest/hosted_policy.py`](../exulanica/ingest/hosted_policy.py)).
 `tests/test_place_name_release_paths.py` holds this wiring at the transport. How every other saved
-name is kept out of a request is the redaction boundary's to state, in
-[companion-question.md, Answer and source boundaries](companion-question.md#answer-and-source-boundaries).
+name is kept out of a request is the redaction boundary's to state, in [companion-question.md,
+Answer and source boundaries](companion-question.md#answer-and-source-boundaries).
 
 ---
 

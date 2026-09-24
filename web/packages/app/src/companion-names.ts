@@ -1,11 +1,13 @@
 /**
  * The account holder's own names, put back where the server left a placeholder.
  *
- * No name the account holder saved goes to a hosted model (`exulanica/epistemics/saved_names.py`):
- * the planner and the composer are sent `[person A]` or `[place A]` instead, so an answer names a
- * person or a place only that way, and the answer's `names` says which entity each placeholder
- * stands for. This module turns a placeholder back into the name, and nothing else does: every
- * surface that shows the Companion's words draws them through one `CompanionNames`.
+ * A person's saved name never goes to a hosted model, and a place's goes only where the account
+ * holder allowed it for that place and model (`exulanica/epistemics/hosted_requests.py`): the
+ * planner and the composer are sent `[person A]` or `[place A]` instead, so an answer names a
+ * person, or a place that was not allowed, only that way, and the answer's `names` says which
+ * entity each placeholder stands for. This module turns a placeholder back into the name, and
+ * nothing else does: every surface that shows the Companion's words draws them through one
+ * `CompanionNames`.
  *
  * **The name comes from the library, never from the answer.** Which entity a placeholder stands
  * for is the server's statement, made by the redaction that wrote the placeholder. What that
