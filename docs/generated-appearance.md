@@ -220,9 +220,9 @@ the numbers are copied into `ml/appearance/evidence/baseline-measurements.log.tx
   machine and report instead. `gpu_run.ceiling_seconds` turns a ceiling into whole billed seconds at
   the day's rate, floored, so a run cannot pass it by a second: $25 at $2.63 an hour is 34,220 s.
 - **Track B has not run.**
-- **Every run is documented in the repository**, not only in the ignored evidence directory:
-  `gpu_run.document_section` writes the dated section that is appended to
-  [reference-gpu-compute.md](reference-gpu-compute.md) and committed. It names the provider and
+- **Every run is documented for a person to read**, not only in the ignored evidence directory:
+  `gpu_run.document_section` writes the dated section that is appended to the operator's GPU compute
+  document, which `.gitignore` keeps out of this repository (section 9). It names the provider and
   instance type, the rate read that day, the instance name, the creation, deadline and deletion
   instants, the hours billed, the cost at the listed rate, what the run produced by digest, and
   what it taught including the false starts. The `appearance-gpu-run` record stays beside it as the
@@ -230,8 +230,8 @@ the numbers are copied into `ml/appearance/evidence/baseline-measurements.log.tx
 - **Consent:** each deploy carries a data-sharing consent with the named provider. That consent
   is accepted before a machine is created.
 - **The instance is recorded twice:** its name, provider and hard deadline the moment it exists,
-  and again when it is deleted. Both instants and the name are in the run record and in the
-  committed ledger.
+  and again when it is deleted. Both instants and the name are in the run record and in that
+  operator ledger.
 - **The smoke job gates the session by machine-checkable conditions**
   (`exulanica.appearance-smoke-gate/v1`): both backends loaded, every output decoded at the size the
   job names, the seam ratio computed on each, seconds per image within 150 per cent of the estimate,

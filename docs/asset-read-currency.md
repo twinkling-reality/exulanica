@@ -155,8 +155,8 @@ explicit producer activation dependency. Manual review has no new unmasked bypas
 ## The investigation that preceded this contract
 
 The 152 lines above are the live read contract. The investigation that preceded it, committed before
-implementation and superseded by it, was lifted on 2026-09-09 to
-[records/2026-09-08-asset-read-currency-investigation.md](records/2026-09-08-asset-read-currency-investigation.md).
+implementation and superseded by it, was lifted on 2026-09-09 into the operator's dated records,
+which `.gitignore` keeps out of this repository.
 
 It was moved rather than deleted, because a superseded proposal that was acted on is a checkpoint
 rather than a draft: it records what was believed before the work and is the only place the

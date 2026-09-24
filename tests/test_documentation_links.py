@@ -33,9 +33,11 @@ look at paths named in prose, and those are exactly as unmovable. Without this r
 reorganisation strands them silently and the strand cannot be repaired afterwards.
 
 **Rule 3, relative links.** The same rot as rule 1, in the form the documentation actually uses
-most, read for every kind of file rule 1 reads and for links that climb with ``../``. A public
-document that links a record a clone does not hold sends every reader of the published repository
-to a missing page.
+most: every relative link the front page or a document under ``docs/`` makes, to a file or a
+directory, including links that climb with ``../``. Nothing is exempt. A document may name a
+withheld file in prose or in backticks, where rules 1 and 4 read the name against the lists below,
+but a link sends a reader to it, and a clone of the published repository cannot follow one to a
+file it does not hold.
 
 **Rule 4, code named in backticks.** A document names code the way a reader types it, as
 ``exulanica/...`` in backticks, and a file that moves leaves that name behind. Rules 1 and 3 read
@@ -56,6 +58,9 @@ path a test builds inside its sandbox, neither of which is a document and neithe
 ever arrive. ``KEPT_OUT_OF_THE_REPOSITORY`` is not a gap either: those documents
 exist and a deliberate decision keeps them out of git. If one of them ever becomes tracked, that is
 a publication, and the failure says so rather than telling a reader to go and write the file.
+
+Both lists explain a NAME. Neither excuses a LINK: rule 3 fails every markdown link to a path a
+clone lacks, explained or not, because a reader who follows it finds nothing.
 
 Neither list is a filter. Both name every path individually, because a prefix rule over
 ``docs/briefs/`` would have swallowed the two never-produced deliverables this file exists to keep
@@ -135,7 +140,6 @@ _OPERATOR_PROCESS: tuple[str, ...] = (
     "docs/judge-access.md",
     "docs/phase-10-tickets.md",
     "docs/reconstruction-throughput.md",
-    "docs/records/2026-09-08-asset-read-currency-investigation.md",
     "docs/records/2026-09-08-scene-inspection.md",
     "docs/reference-gpu-compute.md",
 )
@@ -183,8 +187,7 @@ _TEXT_SUFFIXES = {
 #: A path inside a URL belongs to somebody else's repository. MEASURED: without this, the external
 #: `deep-person-reid` model zoo link in evaluation-methodology.md reads as a local dangling path.
 _URL = re.compile(r"https?://\S+")
-#: What a document may name under ``docs/`` or link to by a relative path. One list for both
-#: rules, so a record a document links to relatively is held to what a record named in full is.
+#: What rule 1 reads as a named file under ``docs/``.
 _DOC_SUFFIXES = ("md", "jsonl", "json", "patch", "txt", "png", "py")
 #: The suffix must end the path. Without the lookahead, `runs/gates.jsonl` was read as
 #: `runs/gates.json`, a file nobody wrote: MEASURED 2026-09-23, fourteen `.jsonl` artifacts a world
@@ -192,13 +195,12 @@ _DOC_SUFFIXES = ("md", "jsonl", "json", "patch", "txt", "png", "py")
 _DOC_PATH = re.compile(
     r"docs/[A-Za-z0-9][A-Za-z0-9/._-]*\.(?:" + "|".join(_DOC_SUFFIXES) + r")(?![A-Za-z0-9_])"
 )
-#: A relative link, including one that climbs before it names anything. A pattern that required
-#: the link to start with a name skipped every ``../`` link: MEASURED 2026-09-23 at 20ee5741, 119
-#: links under ``docs/`` that rule 3 never read, three of them unresolved.
+#: A relative link to anything: every target that is not a URL or another scheme, not an anchor
+#: alone and not an absolute path, with its ``./`` and ``../`` segments first when it has them.
+#: MEASURED 2026-09-23 at 20ee5741: a pattern that required a leading name skipped 119 ``../``
+#: links, and one that read only rule 1's suffixes, with the front page left out, skipped 40 more.
 _RELATIVE_LINK = re.compile(
-    r"\]\(((?:\.\./)*[A-Za-z0-9][A-Za-z0-9/._-]*\.(?:"
-    + "|".join(_DOC_SUFFIXES)
-    + r"))(?:#[^)]*)?\)"
+    r"\]\((?![A-Za-z][A-Za-z0-9+.-]*:)((?:\.{1,2}/)*[A-Za-z0-9_][^)\s#]*)(?:#[^)]*)?\)"
 )
 
 
@@ -302,6 +304,7 @@ def _relative_references() -> list[tuple[str, str, str]]:
     """
     tracked = _tracked()
     documents = sorted(p for p in tracked if p.startswith("docs/") and p.endswith(".md"))
+    documents += [_FRONT_PAGE] if _FRONT_PAGE in tracked else []
     brief_origins = {
         (ROOT / p).read_bytes(): ROOT / os.path.dirname(p)
         for p in tracked
@@ -315,6 +318,25 @@ def _relative_references() -> list[tuple[str, str, str]]:
             target = os.path.normpath(os.path.join(base, link))
             found.append((rel, link, link if target.startswith("..") else target))
     return found
+
+
+def _unfollowable(references: list[tuple[str, str, str]], tracked: frozenset[str]) -> list[str]:
+    """Each link whose target is neither a tracked file nor a directory holding one.
+
+    No explanation excuses a link: the lists above explain names, and a link to a withheld file
+    still sends a reader to a page a clone does not have.
+    """
+    directories = {
+        os.path.dirname(path)[: index]
+        for path in tracked
+        for index in range(len(path))
+        if path[index] == "/"
+    }
+    return [
+        f"{document} -> {link}"
+        for document, link, target in references
+        if target not in tracked and target not in directories
+    ]
 
 
 #: Rule 4 reads a span in backticks as a repository path when it has a slash and starts with a
@@ -492,30 +514,56 @@ def test_frozen_brief_link_context_requires_exact_source_bytes(
 
 
 def test_a_relative_link_to_a_record_is_read_like_one_to_a_document():
-    """Positive control for rule 3: a relative link to a record names it as surely as a
-    ``docs/`` path does, and one that climbs, first or midway, is kept as written."""
+    """Positive control for rule 3's reader: a link to a record, a page, code or a directory is
+    read, one that climbs first or midway is kept as written, and a URL, an address or an anchor
+    alone is not a path."""
     text = (
-        "[a record](evaluation/x.json), [a page](other.md#part), [up](sub/../y.png) "
-        "and [out](../../z.json)"
+        "[a record](evaluation/x.json), [a page](other.md#part), [up](sub/../y.png), "
+        "[out](../../z.json), [code](../exulanica/m.ts), [here](./a.md), [a folder](sub/), "
+        "[web](https://example.org/x.md), [mail](mailto:a@b.c) and [top](#part)"
     )
     assert _RELATIVE_LINK.findall(text) == [
         "evaluation/x.json",
         "other.md",
         "sub/../y.png",
         "../../z.json",
+        "../exulanica/m.ts",
+        "./a.md",
+        "sub/",
+    ]
+
+
+def test_a_link_to_a_withheld_document_fails_where_its_name_may_stand():
+    """Positive control for rule 3's verdict: a link to a file or a directory the repository holds
+    passes, and a link to a withheld document fails although its name is explained.
+
+    The paths are assembled from ``root`` because rule 1 scans this file.
+    """
+    root = "docs"
+    withheld = f"{root}/judge-access.md"
+    assert withheld in KEPT_OUT_OF_THE_REPOSITORY, "the control needs an explained, withheld name"
+    page, record = f"{root}/a.md", f"{root}/sub/b.json"
+    tracked = frozenset({page, record})
+    references = [
+        (page, "sub/b.json", record),
+        (page, "sub/", f"{root}/sub"),
+        (page, "judge-access.md", withheld),
+        (page, "../../outside.md", "../../outside.md"),
+    ]
+    assert _unfollowable(references, tracked) == [
+        f"{page} -> judge-access.md",
+        f"{page} -> ../../outside.md",
     ]
 
 
 def test_relative_links_between_documents_resolve():
     """Rule 3, the form the documentation actually uses most."""
-    tracked = _tracked()
-    broken = [
-        f"{document} -> {link}"
-        for document, link, target in _relative_references()
-        if target not in tracked and target not in _EXPLAINED
-    ]
+    references = _relative_references()
+    assert any(document == _FRONT_PAGE for document, _, _ in references), "the front page is read"
+    broken = _unfollowable(references, _tracked())
     assert not broken, (
-        "relative documentation links that do not resolve:\n  " + "\n  ".join(sorted(broken))
+        "relative links a clone cannot follow; name a withheld file in prose instead, and say it "
+        "is kept out:\n  " + "\n  ".join(sorted(broken))
     )
 
 
@@ -756,7 +804,9 @@ def test_the_lists_of_unresolved_references_have_not_grown_silently():
     the change belongs to, and the number here is edited deliberately in the same commit.
     """
     # Retired narrative removed one private brief and three local-only campaign references.
-    assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 11, 15)
+    # Links to operator documents became prose on 2026-09-23, and the asset-read-currency
+    # investigation record, which only a link named, left the operator process tuple.
+    assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 10, 15)
     assert (len(NAMED_RELATIVE_TO), len(NAMED_ABSENT_BY_DESIGN)) == (1, 0), (
         "rule 4's explanations changed size; edit this line in the same change, and say why"
     )

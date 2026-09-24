@@ -50,7 +50,7 @@ The shape of the deployment is decided. The concrete target is not.
 | Who performs the weekly check through the unattended window | **OPEN**, section 9 |
 | Whether the health endpoint exists | **DECIDED and implemented.** `/healthz` and `/readyz`, section 6 |
 | Whether the redeploy command exists | **OPEN.** Specified in section 9 and not implemented |
-| Whether a seedable, read-mostly deployment for a reviewer exists | **EXECUTED locally 2026-09-10**, and unprovisioned. [judge-access.md](judge-access.md) |
+| Whether a seedable, read-mostly deployment for a reviewer exists | **EXECUTED locally 2026-09-10**, and unprovisioned. Recorded in the operator's reviewer-access note, which `.gitignore` keeps out of this repository |
 | Whether there is a connection pool, a subscriber bound, `blob` reference counting or a decode semaphore | **DECIDED against, on measurement.** Section 12, with the condition that would flip each one |
 | How large a host one API process needs, and what it runs out of first | **MEASURED**, section 5.4 |
 
@@ -965,8 +965,9 @@ deletion" can be enforced rather than intended. And **a reset never touches the 
 which is the rule [demo-integrity.md](demo-integrity.md) section 2.2 set before there was code to
 set it in.
 
-The steps, the measured footprint, and two list-price quotes read on one day are in
-[judge-access.md](judge-access.md). Nothing there is provisioned either: it moves the redeploy
+The steps, the measured footprint, and two list-price quotes read on one day are in the operator's
+reviewer-access note, which `.gitignore` keeps out of this repository. Nothing there is provisioned
+either: it moves the redeploy
 question in section 9.4 from "specified and not implemented" to "implemented and rehearsed for one
 audience on one machine", and it does not settle section 10.
 

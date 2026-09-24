@@ -586,8 +586,8 @@ evaluation plan.
 Infrastructure improvements follow measured bottlenecks. A useful result can be a reproducible
 scene pipeline, checkpoint recovery or an upstream fix demonstrated against an unchanged baseline.
 Vendor usage alone is not an infrastructure contribution. Nebius Token Factory inference and a
-GPU run on a different host do not establish Nebius GPU or Serverless deployment; the
-[compute findings](reference-gpu-compute.md) describe the recorded boundaries.
+GPU run on a different host do not establish Nebius GPU or Serverless deployment; the recorded
+boundaries are in the operator's compute findings, which `.gitignore` keeps out of this repository.
 
 ## Subsequent milestones
 

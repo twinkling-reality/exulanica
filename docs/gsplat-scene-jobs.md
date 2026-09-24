@@ -3,9 +3,9 @@
 Status: **CONTENT-ADDRESSED GSPLAT CONTROLLER AND RESUMABLE TRAINER**.
 `exulanica.reconstruction.splat` is the controller. `exulanica.reconstruction.gsplat_runner` is
 the trainer. CUDA training of the retained bowl collection ran through the scene worker on a
-rented NVIDIA L40S. Measured speeds and costs are in
-[the GPU compute note](reference-gpu-compute.md); the accepted-scene outcome is recorded in the
-evaluation record that accompanies the retained workflow, not asserted here.
+rented NVIDIA L40S. Measured speeds and costs are in the operator's GPU compute note, which
+`.gitignore` keeps out of this repository; the accepted-scene outcome is recorded in the evaluation
+record that accompanies the retained workflow, not asserted here.
 
 The first CUDA run found and fixed four trainer defects the CPU tests could not see: a Double seed
 scale beside Float means, a stderr digest that left the failure nameless, per-iteration JPEG
