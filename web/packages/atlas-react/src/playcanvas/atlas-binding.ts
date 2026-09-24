@@ -12,14 +12,12 @@ import type {
   EmphasisBuffers,
   FocusState,
   Island,
-  LocalVec3,
   IslandId,
   MapPresentationState,
   NavigationWorld,
   NeighborhoodId,
   NeighborhoodIndex,
   NavigationPose,
-  OwnedDistrict,
   ResidencyAction,
   ResidencyAsset,
   ResidencyCost,
@@ -55,9 +53,7 @@ import {
   exitAtlasMap,
   focusDirectly,
   isNavigationLineVisible,
-  isNavigationPositionClear,
   latchFocus,
-  localDirectionToAtlas,
   localToAtlas,
   localVec3,
   mapTierState,
@@ -89,10 +85,12 @@ import {
   authoredRegionOf,
   describeWorldKind,
   worldNavigation,
+  worldViews,
   type AuthoredRegion,
   type OwnedDistrictGround,
   type WorldKind,
 } from './world-kind.js';
+import { cityView, worldStart, type CityView } from './camera-views.js';
 import { AuthoredRegionSociety } from './society/authored-society.js';
 import type { GeneratedTileAttachment, GeneratedTileMount } from './generated-tile/binding-contract.js';
 import { PlayerAvatar } from './player-avatar.js';
@@ -555,6 +553,8 @@ export class AtlasBinding {
   readonly renderRoot: pc.Entity;
   /** Null unless explicitly feature-flagged with a key by the application. */
   googleTiles: GoogleTilesEnvironment<unknown> | null = null;
+  /** The kind of world this binding draws, decided once by `create`. */
+  worldKind!: WorldKind;
   readonly ownedDistrict: OwnedDistrictRuntime | null;
   /** The mounted evaluation tile, if the preview route asked for one. */
   generatedTile: GeneratedTileAttachment | null = null;
@@ -777,7 +777,7 @@ export class AtlasBinding {
   /** Loader must resolve a permitted pinned reference through the current authenticated asset path. */
   enableNativeCharacters(loadBytes:CharacterByteLoader):NativeCharacterRuntime{
     this.nativeCharacters??=new NativeCharacterRuntime(this.app,loadBytes);
-    if(this.ownedDistrict)this.playerAvatar??=new PlayerAvatar(this.device,this.environmentRoot);
+    if(worldViews(this.worldKind).thirdPerson)this.playerAvatar??=new PlayerAvatar(this.device,this.environmentRoot);
     this.syncNativeCharacterFrames(0,true);
     return this.nativeCharacters;
   }
@@ -793,7 +793,7 @@ export class AtlasBinding {
    * is solved after the characters are posed.
    */
   private get playerDrawn():boolean{
-    return this.playerCameraMode==='third-person'&&this.inspection===null
+    return this.playerCameraMode==='third-person'&&this.inspection===null&&this.controls.hold==='ground'
       &&!this.followCamera.occludesPlayer();
   }
   private nearbySignature='';
@@ -1082,12 +1082,13 @@ export class AtlasBinding {
       }
     }
 
+    const start = worldStart(kind, options.scene, navigationWorld);
     const controls = new FirstPersonControls(
       options.canvas,
-      worldStart(kind, options.scene, navigationWorld),
+      start.pose,
       kind.city ? { ...DEFAULT_CONTROLS, moveSpeed: 1.65, sprintMultiplier: 2.7, accelTime: .16 } : DEFAULT_CONTROLS,
       navigationWorld,
-      { groundStart: !kind.aerialStart },
+      { hold: start.hold },
     );
     controls.onCameraToggle = () => { binding.setCameraMode(binding.cameraMode === 'first-person' ? 'third-person' : 'first-person'); };
     controls.setSensitivityMultiplier(options.sensitivityMultiplier ?? 1);
@@ -1146,6 +1147,7 @@ export class AtlasBinding {
       objectRoots,
       ownedDistrict,
     );
+    binding.worldKind = kind;
     binding.authoredPointMaps = authoredPointMaps;
     binding.authoredSociety = authoredSociety;
     binding.renderRoot.enabled = kind.memoryLayerVisible;
@@ -1646,7 +1648,7 @@ export class AtlasBinding {
   get cameraMode(): PlayerCameraMode { return this.playerCameraMode; }
 
   setCameraMode(mode: PlayerCameraMode): void {
-    if (this.ownedDistrict === null) return;
+    if (!worldViews(this.worldKind).thirdPerson) return;
     this.playerCameraMode = mode;
     this.followCamera.reset();
     this.playerAvatar ??= new PlayerAvatar(this.device, this.environmentRoot);
@@ -1662,17 +1664,12 @@ export class AtlasBinding {
     return { origin: [position.x + this.renderOriginState.origin.x, position.y + this.renderOriginState.origin.y, position.z + this.renderOriginState.origin.z], direction: [forward.x, forward.y, forward.z] };
   }
 
-  setCityView(view: 'overview' | 'street'): void {
-    this.nativePlayerDiscontinuity=true;
-    if (this.googleTiles === null && this.ownedDistrict === null) return;
-    Object.assign(
-      this.controls.state,
-      this.ownedDistrict === null
-        ? cityCameraState(view)
-        : view === 'overview'
-          ? ownedDistrictOverviewCameraState(this.ownedDistrict.district)
-          : ownedDistrictCameraState(this.navigationWorld, this.ownedDistrict.district),
-    );
+  /** Set a city view and hold it as it names (`camera-views.ts`); a kind without them ignores this. */
+  setCityView(view: CityView): void {
+    const held = cityView(this.worldKind, view, this.scene, this.navigationWorld);
+    if (held === null) return;
+    this.nativePlayerDiscontinuity = true;
+    this.controls.setView(held.pose, held.hold);
     this.invalidate();
   }
 
@@ -2067,6 +2064,8 @@ export class AtlasBinding {
     if (!this.memoryLayerVisible) this.setMemoryLayerVisible(true);
     if (this.mapState !== null) this.setMapMode(false);
     const planned = planDirectNavigationTransition(resolution, state, reducedMotion);
+    // The journey lands on the ground, so the frames after it are walked, even from an overview.
+    this.controls.holdGround();
     // atlas-core already aims the arrival at the region itself. The previous override tilted the
     // camera up at the source veil hanging above it; with no body in the air there is nothing to
     // look up at, and the region's own landmark is what the arrival should face.
@@ -2364,10 +2363,12 @@ export class AtlasBinding {
     const groundY = s.y - this.navigationWorld.eyeHeight;
     const standingHeight = (this.playerAvatar?.body.heightMm ?? 1820) / 1000;
     const cameraPosition = this.inspection === null
-      ? this.followCamera.solve(s, this.playerCameraMode, {
+      // A view held at altitude is a camera, not a person standing: it is drawn from the eye.
+      ? this.followCamera.solve(s, this.controls.hold === 'ground' ? this.playerCameraMode : 'first-person', {
         ...(this.ownedDistrict?.district === undefined ? {} : { district: this.ownedDistrict.district }),
         requestedDistance: this.playerCameraDistance,
         aimHeight: playerCameraAimHeight(groundY, standingHeight, this.playerCameraDistance),
+        groundHeight: groundY,
         dt,
         reducedMotion: this.reducedMotion,
       })
@@ -2652,209 +2653,6 @@ export class AtlasBinding {
   }
 }
 
-/** Where the session opens in this kind of world. The Google entry is an aerial overview. */
-function worldStart(kind: WorldKind, scene: AtlasScene, navigationWorld: NavigationWorld): CameraState {
-  const ground = kind.ground;
-  switch (ground.form) {
-    case 'generated-tile':
-      return { ...ground.tile.start };
-    case 'owned-district':
-      return ownedDistrictCameraState(navigationWorld, ground.district.document);
-    case 'authored-endless':
-    case 'authored-flat': {
-      const spawn = ground.region.spawn;
-      return {
-        x: spawn.xMm / 1000,
-        y: spawn.yMm / 1000 + navigationWorld.eyeHeight,
-        z: spawn.zMm / 1000,
-        yaw: spawn.yawMicroradians / 1_000_000,
-        pitch: 0,
-      };
-    }
-    case 'scene-regions':
-      return kind.google !== null ? cityCameraState('overview') : initialAtlasCameraState(scene, navigationWorld);
-  }
-  throw new TypeError(`No start for a world standing on ${(ground as { form: string }).form}`);
-}
-
-/**
- * Where a session opens.
- *
- * The upward framing is gone with the body it framed. This used to pitch the opening camera up at
- * the source veil hanging 3.45 metres over the region, which is the one thing that made an opening
- * shot point at empty air once the veil was removed. A region now opens level, looking at its own
- * ground, where its landmark stands.
- */
-export function initialAtlasCameraState(
-  scene: AtlasScene,
-  navigationWorld: NavigationWorld,
-): CameraState {
-  const first = scene.islands[0];
-  if (first !== undefined && first.rung !== 4 && first.viewpointForwardLocal !== undefined) {
-    // A reconstructed region arrives where its first photograph was taken, looking where that
-    // camera looked. The display frame put the recovered cameras at eye height, so this is a
-    // standing viewpoint, and the first frame is the first photograph's view of the geometry.
-    return recoveredCameraState(first, first.viewpointLocal, first.viewpointForwardLocal);
-  }
-  return first === undefined
-    ? {
-        x: navigationWorld.centre.x,
-        y: (navigationWorld.surface.sample(
-          navigationWorld.centre.x,
-          navigationWorld.centre.z + 10,
-        )?.height ?? 0) + navigationWorld.eyeHeight,
-        z: navigationWorld.centre.z + 10,
-        yaw: 0,
-        pitch: -0.085,
-      }
-    : (() => {
-        const distance = Math.max(3.6, Math.min(4.4, first.footprintRadiusLocal * 0.22));
-        const x = first.placement.position.x + Math.sin(first.placement.yaw) * distance;
-        const z = first.placement.position.z + Math.cos(first.placement.yaw) * distance;
-        const height = navigationWorld.surface.sample(x, z)?.height ?? 0;
-        return { x, y: height + navigationWorld.eyeHeight, z, yaw: first.placement.yaw, pitch: -0.085 };
-      })();
-}
-
-/** Deliberate NYC viewpoints in the independent local metre frame. */
-export function cityCameraState(view: 'overview' | 'street'): CameraState {
-  return view === 'street'
-    ? { x: -25, y: 60, z: -280, yaw: Math.PI, pitch: -0.35 }
-    : { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 };
-}
-
-/** Frame the actual admitted district rather than assuming its local origin is Manhattan. */
-export function ownedDistrictOverviewCameraState(district: OwnedDistrict): CameraState {
-  if (district.buildings.length === 0) {
-    return { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 };
-  }
-  const west = Math.min(...district.buildings.map((building) => building.bbox_cm[0] / 100));
-  const north = Math.min(...district.buildings.map((building) => building.bbox_cm[1] / 100));
-  const east = Math.max(...district.buildings.map((building) => building.bbox_cm[2] / 100));
-  const south = Math.max(...district.buildings.map((building) => building.bbox_cm[3] / 100));
-  const tallest = Math.max(...district.buildings.map((building) => building.height_cm / 100));
-  const targetX = (west + east) / 2;
-  const targetZ = (north + south) / 2;
-  const span = Math.max(80, east - west, south - north);
-  const horizontal = span * 0.9;
-  const x = targetX + horizontal * 0.28;
-  const y = Math.max(65, tallest * 1.18, span * 0.52);
-  const z = targetZ + horizontal;
-  const targetY = Math.min(24, tallest * 0.28);
-  const dx = targetX - x;
-  const dz = targetZ - z;
-  return {
-    x, y, z,
-    yaw: Math.atan2(-dx, -dz),
-    pitch: Math.atan2(targetY - y, Math.hypot(dx, dz)),
-  };
-}
-
-/** Deterministic clear spawn on visible owned support, never an invisible safety floor. */
-export function ownedDistrictCameraState(
-  world: NavigationWorld,
-  district?: OwnedDistrict,
-): CameraState {
-  const landmark = district?.buildings
-    .filter((building) => building.name !== null)
-    .map((building) => {
-      const width = Math.max(1, building.bbox_cm[2] - building.bbox_cm[0]);
-      const depth = Math.max(1, building.bbox_cm[3] - building.bbox_cm[1]);
-      const slenderness = Math.max(width, depth) / Math.min(width, depth);
-      return { building, score: building.height_cm * slenderness };
-    })
-    .sort((a, b) => b.score - a.score || a.building.id.localeCompare(b.building.id))[0]?.building;
-  if (landmark !== undefined) {
-    const [west, north, east, south] = landmark.bbox_cm.map((value) => value / 100) as [
-      number, number, number, number,
-    ];
-    const targetX = (west + east) / 2;
-    const targetZ = (north + south) / 2;
-    for (const [offsetX, offsetZ] of [
-      [0, -45], [-38, -34], [38, -34], [-48, 34], [46, 36],
-    ] as const) {
-      const x = targetX + offsetX;
-      const z = targetZ + offsetZ;
-      const position = atlasVec3(x, world.eyeHeight, z);
-      if (
-        isNavigationPositionClear(world, position) &&
-        world.surface.sample(x - 3, z) !== null &&
-        world.surface.sample(x + 3, z) !== null &&
-        world.surface.sample(x, z - 3) !== null &&
-        world.surface.sample(x, z + 3) !== null
-      ) {
-        return {
-          x,
-          y: world.eyeHeight,
-          z,
-          yaw: Math.atan2(-(targetX - x), -(targetZ - z)),
-          pitch: 0.08,
-        };
-      }
-    }
-  }
-  const segmentDistance = (
-    x: number,
-    z: number,
-    ax: number,
-    az: number,
-    bx: number,
-    bz: number,
-  ): number => {
-    const dx = bx - ax;
-    const dz = bz - az;
-    const denominator = dx * dx + dz * dz;
-    const t = denominator === 0
-      ? 0
-      : Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / denominator));
-    return Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-  };
-  let best: { x: number; z: number; score: number } | null = null;
-  const extent = Math.min(340, Math.ceil(world.fieldRadius));
-  for (let z = world.centre.z - extent; z <= world.centre.z + extent; z += 10) {
-    for (let x = world.centre.x - extent; x <= world.centre.x + extent; x += 10) {
-      const position = atlasVec3(x, world.eyeHeight, z);
-      if (
-        !isNavigationPositionClear(world, position) ||
-        world.surface.sample(x - 8, z) === null ||
-        world.surface.sample(x + 8, z) === null ||
-        world.surface.sample(x, z - 8) === null ||
-        world.surface.sample(x, z + 8) === null
-      ) continue;
-      let clearance = 60;
-      for (const obstacle of world.polygonObstacles ?? []) {
-        for (const ring of obstacle.rings) {
-          for (let index = 1; index < ring.length; index += 1) {
-            const a = ring[index - 1]!;
-            const b = ring[index]!;
-            clearance = Math.min(clearance, segmentDistance(x, z, a.x, a.z, b.x, b.z));
-          }
-        }
-      }
-      const score = clearance - Math.hypot(x - world.centre.x, z - world.centre.z) * 0.015;
-      if (best === null || score > best.score) best = { x, z, score };
-    }
-  }
-  if (best !== null) {
-    const dx = world.centre.x - best.x;
-    const dz = world.centre.z - best.z;
-    return {
-      x: best.x,
-      y: world.eyeHeight,
-      z: best.z,
-      yaw: Math.atan2(-dx, -dz),
-      pitch: -0.045,
-    };
-  }
-  return {
-    x: world.centre.x,
-    y: world.eyeHeight,
-    z: world.centre.z,
-    yaw: 0,
-    pitch: 0,
-  };
-}
-
 /**
  * Residency cost of a region's placed point maps, in budget units, capped so one region always fits.
  *
@@ -2873,20 +2671,6 @@ export function pointMapResidencyCost(mapCount: number, budget: number): Residen
     coarse: Math.min(10 * mapCount, budget / 2),
     full: Math.min(24 * mapCount, budget),
   });
-}
-
-/** The controls' pose at a recovered camera: forward is (-sin yaw, 0, -cos yaw), pitch positive up. */
-export function recoveredCameraState(island: Island, viewpointLocal: LocalVec3, forwardLocal: LocalVec3): CameraState {
-  const position = localToAtlas(island.placement, viewpointLocal);
-  const forward = localDirectionToAtlas(island.placement, forwardLocal);
-  const horizontal = Math.hypot(forward.x, forward.z);
-  return {
-    x: position.x,
-    y: position.y,
-    z: position.z,
-    yaw: horizontal < 1e-9 ? island.placement.yaw : Math.atan2(-forward.x, -forward.z),
-    pitch: Math.max(-1.3, Math.min(1.3, Math.atan2(forward.y, horizontal))),
-  };
 }
 
 

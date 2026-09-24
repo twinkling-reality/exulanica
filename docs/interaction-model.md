@@ -356,6 +356,11 @@ zoom the model, choose an available look, edit its supported material colors and
 standing, walking and running animations. Controls follow the selected asset's capabilities;
 the screen does not invent garment combinations, morph targets or equipment statistics.
 Use in world applies the selected look to the existing player presentation and opens third person.
+Third person is offered in every world whose solid parts the follow camera can keep out of: a
+starter, the regions of a photo-built world and the owned district. A generated tile states no
+collision for its buildings and a Google reference draws a ground the binding has no surface for,
+so there the view stays first person and the studio says the figure is not shown
+(`worldViews` in `web/packages/atlas-react/src/playcanvas/world-kind.ts`).
 This is session appearance, explicitly not an account save. An authenticated character catalogue
 and durable character customization are not connected to this application composition.
 

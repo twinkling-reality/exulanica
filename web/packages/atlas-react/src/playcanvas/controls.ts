@@ -63,9 +63,28 @@ export interface CameraState {
   pitch: number;
 }
 
+/**
+ * What carries the pose from one frame to the next.
+ *
+ * `ground` stands it on the navigation world's surface: every move is resolved against that surface
+ * and its field, and the eye sits at eye height above it. `altitude` keeps the height a view gave
+ * it, as an overview from above does: movement pans across the world at that height and no surface
+ * resolves it. A view states its hold when it is set (`setView`); nothing infers one from a height.
+ */
+export type CameraHold = 'ground' | 'altitude';
+
 export interface PlanarMovement {
   readonly x: number;
   readonly z: number;
+}
+
+/**
+ * How far from the field's centre a view held at altitude may pan: as far as the field's recovery
+ * envelope, or as far as the view was set if that is farther. It can cross the whole field and
+ * return to where it was framed from, and it cannot drift away from the world it is looking at.
+ */
+function altitudeReachFrom(world: NavigationWorld, pose: CameraState): number {
+  return Math.max(world.recoveryRadius, Math.hypot(pose.x - world.centre.x, pose.z - world.centre.z));
 }
 
 /** Convert normalized keyboard intent into the horizontal camera basis. */
@@ -103,6 +122,9 @@ export class FirstPersonControls {
   private locked = false;
   private lastSafe: AtlasVec3 | null = null;
   private readonly navigationWorld: NavigationWorld | null;
+  private cameraHold: CameraHold;
+  /** How far from the field's centre a view held at altitude may pan; see `altitudeReachFrom`. */
+  private altitudeReach = 0;
   private spatial: SpatialClassification | null = null;
   private recoveryReason: GroundMovementResolution['recoveryReason'] = null;
   private disposers: Array<() => void> = [];
@@ -123,12 +145,13 @@ export class FirstPersonControls {
     start: CameraState,
     config = DEFAULT_CONTROLS,
     navigationWorld: NavigationWorld | null = null,
-    options: { readonly groundStart?: boolean } = {},
+    options: { readonly hold?: CameraHold } = {},
   ) {
     this.canvas = canvas;
     this.config = config;
     this.navigationWorld = navigationWorld;
     this.state = { ...start };
+    this.cameraHold = options.hold ?? 'ground';
     const initialGround = navigationWorld?.surface.sample(start.x, start.z);
     if (navigationWorld !== null && initialGround != null) {
       const grounded = initialGround.height + navigationWorld.eyeHeight;
@@ -136,12 +159,15 @@ export class FirstPersonControls {
        * Ground the start pose only when it is meant to be one.
        *
        * `flatNavigationSurface` samples everywhere and never returns null, so grounding every
-       * start pose silently teleports the deliberate aerial poses too: the city overview at
-       * y = 95 lands at roughly 0.3 with its -0.48 pitch intact, aimed at the dirt. Recovery
-       * still seeds from the grounded point either way.
+       * start pose silently teleports the deliberate aerial poses too: an overview at y = 95
+       * lands at roughly 0.3 with its downward pitch intact, aimed at the dirt. Recovery still
+       * seeds from the grounded point either way.
        */
-      if (options.groundStart !== false) this.state.y = grounded;
+      if (this.cameraHold === 'ground') this.state.y = grounded;
       this.lastSafe = atlasVec3(this.state.x, grounded, this.state.z);
+    }
+    if (navigationWorld !== null && this.cameraHold === 'altitude') {
+      this.altitudeReach = altitudeReachFrom(navigationWorld, this.state);
     }
     const previousTabIndex = canvas.getAttribute('tabindex');
     canvas.tabIndex = 0;
@@ -238,6 +264,45 @@ export class FirstPersonControls {
     return this.locked ? 'traverse' : 'converse';
   }
 
+  get hold(): CameraHold {
+    return this.cameraHold;
+  }
+
+  /**
+   * Put the camera at a view and hold it there the way the view names.
+   *
+   * A ground view is stood on the surface at once, so its first frame is already the one it keeps,
+   * and becomes the safe point recovery returns to when it is on the field. An altitude view keeps
+   * its height and pans from there.
+   */
+  setView(pose: CameraState, hold: CameraHold): void {
+    Object.assign(this.state, pose);
+    this.vx = 0;
+    this.vz = 0;
+    this.intent = Object.freeze({ x: 0, z: 0 });
+    this.cameraHold = hold;
+    const world = this.navigationWorld;
+    if (world === null) return;
+    if (hold === 'altitude') {
+      this.altitudeReach = altitudeReachFrom(world, pose);
+      return;
+    }
+    const ground = world.surface.sample(pose.x, pose.z);
+    if (ground == null) return;
+    this.state.y = ground.height + world.eyeHeight;
+    if (Math.hypot(pose.x - world.centre.x, pose.z - world.centre.z) <= world.fieldRadius) {
+      this.lastSafe = atlasVec3(pose.x, this.state.y, pose.z);
+    }
+  }
+
+  /**
+   * Stand on the ground again from wherever the pose is, as travel does: its transition ends on
+   * the surface, and the frames after it are walked.
+   */
+  holdGround(): void {
+    this.cameraHold = 'ground';
+  }
+
   get movementSpeed(): number {
     return Math.hypot(this.vx, this.vz);
   }
@@ -326,11 +391,16 @@ export class FirstPersonControls {
       this.state.y,
       this.state.z + this.vz * dt,
     );
-    if (this.navigationWorld === null) {
-      this.state.x = desired.x;
-      // A free geographic display view may deliberately be above street height. There is no
-      // provider-derived collision surface here, so movement preserves that explicit altitude.
-      this.state.z = desired.z;
+    if (this.navigationWorld === null || this.cameraHold === 'altitude') {
+      // A view held at altitude pans at the height it was given. No surface resolves it, because
+      // nothing it passes over is where anyone stands; only its distance from the field is held.
+      const world = this.navigationWorld;
+      const dx = desired.x - (world?.centre.x ?? 0);
+      const dz = desired.z - (world?.centre.z ?? 0);
+      const distance = Math.hypot(dx, dz);
+      const scale = world !== null && distance > this.altitudeReach ? this.altitudeReach / distance : 1;
+      this.state.x = (world?.centre.x ?? 0) + dx * scale;
+      this.state.z = (world?.centre.z ?? 0) + dz * scale;
       return;
     }
     const resolution = resolveGroundMovement(this.navigationWorld, {

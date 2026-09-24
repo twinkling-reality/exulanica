@@ -12,10 +12,12 @@ import { aboutWorld, aboutWorldLayers } from '../src/world-about.js';
 /*
  * The About panel ("About this place") says what the open world is, from the kind of world the
  * renderer drew, and says nothing before it knows. A person's starter world is not described as
- * a district, and toggling the memory layer changes the sentence only where the ground has a
- * layer of its own. Its camera controls follow the same kind: each view is offered only in a
- * world that carries it out (`atlas-react/test/binding/world-views.test.ts` holds that against
- * the binding), and no view that depends on the kind is offered before the kind is known.
+ * a district. Its camera controls follow the same kind: each view is offered only in a world that
+ * carries it out (`atlas-react/test/binding/world-views.test.ts` holds that against the binding),
+ * and no view that depends on the kind is offered before the kind is known. The memory layer
+ * switch is offered only where switching the layer off leaves a world drawn
+ * (`atlas-react/test/binding/world-layers.test.ts`), says what the binding shows from the start,
+ * and follows every change the binding announces.
  */
 
 const STARTER_REGION = {
@@ -54,7 +56,7 @@ function mount(worldKind: WorldKind | undefined, savedStarter: boolean) {
   });
   document.body.append(mounted.root);
   const about = () => mounted.root.querySelector<HTMLElement>('.environment-selection-source')!.textContent;
-  const memoryLayer = () => mounted.root.querySelector<HTMLInputElement>('.environment-selection-layer input')!;
+  const memoryLayer = () => mounted.root.querySelector<HTMLInputElement>('.environment-selection-layer input');
   return { mounted, binding, about, memoryLayer, controls: () => controlsIn(mounted.root) };
 }
 
@@ -84,27 +86,25 @@ const toggle = (box: HTMLInputElement, checked: boolean): void => {
 };
 
 describe('About this place states the kind of world that is open', () => {
-  it('a saved starter world is described as an authored starter, and the memory toggle keeps it so', async () => {
+  it('a saved starter world is described as an authored starter, with no memory layer switch', async () => {
     const starter = describeWorldKind({ authoredRegion: STARTER_REGION });
     const { mounted, about, memoryLayer } = mount(starter, true);
     expect(about()).toBe('');
     await mounted.begin();
     expect(about()).toBe(aboutWorld(starter));
     expect(about()).not.toMatch(/building forms|sidewalk|BUILDING footprints/i);
-    toggle(memoryLayer(), false);
-    expect(about()).toBe(aboutWorld(starter));
-    toggle(memoryLayer(), true);
-    expect(about()).toBe(aboutWorld(starter));
+    // Its memory layer holds its ground, so a switch would only blank the world.
+    expect(memoryLayer()).toBeNull();
   });
 
-  it('a district is described by its source-backed forms, and by its layers when they change', async () => {
+  it('a district is described by its source-backed forms, and by its layers as they change', async () => {
     const district = describeWorldKind({ ownedDistrict: { document: {} as never, residentBytes: 100 } });
     const { mounted, about, memoryLayer } = mount(district, false);
     await mounted.begin();
-    expect(about()).toBe(aboutWorld(district));
-    toggle(memoryLayer(), true);
+    expect(about()).toBe(aboutWorldLayers(district, false));
+    toggle(memoryLayer()!, true);
     expect(about()).toBe(aboutWorldLayers(district, true));
-    toggle(memoryLayer(), false);
+    toggle(memoryLayer()!, false);
     expect(about()).toBe(aboutWorldLayers(district, false));
   });
 
@@ -112,8 +112,7 @@ describe('About this place states the kind of world that is open', () => {
     const { mounted, about, memoryLayer } = mount(undefined, true);
     await mounted.begin();
     expect(about()).toBe('');
-    toggle(memoryLayer(), false);
-    expect(about()).toBe('');
+    expect(memoryLayer()).toBeNull();
   });
 });
 
@@ -138,19 +137,26 @@ const WORLD_KINDS = {
 
 /**
  * Which views each kind of world offers, and why. A district frames the city views on its own
- * buildings and is the only ground with a third-person camera; a Google reference frames the city
- * views on its own viewpoints. No other ground has either, so a control for them would do nothing.
+ * buildings and a Google reference on its walkable field. The third-person camera is offered on
+ * every ground whose solid parts the follow camera can keep out of: not a generated tile, whose
+ * buildings state no collision, and not under a Google reference, whose photographed ground the
+ * binding has no surface for.
  */
+const THIRD_PERSON = ['Third person (C)', 'Third-person framing'];
 const OFFERED: Readonly<Record<keyof typeof WORLD_KINDS, readonly string[]>> = {
-  'authored-endless': [],
-  'authored-with-estimate': [],
-  'authored-flat': [],
-  'personal-regions': [],
-  'owned-district': ['City overview', 'Street level', 'Third person (C)', 'Third-person framing'],
+  'authored-endless': THIRD_PERSON,
+  'authored-with-estimate': THIRD_PERSON,
+  'authored-flat': THIRD_PERSON,
+  'personal-regions': THIRD_PERSON,
+  'owned-district': ['City overview', 'Street level', ...THIRD_PERSON],
   'generated-tile': [],
   'google-reference': ['City overview', 'Street level'],
   'authored-and-google': ['City overview', 'Street level'],
 };
+/** Where the memory layer switch is offered: where another ground is drawn outside the layer. */
+const MEMORY_SWITCH: ReadonlySet<keyof typeof WORLD_KINDS> = new Set([
+  'owned-district', 'generated-tile', 'google-reference', 'authored-and-google',
+]);
 /** The controls whose views depend on the kind of world. */
 const KIND_VIEWS = ['City overview', 'Street level', 'Third person (C)', 'Third-person framing'];
 /** Turning the view and movement assistance work in every world. */
@@ -167,6 +173,7 @@ describe('About this place offers only the camera views the open world carries o
       expect(kindViews(controls())).toEqual([]);
       await mounted.begin();
       expect(kindViews(controls())).toEqual(OFFERED[name]);
+      expect(mounted.root.querySelector('.environment-selection-layer') !== null).toBe(MEMORY_SWITCH.has(name));
       for (const always of EVERY_WORLD) expect(controls().has(always), always).toBe(true);
       // The camera row holds the buttons among them, and is hidden when it holds none.
       const row = cameraGroup(mounted.root);
@@ -199,5 +206,24 @@ describe('About this place offers only the camera views the open world carries o
     expect(kindViews(controls())).toEqual([]);
     expect(cameraGroup(mounted.root).hidden).toBe(true);
     for (const always of EVERY_WORLD) expect(controls().has(always), always).toBe(true);
+  });
+});
+
+describe('the memory layer switch says what the world shows, on every path that changes it', () => {
+  it('starts from the binding, follows travel and the switch itself, and moves the binding only when used', async () => {
+    const district = describeWorldKind({ ownedDistrict: { document: {} as never, residentBytes: 100 } });
+    const { mounted, binding, memoryLayer, about } = mount(district, false);
+    binding.memoryLayerVisible = true;
+    await mounted.begin();
+    // Shown by the binding, so the switch starts checked, and the sentence says so.
+    expect(memoryLayer()!.checked).toBe(true);
+    expect(about()).toBe(aboutWorldLayers(district, true));
+    // The binding changes the layer by itself (travel does), and announces it.
+    (binding.onMemoryLayerChange as unknown as (visible: boolean) => void)(false);
+    expect(memoryLayer()!.checked).toBe(false);
+    expect(about()).toBe(aboutWorldLayers(district, false));
+    expect(binding.setMemoryLayerVisible).not.toHaveBeenCalled();
+    toggle(memoryLayer()!, true);
+    expect(binding.setMemoryLayerVisible).toHaveBeenLastCalledWith(true);
   });
 });

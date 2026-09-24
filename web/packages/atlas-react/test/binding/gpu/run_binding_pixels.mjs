@@ -1,7 +1,12 @@
 // The binding's GPU pixel scenes, headless, so they queue behind the machine-wide GPU slot.
 //
 //   node run_binding_pixels.mjs --port <vite port> --worktree <path> [--out <dir>] [--repeat N]
-//                               [--only scene,scene] [--plate]
+//                               [--only scene,scene] [--plate] [--pin <file> | --check <file>]
+//
+// --pin writes the scenes' digests, with the browser and renderer they were drawn on, to <file>;
+// --check compares this run with <file> and exits 1 when a scene differs, or 3 when the run was
+// drawn on another browser or renderer, whose digests the pin cannot speak for. The committed pin
+// is pins/digests.json beside this file. CI has no GPU: the check runs by hand, inside gpu-slot.
 //
 // Serves nothing itself: the app's Vite dev server for <worktree> must be running on <port>. The
 // page is a plain document on that origin (the dev server's /@vite/env module), so the app does
@@ -10,7 +15,7 @@
 // repeat. With --plate, also the marker plate sweeps (plateSweeps). Node 22 or later (global
 // WebSocket); no packages.
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -26,6 +31,8 @@ const out = argument('out');
 const repeat = Number(argument('repeat', '1'));
 const only = argument('only')?.split(',');
 const plates = process.argv.includes('--plate');
+const pinTo = argument('pin');
+const checkAgainst = argument('check');
 if (!port || !worktree) throw new Error('usage: run_binding_pixels.mjs --port <vite port> --worktree <path>');
 
 function crc32(buffer) {
@@ -136,6 +143,30 @@ try {
   })()`) : null;
   process.stdout.write(`${JSON.stringify({ port, worktree, browser: version.Browser, renderer, repeats: repeat,
     identical_across_repeats: identical, scenes: runs[0], plate_sweeps: plateSweeps, runs }, null, 1)}\n`);
+  const digests = runs[0].map(({ scene, sha256, drawnPixels, skyColours }) => ({ scene, sha256, drawnPixels, skyColours }));
+  if (pinTo !== undefined) {
+    if (!identical) throw new Error('the repeats differ, so there is no one digest per scene to pin');
+    writeFileSync(pinTo, `${JSON.stringify({ browser: version.Browser, renderer, width: runs[0][0]?.width,
+      height: runs[0][0]?.height, scenes: digests }, null, 1)}\n`);
+  }
+  if (checkAgainst !== undefined) {
+    const pin = JSON.parse(readFileSync(checkAgainst, 'utf8'));
+    if (pin.browser !== version.Browser || pin.renderer !== renderer) {
+      process.stderr.write(`not comparable: pinned on ${pin.browser} / ${pin.renderer}, drawn on ${version.Browser} / ${renderer}\n`);
+      code = 3;
+    } else {
+      const pinned = new Map(pin.scenes.map((scene) => [scene.scene, scene]));
+      const differing = digests.filter((scene) => JSON.stringify(pinned.get(scene.scene)) !== JSON.stringify(scene))
+        .map((scene) => scene.scene);
+      const missing = [...pinned.keys()].filter((name) => !digests.some((scene) => scene.scene === name));
+      if (differing.length > 0 || missing.length > 0 || !identical) {
+        process.stderr.write(`differs from the pin: ${[...differing, ...missing.map((name) => `${name} (not drawn)`)].join(', ') || 'repeats differ'}\n`);
+        code = 1;
+      } else {
+        process.stderr.write(`${digests.length} scenes match the pin\n`);
+      }
+    }
+  }
 } catch (error) {
   code = 1;
   process.stderr.write(`${error.stack ?? error}\n`);

@@ -7,9 +7,11 @@ import {
   NEAR_CHARACTER_BUDGET,
   NYCSemanticOverlay,
   NYC_REFERENCE_FRAME,
+  worldLayers,
   worldViews,
   type OwnedSocietyState,
   type NYCLocalFeature,
+  type WorldKind,
   type WorldViews,
 } from '@exulanica/atlas-react/playcanvas';
 import { nycOpenDataAdmissionId } from '../config.js';
@@ -211,7 +213,8 @@ export function mountEnvironmentSelection(
     inspector: inspector.root, inhabitants: inhabitantsList,
     // Offered once the renderer has decided what kind of world is open (`offerViews`).
     camera: [],
-    tools: [memoryLayer, framing, movement], authoring: editDetails,
+    // The memory layer switch joins them only in a world that has one (`offerLayers`).
+    tools: [framing, movement], authoring: editDetails,
   });
 
 
@@ -363,6 +366,22 @@ export function mountEnvironmentSelection(
     deps.state.atlas?.binding.setMemoryLayerVisible(memoryCheckbox.checked);
     reflectMemoryLayer(memoryCheckbox.checked);
   });
+  /**
+   * Offer the memory layer switch only in a world where switching the layer off leaves a world
+   * drawn (`worldLayers`); elsewhere the layer holds the ground itself. Where it is offered, it
+   * starts from what the binding shows and follows every change the binding announces, since travel
+   * switches the layer on by itself: the control follows the world rather than only leading it.
+   */
+  const offerLayers = (kind: WorldKind): void => {
+    const binding = deps.state.atlas?.binding;
+    if (!worldLayers(kind).memoryLayer || binding === undefined) {
+      memoryLayer.remove();
+      return;
+    }
+    framing.before(memoryLayer);
+    reflectMemoryLayer(binding.memoryLayerVisible);
+    binding.onMemoryLayerChange = reflectMemoryLayer;
+  };
 
   function inspectSubject(subject: DistrictSubject, keepInhabitant = false): void {
     const runtime = deps.state.atlas?.binding.ownedDistrict;
@@ -1437,8 +1456,10 @@ export function mountEnvironmentSelection(
   async function attach(): Promise<void> {
     const kind = deps.state.atlas?.worldKind;
     if (kind !== undefined) {
+      // Said before the layers are offered: where a switch is, it says the layer it shows.
       source.textContent = aboutWorld(kind);
       offerViews(worldViews(kind));
+      offerLayers(kind);
     }
     const entry = deps.state.activeWorldEntry;
     if (!deps.env.preview && entry?.authoredScene != null) {
@@ -1489,10 +1510,6 @@ export function mountEnvironmentSelection(
         ?? (atlas.ownedDistrict != null || atlas.generatedTile != null
           ? { pick: () => null, destroy: () => undefined }
           : new NYCSemanticOverlay(atlas.device, atlas.environmentRoot, features));
-      reflectMemoryLayer(atlas.memoryLayerVisible);
-      // Travel to a region switches the layer on by itself, so the control has to follow the world
-      // rather than only lead it.
-      atlas.onMemoryLayerChange = reflectMemoryLayer;
       const interpretation = atlas.ownedDistrict?.interpretation;
       if (interpretation) {
         const destinations = el('details', {}, [el('summary', { text: 'Places inhabitants can use' })]);

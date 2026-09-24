@@ -17,6 +17,17 @@ function setup() {
   return { handlers, view, opener, button };
 }
 describe('Character studio', () => {
+  it('says what Use in world does in a world with no third-person view', () => {
+    const { view } = setup();
+    const note = () => [...view.root.querySelectorAll('p')].find(node => node.textContent?.startsWith('This world is seen in first person'));
+    expect(note()?.hidden).toBe(true);
+    view.setWorldView(false);
+    expect(note()?.hidden).toBe(false);
+    expect(note()?.textContent).toContain('your figure is not shown here');
+    view.setWorldView(true);
+    expect(note()?.hidden).toBe(true);
+  });
+
   it('keeps edits in the preview until Use in world and sends only the selected look and supported color', () => {
     const { view, handlers, button } = setup();
     button('Use in world').click();

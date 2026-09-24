@@ -329,6 +329,19 @@ export const AUTHORED_GROUND_SCALE_SPACING_M = 1;
  * and the endless face drawn in cells no wider than its reach, it was drawn whole at every pose,
  * at the origin and at 8 km. The slope factor is what separates them: a constant alone, up to 64
  * units, left the plate as it was.
+ *
+ * WHY THE MARGIN GROWS WITH DISTANCE, AND WHAT THAT COSTS. This follows from the offset's
+ * definition and was not measured separately. The slope term is the factor times the face's own
+ * change in depth-buffer value per pixel, and a level face seen from eye height h changes by the
+ * same amount per pixel row at every distance (near clip / (h x focal length in pixels)). Turned
+ * back into the world, that is a margin under the face of about factor x distance / focal length:
+ * with 900 rows and a 70 degree vertical field of view (focal length 643 px), 3 mm at 1 m, 3 cm at
+ * 10 m, 31 cm at 100 m. Two things follow. A face lying just under the ground, and so behind it, is
+ * drawn in front of it wherever it lies less than that margin below. And the offset carries the
+ * ground's depth to the far plane at about h x focal length / factor, some 400 to 520 m for 720
+ * to 900 rows at eye height, where the sky is drawn too (composed-world.ts writes it at the far
+ * plane): the two tie there, and which is kept is decided by the order they are drawn in, not by
+ * depth.
  */
 const AUTHORED_FACE_DEPTH_OFFSET = 2;
 const AUTHORED_MARK_DEPTH_OFFSET = 1;

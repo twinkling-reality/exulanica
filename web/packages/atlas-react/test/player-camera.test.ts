@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ownedDistrictOverviewCameraState } from '../src/playcanvas/atlas-binding.js';
+import { ownedDistrictOverviewCameraState } from '../src/playcanvas/camera-views.js';
 import {
   DEFAULT_FOLLOW_CAMERA,
   FollowCamera,

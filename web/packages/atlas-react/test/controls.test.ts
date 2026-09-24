@@ -210,10 +210,42 @@ describe('first-person keyboard ownership', () => {
       { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 },
       undefined,
       world,
-      { groundStart: false },
+      { hold: 'altitude' },
     );
     expect(controls.state.y).toBe(95);
     expect(controls.state.pitch).toBe(-0.48);
+    controls.destroy();
+  });
+
+  it('holds a view at altitude on every frame after, and pans no farther than it was framed from', () => {
+    const canvas = document.createElement('canvas');
+    document.body.append(canvas);
+    const world = buildNavigationWorld(makeScene([], 1, 1), {
+      sample: () => ({ height: 0, normal: { x: 0, y: 1, z: 0 } }),
+    });
+    const controls = new FirstPersonControls(canvas, { x: 0, y: 1.62, z: 0, yaw: 0, pitch: 0 }, undefined, world);
+    controls.setView({ x: 0, y: 95, z: 300, yaw: 0, pitch: -0.4 }, 'altitude');
+    for (let frame = 0; frame < 30; frame += 1) controls.update(1 / 60);
+    expect(controls.state).toMatchObject({ x: 0, y: 95, z: 300 });
+    // Forward (yaw 0 faces the field) pans toward it at the same height; backing away stops at the
+    // distance the view was framed from.
+    canvas.focus();
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+    for (let frame = 0; frame < 60; frame += 1) controls.update(1 / 60);
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }));
+    expect(controls.state.y).toBe(95);
+    expect(controls.state.z).toBeLessThan(295);
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS' }));
+    for (let frame = 0; frame < 240; frame += 1) controls.update(1 / 60);
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyS' }));
+    expect(controls.state.y).toBe(95);
+    expect(Math.hypot(controls.state.x, controls.state.z)).toBeCloseTo(300, 9);
+    // A ground view stands on the surface at once and stays there.
+    controls.setView({ x: 3, y: 40, z: 4, yaw: 0, pitch: 0 }, 'ground');
+    expect(controls.hold).toBe('ground');
+    expect(controls.state.y).toBeCloseTo(world.eyeHeight, 12);
+    controls.update(1 / 60);
+    expect(controls.state).toMatchObject({ x: 3, z: 4 });
     controls.destroy();
   });
 

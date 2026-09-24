@@ -51,7 +51,11 @@ export interface WorldKind {
    * tile, whose sky is a skybox the engine tone-maps along with its fog.
    */
   readonly displaySpaceFog: boolean;
-  /** The session opens as an aerial overview rather than a stance on the ground. */
+  /**
+   * The session opens from above, at the overview (`camera-views.ts`), rather than standing on the
+   * ground. Only where the ground states no arrival of its own and a Google reference is drawn:
+   * regions under a reference. A starter's spawn and a district's clear spawn are where they open.
+   */
   readonly aerialStart: boolean;
   /** The binding's own ground field is drawn. A district or a tile draws its own ground. */
   readonly fieldVisible: boolean;
@@ -71,10 +75,10 @@ export interface WorldKindOptions {
  * Describe the world these options ask for, or refuse a combination no world can be.
  *
  * An authored region WITH a Google reference is accepted, and is exactly what the rules below
- * make it: authored navigation and the authored spawn, the Google reference drawn at city scale,
- * an aerial start that does not hold the camera to the ground, and the memory layer (with the
- * authored ground in it) hidden. That is what the binding did before this description existed;
- * refusing it would be a change of behaviour and is not made here.
+ * make it: authored navigation and the authored spawn, stood on the ground, the Google reference
+ * drawn at city scale, and the memory layer (with the authored ground in it) hidden. That is what
+ * the binding did before this description existed; refusing it would be a change of behaviour and
+ * is not made here.
  */
 export function describeWorldKind(options: WorldKindOptions): WorldKind {
   if (options.ownedDistrict !== undefined && options.generatedTile !== undefined) {
@@ -102,7 +106,7 @@ export function describeWorldKind(options: WorldKindOptions): WorldKind {
     google,
     city: geographic || google !== null,
     displaySpaceFog: ground.form !== 'generated-tile',
-    aerialStart: !geographic && google !== null,
+    aerialStart: ground.form === 'scene-regions' && google !== null,
     fieldVisible: !geographic,
     memoryLayerVisible: !geographic && google === null,
   });
@@ -132,8 +136,14 @@ export interface WorldViews {
    */
   readonly cityViews: boolean;
   /**
-   * A camera behind the person's drawn figure, at a chosen distance. Only a district switches to
-   * it; on any other ground the view stays first person, where a distance has nothing to set.
+   * A camera behind the person's drawn figure, at a chosen distance. The follow camera keeps out of
+   * what the binding knows is solid: the ground under the person, and a district's buildings
+   * (`player-camera.ts`). So it is offered on every ground where that is all there is to keep out
+   * of: a starter, the regions of a photo-built world and a district. Not on a generated tile,
+   * whose buildings are drawn with no collision the camera could read, so a boom behind the person
+   * would pass through their facades; and not under a Google reference, whose photographed ground
+   * the binding has no surface for, so the drawn figure would stand on a plane the picture does not
+   * show. There the view stays first person, where a distance has nothing to set.
    */
   readonly thirdPerson: boolean;
 }
@@ -141,20 +151,45 @@ export interface WorldViews {
 /** The views this kind of world carries out, read from its ground and its reference only. */
 export function worldViews(kind: WorldKind): WorldViews {
   const district = kind.ground.form === 'owned-district';
-  return Object.freeze({ cityViews: district || kind.google !== null, thirdPerson: district });
+  return Object.freeze({
+    cityViews: district || kind.google !== null,
+    thirdPerson: kind.google === null && kind.ground.form !== 'generated-tile',
+  });
+}
+
+/** The layers a person can switch on and off in this kind of world. */
+export interface WorldLayers {
+  /**
+   * A switch for the memory layer: the render root, holding the regions and their motes, the
+   * binding's own ground field and the composed world with its sky. Offered only where another
+   * ground is drawn outside it, a district, a tile or a Google reference, which is what `city`
+   * names. In any other world the memory layer holds the ground itself, so switching it off leaves
+   * nothing drawn. `test/binding/world-layers.test.ts` holds both halves for every kind.
+   */
+  readonly memoryLayer: boolean;
+}
+
+/** The layers this kind of world lets a person switch. */
+export function worldLayers(kind: WorldKind): WorldLayers {
+  return Object.freeze({ memoryLayer: kind.city });
 }
 
 /**
  * How far this renderer carries a person across a ground that states no extent.
  *
- * MEASURED, not chosen. A position reaches the GPU as a 32-bit float, and the render origin only
- * moves when the active neighborhood changes, which in a world whose scene holds no regions never
- * happens. So the whole walk is drawn at its true distance from the world origin, and the smallest
- * position change the pipeline can represent is the float32 step at that distance: 0.12 mm at
- * 2 km, 0.98 mm at 8.192 km, 1.95 mm at 16.4 km. 8192 metres is the farthest distance at which the
- * drawn position still resolves the millimetre, which is the unit every stored coordinate in this
- * product is written in, so it is the farthest distance at which the renderer can still put a
- * person exactly where the world says they are.
+ * Its reason is what has been measured end to end. The world's own movement resolver walks from
+ * the origin to the soft band at 8096 m one frame at a time without a recovery
+ * (`test/endless-authored-ground.test.ts`), and on a release build a sprint to 8 km keeps the sky,
+ * a placed cube and the rest of the frame as they are at arrival (the render at distance record,
+ * `docs/evaluation/2026-09-23-render-at-distance.json`). The 144 m from the last measured picture
+ * to the recovery radius at 8144 m are not measured on their own.
+ *
+ * The float32 step permits the radius and does not set it. A position reaches the GPU as a 32-bit
+ * float, and the render origin only moves when the active neighborhood changes, which in a world
+ * whose scene holds no regions never happens, so the walk is drawn at its true distance from the
+ * world origin. The float32 step there is 0.12 mm at 2 km, 0.49 mm from 4096 to 8192 m and
+ * 0.98 mm from 8192 m up to 16384 m: a drawn position resolves the millimetre, the unit every
+ * stored coordinate in this product is written in, to twice this radius.
  *
  * It is a property of this renderer and not of the world. A descriptor states that its ground has
  * no edge; this states how much of that ground the current pipeline can honestly draw, and it

@@ -101,14 +101,19 @@ renderer drawing it, and the browser binding states it as
 `AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M` in `web/packages/atlas-react/src/playcanvas/world-kind.ts`,
 **8192 metres**. It moves when the renderer does, and no stored world changes when it does.
 
-The number is measured, not chosen. A position reaches the GPU as a 32-bit float. The render origin
-rebases only when the active neighborhood changes, neighborhoods are built from the scene's regions,
-and a starter world's scene has none, so the whole walk is drawn at its true distance from the world
-origin. The gap between one representable position and the next is then the float32 step at that
-distance: 0.0019 mm at 24 metres, 0.061 mm at 1 kilometre, 0.49 mm at 8 kilometres, 0.98 mm at
-8192 metres, and 1.95 mm at 16384 metres. 8192 metres is the farthest distance at which a drawn
-position still resolves the millimetre, which is the unit every stored coordinate in this product
-is written in.
+The radius is what the product has been measured carrying a person to, end to end. The world's own
+movement resolver walks from the origin to the soft band at 8096 metres, one 23 millimetre frame at
+a time, without a recovery, and on a release build the [render at distance
+record](evaluation/2026-09-23-render-at-distance.json) walks and draws to 8 kilometres (below). The
+144 metres between the last measured picture and the recovery radius at 8144 metres are not
+measured on their own. The float32 step permits the radius and does not set it. A position reaches
+the GPU as a 32-bit float. The render origin rebases only when the active neighborhood changes,
+neighborhoods are built from the scene's regions, and a starter world's scene has none, so the whole
+walk is drawn at its true distance from the world origin, where the gap between one representable
+position and the next is the float32 step at that distance: 0.0019 mm at 24 metres, 0.061 mm at
+1 kilometre, 0.49 mm from 4096 to 8192 metres and 0.98 mm from 8192 up to 16384 metres. A drawn
+position therefore resolves the millimetre, the unit every stored coordinate in this product is
+written in, to twice the radius.
 
 Beyond it nothing is invented. The walking surface answers everywhere inside that radius, on a
 circle so that no direction runs further than another, and answers nowhere outside it. Walking is

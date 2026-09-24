@@ -37,10 +37,10 @@ describe('describeWorldKind', () => {
       city: true, displaySpaceFog: false, aerialStart: false, fieldVisible: false, memoryLayerVisible: false });
     expect(flags({ googleTiles: GOOGLE_ON })).toEqual({ form: 'scene-regions', google: true,
       city: true, displaySpaceFog: true, aerialStart: true, fieldVisible: true, memoryLayerVisible: false });
-    // Decided explicitly, as it was built before: authored ground and spawn, an aerial start and
-    // the memory layer (with that ground) hidden under the reference.
+    // Decided explicitly, as it was built before: authored ground, the spawn stood on that ground,
+    // and the memory layer (with that ground) hidden under the reference.
     expect(flags({ authoredRegion: ENDLESS_REGION, googleTiles: GOOGLE_ON })).toEqual({
-      form: 'authored-endless', google: true, city: true, displaySpaceFog: true, aerialStart: true,
+      form: 'authored-endless', google: true, city: true, displaySpaceFog: true, aerialStart: false,
       fieldVisible: true, memoryLayerVisible: false });
   });
 

@@ -3,9 +3,8 @@ import {
   atlasVec3, buildNavigationWorld,
   islandId, localVec3, makeIsland, makeScene, placement, planResidency,
 } from '@exulanica/atlas-core';
-import {
-  initialAtlasCameraState, pointMapResidencyCost, recoveredCameraState,
-} from '../src/playcanvas/atlas-binding.js';
+import { pointMapResidencyCost } from '../src/playcanvas/atlas-binding.js';
+import { initialAtlasCameraState, recoveredCameraState } from '../src/playcanvas/camera-views.js';
 
 const island = makeIsland({
   islandId: islandId('reference-source'), createdAt: 0,

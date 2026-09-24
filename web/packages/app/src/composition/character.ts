@@ -9,6 +9,7 @@ import {
   FirstPersonGesture,
   NEAR_CHARACTER_BUDGET,
   designedLook,
+  worldViews,
   type AtlasBinding,
   type CharacterByteLoader,
   type CharacterLook as PersonLook,
@@ -429,6 +430,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       crowd?.destroy();
       crowd = null;
       binding = atlas;
+      view.setWorldView(worldViews(atlas.worldKind).thirdPerson);
       if (!env.preview) {
         // A signed-in world draws the same catalog people from its reviewed assets, and the player
         // wears what this world keeps for them.

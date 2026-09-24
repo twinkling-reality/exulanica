@@ -20,6 +20,7 @@ import { worldOptions as optionsWith, type WorldKind } from './world-kinds.js';
 
 export {
   DISTRICT_DOCUMENT,
+  FIRST_REGION,
   PERSONAL_SCENE,
   STARTER_REGION,
   WORLD_KINDS,

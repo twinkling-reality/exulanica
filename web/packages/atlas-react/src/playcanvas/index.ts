@@ -187,21 +187,21 @@ export type {
   PlacementCheck,
   ProofLensColor,
 } from './atlas-binding.js';
-export type { AuthoredGround, AuthoredRegion, WorldGround, WorldKind, WorldViews } from './world-kind.js';
+export type { AuthoredGround, AuthoredRegion, WorldGround, WorldKind, WorldLayers, WorldViews } from './world-kind.js';
 export {
   AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M,
   authoredGroundSurface,
   describeWorldKind,
   endlessAuthoredNavigation,
+  worldLayers,
   worldViews,
 } from './world-kind.js';
 export {
   AtlasBinding,
   placedCatalogObjectSubject,
   mapCameraState,
-  ownedDistrictCameraState,
-  ownedDistrictOverviewCameraState,
 } from './atlas-binding.js';
+export { ownedDistrictCameraState, ownedDistrictOverviewCameraState } from './camera-views.js';
 export type {
   OwnedAuthoredEnvironmentInstance,
   OwnedDistrictMetrics,

@@ -29,7 +29,7 @@ export interface FollowCameraTuning {
   readonly portraitDistance: number;
   /** Metres to the camera's right. Zero keeps the player on the screen's centre line. */
   readonly lateralOffset: number;
-  /** The boom never drops closer than this to the district ground plane while looking down. */
+  /** The boom never drops closer than this to the ground under the person while looking up. */
   readonly groundClearance: number;
   /** Slack left between the near plane and a building the boom has backed into. */
   readonly collisionPadding: number;
@@ -92,7 +92,9 @@ function viewForward(player: CameraState): readonly [number, number, number] {
 /**
  * How far back the boom may reach from `start` before it meets a building or the ground.
  *
- * Third person exists only over the owned district, whose ground plane is y = 0.
+ * The ground is the level plane at `groundHeight`, the height of the surface the person stands
+ * on; every ground third person is offered on is level where a person stands (`worldViews`). A
+ * district's ground is y = 0, the default.
  */
 export function resolveBoomDistance(
   start: readonly [number, number, number],
@@ -100,6 +102,7 @@ export function resolveBoomDistance(
   requestedDistance: number,
   district?: OwnedDistrict,
   tuning: FollowCameraTuning = DEFAULT_FOLLOW_CAMERA,
+  groundHeight = 0,
 ): number {
   let distance = Math.max(MINIMUM_DISTANCE, Math.min(MAXIMUM_DISTANCE, requestedDistance));
   // Four padded parallel probes stop the near plane clipping a building corner.
@@ -124,7 +127,7 @@ export function resolveBoomDistance(
   if (direction[1] < 0) {
     distance = Math.min(
       distance,
-      Math.max(tuning.minimumDistance, (start[1] - tuning.groundClearance) / -direction[1]),
+      Math.max(tuning.minimumDistance, (start[1] - groundHeight - tuning.groundClearance) / -direction[1]),
     );
   }
   return distance;
@@ -144,6 +147,7 @@ export function playerCameraPosition(
   aimHeight?: number,
   tuning: FollowCameraTuning = DEFAULT_FOLLOW_CAMERA,
   resolvedDistance?: number,
+  groundHeight = 0,
 ): readonly [number, number, number] {
   if (mode === 'first-person') return [player.x, player.y, player.z];
   const forward = viewForward(player);
@@ -155,7 +159,7 @@ export function playerCameraPosition(
   ];
   const direction: readonly [number, number, number] = [-forward[0]!, -forward[1]!, -forward[2]!];
   const distance = resolvedDistance
-    ?? resolveBoomDistance(start, direction, requestedDistance, district, tuning);
+    ?? resolveBoomDistance(start, direction, requestedDistance, district, tuning, groundHeight);
   return [
     start[0] + direction[0] * distance,
     start[1] + direction[1] * distance,
@@ -194,6 +198,8 @@ export class FollowCamera {
       readonly district?: OwnedDistrict;
       readonly requestedDistance?: number;
       readonly aimHeight?: number;
+      /** Height of the ground under the person; a district's, y = 0, by default. */
+      readonly groundHeight?: number;
       readonly tuning?: FollowCameraTuning;
       readonly dt?: number;
       readonly reducedMotion?: boolean;
@@ -213,7 +219,7 @@ export class FollowCamera {
       player.z + right[2] * tuning.lateralOffset,
     ];
     const direction: readonly [number, number, number] = [-forward[0]!, -forward[1]!, -forward[2]!];
-    const target = resolveBoomDistance(start, direction, requested, options.district, tuning);
+    const target = resolveBoomDistance(start, direction, requested, options.district, tuning, options.groundHeight);
     const dt = options.dt ?? 0;
     const smoothing = options.reducedMotion === true ? 0 : tuning.extendSeconds;
     if (this.extended === null || target <= this.extended || smoothing <= 0 || !(dt > 0)) {

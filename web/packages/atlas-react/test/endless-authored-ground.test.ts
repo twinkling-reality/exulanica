@@ -48,9 +48,11 @@ function endlessWorld(): NavigationWorld {
   );
 }
 
-describe('the float32 limit the supported radius is taken from', () => {
-  it('still resolves one millimetre at the supported radius and stops resolving it past there', () => {
+describe('the float32 step across the supported radius', () => {
+  it('resolves one millimetre at the supported radius and to twice it, so the step does not set it', () => {
     expect(float32Step(RADIUS)).toBeLessThan(0.001);
+    // The step is 0.98 mm from 8192 m up to 16384 m, and 1.95 mm from there.
+    expect(float32Step(RADIUS * 2 - 1)).toBeLessThan(0.001);
     expect(float32Step(RADIUS * 2)).toBeGreaterThan(0.001);
   });
 

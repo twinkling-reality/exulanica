@@ -284,9 +284,9 @@ the Atlas controller's comfort contract, not a statement about the tile. A tile 
 surface" notice.
 
 No tile carries `collision_proxy`, so the capsule's 1.9 m height has no overhead clearance
-check and nothing blocks it; the panel says so. The tile route is first person only, because the
-third person camera and avatar stay tied to the owned district until the characters lane's player
-renderable arrives.
+check and nothing blocks it; the panel says so. The tile route is first person only: with no
+collision for the tile's buildings, a follow camera behind the person would pass through their
+facades (`worldViews` in `web/packages/atlas-react/src/playcanvas/world-kind.ts`).
 
 ## 6. The look, measured
 

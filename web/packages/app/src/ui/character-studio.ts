@@ -160,6 +160,9 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
     handlers.onApplyChoice?.(choice.kind === 'catalog' ? { kind: 'catalog', look: people.editor.look }
       : choice.kind === 'stylized' && selection ? { kind: 'stylized', selection } : choice);
   });
+  // What Use in world does where the world has no third-person view (`setWorldView`).
+  const worldUse = el('p', { class: 'character-session-note', hidden: true,
+    text: 'This world is seen in first person only. Use in world puts this look on you, but your figure is not shown here.' });
   const reset = el('button', { type: 'button', text: 'Reset colors', disabled: true });
   reset.addEventListener('click', () => {
     if (selection) { selection = { ...selection, appearance: {} }; reflectColors(); handlers.onPreview(selection); }
@@ -226,7 +229,7 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
     el('aside', { class: 'character-sidebar' }, [tabs, editing]),
     el('aside', { class: 'character-description' }, [
       el('p', { class: 'character-eyebrow', text: 'Your preview' }), lookName,
-      status, retry, apply, saveNote, history, source,
+      status, retry, apply, worldUse, saveNote, history, source,
     ]),
     el('footer', { class: 'character-preview-controls' }, [
       el('label', {}, [el('span', { text: 'Rotate' }), rotation]),
@@ -326,6 +329,8 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
       editing.disabled = false;
     },
     setSaveNote(text: string) { saveNote.textContent = text; },
+    /** Whether the open world shows the person in third person, which is what Use in world opens. */
+    setWorldView(thirdPerson: boolean) { worldUse.hidden = thirdPerson; },
     /** Newest first; the first entry is what the person wears now. */
     setHistory(revisions: readonly SavedRevision[]) {
       history.hidden = revisions.length === 0;

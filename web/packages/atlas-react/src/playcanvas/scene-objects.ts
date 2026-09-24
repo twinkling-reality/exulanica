@@ -885,20 +885,15 @@ export class SceneObjectRuntime {
   }
 
   /**
-   * Follow the region's residency, exactly as `sourceFirst` does.
-   *
-   * An authored object is drawn only where its region's body is. Without this it would keep
-   * standing in a region that has fallen back to a stub, which is an object hanging in the air
-   * over ground that is not being drawn: the one impression this whole placement path exists to
-   * avoid. On the Map vantage nothing region-local is drawn at all.
-   */
-  /**
    * Draw each object when the ground under it is drawn, and nothing under the Map.
    *
-   * A residency plan gives every region it governs an entry, at least `stub`, so a region with no
-   * entry is one it does not govern: an authored starter region, whose ground is always drawn.
-   * Reading a missing entry as `stub` hid every object in a starter world on the first replan
-   * after it was placed, which leaving the Map causes.
+   * An object placed through a district's frame follows that district's root
+   * (`setRegionOverride`). Any other object is drawn unless the residency plan has left its region
+   * at `stub`, where it would stand in the air over ground that is not being drawn. A plan gives
+   * every region it governs an entry, at least `stub`, so a region with no entry is one it does not
+   * govern: an authored starter region, whose ground is always drawn. Reading a missing entry as
+   * `stub` hid every object in a starter world on the first replan after it was placed, which
+   * leaving the Map causes.
    */
   setResidency(allocated: ReadonlyMap<IslandId, string>, map: boolean): void {
     let changed = false;
