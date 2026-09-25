@@ -485,7 +485,12 @@ def test_version_2_parameters_are_the_measured_ones():
 
 
 def test_a_policy_naming_a_method_the_join_does_not_know_is_refused():
-    for section, key in (("up", "method"), ("translation", "fit"), ("change", "disocclusion")):
+    for section, key in (
+        ("up", "method"),
+        ("translation", "fit"),
+        ("change", "disocclusion"),
+        ("change", "lens"),
+    ):
         params = json.loads(json.dumps(V2_PARAMS))
         params[section][key] = "something-else"
         with pytest.raises(ValueError, match="this join knows no"):
@@ -623,3 +628,79 @@ def test_the_join_imports_where_the_scene_worker_runs(tmp_path):
     )
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout.strip() == "imported"
+
+
+#: Version 3's parameters: version 2's, with the change compared under the pair's measured motion
+#: through the lens that motion was fitted with. They are not registered, because version 3 failed
+#: its pre-registered gates; its records bind them by digest, which the test below holds this to.
+V3_PARAMS = json.loads(
+    (Path(__file__).parent / "fixtures" / "standpoint-v3-params.json").read_text(encoding="utf-8")
+)
+
+
+def test_version_3_parameters_are_version_2s_with_the_fitted_lens_and_the_measured_ones():
+    with_the_fitted_lens = {**V2_PARAMS, "change": {**V2_PARAMS["change"], "lens": "pair-fit"}}
+    assert with_the_fitted_lens == V3_PARAMS
+    for kind in ("preregistration", "outcome"):
+        method = json.loads(
+            (
+                Path(__file__).parents[1]
+                / "docs"
+                / "evaluation"
+                / f"2026-09-25-standpoint-join-v3-{kind}.json"
+            ).read_text(encoding="utf-8")
+        )["record"]["method"]
+        assert sha256_of_canonical(V3_PARAMS).hex() == method["params_sha256"]
+        assert method["stage_version"] == 3 != SPEC.version
+
+
+def _unrefined(params):
+    """``params`` with the focal refinement given no pair to learn from, so that a lens stated off
+    stays off into the final pass and only the pair's own fit can find it."""
+    unrefined = json.loads(json.dumps(params))
+    unrefined["intrinsics"]["refine"]["min_inliers"] = 1_000_000
+    return unrefined
+
+
+def test_a_change_is_compared_through_the_lens_the_pair_was_fitted_with(extractor):
+    # One standpoint, nothing changed, the second photograph's lens stated 3 percent long.
+    cameras = [Camera(0, 0), Camera(-30, 0)]
+    focals = [focal_35mm(camera) for camera in cameras]
+    focals[1] *= 1.03
+    pair = _join(extractor, cameras, focals=focals, params=_unrefined(V3_PARAMS)).pairs[0]
+    assert pair.outcome == "joined", pair
+    assert pair.changed_ppm <= V2_POLICY.max_changed_fraction * 1e6
+    # Version 2 applied the turn and step it found through the zoomed lens to the unzoomed one,
+    # which carries the second photograph's content off by the zoom towards its edges.
+    unzoomed = _join(extractor, cameras, focals=focals, params=_unrefined(V2_PARAMS)).pairs[0]
+    assert unzoomed.outcome == "scene_changed", unzoomed
+    assert unzoomed.translation_mm == pair.translation_mm, "the same motion, compared two ways"
+
+
+def test_through_the_fitted_lens_a_box_that_appears_is_still_a_change(extractor):
+    base = Room()
+    changed = dataclasses.replace(
+        base, boxes=(*base.boxes, Box((-0.9, 0.0, -2.6), (0.3, 1.5, -1.9), (0.9, 0.9, 0.3)))
+    )
+    cameras = [Camera(0, 0), Camera(-30, 0)]
+    focals = [focal_35mm(camera) for camera in cameras]
+    focals[1] *= 1.03
+    pair = _join(
+        extractor,
+        cameras,
+        focals=focals,
+        room=base,
+        rooms={1: changed},
+        params=_unrefined(V3_PARAMS),
+    ).pairs[0]
+    assert pair.outcome == "scene_changed", pair
+
+
+def test_the_fitted_lens_is_compared_through_only_where_a_fit_has_one():
+    params = json.loads(json.dumps(V3_PARAMS))
+    params["translation"]["fit"] = "rotation-translation"
+    del params["translation"]["zoom_prior_sigma_ppm"]
+    with pytest.raises(ValueError, match="needs the zoom fit"):
+        StandpointPolicy.from_params(params)
+    assert StandpointPolicy.from_params(V3_PARAMS).change_lens == "pair-fit"
+    assert V2_POLICY.change_lens == POLICY.change_lens == "member"

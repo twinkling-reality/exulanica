@@ -1,0 +1,6 @@
+held3: 936 files equal to the copy's digests, in the read-only copy and in the working copy
+pre-registration b9570eae33fae77642db5c6fc0e7ce2c561c512279c164b2ca39b99d8ddcacbf
+depth pass: gpu-slot: finished at 10:28:24 with exit 0; load 26.99 25.94 27.73
+exif FAILED ['changed_named', 'changed_never_named_moved', 'joinable_named_changed', 'lines_up_p95_against_version_1', 'moved_named', 'moved_never_named_changed']
+exif-perturbed FAILED ['changed_named', 'changed_never_named_moved', 'joinable_named_changed', 'moved_named', 'moved_never_named_changed']
+exit 0

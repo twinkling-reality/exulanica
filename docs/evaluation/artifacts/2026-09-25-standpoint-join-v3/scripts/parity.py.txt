@@ -1,0 +1,93 @@
+"""A registered version's parameters through the current join: every record must equal its bound run's bytes.
+
+    python parity.py <params.json> <arm> <v1|v2> [--only <prefix>]
+
+v1: the bound version 1 runs (docs/evaluation/artifacts/2026-09-23-standpoint-join/{development,held-out}/
+run-<arm>.json) over version 1's development and held-out splits, 108 sets, stage version 1 (K3's
+v1_parity.py, with this lane's data location).
+v2: the development runs lane K3 recorded for version 2's final candidate f (k3/runs/dev-f-<arm>.json,
+record digests equal to the bound version 2 development runs), the same 108 sets, stage version 2.
+
+Each set is joined exactly as the evaluation joins it (k4lib.inputs_for) and its record's sha256
+compared. The parameters' canonical digest must equal the bound runs' policy digest.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from k4lib import DATA, K3, inputs_for, truth_of  # noqa: E402
+
+from exulanica.canonical import sha256_of_canonical
+from exulanica.reconstruction.standpoint import StandpointPolicy, join_standpoint
+from exulanica.reconstruction.standpoint_features import PycolmapSift
+
+NAMESPACE = uuid.UUID("5c0f3a7e-2d1b-4b8e-9a3c-7d5e1f0b2a64")
+WORKTREE = Path(__file__).resolve().parents[4]
+VERSIONS = {"v1": 1, "v2": 2}
+
+
+def bound_runs(version: str, arm: str) -> list[dict]:
+    if version == "v1":
+        return [
+            json.loads((WORKTREE / "docs/evaluation/artifacts/2026-09-23-standpoint-join" / split / f"run-{arm}.json").read_text())
+            for split in ("development", "held-out")
+        ]
+    if version == "v2":
+        return [json.loads((K3 / "runs" / f"dev-f-{arm}.json").read_text())]
+    raise SystemExit(f"no bound runs named {version!r}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("params", type=Path)
+    parser.add_argument("arm", choices=("exif", "exif-perturbed"))
+    parser.add_argument("version", choices=sorted(VERSIONS))
+    parser.add_argument("--only")
+    args = parser.parse_args()
+    params = json.loads(args.params.read_text())
+    policy = StandpointPolicy.from_params(params)
+    digest = sha256_of_canonical(params).hex()
+    extractor = PycolmapSift(max_features=policy.max_features, peak_threshold=policy.peak_threshold, threads=policy.feature_threads)
+    bound = {}
+    for run in bound_runs(args.version, args.arm):
+        if run["policy_sha256"] != digest:
+            raise SystemExit(f"the parameters' digest {digest} is not the bound runs' {run['policy_sha256']}")
+        if run.get("stage_version", VERSIONS[args.version]) != VERSIONS[args.version]:
+            raise SystemExit("the bound runs were made under another stage version")
+        for s in run["sets"]:
+            bound[s["set"]] = s["record_sha256"]
+    print(f"params {digest}; bound sets {len(bound)}", flush=True)
+    same = differ = 0
+    for split in ("dev", "held"):
+        for scene in sorted(p for p in (DATA / split).iterdir() if (p / "truth.json").exists()):
+            truth = truth_of(scene)
+            for set_entry in truth["sets"]:
+                if args.only and not set_entry["id"].startswith(args.only):
+                    continue
+                inputs = inputs_for(scene, truth, set_entry["id"], args.arm)
+                record = join_standpoint(
+                    scene_ref=str(uuid.uuid5(NAMESPACE, f"set:{set_entry['id']}")),
+                    inputs=inputs, policy=policy, policy_sha256=digest,
+                    stage_version=VERSIONS[args.version], extractor=extractor,
+                )
+                got = hashlib.sha256(record.to_bytes()).hexdigest()
+                if got == bound.pop(set_entry["id"]):
+                    same += 1
+                else:
+                    differ += 1
+                    print("DIFFERS", set_entry["id"], got, flush=True)
+    if not args.only and bound:
+        print("NOT JOINED", sorted(bound))
+        differ += len(bound)
+    print(f"{args.version} {args.arm}: {same} identical, {differ} differ")
+    return 1 if differ else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

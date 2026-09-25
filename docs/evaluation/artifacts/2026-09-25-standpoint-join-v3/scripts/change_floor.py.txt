@@ -1,0 +1,24 @@
+"""For one run: what unchanged pairs disagree by, and what changed pairs measure, by their own surface share.
+
+    python change_floor.py <run.json>
+"""
+import json
+import sys
+
+import numpy as np
+
+run = json.load(open(sys.argv[1]))
+unchanged, changed = [], []
+for s in run["sets"]:
+    for p in s["pairs"]:
+        t = p["truth"]
+        if t["overlap"] < 0.05 or t["distance_m"] >= 1.0:
+            continue
+        row = (s["set"], p["a"], p["b"], t["changed_surface_share"], t["change_share"], p["changed_ppm"], p["outcome"])
+        (changed if t["changed_surface_share"] > 0 else unchanged).append(row)
+measured = np.array([r[5] for r in unchanged if r[5] is not None]) / 1e6
+print(run["arm"], "unchanged pairs compared", len(measured), "p50 %.4f p95 %.4f p99 %.4f max %.4f" % tuple(np.percentile(measured, [50, 95, 99, 100])))
+print("unchanged over 0.015:", [(r[0], r[1], r[2], r[5], r[6]) for r in unchanged if (r[5] or 0) > 15000])
+print("unchanged named changed:", [(r[0], r[1], r[2], r[5]) for r in unchanged if r[6] == "scene_changed"])
+for r in sorted(changed, key=lambda r: r[3]):
+    print("  changed surface %.4f sphere %.4f measured %s %s  %s (%d,%d)" % (r[3], r[4], r[5], r[6], r[0], r[1], r[2]))

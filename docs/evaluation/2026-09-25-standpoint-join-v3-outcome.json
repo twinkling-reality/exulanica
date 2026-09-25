@@ -1,0 +1,840 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "after_the_measurement": "Nothing was tuned or measured again. The pairs named in findings were read from the two versions' runs and the photographs looked at after both arms were judged.",
+  "artifact_notes": {
+   "held-out/depth.log.txt": "the depth pass's log with the checkout's absolute location replaced by <worktree>; each line names the field of view the depth model estimated and the rendered one",
+   "held-out/scene": "the planner's scene files, from which the evaluation reads each changed part's solid",
+   "held-out/version-1-comparison": "version 1's parameters over the same sets through the same code, run after version 3's, read by the gates that compare with version 1",
+   "scripts/redact_preregistration.py.txt": "the script that redacted the pre-registration's copies, with its em dash literals written as chr(0x2014) after it ran; it computes the same thing"
+  },
+  "bound_artifacts": {
+   "held-out/depth.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/depth.log.txt",
+    "sha256": "8aff026fad8a7fb2c4104d4543b210abb7a1a01a98d3ea39cef04386a45f0eb1"
+   },
+   "held-out/depth/held3-courtyard-131.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/depth/held3-courtyard-131.json",
+    "sha256": "756203feacd63981d931b3e6167cf7ac04b23a9a662b31d2bb49d566764d8322"
+   },
+   "held-out/depth/held3-courtyard-132.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/depth/held3-courtyard-132.json",
+    "sha256": "3e681ad70c70c0eea7975f5a03d686ac24ac37f761f18441bc1974e1101c696a"
+   },
+   "held-out/depth/held3-landscape-331.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/depth/held3-landscape-331.json",
+    "sha256": "c4978e3c3c71b401636a05c43b432fd40396fb070a3ec989d371168609056f75"
+   },
+   "held-out/depth/held3-landscape-332.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/depth/held3-landscape-332.json",
+    "sha256": "b98db9b1febe236a31f9a6e264786de9897f666e9b3651a434a77c38676aaa4f"
+   },
+   "held-out/depth/held3-room-231.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/depth/held3-room-231.json",
+    "sha256": "9272c48fa9e15e7903cffc119e151e805b0fc950c79b7dc2e0cb004226bf58d5"
+   },
+   "held-out/depth/held3-room-232.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/depth/held3-room-232.json",
+    "sha256": "0a055389082dd1b1eed03c35db49a6e198a3b11091ba69e657a1e17033c104b0"
+   },
+   "held-out/eval-exif-perturbed.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/eval-exif-perturbed.log.txt",
+    "sha256": "4bc782c17aa0cd4cdd3dc04b8d43e46ff7188d548a884223fdac3eb4bda54e2f"
+   },
+   "held-out/eval-exif.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/eval-exif.log.txt",
+    "sha256": "c89b31368d10981ffc1706e9028e35e212f0cb2bb3f966b5f712f5d14487b467"
+   },
+   "held-out/run-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/run-exif-perturbed.json",
+    "sha256": "9c8d0396f6dac40c843bbcc281a99ba14001ecc93ea8d013f926a7adf4fb9b00"
+   },
+   "held-out/run-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/run-exif.json",
+    "sha256": "d7a3ecfc01d9c6c9760e76da90bca74002b0122c1c0a6ef4ed836b6028ba83b9"
+   },
+   "held-out/run.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/run.log.txt",
+    "sha256": "e005ea3603b60d4893b5b399dfc64e1abc22c81c94546ffd7d56d10666b3d860"
+   },
+   "held-out/scene/held3-courtyard-131.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/scene/held3-courtyard-131.json",
+    "sha256": "b8a30f1239ecb099720ce6e35a23659adff1157ccf794a86d518b6d1b3a961b8"
+   },
+   "held-out/scene/held3-courtyard-132.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/scene/held3-courtyard-132.json",
+    "sha256": "967f364d576aacdfcab224987ebc1a2a97c482bb0bb2a160b5984f59028695fc"
+   },
+   "held-out/scene/held3-landscape-331.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/scene/held3-landscape-331.json",
+    "sha256": "fd020c8392681b23dcbc3a182a8e4567d08857acf418ebbe108abd5f8578751a"
+   },
+   "held-out/scene/held3-landscape-332.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/scene/held3-landscape-332.json",
+    "sha256": "62107d2f71df8e949ed164a9ab2b9a71e44aa73d215f5aefb9ca1c31e2d98aa4"
+   },
+   "held-out/scene/held3-room-231.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/scene/held3-room-231.json",
+    "sha256": "2f279173869872bd1f1e1905b071568165c9901c21680981d91d07c1033a112b"
+   },
+   "held-out/scene/held3-room-232.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/scene/held3-room-232.json",
+    "sha256": "3ded5958fa461188e697fd4f98195f203e4493a39721fb89f5bd9ba4c8ba4d74"
+   },
+   "held-out/statistics-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/statistics-exif-perturbed.json",
+    "sha256": "62ff34fd0c96da0aa6632281931cde86f8cadf82f8d06b072a1730a68bc67022"
+   },
+   "held-out/statistics-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/statistics-exif.json",
+    "sha256": "5e4dda0dfc006e77c009206bcacc816f18492892dfd6b41b50b84bde8ea4e9ec"
+   },
+   "held-out/truth/held3-courtyard-131.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/truth/held3-courtyard-131.json",
+    "sha256": "2042b322b8f6dc820051dfae07727fea186b5342fc8c7d245b47a8241df28fb4"
+   },
+   "held-out/truth/held3-courtyard-132.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/truth/held3-courtyard-132.json",
+    "sha256": "b17607729b0e4703c67278d9ab51e375c71ae488895dee81f3f8b8eab82b6788"
+   },
+   "held-out/truth/held3-landscape-331.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/truth/held3-landscape-331.json",
+    "sha256": "67edb7ce53636c7aba2540bb6816368a4b99df711aedb6dd89e1c14171502539"
+   },
+   "held-out/truth/held3-landscape-332.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/truth/held3-landscape-332.json",
+    "sha256": "0b3da30126f314ded98ff50ad28c924037159de5182650287adb7e3aa6522d49"
+   },
+   "held-out/truth/held3-room-231.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/truth/held3-room-231.json",
+    "sha256": "06f78df1696a8f84fb4a078cbff34e8eb46efb6c839ee29fc9b27fecf71a5569"
+   },
+   "held-out/truth/held3-room-232.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/truth/held3-room-232.json",
+    "sha256": "6875bc6abd70f8d49e869a73545f71f9424cd8572e5477fa053127de55f90fc3"
+   },
+   "held-out/version-1-comparison/eval-exif-perturbed.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/version-1-comparison/eval-exif-perturbed.log.txt",
+    "sha256": "8aac5f626a1d68e6246bda33ea2d8b43acff8c8d02fa657eefa9a4175d529402"
+   },
+   "held-out/version-1-comparison/eval-exif.log.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/version-1-comparison/eval-exif.log.txt",
+    "sha256": "afb06e8bf4bd32cfdd854e96ed0af835e2b2c14cbebf33d2403883a087992e55"
+   },
+   "held-out/version-1-comparison/run-exif-perturbed.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/version-1-comparison/run-exif-perturbed.json",
+    "sha256": "9fa5a3cb74de2813c07bd3784c11e8654a1a7b17285c057d0b33a930ba071496"
+   },
+   "held-out/version-1-comparison/run-exif.json": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/held-out/version-1-comparison/run-exif.json",
+    "sha256": "fafdc0c8bb9cad7caec858efcd948a293e37117bafd65c4cb5c44195fc25f610"
+   },
+   "scripts/redact_preregistration.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/scripts/redact_preregistration.py.txt",
+    "sha256": "3037ea69a3d323450b432e30bce9f0fff3b4f45cac1ffe13ec0f09d2f93b518e"
+   },
+   "scripts/write_outcome.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/scripts/write_outcome.py.txt",
+    "sha256": "fa96184d493dc10c9e0032f2e43b2d4c687ed348345ae5b23fe92ed43ee6306a"
+   }
+  },
+  "execution": {
+   "depth": "MoGe-2 through the product's MoGeDepthModel on this Mac's Metal (MPS) device, 228 photographs, through the machine-wide GPU slot; no remote or paid compute",
+   "features": "pycolmap 4.2.0 SIFT on the CPU",
+   "held_out_files": "every one of the split's 936 files checked against the digest taken when it was copied from the lane that rendered it, in the read-only copy and in the working copy the depth pass wrote into, before the run",
+   "machine": "Apple M5 Max, macOS 26.7",
+   "scripts": "the pre-registration's bound copies, run as they are bound: scripts/held3_run.sh.txt, in one run (held-out/run.log.txt), with one thread a process"
+  },
+  "findings": [
+   "Carrying the lens did what it was for. Two joinable pairs were named changed in each arm, against version 1's six and five on the same photographs, and no pair was joined across a change or a move in either arm. The two are described next; neither was diagnosed as the lens.",
+   "held3-courtyard-132-s3 (1, 2), joinable, named changed in both arms (2.36 and 2.38 percent): the camera moved 0.187 m, the estimate was 0.09 m with a sigma of 6 mm, inside the hand-held bound, and the depth-edge bands a movement of that size makes are narrower than what the true one uncovers. Version 1 refuses the pair too (4.17 and 3.42 percent).",
+   "held3-landscape-332-c1 (1, 2), joinable, named changed in both arms (3.86 percent; version 1 3.66): the camera moved 2.6 cm and the added box's own surface is outside the pair's shared view, by both the surface measure and version 1's sphere. OBSERVED BY EYE after the run, not measured: the box's shadow reaches towards the view photographs 1 and 2 share. The truth this record defines counts a changed part's surfaces, not the light it blocks, and a person sees a shadow appear.",
+   "held3-landscape-331-mv2 (0, 1), moved 1.24 m, named changed in both arms by every version: the translation was estimated at 0.20 m, inside the hand-held bound, from the depth model's scale in a landscape (not_covered in the pre-registration), so the camera was taken to have stood still and the view compared.",
+   "held3-courtyard-131-c3 (0, 1), a box added over 34 percent of the shared view, named moved in both arms by every version: the translation was estimated at 1.2 m where the camera moved 6.5 mm.",
+   "The naming rates fell under the thresholds version 2's development data set, for version 1 too: of the 28 moved pairs, 23 were refused for overlap, which the names allow and the rate does not count as named.",
+   "The exif arm's misregistration failure comes from pairs version 3 joins and version 1 refused as changed: on the 106 pairs both versions arranged, the 95th percentile is 0.288 degrees for each. Its worst pair, held3-landscape-331-s3 (0, 1), a hand-held pair 0.14 m apart whose parallax is 2.99 degrees at the 95th percentile, was joined 1.66 degrees beyond it; version 1 named it changed (3.48 percent).",
+   "Up is version 2's method, unchanged: 0.184 and 0.182 degrees at the median, 1.33 at worst, where version 1 leaned 1.47 at the median and 5.49 at worst.",
+   "A set joined in 3.2 s at the median and 11.7 s at most in each arm, two arms at once on a machine other work was loading (version 1: 2.7 s and 4.5 s). An observation, not a budgeted timing."
+  ],
+  "held_out": {
+   "exif": {
+    "change_under_limit": [
+     {
+      "a": 1,
+      "b": 2,
+      "changed_ppm": 0,
+      "changed_surface_ppm": 400,
+      "in_one_arrangement": true,
+      "outcome": "joined",
+      "set": "held3-courtyard-132-c2"
+     }
+    ],
+    "changed_in_one_arrangement": 0,
+    "changed_named": [
+     4,
+     10
+    ],
+    "excess_misregistration_millidegrees": {
+     "max": 1658,
+     "p50": 47,
+     "p95": 387
+    },
+    "joinable_in_one_arrangement": [
+     79,
+     97
+    ],
+    "joinable_refused_as_changed": [
+     2,
+     138
+    ],
+    "joinable_refused_as_moved": [
+     0,
+     138
+    ],
+    "judged": {
+     "never_passed": true,
+     "passed": false,
+     "verdicts": {
+      "changed_named": false,
+      "changed_never_joined": true,
+      "changed_never_named_moved": false,
+      "joinable_named_changed": false,
+      "joinable_named_moved": true,
+      "joins": true,
+      "joins_against_version_1": true,
+      "lines_up_p95_against_version_1": false,
+      "moved_named": false,
+      "moved_never_joined": true,
+      "moved_never_named_changed": false,
+      "seam_depth_median": true,
+      "seam_depth_p90": true,
+      "up_p50": true,
+      "up_p95": true
+     }
+    },
+    "misnamed": [
+     {
+      "a": 0,
+      "b": 1,
+      "class": "changed",
+      "outcome": "moved_between_photographs",
+      "set": "held3-courtyard-131-c3"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-s3"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-331-mv2"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-332-c1"
+     }
+    ],
+    "moved_in_one_arrangement": 0,
+    "moved_named": [
+     4,
+     16
+    ],
+    "outcomes_by_class": {
+     "change_under_limit": {
+      "joined": 1
+     },
+     "changed": {
+      "insufficient_overlap": 8,
+      "moved_between_photographs": 1,
+      "scene_changed": 8
+     },
+     "joinable": {
+      "insufficient_overlap": 38,
+      "joined": 98,
+      "scene_changed": 2
+     },
+     "moved": {
+      "insufficient_overlap": 23,
+      "moved_between_photographs": 4,
+      "scene_changed": 1
+     },
+     "no_overlap": {
+      "insufficient_overlap": 73,
+      "joined": 1
+     }
+    },
+    "pairs_in_one_arrangement": 111,
+    "seam_depth_ppm": {
+     "max": 937800,
+     "median": 30200,
+     "p90": 198800,
+     "pairs": 111
+    },
+    "up_error_millidegrees": {
+     "max": 1333,
+     "p50": 184,
+     "p95": 816,
+     "sets": 51
+    },
+    "up_methods": {
+     "camera-horizontal-axes": 1,
+     "vertical-edges": 50
+    }
+   },
+   "exif-perturbed": {
+    "change_under_limit": [
+     {
+      "a": 1,
+      "b": 2,
+      "changed_ppm": 0,
+      "changed_surface_ppm": 400,
+      "in_one_arrangement": true,
+      "outcome": "joined",
+      "set": "held3-courtyard-132-c2"
+     }
+    ],
+    "changed_in_one_arrangement": 0,
+    "changed_named": [
+     4,
+     10
+    ],
+    "excess_misregistration_millidegrees": {
+     "max": 1658,
+     "p50": 54,
+     "p95": 587
+    },
+    "joinable_in_one_arrangement": [
+     77,
+     97
+    ],
+    "joinable_refused_as_changed": [
+     2,
+     138
+    ],
+    "joinable_refused_as_moved": [
+     0,
+     138
+    ],
+    "judged": {
+     "never_passed": true,
+     "passed": false,
+     "verdicts": {
+      "changed_named": false,
+      "changed_never_joined": true,
+      "changed_never_named_moved": false,
+      "joinable_named_changed": false,
+      "joinable_named_moved": true,
+      "joins": true,
+      "joins_against_version_1": true,
+      "lines_up_p95_against_version_1": true,
+      "moved_named": false,
+      "moved_never_joined": true,
+      "moved_never_named_changed": false,
+      "seam_depth_median": true,
+      "seam_depth_p90": true,
+      "up_p50": true,
+      "up_p95": true
+     }
+    },
+    "misnamed": [
+     {
+      "a": 0,
+      "b": 1,
+      "class": "changed",
+      "outcome": "moved_between_photographs",
+      "set": "held3-courtyard-131-c3"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-s3"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-331-mv2"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-332-c1"
+     }
+    ],
+    "moved_in_one_arrangement": 0,
+    "moved_named": [
+     4,
+     16
+    ],
+    "outcomes_by_class": {
+     "change_under_limit": {
+      "joined": 1
+     },
+     "changed": {
+      "insufficient_overlap": 8,
+      "moved_between_photographs": 1,
+      "scene_changed": 8
+     },
+     "joinable": {
+      "insufficient_overlap": 39,
+      "joined": 97,
+      "scene_changed": 2
+     },
+     "moved": {
+      "insufficient_overlap": 23,
+      "moved_between_photographs": 4,
+      "scene_changed": 1
+     },
+     "no_overlap": {
+      "insufficient_overlap": 73,
+      "joined": 1
+     }
+    },
+    "pairs_in_one_arrangement": 108,
+    "seam_depth_ppm": {
+     "max": 937300,
+     "median": 30700,
+     "p90": 199900,
+     "pairs": 108
+    },
+    "up_error_millidegrees": {
+     "max": 1337,
+     "p50": 182,
+     "p95": 829,
+     "sets": 51
+    },
+    "up_methods": {
+     "camera-horizontal-axes": 1,
+     "vertical-edges": 50
+    }
+   }
+  },
+  "method": {
+   "params_path": "tests/fixtures/standpoint-v3-params.json",
+   "params_sha256": "cd3b2a577fcb7dce1d116c8ab6b17c968495de1c58e87562f83f00d823886d1d",
+   "sources_note": "every digest equals the pre-registration's, checked when this record was written",
+   "sources_sha256": {
+    "exulanica/ingest/stages/depth.py": "6291ac9563e66d6d2f0ef80a7b41c250c5f955fdd77d6dac318433a8798aaf5d",
+    "exulanica/reconstruction/standpoint.py": "0a4a921a084ed8cf0eeb18a6298936fbfd34777c4d18f4710aa404b2d4785388",
+    "exulanica/reconstruction/standpoint_features.py": "dca0459634a8ae350aa1607c834a2819d8863d141a813407a84e9358487fe232",
+    "exulanica/reconstruction/standpoint_record.py": "9d3165e7c9b4ac2ed05edc8a685fa14be561c1ee0a7ba18a51a11b3de541ea17",
+    "tests/fixtures/standpoint-v3-params.json": "a775e0253f5a463ecc4676a193116890478d99c4e372861be59887c3fce5dcc5"
+   },
+   "stage_version": 3
+  },
+  "not_covered": [
+   "Everything the pre-registration lists under not_covered.",
+   "A change a person sees only as a shadow: the truth counts a changed part's own surfaces.",
+   "How version 3's arrangement looks in the product's world: no browser check was made for it."
+  ],
+  "paired_with_version_1": {
+   "exif": {
+    "excess_misregistration_p95_millidegrees": {
+     "version_1": 288,
+     "version_3": 387
+    },
+    "excess_misregistration_p95_on_pairs_both_arranged_millidegrees": {
+     "version_1": 288,
+     "version_3": 288
+    },
+    "joins": {
+     "version_1": [
+      74,
+      97
+     ],
+     "version_3": [
+      79,
+      97
+     ]
+    },
+    "pairs_in_one_arrangement": {
+     "both": 106,
+     "version_1": 106,
+     "version_3": 111
+    }
+   },
+   "exif-perturbed": {
+    "excess_misregistration_p95_millidegrees": {
+     "version_1": 640,
+     "version_3": 587
+    },
+    "excess_misregistration_p95_on_pairs_both_arranged_millidegrees": {
+     "version_1": 478,
+     "version_3": 478
+    },
+    "joins": {
+     "version_1": [
+      75,
+      97
+     ],
+     "version_3": [
+      77,
+      97
+     ]
+    },
+    "pairs_in_one_arrangement": {
+     "both": 104,
+     "version_1": 107,
+     "version_3": 108
+    }
+   }
+  },
+  "preregistration": {
+   "path": "docs/evaluation/2026-09-25-standpoint-join-v3-preregistration.json",
+   "record_sha256": "e146a74c2881d50efc3c1d87544b6d3d4a532cc4c227f56428d6e4be1e62666f"
+  },
+  "preregistration_note": "The held-out run started under the pre-registration whose record digest is b9570eae33fae77642db5c6fc0e7ce2c561c512279c164b2ca39b99d8ddcacbf (held-out/run.log.txt). Before this record was written, its bound script copies were redacted for publication, which changes its digest to the one named in preregistration; its redaction block says what changed and reconstructs the earlier digest (scripts/redact_preregistration.py.txt).",
+  "profile_note": "Outcome of version 3 of the standpoint join's pre-registered measurement on its held-out split (72 sets, 228 photographs), made once with the frozen method in both arms, with version 1's parameters run on the same sets afterwards, as the gates that compare with version 1 require.",
+  "verdict": "FAILED IN BOTH ARMS. Passed in both arms: no moved pair and no changed pair was joined; no unchanged pair was named moved; the arrangement stood within 0.184 and 0.182 degrees of true up at the median and 0.816 and 0.829 at the 95th percentile (version 1 on the same sets: 1.472 and 1.502, 4.452 and 4.398); 79 and 77 of 97 joinable pairs were joined (version 1: 74 and 75); the seam gates. In the perturbed arm the misregistration at the 95th percentile, 0.587 degrees, was under version 1's 0.640. Failed in both arms: the name gates (in each arm one moved pair named changed, one changed pair named moved and two joinable pairs named changed, where version 1 named 6 and 5 moved pairs changed, the same changed pair moved and 6 and 5 joinable pairs changed), and the naming rates (4 of 16 moved pairs named moved and 4 of 10 changed pairs named changed, against 40 and 70 percent; version 1: 4 and 5 of 16, 5 of 10). Failed in the exif arm: the misregistration at the 95th percentile, 0.387 degrees against version 1's 0.288 plus the 0.075 allowed.",
+  "version_1_on_the_same_split": {
+   "exif": {
+    "change_under_limit": [
+     {
+      "a": 1,
+      "b": 2,
+      "changed_ppm": 0,
+      "changed_surface_ppm": 400,
+      "in_one_arrangement": true,
+      "outcome": "joined",
+      "set": "held3-courtyard-132-c2"
+     }
+    ],
+    "changed_in_one_arrangement": 0,
+    "changed_named": [
+     5,
+     10
+    ],
+    "excess_misregistration_millidegrees": {
+     "max": 517,
+     "p50": 42,
+     "p95": 288
+    },
+    "joinable_in_one_arrangement": [
+     74,
+     97
+    ],
+    "joinable_refused_as_changed": [
+     6,
+     138
+    ],
+    "joinable_refused_as_moved": [
+     0,
+     138
+    ],
+    "misnamed": [
+     {
+      "a": 1,
+      "b": 2,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-131-mv"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "changed",
+      "outcome": "moved_between_photographs",
+      "set": "held3-courtyard-131-c3"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-s3"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-s3"
+     },
+     {
+      "a": 0,
+      "b": 3,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-m1"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-c1"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-mv2"
+     },
+     {
+      "a": 0,
+      "b": 2,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-mv2"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-331-s3"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-331-mv2"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-332-c1"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-332-mv2"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-332-mv2"
+     }
+    ],
+    "moved_in_one_arrangement": 0,
+    "moved_named": [
+     4,
+     16
+    ],
+    "outcomes_by_class": {
+     "change_under_limit": {
+      "joined": 1
+     },
+     "changed": {
+      "insufficient_overlap": 6,
+      "moved_between_photographs": 1,
+      "scene_changed": 10
+     },
+     "joinable": {
+      "insufficient_overlap": 38,
+      "joined": 94,
+      "scene_changed": 6
+     },
+     "moved": {
+      "insufficient_overlap": 18,
+      "moved_between_photographs": 4,
+      "scene_changed": 6
+     },
+     "no_overlap": {
+      "insufficient_overlap": 73,
+      "joined": 1
+     }
+    },
+    "pairs_in_one_arrangement": 106,
+    "seam_depth_ppm": {
+     "max": 936200,
+     "median": 30100,
+     "p90": 193700,
+     "pairs": 106
+    },
+    "up_error_millidegrees": {
+     "max": 5486,
+     "p50": 1472,
+     "p95": 4452,
+     "sets": 49
+    },
+    "up_methods": {
+     "camera-horizontal-axes": 48,
+     "mean-camera-up-about-a-shared-horizontal-axis": 1
+    }
+   },
+   "exif-perturbed": {
+    "change_under_limit": [
+     {
+      "a": 1,
+      "b": 2,
+      "changed_ppm": 0,
+      "changed_surface_ppm": 400,
+      "in_one_arrangement": true,
+      "outcome": "joined",
+      "set": "held3-courtyard-132-c2"
+     }
+    ],
+    "changed_in_one_arrangement": 0,
+    "changed_named": [
+     5,
+     10
+    ],
+    "excess_misregistration_millidegrees": {
+     "max": 1154,
+     "p50": 54,
+     "p95": 640
+    },
+    "joinable_in_one_arrangement": [
+     75,
+     97
+    ],
+    "joinable_refused_as_changed": [
+     5,
+     138
+    ],
+    "joinable_refused_as_moved": [
+     0,
+     138
+    ],
+    "misnamed": [
+     {
+      "a": 1,
+      "b": 2,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-131-mv"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "changed",
+      "outcome": "moved_between_photographs",
+      "set": "held3-courtyard-131-c3"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-s3"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-s3"
+     },
+     {
+      "a": 0,
+      "b": 3,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-m1"
+     },
+     {
+      "a": 0,
+      "b": 2,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-courtyard-132-mv2"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-331-s3"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-331-mv2"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "joinable",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-332-c1"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-332-mv2"
+     },
+     {
+      "a": 1,
+      "b": 2,
+      "class": "moved",
+      "outcome": "scene_changed",
+      "set": "held3-landscape-332-mv2"
+     }
+    ],
+    "moved_in_one_arrangement": 0,
+    "moved_named": [
+     5,
+     16
+    ],
+    "outcomes_by_class": {
+     "change_under_limit": {
+      "joined": 1
+     },
+     "changed": {
+      "insufficient_overlap": 6,
+      "moved_between_photographs": 1,
+      "scene_changed": 10
+     },
+     "joinable": {
+      "insufficient_overlap": 38,
+      "joined": 95,
+      "scene_changed": 5
+     },
+     "moved": {
+      "insufficient_overlap": 18,
+      "moved_between_photographs": 5,
+      "scene_changed": 5
+     },
+     "no_overlap": {
+      "insufficient_overlap": 73,
+      "joined": 1
+     }
+    },
+    "pairs_in_one_arrangement": 107,
+    "seam_depth_ppm": {
+     "max": 936100,
+     "median": 31800,
+     "p90": 193100,
+     "pairs": 107
+    },
+    "up_error_millidegrees": {
+     "max": 5487,
+     "p50": 1502,
+     "p95": 4398,
+     "sets": 50
+    },
+    "up_methods": {
+     "camera-horizontal-axes": 49,
+     "mean-camera-up-about-a-shared-horizontal-axis": 1
+    }
+   }
+  }
+ },
+ "record_sha256": "d29e52331382a33fd36e7451085ee2fec89eb3f2c29d6fea2aed436d8c67bc54"
+}

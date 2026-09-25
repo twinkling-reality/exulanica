@@ -1,0 +1,822 @@
+[
+ {
+  "set": "dev-courtyard-101-ch",
+  "a": 0,
+  "b": 1,
+  "mode": "remove",
+  "object": "bench7",
+  "overlap": 0.4488,
+  "sphere": 0.0543,
+  "surface": 0.0405
+ },
+ {
+  "set": "dev-courtyard-101-ch",
+  "a": 1,
+  "b": 2,
+  "mode": "remove",
+  "object": "bench7",
+  "overlap": 0.3574,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "dev-courtyard-102-ch",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-dev-courtyard-102-ch",
+  "overlap": 0.3194,
+  "sphere": 0.109,
+  "surface": 0.1055
+ },
+ {
+  "set": "dev-courtyard-102-ch",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-dev-courtyard-102-ch",
+  "overlap": 0.4501,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "dev-landscape-301-ch",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-dev-landscape-301-ch",
+  "overlap": 0.2221,
+  "sphere": 0.4075,
+  "surface": 0.298
+ },
+ {
+  "set": "dev-landscape-301-ch",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-dev-landscape-301-ch",
+  "overlap": 0.2009,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "dev-room-201-ch",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-dev-room-201-ch",
+  "overlap": 0.3605,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "dev-room-201-ch",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-dev-room-201-ch",
+  "overlap": 0.3619,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "dev-room-202-ch",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-dev-room-202-ch",
+  "overlap": 0.3616,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "dev-room-202-ch",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-dev-room-202-ch",
+  "overlap": 0.2498,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-courtyard-111-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-courtyard-111-c1",
+  "overlap": 0.2698,
+  "sphere": 0.3817,
+  "surface": 0.2982
+ },
+ {
+  "set": "held-courtyard-111-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-courtyard-111-c1",
+  "overlap": 0.38,
+  "sphere": 0.0003,
+  "surface": 0.0
+ },
+ {
+  "set": "held-courtyard-111-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "move",
+  "object": "crate1",
+  "overlap": 0.3332,
+  "sphere": 0.1002,
+  "surface": 0.0941
+ },
+ {
+  "set": "held-courtyard-111-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "move",
+  "object": "crate1",
+  "overlap": 0.3275,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-courtyard-111-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-courtyard-111-c3",
+  "overlap": 0.419,
+  "sphere": 0.1989,
+  "surface": 0.1656
+ },
+ {
+  "set": "held-courtyard-111-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-courtyard-111-c3",
+  "overlap": 0.3726,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-courtyard-112-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-courtyard-112-c1",
+  "overlap": 0.2321,
+  "sphere": 0.6131,
+  "surface": 0.4137
+ },
+ {
+  "set": "held-courtyard-112-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-courtyard-112-c1",
+  "overlap": 0.3858,
+  "sphere": 0.0289,
+  "surface": 0.0147
+ },
+ {
+  "set": "held-courtyard-112-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "move",
+  "object": "fountain4",
+  "overlap": 0.2994,
+  "sphere": 0.2859,
+  "surface": 0.2855
+ },
+ {
+  "set": "held-courtyard-112-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "move",
+  "object": "fountain4",
+  "overlap": 0.3393,
+  "sphere": 0.0476,
+  "surface": 0.0476
+ },
+ {
+  "set": "held-courtyard-112-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-courtyard-112-c3",
+  "overlap": 0.1968,
+  "sphere": 0.447,
+  "surface": 0.3159
+ },
+ {
+  "set": "held-courtyard-112-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-courtyard-112-c3",
+  "overlap": 0.4756,
+  "sphere": 0.0035,
+  "surface": 0.0024
+ },
+ {
+  "set": "held-landscape-311-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-landscape-311-c1",
+  "overlap": 0.1066,
+  "sphere": 0.5686,
+  "surface": 0.4989
+ },
+ {
+  "set": "held-landscape-311-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-landscape-311-c1",
+  "overlap": 0.1666,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-landscape-311-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "move",
+  "object": "rock7",
+  "overlap": 0.1245,
+  "sphere": 0.1706,
+  "surface": 0.1688
+ },
+ {
+  "set": "held-landscape-311-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "move",
+  "object": "rock7",
+  "overlap": 0.3213,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-landscape-311-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-landscape-311-c3",
+  "overlap": 0.0215,
+  "sphere": 0.8006,
+  "surface": 0.7949
+ },
+ {
+  "set": "held-landscape-311-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-landscape-311-c3",
+  "overlap": 0.1529,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-landscape-312-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-landscape-312-c1",
+  "overlap": 0.2629,
+  "sphere": 0.431,
+  "surface": 0.3287
+ },
+ {
+  "set": "held-landscape-312-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-landscape-312-c1",
+  "overlap": 0.316,
+  "sphere": 0.0863,
+  "surface": 0.0696
+ },
+ {
+  "set": "held-landscape-312-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "move",
+  "object": "rock10",
+  "overlap": 0.172,
+  "sphere": 0.1684,
+  "surface": 0.1637
+ },
+ {
+  "set": "held-landscape-312-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "move",
+  "object": "rock10",
+  "overlap": 0.1993,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-landscape-312-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-landscape-312-c3",
+  "overlap": 0.1054,
+  "sphere": 0.8708,
+  "surface": 0.7227
+ },
+ {
+  "set": "held-landscape-312-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-landscape-312-c3",
+  "overlap": 0.2576,
+  "sphere": 0.3035,
+  "surface": 0.1547
+ },
+ {
+  "set": "held-room-211-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-room-211-c1",
+  "overlap": 0.3281,
+  "sphere": 0.2311,
+  "surface": 0.2311
+ },
+ {
+  "set": "held-room-211-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-room-211-c1",
+  "overlap": 0.4381,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-room-211-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-room-211-c2",
+  "overlap": 0.4261,
+  "sphere": 0.0844,
+  "surface": 0.0844
+ },
+ {
+  "set": "held-room-211-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-room-211-c2",
+  "overlap": 0.3771,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-room-211-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-room-211-c3",
+  "overlap": 0.3267,
+  "sphere": 0.0989,
+  "surface": 0.0989
+ },
+ {
+  "set": "held-room-211-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-room-211-c3",
+  "overlap": 0.481,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-room-212-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-room-212-c1",
+  "overlap": 0.2595,
+  "sphere": 0.2433,
+  "surface": 0.2433
+ },
+ {
+  "set": "held-room-212-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-room-212-c1",
+  "overlap": 0.4462,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-room-212-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-room-212-c2",
+  "overlap": 0.3974,
+  "sphere": 0.1795,
+  "surface": 0.1795
+ },
+ {
+  "set": "held-room-212-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-room-212-c2",
+  "overlap": 0.3928,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held-room-212-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held-room-212-c3",
+  "overlap": 0.2605,
+  "sphere": 0.2611,
+  "surface": 0.2587
+ },
+ {
+  "set": "held-room-212-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held-room-212-c3",
+  "overlap": 0.4333,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-courtyard-121-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-121-c1",
+  "overlap": 0.1942,
+  "sphere": 0.5634,
+  "surface": 0.3146
+ },
+ {
+  "set": "held2-courtyard-121-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-121-c1",
+  "overlap": 0.3894,
+  "sphere": 0.0356,
+  "surface": 0.0188
+ },
+ {
+  "set": "held2-courtyard-121-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-121-c2",
+  "overlap": 0.2714,
+  "sphere": 0.2497,
+  "surface": 0.1896
+ },
+ {
+  "set": "held2-courtyard-121-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-121-c2",
+  "overlap": 0.3584,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-courtyard-121-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-121-c3",
+  "overlap": 0.2326,
+  "sphere": 0.1727,
+  "surface": 0.1644
+ },
+ {
+  "set": "held2-courtyard-121-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-121-c3",
+  "overlap": 0.3872,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-courtyard-122-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-122-c1",
+  "overlap": 0.4021,
+  "sphere": 0.2018,
+  "surface": 0.1706
+ },
+ {
+  "set": "held2-courtyard-122-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-122-c1",
+  "overlap": 0.4613,
+  "sphere": 0.001,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-courtyard-122-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-122-c2",
+  "overlap": 0.1702,
+  "sphere": 0.4071,
+  "surface": 0.4071
+ },
+ {
+  "set": "held2-courtyard-122-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-122-c2",
+  "overlap": 0.3196,
+  "sphere": 0.0116,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-courtyard-122-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-122-c3",
+  "overlap": 0.2531,
+  "sphere": 0.5003,
+  "surface": 0.4859
+ },
+ {
+  "set": "held2-courtyard-122-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-courtyard-122-c3",
+  "overlap": 0.3073,
+  "sphere": 0.2457,
+  "surface": 0.2457
+ },
+ {
+  "set": "held2-landscape-321-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "remove",
+  "object": "rock17",
+  "overlap": 0.111,
+  "sphere": 0.6035,
+  "surface": 0.4893
+ },
+ {
+  "set": "held2-landscape-321-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "remove",
+  "object": "rock17",
+  "overlap": 0.2906,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-landscape-321-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-landscape-321-c2",
+  "overlap": 0.2685,
+  "sphere": 0.5243,
+  "surface": 0.3887
+ },
+ {
+  "set": "held2-landscape-321-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-landscape-321-c2",
+  "overlap": 0.2604,
+  "sphere": 0.2225,
+  "surface": 0.1905
+ },
+ {
+  "set": "held2-landscape-321-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-landscape-321-c3",
+  "overlap": 0.0954,
+  "sphere": 0.7098,
+  "surface": 0.606
+ },
+ {
+  "set": "held2-landscape-321-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-landscape-321-c3",
+  "overlap": 0.2062,
+  "sphere": 0.0934,
+  "surface": 0.0839
+ },
+ {
+  "set": "held2-landscape-322-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-landscape-322-c1",
+  "overlap": 0.1377,
+  "sphere": 0.517,
+  "surface": 0.451
+ },
+ {
+  "set": "held2-landscape-322-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-landscape-322-c1",
+  "overlap": 0.2123,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-landscape-322-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-landscape-322-c2",
+  "overlap": 0.0599,
+  "sphere": 0.599,
+  "surface": 0.599
+ },
+ {
+  "set": "held2-landscape-322-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-landscape-322-c2",
+  "overlap": 0.1328,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-landscape-322-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-landscape-322-c3",
+  "overlap": 0.099,
+  "sphere": 0.4538,
+  "surface": 0.4538
+ },
+ {
+  "set": "held2-landscape-322-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-landscape-322-c3",
+  "overlap": 0.2744,
+  "sphere": 0.0038,
+  "surface": 0.0035
+ },
+ {
+  "set": "held2-room-221-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-room-221-c1",
+  "overlap": 0.2341,
+  "sphere": 0.3848,
+  "surface": 0.3695
+ },
+ {
+  "set": "held2-room-221-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-room-221-c1",
+  "overlap": 0.4172,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-room-221-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-room-221-c2",
+  "overlap": 0.3614,
+  "sphere": 0.1285,
+  "surface": 0.1285
+ },
+ {
+  "set": "held2-room-221-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-room-221-c2",
+  "overlap": 0.3797,
+  "sphere": 0.005,
+  "surface": 0.005
+ },
+ {
+  "set": "held2-room-221-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-room-221-c3",
+  "overlap": 0.3149,
+  "sphere": 0.1217,
+  "surface": 0.1217
+ },
+ {
+  "set": "held2-room-221-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-room-221-c3",
+  "overlap": 0.3662,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-room-222-c1",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-room-222-c1",
+  "overlap": 0.2374,
+  "sphere": 0.3332,
+  "surface": 0.3332
+ },
+ {
+  "set": "held2-room-222-c1",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-room-222-c1",
+  "overlap": 0.3444,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-room-222-c2",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-room-222-c2",
+  "overlap": 0.3496,
+  "sphere": 0.2631,
+  "surface": 0.2631
+ },
+ {
+  "set": "held2-room-222-c2",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-room-222-c2",
+  "overlap": 0.509,
+  "sphere": 0.0,
+  "surface": 0.0
+ },
+ {
+  "set": "held2-room-222-c3",
+  "a": 0,
+  "b": 1,
+  "mode": "add",
+  "object": "arrival-held2-room-222-c3",
+  "overlap": 0.3098,
+  "sphere": 0.0624,
+  "surface": 0.0624
+ },
+ {
+  "set": "held2-room-222-c3",
+  "a": 1,
+  "b": 2,
+  "mode": "add",
+  "object": "arrival-held2-room-222-c3",
+  "overlap": 0.435,
+  "sphere": 0.0,
+  "surface": 0.0
+ }
+]

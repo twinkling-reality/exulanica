@@ -1,0 +1,47 @@
+"""Both change measures for every pair of every changed development set, from ground truth alone.
+
+    python truth_shares.py <out.json>
+"""
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from k4lib import load_camera, scenes, set_photo_ids, truth_of  # noqa: E402
+
+spec_ = importlib.util.spec_from_file_location("ev", Path(__file__).parent / "standpoint_eval.py")
+EV = importlib.util.module_from_spec(spec_)
+spec_.loader.exec_module(EV)
+
+
+def main(out):
+    rows = []
+    for scene in scenes():
+        truth = truth_of(scene)
+        for set_entry in truth["sets"]:
+            if set_entry.get("change") is None:
+                continue
+            ids = set_photo_ids(truth, set_entry["id"])
+            cams = [load_camera(scene, truth, pid) for pid in ids]
+            spheres = EV._change_spheres(scene, set_entry)
+            solids = EV._change_solids(scene, set_entry)
+            for a in range(len(ids)):
+                for b in range(a + 1, len(ids)):
+                    if 1 not in (a, b):
+                        continue
+                    k, l = cams[a], cams[b]
+                    t = EV.truth_pair(k, l)
+                    row = {"set": set_entry["id"], "a": a, "b": b, "mode": set_entry["change"]["mode"],
+                           "object": set_entry["change"]["object"], "overlap": round(t["overlap"], 4),
+                           "sphere": round(max(EV.change_share(k, l, spheres), EV.change_share(l, k, spheres)), 4),
+                           "surface": round(max(EV.changed_surface_share(k, l, solids), EV.changed_surface_share(l, k, solids)), 4)}
+                    rows.append(row)
+                    print(row, flush=True)
+    Path(out).write_text(json.dumps(rows, indent=1))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])

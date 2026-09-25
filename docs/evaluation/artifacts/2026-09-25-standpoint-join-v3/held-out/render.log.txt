@@ -1,0 +1,7 @@
+rendered held3-courtyard-131 in 321.8 s
+rendered held3-courtyard-132 in 300.6 s
+rendered held3-landscape-331 in 237.5 s
+rendered held3-landscape-332 in 286.1 s
+rendered held3-room-231 in 490.5 s
+rendered held3-room-232 in 553.7 s
+exit 0

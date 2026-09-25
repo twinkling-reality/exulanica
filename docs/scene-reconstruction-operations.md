@@ -180,6 +180,10 @@ a scene whose pose recovery placed a member.
   `not_joined`, or never read: `not_permitted`, `point_map_unreadable`, or `focal_length_unstated`
   (a photograph that does not state its lens stays a separate photograph, because the depth model's
   own field-of-view estimate joins visibly wrong). Photographs that overlap nothing stay separate.
+  A pair is `scene_changed` when more than 2 percent of the view the two photographs share shows
+  something else. A smaller change may be joined, and the arrangement then shows it as the
+  photograph drawn there has it: an object that appeared over 1.2 to 1.9 percent of a pair's shared
+  view, as counted from one photograph or the other, was joined by every version measured.
 - **Permission and withdrawal.** A member is read only under the permission the depth stage
   requires for its point map, including a personal model right naming the depth model where the
   capture needs one, and the question is asked again inside the publication transaction. The graph
@@ -222,6 +226,25 @@ that photograph through its unzoomed lens. With the lens off by up to 3 percent,
 lined up within 0.46 degrees at the 95th percentile against the gate's 0.41 (version 1 on the same
 split: 0.43). Records: `docs/evaluation/2026-09-24-standpoint-join-v2-preregistration.json` and
 `docs/evaluation/2026-09-24-standpoint-join-v2-outcome.json`.
+
+MEASURED for version 3 on a third held-out split of 72 synthetic sets and 228 photographs, in the
+same two arms and beside version 1 on the same sets: the pre-registered gates failed in both arms.
+Version 3 is version 2 with the change compared through the lens the pair's fit found, selected by
+its parameters, and the stage registers version 1. A change was counted by the changed object's own
+visible surface, and the join was required to refuse every change over the 2 percent its policy
+names. No moved pair and no changed pair was joined, in either version. In each arm 2 of 138
+joinable pairs were refused as changed (version 1: 6 and 5), the arrangement stood within 0.18
+degrees of true up at the median and 0.82 and 0.83 at the 95th percentile (version 1: 1.47 and 1.50,
+4.45 and 4.40), and 79 and 77 of 97 joinable pairs were joined (version 1: 74 and 75). The name
+gates and the naming rates failed (4 of 16 moved and 4 of 10 changed pairs named; version 1: 4 and 5
+of 16, 5 of 10): in each arm one moved pair was named changed, a landscape walk the depth model's
+scale read as 0.2 m, and one changed pair was named moved, where an added object covered a third of
+the shared view; version 1 named 6 and 5 moved pairs changed and the same changed pair moved. With
+the stated lens, joined photographs lined up within 0.39 degrees at the 95th percentile against
+version 1's 0.29 and one pixel (0.075 degrees) allowed over it: on the pairs both versions joined
+the two are equal, and the difference is hand-held pairs only version 3 joins. Records:
+`docs/evaluation/2026-09-25-standpoint-join-v3-preregistration.json` and
+`docs/evaluation/2026-09-25-standpoint-join-v3-outcome.json`.
 
 ## 5. Recorded rung, displayed rung, and substrate
 

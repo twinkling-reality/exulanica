@@ -1,0 +1,3 @@
+I20260925 10:16:30.376717 0x1f2cce1c0 sift.cc:765] Creating SIFT CPU feature extractor
+params a7a582c038d6408f4fd76cb791e551fdeb4925332e32bb68f64d2f331993bc06; bound sets 108
+v1 exif: 108 identical, 0 differ

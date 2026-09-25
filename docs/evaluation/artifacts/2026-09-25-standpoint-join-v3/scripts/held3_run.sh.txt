@@ -1,0 +1,53 @@
+#!/bin/zsh
+# held3_run.sh: the one measurement of version 3 on the held-out split, as pre-registered.
+#   1. check every held-out file against the digests taken when it was copied from lane K3;
+#   2. copy it to a working directory (the depth pass writes each scene's opm/ beside its photographs)
+#      and check the copy the same way;
+#   3. the depth pass, once, through the machine-wide GPU slot;
+#   4. version 3 in both arms, then version 1 in both arms on the same sets;
+#   5. each arm judged by the pre-registration's gates, paired with version 1's run.
+# Nothing here is repeated: a step that fails stops the run, and the failure is the result.
+emulate -L zsh
+setopt err_exit
+W=<worktree>
+L=$W/.exulanica/lane-standpoint4
+P=$W/.venv/bin/python
+PREREG=$W/docs/evaluation/2026-09-25-standpoint-join-v3-preregistration.json
+cd $W
+# One thread a process, at most four processes at once: the machine is shared (the run's numbers
+# do not depend on it: the parity checks gave the same bytes with and without these settings).
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+[[ -e $L/runs/held3-v3-exif.json ]] && { print -r -- "held3 was measured already"; exit 3; }
+$P - <<PY
+import hashlib, json, os, shutil
+lane = "$L"
+manifest = json.load(open(f"{lane}/k3-source-manifest.json"))
+held = {k: v for k, v in manifest.items() if k.startswith("data/held3/")}
+def check(root):
+    bad = [k for k, v in held.items() if hashlib.sha256(open(os.path.join(root, k[len("data/"):]), "rb").read()).hexdigest() != v]
+    return bad
+assert len(held) == 936, len(held)
+assert not check(f"{lane}/k3/data"), "the read-only copy differs from the digests taken at the copy"
+work = f"{lane}/held3-work"
+shutil.copytree(f"{lane}/k3/data/held3", f"{work}/held3")
+for d, _dirs, files in os.walk(work):
+    os.chmod(d, 0o755)
+    for f in files:
+        os.chmod(os.path.join(d, f), 0o644)
+assert not check(work), "the working copy differs"
+print("held3: 936 files equal to the copy's digests, in the read-only copy and in the working copy")
+PY
+record_sha=$($P -c "import json; print(json.load(open('$PREREG'))['record_sha256'])")
+print -r -- "pre-registration $record_sha"
+HF_HUB_OFFLINE=1 <main-checkout>/.exulanica/bin/gpu-slot $P $L/k3/scripts/v1-lane/standpoint_depth_pass.py $L/held3-work/held3 > $L/logs/held3-depth.log 2>&1
+print -r -- "depth pass: $(tail -1 $L/logs/held3-depth.log)"
+for version params stage in v3 $W/tests/fixtures/standpoint-v3-params.json 3 v1 $L/v1-params-from-stages.json 1; do
+  for arm in exif exif-perturbed; do
+    $P $L/scripts/k4/standpoint_eval.py $L/held3-work/held3 $params $L/runs/held3-$version-$arm.json --arm $arm --stage-version $stage > $L/logs/held3-$version-eval-$arm.log 2>&1 &
+  done
+  wait
+done
+for arm in exif exif-perturbed; do
+  $P $L/scripts/k4/standpoint_gates.py $L/runs/held3-v3-$arm.json $L/runs/held3-v1-$arm.json $PREREG > $L/runs/held3-gates-$arm.json
+  $P -c "import json; j = json.load(open('$L/runs/held3-gates-$arm.json'))['judged']; print('$arm', 'PASSED' if j['passed'] else 'FAILED', sorted(k for k, v in j['verdicts'].items() if not v))"
+done

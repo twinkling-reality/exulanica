@@ -1,0 +1,14 @@
+#!/bin/zsh
+# final_dev.sh: version 3's development runs and the version 1 and 2 parity checks, on the frozen code.
+emulate -L zsh
+W=<worktree>
+L=$W/.exulanica/lane-standpoint4
+P=$W/.venv/bin/python
+cd $W
+for arm in exif exif-perturbed; do
+  $L/scripts/k4/dev_eval.sh $W/tests/fixtures/standpoint-v3-params.json v3 $arm 3 &
+  $P $L/scripts/k4/parity.py $L/v1-params-from-stages.json $arm v1 > $L/logs/v1-parity-$arm.log 2>&1 &
+  $P $L/scripts/k4/parity.py $W/tests/fixtures/standpoint-v2-params.json $arm v2 > $L/logs/v2-parity-$arm.log 2>&1 &
+done
+wait
+for f in $L/logs/v1-parity-*.log $L/logs/v2-parity-*.log; do print -r -- "$f: $(tail -1 $f)"; done

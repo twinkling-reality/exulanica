@@ -1,0 +1,77 @@
+"""Diagnose one development pair's change comparison under the v3 candidate's parameters.
+
+    python pair_compare.py <params.json> <arm> <set:a:b> ...
+Prints the pair's zoom, translation, the true distance, and the changed share under: a pure turn
+(strict), the measured motion through the member lens and through the fitted lens (strict and
+tolerant).
+"""
+from __future__ import annotations
+
+import json
+import math
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).parent))
+from k4lib import inputs_for, load_camera, scenes, set_photo_ids, truth_of  # noqa: E402
+
+from exulanica.reconstruction import standpoint as sp
+from exulanica.reconstruction.standpoint_features import PycolmapSift
+
+
+def main(params_path, arm, *specs):
+    policy = sp.StandpointPolicy.from_params(json.loads(Path(params_path).read_text()))
+    ex = PycolmapSift(max_features=policy.max_features, peak_threshold=policy.peak_threshold, threads=policy.feature_threads)
+    for spec in specs:
+        set_id, a, b = spec.split(":")
+        a, b = int(a), int(b)
+        scene = next(s for s in scenes() if set_id.startswith(s.name + "-"))
+        truth = truth_of(scene)
+        ids = set_photo_ids(truth, set_id)
+        cams = [load_camera(scene, truth, pid) for pid in ids]
+        members = {i.ordinal: sp._prepare(i, policy, ex) for i in inputs_for(scene, truth, set_id, arm)}
+        readable = sorted(members)
+        everyone = [(x, y) for k, x in enumerate(readable) for y in readable[k + 1:]]
+        prov = {(x, y): sp._join_pair(members[x], members[y], policy, provisional=True) for x, y in everyone}
+        focals = sp._refine_focals(members, prov, policy)
+        members = {o: sp._with_focal(m, focals[o]) for o, m in members.items()}
+        A, B = members[a], members[b]
+        ia, ib = sp._match(A, B, policy.match_ratio)
+        target, source = A.bearings[ia], B.bearings[ib]
+        rot = sp._ransac(target, source, policy, (a, b))
+        window = sp._angles_deg(target, source @ rot.T) <= policy.candidate_window_deg
+        plain = sp._Motion(rot, np.zeros(3), np.full((3, 3), np.inf), 0.0)
+        inl = window
+        for _ in range(2):
+            plain = sp._fit_rotation_translation(A, B, ia[inl], ib[inl], plain.rotation, policy)
+            inl = window & (sp._angles_deg(target, plain.predict(B, ib)) <= policy.inlier_threshold_deg)
+        zoomed = sp._zoom_refinement(A, B, ia[inl], ib[inl], plain.rotation, policy)
+        turn = sp._turn_only(target[inl], source[inl], zoomed.rotation, policy)
+        ra = 1.0 / np.where(A.inverse_range[ia[inl]] > 0, A.inverse_range[ia[inl]], np.nan)
+        rb = 1.0 / np.where(B.inverse_range[ib[inl]] > 0, B.inverse_range[ib[inl]], np.nan)
+        carried = np.linalg.norm((zoomed.source(B, ib[inl]) * rb[:, None]) @ zoomed.rotation.T + zoomed.translation[None, :], axis=1)
+        ratios = ra / carried
+        ratio = float(np.exp(np.median(np.log(ratios[np.isfinite(ratios) & (ratios > 0)]))))
+        Bz = zoomed.lens(B)
+        f = lambda m, r, t, tol: round(sp._pair_changed(A, m, r, t, ratio, policy, tolerant=tol), 4)  # noqa: E731
+        out = {
+            "true_m": round(float(np.linalg.norm(cams[a]["c"] - cams[b]["c"])), 3),
+            "focal_err_pct": [round(100 * (members[o].focal_source / cams[o]["focal"] - 1), 2) for o in (a, b)],
+            "zoom": round(math.exp(zoomed.zoom), 4),
+            "t_m": round(float(np.linalg.norm(zoomed.translation)) * ratio, 3),
+            "turn_strict": f(B, turn, np.zeros(3), False),
+            "member_tolerant(v2)": f(B, zoomed.rotation, zoomed.translation, True),
+            "fitted_tolerant(a)": f(Bz, zoomed.rotation, zoomed.translation, True),
+            "fitted_strict": f(Bz, zoomed.rotation, zoomed.translation, False),
+            "fitted_zero_t_strict": f(Bz, zoomed.rotation, np.zeros(3), False),
+            "sigma_m": round(ratio * math.sqrt(float((zoomed.translation / np.linalg.norm(zoomed.translation)) @ zoomed.covariance @ (zoomed.translation / np.linalg.norm(zoomed.translation)))), 4),
+        }
+        for share in (0.0, 0.25, 0.5, 0.75, 1.0):
+            out[f"band{share}"] = round(sp._pair_changed(A, Bz, zoomed.rotation, zoomed.translation, ratio, policy, tolerant=True, band_share=share), 4)
+        print(arm, spec, out, flush=True)
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

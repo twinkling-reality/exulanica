@@ -65,6 +65,12 @@ exceeds the comparison's search is not compared: the far surface beside a near p
 by the movement, not changed. Version 1's parameters name none of this and are decoded to exactly
 what they meant.
 
+**The comparison uses the lens the motion was fitted with (stage version 3).** The zoom fit finds
+a turn and a step that belong with the second photograph's lens zoomed; applied through its own
+lens, they misplace what it shows by the zoom towards its edges, which reads as a change. Version 3
+carries the second photograph through the zoomed lens wherever the comparison uses that motion.
+Version 2's parameters name the photograph's own lens and are decoded to it.
+
 **Up (stage version 2).** People hold a camera level only roughly, so the camera's own
 horizontal axes lean with its roll. Version 2 takes up from the photographs' vertical edges: the
 direction most perpendicular to the planes through the camera and each strong edge, sought from
@@ -140,6 +146,10 @@ _PAIR_FIT_V1: Final = "rotation-translation"
 #: Where the camera stood still, how tiles at depth edges are treated, by name. Version 1's
 #: parameters name none: theirs compares every tile, and decoding keeps it.
 _DISOCCLUSION_V1: Final = "none"
+#: Through which lens the second photograph is carried when the change is compared under the
+#: pair's measured motion, by name. Versions 1 and 2 name none: theirs is the member's own lens,
+#: and decoding keeps it.
+_CHANGE_LENS_V1: Final = "member"
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,10 +176,11 @@ class UpFromEdges:
 class StandpointPolicy:
     """The stage's parameters, decoded once and named. See the stage registry for each reason.
 
-    The fields after ``up_min_spread`` exist from stage version 2. Version 1's parameters decode
-    to the values that keep what version 1 computed: the rotation-and-translation fit, no zoom,
-    no hand-held bound or depth-spread requirement (two outcomes of the moved test, not three),
-    every tile compared, and up from the cameras' horizontal axes.
+    The fields after ``up_min_spread`` exist from stage version 2, ``change_lens`` from version 3.
+    Version 1's parameters decode to the values that keep what version 1 computed: the
+    rotation-and-translation fit, no zoom, no hand-held bound or depth-spread requirement (two
+    outcomes of the moved test, not three), every tile compared, the member's own lens, and up
+    from the cameras' horizontal axes. Version 2's decode to the member's own lens.
     """
 
     feature_max_edge_px: int
@@ -217,6 +228,7 @@ class StandpointPolicy:
     change_disocclusion_max_px: int
     change_disocclusion_min_share: float
     change_disocclusion_margin_px: int
+    change_lens: str
     up_method: str
     up_edges: UpFromEdges | None
 
@@ -246,6 +258,9 @@ class StandpointPolicy:
         disocclusion = str(change.get("disocclusion", _DISOCCLUSION_V1))
         if disocclusion not in _DISOCCLUSIONS:
             raise ValueError(f"this join knows no depth-edge treatment named {disocclusion!r}")
+        change_lens = str(change.get("lens", _CHANGE_LENS_V1))
+        if change_lens not in _CHANGE_LENSES:
+            raise ValueError(f"this join knows no lens named {change_lens!r} to compare through")
         if (disocclusion == "depth-edge-parallax") != all(
             key in change
             for key in (
@@ -271,6 +286,8 @@ class StandpointPolicy:
         zoom_sigma = translation.get("zoom_prior_sigma_ppm")
         if (pair_fit == "rotation-translation-zoom") != (zoom_sigma is not None):
             raise ValueError("the zoom fit and its prior come together")
+        if change_lens == "pair-fit" and pair_fit != "rotation-translation-zoom":
+            raise ValueError("a change compared through the pair's fitted lens needs the zoom fit")
         low, high = intrinsics["exif_plausible_mm"]
         return cls(
             feature_max_edge_px=int(features["max_edge_px"]),
@@ -318,6 +335,7 @@ class StandpointPolicy:
             change_disocclusion_max_px=int(change.get("disocclusion_max_px", 0)),
             change_disocclusion_min_share=int(change.get("disocclusion_min_share_ppm", 0)) / _MICRO,
             change_disocclusion_margin_px=int(change.get("disocclusion_margin_px", 0)),
+            change_lens=change_lens,
             up_method=up_method,
             up_edges=(
                 None
@@ -915,6 +933,12 @@ class _Motion:
             return b.bearings[ib]
         return _bearings(b.xy[ib], b.source_size, b.focal_source * math.exp(self.zoom))
 
+    def lens(self, b: _Member) -> _Member:
+        """``b`` read through the lens the fit found: its own focal length times the zoom."""
+        if self.zoom == 0.0:
+            return b
+        return _with_focal(b, b.focal_source * math.exp(self.zoom))
+
     def predict(self, b: _Member, ib: np.ndarray) -> np.ndarray:
         predicted = self.source(b, ib) @ self.rotation.T + (
             self.translation[None, :] * b.inverse_range[ib][:, None]
@@ -963,6 +987,11 @@ _PAIR_FITS: Final[Mapping[str, Callable[..., _Motion] | None]] = {
     "rotation-translation-zoom": _zoom_refinement,
 }
 _DISOCCLUSIONS: Final = frozenset({"none", "depth-edge-parallax"})
+#: Through which lens ``b`` is carried when a change is compared under the pair's measured motion,
+#: by the name the policy gives: the member's own (the focal refinement's), or the one the pair's
+#: fit found, the member's times the fit's zoom. A name missing here is refused when the policy is
+#: decoded.
+_CHANGE_LENSES: Final = frozenset({"member", "pair-fit"})
 
 
 def _bound_parallax_deg(inverse: np.ndarray, movement: float) -> float:
@@ -1442,8 +1471,14 @@ def _join_pair(
             return refused("insufficient_overlap", **fields)
         changed = _pair_changed(a, b, turn, np.zeros(3), ratio, policy, tolerant=False)
         if still:
+            # The measured motion carries b through the lens it was fitted with (stage version
+            # 3): a rotation and translation found through b's lens zoomed, applied through the
+            # unzoomed one, misplace b's content by the zoom at the frame's edges. MEASURED on
+            # version 2's held-out split: all five joinable pairs it named changed came from that.
+            compared = motion.lens(b) if policy.change_lens == "pair-fit" else b
             changed = min(
-                changed, _pair_changed(a, b, rotation, translation, ratio, policy, tolerant=True)
+                changed,
+                _pair_changed(a, compared, rotation, translation, ratio, policy, tolerant=True),
             )
     fields["changed_ppm"] = round(changed * PARTS_PER_MILLION)
     if changed > policy.max_changed_fraction:

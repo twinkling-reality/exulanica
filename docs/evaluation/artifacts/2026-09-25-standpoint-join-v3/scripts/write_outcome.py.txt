@@ -1,0 +1,80 @@
+"""Write the standpoint join's version 3 held-out outcome, binding what the one measurement produced.
+
+    python write_outcome.py <outcome-body.json>
+
+Binds the held-out truth and scene files, the depth pass's per-scene ledgers and log, the run log,
+both versions' runs, logs and each arm's judged statistics; checks every source and the parameters
+against the pre-registration; and writes docs/evaluation/2026-09-25-standpoint-join-v3-outcome.json.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from record_common import LANE, OUTCOME, PARAMS, PREREGISTRATION, ROOT, SOURCES, bind, rel, sha  # noqa: E402
+from write_preregistration import paired_summary, summary  # noqa: E402
+
+from exulanica.canonical import canonical_json, sha256_of_canonical
+
+
+def main(body_path: str) -> None:
+    prereg = json.loads(PREREGISTRATION.read_text(encoding="utf-8"))
+    method = prereg["record"]["method"]
+    params_sha256 = sha256_of_canonical(json.loads(PARAMS.read_text(encoding="utf-8"))).hex()
+    if params_sha256 != method["params_sha256"]:
+        raise SystemExit("the parameters changed after the pre-registration")
+    sources = {name: sha(ROOT / name) for name in SOURCES}
+    if sources != method["sources_sha256"]:
+        raise SystemExit("a source file changed after the pre-registration")
+    for name, binding in prereg["record"]["scripts"].items():
+        if sha(ROOT / binding["path"]) != binding["sha256"]:
+            raise SystemExit(f"the bound copy of {name} changed")
+    work = LANE / "held3-work" / "held3"
+    bound = {}
+    for scene in sorted(work.iterdir()):
+        if (scene / "truth.json").exists():
+            bound[f"held-out/truth/{scene.name}.json"] = bind(f"held-out/truth/{scene.name}.json", scene / "truth.json")
+            bound[f"held-out/scene/{scene.name}.json"] = bind(f"held-out/scene/{scene.name}.json", scene / "spec.json")
+            bound[f"held-out/depth/{scene.name}.json"] = bind(f"held-out/depth/{scene.name}.json", scene / "opm" / "depth.json")
+    bound["held-out/depth.log.txt"] = bind("held-out/depth.log.txt", LANE / "logs" / "held3-depth.log", redact=True)
+    bound["held-out/run.log.txt"] = bind("held-out/run.log.txt", LANE / "logs" / "held3-run.log", redact=True)
+    v1_sha256 = prereg["record"]["comparison"]["version_1_params_sha256"]
+    results, comparison, paired = {}, {}, {}
+    for arm in ("exif", "exif-perturbed"):
+        for version, digest, stage_version in (("v3", params_sha256, 3), ("v1", v1_sha256, 1)):
+            run = json.loads((LANE / "runs" / f"held3-{version}-{arm}.json").read_text(encoding="utf-8"))
+            if run["policy_sha256"] != digest or run["stage_version"] != stage_version:
+                raise SystemExit(f"the {version} {arm} held-out run was not made with the recorded parameters")
+            folder = "held-out" if version == "v3" else "held-out/version-1-comparison"
+            bound[f"{folder}/run-{arm}.json"] = bind(f"{folder}/run-{arm}.json", LANE / "runs" / f"held3-{version}-{arm}.json")
+            bound[f"{folder}/eval-{arm}.log.txt"] = bind(f"{folder}/eval-{arm}.log.txt", LANE / "logs" / f"held3-{version}-eval-{arm}.log", redact=True)
+        bound[f"held-out/statistics-{arm}.json"] = bind(f"held-out/statistics-{arm}.json", LANE / "runs" / f"held3-gates-{arm}.json")
+        stats = json.loads((LANE / "runs" / f"held3-gates-{arm}.json").read_text(encoding="utf-8"))
+        judged = stats["judged"]
+        results[arm] = {**summary(stats["statistics"]), "judged": {k: judged[k] for k in ("verdicts", "never_passed", "passed")}}
+        comparison[arm] = summary(stats["version_1"]["statistics"])
+        paired[arm] = paired_summary(stats["paired_with_version_1"])
+    for name in ("redact_preregistration.py", "write_outcome.py"):
+        bound[f"scripts/{name}.txt"] = bind(f"scripts/{name}.txt", LANE / "scripts" / "k4" / name)
+    record = json.loads(Path(body_path).read_text(encoding="utf-8"))
+    record["held_out"] = results
+    record["version_1_on_the_same_split"] = comparison
+    record["paired_with_version_1"] = paired
+    record["bound_artifacts"] = bound
+    record["method"] = {"params_path": rel(PARAMS), "params_sha256": params_sha256, "stage_version": 3, "sources_sha256": sources,
+                        "sources_note": "every digest equals the pre-registration's, checked when this record was written"}
+    record["preregistration"] = {"path": rel(PREREGISTRATION), "record_sha256": prereg["record_sha256"]}
+    document = {"profile": "exulanica.digest-bound-record/v1", "record": record,
+                "record_sha256": hashlib.sha256(canonical_json(record)).hexdigest()}
+    text = json.dumps(document, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
+    if "/Users/" in text.replace('"/Users/"', "") or "\u2014" in text:
+        raise SystemExit("the record would carry a personal path or an em dash")
+    OUTCOME.write_text(text, encoding="utf-8")
+    print(rel(OUTCOME), document["record_sha256"])
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])

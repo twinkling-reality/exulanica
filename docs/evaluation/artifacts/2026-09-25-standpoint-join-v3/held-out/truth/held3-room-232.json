@@ -1,0 +1,1604 @@
+{
+ "family": "room",
+ "seed": 232,
+ "sets": [
+  {
+   "id": "held3-room-232-s1",
+   "condition": {
+    "kind": "sweep",
+    "count": 3,
+    "overlap": [
+     0.3,
+     0.55
+    ],
+    "translation_m": 0.0
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-s1-p0",
+    "held3-room-232-s1-p1",
+    "held3-room-232-s1-p2"
+   ]
+  },
+  {
+   "id": "held3-room-232-s2",
+   "condition": {
+    "kind": "sweep",
+    "count": 4,
+    "overlap": [
+     0.15,
+     0.45
+    ],
+    "translation_m": 0.15
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-s2-p0",
+    "held3-room-232-s2-p1",
+    "held3-room-232-s2-p2",
+    "held3-room-232-s2-p3"
+   ]
+  },
+  {
+   "id": "held3-room-232-s3",
+   "condition": {
+    "kind": "sweep",
+    "count": 3,
+    "overlap": [
+     0.25,
+     0.5
+    ],
+    "translation_m": 0.3
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-s3-p0",
+    "held3-room-232-s3-p1",
+    "held3-room-232-s3-p2"
+   ]
+  },
+  {
+   "id": "held3-room-232-g1",
+   "condition": {
+    "kind": "grid",
+    "columns": 2,
+    "translation_m": 0.05
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-g1-p0",
+    "held3-room-232-g1-p1",
+    "held3-room-232-g1-p2",
+    "held3-room-232-g1-p3"
+   ]
+  },
+  {
+   "id": "held3-room-232-m1",
+   "condition": {
+    "kind": "mixed_lens",
+    "lenses": [
+     "2x",
+     "5x"
+    ],
+    "second_wide": true,
+    "translation_m": 0.1
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-m1-p0",
+    "held3-room-232-m1-p1",
+    "held3-room-232-m1-p2",
+    "held3-room-232-m1-p3"
+   ]
+  },
+  {
+   "id": "held3-room-232-p1",
+   "condition": {
+    "kind": "sweep",
+    "count": 3,
+    "portrait": true,
+    "overlap": [
+     0.25,
+     0.5
+    ],
+    "translation_m": 0.1
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-p1-p0",
+    "held3-room-232-p1-p1",
+    "held3-room-232-p1-p2"
+   ]
+  },
+  {
+   "id": "held3-room-232-mv",
+   "condition": {
+    "kind": "moved",
+    "count": 3,
+    "step_m": [
+     1.5,
+     3.0
+    ]
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-mv-p0",
+    "held3-room-232-mv-p1",
+    "held3-room-232-mv-p2"
+   ]
+  },
+  {
+   "id": "held3-room-232-lo",
+   "condition": {
+    "kind": "low_overlap",
+    "count": 2,
+    "overlap": [
+     -0.1,
+     0.06
+    ]
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-lo-p0",
+    "held3-room-232-lo-p1"
+   ]
+  },
+  {
+   "id": "held3-room-232-c1",
+   "condition": {
+    "kind": "changed",
+    "count": 3,
+    "overlap": [
+     0.35,
+     0.55
+    ],
+    "change": "remove",
+    "translation_m": 0.05,
+    "candidate_depth_m": [
+     1.0,
+     6.0
+    ],
+    "add_distance_m": [
+     1.6,
+     2.6
+    ],
+    "add_size_m": [
+     0.8,
+     0.9,
+     1.1
+    ]
+   },
+   "change": {
+    "mode": "remove",
+    "object": "plant",
+    "parts": [
+     "plant"
+    ]
+   },
+   "cameras": [
+    "held3-room-232-c1-p0",
+    "held3-room-232-c1-p1",
+    "held3-room-232-c1-p2"
+   ]
+  },
+  {
+   "id": "held3-room-232-c2",
+   "condition": {
+    "kind": "changed",
+    "count": 3,
+    "overlap": [
+     0.35,
+     0.55
+    ],
+    "change": "move",
+    "translation_m": 0.05,
+    "candidate_depth_m": [
+     1.0,
+     6.0
+    ],
+    "add_distance_m": [
+     1.6,
+     2.6
+    ],
+    "add_size_m": [
+     0.8,
+     0.9,
+     1.1
+    ]
+   },
+   "change": {
+    "mode": "add",
+    "object": "arrival-held3-room-232-c2"
+   },
+   "cameras": [
+    "held3-room-232-c2-p0",
+    "held3-room-232-c2-p1",
+    "held3-room-232-c2-p2"
+   ]
+  },
+  {
+   "id": "held3-room-232-c3",
+   "condition": {
+    "kind": "changed",
+    "count": 3,
+    "overlap": [
+     0.35,
+     0.55
+    ],
+    "change": "add",
+    "translation_m": 0.05,
+    "candidate_depth_m": [
+     1.0,
+     6.0
+    ],
+    "add_distance_m": [
+     1.6,
+     2.6
+    ],
+    "add_size_m": [
+     0.8,
+     0.9,
+     1.1
+    ]
+   },
+   "change": {
+    "mode": "add",
+    "object": "arrival-held3-room-232-c3"
+   },
+   "cameras": [
+    "held3-room-232-c3-p0",
+    "held3-room-232-c3-p1",
+    "held3-room-232-c3-p2"
+   ]
+  },
+  {
+   "id": "held3-room-232-mv2",
+   "condition": {
+    "kind": "moved",
+    "count": 3,
+    "step_m": [
+     1.0,
+     2.0
+    ]
+   },
+   "change": null,
+   "cameras": [
+    "held3-room-232-mv2-p0",
+    "held3-room-232-mv2-p1",
+    "held3-room-232-mv2-p2"
+   ]
+  }
+ ],
+ "cameras": {
+  "held3-room-232-s1-p0": {
+   "set": "held3-room-232-s1",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.5390604734420776,
+     0.04518909007310867,
+     -0.8410539627075195
+    ],
+    [
+     0.014479887671768665,
+     0.9989093542098999,
+     0.044389862567186356
+    ],
+    [
+     0.8421425819396973,
+     0.011750455014407635,
+     -0.5391269326210022
+    ]
+   ],
+   "centre_world": [
+    -0.0816514864563942,
+    1.6773160696029663,
+    0.048052191734313965
+   ],
+   "depth_file": "render/held3-room-232-s1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "0f10a479a944c829b68f505a309edf6c8666cfbe751b98f22c5e5dbd26c73b64",
+   "noexif_jpeg_sha256": "aff801739cb23e2ff7c8cd397f1c0b6a38febba56b60316673ca354214e6f49e",
+   "render_seconds": 12.615
+  },
+  "held3-room-232-s1-p1": {
+   "set": "held3-room-232-s1",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9231568574905396,
+     0.002343091880902648,
+     -0.38441628217697144
+    ],
+    [
+     0.01364038698375225,
+     0.9995513558387756,
+     -0.026664260774850845
+    ],
+    [
+     0.38418135046958923,
+     -0.02985888347029686,
+     -0.9227746725082397
+    ]
+   ],
+   "centre_world": [
+    -0.0816514864563942,
+    1.6773160696029663,
+    0.048052191734313965
+   ],
+   "depth_file": "render/held3-room-232-s1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "559b7182b51e42d282cb79a2753eb24d83dd86aadbe4680b8eb918f7fc7655af",
+   "noexif_jpeg_sha256": "b5913747c8a5bc010309f446cd5e08c2a85928d1db4a3b10e53ed9bb02efb8f7",
+   "render_seconds": 13.769
+  },
+  "held3-room-232-s1-p2": {
+   "set": "held3-room-232-s1",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9793956875801086,
+     -0.013429243117570877,
+     0.201503723859787
+    ],
+    [
+     -0.026711011305451393,
+     0.9976345300674438,
+     -0.06333964318037033
+    ],
+    [
+     -0.20017646253108978,
+     -0.06741693615913391,
+     -0.9774376153945923
+    ]
+   ],
+   "centre_world": [
+    -0.0816514864563942,
+    1.6773160696029663,
+    0.048052191734313965
+   ],
+   "depth_file": "render/held3-room-232-s1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "e8564e789fb618be7db3907eb8bc3e135d981528bd7ccdccefb313cb260e8823",
+   "noexif_jpeg_sha256": "295ae37bcdcdf6f170fe1ab5d681709ae430bc23210f6d76a72d31aa985e284c",
+   "render_seconds": 13.687
+  },
+  "held3-room-232-s2-p0": {
+   "set": "held3-room-232-s2",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.9762794971466064,
+     -0.04962106794118881,
+     -0.21075132489204407
+    ],
+    [
+     0.04982057586312294,
+     0.9987486600875854,
+     -0.004366124980151653
+    ],
+    [
+     0.2107042521238327,
+     -0.006237194873392582,
+     0.9775299429893494
+    ]
+   ],
+   "centre_world": [
+    0.4781500995159149,
+    1.5279345512390137,
+    0.15447799861431122
+   ],
+   "depth_file": "render/held3-room-232-s2-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "9326f4238b64c754a1b0ce2b0d449117e3a6f033c120c69a4556d34c85651374",
+   "noexif_jpeg_sha256": "641b715165e9a1b13d3a247a12613031cdedb5b978222c9d903ac6a0665a4263",
+   "render_seconds": 13.292
+  },
+  "held3-room-232-s2-p1": {
+   "set": "held3-room-232-s2",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.4922744929790497,
+     0.11801128834486008,
+     -0.862403154373169
+    ],
+    [
+     -0.025410329923033714,
+     0.9922929406166077,
+     0.12128076702356339
+    ],
+    [
+     0.8700690269470215,
+     -0.0377894788980484,
+     0.49147918820381165
+    ]
+   ],
+   "centre_world": [
+    0.43810904026031494,
+    1.5091155767440796,
+    0.15664327144622803
+   ],
+   "depth_file": "render/held3-room-232-s2-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "7111caf4ce344775eb87aacfa9c5875290e337e668fd17219de818bfcdf8d16c",
+   "noexif_jpeg_sha256": "c0e5afd6a60701182da2683e50c084a49ffa5e8e84a64bb7d9717279b25bc4b5",
+   "render_seconds": 13.633
+  },
+  "held3-room-232-s2-p2": {
+   "set": "held3-room-232-s2",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.1881466805934906,
+     0.12223590165376663,
+     -0.9745045900344849
+    ],
+    [
+     0.01982705295085907,
+     0.9924952983856201,
+     0.1206645518541336
+    ],
+    [
+     0.9819408059120178,
+     0.003381079761311412,
+     -0.18915827572345734
+    ]
+   ],
+   "centre_world": [
+    0.4481546878814697,
+    1.512539029121399,
+    0.14120784401893616
+   ],
+   "depth_file": "render/held3-room-232-s2-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "14ca59d7f38d7df5a9061de5b7e6989049da6710e1a44fb382be7db05a763488",
+   "noexif_jpeg_sha256": "b563640a8d5fa7d1557cf55add5509672989a9fb79a98b4d999bb5b5cc98ba48",
+   "render_seconds": 12.477
+  },
+  "held3-room-232-s2-p3": {
+   "set": "held3-room-232-s2",
+   "index": 3,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.7792436480522156,
+     0.08369304239749908,
+     -0.6211077570915222
+    ],
+    [
+     0.018587177619338036,
+     0.9936935305595398,
+     0.11057871580123901
+    ],
+    [
+     0.6264454126358032,
+     0.07462312281131744,
+     -0.7758849859237671
+    ]
+   ],
+   "centre_world": [
+    0.4096786677837372,
+    1.5351864099502563,
+    0.14611411094665527
+   ],
+   "depth_file": "render/held3-room-232-s2-p3.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "54ff336ae813b5fa3e5cf68c63e7474c23f17620b469ed730214737fb77cd600",
+   "noexif_jpeg_sha256": "48abf0116cb7af3399045de38037bf2748fc9a1c0561b3cd2be44127ec3e136c",
+   "render_seconds": 13.233
+  },
+  "held3-room-232-s3-p0": {
+   "set": "held3-room-232-s3",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9459576606750488,
+     -0.04531081020832062,
+     -0.3211091458797455
+    ],
+    [
+     -0.0026811964344233274,
+     0.9912495613098145,
+     -0.13197389245033264
+    ],
+    [
+     0.32427915930747986,
+     -0.12398075312376022,
+     -0.9378015995025635
+    ]
+   ],
+   "centre_world": [
+    0.5680314898490906,
+    1.5399434566497803,
+    -0.1360526829957962
+   ],
+   "depth_file": "render/held3-room-232-s3-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "7213017d37e4336ae3636190bba202793728f4e9888c08096af88d35acb7324d",
+   "noexif_jpeg_sha256": "ceb3cc6fdeda82863eefbc6d5b781962989c0a37220c102a51d99f9c32eb0a19",
+   "render_seconds": 15.004
+  },
+  "held3-room-232-s3-p1": {
+   "set": "held3-room-232-s3",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9252368807792664,
+     0.008408522233366966,
+     0.3792966902256012
+    ],
+    [
+     0.03347167372703552,
+     0.9976650476455688,
+     0.059532128274440765
+    ],
+    [
+     -0.3779104948043823,
+     0.06777701526880264,
+     -0.9233579635620117
+    ]
+   ],
+   "centre_world": [
+    0.48155245184898376,
+    1.523033857345581,
+    -0.00966300442814827
+   ],
+   "depth_file": "render/held3-room-232-s3-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "16400d4239a186f3abf52f3a5a37e7bfb5b1dbb1924a8260312248b6ba0062d5",
+   "noexif_jpeg_sha256": "ff257b19433097376d52fb9e4687455eba0569c8491aac32d2939fa2413a276d",
+   "render_seconds": 14.639
+  },
+  "held3-room-232-s3-p2": {
+   "set": "held3-room-232-s3",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.4982081353664398,
+     0.07281098514795303,
+     0.8639948964118958
+    ],
+    [
+     0.0057126786559820175,
+     0.9967219233512878,
+     -0.08070209622383118
+    ],
+    [
+     -0.8670386672019958,
+     -0.03527071699500084,
+     -0.4969909191131592
+    ]
+   ],
+   "centre_world": [
+    0.5821503400802612,
+    1.5741914510726929,
+    -0.008786980994045734
+   ],
+   "depth_file": "render/held3-room-232-s3-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "0cf61f6b05b156f1a0dcec1006372b3c4f69ae01aec9b22ea15a900759bd7513",
+   "noexif_jpeg_sha256": "7703f1629635ca79d8f2640aa913127020e86931efe6f81d90bae0ec3f8f577f",
+   "render_seconds": 12.134
+  },
+  "held3-room-232-g1-p0": {
+   "set": "held3-room-232-g1",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.06030554324388504,
+     -0.25003236532211304,
+     0.9663576483726501
+    ],
+    [
+     0.03087039664387703,
+     0.967189371585846,
+     0.2521740198135376
+    ],
+    [
+     -0.9977024793624878,
+     0.045039333403110504,
+     -0.05060828477144241
+    ]
+   ],
+   "centre_world": [
+    -0.06475017219781876,
+    1.7164216041564941,
+    0.21816180646419525
+   ],
+   "depth_file": "render/held3-room-232-g1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "f104f2764fd9688634d189720544f80298cab9161d928bc275bb59d2827ae607",
+   "noexif_jpeg_sha256": "7c2b6066971d817ab2b55eb783cbfa019153cc7f451d2c96d49de754bc9bd5b7",
+   "render_seconds": 10.995
+  },
+  "held3-room-232-g1-p1": {
+   "set": "held3-room-232-g1",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.6482394337654114,
+     -0.18739676475524902,
+     0.7380163669586182
+    ],
+    [
+     -0.0075012086890637875,
+     0.9676233530044556,
+     0.2522871792316437
+    ],
+    [
+     -0.7613996267318726,
+     -0.1690784990787506,
+     0.6258458495140076
+    ]
+   ],
+   "centre_world": [
+    -0.07393503934144974,
+    1.7137678861618042,
+    0.2151162475347519
+   ],
+   "depth_file": "render/held3-room-232-g1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "dda394946eb80596a1e5f15abcbc62e7845ba56193b85254f67d033354e90dc2",
+   "noexif_jpeg_sha256": "a8e8f5de1fe6c36c4fc95ccdde3faef6cfa17b5cda35f562b181df120e45c56a",
+   "render_seconds": 12.725
+  },
+  "held3-room-232-g1-p2": {
+   "set": "held3-room-232-g1",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.060313016176223755,
+     0.38233014941215515,
+     0.9220553040504456
+    ],
+    [
+     -0.026559846475720406,
+     0.9227952361106873,
+     -0.3843742609024048
+    ],
+    [
+     -0.997826099395752,
+     -0.047672417014837265,
+     -0.04550193250179291
+    ]
+   ],
+   "centre_world": [
+    -0.06561553478240967,
+    1.719170331954956,
+    0.2099066972732544
+   ],
+   "depth_file": "render/held3-room-232-g1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "ad26b7b566a3e4ef4299f647d10413733028e76e574bf3ccc7d17f0094dce550",
+   "noexif_jpeg_sha256": "e6d73fd52812ca82cc73901864c0d9d15181818d18cbd8e817b10b910372f5b6",
+   "render_seconds": 14.967
+  },
+  "held3-room-232-g1-p3": {
+   "set": "held3-room-232-g1",
+   "index": 3,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.6482552886009216,
+     0.2943876385688782,
+     0.7022114992141724
+    ],
+    [
+     -0.002696624957025051,
+     0.9231175184249878,
+     -0.38450849056243896
+    ],
+    [
+     -0.7614182829856873,
+     0.2473660707473755,
+     0.5992096662521362
+    ]
+   ],
+   "centre_world": [
+    -0.09021634608507156,
+    1.712353229522705,
+    0.2246449738740921
+   ],
+   "depth_file": "render/held3-room-232-g1-p3.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "f57f403b2ab793feeaa1aacac99ad029a1f3968bcb710ed17d2996548ca6d0c1",
+   "noexif_jpeg_sha256": "c999ab5513e73cb480b4250ed32dc0a09e3a3b305aedad23b89906bd396dba92",
+   "render_seconds": 15.528
+  },
+  "held3-room-232-m1-p0": {
+   "set": "held3-room-232-m1",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.8971458077430725,
+     -0.05740352347493172,
+     -0.43798887729644775
+    ],
+    [
+     -0.0009185858070850372,
+     0.9912759065628052,
+     -0.13179977238178253
+    ],
+    [
+     0.44173359870910645,
+     0.11864594370126724,
+     0.889266312122345
+    ]
+   ],
+   "centre_world": [
+    -0.37364739179611206,
+    1.6056902408599854,
+    0.12677529454231262
+   ],
+   "depth_file": "render/held3-room-232-m1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "81621e01c9639009c8f8ebef825d9aa0b2716eb970e7bdc7e449ae73002da3f1",
+   "noexif_jpeg_sha256": "2f714a469e6471b08b05a0b6e4162d365176312a5175bca1ef5b31a8504fd51d",
+   "render_seconds": 16.828
+  },
+  "held3-room-232-m1-p1": {
+   "set": "held3-room-232-m1",
+   "index": 1,
+   "lens": "2x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 28.030970112527594,
+   "rotation_world_from_camera": [
+    [
+     0.8264695405960083,
+     -0.11111385375261307,
+     -0.551907479763031
+    ],
+    [
+     -0.005460000596940517,
+     0.978701651096344,
+     -0.20521527528762817
+    ],
+    [
+     0.5629549622535706,
+     0.1726175844669342,
+     0.8082603812217712
+    ]
+   ],
+   "centre_world": [
+    -0.41180670261383057,
+    1.6055387258529663,
+    0.09286998957395554
+   ],
+   "depth_file": "render/held3-room-232-m1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "7ac647a0143d780d59612c9d07b36bed6d6fad7a4ce31841950b61542593d487",
+   "noexif_jpeg_sha256": "c89a48ea80d843f81c20d8d66b57712750de4d149d7f2ec098c3048a89b4138c",
+   "render_seconds": 14.976
+  },
+  "held3-room-232-m1-p2": {
+   "set": "held3-room-232-m1",
+   "index": 2,
+   "lens": "5x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 12.346968401455367,
+   "rotation_world_from_camera": [
+    [
+     0.8763788342475891,
+     -0.055635154247283936,
+     -0.4783981740474701
+    ],
+    [
+     0.030934929847717285,
+     0.9977569580078125,
+     -0.05936402454972267
+    ],
+    [
+     0.4806278347969055,
+     0.03722616285085678,
+     0.8761341571807861
+    ]
+   ],
+   "centre_world": [
+    -0.40380313992500305,
+    1.6229981184005737,
+    0.1460898071527481
+   ],
+   "depth_file": "render/held3-room-232-m1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "1090dd743fb1c4e5a0b1c08b713ae22a54d20d6ec59ba1b309d1f601df515692",
+   "noexif_jpeg_sha256": "330b71ec21ad6997d0c6abca9c55ef364916446a1e488373d7462e178d0c5157",
+   "render_seconds": 14.557
+  },
+  "held3-room-232-m1-p3": {
+   "set": "held3-room-232-m1",
+   "index": 3,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.3456748425960541,
+     0.009156965650618076,
+     -0.9383096694946289
+    ],
+    [
+     -0.00502066221088171,
+     0.9999561309814453,
+     0.007908952422440052
+    ],
+    [
+     0.9383409023284912,
+     0.0019770096987485886,
+     0.34570565819740295
+    ]
+   ],
+   "centre_world": [
+    -0.40519294142723083,
+    1.6185603141784668,
+    0.10170348733663559
+   ],
+   "depth_file": "render/held3-room-232-m1-p3.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "87a4898fa742bdda32bec3006204ba73902d603a2b69378fa3ce47227e1aaade",
+   "noexif_jpeg_sha256": "3ad5cd95317c566a119db389d9faee65d6914ecc240aa2e528b9b3563ac20c38",
+   "render_seconds": 14.254
+  },
+  "held3-room-232-p1-p0": {
+   "set": "held3-room-232-p1",
+   "index": 0,
+   "lens": "1x",
+   "width": 768,
+   "height": 1024,
+   "fov_y_deg": 67.29866699741999,
+   "rotation_world_from_camera": [
+    [
+     0.6312288045883179,
+     0.049887765198946,
+     0.7739905714988708
+    ],
+    [
+     0.014929533936083317,
+     0.9969627857208252,
+     -0.07643529027700424
+    ],
+    [
+     -0.7754529714584351,
+     0.05980347841978073,
+     0.6285668015480042
+    ]
+   ],
+   "centre_world": [
+    -0.3803470730781555,
+    1.6401422023773193,
+    0.24149952828884125
+   ],
+   "depth_file": "render/held3-room-232-p1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "02e2c4d4c548a90805b9599f81a451dcffd30a5613eb5fdea0b8dc99e77029f2",
+   "noexif_jpeg_sha256": "be2315fafb9ae73aa977657368b33fe1edef287f96aad5bd08e30a0ed9a44ddb",
+   "render_seconds": 14.148
+  },
+  "held3-room-232-p1-p1": {
+   "set": "held3-room-232-p1",
+   "index": 1,
+   "lens": "1x",
+   "width": 768,
+   "height": 1024,
+   "fov_y_deg": 67.29866699741999,
+   "rotation_world_from_camera": [
+    [
+     0.9477607011795044,
+     0.07259631156921387,
+     0.31061142683029175
+    ],
+    [
+     -0.03479606658220291,
+     0.9914761185646057,
+     -0.1255561113357544
+    ],
+    [
+     -0.31707870960235596,
+     0.10818909108638763,
+     0.9422081708908081
+    ]
+   ],
+   "centre_world": [
+    -0.37100040912628174,
+    1.646244764328003,
+    0.21457049250602722
+   ],
+   "depth_file": "render/held3-room-232-p1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "963ee9b741423463ce37da16b56fb9041838f8bde6b8b2a5c5181d379d899d37",
+   "noexif_jpeg_sha256": "65831f9775fd295f58374ab48a66dadb10e0e1593f7c8252149261cf117c1122",
+   "render_seconds": 13.575
+  },
+  "held3-room-232-p1-p2": {
+   "set": "held3-room-232-p1",
+   "index": 2,
+   "lens": "1x",
+   "width": 768,
+   "height": 1024,
+   "fov_y_deg": 67.29866699741999,
+   "rotation_world_from_camera": [
+    [
+     0.9734527468681335,
+     -0.05543329194188118,
+     -0.22207415103912354
+    ],
+    [
+     0.020666297525167465,
+     0.9875535368919373,
+     -0.15591944754123688
+    ],
+    [
+     0.2279532551765442,
+     0.14719076454639435,
+     0.9624823331832886
+    ]
+   ],
+   "centre_world": [
+    -0.33322954177856445,
+    1.6484578847885132,
+    0.2700771391391754
+   ],
+   "depth_file": "render/held3-room-232-p1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "62c2743680d5ab94923af87f38bc49549e93431b8b535d9ef70c20d4d605f214",
+   "noexif_jpeg_sha256": "19c8f9e32907488ae5df07d867e21e8cdb4ed48453c441e5e77641824202e8db",
+   "render_seconds": 12.468
+  },
+  "held3-room-232-mv-p0": {
+   "set": "held3-room-232-mv",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.19256140291690826,
+     0.07826174795627594,
+     0.9781590700149536
+    ],
+    [
+     -0.011950183659791946,
+     0.9969276785850525,
+     -0.07741088420152664
+    ],
+    [
+     -0.9812121391296387,
+     0.0032171672210097313,
+     0.1929050236940384
+    ]
+   ],
+   "centre_world": [
+    -0.32205966114997864,
+    1.718428134918213,
+    -0.06749840080738068
+   ],
+   "depth_file": "render/held3-room-232-mv-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "dd64aa78ad9c9dbdbfd04905f89da6041ffb63ba677c02b63f6a66a80a6e1b54",
+   "noexif_jpeg_sha256": "458c1bb5eb80bf7e37efd7bdca194dd1280c90175d9fceaac29bf12917c19ae3",
+   "render_seconds": 13.651
+  },
+  "held3-room-232-mv-p1": {
+   "set": "held3-room-232-mv",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.34462404251098633,
+     0.08126060664653778,
+     0.9352170825004578
+    ],
+    [
+     -0.01749352551996708,
+     0.9966292381286621,
+     -0.08015038818120956
+    ],
+    [
+     -0.9385777711868286,
+     0.01126150693744421,
+     0.3448839485645294
+    ]
+   ],
+   "centre_world": [
+    -0.5586445927619934,
+    1.718428134918213,
+    -2.632420301437378
+   ],
+   "depth_file": "render/held3-room-232-mv-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "b72ebb75566cbdfa4b5e0dfaeae733261bf78a6a16eb100b3aab985a2592b8d5",
+   "noexif_jpeg_sha256": "c6408b8cca70a04be5ede64f0de7b61fbd6d0ba10c74d12c54b0abbaf0cde2a3",
+   "render_seconds": 12.914
+  },
+  "held3-room-232-mv-p2": {
+   "set": "held3-room-232-mv",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.6286102533340454,
+     -0.07491686195135117,
+     0.7741037607192993
+    ],
+    [
+     0.027717962861061096,
+     0.9968753457069397,
+     0.0739680826663971
+    ],
+    [
+     -0.7772263884544373,
+     -0.0250405166298151,
+     0.628722608089447
+    ]
+   ],
+   "centre_world": [
+    -0.4607352912425995,
+    1.718428134918213,
+    -4.133724212646484
+   ],
+   "depth_file": "render/held3-room-232-mv-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "04d771ab8225c51da9d3c8c2e54c841a56aa019f67dd8c2caf1f39be1c427842",
+   "noexif_jpeg_sha256": "4389f1d25871b0e4e08ef0bb4e4a289eb279deb5fd4274430d294f893022c3ef",
+   "render_seconds": 1.914
+  },
+  "held3-room-232-lo-p0": {
+   "set": "held3-room-232-lo",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.5393388867378235,
+     -0.07119661569595337,
+     -0.839073657989502
+    ],
+    [
+     0.017911091446876526,
+     0.995224118232727,
+     -0.09595908224582672
+    ],
+    [
+     0.8418983221054077,
+     -0.06678318977355957,
+     -0.5354878902435303
+    ]
+   ],
+   "centre_world": [
+    0.047541435807943344,
+    1.624438762664795,
+    -0.12004373222589493
+   ],
+   "depth_file": "render/held3-room-232-lo-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "717e83a677940e582573503660f1ed855b2ccbc1c334a7bea88c0844f0397db8",
+   "noexif_jpeg_sha256": "bf024542034a520fde32237dec2c101a74fe79de70d88ebac9ad7e7b4ec08c57",
+   "render_seconds": 13.251
+  },
+  "held3-room-232-lo-p1": {
+   "set": "held3-room-232-lo",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9596979022026062,
+     -0.003530554473400116,
+     0.28101155161857605
+    ],
+    [
+     -0.001951486454345286,
+     0.9999806880950928,
+     0.005898863542824984
+    ],
+    [
+     -0.2810269594192505,
+     0.005112736485898495,
+     -0.959686279296875
+    ]
+   ],
+   "centre_world": [
+    0.047541435807943344,
+    1.624438762664795,
+    -0.12004373222589493
+   ],
+   "depth_file": "render/held3-room-232-lo-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "afa9fd0857a86e81175194cacfc78db66a89e8f055403e20847e476f02a8d9af",
+   "noexif_jpeg_sha256": "bd7bccadd6c5daacc275f1e3cd11ad6f4f2b13a04bd39864eeb1a0223c2a6da6",
+   "render_seconds": 14.228
+  },
+  "held3-room-232-c1-p0": {
+   "set": "held3-room-232-c1",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.2798718810081482,
+     -0.11582091450691223,
+     -0.9530253410339355
+    ],
+    [
+     0.024955790489912033,
+     0.9914829134941101,
+     -0.1278233528137207
+    ],
+    [
+     0.9597129225730896,
+     -0.05955766141414642,
+     -0.27459779381752014
+    ]
+   ],
+   "centre_world": [
+    -0.007315424736589193,
+    1.5447536706924438,
+    0.07734540104866028
+   ],
+   "depth_file": "render/held3-room-232-c1-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "76dab163eb9e4b0561c61a0d269e623a3fb99abdd26430efb9ae779a8138199e",
+   "noexif_jpeg_sha256": "e1b06ebac80463a492b90dbb65720b88bd4d27e122e3248d13028d1fcdc2bece",
+   "render_seconds": 12.832
+  },
+  "held3-room-232-c1-p1": {
+   "set": "held3-room-232-c1",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.8345887064933777,
+     0.04577013850212097,
+     -0.5489688515663147
+    ],
+    [
+     -0.011050247587263584,
+     0.9949508309364319,
+     0.09975329041481018
+    ],
+    [
+     0.5507627129554749,
+     0.08931921422481537,
+     -0.8298689723014832
+    ]
+   ],
+   "centre_world": [
+    0.004669613670557737,
+    1.5465303659439087,
+    0.07359582185745239
+   ],
+   "depth_file": "render/held3-room-232-c1-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "0f159b871569f99eac62c9713f498ca0d305a33f0ea3e31542760ede361816c7",
+   "noexif_jpeg_sha256": "c636577dd5a68404a8685197301e7fbc5144a04c13519a1bef3e44f5c75ecaa9",
+   "render_seconds": 13.648
+  },
+  "held3-room-232-c1-p2": {
+   "set": "held3-room-232-c1",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.9995439648628235,
+     0.015493526123464108,
+     0.025920195505023003
+    ],
+    [
+     0.014306679368019104,
+     0.9988681077957153,
+     -0.04536363482475281
+    ],
+    [
+     -0.026593700051307678,
+     -0.04497211426496506,
+     -0.9986342191696167
+    ]
+   ],
+   "centre_world": [
+    -0.016623705625534058,
+    1.5410045385360718,
+    0.09225816279649734
+   ],
+   "depth_file": "render/held3-room-232-c1-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "b07fc3e5a9eb42cfe095a24e965676f858b1e3d9855dd0d023b1f8920ae78823",
+   "noexif_jpeg_sha256": "9931b0fd8c1b45da7516fa2345f6f1edee6de6de82518d0f5ab7214749a89720",
+   "render_seconds": 14.62
+  },
+  "held3-room-232-c2-p0": {
+   "set": "held3-room-232-c2",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.7000666856765747,
+     0.027728496119379997,
+     0.7135389447212219
+    ],
+    [
+     -0.023012742400169373,
+     0.9996027946472168,
+     -0.016266847029328346
+    ],
+    [
+     -0.7137065529823303,
+     -0.005032610613852739,
+     0.7004267573356628
+    ]
+   ],
+   "centre_world": [
+    0.43813711404800415,
+    1.6827157735824585,
+    0.23456238210201263
+   ],
+   "depth_file": "render/held3-room-232-c2-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "9199e1261cf91fa8229a3d4026c03922cf9212fa015915bc5dbbdcea98fbb6b7",
+   "noexif_jpeg_sha256": "4027d81dd1d6d31e5e422db5f12d2891ef6fd10bcc9660b2327e74572bb35bd5",
+   "render_seconds": 14.881
+  },
+  "held3-room-232-c2-p1": {
+   "set": "held3-room-232-c2",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.9848414659500122,
+     0.022514764219522476,
+     0.17198951542377472
+    ],
+    [
+     -0.03475729376077652,
+     0.99704509973526,
+     0.06850527971982956
+    ],
+    [
+     -0.16993893682956696,
+     -0.07344473153352737,
+     0.9827139377593994
+    ]
+   ],
+   "centre_world": [
+    0.4253038167953491,
+    1.6805907487869263,
+    0.23203586041927338
+   ],
+   "depth_file": "render/held3-room-232-c2-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "fc33bb27f2a765c2c2012506eb05efae29e318b72e87bbad5114df7fe23f1e87",
+   "noexif_jpeg_sha256": "856b42c569168aa2222b4762a5201eff6409add20542f62bfb14cf978692f493",
+   "render_seconds": 14.11
+  },
+  "held3-room-232-c2-p2": {
+   "set": "held3-room-232-c2",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.904224693775177,
+     0.07043899595737457,
+     -0.42120784521102905
+    ],
+    [
+     -0.021255727857351303,
+     0.9925042986869812,
+     0.12034688889980316
+    ],
+    [
+     0.426527738571167,
+     -0.0998675525188446,
+     0.8989441394805908
+    ]
+   ],
+   "centre_world": [
+    0.44365954399108887,
+    1.6793495416641235,
+    0.22075189650058746
+   ],
+   "depth_file": "render/held3-room-232-c2-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "160877d0f6765aa6c1f3d1dc825d0ed24406faca95f1e91f574efa0748a3940e",
+   "noexif_jpeg_sha256": "f2214d5485474c2333b6dc973c5073f77c4bf6b78505b9adaba84d96b3f54c9c",
+   "render_seconds": 13.464
+  },
+  "held3-room-232-c3-p0": {
+   "set": "held3-room-232-c3",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     -0.2764218747615814,
+     0.09774573147296906,
+     0.9560526609420776
+    ],
+    [
+     -0.011514988727867603,
+     0.9944059252738953,
+     -0.10499623417854309
+    ],
+    [
+     -0.9609674215316772,
+     -0.040032193064689636,
+     -0.27375003695487976
+    ]
+   ],
+   "centre_world": [
+    0.009249266237020493,
+    1.6778448820114136,
+    -0.47223135828971863
+   ],
+   "depth_file": "render/held3-room-232-c3-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "f736a4eb9aaca5a78a6b988a9ace04edc7dd773866c0942181f4cc050ca8eea6",
+   "noexif_jpeg_sha256": "184b2e7f3ee07cd700430520ecd0a72920fdadd3205aa051137a92d6fd615e3c",
+   "render_seconds": 13.749
+  },
+  "held3-room-232-c3-p1": {
+   "set": "held3-room-232-c3",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.34910228848457336,
+     -0.05829338729381561,
+     0.9352697134017944
+    ],
+    [
+     -0.05803384631872177,
+     0.9948025345802307,
+     0.0836658701300621
+    ],
+    [
+     -0.9352858662605286,
+     -0.08348524570465088,
+     0.34390485286712646
+    ]
+   ],
+   "centre_world": [
+    -0.009358873590826988,
+    1.6805444955825806,
+    -0.48612067103385925
+   ],
+   "depth_file": "render/held3-room-232-c3-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "166c3cabb82e32187bf6952a5d3e8055e3d0aac255a4b7fb5de9522c91ac4639",
+   "noexif_jpeg_sha256": "1c361aef1b8eee11f7f08339484b8d79e36d7a15d8e6f38e2079410fc4f6ac54",
+   "render_seconds": 20.51
+  },
+  "held3-room-232-c3-p2": {
+   "set": "held3-room-232-c3",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.8672308921813965,
+     0.02950908988714218,
+     0.49703097343444824
+    ],
+    [
+     -0.022756436839699745,
+     0.9995481371879578,
+     -0.019637953490018845
+    ],
+    [
+     -0.4973858892917633,
+     0.005719986278563738,
+     0.8675105571746826
+    ]
+   ],
+   "centre_world": [
+    -0.023701466619968414,
+    1.6819437742233276,
+    -0.4534456431865692
+   ],
+   "depth_file": "render/held3-room-232-c3-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "1a2e1732b54537ab689cf90076ed97d0a4e2c86e99173a3fd990b4a27ae2fb2e",
+   "noexif_jpeg_sha256": "592a920174904f93ff3035c0450101bf8f4c06810b02e6e5b9387158e03183a6",
+   "render_seconds": 31.068
+  },
+  "held3-room-232-mv2-p0": {
+   "set": "held3-room-232-mv2",
+   "index": 0,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.4172855615615845,
+     -0.10694368183612823,
+     -0.9024609923362732
+    ],
+    [
+     0.0011733241844922304,
+     0.9931142926216125,
+     -0.11714377254247665
+    ],
+    [
+     0.9087746739387512,
+     0.047823525965213776,
+     0.4145377278327942
+    ]
+   ],
+   "centre_world": [
+    -0.23571772873401642,
+    1.522238850593567,
+    -0.3569420278072357
+   ],
+   "depth_file": "render/held3-room-232-mv2-p0.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "2c0c8226ebf42b51412cd789628fa36800063095ae3ffb17ea0651c2a8796137",
+   "noexif_jpeg_sha256": "554c1ed16ad7eeef033f87dda5ce1fd3b64817f64b811e5e370e2e84e0c34735",
+   "render_seconds": 25.493
+  },
+  "held3-room-232-mv2-p1": {
+   "set": "held3-room-232-mv2",
+   "index": 1,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.28591883182525635,
+     -0.05608554929494858,
+     -0.9566110968589783
+    ],
+    [
+     -0.005066574551165104,
+     0.9981832504272461,
+     -0.06003723666071892
+    ],
+    [
+     0.9582404494285583,
+     0.02201251871883869,
+     0.28511524200439453
+    ]
+   ],
+   "centre_world": [
+    0.050817348062992096,
+    1.522238850593567,
+    0.6234127283096313
+   ],
+   "depth_file": "render/held3-room-232-mv2-p1.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "a046b86c54d1009536c61f17f68be4972b5e04c776e5cf770e46a3227cc3fa81",
+   "noexif_jpeg_sha256": "4500c7818f51fa6861dbb1d5616269492c1f5ca9b35b5a17b8d8ce9369f85ba9",
+   "render_seconds": 17.73
+  },
+  "held3-room-232-mv2-p2": {
+   "set": "held3-room-232-mv2",
+   "index": 2,
+   "lens": "1x",
+   "width": 1024,
+   "height": 768,
+   "fov_y_deg": 53.059508414520586,
+   "rotation_world_from_camera": [
+    [
+     0.01214519888162613,
+     -0.12380704283714294,
+     -0.9922319650650024
+    ],
+    [
+     0.0023584391456097364,
+     0.9923059344291687,
+     -0.12378741055727005
+    ],
+    [
+     0.9999234676361084,
+     -0.0008366960100829601,
+     0.01234374474734068
+    ]
+   ],
+   "centre_world": [
+    0.4580564498901367,
+    1.522238850593567,
+    2.388183116912842
+   ],
+   "depth_file": "render/held3-room-232-mv2-p2.depth.f32",
+   "depth_convention": "planar distance along the camera's view axis, metres",
+   "jpeg_sha256": "a8a0b6eb7b80263d5d2d755aa85efea807ddb8e3cc9a82fcdf89ea9d219afbbb",
+   "noexif_jpeg_sha256": "1ce2bc906015c0ad45446a4edab9d422d8216cdf2bd2603d8da1e37c365685f5",
+   "render_seconds": 14.627
+  }
+ }
+}

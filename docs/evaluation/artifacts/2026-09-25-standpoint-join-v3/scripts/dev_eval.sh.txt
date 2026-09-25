@@ -1,0 +1,21 @@
+#!/bin/zsh
+# dev_eval.sh <params.json> <tag> <arm> <stage_version>: the evaluation over the three development
+# directories (version 1's development and held-out splits, version 2's held-out split), merged.
+emulate -L zsh
+setopt err_exit
+L=<worktree>/.exulanica/lane-standpoint4
+P=<worktree>/.venv/bin/python
+params=$1 tag=$2 arm=$3 version=$4
+for split in dev held held2; do
+  $P $L/scripts/k4/standpoint_eval.py $L/k3/data/$split $params $L/runs/dev-$tag-$arm-$split.json --arm $arm --stage-version $version > $L/logs/dev-$tag-$arm-$split.log 2>&1 &
+done
+wait
+$P - <<PY
+import json
+runs = [json.load(open(f"$L/runs/dev-$tag-$arm-{s}.json")) for s in ("dev", "held", "held2")]
+merged = runs[0]
+for other in runs[1:]:
+    merged["sets"] += other["sets"]
+json.dump(merged, open("$L/runs/dev-$tag-$arm.json", "w"), indent=1)
+print("merged", len(merged["sets"]))
+PY

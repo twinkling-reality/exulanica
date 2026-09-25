@@ -1,0 +1,78 @@
+"""Redact the pre-registration's bound script copies for publication, keeping the record written
+before the measurement reconstructable.
+
+    python redact_preregistration.py
+
+The copies were bound with this checkout's absolute locations in them, and one with an em dash in a
+string literal, which a published file may not carry. Each copy is rewritten with the locations
+named and the em dash written as its Python escape (the same string to Python), and the record gains
+``redaction``: the digest of the record as written before the measurement, the bindings it carried,
+and what was replaced. Removing ``redaction`` and restoring those bindings gives that record back
+byte for byte, which this script checks before it writes.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from record_common import PREREGISTRATION, ROOT, rel, sha  # noqa: E402
+
+from exulanica.canonical import canonical_json
+
+EM_DASH = chr(0x2014)
+BEFORE = "b9570eae33fae77642db5c6fc0e7ce2c561c512279c164b2ca39b99d8ddcacbf"
+HOME = "/" + "Users/glendonchin/dev/Technology/"
+REPLACEMENTS = {
+    HOME + "exulanica-0923-standpoint4": "<worktree>",
+    HOME + "exulanica-0923-standpoint3": "<k3-worktree>",
+    HOME + "orimera": "<main-checkout>",
+    EM_DASH: "\\u2014",
+}
+
+
+def main() -> None:
+    document = json.loads(PREREGISTRATION.read_text(encoding="utf-8"))
+    record = document["record"]
+    if document["record_sha256"] != BEFORE or "redaction" in record:
+        raise SystemExit("the pre-registration is not the one written before the measurement")
+    before = json.loads(json.dumps(record["scripts"]))
+    changed = []
+    for name, binding in record["scripts"].items():
+        path = ROOT / binding["path"]
+        if sha(path) != binding["sha256"]:
+            raise SystemExit(f"{name} is not the copy the record bound")
+        text = path.read_text(encoding="utf-8")
+        redacted = text
+        for old, new in REPLACEMENTS.items():
+            redacted = redacted.replace(old, new)
+        if ("/Users/" in redacted.replace('"/Users/"', "")) or EM_DASH in redacted:
+            raise SystemExit(f"{name} still carries a location or an em dash")
+        if redacted != text:
+            path.write_text(redacted, encoding="utf-8")
+            binding["sha256"] = sha(path)
+            changed.append(name)
+    record["redaction"] = {
+        "record_sha256_before_the_measurement": BEFORE,
+        "scripts_as_bound_before_the_measurement": before,
+        "redacted": sorted(changed),
+        "what": "In the bound script copies named in redacted, this checkout's absolute location, the absolute location of the lane checkout that rendered the held-out split and the main checkout's were replaced by <worktree>, <k3-worktree> and <main-checkout>, and one em dash in a string literal was written as its Python escape, the same string to Python. Nothing else in the record or the copies changed.",
+        "when": "after the held-out measurement, before the outcome record was written, because a published file may not carry a home path or an em dash",
+        "check": "Removing redaction and setting scripts to scripts_as_bound_before_the_measurement gives the record whose canonical sha256 is record_sha256_before_the_measurement, the digest the held-out run printed when it started (the outcome's held-out/run.log.txt).",
+    }
+    rebuilt = {k: v for k, v in record.items() if k != "redaction"}
+    rebuilt["scripts"] = before
+    if hashlib.sha256(canonical_json(rebuilt)).hexdigest() != BEFORE:
+        raise SystemExit("the record written before the measurement does not reconstruct")
+    document = {"profile": document["profile"], "record": record, "record_sha256": hashlib.sha256(canonical_json(record)).hexdigest()}
+    text = json.dumps(document, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
+    if "/Users/" in text.replace('"/Users/"', "") or EM_DASH in text:
+        raise SystemExit("the record would carry a location or an em dash")
+    PREREGISTRATION.write_text(text, encoding="utf-8")
+    print(rel(PREREGISTRATION), document["record_sha256"], "redacted", changed)
+
+
+if __name__ == "__main__":
+    main()

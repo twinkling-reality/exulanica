@@ -1,0 +1,14 @@
+#!/bin/zsh
+# parity_single_thread.sh: the version 1 and 2 parity checks again, one thread a process, four processes.
+emulate -L zsh
+W=<worktree>
+L=$W/.exulanica/lane-standpoint4
+P=$W/.venv/bin/python
+cd $W
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+for arm in exif exif-perturbed; do
+  $P $L/scripts/k4/parity.py $L/v1-params-from-stages.json $arm v1 > $L/logs/v1-parity-single-thread-$arm.log 2>&1 &
+  $P $L/scripts/k4/parity.py $W/tests/fixtures/standpoint-v2-params.json $arm v2 > $L/logs/v2-parity-single-thread-$arm.log 2>&1 &
+done
+wait
+for f in $L/logs/v?-parity-single-thread-*.log; do print -r -- "${f:t}: $(tail -1 $f)"; done

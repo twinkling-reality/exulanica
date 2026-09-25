@@ -1,0 +1,175 @@
+"""Write the standpoint join's version 3 pre-registration and freeze what it binds.
+
+    python write_preregistration.py <body.json> <gates.json>
+
+Copies the measuring scripts (as .py.txt), the held-out split's definition and its plan, render and
+finish logs, the development runs and statistics of version 3 and of version 1 in both arms, and
+the version 1 and version 2 parity logs into docs/evaluation/artifacts/2026-09-25-standpoint-join-v3/,
+then writes docs/evaluation/2026-09-25-standpoint-join-v3-preregistration.json binding each by digest.
+Refuses when a development run was not made with the parameters and sources it would name.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from record_common import (  # noqa: E402
+    ARTIFACTS,
+    K3,
+    LANE,
+    PARAMS,
+    PREREGISTRATION,
+    ROOT,
+    SOURCES,
+    V1_ARTIFACTS,
+    V2_ARTIFACTS,
+    bind,
+    existing,
+    rel,
+    sha,
+)
+
+from exulanica.canonical import canonical_json, sha256_of_canonical
+from exulanica.ingest.stages import stage
+
+#: The held-out split as lane K3 planned it; its digest is the one the brief for this version names.
+HELD3_SPLIT_SHA256 = "a30544381a8ac69a2caa21ec9fdf7fb08327263d8eccc7c0514ceac7e014a8fd"
+SCRIPTS = {
+    "standpoint_synthetic_sets.py": K3 / "scripts/v1-lane/standpoint_synthetic_sets.py",
+    "standpoint_blender_scene.py": K3 / "scripts/v1-lane/standpoint_blender_scene.py",
+    "standpoint_depth_pass.py": K3 / "scripts/v1-lane/standpoint_depth_pass.py",
+    "standpoint_eval.py": LANE / "scripts/k4/standpoint_eval.py",
+    "standpoint_gates.py": LANE / "scripts/k4/standpoint_gates.py",
+    "k4lib.py": LANE / "scripts/k4/k4lib.py",
+    "parity.py": LANE / "scripts/k4/parity.py",
+    "dev_eval.sh": LANE / "scripts/k4/dev_eval.sh",
+    "final_dev.sh": LANE / "scripts/k4/final_dev.sh",
+    "parity_single_thread.sh": LANE / "scripts/k4/parity_single_thread.sh",
+    "held3_run.sh": LANE / "scripts/k4/held3_run.sh",
+    "truth_shares.py": LANE / "scripts/k4/truth_shares.py",
+    "surface_overlay.py": LANE / "scripts/k4/surface_overlay.py",
+    "change_floor.py": LANE / "scripts/k4/change_floor.py",
+    "pair_compare.py": LANE / "scripts/k4/pair_compare.py",
+    "record_common.py": LANE / "scripts/k4/record_common.py",
+    "write_preregistration.py": LANE / "scripts/k4/write_preregistration.py",
+}
+
+
+def _milli(value: float) -> int:
+    return round(value * 1000)
+
+
+def _ppm(value: float) -> int:
+    return round(value * 1_000_000)
+
+
+def summary(stats: dict) -> dict:
+    """The statistics a reader needs, in the record's integer units."""
+    misregistration = stats["excess_misregistration_deg"]
+    seam = stats["seam_depth_p50_by_pair"]
+    up = stats["up_error_deg"]
+    return {
+        "outcomes_by_class": stats["outcomes_by_class"],
+        "misnamed": stats["misnamed"],
+        "change_under_limit": [
+            {**{k: v for k, v in row.items() if k != "changed_surface_share"},
+             "changed_surface_ppm": _ppm(row["changed_surface_share"])}
+            for row in stats["change_under_limit"]
+        ],
+        "excess_misregistration_millidegrees": {key: _milli(misregistration[key]) for key in ("p50", "p95", "max")},
+        "pairs_in_one_arrangement": stats["pairs_in_one_arrangement"],
+        "seam_depth_ppm": {"pairs": seam["n"], **{key: _ppm(seam[key]) for key in ("median", "p90", "max")}},
+        "up_error_millidegrees": {"sets": up["n"], **{key: _milli(up[key]) for key in ("p50", "p95", "max")}},
+        "up_methods": stats["up_methods"],
+        "moved_named": stats["moved_named"],
+        "changed_named": stats["changed_named"],
+        "joinable_refused_as_moved": stats["joinable_refused_as_moved"],
+        "joinable_refused_as_changed": stats["joinable_refused_as_changed"],
+        "joinable_in_one_arrangement": stats["joinable_in_one_arrangement"],
+        "moved_in_one_arrangement": stats["moved_in_one_arrangement"],
+        "changed_in_one_arrangement": stats["changed_in_one_arrangement"],
+    }
+
+
+def paired_summary(paired: dict) -> dict:
+    return {
+        "excess_misregistration_p95_millidegrees": {k: _milli(v) for k, v in paired["excess_misregistration_p95_deg"].items()},
+        "pairs_in_one_arrangement": paired["pairs_in_one_arrangement"],
+        "excess_misregistration_p95_on_pairs_both_arranged_millidegrees": {
+            k: _milli(v) for k, v in paired["excess_misregistration_p95_on_pairs_both_arranged_deg"].items()},
+        "joins": paired["joins"],
+    }
+
+
+def main(body_path: str, gates_path: str) -> None:
+    params = json.loads(PARAMS.read_text(encoding="utf-8"))
+    params_sha256 = sha256_of_canonical(params).hex()
+    v1_sha256 = sha256_of_canonical(stage("scene_standpoint").params).hex()
+    split = K3 / "data" / "held3-split.json"
+    if sha(split) != HELD3_SPLIT_SHA256:
+        raise SystemExit("the held-out split is not the one planned")
+    gates = json.loads(Path(gates_path).read_text(encoding="utf-8"))
+    development, comparison = {}, {}
+    for arm in ("exif", "exif-perturbed"):
+        run = json.loads((LANE / "runs" / f"dev-v3-{arm}.json").read_text(encoding="utf-8"))
+        v1_run = json.loads((LANE / "runs" / f"dev-v1-{arm}.json").read_text(encoding="utf-8"))
+        if run["policy_sha256"] != params_sha256 or run["stage_version"] != 3:
+            raise SystemExit(f"the {arm} development run was not made with version 3's parameters")
+        if v1_run["policy_sha256"] != v1_sha256 or v1_run["stage_version"] != 1:
+            raise SystemExit(f"the {arm} version 1 development run was not made with version 1's parameters")
+        stats = json.loads((LANE / "runs" / f"dev-v3-gates-{arm}.json").read_text(encoding="utf-8"))
+        if stats["statistics"]["change_limit"] * 1_000_000 != gates["change_limit_ppm"]:
+            raise SystemExit("the development statistics were not made at the recorded change limit")
+        development[arm] = {"version_3": summary(stats["statistics"]), "version_1": summary(stats["version_1"]["statistics"]),
+                            "paired": paired_summary(stats["paired_with_version_1"])}
+    sources_file = LANE / "logs" / "final.sources"
+    for line in sources_file.read_text(encoding="utf-8").splitlines():
+        digest, name = line.split()
+        if name in SOURCES and sha(ROOT / name) != digest:
+            raise SystemExit(f"{name} changed after the development runs")
+    bound = {f"scripts/{name}.txt": bind(f"scripts/{name}.txt", path) for name, path in SCRIPTS.items()}
+    bound["splits/held-out-split.json"] = bind("splits/held-out-split.json", split)
+    for kind in ("plan", "render", "finish"):
+        bound[f"held-out/{kind}.log.txt"] = bind(f"held-out/{kind}.log.txt", K3 / "logs" / f"held3-{kind}.log", redact=True)
+    for arm in ("exif", "exif-perturbed"):
+        bound[f"development/run-{arm}.json"] = bind(f"development/run-{arm}.json", LANE / "runs" / f"dev-v3-{arm}.json")
+        bound[f"development/version-1-run-{arm}.json"] = bind(f"development/version-1-run-{arm}.json", LANE / "runs" / f"dev-v1-{arm}.json")
+        bound[f"development/statistics-{arm}.json"] = bind(f"development/statistics-{arm}.json", LANE / "runs" / f"dev-v3-gates-{arm}.json")
+        for version in ("v1", "v2"):
+            for kind in ("parity", "parity-single-thread"):
+                bound[f"development/{version}-{kind}-{arm}.log.txt"] = bind(
+                    f"development/{version}-{kind}-{arm}.log.txt", LANE / "logs" / f"{version}-{kind}-{arm}.log", redact=True)
+    bound["development/sources.txt"] = bind("development/sources.txt", sources_file)
+    bound["development/changed-surface-shares.json"] = bind("development/changed-surface-shares.json", LANE / "runs" / "truth-shares.json")
+    for name in ("held2-courtyard-121-c1-p1.png", "held2-landscape-321-c1-p1.png"):
+        bound[f"development/overlays/{name}"] = bind(f"development/overlays/{name}", LANE / "overlays" / name)
+    record = json.loads(Path(body_path).read_text(encoding="utf-8"))
+    record["gates"] = gates
+    record["method"]["params_path"] = rel(PARAMS)
+    record["method"]["params_sha256"] = params_sha256
+    record["method"]["stage_version"] = 3
+    record["method"]["sources_sha256"] = {name: sha(ROOT / name) for name in SOURCES}
+    record["comparison"]["version_1_params_sha256"] = v1_sha256
+    record["bound_artifacts"] = {k: v for k, v in bound.items() if not k.startswith("scripts/")}
+    record["scripts"] = {k: v for k, v in bound.items() if k.startswith("scripts/")}
+    record["splits"]["development"]["definitions"] = {
+        "v1-development": existing(V1_ARTIFACTS / "splits" / "development-split.json"),
+        "v1-held-out": existing(V1_ARTIFACTS / "splits" / "held-out-split.json"),
+        "v2-held-out": existing(V2_ARTIFACTS / "splits" / "held-out-split.json"),
+    }
+    record["splits"]["held_out"]["definition"] = bound["splits/held-out-split.json"]
+    record["development_results"] = development
+    document = {"profile": "exulanica.digest-bound-record/v1", "record": record,
+                "record_sha256": hashlib.sha256(canonical_json(record)).hexdigest()}
+    text = json.dumps(document, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
+    if "/Users/" in text or "\u2014" in text:
+        raise SystemExit("the record would carry a personal path or an em dash")
+    PREREGISTRATION.write_text(text, encoding="utf-8")
+    print(rel(PREREGISTRATION), document["record_sha256"], "artifacts", rel(ARTIFACTS))
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

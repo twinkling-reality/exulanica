@@ -1,0 +1,60 @@
+"""Shared pieces of the version 3 records: where things are and how a file is bound."""
+from __future__ import annotations
+
+import hashlib
+import shutil
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[4]
+LANE = ROOT / ".exulanica" / "lane-standpoint4"
+K3 = LANE / "k3"
+NAME = "2026-09-25-standpoint-join-v3"
+ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / NAME
+PREREGISTRATION = ROOT / "docs" / "evaluation" / f"{NAME}-preregistration.json"
+OUTCOME = ROOT / "docs" / "evaluation" / f"{NAME}-outcome.json"
+PARAMS = ROOT / "tests" / "fixtures" / "standpoint-v3-params.json"
+V1_ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / "2026-09-23-standpoint-join"
+V2_ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / "2026-09-24-standpoint-join-v2"
+#: The files whose bytes decide what the method computes, frozen from the pre-registration to the
+#: outcome. The stage registry is not among them: version 3's parameters are the fixture above,
+#: and the registry names version 3 only after it passes.
+SOURCES = (
+    "exulanica/ingest/stages/depth.py",
+    "exulanica/reconstruction/standpoint.py",
+    "exulanica/reconstruction/standpoint_features.py",
+    "exulanica/reconstruction/standpoint_record.py",
+    "tests/fixtures/standpoint-v3-params.json",
+)
+#: Absolute locations in logs are replaced with these names before a log is bound.
+LOCATIONS = {
+    str(ROOT): "<worktree>",
+    "<k3-worktree>": "<k3-worktree>",
+}
+
+
+def sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def rel(path: Path) -> str:
+    return path.relative_to(ROOT).as_posix()
+
+
+def bind(target: str, source: Path, *, redact: bool = False) -> dict[str, str]:
+    """Copy ``source`` to the artifacts directory at ``target`` and return its binding."""
+    destination = ARTIFACTS / target
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if redact:
+        text = source.read_text(encoding="utf-8")
+        for old, new in LOCATIONS.items():
+            text = text.replace(old, new)
+        if "/Users/" in text:
+            raise SystemExit(f"{source} carries a personal path after redaction")
+        destination.write_text(text, encoding="utf-8")
+    else:
+        shutil.copyfile(source, destination)
+    return {"path": rel(destination), "sha256": sha(destination)}
+
+
+def existing(path: Path) -> dict[str, str]:
+    return {"path": rel(path), "sha256": sha(path)}

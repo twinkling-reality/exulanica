@@ -1,0 +1,82 @@
+"""Shared loading for the K4 lane: sets, cameras and inputs as the v1 eval builds them (K3's k3lib, data read from the K3 copy)."""
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import uuid
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+from exulanica.ingest.exif import extract_exif_facts
+from exulanica.reconstruction.standpoint import StandpointInput
+
+LANE = Path(__file__).resolve().parents[2]
+#: K3's lane data, copied read-only into this lane (k3/), digests verified after the copy.
+K3 = LANE / "k3"
+DATA = K3 / "data"
+NAMESPACE = uuid.UUID("5c0f3a7e-2d1b-4b8e-9a3c-7d5e1f0b2a64")
+PERTURBATION = 0.03
+
+
+def scenes(which=("dev", "held", "held2")):
+    for split in which:
+        for scene in sorted(p for p in (DATA / split).iterdir() if (p / "truth.json").exists()):
+            yield scene
+
+
+def truth_of(scene: Path) -> dict:
+    return json.loads((scene / "truth.json").read_text())
+
+
+def set_photo_ids(truth: dict, set_id: str) -> list[str]:
+    return sorted((pid for pid, c in truth["cameras"].items() if c["set"] == set_id), key=lambda p: truth["cameras"][p]["index"])
+
+
+def load_camera(scene: Path, truth: dict, photo_id: str) -> dict:
+    camera = truth["cameras"][photo_id]
+    width, height = camera["width"], camera["height"]
+    depth = np.fromfile(scene / camera["depth_file"], dtype="<f4").reshape(height, width)
+    focal = (height / 2) / math.tan(math.radians(camera["fov_y_deg"]) / 2)
+    return {"id": photo_id, "R": np.array(camera["rotation_world_from_camera"]), "c": np.array(camera["centre_world"]),
+            "depth": depth.astype(np.float64), "focal": focal, "size": (width, height)}
+
+
+def exif_focal(jpeg: Path):
+    with Image.open(jpeg) as image:
+        value = image.getexif().get_ifd(0x8769).get(0xA405)
+    return None if value in (None, 0) else float(value)
+
+
+def stated_focal(jpeg: Path, photo_id: str, arm: str):
+    focal = exif_focal(jpeg)
+    if focal is None or arm == "exif":
+        return focal
+    unit = int.from_bytes(hashlib.sha256(photo_id.encode()).digest()[:8], "big") / 2**64
+    return focal * (1 + PERTURBATION * (2 * unit - 1))
+
+
+def inputs_for(scene: Path, truth: dict, set_id: str, arm: str = "exif") -> list[StandpointInput]:
+    out = []
+    for ordinal, photo_id in enumerate(set_photo_ids(truth, set_id)):
+        jpeg = scene / f"{photo_id}.jpg"
+        with Image.open(jpeg) as opened:
+            upright, _facts = extract_exif_facts(opened)
+            upright = upright.convert("RGB")
+        opm = (scene / "opm" / f"{photo_id}.opm").read_bytes()
+        out.append(StandpointInput(
+            ordinal=ordinal,
+            member_ref=str(uuid.uuid5(NAMESPACE, f"member:{photo_id}")),
+            point_map_artifact_ref=str(uuid.uuid5(NAMESPACE, f"opm:{photo_id}")),
+            point_map=opm,
+            image=upright,
+            image_sha256=hashlib.sha256(jpeg.read_bytes()).hexdigest(),
+            exif_focal_35mm=stated_focal(jpeg, photo_id, arm),
+        ))
+    return out
+
+
+def angle_deg(a, b) -> float:
+    return math.degrees(math.atan2(float(np.linalg.norm(np.cross(a, b))), float(np.dot(a, b))))

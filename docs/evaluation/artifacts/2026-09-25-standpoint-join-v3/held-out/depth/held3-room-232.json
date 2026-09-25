@@ -1,0 +1,382 @@
+{
+ "held3-room-232-c1-p0": {
+  "fov_y_deg_estimated": 51.7617,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "76dab163eb9e4b0561c61a0d269e623a3fb99abdd26430efb9ae779a8138199e",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "0b0dcb7ae8c63885fca0e113471dc71ecd6330e52f8da360ca6a2a38dd40e314",
+  "rung": 3,
+  "seconds": 1.032,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-c1-p1": {
+  "fov_y_deg_estimated": 54.8636,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "0f159b871569f99eac62c9713f498ca0d305a33f0ea3e31542760ede361816c7",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "4bf2db026337f032098bccc8876f12c8fe707e400132da534fe99c02a17a52d3",
+  "rung": 3,
+  "seconds": 1.012,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-c1-p2": {
+  "fov_y_deg_estimated": 49.5589,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "b07fc3e5a9eb42cfe095a24e965676f858b1e3d9855dd0d023b1f8920ae78823",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "336b0228481ca3396c7aa8bbbd2a71696a92d5e4ae856394b236734f1822dbed",
+  "rung": 3,
+  "seconds": 0.993,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-c2-p0": {
+  "fov_y_deg_estimated": 54.4659,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "9199e1261cf91fa8229a3d4026c03922cf9212fa015915bc5dbbdcea98fbb6b7",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "c140c3807d259f495c31ccc6f3778c2fc580bd655f325f435a00a6c8fbe72064",
+  "rung": 3,
+  "seconds": 0.973,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-c2-p1": {
+  "fov_y_deg_estimated": 52.4374,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "fc33bb27f2a765c2c2012506eb05efae29e318b72e87bbad5114df7fe23f1e87",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "69e6a1f94edb15b33eff8eef576d378397bb87320d06c25780247e306c0578f8",
+  "rung": 3,
+  "seconds": 0.934,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-c2-p2": {
+  "fov_y_deg_estimated": 53.4604,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "160877d0f6765aa6c1f3d1dc825d0ed24406faca95f1e91f574efa0748a3940e",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "9fadd73c26e1dd65a5c834e3be59f7857f955bcc570b5239952ccba6ed6d3da2",
+  "rung": 3,
+  "seconds": 0.928,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-c3-p0": {
+  "fov_y_deg_estimated": 54.531,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "f736a4eb9aaca5a78a6b988a9ace04edc7dd773866c0942181f4cc050ca8eea6",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "2b23e8f19ef4a9edd80dd44b8c6c0ec7a9507d077c29efbfae0dd590ffc6ab73",
+  "rung": 3,
+  "seconds": 0.984,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-c3-p1": {
+  "fov_y_deg_estimated": 51.6209,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "166c3cabb82e32187bf6952a5d3e8055e3d0aac255a4b7fb5de9522c91ac4639",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "12cba2990927cc01132e14d0ac57ada550ea1cbcfa293b1f3e3c3d03eb356151",
+  "rung": 3,
+  "seconds": 0.969,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-c3-p2": {
+  "fov_y_deg_estimated": 53.904,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "1a2e1732b54537ab689cf90076ed97d0a4e2c86e99173a3fd990b4a27ae2fb2e",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "da741893fc1016a908b0eaca37fc87124887a900a3265c0f39f5924e9d021724",
+  "rung": 3,
+  "seconds": 0.939,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-g1-p0": {
+  "fov_y_deg_estimated": 54.7524,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "f104f2764fd9688634d189720544f80298cab9161d928bc275bb59d2827ae607",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "be8993a1cdfcf7292a203ec5d70c751b763e04192b1505edc7feea05754e77a7",
+  "rung": 3,
+  "seconds": 0.942,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-g1-p1": {
+  "fov_y_deg_estimated": 53.6003,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "dda394946eb80596a1e5f15abcbc62e7845ba56193b85254f67d033354e90dc2",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "a1cba24ab269501364e11e43bafd0f3466f21d4e404feec467e652d6dfed5f42",
+  "rung": 3,
+  "seconds": 0.886,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-g1-p2": {
+  "fov_y_deg_estimated": 48.9284,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "ad26b7b566a3e4ef4299f647d10413733028e76e574bf3ccc7d17f0094dce550",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "1ebe74762942fadd73fac8972682a821a9f49bc627875db0ec8c343a5865ceb7",
+  "rung": 3,
+  "seconds": 0.885,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-g1-p3": {
+  "fov_y_deg_estimated": 52.765,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "f57f403b2ab793feeaa1aacac99ad029a1f3968bcb710ed17d2996548ca6d0c1",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "4c67cbd5a17e45e158dcebc2d9472b408b45c7373fc8ced0d7bfb1d6bfc3845d",
+  "rung": 3,
+  "seconds": 0.89,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-lo-p0": {
+  "fov_y_deg_estimated": 53.0994,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "717e83a677940e582573503660f1ed855b2ccbc1c334a7bea88c0844f0397db8",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "46988cccff3017fa962496667c79325be527b8a8607420041c041faabe8b9e83",
+  "rung": 3,
+  "seconds": 0.917,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-lo-p1": {
+  "fov_y_deg_estimated": 49.711,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "afa9fd0857a86e81175194cacfc78db66a89e8f055403e20847e476f02a8d9af",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "92e98a81b8682c7ab158d621c289d32169919955c1cf29dc2c1b7d9da79226bf",
+  "rung": 3,
+  "seconds": 0.916,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-m1-p0": {
+  "fov_y_deg_estimated": 53.3718,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "81621e01c9639009c8f8ebef825d9aa0b2716eb970e7bdc7e449ae73002da3f1",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "2925cd7ca78b0d70a1de86222b8c25343c45debbbb85e06d9142e8c51f98b4f7",
+  "rung": 3,
+  "seconds": 0.887,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-m1-p1": {
+  "fov_y_deg_estimated": 37.8712,
+  "fov_y_deg_true": 28.030970112527594,
+  "jpeg_sha256": "7ac647a0143d780d59612c9d07b36bed6d6fad7a4ce31841950b61542593d487",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "be6374752c16e9621dda8b71ccfce740ac0b4454e9fdeddd608976bd9718c44f",
+  "rung": 3,
+  "seconds": 0.881,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-m1-p2": {
+  "fov_y_deg_estimated": 35.8153,
+  "fov_y_deg_true": 12.346968401455367,
+  "jpeg_sha256": "1090dd743fb1c4e5a0b1c08b713ae22a54d20d6ec59ba1b309d1f601df515692",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "47048fad7073ad961148342314936d94514b03a1dbcebe35b5de537058a56f34",
+  "rung": 3,
+  "seconds": 0.864,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-m1-p3": {
+  "fov_y_deg_estimated": 53.8797,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "87a4898fa742bdda32bec3006204ba73902d603a2b69378fa3ce47227e1aaade",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "db6e54dc130534311013a15b25c090dabdb5b80c6607ae0fbab86952fa66e84d",
+  "rung": 3,
+  "seconds": 0.835,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-mv-p0": {
+  "fov_y_deg_estimated": 55.459,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "dd64aa78ad9c9dbdbfd04905f89da6041ffb63ba677c02b63f6a66a80a6e1b54",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "e9c8d55ea0f6c8043607d2b5b9acc9c918a44033b5ccf27711e56fbae5df7854",
+  "rung": 3,
+  "seconds": 0.823,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-mv-p1": {
+  "fov_y_deg_estimated": 51.8311,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "b72ebb75566cbdfa4b5e0dfaeae733261bf78a6a16eb100b3aab985a2592b8d5",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "63cbd314cfb85592641d0ab7f7fad8a8f515bcec54288445aa86937e72d9a1fc",
+  "rung": 3,
+  "seconds": 0.865,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-mv-p2": {
+  "fov_y_deg_estimated": 18.5701,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "04d771ab8225c51da9d3c8c2e54c841a56aa019f67dd8c2caf1f39be1c427842",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "ef4f7a096188a416e495e14fba7ac66d106e55e472b8247c6631e1ebbc77276f",
+  "rung": 3,
+  "seconds": 0.842,
+  "valid_fraction": 0.9668
+ },
+ "held3-room-232-mv2-p0": {
+  "fov_y_deg_estimated": 54.6707,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "2c0c8226ebf42b51412cd789628fa36800063095ae3ffb17ea0651c2a8796137",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "16c63a904bccd8529605b7aa1b80eee75e73a5cc5ea67cf0397132e2a3bd05a7",
+  "rung": 3,
+  "seconds": 0.841,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-mv2-p1": {
+  "fov_y_deg_estimated": 51.9208,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "a046b86c54d1009536c61f17f68be4972b5e04c776e5cf770e46a3227cc3fa81",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "fd7d55a1a57835f15fb2583456088be5549fc48e996a9617d47d6470b06f6ac8",
+  "rung": 3,
+  "seconds": 0.863,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-mv2-p2": {
+  "fov_y_deg_estimated": 52.1121,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "a8a0b6eb7b80263d5d2d755aa85efea807ddb8e3cc9a82fcdf89ea9d219afbbb",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "00ca1ec3d443ee734fee09ebfb1f7aae17e9270b006e687a62bb5ad0407738cc",
+  "rung": 3,
+  "seconds": 0.858,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-p1-p0": {
+  "fov_y_deg_estimated": 65.0554,
+  "fov_y_deg_true": 67.29866699741999,
+  "jpeg_sha256": "02e2c4d4c548a90805b9599f81a451dcffd30a5613eb5fdea0b8dc99e77029f2",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "7eeb257e5200569dc5cb4e536a94be6af2504de27462c7c5b5ca8943c795888c",
+  "rung": 3,
+  "seconds": 0.864,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-p1-p1": {
+  "fov_y_deg_estimated": 63.7554,
+  "fov_y_deg_true": 67.29866699741999,
+  "jpeg_sha256": "963ee9b741423463ce37da16b56fb9041838f8bde6b8b2a5c5181d379d899d37",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "a20ef89a95022fe4800f15be156fa63b1c2f50b52cd622f698c3cc54c25fa01d",
+  "rung": 3,
+  "seconds": 0.905,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-p1-p2": {
+  "fov_y_deg_estimated": 63.0694,
+  "fov_y_deg_true": 67.29866699741999,
+  "jpeg_sha256": "62c2743680d5ab94923af87f38bc49549e93431b8b535d9ef70c20d4d605f214",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "3ba87d6a125419645a55bb0aa1adaf3b89e667b381853b132561b39cec625226",
+  "rung": 3,
+  "seconds": 0.898,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s1-p0": {
+  "fov_y_deg_estimated": 51.2477,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "0f10a479a944c829b68f505a309edf6c8666cfbe751b98f22c5e5dbd26c73b64",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "19562382c114a4e6b0450d5dd7735d1c246f8ccbcce65ac93a41c428ae725c06",
+  "rung": 3,
+  "seconds": 0.882,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s1-p1": {
+  "fov_y_deg_estimated": 51.8232,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "559b7182b51e42d282cb79a2753eb24d83dd86aadbe4680b8eb918f7fc7655af",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "8ef8ed1e5973463f76cc6985c2f236e40f7ad469a3c611e7b50447d8e8f6a5c0",
+  "rung": 3,
+  "seconds": 0.891,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s1-p2": {
+  "fov_y_deg_estimated": 49.6102,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "e8564e789fb618be7db3907eb8bc3e135d981528bd7ccdccefb313cb260e8823",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "cac26483d3da1b1fb269f7fe0f7426f3d4005fba7c62e51ea0bdbfcbaca24473",
+  "rung": 3,
+  "seconds": 0.884,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s2-p0": {
+  "fov_y_deg_estimated": 49.9821,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "9326f4238b64c754a1b0ce2b0d449117e3a6f033c120c69a4556d34c85651374",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "7deccfaa727aac883f442ef4c9de09041c3e79aa963b32db10444e2d2e62baf1",
+  "rung": 3,
+  "seconds": 0.906,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s2-p1": {
+  "fov_y_deg_estimated": 52.5575,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "7111caf4ce344775eb87aacfa9c5875290e337e668fd17219de818bfcdf8d16c",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "7b1c5cadbabf1e35b1e584dc6a02f53f5f52e99485ee6003fb4d5ee20bf63fd4",
+  "rung": 3,
+  "seconds": 0.898,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s2-p2": {
+  "fov_y_deg_estimated": 51.7803,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "14ca59d7f38d7df5a9061de5b7e6989049da6710e1a44fb382be7db05a763488",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "d36e281b1108a6ed423d258abb702081fc6bf4db622abf5b1105cfef65cee299",
+  "rung": 3,
+  "seconds": 0.864,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s2-p3": {
+  "fov_y_deg_estimated": 52.4505,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "54ff336ae813b5fa3e5cf68c63e7474c23f17620b469ed730214737fb77cd600",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "45ae3abf90b0f4e748f690057481581f088552be86223e9627edac6bc811d073",
+  "rung": 3,
+  "seconds": 0.933,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s3-p0": {
+  "fov_y_deg_estimated": 52.7178,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "7213017d37e4336ae3636190bba202793728f4e9888c08096af88d35acb7324d",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "b7065ae98835fb731e33aa011f0cc69212f0545344751e9babf2f7e25bd89e2d",
+  "rung": 3,
+  "seconds": 0.874,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s3-p1": {
+  "fov_y_deg_estimated": 50.9201,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "16400d4239a186f3abf52f3a5a37e7bfb5b1dbb1924a8260312248b6ba0062d5",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "4576bf78a4cfc88bb24e66581dfba23e5f99bfefe776226a0a9bbe034fd51bb1",
+  "rung": 3,
+  "seconds": 0.824,
+  "valid_fraction": 1.0
+ },
+ "held3-room-232-s3-p2": {
+  "fov_y_deg_estimated": 53.4703,
+  "fov_y_deg_true": 53.059508414520586,
+  "jpeg_sha256": "0cf61f6b05b156f1a0dcec1006372b3c4f69ae01aec9b22ea15a900759bd7513",
+  "model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+  "opm_sha256": "0e3a8d51891bfece6c2b9af34dbc1c8017bf1cdbb89182de884d3175cb770cef",
+  "rung": 3,
+  "seconds": 0.845,
+  "valid_fraction": 1.0
+ }
+}

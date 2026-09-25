@@ -1,0 +1,48 @@
+"""Overlay, on each photograph of a development pair, the pixels the changed-surface truth marks.
+
+    python surface_overlay.py <set_id> <a> <b> <out_dir>
+Red: pixels whose own surface point lies on a changed part's solid; the frame shows the photograph.
+"""
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+sys.path.insert(0, str(Path(__file__).parent))
+from k4lib import load_camera, scenes, set_photo_ids, truth_of  # noqa: E402
+
+spec_ = importlib.util.spec_from_file_location("ev", Path(__file__).parent / "standpoint_eval.py")
+EV = importlib.util.module_from_spec(spec_)
+spec_.loader.exec_module(EV)
+
+
+def main(set_id, a, b, out_dir):
+    scene = next(s for s in scenes() if set_id.startswith(s.name + "-"))
+    truth = truth_of(scene)
+    set_entry = next(s for s in truth["sets"] if s["id"] == set_id)
+    ids = set_photo_ids(truth, set_id)
+    solids = EV._change_solids(scene, set_entry)
+    for index in (int(a), int(b)):
+        cam = load_camera(scene, truth, ids[index])
+        w, h = cam["size"]
+        cols, rows = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
+        xy = np.stack([cols.ravel(), rows.ravel()], 1)
+        depth = cam["depth"].ravel()
+        world = (EV._rays(xy, cam["size"], cam["focal"]) * depth[:, None]) @ cam["R"].T + cam["c"]
+        hit = np.zeros(len(world), bool)
+        for item, loc in solids:
+            hit |= EV._inside_solid(item, loc, world, EV.SURFACE_TOLERANCE_M)
+        hit &= depth < 3000
+        image = np.asarray(Image.open(scene / f"{ids[index]}.jpg").convert("RGB")).astype(float)
+        mask = hit.reshape(h, w)
+        image[mask] = 0.5 * image[mask] + 0.5 * np.array([255, 0, 0])
+        Image.fromarray(image.astype(np.uint8)).save(Path(out_dir) / f"{set_id}-p{index}.png")
+        print(set_id, index, "marked", round(float(mask.mean()), 4))
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

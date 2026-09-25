@@ -486,7 +486,10 @@ STAGES: Final[dict[str, StageSpec]] = {
         # zoom in the pair fit, naming a cause only where it is measured, depth-edge bands) are
         # selected by its parameters, tests/fixtures/standpoint-v2-params.json. They are not
         # registered: version 2 failed its pre-registered gates
-        # (docs/evaluation/2026-09-24-standpoint-join-v2-outcome.json).
+        # (docs/evaluation/2026-09-24-standpoint-join-v2-outcome.json). Version 3's (version 2's,
+        # with a change compared through the lens the pair's fit found) are
+        # tests/fixtures/standpoint-v3-params.json, and failed theirs
+        # (docs/evaluation/2026-09-25-standpoint-join-v3-outcome.json).
         version=1,
         output_kind="standpoint_scene",
         # Deterministic in the sense the flag carries (ADR-0017): no model runs here. MoGe-2 ran
