@@ -27,7 +27,7 @@ is exactly what a returning user experiences, which is why it is legitimate.
 
 **Computed live, every time, for every visitor:** focus resolution and view recomposition in the
 browser, the confirmation write, retrieval, the answer turn on Nemotron, evidence resolution behind
-every citation chip, and the public-entity lookup.
+every citation chip.
 
 **Never, under any framing:**
 
@@ -101,7 +101,7 @@ today.
 | 7 | WebGL context loss | Restore retained decoded resources; if unrecoverable, hand over to the World Index, which is a complete and equivalent path to every function rather than a reduced one | **Built and contract-tested.** PlayCanvas recovery on target hardware remains unmeasured. |
 | 8 | A visitor opens it on a phone or a window at or below 60rem | A factual viewport-boundary notice says the current prototype requires a laptop or desktop window. No mobile controls or alternate Index mode are implied | Built in the authenticated shell; ADR-0006 |
 | 9 | A previous visitor left mutable state | Per-visitor ephemeral tenants, section 2.2 | **OPEN** |
-| 10 | Tavily credits exhausted | The lookup is opt-in and its results can never be cited, so its absence removes a panel and breaks nothing. On failure the panel says the lookup failed. The declared fallback is to cut the feature, never to fake a result | Partly. The call is verified; the product surface is **OPEN** |
+| 10 | Tavily credits exhausted | The lookup is opt-in and its results can never be cited, so its absence removes a panel and breaks nothing. On failure the panel says the lookup failed. The declared fallback is to cut the feature, never to fake a result | Not built. No product code calls Tavily; `scripts/verify_web_lookup.py` checked the credential once |
 | 11 | Pointer lock is refused by the browser | The keyboard route and the World Index, both of which are complete paths | Partly |
 | 12 | Someone asks to see reconstruction run live | It does not run in the live path, by decision. Each region displays the rung it earned, and the rung is part of the region's identity rather than something hidden | Decided. `rungProperties` exists in `atlas-core` |
 
