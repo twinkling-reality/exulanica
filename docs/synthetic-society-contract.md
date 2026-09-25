@@ -17,7 +17,7 @@ residents, infer demographic facts or demonstrate general social intelligence.
 <details>
 <summary>Sections</summary>
 
-- [Connection to the personal world](#connection-to-the-personal-world)
+- [Connection to the world](#connection-to-the-world)
 - [Identity, branches and compatibility](#identity-branches-and-compatibility)
 - [V2 input authority](#v2-input-authority)
 - [Goals, routes and actions](#goals-routes-and-actions)
@@ -37,11 +37,12 @@ residents, infer demographic facts or demonstrate general social intelligence.
 
 </details>
 
-## Connection to the personal world
+## Connection to the world
 
-The product direction is a persistent society inside a person's composed world. Inhabitants
-interact with permitted places and authored objects through declared affordances. Personal meaning
-comes from what the person brings into and changes in that world. Inhabitants never impersonate
+The society is the product's core: the people in a world are its agents, and the explicit model
+proposal path below is how an open model proposes what one of them does. Inhabitants interact with
+permitted places and authored objects through declared affordances. What a person brings into and
+changes in their world changes what its people do. Inhabitants never impersonate
 remembered people. The Companion must explain actions from recorded goals, referenced objects and
 simulation events while keeping personal evidence distinct.
 
