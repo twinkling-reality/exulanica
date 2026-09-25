@@ -1,4 +1,4 @@
-"""Exulanica: a personal world memory model built on an evidence-addressed spine.
+"""Exulanica: Worlds for AI Agents, built on an evidence-addressed spine.
 
 Two things in this package are load bearing and everything else is downstream of them:
 

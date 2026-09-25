@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "Exulanica",
-  "summary": "A personal world memory model. Every historical claim resolves to its source.",
+  "summary": "Worlds for AI Agents. Every historical claim resolves to its source.",
   "version": "0.1.0"
  },
  "paths": {

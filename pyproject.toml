@@ -1,7 +1,7 @@
 [project]
 name = "exulanica"
 version = "0.1.0"
-description = "Exulanica: a personal world memory model with an evidence-addressed spine."
+description = "Exulanica: Worlds for AI Agents, built on an evidence-addressed spine."
 requires-python = ">=3.11,<3.12"
 license = { file = "LICENSE" }
 

@@ -264,7 +264,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     """
     app = FastAPI(
         title="Exulanica",
-        summary="A personal world memory model. Every historical claim resolves to its source.",
+        summary="Worlds for AI Agents. Every historical claim resolves to its source.",
         version="0.1.0",
         lifespan=_lifespan,
         # Every route, by construction. See exulanica.api.dependencies for why it is here rather
