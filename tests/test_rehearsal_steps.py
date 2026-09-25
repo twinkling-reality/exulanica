@@ -68,17 +68,49 @@ def test_the_step_list_is_well_formed():
 
 
 def test_every_gate_the_owning_document_states_is_read_and_served():
-    # Both declared sources yield gates, so coverage cannot pass on an empty gate list.
+    # Every declared source yields gates, so coverage cannot pass on an empty gate list.
     assert {gate.source for gate in GATES} == {source["key"] for source in STEPS["gate_sources"]}
     served = {gate for step in STEPS["steps"] for gate in step["gates"]}
-    assert [gate.key for gate in GATES if gate.key not in served] == []
+    unserved = STEPS["unserved_gates"]
+    assert [gate.key for gate in GATES if gate.key not in served and gate.key not in unserved] == []
+    # A gate said to have no step has none, and says why; one served in part has steps.
+    assert not served & set(unserved) and all(reason.strip() for reason in unserved.values())
+    assert set(STEPS["gates_in_part"]) <= served
+
+
+def test_a_gate_said_to_have_no_step_or_served_in_part_is_held_to_the_document():
+    unserved = next(iter(STEPS["unserved_gates"]))
+    found = _problems_with(lambda s: s["unserved_gates"].pop(unserved))
+    assert any(f"gate {unserved!r}" in p and "has no step" in p for p in found)
+    found = _problems_with(lambda s: s["unserved_gates"].update({unserved: " "}))
+    assert f"unserved_gates gives no reason for {unserved!r}" in found
+    found = _problems_with(lambda s: s["unserved_gates"].update({"delivery:Speed": "slow"}))
+    unstated = "unserved_gates names 'delivery:Speed', which the owning document does not state"
+    assert unstated in found
+    found = _problems_with(lambda s: s["unserved_gates"].update({"foundation:Inspection": "none"}))
+    assert "gate 'foundation:Inspection' is said to have no step, and steps serve it" in found
+    found = _problems_with(lambda s: s["gates_in_part"].update({unserved: "some"}))
+    assert f"gate {unserved!r} is said to be served in part, and no step serves it" in found
+
+
+def test_the_foundation_deliverables_are_read_from_their_own_level_three_section():
+    """The saved-world foundation's table sits inside the first milestone's section; each source
+    reads only its own table, so neither takes the other's rows."""
+    by_source = {
+        source: [gate.name for gate in GATES if gate.source == source]
+        for source in ("milestone", "foundation")
+    }
+    assert by_source["foundation"] and by_source["milestone"]
+    assert not set(by_source["foundation"]) & set(by_source["milestone"])
+    assert "Deliverable" not in by_source["milestone"] + by_source["foundation"]
+    assert "World entry" in by_source["foundation"]
 
 
 def test_a_delivery_gate_with_no_step_fails(tmp_path):
     root = _direction_copy(
         tmp_path,
-        "5. **Release rehearsal:**",
-        "5. **Unrehearsed gate:** a gate no step serves.\n6. **Release rehearsal:**",
+        "6. **Release rehearsal:**",
+        "6. **Unrehearsed gate:** a gate no step serves.\n7. **Release rehearsal:**",
     )
     gates = steplist.read_gates(STEPS["gate_sources"], root)
     found = steplist.problems(STEPS, gates)
@@ -90,22 +122,32 @@ def test_a_delivery_gate_with_no_step_fails(tmp_path):
 
 def test_a_milestone_deliverable_with_no_step_fails(tmp_path):
     root = _direction_copy(
-        tmp_path,
-        "| Inspection |",
-        "| Unrehearsed deliverable | A deliverable no step serves. |\n| Inspection |",
+        tmp_path / "milestone",
+        "| A model per group |",
+        "| Unrehearsed deliverable | A deliverable no step serves. |\n| A model per group |",
     )
     gates = steplist.read_gates(STEPS["gate_sources"], root)
     assert any(
         "gate 'milestone:Unrehearsed deliverable'" in problem
         for problem in steplist.problems(STEPS, gates)
     )
+    root = _direction_copy(
+        tmp_path / "foundation",
+        "| Inspection |",
+        "| Unrehearsed deliverable | A deliverable no step serves. |\n| Inspection |",
+    )
+    gates = steplist.read_gates(STEPS["gate_sources"], root)
+    assert any(
+        "gate 'foundation:Unrehearsed deliverable'" in problem
+        for problem in steplist.problems(STEPS, gates)
+    )
 
 
 def test_a_renamed_gate_leaves_its_steps_naming_a_gate_the_document_does_not_state(tmp_path):
-    root = _direction_copy(tmp_path, "**Persistence:**", "**Durability:**")
+    root = _direction_copy(tmp_path, "**Persistence and replay:**", "**Durability:**")
     gates = steplist.read_gates(STEPS["gate_sources"], root)
     found = steplist.problems(STEPS, gates)
-    unstated = "'delivery:Persistence', which the owning document does not state"
+    unstated = "'delivery:Persistence and replay', which the owning document does not state"
     assert any(unstated in problem for problem in found)
     assert any("gate 'delivery:Durability'" in p and "has no step" in p for p in found)
 
@@ -114,11 +156,21 @@ def test_the_gate_reader_refuses_a_missing_or_empty_section(tmp_path):
     missing = _direction_copy(tmp_path / "missing", "## First milestone", "## First release")
     with pytest.raises(steplist.StepListError, match="has no section '## First milestone'"):
         steplist.read_gates(STEPS["gate_sources"], missing)
-    empty = _direction_copy(
-        tmp_path / "empty", "1. **Usable environment:**", "1. Usable environment:"
+    below = _direction_copy(
+        tmp_path / "below", "### Saved-world foundation", "#### Saved-world foundation"
     )
+    with pytest.raises(steplist.StepListError, match="has no section '### Saved-world foundation'"):
+        steplist.read_gates(STEPS["gate_sources"], below)
+    empty = _direction_copy(tmp_path / "empty", "1. **Usable world:**", "1. Usable world:")
     text = (empty / "docs" / DIRECTION.name).read_text(encoding="utf-8")
-    for name in ("Meaningful action", "Persistence", "Independent use", "Release rehearsal"):
+    names = (
+        "Models in their roles",
+        "Swap and compare",
+        "Persistence and replay",
+        "Independent use",
+        "Release rehearsal",
+    )
+    for name in names:
         text = text.replace(f"**{name}:**", f"{name}:")
     (empty / "docs" / DIRECTION.name).write_text(text, encoding="utf-8")
     with pytest.raises(steplist.StepListError, match="states no gate in the numbered form"):
@@ -291,7 +343,7 @@ def test_a_result_reports_every_step_once_and_the_first_failure_of_each_gate():
 
     gates = {gate["gate"]: gate for gate in document["gates"]}
     assert set(gates) == {gate.key for gate in GATES}
-    creation = gates["milestone:Durable creation"]
+    creation = gates["foundation:Durable creation"]
     assert creation["status"] == "failed"
     assert creation["first_failure"] == {
         "step": "place-reviewed-object",
@@ -299,11 +351,14 @@ def test_a_result_reports_every_step_once_and_the_first_failure_of_each_gate():
         "owner_area": _step(STEPS, "place-reviewed-object")["owner_area"],
     }
     # World entry's first failed step in step order is name-world, ahead of the unreached return.
-    assert gates["milestone:World entry"]["first_failure"]["step"] == "name-world"
-    assert gates["delivery:Independent use"] == gates["delivery:Independent use"] | {
-        "status": "passed",
+    assert gates["foundation:World entry"]["first_failure"]["step"] == "name-world"
+    assert gates["foundation:Developer proof"] == gates["foundation:Developer proof"] | {
+        "status": "not_reachable",
         "first_failure": None,
     }
+    # A gate no step serves is reported with the step list's reason, never left out.
+    for key, reason in STEPS["unserved_gates"].items():
+        assert gates[key] | {"status": "not_served", "reason": reason, "steps": []} == gates[key]
 
 
 def test_a_failed_step_fails_its_gate_whatever_comes_before_it():
@@ -328,7 +383,7 @@ def test_a_failed_step_fails_its_gate_whatever_comes_before_it():
     assert order.index("not_available") < order.index("failed")
     assert release["status"] == "failed"
     assert release["first_failure"]["step"] == "access-gate"
-    personal = next(g for g in document["gates"] if g["gate"] == "milestone:Personal-media path")
+    personal = next(g for g in document["gates"] if g["gate"] == "foundation:Personal-media path")
     assert personal["status"] == "not_available" and personal["first_failure"] is None
 
 
@@ -403,21 +458,25 @@ def test_the_stand_in_review_is_stated_once_and_every_gate_resting_on_it_is_qual
     ]
     assert by_id["name-world"]["stand_ins"] == []
     gates = {gate["gate"]: gate for gate in document["gates"]}
-    companion = gates["milestone:Companion interaction"]
+    companion = gates["foundation:Companion interaction"]
     assert companion["status"] == "passed_on_stand_in"
     assert companion["qualification"] == [stand_in["gate_qualification"]]
-    assert gates["milestone:Durable creation"]["status"] == "passed"
-    assert gates["milestone:Durable creation"]["qualification"] == []
+    assert gates["foundation:Durable creation"]["status"] == "passed"
+    assert gates["foundation:Durable creation"]["qualification"] == []
+    # A gate its steps serve in part never passes plainly, and says what they leave out.
+    for key, gap in STEPS["gates_in_part"].items():
+        assert gates[key]["status"] == "passed_in_part"
+        assert gates[key]["qualification"][0] == f"In part: {gap}"
     # A gate that fails or cannot be reached keeps that status and names the stand-in, and its
     # qualification, which speaks of a pass, is empty.
-    assert gates["milestone:Personal-media path"]["status"] == "not_available"
-    assert gates["milestone:Personal-media path"]["stand_ins"] == ["human-review"]
-    assert gates["milestone:Personal-media path"]["qualification"] == []
+    assert gates["foundation:Personal-media path"]["status"] == "not_available"
+    assert gates["foundation:Personal-media path"]["stand_ins"] == ["human-review"]
+    assert gates["foundation:Personal-media path"]["qualification"] == []
 
 
 def test_a_stand_in_no_step_gives_or_a_step_giving_an_unstated_one_is_not_well_formed():
     found = _problems_with(lambda s: _step(s, "review-photographs-in-app").pop("stand_in"))
-    assert "stand-in 'human-review' is stated and no step gives it" not in found  # the refusal step
+    assert "stand-in 'human-review' is stated and no step gives it" not in found  # the addition
     found = _problems_with(lambda s: [step.pop("stand_in", None) for step in s["steps"]])
     assert "stand-in 'human-review' is stated and no step gives it" in found
     found = _problems_with(lambda s: _step(s, "review-photographs-in-app").update(stand_in="x"))
@@ -429,7 +488,8 @@ def test_a_stand_in_no_step_gives_or_a_step_giving_an_unstated_one_is_not_well_f
 def test_a_result_that_drops_the_stand_in_from_a_passing_gate_is_refused_by_the_schema():
     document = resultdoc.assemble(STEPS, GATES, _all_passing(STEPS), {}, _run_block())
     schema = json.loads((REHEARSAL / "result.schema.json").read_text())
-    companion = next(g for g in document["gates"] if g["gate"] == "milestone:Companion interaction")
+    gate = "foundation:Companion interaction"
+    companion = next(g for g in document["gates"] if g["gate"] == gate)
     # Its status and its qualification both dropped: only the stand-in list is left to say it.
     companion["status"] = "passed"
     companion["qualification"] = []
@@ -439,7 +499,8 @@ def test_a_result_that_drops_the_stand_in_from_a_passing_gate_is_refused_by_the_
 
 def test_the_personal_path_reviews_waits_makes_and_the_companion_moves_into_the_made_world():
     """Review, the depth and grouping wait and making the world come in order in the photos session;
-    every Companion step rests on the made world; the return reopens it and reviews once more."""
+    every Companion step rests on the made world; the return reopens it, reviews one more photograph
+    and adds it to the made world on a confirmed preview."""
     ids = [step["id"] for step in STEPS["steps"]]
     path = [
         "review-photographs-in-app",
@@ -464,11 +525,26 @@ def test_the_personal_path_reviews_waits_makes_and_the_companion_moves_into_the_
     assert returning == [
         "returning-user-reopens",
         "return-to-made-world",
-        "made-world-refuses-new-photograph",
+        "made-world-takes-new-photograph",
     ]
-    refusal = _step(STEPS, "made-world-refuses-new-photograph")
-    assert refusal["stand_in"] == "human-review"
-    assert refusal["parameters"]["refusal"] == "personal_world_already_made"
+    addition = _step(STEPS, "made-world-takes-new-photograph")
+    assert addition["stand_in"] == "human-review"
+    assert addition["requires"] == ["return-to-made-world"]
+    parameters = addition["parameters"]
+    assert parameters["action"] == "add_photographs"
+    assert parameters["buttons"]["add_photographs"].strip() and parameters["confirm"].strip()
+    assert parameters["refusal_after"] == "personal_world_current"
+    assert "refusal" not in parameters
+    assert {kind: [o["id"] for o in found] for kind, found in addition["expect"].items()} == {
+        "api": [
+            "new-photograph-reviewed",
+            "offer-reads-preview",
+            "cancel-writes-nothing",
+            "confirmed-with-preview",
+            "world-advanced",
+        ],
+        "page": ["preview-before-write", "reopened-with-edits", "current-after-confirm"],
+    }
     make = _step(STEPS, "make-world-from-photographs")
     assert {o["id"] for o in make["expect"]["api"]} == {
         "offer-read",
@@ -575,7 +651,7 @@ JOB_WAITING_STEPS = (
     "grant-model-rights-in-app",
     "wait-for-depth-and-grouping",
     "photo-jobs-end-cleanly",
-    "made-world-refuses-new-photograph",
+    "made-world-takes-new-photograph",
 )
 
 
@@ -592,3 +668,88 @@ def test_every_wait_the_steps_declare_has_a_bound_and_a_reason():
                 stem = name.rsplit("_", 1)[0]
                 assert isinstance(value, int) and value > 0, (step["id"], name)
                 assert step["parameters"].get(f"{stem}_reason", "").strip(), (step["id"], name)
+
+
+def _instruments() -> set[str]:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not on PATH")
+    listed = subprocess.run(
+        [node, str(REHEARSAL / "session.mjs"), "--list-instruments"],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    return set(json.loads(listed.stdout))
+
+
+def test_every_instrument_a_session_names_is_registered_and_says_why():
+    named = {
+        (session["id"], name)
+        for session in STEPS["sessions"]
+        for name in session.get("instruments", [])
+    }
+    assert named, "the positive control needs a session that names an instrument"
+    registered = _instruments()
+    assert {name for _, name in named} <= registered
+    for session in STEPS["sessions"]:
+        if session.get("instruments"):
+            assert session["runner"] == "browser" and session["instruments_reason"].strip()
+    assert "no-such-instrument" not in registered
+
+
+#: The living world, in the order a person meets it, each step requiring the one it builds on.
+LIVING = {
+    "furnish-small-square": ["enter-owned-starter"],
+    "bring-in-inhabitants": ["furnish-small-square"],
+    "play-and-watch-walking": ["bring-in-inhabitants"],
+    "inspect-an-inhabitant": ["play-and-watch-walking"],
+    "object-in-use": ["play-and-watch-walking"],
+    "pause-playback": ["play-and-watch-walking"],
+}
+
+
+def test_the_living_session_furnishes_brings_people_in_plays_inspects_and_pauses():
+    """The living world is one browser session in the starter, played by the host it launches.
+
+    Its steps come in the order a person meets them, each requiring the one it builds on, and
+    each says why it serves the gates it names, since no gate of the first demonstration names a
+    living world. The session measures walking with its instrument, and the launcher is asked to
+    play the run's workspace, which is what lets People nearby offer Play at all.
+    """
+    living = [s for s in STEPS["steps"] if s.get("session") == "living"]
+    assert {s["id"]: s["requires"] for s in living} == LIVING
+    assert [s["id"] for s in living] == list(LIVING)
+    for step in living:
+        assert step["gates"] == ["milestone:A world to run", "delivery:Usable world"], step["id"]
+        assert step["gates_reason"].strip(), step["id"]
+    # They show part of both gates, never all of either: a town is not a starter with a square.
+    assert {"milestone:A world to run", "delivery:Usable world"} <= set(STEPS["gates_in_part"])
+    session = next(s for s in STEPS["sessions"] if s["id"] == "living")
+    assert session["instruments"] == ["walker-positions"]
+    ids = [s["id"] for s in STEPS["sessions"]]
+    assert ids.index("appearance") < ids.index("living") < ids.index("photos")
+    watch = _step(STEPS, "play-and-watch-walking")["parameters"]
+    assert watch["walking_floor_m_per_s"] > 0 and watch["walking_floor_reason"].strip()
+    # The pace bound lies between W2's two measured arms, 2.8 m/s walking on and 13.9 m/s rushing.
+    assert "13.9" in watch["pace_reason"] and "2.8" in watch["pace_reason"]
+    assert 2.8 < watch["pace_p95_at_most_m_per_s"] < 13.9
+    assert STEPS["runtime"]["society_playback"]["launcher_flags"] == ["--society-playback"]
+    # The session's allowance holds its bounds: the watch and the wait for someone at the square.
+    in_use = _step(STEPS, "object-in-use")["parameters"]["in_use_wait_seconds"]
+    assert session["budget_seconds"] > watch["sample_seconds"] + in_use
+
+
+def test_the_first_use_square_is_taken_back_and_nothing_waits_on_it():
+    """The card's square can only be pressed while the starter is empty, so it comes straight after
+    the About panel, takes the square back one change at a time, and no step requires it: the
+    creation steps start from a world with no object either way."""
+    ids = [step["id"] for step in STEPS["steps"]]
+    card = _step(STEPS, "start-with-small-square")
+    assert ids.index("start-with-small-square") == ids.index("read-about-this-place") + 1
+    assert card["session"] == "arrival" and card["requires"] == ["enter-owned-starter"]
+    assert card["undo_reason"].strip() and card["gates_reason"].strip()
+    card_id = card["id"]
+    assert [s["id"] for s in STEPS["steps"] if card_id in s.get("requires", [])] == []
+    assert "undone-newest-first" in {o["id"] for o in card["expect"]["api"]}

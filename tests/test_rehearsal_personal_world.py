@@ -1,7 +1,7 @@
 """The rehearsal's personal path holds the drawer's offer and review to the server's own answers.
 
 ``review-photographs-in-app``, ``wait-for-depth-and-grouping``, ``make-world-from-photographs`` and
-``made-world-refuses-new-photograph`` decide with exported functions of
+``made-world-takes-new-photograph`` decide with exported functions of
 ``scripts/rehearsal/handlers.mjs``: ``offerMismatches`` (the offer a person reads against
 GET /worlds/personal-source), ``reviewMismatches`` (the review the drawer posted against the
 stand-in the step list states) and ``sceneWorkWaiting`` (what GET /operations/reconstruction-scenes

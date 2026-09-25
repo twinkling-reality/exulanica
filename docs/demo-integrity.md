@@ -144,12 +144,14 @@ of whoever is watching.
 `scripts/rehearsal/` repeats the first demonstration in the real application without a person
 clicking through it, and reports which step of which
 [delivery gate](product-direction.md#delivery-gates-for-the-first-demonstration) and
-[first-milestone deliverable](product-direction.md#first-milestone) works. Its step list,
-`scripts/rehearsal/steps.json`, is data. Each step is one action a person takes, with the results
-that must be observable after it on the page, in the API and after a reload, and the owner area a
-failure routes to. The gates are read from the product roadmap itself; `tests/test_rehearsal_steps.py`
-fails when a gate there has no step, when a step names no observable result, and when a runnable
-step has no driver.
+[first-milestone deliverable](product-direction.md#first-milestone), including the saved-world
+foundation beneath it, works. Its step list, `scripts/rehearsal/steps.json`, is data. Each step is
+one action a person takes, with the results that must be observable after it on the page, in the
+API and after a reload, and the owner area a failure routes to. The gates are read from the product
+roadmap itself. A gate no step serves is named in the step list with its reason, and a gate whose
+steps rehearse only part of it is named with what they leave out. `tests/test_rehearsal_steps.py`
+fails when a gate has no step and no such reason, when a step names no observable result, and when
+a runnable step has no driver.
 
 **Running it.**
 
@@ -160,14 +162,19 @@ python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <ne
 - `--worktree` is the checkout whose application is rehearsed, a linked worktree or a plain clone.
   It needs its own `.venv` and web packages. The runtime comes from the acceptance launcher,
   `scripts/acceptance/launch.py` in the rehearsal's own tree unless `--launcher` names another,
-  run with `up --production`. It starts that checkout's disposable test server, a fresh synthetic
-  workspace with its own token, and the API, on the port block `--slot` chooses.
+  run with `up --production` and the flags the step list's `runtime.society_playback` names
+  (`--society-playback`). It starts that checkout's disposable test server, a fresh synthetic
+  workspace with its own token, and the API, on the port block `--slot` chooses, and the API plays
+  that workspace's societies at the host's declared base wait, the pace the product ships.
 - The launcher builds the application for production, with no development token in the build
   environment, and serves it with `vite preview` on the slot's application port. Every page load
   passes the application's own access-token gate. The result records the build's hashes and the
   hash of the page the preview served. Account sign-in is not exercised.
 - Each browser session is one headless Chrome with one page, driven over the DevTools protocol, and
-  waits its turn behind the development machine's GPU slot where that machine provides one.
+  waits its turn behind the development machine's GPU slot where that machine provides one. A
+  session that names an instrument (`scripts/rehearsal/instruments.mjs`) has it installed before
+  the page loads. The living session's instrument reads where the page draws each walker in every
+  animation frame and changes nothing the page does.
 - `--model-env` names the environment file that holds the hosted-model key. A child process reads
   only `NEBIUS_API_KEY` from it and hands it to the launcher by environment, together with the step
   list's `spend.bound_usd` as `EXULANICA_BUDGET_USD`, so the API itself refuses a model call past
@@ -208,6 +215,8 @@ and each browser session's log. Every step appears once, in step-list order:
 | --- | --- |
 | passed | Every observable the step list declares for it was checked and held. A runner that checks less, or something undeclared, fails the step. |
 | passed_on_stand_in | Gates only. Every step that serves it passed, and at least one rests on an action the rehearsal driver performed in place of a person; the gate carries the stand-in's qualification. |
+| passed_in_part | Gates only. Every step that serves it passed, and the step list states that those steps rehearse only part of the gate; the gate carries what they leave out. |
+| not_served | Gates only. No step serves it, and the step list states why. |
 | failed | The observation, the screenshots, the API reads and the page's own requests are in the step's evidence. |
 | not_reachable | A step it requires did not pass, its browser session ended first, or no hosted model was configured. The reason says which. |
 | not_available | The step list declares that the product cannot attempt it, and says why. |
@@ -216,8 +225,24 @@ The gate table gives each gate the worst status of its steps and names its first
 that step's owner area. The command exits 0 only when every step passed or is declared not
 available, and 3 when the run directory or the production build holds the workspace token.
 
-**What it does not do.** It does not observe a person or record demonstration footage, and it
-measures no frame time. The human review of its photographs is given by the rehearsal driver
+**The living world.** The first-use card's "Start with a small square" is pressed at arrival, the
+only moment it is offered, because the card greets only a starter that holds nothing and a
+workspace has one starter. The rehearsal places the square from the card and then takes it back
+one change at a time, so the creation steps still begin with an empty world. The living session
+then furnishes the starter with the Create panel's own square and brings inhabitants in. It
+presses Play in People nearby, lets a minute pass on its own and watches for a minute. Walking
+counts as continuous when someone is drawn walking and the 95th percentile of the pace walkers are
+drawn at is at most 6 m/s: people walk on rather than rush a minute's path and stand. Standing is
+not a failure, since people linger by design. It reads one inhabitant in the inspector, waits for
+someone to use an object of the square, and pauses the world. These steps serve the first milestone's A world to run and
+the Usable world delivery gate in part: they watch people move under the deterministic planner in
+a starter furnished with one square, not in the small town those gates name. The gates that choose
+or swap the model running people have no step, because the product runs no model for them; the
+result reports them `not_served` with that reason.
+
+**What it does not do.** It does not observe a person or record demonstration footage. It judges
+no frame time: the walking measure reads how far walkers are drawn to move between frames, not
+how long a frame takes. The human review of its photographs is given by the rehearsal driver
 through the photo drawer's own controls, as a stand-in the step list states once (`stand_ins` in
 `scripts/rehearsal/steps.json`): the reviewer name and purpose it records say so, every step resting
 on it carries that statement in the result, and a gate resting on it reports `passed_on_stand_in`
@@ -226,4 +251,5 @@ development machine's processor, and it does not run multi-view reconstruction: 
 its photographs holds the three photographs with point maps that pose recovery needs, and the scene
 worker requires the pose runtime image by digest as provenance, which the development machine does
 not build. It confirms the proposed place through the identity routes rather than through the
-application. Every photograph it uses is a synthetic drawing.
+application. The photograph it adds to the made world on its return rests on the same stand-in
+review. Every photograph it uses is a synthetic drawing.

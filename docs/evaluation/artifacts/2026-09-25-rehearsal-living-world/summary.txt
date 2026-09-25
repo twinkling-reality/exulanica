@@ -1,0 +1,71 @@
+STEP                                         STATUS          REASON
+clean-start                                  passed          
+access-gate                                  passed          
+enter-owned-starter                          passed          
+read-about-this-place                        passed          
+start-with-small-square                      passed          
+name-world                                   passed          
+explore-walk                                 passed          
+place-reviewed-object                        passed          
+move-object                                  passed          
+inspect-object                               passed          
+give-bounded-motion                          passed          
+trigger-stop-reset                           passed          
+refuse-unsupported-behaviour                 passed          
+creation-survives-reload                     passed          
+undo-last-change                             passed          
+change-appearance                            passed          
+appearance-survives-reload                   passed          
+restore-original-appearance                  passed          
+furnish-small-square                         passed          
+bring-in-inhabitants                         passed          
+play-and-watch-walking                       passed          
+inspect-an-inhabitant                        passed          
+object-in-use                                passed          
+pause-playback                               passed          
+open-close-photo-intake                      passed          
+upload-synthetic-photographs                 passed          
+authorize-admission-in-app                   passed          
+grant-model-rights-in-app                    passed          
+confirm-proposed-place                       passed          
+review-photographs-in-app                    passed          
+wait-for-depth-and-grouping                  passed          
+make-world-from-photographs                  passed          
+photo-jobs-end-cleanly                       passed          
+ask-grounded-question                        passed          
+open-cited-photograph                        passed          
+unanswerable-question-abstains               passed          
+companion-proposes-appearance-change         passed          
+developer-client-walkthrough                 passed          
+returning-user-reopens                       passed          
+return-to-made-world                         passed          
+made-world-takes-new-photograph              passed          
+reconstruct-scene-geometry                   not_available   What this rehearsal runs, and what it cannot. It runs main's production derivative worker with its depth model (runtime.derivative_worker: MoGe-2 on this machin
+observe-a-person-and-footage                 not_available   A person's use of the experience and the demonstration footage are observed and recorded by a person; this rehearsal keeps a screenshot of each step as its own 
+
+GATE                                         STATUS              FIRST FAILURE (OWNER AREA)
+milestone:A world to run                     passed_in_part      
+                                             In part: the world is the starter furnished with one small square from the catalogs, not a small town built from them; its people are seen moving under the deterministic planner there.
+milestone:A model per group                  not_served          The product chooses no model per group of people: the society's opt-in model decision slot exists, and docs/product-direction.md states that a model chosen per group does not.
+milestone:Recorded decisions                 not_served          No model runs the rehearsal's people, so no decision a model served is recorded for a run to replay.
+milestone:Swap and compare                   not_served          The product runs no mixed-model pair and shows no side-by-side view: docs/product-direction.md states that neither exists.
+milestone:Honest difference                  not_served          No comparison between models exists to bound with a same-model control pair.
+milestone:Independent reading                not_served          No run or model decision exists for a client other than the browser to read.
+foundation:World entry                       passed_on_stand_in  
+                                             Passed on a review the rehearsal driver gave in place of a person; it is not a person's review.
+foundation:Durable creation                  passed              
+foundation:Inspection                        passed              
+foundation:Bounded interaction               passed              
+foundation:Companion interaction             passed_on_stand_in  
+                                             Passed on a review the rehearsal driver gave in place of a person; it is not a person's review.
+foundation:Developer proof                   passed              
+foundation:Personal-media path               not_available       
+delivery:Usable world                        passed_in_part      
+                                             In part: the people are watched moving in the starter furnished with one small square, not in the town the milestone builds.
+delivery:Models in their roles               not_served          No group's decisions come from a named model: the rehearsal's people run under the deterministic planner.
+delivery:Swap and compare                    not_served          The product runs no swapped pair and shows no side-by-side view to rehearse.
+delivery:Persistence and replay              passed_in_part      
+                                             In part: the saved world is reopened and verified to hold what was saved, but no run exists to replay from stored decisions.
+                                             Passed on a review the rehearsal driver gave in place of a person; it is not a person's review.
+delivery:Independent use                     not_served          No run or decision exists to read through the developer interface; the developer client's read and edit of a saved version serves the saved-world foundation's Developer proof.
+delivery:Release rehearsal                   not_available       

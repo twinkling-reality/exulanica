@@ -115,6 +115,7 @@ def test_a_model_run_asks_for_a_production_build_and_hands_over_the_step_lists_b
     ]
     assert command[-1] == "--model"
     assert "--production" in command
+    assert "--society-playback" in command
     assert str(LAUNCHER) in command
 
 
@@ -138,6 +139,8 @@ def test_a_run_without_a_model_asks_for_a_production_build_and_hands_over_no_bou
     assert not [name for name in environment if name.startswith("EXULANICA_")]
     assert "--model" not in command
     assert "--production" in command
+    # The host plays the run's own workspace, with or without a model: the living session's Play.
+    assert "--society-playback" in command
 
 
 def _launched_state(run_dir: Path, mode: str = "production") -> dict:
