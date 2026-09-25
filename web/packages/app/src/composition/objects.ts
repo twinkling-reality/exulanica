@@ -192,6 +192,10 @@ export interface MountedObjects {
   readonly confirm: GatedConfirmPanel;
   toggle(): void;
   close(): void;
+  /** Where the Create panel offers a small square: a saved world with an authored ground. */
+  smallSquareOffered(): boolean;
+  /** The Create panel's own small square, asked for from elsewhere with the role the person chose. */
+  arrangeSmallSquare(role: ObjectRole): void;
   /** Read the authority and draw what it holds. Awaited by tests; fire and forget in the app. */
   begin(versionId?: string): Promise<void>;
   dispose(): void;
@@ -1690,6 +1694,12 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     close() { setPanelVisible(false); },
     toggle() {
       setPanelVisible(!panel.visible());
+    },
+    smallSquareOffered: () => client !== null && deps.authoredRegion !== undefined,
+    arrangeSmallSquare(role) {
+      // Open the panel first: it holds "Take back the last change", which the confirmation names.
+      setPanelVisible(true);
+      proposeArrangement(role);
     },
     begin,
     dispose() {

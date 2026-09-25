@@ -66,6 +66,7 @@ import {
   type WorldArtProfile,
 } from '@exulanica/presentation';
 
+import { giveFlatNormalsWhereUnusable } from './object-normals.js';
 import { fetchAuthenticatedAsset, type AuthenticatedAssetFetchOptions } from './physical-residency.js';
 
 /** The only media type an authored object may name. A file extension is not a media type. */
@@ -764,6 +765,9 @@ export class SceneObjectRuntime {
         for (const render of entity.findComponents('render') as pc.RenderComponent[]) {
           for (const instance of render.meshInstances) instance.material = this.#materiallessFallback;
         }
+      }
+      if (giveFlatNormalsWhereUnusable(this.#app.graphicsDevice, entity).unrepairable > 0) {
+        notices.push('Part of this object has no surface direction to light it by, so it may draw dark.');
       }
       entity.name = `authored-object:${object.objectId}`;
       const authoredMm = translationOf(object.transform);

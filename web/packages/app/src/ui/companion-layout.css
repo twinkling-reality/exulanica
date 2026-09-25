@@ -40,6 +40,7 @@
 
 #shell .companion-encounter[data-first-use] .companion-prompt-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.65rem;
   align-items: center;
   padding: 0;
@@ -82,6 +83,12 @@
   border-radius: var(--radius-label);
   font-weight: 500;
   text-align: center;
+}
+
+/* Inside a button the cap sits within the button's own padding; its block padding would make
+   that button taller than a button without a cap beside it. */
+#shell .companion-encounter[data-first-use] .companion-prompt-button b {
+  padding-block: 0;
 }
 
 /* One right-edge instrument, with the Companion presence seated in its header seam. */

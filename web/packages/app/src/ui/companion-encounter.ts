@@ -255,6 +255,7 @@ export function buildCompanionEncounter(
     if (firstUsePrompt !== null) {
       root.hidden = false;
       root.toggleAttribute('data-compact-prompt', firstUsePrompt.compact === true);
+      const hadFocus = root.contains(document.activeElement);
       draw([
         el('p', { class: 'companion-prompt' }, [
           el('span', { class: 'companion-prompt-statement', text: firstUsePrompt.statement }),
@@ -262,6 +263,10 @@ export function buildCompanionEncounter(
             firstUsePrompt.actions.map(promptAction)),
         ]),
       ]);
+      // A control that asked the card a question is replaced by the question's own controls.
+      if (hadFocus && !root.contains(document.activeElement)) {
+        root.querySelector<HTMLButtonElement>('.companion-prompt-button')?.focus({ preventScroll: true });
+      }
       return;
     }
     root.removeAttribute('data-compact-prompt');

@@ -582,6 +582,7 @@ async function mount(): Promise<void> {
         (entry.currentAuthoredEditSeq > 0 || entry.sourceAttachments.length > 0 ||
           built.scene.islands.length > 0);
     },
+    smallSquareOffered: () => objects.smallSquareOffered(),
   });
   let inputMode: FirstUseMode = 'converse';
   let reflectFirstUse = (): void => undefined;
@@ -660,10 +661,14 @@ async function mount(): Promise<void> {
       shellState.primary === 'menu' || shellState.primary === 'options' ||
       shellState.primary === 'controls' || shellState.primary === 'character' ||
       shellState.primary === 'experiment' || shellState.primary === 'photos',
-    onFirstUseAction: ({ activate }) => {
+    onFirstUseAction: (action) => {
+      const { activate } = action;
       if (activate === 'summon-companion') runFirstUseAction();
       // What Escape does on the welcome (composition/input-modes.ts), from a real control.
       else if (activate === 'dismiss') finishFirstUse();
+      else if (activate === 'small-square') { firstUse.askSmallSquareRole(); reflectFirstUse(); }
+      // The Create panel's square, with the role the person picked on the card.
+      else if (activate === 'place-small-square') { finishFirstUse(); objects.arrangeSmallSquare(action.role); }
       else if (activate !== undefined) throw new Error(`no first-use action ${activate satisfies never}`);
     },
     ...(placeNames === undefined ? {} : { placeNames }),

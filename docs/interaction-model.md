@@ -1002,7 +1002,7 @@ carries over.
 
 | Real pipeline stage | Visual state in the Atlas | Honest label pattern |
 | --- | --- | --- |
-| Upload received | A dim unlit void volume appears at the region's future placement; sparse motes drift inward | "Received 148 photographs. Not yet processed." |
+| Upload received | A dim unlit void volume appears at the region's future placement; sparse motes drift inward | "Received 148 photographs. No processing stage has reported yet." |
 | Decode and metadata read | Motes begin aligning onto a faint horizontal disc, the future ground plane | "Reading images: 62 of 148." |
 | Pose estimation | Thin wireframe camera frusta appear along the estimated trajectory; the disc gains real extent | "Estimating camera positions: 91 of 148 registered." |
 | Dense reconstruction | Motes migrate onto surfaces; the region resolves silhouette to structure **in the order the reconstruction actually converges**, not uniformly | Shown only when a real fraction exists |

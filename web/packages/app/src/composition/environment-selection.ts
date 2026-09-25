@@ -42,6 +42,7 @@ import {
   type EnvironmentPlacementRequest,
   type EnvironmentProposal,
 } from '../environment-selection-api.js';
+import { say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 import { characterDisplayDetails } from '../ui/character-details.js';
 import { buildRepresentationInspector } from '../ui/representation-inspector.js';
@@ -280,7 +281,7 @@ export function mountEnvironmentSelection(
     : 'Editing is unavailable until an authored world is connected.' });
   workspace.authoring.append(authoringAvailability);
   if (deps.onObjects) {
-    const objectButton = el('button', { type: 'button', text: 'Add and arrange objects' });
+    const objectButton = el('button', { type: 'button', text: say('worldControls.addAndArrange') });
     objectButton.addEventListener('click', () => { workspace.close(false); deps.onObjects?.(); });
     workspace.authoring.children[1]?.before(el('p', { text: 'Use the available object catalog to place and arrange objects.' }), objectButton);
   }

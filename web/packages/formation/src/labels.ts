@@ -89,10 +89,14 @@ function usableLine(state: FormationState): string | null {
 function stageHeadline(state: FormationState): string {
   const c = state.counters;
   switch (state.phase) {
+    // What the queue knows at this stage is that the upload arrived and no stage has reported on it
+    // since. That is all it says: whether the photographs were handled elsewhere, or will be, is
+    // not something this stream can see, and a sentence claiming either contradicted the line
+    // saying they can be opened.
     case 'received':
       return state.photographs === null
-        ? 'Photographs received. Not yet counted.'
-        : `Received ${plural(state.photographs, 'photograph', 'photographs')}. Not yet processed.`;
+        ? 'Photographs received. No count reported yet.'
+        : `Received ${plural(state.photographs, 'photograph', 'photographs')}. No processing stage has reported yet.`;
 
     case 'media_extraction':
       if (!c) return 'Reading images. No count reported yet.';
@@ -206,6 +210,14 @@ export function formationLabel(state: FormationState): FormationLabel {
     elapsed,
     note: state.note,
   };
+}
+
+/**
+ * The label as one line, in reading order: stage, headline, detail, then the pipeline's note.
+ * Elapsed time is left out, as a one-line status has no second slot to hold it.
+ */
+export function formationLabelLine(label: FormationLabel): string {
+  return [label.stage, label.headline, ...label.detail, label.note].filter(Boolean).join(' ');
 }
 
 export { STAGE_NAME };

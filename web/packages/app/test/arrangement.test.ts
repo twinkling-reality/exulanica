@@ -201,7 +201,7 @@ const mounts: MountedObjects[] = [];
 afterEach(() => { for (const mounted of mounts.splice(0)) mounted.dispose(); });
 beforeEach(() => { document.body.replaceChildren(); });
 
-function harness(blockedReason: string | null = null) {
+function harness(blockedReason: string | null = null, authored = true) {
   const calls: { name: string; args: unknown[] }[] = [];
   const current = version();
   const client = {
@@ -264,9 +264,11 @@ function harness(blockedReason: string | null = null) {
     showTravelStatus: () => undefined,
     isWorldPrimary: () => true,
     hideWritePathConfirm: vi.fn(),
-    authoredRegion: {
-      regionId: 'region:starter', kind: 'flat', halfWidthMm: 12_000, halfDepthMm: 12_000, elevationMm: 0,
-    },
+    ...(authored ? {
+      authoredRegion: {
+        regionId: 'region:starter', kind: 'flat', halfWidthMm: 12_000, halfDepthMm: 12_000, elevationMm: 0,
+      },
+    } as const : {}),
     client,
     loadBytes: async () => new ArrayBuffer(784),
   });
@@ -338,6 +340,48 @@ describe('the Create panel offers the catalog’s kinds and a small square', () 
     await vi.waitFor(() => expect(h.mounted.confirm.root.textContent)
       .toContain('Something already stands where the square would go, or where people stand to use it.'));
     expect(h.mounted.confirm.root.textContent).toContain('take that object away first');
+    expect(button(h.mounted.confirm.root, 'Confirm').disabled).toBe(true);
+    expect(h.calls.filter((call) => call.name === 'apply')).toEqual([]);
+  });
+});
+
+describe('the welcome card asks for the Create panel’s own square', () => {
+  it('offers it only for a saved world with an authored ground', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    expect(h.mounted.smallSquareOffered()).toBe(true);
+    const unauthored = harness(null, false);
+    await unauthored.mounted.begin();
+    expect(unauthored.mounted.smallSquareOffered()).toBe(false);
+  });
+
+  it('opens the panel and previews then applies the same request, with the role the person picked', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    expect(h.mounted.panel.visible()).toBe(false);
+    h.mounted.arrangeSmallSquare('personal');
+    // The panel holds "Take back the last change", which the confirmation tells the person to use.
+    expect(h.mounted.panel.visible()).toBe(true);
+    const confirm = button(h.mounted.confirm.root, 'Confirm');
+    await vi.waitFor(() => expect(confirm.disabled).toBe(false));
+    expect(h.calls.find((call) => call.name === 'preview')!.args[1]).toEqual({
+      arrangement_key: SMALL_SQUARE.key,
+      arrangement_version: SMALL_SQUARE.version,
+      viewer: { x_mm: 0, z_mm: 0, yaw_microradians: HALF_TURN_MICRORADIANS },
+      origin_role: 'personal',
+    });
+    confirm.click();
+    await vi.waitFor(() => expect(h.calls.filter((call) => call.name === 'apply')).toHaveLength(1));
+    expect(h.calls.find((call) => call.name === 'apply')!.args[1])
+      .toEqual(h.calls.find((call) => call.name === 'preview')!.args[1]);
+  });
+
+  it('shows the server’s refusal when the square does not fit, and applies nothing', async () => {
+    const h = harness('arrangement_outside_ground');
+    await h.mounted.begin();
+    h.mounted.arrangeSmallSquare('fictional');
+    await vi.waitFor(() => expect(h.mounted.confirm.root.textContent)
+      .toContain('The server said why in its own words.'));
     expect(button(h.mounted.confirm.root, 'Confirm').disabled).toBe(true);
     expect(h.calls.filter((call) => call.name === 'apply')).toEqual([]);
   });

@@ -584,6 +584,12 @@ describe('a placed catalog object is inspected as what it is', () => {
   });
 });
 
+/** One vertex whose normal names a direction, so the normal repair leaves the mesh alone. */
+const LIT_MESH = {
+  getPositions: (out: number[]) => { out.push(0, 0, 0); return 1; },
+  getNormals: (out: number[]) => { out.push(0, 1, 0); return 1; },
+};
+
 describe('the runtime places, moves and animates what a surface already committed', () => {
   it('places an object under its region, converting fixed point to metres', async () => {
     const { runtime, drawn, root } = harness();
@@ -598,7 +604,7 @@ describe('the runtime places, moves and animates what a surface already committe
 
   it('gives only material-less geometry a matte fallback that follows world appearance', async () => {
     const materialless = harness();
-    const instance = { material: { name: 'engine-default' } };
+    const instance = { material: { name: 'engine-default' }, mesh: LIT_MESH };
     (materialless.drawn.findComponents as ReturnType<typeof vi.fn>)
       .mockReturnValue([{ meshInstances: [instance] }]);
     await materialless.runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
@@ -615,7 +621,7 @@ describe('the runtime places, moves and animates what a surface already committe
 
     const declared = harness();
     const ownMaterial = { name: 'asset-authored-material' };
-    const ownInstance = { material: ownMaterial };
+    const ownInstance = { material: ownMaterial, mesh: LIT_MESH };
     (declared.drawn.findComponents as ReturnType<typeof vi.fn>)
       .mockReturnValue([{ meshInstances: [ownInstance] }]);
     const bytes = glb({

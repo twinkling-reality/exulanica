@@ -1,3 +1,4 @@
+import { say } from './copy.js';
 import { el } from './dom.js';
 
 /** Presentation only: existing nodes retain their listeners and contract ownership. */
@@ -82,12 +83,12 @@ export function buildWorldWorkspace(parts: {
     camera,
     ...parts.tools,
   ]);
-  const authoring = addPanel('authoring', 'Create', [
+  const authoring = addPanel('authoring', say('worldControls.create'), [
     el('p', { text: 'Select a source building with E, then preview an edit before applying it.' }), parts.authoring,
   ]);
   const inspection = addPanel('inspection', 'Selected in the world', [parts.selected, parts.inspector]);
   const nav = el('nav', { class: 'world-local-nav', 'aria-label': 'Explore this place' });
-  for (const [name, label] of [['nearby', 'Nearby'], ['authoring', 'Create'], ['details', 'About']] as const) {
+  for (const [name, label] of [['nearby', 'Nearby'], ['authoring', say('worldControls.create')], ['details', 'About']] as const) {
     const button = el('button', { type: 'button', text: label, 'aria-expanded': 'false', 'aria-controls': `world-panel-${name}` });
     button.addEventListener('click', () => active === name ? close() : open(name));
     buttons.set(name, button);

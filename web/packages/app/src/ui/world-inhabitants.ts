@@ -20,6 +20,7 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { societyEngine } from '../society-engines.js';
+import { say } from './copy.js';
 import { el, replace } from './dom.js';
 import './world-inhabitants.css';
 
@@ -135,7 +136,7 @@ const PRESENCE_WORDS: Readonly<Record<string, string>> = {
   already_here: 'They are already here.',
   a_request_is_waiting: 'Someone was just asked to go somewhere. Advance one minute first, then ask again.',
   nowhere_to_arrive: 'They cannot come back yet: there is nowhere in this world they could reach. Put something '
-    + 'they can rest on or visit near where you arrive, then ask again.',
+    + `they can rest on or visit near where you arrive, then ask again. ${say('inhabitants.whereToPlace')}`,
   stale_society_state: 'This world changed while you were deciding. Look again, then ask again.',
   engine_keeps_its_people: 'The inhabitants of this world cannot be sent away.',
 };
@@ -146,7 +147,7 @@ export function refusalWords(refusal: NonNullable<InhabitantsView['refusal']>): 
   if (presence !== undefined) return presence;
   if (/reachable targets/.test(refusal.detail)) {
     return 'Nobody came in: there is nowhere in this world they could reach yet. Put something they can '
-      + 'rest on or visit near where you arrive, then ask again.';
+      + `rest on or visit near where you arrive, then ask again. ${say('inhabitants.whereToPlace')}`;
   }
   if (refusal.status === 424) return `Inhabitants cannot come in right now. ${refusal.detail}`;
   return `Inhabitants were not brought in. ${refusal.detail}`;
@@ -383,7 +384,8 @@ export function buildWorldInhabitants(handlers: {
   });
   const need = el('p', {
     class: 'world-help',
-    text: 'They need somewhere to go: something to rest on or visit. Nothing comes in until you ask.',
+    text: 'They need somewhere to go: something to rest on or visit. '
+      + `${say('inhabitants.whereToPlace')} Nothing comes in until you ask.`,
   });
   const refusal = el('p', { class: 'world-inhabitants-refusal', role: 'alert', hidden: true });
   const refusalCode = el('code');

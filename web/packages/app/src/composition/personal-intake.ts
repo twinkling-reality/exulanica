@@ -1,5 +1,5 @@
 /** Mounted source-first journey. Server state remains authoritative after every mutation. */
-import { formationLabel } from '@exulanica/formation';
+import { formationLabel, formationLabelLine } from '@exulanica/formation';
 import { ApiError, type GraphSnapshot, type TransportOptions } from '@exulanica/graph-client';
 import type { SourceMediaCatalog } from '@exulanica/atlas-react/playcanvas';
 import { PersonalAdmissionApi, DEPTH_ROLE, HUMAN_ATTESTATION,
@@ -610,8 +610,7 @@ export function mountPersonalIntake(deps: {
     stopWatch?.();
     stopWatch = watchBatch(deps.credentials, batch, state => {
       if (disposed) return;
-      const label = formationLabel(state);
-      ui.progress.textContent = [label.stage, label.headline, ...label.detail, label.note].filter(Boolean).join(' ');
+      ui.progress.textContent = formationLabelLine(formationLabel(state));
     });
   }
   function sourceOptions(): void {

@@ -318,6 +318,10 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldControls.world': 'World',
   'worldControls.openWorld': 'Open World menu',
   'worldControls.addObject': 'Add object',
+  'worldControls.create': 'Create',
+  'worldControls.addAndArrange': 'Add and arrange objects',
+  // Where a person places something inhabitants can rest on or visit, named by the controls above.
+  'inhabitants.whereToPlace': 'You place objects from Create, with “Add and arrange objects”.',
   'worldControls.addPhotos': 'Add photos',
   'photosDrawer.kicker': 'World sources',
   'photosDrawer.title': 'Add photos',
@@ -326,6 +330,8 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   // -- what somebody who has just arrived is told (`first-use-guidance.ts`) -----------------
   'firstUse.welcome': 'This is your world. Nothing is in it yet.',
   'firstUse.startBuilding': 'Start building',
+  'firstUse.smallSquare': 'Start with a small square',
+  'firstUse.smallSquareRole': 'Place a small square in front of you. What is it to you?',
   'firstUse.dismiss': 'Dismiss',
   'firstUse.orientation': 'Look around with the mouse.',
   'firstUse.walk': 'Walk',
