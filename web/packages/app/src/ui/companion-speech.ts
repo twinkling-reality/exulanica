@@ -3,6 +3,7 @@ import type {
   AnswerProvenance,
   AskUnavailable,
   CompanionAnswer,
+  ModelCall,
 } from '../companion-ask-api.js';
 import { contentRowFields } from '../companion-content.js';
 import type { CompanionNames, SpokenPiece } from '../companion-names.js';
@@ -104,6 +105,47 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
   if (provenance.servedModel === null) return say('provenance.none');
   const values = { model: provenance.servedModel, duration: spent };
   return fill(provenance.usedFallback ? 'provenance.modelOnFallback' : 'provenance.model', values);
+}
+
+/**
+ * What the attempts that returned no result add to the line above, or nothing when none did.
+ *
+ * Said because each may have been billed: a person reading "Answered by X in 12.0 s" should not
+ * have to guess that the twelve seconds included a model that timed out first. Whether their cost
+ * is known comes from the record, never from the failure's own words.
+ */
+export function unansweredSentence(calls: readonly ModelCall[]): string {
+  const unanswered = calls.filter((call) => call.outcome !== 'completed');
+  if (unanswered.length === 0) return '';
+  const count = fill('provenance.unanswered', { count: String(unanswered.length) });
+  return unanswered.some((call) => call.costBasis === 'unknown')
+    ? `${count} ${say('provenance.costUnknown')}`
+    : count;
+}
+
+/**
+ * The line a question that failed shows where an answer's provenance would be, whenever the server
+ * sent its record: the attempt that ended it and the model it was for, or, when every model it
+ * asked answered and something else stopped it (a budget ceiling, say), the models it asked; and
+ * how long the question waited in all.
+ */
+export function failedSentence(calls: readonly ModelCall[]): string {
+  if (calls.length === 0) return '';
+  const spent = duration(calls.reduce((total, call) => total + call.latencyMs, 0));
+  const ended = [...calls].reverse().find((call) => call.outcome !== 'completed');
+  const line = ended === undefined
+    ? fill('provenance.failed.afterAnswers', {
+      models: [...new Set(calls.map((call) => call.servedModel ?? call.requestedModel))].join(', '),
+      duration: spent,
+    })
+    : fill(
+      // Never "was asked" of a request that was never sent.
+      ended.costBasis === 'not_sent' ? 'provenance.failed.not_sent' : `provenance.failed.${ended.outcome}`,
+      { model: ended.requestedModel, duration: spent },
+    );
+  return calls.some((call) => call.costBasis === 'unknown')
+    ? `${line} ${say('provenance.costUnknown')}`
+    : line;
 }
 
 /**
@@ -253,7 +295,9 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
 
     content.push(el('p', {
       class: 'companion-provenance',
-      text: provenanceSentence(answer.provenance),
+      text: [provenanceSentence(answer.provenance), unansweredSentence(answer.calls)]
+        .filter((sentence) => sentence !== '')
+        .join(' '),
     }));
 
     root.dataset['mode'] = 'answer';
@@ -304,11 +348,14 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       // The server's sentence is shown as written, without the transport's `code: ` prefix
       // (`http_503: `), which names a status rather than saying anything to a person.
       const detail = failure.detail.replace(/^[a-z0-9_]+: /, '');
+      // What the question paid for before it failed, where an answer's provenance would be.
+      const paid = failedSentence(failure.execution?.calls ?? []);
       replace(root, [
         speaker(),
         el('p', { class: 'companion-question-echo', text: lastQuestion }),
         el('p', { class: 'companion-refusal', text: say(`ask.failed.${failure.kind}`) }),
         ...(detail === '' ? [] : [el('p', { class: 'companion-refusal-detail', text: detail })]),
+        ...(paid === '' ? [] : [el('p', { class: 'companion-provenance', text: paid })]),
       ]);
     },
     reportRefusal(reasonKey) {

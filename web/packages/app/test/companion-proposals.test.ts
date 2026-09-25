@@ -44,15 +44,15 @@ const PARAMETERS = validateLocalReference(PROFILE).parameters;
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-const binding = () => {
-  const recipe = worldStyleRecipe(PROFILE.profileId, PROFILE.profileVersion)!;
+const binding = (profile: { profileId: string; profileVersion: number } = PROFILE) => {
+  const recipe = worldStyleRecipe(profile.profileId, profile.profileVersion)!;
   return {
     schemaVersion: 1,
     frontendCommit: WORLD_STYLE_REGISTRY_DOCUMENT.frontend_contract.commit,
     availability: recipe.availability,
     origin: recipe.origin,
-    profileId: PROFILE.profileId,
-    profileVersion: PROFILE.profileVersion,
+    profileId: profile.profileId,
+    profileVersion: profile.profileVersion,
     modules: [...recipe.modules],
     capabilityMapping: Object.fromEntries(
       recipe.controls.map((control) => [control.key, control.capability]),
@@ -284,28 +284,63 @@ interface Harness {
   readonly mounted: ReturnType<typeof mountAppearance>;
   readonly outcomes: { originReference: string; kind: string; detail: string }[];
   readonly stop: () => void;
+  readonly client: WorldStyleClient;
+  readonly gets: string[];
+  readonly open: unknown[];
 }
 
-async function harness(over: { previewStatus?: number; previewBody?: unknown } = {}): Promise<Harness> {
+async function harness(over: {
+  previewStatus?: number;
+  previewBody?: unknown;
+  /** Which POSTs to the preview route the authority refuses, by their 1-based order. */
+  refuse?: (post: number) => boolean;
+  /** The world's open previews, as GET /world/styles/previews answers at connect. */
+  open?: unknown[];
+  /** The world the page opens, for a page that opens another world. */
+  worldId?: string;
+  /** A status the read-back answers with instead of the open previews. */
+  openStatus?: number;
+  /** How many open previews the server says it could not read. */
+  unreadable?: number;
+  /** A status every discard answers with instead of 204. */
+  deleteStatus?: number;
+  /** The open previews of another tab's harness, so two tabs look at one world. */
+  shared?: unknown[];
+  /** Every apply is answered as made against a version that is no longer current. */
+  applyStale?: boolean;
+} = {}): Promise<Harness> {
   const bodies: Record<string, unknown>[] = [];
   const applied: string[] = [];
   const deleted: string[] = [];
+  const gets: string[] = [];
+  /** The world's open previews, oldest first, as the authority holds them: shared by every tab. */
+  const open: unknown[] = over.shared ?? [...(over.open ?? [])].reverse();
   const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
     const url = new URL(String(input));
+    if ((init.method ?? 'GET') === 'GET') gets.push(`${url.pathname}${url.search}`);
     if (url.pathname.endsWith('/world/styles/catalog')) return json(catalog());
     if (url.pathname.endsWith('/world/styles/current')) {
       return json({ current_topology_digest: 'topology-a', current: version('v0', 0) });
     }
     if (url.pathname.endsWith('/world/styles/versions')) return json([version('v0', 0)]);
+    if (url.pathname.endsWith('/world/styles/previews') && (init.method ?? 'GET') === 'GET') {
+      if (over.openStatus !== undefined) return json({ code: 'invalid_preview_state', detail: 'no' }, over.openStatus);
+      return json({ previews: [...open].reverse(), unreadable: over.unreadable ?? 0 });
+    }
     if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
       const body = JSON.parse(String(init.body)) as Record<string, unknown>;
       bodies.push(body);
+      if (over.refuse?.(bodies.length) === true) {
+        return json({ code: 'invalid_style_data', detail: 'the authority refused this one' }, 422);
+      }
       if (over.previewStatus !== undefined) {
         return json(over.previewBody ?? { code: 'invalid_style_data', detail: 'no' }, over.previewStatus);
       }
+      const previewId = `preview-${bodies.length}`;
+      open.push(openFromBody(previewId, body));
       return json(
         {
-          preview_id: 'preview-1',
+          preview_id: previewId,
           proposal_id: String(body['proposalId']),
           candidate: version('candidate-1', 0, 0.8, {
             // Echoed from the body. A candidate that ignored what was posted made every
@@ -331,17 +366,30 @@ async function harness(over: { previewStatus?: number; previewBody?: unknown } =
     }
     if (url.pathname.endsWith('/apply')) {
       applied.push(url.pathname);
+      if (over.applyStale === true) {
+        return json({ code: 'stale_style_version', detail: 'the world changed' }, 409);
+      }
+      const id = decodeURIComponent(url.pathname.split('/').at(-2) ?? '');
+      const at = open.findIndex((row) => (row as { preview: { preview_id: string } }).preview.preview_id === id);
+      if (at >= 0) open.splice(at, 1);
       return json(version('v1', 1, 0.8));
     }
     if (url.pathname.includes('/world/styles/previews/') && init.method === 'DELETE') {
       deleted.push(url.pathname);
+      if (over.deleteStatus !== undefined) {
+        return json({ code: 'internal_error', detail: 'the discard failed' }, over.deleteStatus);
+      }
+      const id = decodeURIComponent(url.pathname.split('/').at(-1) ?? '');
+      const at = open.findIndex((row) => (row as { preview: { preview_id: string } }).preview.preview_id === id);
+      if (at >= 0) open.splice(at, 1);
       return new Response(null, { status: 204 });
     }
+
     throw new Error(`unhandled ${init.method ?? 'GET'} ${url.pathname}`);
   }) as unknown as typeof globalThis.fetch;
 
   const client = new WorldStyleClient({
-      worldId: TEST_WORLD,
+      worldId: over.worldId ?? TEST_WORLD,
     baseUrl: 'https://exulanica.test/api',
     token: 'secret',
     fetch,
@@ -391,7 +439,7 @@ async function harness(over: { previewStatus?: number; previewBody?: unknown } =
   // to nobody. It is also what a person would be looking at.
   document.body.replaceChildren(mounted.options.root);
   cleanups.push(stop, () => mounted.dispose());
-  return { bodies, applied, deleted, mounted, outcomes, stop };
+  return { bodies, applied, deleted, mounted, outcomes, stop, client, gets, open };
 }
 
 const COMPANION = {
@@ -623,6 +671,524 @@ describe('a Companion proposal through the appearance surface', () => {
     expect(outcomes.at(-1)?.detail).toContain('cannot be shown on this panel');
     const apply = mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!;
     expect(apply.disabled).toBe(true);
+  });
+});
+
+// -- a staged proposal waits for the person ----------------------------------------------------
+
+describe('a staged Companion proposal until the person decides', () => {
+  beforeEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
+    document.body.replaceChildren();
+  });
+
+  const lifecycle = (): string | undefined =>
+    document.querySelector<HTMLElement>('.world-style-lifecycle')?.dataset['state'];
+  const reviewShown = (mounted: Harness['mounted']): boolean =>
+    !mounted.options.root.querySelector<HTMLElement>('.world-style-proposal-review')!.hidden;
+
+  it('survives the shell hiding Customize, as closing the Companion does', async () => {
+    const { deleted, outcomes, mounted, applied } = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed']);
+
+    // What reflectShell does on every shell change: Customize is not the primary surface.
+    mounted.options.setVisible(false);
+    mounted.options.setVisible(false);
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed']);
+    expect(lifecycle()).toBe('ready');
+    expect(reviewShown(mounted)).toBe(true);
+
+    // Opened later, it is still there to accept.
+    mounted.options.setVisible(true);
+    const apply = mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!;
+    expect(apply.disabled).toBe(false);
+    apply.click();
+    await settle();
+    expect(applied).toHaveLength(1);
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed', 'accepted']);
+  });
+
+  it('survives the person closing Customize without deciding', async () => {
+    const { deleted, outcomes, mounted } = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    mounted.options.setVisible(true);
+    mounted.options.root.querySelector<HTMLButtonElement>('.overlay-close')!.click();
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed']);
+    expect(reviewShown(mounted)).toBe(true);
+  });
+
+  it('is thrown away when the person undoes it in Customize', async () => {
+    const { deleted, outcomes, mounted } = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    [...mounted.options.root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Undo preview')!
+      .click();
+    await settle();
+    // Reported once the authority has answered the discard, which is a request of its own.
+    await vi.waitFor(() => expect(outcomes).toHaveLength(2));
+
+    expect(deleted).toHaveLength(1);
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed', 'discarded']);
+    expect(lifecycle()).toBe('idle');
+  });
+
+  it('gives way to another proposal, which is the one the panel then holds', async () => {
+    const { outcomes, mounted, applied, bodies } = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    const second = {
+      ...COMPANION,
+      originReference: 'companion-utterance:77aa',
+      profile: { ...PROFILE, parameters: { ...PARAMETERS, vitality: 0.5 } },
+    };
+    worldStyleProposalInbox.submit(second);
+    await settle();
+    mounted.options.setVisible(false);
+    await settle();
+
+    expect(outcomes.map((o) => [o.originReference, o.kind])).toEqual([
+      ['companion-utterance:0f2c', 'previewed'],
+      ['companion-utterance:0f2c', 'discarded'],
+      ['companion-utterance:77aa', 'previewed'],
+    ]);
+    const draft = mounted.options.preferences().worldStyleParameters;
+    expect(draft['vitality']).toBe(0.5);
+    expect(draft['horizon-softness']).toBe(PARAMETERS['horizon-softness']);
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+    expect(applied).toHaveLength(1);
+    expect(bodies.every((body) => body['origin'] === 'companion')).toBe(true);
+    expect(outcomes.at(-1)).toMatchObject({
+      originReference: 'companion-utterance:77aa', kind: 'accepted',
+    });
+  });
+
+  it('still throws away the panel\'s own draft when the panel is hidden', async () => {
+    const { bodies, deleted, mounted } = await harness();
+    const vitality = mounted.options.root.querySelector<HTMLInputElement>(
+      '[aria-label="Color vitality"]',
+    )!;
+    vitality.value = '0.3';
+    vitality.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(bodies.some((body) => body['origin'] === 'settings')).toBe(true);
+    }, { timeout: 2000 });
+    await settle();
+    expect(mounted.options.preferences().worldStyleParameters['vitality']).toBe(0.3);
+
+    mounted.options.setVisible(false);
+    await settle();
+
+    expect(deleted).toHaveLength(1);
+    expect(mounted.options.preferences().worldStyleParameters['vitality'])
+      .toBe(DEFAULT_PREFERENCES.worldStyleParameters['vitality']);
+  });
+});
+
+// -- a refused second proposal, and a staged proposal across a reload -----------------------------
+
+const SECOND = {
+  ...COMPANION,
+  originReference: 'companion-utterance:77aa',
+  profile: { ...PROFILE, parameters: { ...PARAMETERS, vitality: 0.5 } },
+};
+
+/** One open preview as GET /world/styles/previews answers, with the proposal it was made from. */
+const openPreview = (over: {
+  id: string;
+  origin?: 'companion' | 'settings';
+  reference?: string;
+  base?: string;
+  softness?: number;
+  /** Another reviewed profile than the world's, which this panel cannot show. */
+  profile?: { readonly profileId: string; readonly profileVersion: number };
+}) => {
+  const origin = over.origin ?? 'companion';
+  const companion = origin === 'companion';
+  const provenance = {
+    origin,
+    actor: 'actor-1',
+    origin_reference: companion ? (over.reference ?? `companion-utterance:${over.id}`) : 'appearance-panel',
+  };
+  const profile = over.profile ?? PROFILE;
+  const parameters = over.profile === undefined
+    ? { ...PARAMETERS, 'horizon-softness': over.softness ?? 0.8 }
+    : validateLocalReference(over.profile).parameters;
+  const other = over.profile === undefined ? {} : {
+    global_style: { profile_id: profile.profileId, profile_version: profile.profileVersion, parameters },
+    recipe_binding: binding(profile),
+    capability_mapping: binding(profile).capabilityMapping,
+  };
+  return {
+    preview: {
+      preview_id: `preview-${over.id}`,
+      proposal_id: `proposal-${over.id}`,
+      candidate: version(`candidate-${over.id}`, 0, over.softness ?? 0.8, {
+        provenance,
+        model_id: companion ? COMPANION.modelId : null,
+        prompt_version: companion ? COMPANION.promptVersion : null,
+        reference_ids: companion ? COMPANION.referenceIds : [],
+        ...other,
+      }),
+      created_at: '2026-09-10T09:01:00Z',
+    },
+    proposal: {
+      proposal_id: `proposal-${over.id}`,
+      provenance,
+      scope: { kind: 'global', region_id: null },
+      base_style_version_id: over.base ?? 'v0',
+      base_topology_digest: 'topology-a',
+      profile: { profile_id: profile.profileId, profile_version: profile.profileVersion, parameters },
+      reference_ids: companion ? COMPANION.referenceIds : [],
+      model_id: companion ? COMPANION.modelId : null,
+      prompt_version: companion ? COMPANION.promptVersion : null,
+      refines_proposal_id: null,
+      recipe_binding: binding(profile),
+      capability_mapping: binding(profile).capabilityMapping,
+      status: 'previewed',
+      validation_issues: [],
+      created_at: '2026-09-10T09:01:00Z',
+      updated_at: '2026-09-10T09:01:00Z',
+    },
+  };
+};
+
+/** The open-preview row the authority holds for one preview the page posted. */
+function openFromBody(previewId: string, body: Record<string, unknown>) {
+  const origin = body['origin'] as 'companion' | 'settings';
+  const profile = body['profile'] as Record<string, unknown>;
+  const row = openPreview({
+    id: previewId.replace(/^preview-/, ''),
+    origin,
+    reference: String(body['originReference'] ?? ''),
+    base: String(body['baseStyleVersionId']),
+  });
+  const parameters = profile['parameters'];
+  row.preview.preview_id = previewId;
+  (row.preview.candidate.global_style as { parameters: unknown }).parameters = parameters;
+  (row.proposal.profile as { parameters: unknown }).parameters = parameters;
+  row.proposal.proposal_id = String(body['proposalId']);
+  row.preview.proposal_id = String(body['proposalId']);
+  return row;
+}
+
+describe('a second proposal the authority refuses', () => {
+  beforeEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
+    document.body.replaceChildren();
+  });
+
+  it('leaves the first staged, says the second was refused, and applies the first as its own', async () => {
+    const { deleted, outcomes, mounted, applied, bodies } = await harness({
+      refuse: (post) => post === 2,
+    });
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    worldStyleProposalInbox.submit(SECOND);
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(outcomes.map((o) => [o.originReference, o.kind])).toEqual([
+      ['companion-utterance:0f2c', 'previewed'],
+      ['companion-utterance:77aa', 'refused'],
+    ]);
+    expect(mounted.options.preferences().worldStyleParameters['horizon-softness']).toBe(0.8);
+
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+    expect(applied).toHaveLength(1);
+    expect(bodies.every((body) => body['origin'] === 'companion')).toBe(true);
+    expect(outcomes.at(-1)).toMatchObject({
+      originReference: 'companion-utterance:0f2c', kind: 'accepted',
+    });
+  });
+
+  it('never applies a proposal\'s values as a Settings change once its preview is gone', async () => {
+    const { mounted, applied, bodies, client } = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    // The authority no longer holds it, behind the panel's back.
+    await client.discardActive();
+
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+
+    expect(applied).toEqual([]);
+    expect(bodies.some((body) => body['origin'] === 'settings')).toBe(false);
+    expect(document.querySelector<HTMLElement>('.world-style-lifecycle')?.dataset['state'])
+      .toBe('failed');
+  });
+});
+
+describe('a staged proposal the page finds when it opens', () => {
+  beforeEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
+    document.body.replaceChildren();
+  });
+
+  const reviewShown = (mounted: Harness['mounted']): boolean =>
+    !mounted.options.root.querySelector<HTMLElement>('.world-style-proposal-review')!.hidden;
+  const lifecycle = (): string | undefined =>
+    document.querySelector<HTMLElement>('.world-style-lifecycle')?.dataset['state'];
+
+  it('is staged again after a reload, and applies as the proposal it was', async () => {
+    const { mounted, deleted, outcomes, applied } = await harness({
+      open: [openPreview({ id: 'a', reference: 'companion-utterance:0f2c' })],
+    });
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(outcomes).toEqual([]);
+    expect(reviewShown(mounted)).toBe(true);
+    expect(lifecycle()).toBe('ready');
+    expect(mounted.options.preferences().worldStyleParameters['horizon-softness']).toBe(0.8);
+
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+    expect(applied).toEqual(['/api/world/styles/previews/preview-a/apply']);
+    expect(outcomes.at(-1)).toMatchObject({
+      originReference: 'companion-utterance:0f2c', kind: 'accepted', earlier: true,
+    });
+  });
+
+  it('takes up the newest on the current version and closes nothing', async () => {
+    const { mounted, deleted, outcomes, open } = await harness({
+      open: [
+        openPreview({ id: 'new', softness: 0.8 }),
+        openPreview({ id: 'panel', origin: 'settings', softness: 0.3 }),
+        openPreview({ id: 'old', softness: 0.6 }),
+      ],
+    });
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(outcomes).toEqual([]);
+    expect(open).toHaveLength(3);
+    expect(reviewShown(mounted)).toBe(true);
+    expect(mounted.options.preferences().worldStyleParameters['horizon-softness']).toBe(0.8);
+  });
+
+  it('shows one made against an earlier version as stale, and never applies it', async () => {
+    // The world is at v0 and the proposal was drafted against an earlier version: v0 is a later
+    // change its whole old design would undo.
+    const { mounted, deleted, applied, bodies, outcomes } = await harness({
+      open: [openPreview({ id: 'stale', base: 'v-earlier' })],
+    });
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(reviewShown(mounted)).toBe(true);
+    expect(lifecycle()).toBe('stale');
+    // Not the promise of a fresh preview: one found on opening is never re-made.
+    expect(document.querySelector('.world-style-lifecycle')?.textContent)
+      .toContain('earlier version of your world');
+
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+    expect(applied).toEqual([]);
+    expect(bodies).toEqual([]);
+    expect(lifecycle()).toBe('failed');
+    expect(outcomes).toEqual([{
+      originReference: 'companion-utterance:stale',
+      kind: 'refused',
+      detail: expect.stringContaining('earlier version of your world'),
+      earlier: true,
+    }]);
+  });
+
+  it('never applies one the authority finds stale, and closes what the recovery re-made', async () => {
+    const { mounted, deleted, applied, outcomes } = await harness({
+      applyStale: true,
+      open: [openPreview({ id: 'looks-current' })],
+    });
+    await settle();
+
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+
+    expect(applied).toEqual(['/api/world/styles/previews/preview-looks-current/apply']);
+    // The recovery's own preview, made from the old design, is closed rather than offered.
+    expect(deleted).toHaveLength(1);
+    expect(outcomes.at(-1)).toMatchObject({
+      originReference: 'companion-utterance:looks-current', kind: 'refused', earlier: true,
+    });
+    expect(lifecycle()).toBe('failed');
+  });
+
+  it('leaves open one it cannot show, and says so in words the Companion keeps', async () => {
+    const { mounted, deleted, outcomes, open } = await harness({
+      open: [openPreview({ id: 'other', profile: { profileId: 'survey-relief', profileVersion: 1 } })],
+    });
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(open).toHaveLength(1);
+    expect(reviewShown(mounted)).toBe(false);
+    expect(outcomes).toEqual([{
+      originReference: 'companion-utterance:other',
+      kind: 'still_open',
+      detail: expect.stringContaining('left as it was'),
+      earlier: true,
+    }]);
+    // The world opened and works: a proposal made now stages as usual.
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    expect(reviewShown(mounted)).toBe(true);
+  });
+
+  it('takes up no settings preview another page left open, and leaves it open', async () => {
+    const { mounted, deleted, outcomes } = await harness({
+      open: [openPreview({ id: 'panel', origin: 'settings' })],
+    });
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(outcomes).toEqual([]);
+    expect(reviewShown(mounted)).toBe(false);
+  });
+
+  it('reads the open previews of the world the page opens, after a switch as on a reload', async () => {
+    const { gets, mounted } = await harness({
+      worldId: 'world:personal:second',
+      open: [openPreview({ id: 'b' })],
+    });
+    await settle();
+
+    expect(gets).toContain(
+      `/api/world/styles/previews?world_id=${encodeURIComponent('world:personal:second')}`,
+    );
+    expect(reviewShown(mounted)).toBe(true);
+  });
+
+  it('still opens the world when the read-back fails, and takes nothing up', async () => {
+    const { mounted, deleted } = await harness({ openStatus: 409 });
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(reviewShown(mounted)).toBe(false);
+    // The world opened: a proposal made now stages as usual.
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    expect(reviewShown(mounted)).toBe(true);
+  });
+
+  it('skips a row it cannot parse, and one the server could not read, and takes up the next', async () => {
+    const broken = { preview: { preview_id: 'preview-broken' }, proposal: { provenance: 'nonsense' } };
+    const { mounted, deleted } = await harness({
+      unreadable: 2,
+      open: [broken, openPreview({ id: 'good', softness: 0.8 })],
+    });
+    await settle();
+
+    expect(deleted).toEqual([]);
+    expect(reviewShown(mounted)).toBe(true);
+    expect(mounted.options.preferences().worldStyleParameters['horizon-softness']).toBe(0.8);
+  });
+
+  it('leaves a proposal another tab staged open for it, when a second tab opens the world', async () => {
+    const first = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    expect(first.open).toHaveLength(1);
+
+    // A second tab on the same world, with its own client and panel, reading the same authority.
+    const second = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api',
+      token: 'secret',
+      fetch: vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith('/world/styles/catalog')) return json(catalog());
+        if (url.pathname.endsWith('/world/styles/current')) {
+          return json({ current_topology_digest: 'topology-a', current: version('v0', 0) });
+        }
+        if (url.pathname.endsWith('/world/styles/versions')) return json([version('v0', 0)]);
+        if (url.pathname.endsWith('/world/styles/previews') && (init.method ?? 'GET') === 'GET') {
+          return json({ previews: [...first.open].reverse(), unreadable: 0 });
+        }
+        throw new Error(`the second tab sent ${init.method ?? 'GET'} ${url.pathname}`);
+      }) as unknown as typeof globalThis.fetch,
+    });
+    await second.connect();
+
+    expect(second.activePreview()?.request.originReference).toBe('companion-utterance:0f2c');
+    expect(first.deleted).toEqual([]);
+    expect(first.open).toHaveLength(1);
+    // The first tab can still apply what it staged.
+    first.mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+    expect(first.applied).toHaveLength(1);
+  });
+});
+
+describe('a replaced preview whose discard fails', () => {
+  beforeEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
+    document.body.replaceChildren();
+  });
+
+  it('keeps the new proposal staged and says the old one is still open', async () => {
+    const { mounted, outcomes, deleted } = await harness({ deleteStatus: 500 });
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    worldStyleProposalInbox.submit(SECOND);
+    await settle();
+
+    expect(deleted).toHaveLength(1);
+    expect(outcomes.map((o) => [o.originReference, o.kind])).toEqual([
+      ['companion-utterance:0f2c', 'previewed'],
+      ['companion-utterance:0f2c', 'still_open'],
+      ['companion-utterance:77aa', 'previewed'],
+    ]);
+    expect(outcomes[1]?.detail).toContain('still open');
+    expect(mounted.options.preferences().worldStyleParameters['vitality']).toBe(0.5);
+    expect(document.querySelector<HTMLElement>('.world-style-lifecycle')?.dataset['state'])
+      .toBe('ready');
+  });
+});
+
+describe('a person who moves a staged proposal\'s control', () => {
+  beforeEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
+    document.body.replaceChildren();
+  });
+
+  it('may apply their own values as a Settings change, even after moving it back', async () => {
+    const { mounted, bodies, applied } = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    const softness = mounted.options.root.querySelector<HTMLInputElement>(
+      '[aria-label="Horizon softness"]',
+    )!;
+    softness.value = '0.6';
+    softness.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(bodies.some((body) => body['origin'] === 'settings')).toBe(true);
+    }, { timeout: 2000 });
+    await settle();
+    softness.value = '0.8';
+    softness.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(bodies.filter((body) => body['origin'] === 'settings')).toHaveLength(2);
+    }, { timeout: 2000 });
+    await settle();
+
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+
+    expect(applied).toHaveLength(1);
+    expect(document.querySelector<HTMLElement>('.world-style-lifecycle')?.dataset['state'])
+      .toBe('saved');
   });
 });
 

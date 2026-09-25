@@ -200,6 +200,8 @@ export class WorldStyleClient {
   #previewQueue: Promise<void> = Promise.resolve();
   #displayedVersionId: string | null = null;
   #requiresReconciliation = false;
+  /** A preview a replacement could not close, which the caller says is still open. */
+  #leftOpen: ActiveWorldStylePreview | null = null;
 
   constructor(options: TransportOptions & {
     readonly ids?: IdFactory;
@@ -250,6 +252,7 @@ export class WorldStyleClient {
     }
     this.#displayedVersionId = selected.versionId;
     this.#requiresReconciliation = selected.versionId !== this.#state.current.versionId;
+    if (!this.#requiresReconciliation) await this.#readBackPreviews();
     return Object.freeze({
       state: Object.freeze({
         currentTopologyDigest: selected.topologyDigest,
@@ -257,6 +260,81 @@ export class WorldStyleClient {
       }),
       versions: this.#versions,
     });
+  }
+
+  /**
+   * Stop holding the active preview without closing it: it stays open on the authority, for the
+   * tab or the person that can decide it. What a page does with a preview it found open on
+   * opening and cannot show.
+   */
+  release(): void {
+    this.#active = null;
+  }
+
+  /**
+   * The preview a replacement could not close, once: the new one is active, and the old one is
+   * still open on the server for the caller to say so.
+   */
+  takeLeftOpen(): ActiveWorldStylePreview | null {
+    const left = this.#leftOpen;
+    this.#leftOpen = null;
+    return left;
+  }
+
+  /*
+   * A staged proposal is the server's, not the page's: it is held until a person applies or
+   * discards it, whatever happens to the page, and another tab or device may be looking at it
+   * now. So a page that opens reads the world's open previews back (GET /world/styles/previews,
+   * newest first) and takes up one from another origin, such as a Companion proposal: the newest
+   * made against the current version, else the newest, which the person then sees is stale. It
+   * closes nothing, since it cannot tell a preview an earlier page left from one a live tab holds:
+   * previews close only through an act, a new proposal, Apply or a discard.
+   *
+   * Best effort by design. A row the server could not read is left out there; one this client
+   * cannot parse is skipped here; and a read that fails in any way adopts nothing. Nothing in it
+   * can stop a world from opening.
+   */
+  async #readBackPreviews(): Promise<void> {
+    let listed: Record<string, unknown>;
+    try {
+      listed = record(
+        await this.#transport.getJson<unknown>(this.#path('/world/styles/previews')),
+        'open world style previews',
+      );
+    } catch {
+      return;
+    }
+    const state = this.#requireState();
+    const found: ActiveWorldStylePreview[] = [];
+    for (const item of Array.isArray(listed['previews']) ? listed['previews'] : []) {
+      try {
+        const entry = record(item, 'open world style preview');
+        const preview = parsePreview(entry['preview']);
+        const proposal = parseProposal(entry['proposal']);
+        if (proposal.provenance.origin === 'settings' || proposal.scope.kind !== 'global') continue;
+        found.push(Object.freeze({
+          preview,
+          request: Object.freeze({
+            origin: proposal.provenance.origin,
+            originReference: proposal.provenance.originReference,
+            scope: proposal.scope,
+            profile: proposal.profile,
+            referenceIds: proposal.referenceIds,
+            modelId: proposal.modelId,
+            promptVersion: proposal.promptVersion,
+            refinesProposalId: proposal.refinesProposalId,
+          }),
+          baseStyleVersionId: proposal.baseStyleVersionId,
+          baseTopologyDigest: proposal.baseTopologyDigest,
+          recoveredFromStale: false,
+        }));
+      } catch {
+        // A preview this client cannot read is left where it is, for the page that made it.
+      }
+    }
+    const current = found.find((active) => active.baseStyleVersionId === state.current.versionId
+      && active.baseTopologyDigest === state.currentTopologyDigest);
+    this.#active = current ?? found[0] ?? null;
   }
 
   async refresh(): Promise<WorldStyleState> {
@@ -333,9 +411,13 @@ export class WorldStyleClient {
     const active = this.#active;
     this.#active = null;
     if (active === null) return;
+    await this.#discardPreview(active);
+  }
+
+  async #discardPreview(preview: ActiveWorldStylePreview): Promise<void> {
     try {
       await this.#transport.delete(
-        this.#path(`/world/styles/previews/${encodeURIComponent(active.preview.previewId)}`),
+        this.#path(`/world/styles/previews/${encodeURIComponent(preview.preview.previewId)}`),
       );
     } catch (error) {
       if (!(error instanceof ApiError) || error.code !== 'invalid_preview_state') throw error;
@@ -429,22 +511,35 @@ export class WorldStyleClient {
         'Restore this saved appearance before changing it, because another appearance is active.',
       );
     }
-    await this.#discardActiveNow();
+    /*
+     * The new preview is made BEFORE the one it replaces is discarded. The other order destroyed a
+     * staged proposal whenever the authority refused its replacement: the page kept the old
+     * proposal's values as a draft with nothing behind them, nobody was told, and Apply would have
+     * saved them under another origin. A refused request now leaves the previous preview active.
+     */
+    const previous = this.#active;
+    let active: ActiveWorldStylePreview;
     try {
-      const active = await this.#createPreview(request, false);
-      this.#active = active;
-      return active;
+      active = await this.#createPreview(request, false);
     } catch (error) {
       if (!(error instanceof ApiError) || error.code !== 'stale_style_version') throw error;
       const rejectedProposalId = this.#lastProposalId;
       await this.refresh();
-      const recovered = await this.#createPreview({
+      active = await this.#createPreview({
         ...request,
         refinesProposalId: rejectedProposalId,
       }, true);
-      this.#active = recovered;
-      return recovered;
     }
+    this.#active = active;
+    if (previous !== null) {
+      try {
+        await this.#discardPreview(previous);
+      } catch {
+        // Not a failure of the new preview, which is made and active: the old one is still open.
+        this.#leftOpen = previous;
+      }
+    }
+    return active;
   }
 
   #lastProposalId: string | null = null;

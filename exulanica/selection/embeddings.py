@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from time import perf_counter
+from typing import Final
 
 import psycopg
 from psycopg import sql
@@ -31,6 +32,31 @@ __all__ = ["QueryEmbedding", "embed_capture", "embed_query", "has_embeddings", "
 
 # A provisional relevance floor, not a probability or a measured quality guarantee.
 MIN_COSINE = 0.65
+
+#: The one tombstone scope whose stop can be followed by the same entry made again: migration
+#: 0104's insert guard keeps 0044's refusal of an id recorded as a target for every other scope and
+#: admits it for this one while a current search right covers it, because a vector id is a digest
+#: of the capture, text and model and a right granted again makes the same id.
+#: ``tests/test_search_entry_granted_again.py`` holds this value to the guard's own definition.
+READMITTED_SCOPE: Final = "caption_search"
+
+# A search entry is left out while any tombstone names it as a vector target (0044, 0104), of
+# whatever scope. The one exception is a target of READMITTED_SCOPE whose purge job is done: the
+# purge worker deletes the entry and marks its job done in one transaction, so an entry that exists
+# beside that done job is a later row the guard admitted under a right granted again. A target of
+# any other scope stays excluding after its purge, as the guard never admits its id again. The
+# target rows stay as the stop's record.
+_NOT_A_PENDING_TARGET = f"""not exists (
+    select 1 from tombstone_embedding_target d
+      join tombstone t on t.workspace_id = d.workspace_id and t.tombstone_id = d.tombstone_id
+     where d.workspace_id = e.workspace_id and d.embedding_id = e.embedding_id
+       and not (t.scope::text = '{READMITTED_SCOPE}'
+                and exists (select 1 from purge_job p
+                             where p.workspace_id = d.workspace_id
+                               and p.tombstone_id = d.tombstone_id
+                               and p.target_kind = 'embedding'
+                               and p.target_ref = d.embedding_id::text
+                               and p.state = 'done')))"""
 
 
 def embed_query(
@@ -62,7 +88,8 @@ def text_match_query(
     Semantic-only candidates must clear the cosine floor; unrelated queries may still abstain.
     The executor intersects these candidates with every other validated dimension before fusion.
     A search entry a deletion or a stopped search right has targeted is not ranked from the moment
-    it is targeted, whether or not its purge has run (``tombstone_embedding_target``, 0044, 0104).
+    it is targeted until its purge destroys it; an entry made again under a right granted after
+    that purge is ranked (``_NOT_A_PENDING_TARGET``).
     """
     statement = sql.SQL(
         "with source as ("
@@ -82,9 +109,9 @@ def text_match_query(
              where e.workspace_id=%s and e.ref_type='span' and e.ref_id=source.span_id
                and e.family=%s || encode(digest(source.body, 'sha256'), 'hex')
                and e.model_ref=%s and e.pipeline_version=%s
-               and not exists (select 1 from tombstone_embedding_target d
-                               where d.workspace_id=e.workspace_id
-                                 and d.embedding_id=e.embedding_id)) as cosine
+               and """
+        + _NOT_A_PENDING_TARGET
+        + """) as cosine
           from source cross join q where cardinality(q.words) > 0
         )
         select capture_id, lexical, case when cosine >= %s then cosine end as cosine
@@ -116,8 +143,7 @@ def has_embeddings(
             "where e.workspace_id=%s and e.ref_type='span' "
             "and e.family=%s || encode(digest(source.body, 'sha256'), 'hex') "
             "and e.model_ref=%s and e.pipeline_version=%s "
-            "and not exists (select 1 from tombstone_embedding_target d "
-            "where d.workspace_id=e.workspace_id and d.embedding_id=e.embedding_id) limit 1",
+            "and " + _NOT_A_PENDING_TARGET + " limit 1",
             (
                 workspace_id,
                 list(SEARCHABLE_PREDICATES),

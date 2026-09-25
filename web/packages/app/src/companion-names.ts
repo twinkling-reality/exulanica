@@ -21,7 +21,8 @@
  * not named" stay two different statements.
  *
  * An answer kept in the Companion's memory keeps its `names` too (`companion_answer_name`, migration
- * 0103), so a remembered answer is drawn through this resolver exactly as a fresh one is. What it
+ * 0103), so a remembered answer is drawn through this resolver exactly as a fresh one is, and an
+ * appearance proposal's words carry the `names` the appearance route returns with them. What it
  * does not do: a name is the entity's name in the library the page holds when the answer is drawn,
  * so an answer drawn again, after a reload or once the page has read a rename, shows the new name,
  * even where the placeholder stood for the words on a sign.

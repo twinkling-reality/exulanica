@@ -473,6 +473,7 @@ _WORLD_READS: Final = _every(
     "GET /world/source-media/{source_id}",
     "GET /world/styles/catalog",
     "GET /world/styles/current",
+    "GET /world/styles/previews",
     "GET /world/styles/proposals/{proposal_id}",
     "GET /world/styles/versions",
     "GET /world/versions",

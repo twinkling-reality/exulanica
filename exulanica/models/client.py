@@ -58,6 +58,7 @@ import copy
 import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from decimal import Decimal
 from types import MappingProxyType
 from typing import Any, Final, TypeVar
 
@@ -90,7 +91,7 @@ from exulanica.models.schema import (
     response_format_for,
 )
 from exulanica.models.transport import HttpxTransport, Transport
-from exulanica.models.usage import CostLedger
+from exulanica.models.usage import CallUsage, CostLedger
 
 __all__ = [
     "ChatResult",
@@ -155,6 +156,9 @@ class ModelClient:
         self._manifest = manifest or load_manifest()
         self._cache: ResponseCache = cache if cache is not None else NullResponseCache()
         self._budget = budget if budget is not None else BudgetGuard()
+        #: What every attempt is reserved and recorded through: the guard itself, or the guard
+        #: with one request's observers after it (``with_attempts``).
+        self._recorder: BudgetGuard = self._budget
         network = transport if transport is not None else HttpxTransport()
         # Checked before the credential is read, so a misconfigured deployment is told about its
         # allowlist rather than about a key it may not need yet. A transport that carries no
@@ -218,6 +222,25 @@ class ModelClient:
             raise TypeError("a hosted-request policy has an admit method")
         bound = copy.copy(self)
         bound._policies = (*self._policies, policy)
+        return bound
+
+    def with_attempts(self, observe: Callable[[CallUsage], object]) -> ModelClient:
+        """This client, handing ``observe`` every attempt it makes as its budget guard records it.
+
+        For one request's own record of what it paid for: each completed reply, each attempt that
+        timed out or failed, and each reply that came back and was then refused as truncated or
+        off-schema, which the ledger records before the refusal is raised. The copy shares the
+        manifest, the cache, the policies and the budget guard itself, whatever kind of guard it
+        is, so it sends exactly what this client would, reserved and counted exactly as it would
+        be, and a client with no policy still refuses to send. A request refused before it left,
+        by a policy or by the budget, is never an attempt, so ``observe`` is not called for it.
+        Only requests sent through the returned copy reach ``observe``, so two requests in flight
+        at once, each through its own copy, are never mixed up, whatever else the process sends.
+        """
+        recorder = _ObservedBudget(self._recorder, observe)
+        bound = copy.copy(self)
+        bound._recorder = recorder
+        bound._chain = self._chain.with_budget(recorder)
         return bound
 
     def _admit(
@@ -413,7 +436,7 @@ class ModelClient:
                 served = self._manifest.spec(cached["model_id"])
                 return result_from_body(
                     role=role,
-                    budget=self._budget,
+                    budget=self._recorder,
                     endpoint=self._manifest.base_url,
                     spec=served,
                     body=cached["response"],
@@ -442,7 +465,7 @@ class ModelClient:
         )
         result = result_from_body(
             role=role,
-            budget=self._budget,
+            budget=self._recorder,
             endpoint=self._manifest.base_url,
             spec=served.spec,
             body=served.body,
@@ -636,7 +659,7 @@ class ModelClient:
                 role,
                 spec,
                 cached["response"],
-                budget=self._budget,
+                budget=self._recorder,
                 cache_hit=True,
                 used_fallback=bool(cached.get("used_fallback", False)),
                 attempts=0,
@@ -667,7 +690,7 @@ class ModelClient:
             role,
             served.spec,
             served.body,
-            budget=self._budget,
+            budget=self._recorder,
             cache_hit=False,
             used_fallback=served.used_fallback,
             latency_s=served.latency_s,
@@ -675,3 +698,36 @@ class ModelClient:
             tried=served.tried,
             usd_bound=served.reserved_usd,
         )
+
+
+class _ObservedBudget(BudgetGuard):
+    """A budget guard, and one request's observer told of each attempt after the guard records it.
+
+    Not a second guard: every reservation and record goes to ``guard`` itself, whatever its kind
+    (a lens guard keeps its own counters outside the ledger), and the observer only hears what the
+    guard recorded. The chain and the response path ask a guard for ``reserve`` and ``record``;
+    anything else asked of this wrapper is answered by the guard it wraps.
+    """
+
+    def __init__(self, guard: BudgetGuard, observe: Callable[[CallUsage], object]) -> None:
+        # Deliberately not BudgetGuard.__init__: this holds no ceiling and no ledger of its own.
+        self._guard = guard
+        self._observe = observe
+
+    def __getattr__(self, name: str) -> Any:
+        # Asked only for what this instance does not hold. Before `_guard` is set (a copy, a
+        # deepcopy or an unpickle builds the instance first), there is nothing to ask, and asking
+        # `self._guard` here would ask this method again, without end.
+        try:
+            guard = object.__getattribute__(self, "_guard")
+        except AttributeError:
+            raise AttributeError(name) from None
+        return getattr(guard, name)
+
+    def reserve(self, *args: Any, **kwargs: Any) -> Decimal:
+        return self._guard.reserve(*args, **kwargs)
+
+    def record(self, usage: CallUsage) -> CallUsage:
+        recorded = self._guard.record(usage)
+        self._observe(usage)
+        return recorded

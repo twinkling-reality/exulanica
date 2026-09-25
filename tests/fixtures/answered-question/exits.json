@@ -237,6 +237,8 @@
       {
         "attempts": 1,
         "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "completed",
         "prompt_tokens": 100,
         "reasoning_tokens": 150,
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
@@ -348,6 +350,8 @@
       {
         "attempts": 1,
         "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "completed",
         "prompt_tokens": 100,
         "reasoning_tokens": 150,
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
@@ -360,6 +364,8 @@
       {
         "attempts": 1,
         "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "completed",
         "prompt_tokens": 100,
         "reasoning_tokens": 150,
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
@@ -487,6 +493,8 @@
       {
         "attempts": 1,
         "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "completed",
         "prompt_tokens": 100,
         "reasoning_tokens": 150,
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
@@ -499,6 +507,8 @@
       {
         "attempts": 1,
         "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "completed",
         "prompt_tokens": 100,
         "reasoning_tokens": 150,
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
@@ -612,6 +622,8 @@
       {
         "attempts": 1,
         "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "completed",
         "prompt_tokens": 100,
         "reasoning_tokens": 150,
         "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
@@ -750,7 +762,36 @@
         "value_refs": []
       }
     ],
-    "calls": [],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "reply_refused",
+        "prompt_tokens": 100,
+        "reasoning_tokens": null,
+        "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "role": "structured_extraction",
+        "served_model": null,
+        "served_model_unavailable": "result_not_returned",
+        "usd": "0.00014000",
+        "used_fallback": false
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "reply_refused",
+        "prompt_tokens": 100,
+        "reasoning_tokens": null,
+        "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "role": "structured_extraction",
+        "served_model": null,
+        "served_model_unavailable": "result_not_returned",
+        "usd": "0.00014000",
+        "used_fallback": false
+      }
+    ],
     "content_packet": null,
     "deterministic": false,
     "names": [],
@@ -776,6 +817,8 @@
       {
         "attempts": 1,
         "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "completed",
         "prompt_tokens": 100,
         "reasoning_tokens": 150,
         "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
@@ -826,6 +869,8 @@
       {
         "attempts": 1,
         "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "completed",
         "prompt_tokens": 100,
         "reasoning_tokens": 150,
         "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",

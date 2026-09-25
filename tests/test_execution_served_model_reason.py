@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from exulanica.api.routes.selection import _execution
 from exulanica.models.results import NO_MODEL_IN_RESPONSE
-from exulanica.selection.calls import ModelCall
+from exulanica.selection.calls import AttemptOutcome, CallCost, ModelCall
 
 
 def _call(*, served_model: str | None, served_model_unavailable: str | None) -> ModelCall:
@@ -26,6 +26,8 @@ def _call(*, served_model: str | None, served_model_unavailable: str | None) -> 
         reasoning_tokens=None,
         usd="0.00000002",
         served_model_unavailable=served_model_unavailable,
+        outcome=AttemptOutcome.COMPLETED,
+        cost_basis=CallCost.KNOWN,
     )
 
 

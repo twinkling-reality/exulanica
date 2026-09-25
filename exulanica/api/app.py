@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from typing import Final
 
@@ -101,6 +101,7 @@ from exulanica.api.routes import (
     world_write,
     worlds,
 )
+from exulanica.api.routes.selection import failure_extensions
 from exulanica.api.services import Services, build_services
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
@@ -125,7 +126,15 @@ from exulanica.identity.subjects import (
     UnknownSubject,
 )
 from exulanica.models.egress import EgressRefused
-from exulanica.models.errors import BudgetExceededError, ModelError, TruncatedResponseError
+from exulanica.models.errors import (
+    BudgetExceededError,
+    ModelError,
+    ModelUnavailableError,
+    NoFallbackError,
+    StructuredOutputError,
+    TransportError,
+    TruncatedResponseError,
+)
 from exulanica.models.policy import HostedRequestRefused, NoHostedRequestPolicy
 from exulanica.selection.validation import RejectionCode, SelectionRejected
 from exulanica.world import (
@@ -156,9 +165,39 @@ _REJECTION_STATUS: Final[dict[RejectionCode, int]] = {
 }
 
 
-def _problem(status: int, code: str, detail: str) -> JSONResponse:
-    """One response shape for every failure, so a client has one thing to parse."""
-    return JSONResponse(status_code=status, content={"code": code, "detail": detail})
+def _model_failure_detail(exc: ModelError) -> str:
+    """What a model failure says in a problem body: this instance's words, never another's.
+
+    A transport error carries the provider's answer, a withdrawn model the provider's wording,
+    and a refused form an excerpt of the model's own reply; each is said here in product words,
+    and what the request paid for is in the problem's ``execution`` member. Every other model
+    error's text is this instance's own sentence about its own limit or configuration (a budget
+    ceiling, a truncation on this side's token limit, an egress declaration), and is kept.
+    """
+    if isinstance(exc, TransportError):
+        if exc.timed_out:
+            return "a model request timed out before its reply arrived"
+        if exc.reached_provider is False:
+            return "a model request could not reach the model endpoint"
+        return "the model endpoint could not answer a request"
+    if isinstance(exc, (NoFallbackError, ModelUnavailableError)):
+        return "no model the request's role can reach is available"
+    if isinstance(exc, StructuredOutputError):
+        return "a model's reply could not be read as the form it was asked to fill"
+    return str(exc)
+
+
+def _problem(
+    status: int, code: str, detail: str, extensions: Mapping[str, object] | None = None
+) -> JSONResponse:
+    """One response shape for every failure, so a client has one thing to parse.
+
+    ``extensions`` are further members of a problem that has more to say (RFC 9457), such as the
+    execution record of a Companion request a model error ended. They never replace
+    ``code`` or ``detail``.
+    """
+    content: dict[str, object] = {**(extensions or {}), "code": code, "detail": detail}
+    return JSONResponse(status_code=status, content=content)
 
 
 @asynccontextmanager
@@ -326,7 +365,11 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
 
     @app.exception_handler(SelectionRejected)
     async def _rejected(_request: Request, exc: SelectionRejected) -> JSONResponse:
-        return _problem(_REJECTION_STATUS[exc.code], str(exc.code), exc.detail)
+        # A Companion request can end here after it paid for its planner and composer, so the
+        # record it noted travels with the problem, as with every refusal below that can.
+        return _problem(
+            _REJECTION_STATUS[exc.code], str(exc.code), exc.detail, failure_extensions(exc)
+        )
 
     @app.exception_handler(UnknownSubject)
     async def _unknown(_request: Request, exc: UnknownSubject) -> JSONResponse:
@@ -354,15 +397,15 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     async def _epistemic(_request: Request, exc: EpistemicViolation) -> JSONResponse:
         # 422 rather than 400: the request was well formed and the claim it carried was not
         # permitted under the provenance class it asked for.
-        return _problem(422, "epistemic_violation", str(exc))
+        return _problem(422, "epistemic_violation", str(exc), failure_extensions(exc))
 
     @app.exception_handler(TombstonedError)
     async def _tombstoned(_request: Request, exc: TombstonedError) -> JSONResponse:
-        return _problem(410, "tombstoned", str(exc))
+        return _problem(410, "tombstoned", str(exc), failure_extensions(exc))
 
     @app.exception_handler(BlobNotFoundError)
-    async def _missing(_request: Request, _exc: BlobNotFoundError) -> JSONResponse:
-        return _problem(404, "unknown_reference", "no such evidence")
+    async def _missing(_request: Request, exc: BlobNotFoundError) -> JSONResponse:
+        return _problem(404, "unknown_reference", "no such evidence", failure_extensions(exc))
 
     @app.exception_handler(IntegrityError)
     async def _integrity(_request: Request, exc: IntegrityError) -> JSONResponse:
@@ -392,13 +435,17 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # so in its own module docstring, that it "names a configuration mistake, not a model
         # failure, and says so, because the opposite reading has already cost this project one
         # wrong conclusion". Filing it as `model_refused` would be that reading.
+        #
+        # A Companion request the error ended carries what it had already paid for, the same
+        # execution block a completed request returns, as a member of the problem.
+        extensions = failure_extensions(exc)
         if isinstance(exc, BudgetExceededError):
-            return _problem(429, "budget_exceeded", str(exc))
+            return _problem(429, "budget_exceeded", str(exc), extensions)
         if isinstance(exc, EgressRefused):
-            return _problem(502, "egress_refused", str(exc))
+            return _problem(502, "egress_refused", str(exc), extensions)
         if isinstance(exc, TruncatedResponseError):
-            return _problem(500, "model_output_truncated", str(exc))
-        return _problem(502, "model_refused", str(exc))
+            return _problem(500, "model_output_truncated", str(exc), extensions)
+        return _problem(502, "model_refused", _model_failure_detail(exc), extensions)
 
     @app.exception_handler(HostedRequestRefused)
     async def _hosted_refused(_request: Request, exc: HostedRequestRefused) -> JSONResponse:
@@ -407,7 +454,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # the status this API gives a privacy refusal elsewhere: the request was well formed and
         # authorised, and what refused it is the account holder's current decision, so the same
         # request is answered once that decision allows it. The detail names which rule refused.
-        return _problem(409, "hosted_request_refused", str(exc))
+        return _problem(409, "hosted_request_refused", str(exc), failure_extensions(exc))
 
     @app.exception_handler(NoHostedRequestPolicy)
     async def _no_hosted_policy(_request: Request, exc: NoHostedRequestPolicy) -> JSONResponse:
@@ -416,11 +463,11 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # the caller's request and not upstream: 500, as a configuration mistake on this side is
         # (``model_output_truncated``), and named, so it cannot be taken for a crash or a model's
         # refusal.
-        return _problem(500, "no_hosted_request_policy", str(exc))
+        return _problem(500, "no_hosted_request_policy", str(exc), failure_extensions(exc))
 
     @app.exception_handler(InvalidStyleData)
     async def _invalid_style(_request: Request, exc: InvalidStyleData) -> JSONResponse:
-        return _problem(422, "invalid_style_data", str(exc))
+        return _problem(422, "invalid_style_data", str(exc), failure_extensions(exc))
 
     @app.exception_handler(InvalidInteractionData)
     async def _invalid_interaction(_request: Request, exc: InvalidInteractionData) -> JSONResponse:
@@ -451,8 +498,8 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         return _problem(424, "unavailable_asset", str(exc))
 
     @app.exception_handler(UnknownWorldResource)
-    async def _unknown_world(_request: Request, _exc: UnknownWorldResource) -> JSONResponse:
-        return _problem(404, "unknown_reference", "no such world resource")
+    async def _unknown_world(_request: Request, exc: UnknownWorldResource) -> JSONResponse:
+        return _problem(404, "unknown_reference", "no such world resource", failure_extensions(exc))
 
     @app.exception_handler(UnknownSociety)
     async def _unknown_society(_request: Request, _exc: UnknownSociety) -> JSONResponse:
@@ -468,7 +515,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
 
     @app.exception_handler(WorldNotConfigured)
     async def _world_not_configured(_request: Request, exc: WorldNotConfigured) -> JSONResponse:
-        return _problem(409, "world_not_configured", str(exc))
+        return _problem(409, "world_not_configured", str(exc), failure_extensions(exc))
 
     # -- the generator's refusals ----------------------------------------------------------
     #

@@ -97,6 +97,18 @@ counts against the ceiling at that bound and a failed attempt counts toward the 
 error that reaches the caller states the cost the same way. What the provider actually bills for
 an abandoned request is not observable from this side.
 
+A request that needs its own record of what it paid for sends through a copy of the client made
+for it alone (`ModelClient.with_attempts` in [the client](../exulanica/models/client.py)). The
+copy keeps every policy the client has, so a client with no policy still refuses to send, and it
+reserves and records through the client's own budget guard, whatever kind it is, a lens budget
+included, so the budget and the report see one set of numbers; it also hands each row the guard
+records to the request. A reply is recorded before the client decides whether to believe it, so a
+reply later refused as truncated or outside the schema, or one with no choices, is a completed row
+that returned no result. A request a policy or the budget guard refuses sends nothing and records no
+row. The Companion's execution record is built this way, one copy per question or proposal, and
+never read back from the process ledger
+([Companion question: execution provenance](companion-question.md#execution-provenance)).
+
 ### Decision and evidence
 
 **DECISION:** retain the implemented stack as the comparison baseline. Add the evaluations in the

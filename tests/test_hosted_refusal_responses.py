@@ -111,7 +111,9 @@ def test_a_request_the_account_holders_rules_refuse_as_it_leaves_is_a_named_conf
 
     assert response.status_code == 409, response.text
     body = response.json()
-    assert set(body) == {"code", "detail"}
+    # The execution record says the question paid for nothing: the refused request never left.
+    assert set(body) == {"code", "detail", "execution"}
+    assert body["execution"]["calls"] == []
     assert body["code"] == "hosted_request_refused"
     assert "reasoning_cheap" in body["detail"] and "has ended" in body["detail"]
     assert site.transport.requests == [], "a refused request reached the transport"

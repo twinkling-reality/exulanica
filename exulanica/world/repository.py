@@ -11,7 +11,7 @@ import datetime as dt
 import re
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any, Final
 
 import psycopg
@@ -62,6 +62,28 @@ from exulanica.world.style_structure import (
 __all__ = ["WorldStyleRepository"]
 
 _SLOT_KEY: Final = re.compile(r"^[a-z][a-z0-9.-]*$")
+
+
+@dataclass(frozen=True, slots=True)
+class OpenStylePreviews:
+    """A world's open previews this code could read, each with its proposal, and how many not."""
+
+    readable: tuple[tuple[StylePreview, StyleProposalRecord], ...]
+    unreadable: int
+
+
+#: What reading one stored preview back raises when the row is older than, or otherwise outside,
+#: the contract this code reads: a candidate missing the recipe-binding fields (0023), a stored
+#: style the registry refuses, or a proposal row that no longer resolves. Anything else is a fault
+#: and surfaces as one.
+_UNREADABLE_PREVIEW: Final = (InvalidPreviewState, InvalidStyleData, UnknownWorldResource)
+
+#: How many of a world's open previews, newest first, a page reads back when it opens the world.
+#: A declared bound, not a measurement: the page takes up one, the newest made against the current
+#: version or else the newest, so eight lets that one be found behind a few made against earlier
+#: versions while holding every world opening to eight proposal reads, however many previews tabs
+#: and the Companion have left open over time.
+OPEN_PREVIEWS_READ: Final = 8
 
 
 class WorldStyleRepository:
@@ -293,6 +315,40 @@ class WorldStyleRepository:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
+
+    def open_previews(self) -> OpenStylePreviews:
+        """The newest ``OPEN_PREVIEWS_READ`` of this world's previews nobody has applied or
+        discarded, newest first, and how many of those it could not read.
+
+        What a page reads back when it opens, so a preview it staged before a reload or a world
+        switch is still the person's to apply or discard: the server holds a preview until a
+        decision closes it, and a page's memory does not. Best effort by design: a row this code
+        cannot read, such as a preview made before the reviewed recipe-binding contract (0023), is
+        counted and skipped rather than refused, because what it serves is a convenience on
+        opening a world and must never stand in the way of the opening.
+        """
+        rows = self.connection.execute(
+            "select preview_id,proposal_id,candidate,created_at from world_style_preview "
+            "where workspace_id=%s and world_id=%s and status='open' "
+            "order by created_at desc, preview_id desc limit %s",
+            (self.workspace_id, self.world_id, OPEN_PREVIEWS_READ),
+        ).fetchall()
+        readable: list[tuple[StylePreview, StyleProposalRecord]] = []
+        unreadable = 0
+        for row in rows:
+            try:
+                record = self.proposal(row["proposal_id"])
+                candidate = self._candidate_from_document(row["candidate"])
+            except _UNREADABLE_PREVIEW:
+                unreadable += 1
+                continue
+            readable.append(
+                (
+                    StylePreview(row["preview_id"], record.proposal, candidate, row["created_at"]),
+                    record,
+                )
+            )
+        return OpenStylePreviews(readable=tuple(readable), unreadable=unreadable)
 
     # -- proposal lifecycle --------------------------------------------------------------
 

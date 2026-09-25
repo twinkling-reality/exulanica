@@ -84,7 +84,25 @@ base_topology_digest   == current_topology_digest
 
 Preview validates a proposal and writes an isolated candidate; it never moves the pointer. Apply
 inserts the global version and all regional overrides, moves the pointer, closes the preview, and
-writes the audit event in one transaction. Discard closes only the preview/proposal. Rollback
+writes the audit event in one transaction. Discard closes only the preview/proposal. A preview
+stays open until one of the two closes it, whatever happens to the page that made it, and
+`GET /world/styles/previews` reads back the newest eight of the world's open previews
+(`OPEN_PREVIEWS_READ` in `exulanica/world/repository.py`, which states why eight), counting in
+`unreadable` and leaving out any it cannot read, such as one made before the reviewed
+recipe-binding contract. When a page opens a world, the browser's client takes up the newest open
+preview from another origin, such as a Companion proposal, made against the current version, or
+else the newest, which Customize shows as stale; so a staged proposal is still in Customize after a
+reload, after the person opens another world and comes back, and in a second tab. A proposal found
+open this way that was made against an earlier version is never applied, and never made again
+against the current one, because its candidate is the whole design as it was and applying it would
+undo every change made since: the page refuses it in words and the person asks again. One the page cannot show, such as a design of
+another profile, is left open and the page says so in words the Companion keeps. Opening a world
+closes nothing, because a page cannot tell a preview an earlier page left from one a live tab
+holds: a preview closes only when a person applies or discards it or a new proposal replaces it. The read-back is best effort, and
+a failed read or a row the client cannot parse leaves the world opening as it would with none
+(`web/packages/app/src/world-style-api.ts`). A new preview is made before the one it replaces is
+discarded, so an authority that refuses the new one leaves the previous one staged, and a discard
+that fails leaves the new one staged and the old one open, which the page says. Rollback
 copies a historical version into a new revision and moves the pointer in one transaction; it never
 updates the target. Regional overrides for regions absent from the current protected topology are
 omitted and named in rollback audit details.
@@ -197,6 +215,7 @@ All routes require a bearer token.
 | `GET` | `/world/styles/current` | Current version plus the independently current topology digest |
 | `GET` | `/world/styles/versions` | Immutable resolved history with warnings/provenance |
 | `GET` | `/world/styles/proposals/{id}` | Proposal status, provenance, refinement, and recipe binding |
+| `GET` | `/world/styles/previews` | The world's open previews, newest first, each with its proposal, and how many it could not read |
 | `POST` | `/world/styles/previews` | Validate and create an isolated preview |
 | `POST` | `/world/styles/previews/{id}/apply` | Compare both bases and atomically apply |
 | `DELETE` | `/world/styles/previews/{id}` | Atomically discard without changing current style |

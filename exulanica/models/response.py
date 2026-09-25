@@ -59,14 +59,9 @@ def result_from_body(
     response_format: Mapping[str, Any] | None = None,
     usd_bound: Decimal | None = None,
 ) -> ChatResult:
-    choices = body.get("choices") or []
-    if not choices:
-        raise TransportError(f"{spec.model_id} returned no choices", retryable=False)
-    choice = choices[0]
-    message = choice.get("message") or {}
-    finish_reason = str(choice.get("finish_reason") or "")
-    split: SplitContent = split_message(message)
-
+    # Recorded before anything about the reply is believed, a reply with no choices included: the
+    # request reached the provider and came back, so it may be billed, and the ledger, the budget
+    # and a request's own record must each see it.
     usage = CallUsage.from_response(
         role=role,
         spec=spec,
@@ -77,6 +72,14 @@ def result_from_body(
         usd_bound=usd_bound,
     )
     budget.record(usage)
+
+    choices = body.get("choices") or []
+    if not choices:
+        raise TransportError(f"{spec.model_id} returned no choices", retryable=False)
+    choice = choices[0]
+    message = choice.get("message") or {}
+    finish_reason = str(choice.get("finish_reason") or "")
+    split: SplitContent = split_message(message)
 
     if finish_reason == "length" and split.empty_answer:
         raise TruncatedResponseError(

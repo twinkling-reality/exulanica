@@ -61,6 +61,7 @@ from exulanica.selection import (
     execute,
     validate,
 )
+from exulanica.selection.calls import AttemptOutcome, CallCost, noted_calls
 from exulanica.selection.packet import build_content_packet
 from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSION
 from exulanica.selection.proposal import propose_appearance
@@ -194,11 +195,14 @@ class QuestionRequest(BaseModel):
 
 
 class ModelCallView(BaseModel):
-    """One model call the answer path made, as the response to it reported.
+    """One model call the answer path made, as the response to it reported, or one attempt it
+    paid for that returned no result.
 
     Read off the response and never off the manifest. ``requested_model`` is what the chain
     asked for and ``served_model`` is what answered; they differ exactly when ``used_fallback``
-    is true, which is the case a record derived from configuration would report wrongly.
+    is true, which is the case a record derived from configuration would report wrongly. An
+    attempt that returned no result names the model it was sent to, its ``outcome`` and its
+    ``cost_basis``, and never the provider's or the transport's words about the failure.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -217,9 +221,17 @@ class ModelCallView(BaseModel):
     reasoning_tokens: int | None
     usd: str | None = None
     #: Why ``served_model`` is null, by name: ``response_names_no_model`` when the response body
-    #: named no model, so a null is never read as the requested model. ``null`` when
-    #: ``served_model`` names one.
+    #: named no model, or ``result_not_returned`` for an attempt no result came from, so a null
+    #: is never read as the requested model. ``null`` when ``served_model`` names one.
     served_model_unavailable: str | None = None
+    #: ``completed`` for a result the workflow received; ``timed_out``, ``failed`` or
+    #: ``reply_refused`` (a reply refused as truncated or outside the schema) for an attempt that
+    #: returned none.
+    outcome: AttemptOutcome
+    #: ``known`` when ``usd`` is the attempt's cost; ``unknown`` when the request was sent and
+    #: nothing priced it, so the provider may bill it and ``usd`` is null; ``not_sent`` when the
+    #: connection was never made and it cost nothing.
+    cost_basis: CallCost
 
 
 class ExecutionView(BaseModel):
@@ -231,17 +243,20 @@ class ExecutionView(BaseModel):
     rather than inferred from configuration". This block carries the executed identifier, latency
     and usage, so the claim is read from the response rather than off the manifest.
 
-    ``calls`` lists the calls that RETURNED A RESULT, in order. Read it as exactly that and not
-    as "every model this answer cost", because two cases separate the two:
+    ``calls`` lists, in order, every attempt the request paid for or may have: each call that
+    returned a result, and each attempt that timed out, failed, or came back and was refused as
+    truncated or outside the schema, with its ``outcome`` and ``cost_basis``. Find a role's call
+    by its ``role`` and ``outcome``, never by its position. Two cases to read it by:
 
     *   **An abstention still lists the planner.** A question asked in words carries no plan, so
         the planner ran and was recorded before the packet came back empty. What an abstention
-        guarantees is that no COMPOSER call is in the list, because there is no code path from an
-        empty packet to one. A caller that read an abstention's list as "no model was asked"
-        would be wrong about every question asked through an interface.
-    *   **A call the endpoint truncated, or answered with a body the schema refused, is
-        absent.** It raises inside the client before any result reaches the route.
-        ``deterministic`` and ``rejections`` are what say that one happened.
+        guarantees is that no COMPOSER attempt is in the list, because there is no code path from
+        an empty packet to one.
+    *   **A request refused before it left is absent.** A hosted-request policy or the budget
+        guard that refuses a request sends nothing, so there is no attempt to list.
+
+    When a model error ends the request, the problem body carries this block as its
+    ``execution`` member (:func:`failure_extensions`).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -601,10 +616,25 @@ def _execution(
                 reasoning_tokens=call.reasoning_tokens,
                 usd=call.usd,
                 served_model_unavailable=call.served_model_unavailable,
+                outcome=call.outcome,
+                cost_basis=call.cost_basis,
             )
             for call in calls
         ],
     )
+
+
+def failure_extensions(failure: BaseException) -> dict[str, object]:
+    """The problem body's extension members for a Companion request a model error ended.
+
+    ``execution``, the block a completed request returns, from the calls the request noted on the
+    error (:func:`~exulanica.selection.calls.noted_calls`); none when it noted none.
+    """
+    noted = noted_calls(failure)
+    if noted is None:
+        return {}
+    execution = _execution(noted.calls, noted.rejections, prompt_version=noted.prompt_version)
+    return {"execution": execution.model_dump(mode="json")}
 
 
 def _require_model(
@@ -793,6 +823,10 @@ class AppearanceView(BaseModel):
     #: Which models were asked, how long they took and what they spent. The same block the
     #: answer route returns, from the same recorder, so one measurement can read both.
     execution: ExecutionView
+    #: Each placeholder the proposal's words may carry and the entity it stands for, as
+    #: ``AnswerView.names`` is for an answer: the client restores each name from the account
+    #: holder's own data. Empty when the words name nothing.
+    names: dict[str, uuid.UUID] = Field(default_factory=dict)
 
 
 @router.post(
@@ -859,4 +893,5 @@ def appearance(
             )
         ),
         execution=_execution(outcome.calls, (), prompt_version=PROPOSAL_PROMPT_VERSION),
+        names=dict(outcome.names),
     )

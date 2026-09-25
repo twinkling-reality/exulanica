@@ -111,6 +111,10 @@ function connectedFetch(handler?: (
     if (url.pathname.endsWith('/world/styles/catalog')) return json(catalog());
     if (url.pathname.endsWith('/world/styles/current')) return json(state());
     if (url.pathname.endsWith('/world/styles/versions')) return json([version('v0', 0)]);
+    // The world's open previews, read back at connect: none unless a test says otherwise.
+    if (url.pathname.endsWith('/world/styles/previews') && (init.method ?? 'GET') === 'GET') {
+      return json([]);
+    }
     throw new Error(`unhandled request ${init.method ?? 'GET'} ${url.pathname}`);
   }) as typeof globalThis.fetch;
 }
@@ -492,10 +496,12 @@ describe('reviewed historical recipe bindings', () => {
   it('opens an exact historical binding without rewriting it and keeps new previews strict', async () => {
     const saved = historicalVersion();
     const original = structuredClone(saved);
-    const fetch = connectedFetch(url => {
+    const fetch = connectedFetch((url, init) => {
       if (url.pathname.endsWith('/current')) return json({ current_topology_digest: 'topology-a', current: saved });
       if (url.pathname.endsWith('/versions')) return json([saved]);
-      if (url.pathname.endsWith('/previews')) return json({ ...preview('p', 'proposal'), candidate: saved }, 201);
+      if (url.pathname.endsWith('/previews') && init.method === 'POST') {
+        return json({ ...preview('p', 'proposal'), candidate: saved }, 201);
+      }
       return undefined;
     });
     const client = new WorldStyleClient({ worldId: TEST_WORLD,baseUrl:'https://exulanica.test',token:'fixture',fetch});

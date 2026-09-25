@@ -11,7 +11,8 @@
  * **A failure carries its code, not its status.** The API answers every failure with
  * `{code, detail}`, and the code is the thing worth branching on: `unknown_reference` means the
  * same thing whether it arrived as a 404 from the evidence route or from an identity commit.
- * Callers that switch on a number end up encoding the router.
+ * Callers that switch on a number end up encoding the router. A problem with more to say carries
+ * further members, which `ApiError.extensions` keeps for the caller that knows them.
  *
  * **404 is not an error class of its own.** The API returns 404 for 'not there' and for "not
  * yours", deliberately and identically, so that the surface is not an existence oracle. A client
@@ -33,6 +34,12 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     detail: string,
+    /**
+     * Every other member of the problem body, as the server sent it (RFC 9457 extension
+     * members), such as the execution record of a Companion question a model error ended. Data
+     * for a caller that knows the member, never a replacement for `code`.
+     */
+    readonly extensions: Readonly<Record<string, unknown>> = {},
   ) {
     super(`${code}: ${detail}`);
     this.name = 'ApiError';
@@ -154,12 +161,17 @@ export class Transport {
 export async function toApiError(response: Response): Promise<ApiError> {
   let code = `http_${response.status}`;
   let detail = response.statusText || 'the request failed';
+  let extensions: Record<string, unknown> = {};
   try {
-    const body = (await response.json()) as Partial<ApiProblem>;
+    const body = (await response.json()) as Partial<ApiProblem> & Record<string, unknown>;
     if (typeof body.code === 'string') code = body.code;
     if (typeof body.detail === 'string') detail = body.detail;
+    if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
+      const { code: _code, detail: _detail, ...rest } = body;
+      extensions = rest;
+    }
   } catch {
     // Not JSON. The status and statusText above are what there is, and they are enough to act on.
   }
-  return new ApiError(response.status, code, detail);
+  return new ApiError(response.status, code, detail, extensions);
 }

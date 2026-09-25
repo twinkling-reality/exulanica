@@ -299,15 +299,13 @@ class AnsweredQuestion:
     abstention: Abstention | None = None
     #: Why the composer's output was refused, kept for the evaluation record.
     rejections: tuple[str, ...] = ()
-    #: Every model call this question made that RETURNED A RESULT, in the order it made them.
+    #: Every model call this question made, in the order it made them, and every attempt it paid
+    #: for that returned no result, each with its outcome (:class:`CallLog`).
     #:
-    #: Not "empty on an abstention", which is what this said and which is false in both
-    #: directions. An abstention reached without a supplied plan still ran the planner and still
-    #: lists it: only the COMPOSER is guaranteed not to have been called, because there is no
-    #: code path from an empty packet to one. And a composer whose reply the endpoint truncated
-    #: raises inside ``ModelClient.structured`` before any result reaches this module, so that
-    #: call is absent from a list that is not empty of the planner. ``deterministic`` and
-    #: ``rejections`` are what say a discarded attempt happened.
+    #: Not "empty on an abstention", which is false in both directions. An abstention reached
+    #: without a supplied plan still ran the planner and still lists it: only the COMPOSER is
+    #: guaranteed not to have been called, because there is no code path from an empty packet to
+    #: one. And a composer whose reply the endpoint truncated is listed as ``reply_refused``.
     calls: tuple[ModelCall, ...] = ()
     #: Each placeholder the answer text may carry, and the entity it stands for: the request's one
     #: record (:class:`~exulanica.selection.request_names.RequestNames`). A person, or a place the
@@ -368,6 +366,8 @@ def compose_answer(
             return _in_canonical_form(validate_answer(answer, packet), packet), False, rejections
         except AnswerRejected as rejected:
             rejections = rejected.reasons
+            if log is not None:
+                log.rejected(rejections)
             if attempt == COMPOSER_ATTEMPTS:
                 break
             messages.append(
@@ -464,8 +464,47 @@ def answer_question(
         raise ValueError(
             "a model client is required to plan a question or compose a capture answer"
         )
-    proposed = plan is None
     log = CallLog()
+    # This question's own copy of the client, so its log hears every attempt it pays for and no
+    # other question's; the copy keeps every policy the client has.
+    observed = None if client is None else client.with_attempts(log.attempt)
+    try:
+        return _answered(
+            connection,
+            observed,
+            question,
+            session,
+            log,
+            world_id=world_id,
+            plan=plan,
+            now=now,
+            store=store,
+            society_authorizer=society_authorizer,
+            before_compose=before_compose,
+        )
+    except Exception as failed:
+        # No answer exists to carry the record, so the error that ended the request
+        # carries it: a model error, a policy's refusal as a request left, or anything else.
+        log.on_failure(PROMPT_VERSION).note(failed)
+        raise
+
+
+def _answered(
+    connection: psycopg.Connection,
+    client: ModelClient | None,
+    question: str,
+    session: Session,
+    log: CallLog,
+    *,
+    world_id: str | None,
+    plan: SelectionPlan | None,
+    now: dt.datetime | None,
+    store: ContentAddressedStore | None,
+    society_authorizer: Callable[[dict[str, Any]], None] | None,
+    before_compose: Callable[[Iterable[uuid.UUID], ModelHandoff], None],
+) -> AnsweredQuestion:
+    """:func:`answer_question` after its preconditions, every call recorded in ``log``."""
+    proposed = plan is None
     # A person's saved name never reaches a hosted model, and a place's only under a right the
     # account holder grants for that place and the role. One record serves every request this
     # question makes: the planner and the composer are sent each name no right can release as its

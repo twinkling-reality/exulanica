@@ -47,6 +47,8 @@ const classified = {
   promptTokens: 400,
   completionTokens: 8,
   reasoningTokens: null,
+  outcome: 'completed' as const,
+  costBasis: 'known' as const,
 };
 
 function refused(utterance: string, code: 'not_drafted' | 'not_in_catalogue'): CompanionProposal {

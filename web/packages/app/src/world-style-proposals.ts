@@ -54,7 +54,12 @@ export type WorldStyleProposalOutcomeKind =
   /** A person threw it away, or the surface replaced it. Nothing changed. */
   | 'discarded'
   /** The authority would not have it. Nothing changed and the reason is in `detail`. */
-  | 'refused';
+  | 'refused'
+  /**
+   * Nobody has decided about it and it is still open on the authority, but this page could not
+   * show it or could not close it: the reason is in `detail`. Not final.
+   */
+  | 'still_open';
 
 export interface WorldStyleProposalOutcome {
   /** The origin reference the proposal carried. Empty for a proposal that had none. */
@@ -62,6 +67,11 @@ export interface WorldStyleProposalOutcome {
   readonly kind: WorldStyleProposalOutcomeKind;
   /** What the surface would say about it. The failure's own words when it is a refusal. */
   readonly detail: string;
+  /**
+   * True for a proposal an earlier page made, which this page found still open when it connected
+   * (``WorldStyleClient.connect``): its sentence is not this page's to name.
+   */
+  readonly earlier?: boolean;
 }
 
 export type WorldStyleProposalOutcomeListener = (

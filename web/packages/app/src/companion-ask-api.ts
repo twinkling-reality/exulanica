@@ -96,6 +96,21 @@ export interface AnswerEvidence {
   readonly capturedAt: string | null;
 }
 
+/**
+ * How one attempt ended, as the server's execution record says it (`AttemptOutcome` in
+ * `exulanica/selection/calls.py`; `tests/test_execution_outcome_parity.py` holds the two equal).
+ * Only `completed` is a result the workflow received; the others returned none.
+ */
+export const CALL_OUTCOMES = ['completed', 'timed_out', 'failed', 'reply_refused'] as const;
+export type CallOutcome = (typeof CALL_OUTCOMES)[number];
+
+/** Whether an attempt's cost is known (`CallCost` in the same module, held the same way). */
+export const CALL_COSTS = ['known', 'unknown', 'not_sent'] as const;
+export type CallCost = (typeof CALL_COSTS)[number];
+
+/** The role the answer path's composer runs as: the call whose sentence is on the screen. */
+export const COMPOSER_ROLE = 'reasoning_cheap';
+
 export interface ModelCall {
   readonly role: string;
   readonly requestedModel: string;
@@ -106,6 +121,14 @@ export interface ModelCall {
   readonly promptTokens: number | null;
   readonly completionTokens: number | null;
   readonly reasoningTokens: number | null;
+  readonly outcome: CallOutcome;
+  readonly costBasis: CallCost;
+}
+
+/** What a request paid for, as the server recorded it: its prompt version and every attempt. */
+export interface Execution {
+  readonly promptVersion: string;
+  readonly calls: readonly ModelCall[];
 }
 
 /**
@@ -209,6 +232,11 @@ export class AskUnavailable extends Error {
   constructor(
     readonly kind: AskFailure,
     readonly detail: string,
+    /**
+     * What the question paid for before it failed, when the server said: the problem body's
+     * `execution` member, the block a completed answer carries. Null when it sent none.
+     */
+    readonly execution: Execution | null = null,
   ) {
     super(detail);
     this.name = 'AskUnavailable';
@@ -234,6 +262,14 @@ interface WireCall {
   readonly prompt_tokens: number | null;
   readonly completion_tokens: number | null;
   readonly reasoning_tokens: number | null;
+  /** Absent from a server that listed only the results it received, all of them completed. */
+  readonly outcome?: string;
+  readonly cost_basis?: string;
+}
+
+interface WireExecution {
+  readonly prompt_version: string;
+  readonly calls: readonly WireCall[];
 }
 
 interface WireAnswer {
@@ -244,7 +280,7 @@ interface WireAnswer {
   readonly abstained: string | null;
   readonly deterministic: boolean;
   readonly repaired: boolean;
-  readonly execution: { readonly prompt_version: string; readonly calls: readonly WireCall[] };
+  readonly execution: WireExecution;
   /** Each placeholder the answer may carry, `[place A]`, and the entity it stands for. */
   readonly names?: Readonly<Record<string, string>>;
 }
@@ -318,12 +354,50 @@ function placesOf(body: WireAnswer, content: CompanionContentSurface | undefined
 }
 
 /** The placeholder-to-entity map as the server sent it, keeping only entries that name an id. */
-function namesOf(body: WireAnswer): Record<string, string> {
+function namesOf(body: { readonly names?: Readonly<Record<string, string>> }): Record<string, string> {
   const names: Record<string, string> = {};
   for (const [label, id] of Object.entries(body.names ?? {})) {
     if (typeof id === 'string' && id.length > 0) names[label] = id;
   }
   return names;
+}
+
+/**
+ * The execution record's calls, as the page reads them.
+ *
+ * An outcome or a cost this client has no words for is read as the most careful true thing: an
+ * attempt that returned no result, whose cost is not known. An absent one comes from a server
+ * that listed only the results it received.
+ */
+function callsOf(calls: readonly WireCall[] | undefined): ModelCall[] {
+  return (calls ?? []).map((call): ModelCall => ({
+    role: call.role,
+    requestedModel: call.requested_model,
+    servedModel: call.served_model,
+    usedFallback: call.used_fallback,
+    attempts: call.attempts,
+    latencyMs: call.latency_ms,
+    promptTokens: call.prompt_tokens,
+    completionTokens: call.completion_tokens,
+    reasoningTokens: call.reasoning_tokens,
+    outcome: call.outcome === undefined
+      ? 'completed'
+      : (CALL_OUTCOMES.find((known) => known === call.outcome) ?? 'failed'),
+    costBasis: call.cost_basis === undefined
+      ? 'known'
+      : (CALL_COSTS.find((known) => known === call.cost_basis) ?? 'unknown'),
+  }));
+}
+
+/** The execution block a problem body carries as its `execution` member, or null. */
+function executionOf(member: unknown): Execution | null {
+  if (member === null || typeof member !== 'object' || Array.isArray(member)) return null;
+  const wire = member as Partial<WireExecution>;
+  if (!Array.isArray(wire.calls)) return null;
+  return {
+    promptVersion: typeof wire.prompt_version === 'string' ? wire.prompt_version : '',
+    calls: callsOf(wire.calls),
+  };
 }
 
 export class CompanionAskClient {
@@ -431,19 +505,7 @@ export class CompanionAskClient {
       });
     }
 
-    const calls = (body.execution?.calls ?? []).map(
-      (call): ModelCall => ({
-        role: call.role,
-        requestedModel: call.requested_model,
-        servedModel: call.served_model,
-        usedFallback: call.used_fallback,
-        attempts: call.attempts,
-        latencyMs: call.latency_ms,
-        promptTokens: call.prompt_tokens,
-        completionTokens: call.completion_tokens,
-        reasoningTokens: call.reasoning_tokens,
-      }),
-    );
+    const calls = callsOf(body.execution?.calls);
 
     const planIntent =
       body.plan !== null &&
@@ -533,20 +595,22 @@ function provenanceOf(
 ): AnswerProvenance {
   const latencyMs = calls.reduce((total, call) => total + call.latencyMs, 0);
   const usedFallback = calls.some((call) => call.usedFallback);
-  // The composing call is the LAST reasoning call rather than the first: a repair replaces the
-  // attempt before it, and it is the repair whose sentence is on the screen.
-  const composing = [...calls].reverse().find((call) => call.role.startsWith('reasoning')) ?? null;
-  const planning = calls.find((call) => !call.role.startsWith('reasoning')) ?? null;
+  // Found by role and outcome, never by position: the list holds attempts that returned nothing
+  // as well as results. The composing call is the LAST completed composer call rather than the
+  // first, because a repair replaces the attempt before it and it is the repair whose sentence is
+  // on the screen.
+  const received = calls.filter((call) => call.outcome === 'completed');
+  const composing = [...received].reverse().find((call) => call.role === COMPOSER_ROLE) ?? null;
+  const planning = received.find((call) => call.role !== COMPOSER_ROLE) ?? null;
   const plannedBy = planning?.servedModel ?? null;
 
   /*
    * Checked BEFORE the empty-list branch, and the order is the whole point.
    *
    * A planner failure abstains with `UNANSWERABLE_NOT_UNDERSTOOD`, and the calls behind it are
-   * often not in the list: `client.structured` raises before any result reaches the recorder, so
-   * two failed attempts leave nothing. Falling through to `none` would print "No model was
-   * asked" over an answer two models had just been asked to produce, which is the same falsehood
-   * `search` was added to stop, one branch further down.
+   * often refused replies, so no completed call names a model. Falling through to `none` would
+   * print "No model was asked" over an answer two models had just been asked to produce, which
+   * is the same falsehood `search` was added to stop, one branch further down.
    */
   if (abstained === 'UNANSWERABLE_NOT_UNDERSTOOD') {
     return { composed: 'unreadable', servedModel: null, plannedBy, latencyMs, usedFallback };
@@ -556,8 +620,8 @@ function provenanceOf(
   }
   if (deterministic) {
     // Asked, answered, and the answer was not supported by the evidence. `servedModel` may still
-    // be null here: a composer whose reply the endpoint truncated raises before any result
-    // reaches the recorder, so the call that failed is not in the list.
+    // be null here: a composer whose reply was refused as truncated returned no result that
+    // names the model that served it.
     return {
       composed: 'discarded',
       servedModel: composing?.servedModel ?? null,
@@ -589,7 +653,7 @@ function asAskFailure(error: unknown): AskUnavailable {
       return new AskUnavailable('no_model', error.message);
     }
     if (error.isUnauthenticated) return new AskUnavailable('unauthenticated', error.message);
-    return new AskUnavailable('refused', error.message);
+    return new AskUnavailable('refused', error.message, executionOf(error.extensions['execution']));
   }
   // A timeout, a dropped connection, or a proxy that answered with nothing. The distinction the
   // person needs is that the question did not arrive, not which layer dropped it.
@@ -672,6 +736,7 @@ export const PROPOSAL_OUTCOMES: readonly string[] = [
   'accepted',
   'discarded',
   'refused',
+  'still_open',
 ];
 
 /** The complete reference a preview would be created from, plus what actually moved. */
@@ -710,6 +775,11 @@ export interface CompanionProposal {
   readonly refusal: ProposalRefusal | null;
   readonly promptVersion: string;
   readonly calls: readonly ModelCall[];
+  /**
+   * Each placeholder the proposal's words may carry, `[person A]`, and the entity it stands for,
+   * as an answer's `names` are. Ids only. Absent when the words name nothing.
+   */
+  readonly names?: Readonly<Record<string, string>>;
 }
 
 interface WireProposal {
@@ -728,7 +798,8 @@ interface WireProposal {
     readonly spoken: string;
   } | null;
   readonly refusal: { readonly code: string; readonly detail: string } | null;
-  readonly execution: { readonly prompt_version: string; readonly calls: readonly WireCall[] };
+  readonly execution: WireExecution;
+  readonly names?: Readonly<Record<string, string>>;
 }
 
 /** A sentence the person did not get a proposal for, but did not ask a question either. */
@@ -768,19 +839,8 @@ export class CompanionProposalClient {
     }
     if (body.classification !== 'appearance') return asQuestion(utterance);
 
-    const calls = (body.execution?.calls ?? []).map(
-      (call): ModelCall => ({
-        role: call.role,
-        requestedModel: call.requested_model,
-        servedModel: call.served_model,
-        usedFallback: call.used_fallback,
-        attempts: call.attempts,
-        latencyMs: call.latency_ms,
-        promptTokens: call.prompt_tokens,
-        completionTokens: call.completion_tokens,
-        reasoningTokens: call.reasoning_tokens,
-      }),
-    );
+    const calls = callsOf(body.execution?.calls);
+    const names = namesOf(body);
     const promptVersion = body.execution?.prompt_version ?? '';
     const wire = body.proposal;
     const refusal = body.refusal;
@@ -814,6 +874,7 @@ export class CompanionProposalClient {
             },
       promptVersion,
       calls,
+      ...(Object.keys(names).length === 0 ? {} : { names }),
     };
   }
 }

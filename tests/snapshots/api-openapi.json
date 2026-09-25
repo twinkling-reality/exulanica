@@ -7322,6 +7322,64 @@
       }
      }
     }
+   },
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "This world's open appearance previews, newest first, each with its proposal.",
+    "operationId": "open_previews_world_styles_previews_get",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OpenPreviewsView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/world/styles/proposals/{proposal_id}": {
@@ -12230,6 +12288,14 @@
      },
      "execution": {
       "$ref": "#/components/schemas/ExecutionView"
+     },
+     "names": {
+      "additionalProperties": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "object",
+      "title": "Names"
      }
     },
     "additionalProperties": false,
@@ -12657,6 +12723,17 @@
      "sources"
     ],
     "title": "AttachSavedWorldSourcesBody"
+   },
+   "AttemptOutcome": {
+    "type": "string",
+    "enum": [
+     "completed",
+     "timed_out",
+     "failed",
+     "reply_refused"
+    ],
+    "title": "AttemptOutcome",
+    "description": "How one attempt ended, as the execution record says it."
    },
    "AttemptResponse": {
     "properties": {
@@ -13536,6 +13613,16 @@
     ],
     "title": "BranchedVersionView",
     "description": "The version a branch made, and each of its parent's rows it left out.\n\nA branch's rows are new placements, so a row whose source may no longer be written into a\nversion (a withdrawn environment source, an ended depth right, a deleted photograph) stays in\nthe parent only, and is named here. Empty for a version made from a snapshot."
+   },
+   "CallCost": {
+    "type": "string",
+    "enum": [
+     "known",
+     "unknown",
+     "not_sent"
+    ],
+    "title": "CallCost",
+    "description": "Whether an attempt's cost is known, as the execution record says it."
    },
    "CaptureSelector": {
     "properties": {
@@ -15922,7 +16009,7 @@
      "rejections"
     ],
     "title": "ExecutionView",
-    "description": "What this answer actually cost to produce, rather than what it was configured to cost.\n\n``docs/product-direction.md`` makes this a delivery gate rather than telemetry: the memory\ninteraction must \"record the executed model, task, latency and output\", and \"Nemotron use\nmust be functional in that interaction if claimed, with the actual executed variant recorded\nrather than inferred from configuration\". This block carries the executed identifier, latency\nand usage, so the claim is read from the response rather than off the manifest.\n\n``calls`` lists the calls that RETURNED A RESULT, in order. Read it as exactly that and not\nas \"every model this answer cost\", because two cases separate the two:\n\n*   **An abstention still lists the planner.** A question asked in words carries no plan, so\n    the planner ran and was recorded before the packet came back empty. What an abstention\n    guarantees is that no COMPOSER call is in the list, because there is no code path from an\n    empty packet to one. A caller that read an abstention's list as \"no model was asked\"\n    would be wrong about every question asked through an interface.\n*   **A call the endpoint truncated, or answered with a body the schema refused, is\n    absent.** It raises inside the client before any result reaches the route.\n    ``deterministic`` and ``rejections`` are what say that one happened."
+    "description": "What this answer actually cost to produce, rather than what it was configured to cost.\n\n``docs/product-direction.md`` makes this a delivery gate rather than telemetry: the memory\ninteraction must \"record the executed model, task, latency and output\", and \"Nemotron use\nmust be functional in that interaction if claimed, with the actual executed variant recorded\nrather than inferred from configuration\". This block carries the executed identifier, latency\nand usage, so the claim is read from the response rather than off the manifest.\n\n``calls`` lists, in order, every attempt the request paid for or may have: each call that\nreturned a result, and each attempt that timed out, failed, or came back and was refused as\ntruncated or outside the schema, with its ``outcome`` and ``cost_basis``. Find a role's call\nby its ``role`` and ``outcome``, never by its position. Two cases to read it by:\n\n*   **An abstention still lists the planner.** A question asked in words carries no plan, so\n    the planner ran and was recorded before the packet came back empty. What an abstention\n    guarantees is that no COMPOSER attempt is in the list, because there is no code path from\n    an empty packet to one.\n*   **A request refused before it left is absent.** A hosted-request policy or the budget\n    guard that refuses a request sends nothing, so there is no attempt to list.\n\nWhen a model error ends the request, the problem body carries this block as its\n``execution`` member (:func:`failure_extensions`)."
    },
    "ExperimentDefinitionResponse": {
     "properties": {
@@ -17937,6 +18024,12 @@
        }
       ],
       "title": "Served Model Unavailable"
+     },
+     "outcome": {
+      "$ref": "#/components/schemas/AttemptOutcome"
+     },
+     "cost_basis": {
+      "$ref": "#/components/schemas/CallCost"
      }
     },
     "additionalProperties": false,
@@ -17950,10 +18043,12 @@
      "latency_ms",
      "prompt_tokens",
      "completion_tokens",
-     "reasoning_tokens"
+     "reasoning_tokens",
+     "outcome",
+     "cost_basis"
     ],
     "title": "ModelCallView",
-    "description": "One model call the answer path made, as the response to it reported.\n\nRead off the response and never off the manifest. ``requested_model`` is what the chain\nasked for and ``served_model`` is what answered; they differ exactly when ``used_fallback``\nis true, which is the case a record derived from configuration would report wrongly."
+    "description": "One model call the answer path made, as the response to it reported, or one attempt it\npaid for that returned no result.\n\nRead off the response and never off the manifest. ``requested_model`` is what the chain\nasked for and ``served_model`` is what answered; they differ exactly when ``used_fallback``\nis true, which is the case a record derived from configuration would report wrongly. An\nattempt that returned no result names the model it was sent to, its ``outcome`` and its\n``cost_basis``, and never the provider's or the transport's words about the failure."
    },
    "ModelRightRequest": {
     "properties": {
@@ -18235,6 +18330,47 @@
      "captured_at"
     ],
     "title": "OccurrenceRow"
+   },
+   "OpenPreviewView": {
+    "properties": {
+     "preview": {
+      "$ref": "#/components/schemas/PreviewView"
+     },
+     "proposal": {
+      "$ref": "#/components/schemas/StyleProposalView"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "preview",
+     "proposal"
+    ],
+    "title": "OpenPreviewView",
+    "description": "One preview nobody has applied or discarded, with the proposal it was made from."
+   },
+   "OpenPreviewsView": {
+    "properties": {
+     "previews": {
+      "items": {
+       "$ref": "#/components/schemas/OpenPreviewView"
+      },
+      "type": "array",
+      "title": "Previews"
+     },
+     "unreadable": {
+      "type": "integer",
+      "title": "Unreadable"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "previews",
+     "unreadable"
+    ],
+    "title": "OpenPreviewsView",
+    "description": "A world's open previews, newest first, and how many open ones this server could not read.\n\nBest effort: a preview this server cannot read, such as one made before the reviewed\nrecipe-binding contract, is counted in ``unreadable`` and left out, never refused, because a\npage reads this as it opens a world and nothing here may stand in the way of the opening."
    },
    "OperationRights": {
     "properties": {

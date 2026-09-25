@@ -36,6 +36,7 @@ from pydantic import (
     StrictFloat,
     StrictInt,
     StrictStr,
+    ValidationError,
     model_validator,
 )
 
@@ -261,6 +262,29 @@ class PreviewView(BaseModel):
     created_at: dt.datetime
 
 
+class OpenPreviewView(BaseModel):
+    """One preview nobody has applied or discarded, with the proposal it was made from."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    preview: PreviewView
+    proposal: StyleProposalView
+
+
+class OpenPreviewsView(BaseModel):
+    """A world's open previews, newest first, and how many open ones this server could not read.
+
+    Best effort: a preview this server cannot read, such as one made before the reviewed
+    recipe-binding contract, is counted in ``unreadable`` and left out, never refused, because a
+    page reads this as it opens a world and nothing here may stand in the way of the opening.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    previews: list[OpenPreviewView]
+    unreadable: int
+
+
 class StyleProposalView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -392,6 +416,34 @@ def preview(body: PreviewBody, repository: WriteWorld, session: CurrentSession) 
         candidate=_version_view(created.candidate),
         created_at=created.created_at,
     )
+
+
+@router.get(
+    "/styles/previews",
+    response_model=OpenPreviewsView,
+    summary="This world's open appearance previews, newest first, each with its proposal.",
+)
+def open_previews(repository: ReadWorld) -> OpenPreviewsView:
+    found = repository.open_previews()
+    previews: list[OpenPreviewView] = []
+    unreadable = found.unreadable
+    for preview, record in found.readable:
+        try:
+            previews.append(
+                OpenPreviewView(
+                    preview=PreviewView(
+                        preview_id=preview.preview_id,
+                        proposal_id=preview.proposal.proposal_id,
+                        candidate=_version_view(preview.candidate),
+                        created_at=preview.created_at,
+                    ),
+                    proposal=_proposal_view(record),
+                )
+            )
+        except ValidationError:
+            # A stored value this server's own view refuses is counted with the rest.
+            unreadable += 1
+    return OpenPreviewsView(previews=previews, unreadable=unreadable)
 
 
 @router.get(

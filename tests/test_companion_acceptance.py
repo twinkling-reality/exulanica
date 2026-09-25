@@ -288,6 +288,10 @@ class _UnusedModel:
     def __init__(self, manifest: object) -> None:
         self.manifest = manifest
 
+    def with_attempts(self, observe: object) -> _UnusedModel:
+        # The question's own copy of the client, which sends nothing by being made.
+        return self
+
     def __getattr__(self, name: str) -> object:
         raise AssertionError(f"the model client was used: {name}")
 

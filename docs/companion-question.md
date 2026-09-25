@@ -215,11 +215,16 @@ each placeholder and the entity it stood for, as ids and never as a name, append
 entity's own class and refused for an entity already deleted, and a correction keeps the map of the
 answer it replaces. `GET /companion/memory/recent` serves the map with each answer, and the browser
 draws a remembered answer through the same resolver as a fresh one, so every case in the table
-above holds for it. What it does not do: an appearance proposal's words arrive with no `names`, so
-each placeholder in them reads as one the answer does not name; and a name is the one in the
-library the page holds when the answer is drawn, so an answer drawn again after a reload, or once
-the page has read a rename, shows the new name, even where the placeholder stood for the words on
-a sign.
+above holds for it. An appearance proposal's words carry the same map: `propose_appearance` returns
+the request's record with the proposal or the refusal (`AppearanceOutcome.names` in
+`exulanica/selection/proposal.py`), `POST /selection/appearance` serves it as `names`, and the page
+draws the spoken change and a `not_in_catalogue` detail through the same resolver and writes the map
+back with the proposal, so a reload shows the same names. `tests/test_appearance_proposal_names.py`
+holds the map and the absence of a person's saved name from every request on that path, with no
+right granted and with every entity released as though a right existed for each. What it does not
+do: a name is the one in the library the page holds when the words are drawn, so an answer or a
+proposal drawn again after a reload, or once the page has read a rename, shows the new name, even
+where the placeholder stood for the words on a sign.
 
 **The composer is told where the account holder confirmed a photograph was taken.** A Selection
 filtered by a place holds a photograph because of a confirmed link from the photograph's place
@@ -345,20 +350,37 @@ That leaks nothing, and what it costs vector retrieval is measured under Evidenc
 
 ## Execution provenance
 
-The Selection response's execution block records prompt version, validator rejections and model
-calls returned to the workflow. A call identifies requested and served model, fallback use,
-attempts, latency and available token counts. The served model of every call, the query-vector
-call included, is the identifier the response body named; when a body names none, the record keeps
-it null with the reason `response_names_no_model` rather than repeating the requested model.
-Provider usage that is absent remains absent rather than becoming a measured zero. Read the exact
-fields in [Selection response models](../exulanica/api/routes/selection.py) and
+The Selection response's execution block records prompt version, validator rejections and every
+attempt the request paid for, or may have, in order. Each entry names its role, the model it was sent
+to, its `outcome` and its `cost_basis`. The outcome is `completed` for a call that returned a result
+to the workflow, `timed_out` or `failed` for an attempt that returned no reply (a withdrawn primary
+before its fallback among them), and `reply_refused` for a reply the client refused as truncated or
+outside the schema. The cost basis is `known`, `unknown` when the request was sent and nothing
+priced it, so the provider may bill it and `usd` is null, or `not_sent` when the connection was
+never made. A completed call identifies requested and served model, fallback use, attempts, latency
+and available token counts. The served model of every call, the query-vector call included, is the
+identifier the response body named; when a body names none, the record keeps it null with the
+reason `response_names_no_model`, and an attempt that returned no result carries
+`result_not_returned`, rather than repeating the requested model. Provider usage that is absent
+remains absent rather than becoming a measured zero, and no entry carries the provider's or the
+transport's words about a failure. Read the exact fields in
+[Selection response models](../exulanica/api/routes/selection.py) and
 [the call record](../exulanica/selection/calls.py).
 
-The list is per question, not the process-wide model ledger. A discarded answer that returned a
-model result can have a recorded call; a failure before a result reaches the workflow need not have
-one. The list is therefore not a complete transport audit. The process-wide ledger does record every
-attempt, failed and timed-out ones included, with its cost stated as known or unknown; see
-[model and service selection](model-and-service-selection.md#hosted-call-bounds-and-cost).
+The list is per request and never read from the process-wide ledger. Each question and each
+proposal sends through its own copy of the model client (`ModelClient.with_attempts` in
+[the client](../exulanica/models/client.py)), which keeps the workspace's policies and hands the
+request's log each attempt as the shared ledger records it, so two questions in flight at once each
+list only their own attempts (`tests/test_execution_every_attempt.py`). A request that a
+hosted-request policy or the budget guard refused before it left sent nothing and is not in the
+list. When an error ends the request, a model's failure, a policy's refusal as a request left, or a
+refusal of the plan or the world the request named after it was paid for, the problem body carries
+the same block, validator rejections included, as its `execution` member
+beside `code` and `detail`, and the page shows it where it shows a completed answer's provenance.
+The `detail` of a model failure says what happened in this product's words and never repeats the
+provider's answer or a model's reply. The page finds the composer's call by its role and outcome,
+never by its place in the list. An environment proposal (`POST /selection/environment`) records
+its attempts the same way.
 
 A deterministic or abstained answer does not mean no model executed: a planner can run even when
 there is no composing call. UI provenance must distinguish search/planning from answer composition.

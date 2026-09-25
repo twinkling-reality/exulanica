@@ -215,6 +215,9 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'proposal.outcome.discarded': 'The change was thrown away and your world is as it was.',
   'proposal.outcome.refused': 'The change was refused and your world is as it was.',
   'proposal.outcome.previewed': 'The change is waiting to be confirmed in Customize.',
+  'proposal.outcome.still_open': 'The change is still waiting, and nothing has changed yet.',
+  // What an outcome is kept under when the proposal was made before this page opened.
+  'proposal.earlier': 'A change the Companion proposed earlier',
 
   // The read half, which fails differently and costs something different. A question that cannot
   // be answered is a question; a memory that cannot be read is a Companion that has forgotten
@@ -280,8 +283,8 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'provenance.discarded':
     '{model} was asked and answered in {duration}. What it wrote was not supported by the ' +
     'evidence, so this is the answer built from the search itself.',
-  // The same outcome, with no model to name: a composer whose reply the endpoint truncated
-  // raises before any result reaches the recorder, so the call that failed is not in the list.
+  // The same outcome, with no model to name: a composer whose reply was refused as truncated
+  // returned no result that names the model that served it.
   'provenance.discardedUnnamed':
     'A model was asked and took {duration}. What it wrote was not supported by the evidence, so '
     + 'this is the answer built from the search itself.',
@@ -307,6 +310,17 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'provenance.unreadableNamed':
     '{model} read the question in {duration} and could not turn it into a search of your '
     + 'photographs.',
+  // Attempts that returned no result, each of which the provider may have billed.
+  'provenance.unanswered': 'Requests that returned no answer: {count}.',
+  'provenance.costUnknown': 'The cost of a request that returned no answer is not known.',
+  // A question that failed: the attempt that ended it, named by the model it was sent to.
+  'provenance.failed.timed_out': '{model} was asked and timed out. The question waited {duration}.',
+  'provenance.failed.failed': '{model} was asked and the request failed. The question waited {duration}.',
+  'provenance.failed.reply_refused':
+    '{model} replied and the reply could not be used. The question waited {duration}.',
+  'provenance.failed.not_sent': 'The request to {model} could not be sent. The question waited {duration}.',
+  'provenance.failed.afterAnswers':
+    'Before it stopped, {models} read the question. It waited {duration}.',
 
   // -- the controls attached to the live world, and its photo drawer --------------------------
   'worldControls.label': 'World controls',

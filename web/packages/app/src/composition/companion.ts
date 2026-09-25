@@ -18,7 +18,7 @@ import { companionAppearanceConfiguration } from '@exulanica/presentation';
 import { MemoryUnavailable, rememberedAsAnswer } from '../companion-memory-api.js';
 
 import { createCompanionController, type CompanionController } from '../companion.js';
-import type { CompanionAnswer, CompanionProposal, ModelCall } from '../companion-ask-api.js';
+import type { CompanionAnswer, CompanionProposal } from '../companion-ask-api.js';
 import { companionNames } from '../companion-names.js';
 import type { EvidenceCache } from '../evidence.js';
 import { say } from '../ui/copy.js';
@@ -220,7 +220,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     if (outcome.classification === 'question') return deps.ask(utterance);
     if (outcome.proposal === null) return refusalAnswer(outcome);
 
-    const originReference = `companion-utterance:${crypto.randomUUID()}`;
+    const originReference = `${COMPANION_REFERENCE}${crypto.randomUUID()}`;
     proposalUtterances.set(originReference, utterance);
     const reached = worldStyleProposalInbox.submit({
       origin: 'companion',
@@ -265,19 +265,25 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
    */
   stopPreviousOutcomes?.();
   const stopOutcomes = worldStyleProposalOutcomes.subscribe((outcome) => {
-    const utterance = proposalUtterances.get(outcome.originReference);
+    // A proposal an earlier page made, which this page found still open, has no sentence here;
+    // its outcome is kept under words that say so. Any other stranger's outcome is not ours.
+    const utterance = proposalUtterances.get(outcome.originReference)
+      ?? (outcome.earlier === true && outcome.originReference.startsWith(COMPANION_REFERENCE)
+        ? say('proposal.earlier')
+        : undefined);
     if (utterance === undefined) return;
     // 'previewed' is the state the proposal was already recorded in. Keeping it again would
     // write one row per stale-base recovery for a proposal nobody has decided about yet.
     if (outcome.kind === 'previewed') return;
     /*
-     * Forgotten only when the decision is FINAL. A refused Apply is not final: the preview is
+     * Forgotten only when the decision is FINAL. A refused Apply is not final, and neither is a
+     * proposal still open that this page could not show or close: the preview is
      * still open, the panel re-enables Apply, and a person who presses it again gets an
      * acceptance that this listener would otherwise have had no utterance to attach to. So a
      * refusal is recorded and remembered, and a later acceptance is recorded too, because two
      * things happened.
      */
-    if (outcome.kind !== 'refused') proposalUtterances.delete(outcome.originReference);
+    if (FINAL_OUTCOMES.has(outcome.kind)) proposalUtterances.delete(outcome.originReference);
     const remember = deps.rememberAnswer;
     if (remember === undefined) return;
     void remember(outcomeAnswer(utterance, outcome)).catch((error: unknown) => {
@@ -459,6 +465,12 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
   };
 }
 
+/** The outcomes after which nothing more can happen to a proposal: its sentence is forgotten. */
+const FINAL_OUTCOMES: ReadonlySet<string> = new Set(['accepted', 'discarded']);
+
+/** The prefix of every origin reference this module gives a proposal it hands to the inbox. */
+const COMPANION_REFERENCE = 'companion-utterance:';
+
 /**
  * A proposal, an outcome, or a refusal, shaped as the answer the encounter renders.
  *
@@ -484,6 +496,7 @@ function spokenAnswer(
   composed: 'proposed' | 'refused' | 'undrafted',
 ): CompanionAnswer {
   const calls = outcome.calls;
+  const received = calls.filter((call) => call.outcome === 'completed');
   return {
     question: outcome.utterance,
     clauses: sentences
@@ -499,13 +512,16 @@ function spokenAnswer(
       composed,
       // The identifier that DREW it, out of the response body. Null when no draft call
       // returned, which is the case a configuration-derived value would report wrongly.
-      servedModel: draftingModel(calls),
-      plannedBy: calls[0]?.servedModel ?? null,
+      servedModel: draftingModel(outcome),
+      plannedBy: received[0]?.servedModel ?? null,
       latencyMs: calls.reduce((total, call) => total + call.latencyMs, 0),
       usedFallback: calls.some((call) => call.usedFallback),
     },
     promptVersion: outcome.promptVersion,
     calls,
+    // The proposal's own record of whom its placeholders stand for, restored and remembered as a
+    // fresh answer's is.
+    ...(outcome.names === undefined ? {} : { names: outcome.names }),
   };
 }
 
@@ -565,12 +581,16 @@ function outcomeAnswer(utterance: string, outcome: WorldStyleProposalOutcome): C
 }
 
 /**
- * The call that DREW the proposal, which is the last one rather than the first.
+ * The model that DREW the proposal: the one the server names on it, or else the last result the
+ * drafter returned.
  *
- * The classifier goes first and the drafter second, and a refused draft is retried once, so the
- * last recorded call is the one whose output reached the person. Reading the first would name
- * the classifier, which decided what the sentence was and wrote none of it.
+ * The classifier goes first and the drafter second, and a refused draft is retried once, so of
+ * the results received the last is the one whose output reached the person; an attempt that
+ * returned nothing drew nothing. Reading the first would name the classifier, which decided what
+ * the sentence was and wrote none of it.
  */
-function draftingModel(calls: readonly ModelCall[]): string | null {
-  return calls.length > 1 ? (calls.at(-1)?.servedModel ?? null) : null;
+function draftingModel(outcome: CompanionProposal): string | null {
+  if (outcome.proposal !== null) return outcome.proposal.modelId;
+  const received = outcome.calls.filter((call) => call.outcome === 'completed');
+  return received.length > 1 ? (received.at(-1)?.servedModel ?? null) : null;
 }

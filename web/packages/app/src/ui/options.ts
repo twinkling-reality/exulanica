@@ -119,6 +119,12 @@ interface OptionsCallbacks {
    */
   readonly onReadSourceLight?: () => Promise<Readonly<Record<string, number>> | null>;
   readonly onWorldDiscard?: (preferences: AtlasPreferences) => void;
+  /**
+   * Whether the world draft on this panel is a preview something else made, such as a staged
+   * Companion proposal. Hiding or closing the panel keeps such a draft for the person to apply
+   * or undo; only the panel's own draft is thrown away when it is hidden.
+   */
+  readonly worldDraftIsProposal?: () => boolean;
   readonly onWorldApply?: (preferences: AtlasPreferences) => Promise<boolean>;
   readonly onWorldRollback?: (versionId: string) => Promise<AtlasPreferences | null>;
   readonly onClose: () => void;
@@ -135,7 +141,8 @@ function field(label: string, control: HTMLElement, note?: string): HTMLElement 
   return el('label', { class: 'option-field' }, content);
 }
 
-const sameWorldStyle = (left: AtlasPreferences, right: AtlasPreferences): boolean => {
+/** Whether two sets of preferences hold the same world style. */
+export const sameWorldStyle = (left: AtlasPreferences, right: AtlasPreferences): boolean => {
   if (left.worldArtProfile !== right.worldArtProfile) return false;
   if (left.worldArtProfileVersion !== right.worldArtProfileVersion) return false;
   const keys = new Set([
@@ -295,8 +302,12 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     render();
     callbacks.onWorldDiscard?.(applied);
   };
-  close.addEventListener('click', () => {
+  const hideWorldPreview = (): void => {
+    if (callbacks.worldDraftIsProposal?.() === true) return;
     discardWorldPreview();
+  };
+  close.addEventListener('click', () => {
+    hideWorldPreview();
     callbacks.onClose();
   });
   const commit = (patch: Partial<AtlasPreferences>): void => {
@@ -622,7 +633,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
       render();
     },
     setVisible(visible) {
-      if (!visible) discardWorldPreview();
+      if (!visible) hideWorldPreview();
       modalFocus.setVisible(visible);
     },
     reportPersistence(state) {

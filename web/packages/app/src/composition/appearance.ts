@@ -24,7 +24,7 @@ import {
 import { writePreferences, type AtlasPreferences } from '../preferences.js';
 import { applyDocumentAppearance, applyDocumentWorldStyle } from '../theme.js';
 import { buildControlsGuide } from '../ui/controls-guide.js';
-import { buildOptions } from '../ui/options.js';
+import { buildOptions, sameWorldStyle } from '../ui/options.js';
 import {
   WorldStyleContractError,
   type ActiveWorldStylePreview,
@@ -82,6 +82,16 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
    * provenance the person was shown would be gone by the time they pressed Apply.
    */
   let stagingProposal = false;
+  /*
+   * The values the last staged proposal put into the panel, while nothing has decided it.
+   *
+   * A draft equal to these is a proposal's values, not the person's, and it is applied only
+   * through that proposal's own preview: never as a Settings change, which would save a model's
+   * design under the person's name.
+   */
+  let stagedCandidate: AtlasPreferences | null = null;
+  /** Origin references of the proposals an earlier page made that this page found open. */
+  const earlierReferences = new Set<string>();
 
   const reflectLocalWorldPreview = (
     candidate: AtlasPreferences,
@@ -131,12 +141,8 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
      * behaviour and it was silent: the Companion had proposed something and would never learn
      * what became of it, so its memory kept the proposal and no outcome for ever.
      */
+    // Said once the new preview exists: a refused one replaced nothing.
     const replaced = client.activePreview();
-    if (replaced !== null && replaced.request.origin !== 'settings') {
-      reportProposalOutcome(
-        replaced, 'discarded', 'A change made on this panel replaced the proposed design.',
-      );
-    }
     optionsView.reportWorldLifecycle('checking');
     try {
       const active = await client.previewSettings({
@@ -144,6 +150,9 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         profileVersion: candidate.worldArtProfileVersion,
         parameters: candidate.worldStyleParameters,
       });
+      reportReplaced(
+        replaced, active, client, 'A change made on this panel replaced the proposed design.',
+      );
       if (sequence === previewSequence) {
         syncWorldStyleConnection(state, client);
         presentWorldStyleAuthority(
@@ -184,11 +193,56 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     detail: string,
   ): void => {
     if (active === null || active.request.origin === 'settings') return;
+    const originReference = active.request.originReference ?? '';
     worldStyleProposalOutcomes.report({
-      originReference: active.request.originReference ?? '',
+      originReference,
       kind,
       detail,
+      ...(earlierReferences.has(originReference) ? { earlier: true } : {}),
     });
+  };
+
+  /** A preview found open on opening whose base is not the version the world holds now. */
+  const madeForAnEarlierVersion = (
+    active: ActiveWorldStylePreview,
+    client: WorldStyleClient,
+  ): boolean => {
+    if (!earlierReferences.has(active.request.originReference ?? '')) return false;
+    const current = client.state();
+    return current !== null && (
+      active.baseStyleVersionId !== current.current.versionId
+      || active.baseTopologyDigest !== current.currentTopologyDigest
+    );
+  };
+
+  const refuseEarlier = (active: ActiveWorldStylePreview): void => {
+    const detail =
+      'This change was proposed for an earlier version of your world, so applying it would undo '
+      + 'what changed since. It was not applied. Ask again for it.';
+    optionsView.reportWorldLifecycle('failed', detail);
+    reportProposalOutcome(active, 'refused', detail);
+  };
+
+  /** Say what became of a preview another one replaced: closed, or still open if it could not be. */
+  const reportReplaced = (
+    replaced: ActiveWorldStylePreview | null,
+    active: ActiveWorldStylePreview,
+    client: WorldStyleClient,
+    detail = 'Another proposal replaced it.',
+  ): void => {
+    const leftOpen = client.takeLeftOpen();
+    if (replaced === null || replaced.request.originReference === active.request.originReference) {
+      return;
+    }
+    if (leftOpen !== null && leftOpen.preview.previewId === replaced.preview.previewId) {
+      reportProposalOutcome(
+        replaced,
+        'still_open',
+        'Another proposal took its place on this panel, and it could not be closed, so it is still open.',
+      );
+      return;
+    }
+    reportProposalOutcome(replaced, 'discarded', detail);
   };
 
   optionsView = buildOptions({
@@ -221,8 +275,25 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       // companion-origin one. The local renderer preview still runs, because the person has to
       // see what they are being asked about.
       if (reflectLocalWorldPreview(candidate) && !stagingProposal) queueServerPreview(candidate);
+      // The person moved a world control away from what the proposal put there: from here the
+      // draft is theirs, and Apply saves it as their change even if they move it back.
+      if (!stagingProposal && stagedCandidate !== null && !sameWorldStyle(candidate, stagedCandidate)) {
+        stagedCandidate = null;
+      }
+    },
+    /*
+     * A staged proposal is the authority's active preview, from another origin, while the draft
+     * on the panel is exactly that preview. Read off the client, which knows which proposal is
+     * current. Once the person moves a control the draft is theirs, and the settings preview it
+     * queues replaces the proposal and says so.
+     */
+    worldDraftIsProposal: () => {
+      const active = state.worldStyles?.activePreview() ?? null;
+      return active !== null && active.request.origin !== 'settings' &&
+        worldStylePreviewMatches(active, optionsView.preferences());
     },
     onWorldDiscard: (restored) => {
+      stagedCandidate = null;
       if (serverPreviewTimer !== null) {
         window.clearTimeout(serverPreviewTimer);
         serverPreviewTimer = null;
@@ -270,6 +341,17 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       const existing = client.activePreview();
       const matches = existing !== null && worldStylePreviewMatches(existing, candidate);
       /*
+       * **A proposal made for an earlier version of the world is not applied.** Its candidate is
+       * the whole design as it was at its base, so applying it, or re-making it against the
+       * current version, would silently undo every change made since (a rollback, another
+       * device's change). A proposal found open when the page opened is the one that can be that
+       * old; it is refused in words, and asking again drafts one for the world as it is.
+       */
+      if (existing !== null && madeForAnEarlierVersion(existing, client)) {
+        refuseEarlier(existing);
+        return false;
+      }
+      /*
        * **A proposal is never quietly re-previewed as a Settings change.**
        *
        * `previewOnServer` posts `origin: settings` with no model, no prompt version and no
@@ -279,6 +361,17 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
        * the panel's draft and the reviewed candidate have drifted apart, and the honest answer
        * to that is to say so.
        */
+      if (
+        (existing === null || existing.request.origin === 'settings') &&
+        stagedCandidate !== null && sameWorldStyle(candidate, stagedCandidate)
+      ) {
+        optionsView.reportWorldLifecycle(
+          'failed',
+          'The proposed design is no longer held for this world, so it was not applied. Ask '
+          + 'again, or make the change yourself.',
+        );
+        return false;
+      }
       if (existing !== null && existing.request.origin !== 'settings' && !matches) {
         const detail =
           'The proposed design no longer matches what is on this panel. Discard it and ask '
@@ -293,6 +386,19 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       try {
         const result = await client.applyActive();
         syncWorldStyleConnection(state, client);
+        if (result.kind === 'stale-recovered' && earlierReferences.has(
+          result.preview.request.originReference ?? '',
+        )) {
+          // Found open on this page's opening and stale at the authority: the recovery re-made
+          // its old whole design, which is exactly what must not be applied. Closed, and said.
+          await client.discardActive();
+          syncWorldStyleConnection(state, client);
+          presentWorldStyleAuthority(
+            optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
+          );
+          refuseEarlier(result.preview);
+          return false;
+        }
         if (result.kind === 'stale-recovered') {
           presentWorldStyleAuthority(
             optionsView, state.worldStyleConnection, state.worldStyleFailure, result.preview,
@@ -310,6 +416,7 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         presentWorldStyleAuthority(
           optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
         );
+        stagedCandidate = null;
         await deps.onStyleSaved?.(result.version);
         optionsView.reportWorldLifecycle('saved');
         reportProposalOutcome(
@@ -359,6 +466,100 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     onShowControls: deps.onShowControls,
   });
   presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
+  /**
+   * Put a preview from another origin into the panel's own controls, as the person reviews it.
+   *
+   * One path for a proposal that has just arrived and for one the page found still open when it
+   * connected (``WorldStyleClient.connect``), so a staged proposal looks and applies the same after
+   * a reload as before it.
+   */
+  async function stageActive(
+    client: WorldStyleClient,
+    active: ActiveWorldStylePreview,
+    announce = true,
+  ): Promise<void> {
+    const candidate = preferencesForWorldReference(
+      state.preferences,
+      active.preview.candidate.globalStyle,
+    );
+    /*
+     * Staged into the panel's OWN controls rather than pushed in as the applied state.
+     *
+     * `setPreferences` moves the panel's applied baseline as well as its draft, which leaves
+     * `worldDirty()` false, and the panel disables Apply and Undo when it is false. So the
+     * obvious version of this line rendered a proposal nobody could accept and whose Undo
+     * would have restored it: the inbox had never been fed, so nothing had ever pressed those
+     * buttons. Moving the controls instead means a proposal and a hand-moved slider arrive at
+     * Apply by exactly the same route, and there is no path to a write that a person could not
+     * have taken themselves.
+     */
+    stagingProposal = true;
+    let staged = false;
+    try {
+      staged = stageWorldProposal(optionsView, candidate, state.preferences);
+    } finally {
+      stagingProposal = false;
+    }
+    if (!staged && !announce) {
+      /*
+       * Found open when the page opened, and this page cannot show it. Opening a world closes
+       * nothing, so it is left open for the tab or the person that can decide it; this page stops
+       * holding it and says so, in words the Companion keeps.
+       */
+      const detail =
+        'A change proposed earlier could not be shown on this panel, so it is left as it was.';
+      client.release();
+      syncWorldStyleConnection(state, client);
+      presentWorldStyleAuthority(
+        optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
+      );
+      optionsView.reportWorldLifecycle('failed', detail);
+      reportProposalOutcome(active, 'still_open', detail);
+      return;
+    }
+    if (!staged) {
+      const detail =
+        'That design cannot be shown on this panel, so it was not proposed and nothing changed.';
+      await client.discardActive();
+      syncWorldStyleConnection(state, client);
+      presentWorldStyleAuthority(
+        optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
+      );
+      optionsView.reportWorldLifecycle('failed', detail);
+      worldStyleProposalOutcomes.report({
+        originReference: active.request.originReference ?? '',
+        kind: 'refused',
+        detail,
+      });
+      return;
+    }
+    stagedCandidate = candidate;
+    reflectLocalWorldPreview(
+      candidate,
+      active.request.origin === 'companion' ? 'companion' : 'settings',
+    );
+    syncWorldStyleConnection(state, client);
+    presentWorldStyleAuthority(
+      optionsView, state.worldStyleConnection, state.worldStyleFailure, active,
+    );
+    // A preview made against an earlier version than the one the world now holds is shown as
+    // stale: Apply then makes it again against the current version for the person to review.
+    const current = state.worldStyleConnection?.state.current.versionId;
+    const stale = active.recoveredFromStale
+      || (current !== undefined && active.baseStyleVersionId !== current);
+    // One found on opening and made for an earlier version is never applied (`refuseEarlier`),
+    // so it does not promise the fresh preview a stale one made on this page would get.
+    const earlier = madeForAnEarlierVersion(active, client);
+    optionsView.reportWorldLifecycle(
+      stale ? 'stale' : 'ready',
+      earlier
+        ? 'This change was proposed for an earlier version of your world, so it cannot be '
+          + 'applied. Ask again for it, or throw it away.'
+        : undefined,
+    );
+    if (announce) reportProposalOutcome(active, 'previewed', 'Waiting to be confirmed in Customize.');
+  }
+
   state.stopWorldStyleProposalInbox?.();
   state.stopWorldStyleProposalInbox = worldStyleProposalInbox.subscribe(async (proposal) => {
     const client = state.worldStyles;
@@ -387,55 +588,11 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     }
     try {
       optionsView.reportWorldLifecycle('checking', 'Validating the upstream proposal…');
+      // Read before the new preview replaces it, so the Companion hears what became of it.
+      const replaced = client.activePreview();
       const active = await client.previewUpstream(proposal);
-      const candidate = preferencesForWorldReference(
-        state.preferences,
-        active.preview.candidate.globalStyle,
-      );
-      /*
-       * Staged into the panel's OWN controls rather than pushed in as the applied state.
-       *
-       * `setPreferences` moves the panel's applied baseline as well as its draft, which leaves
-       * `worldDirty()` false, and the panel disables Apply and Undo when it is false. So the
-       * obvious version of this line rendered a proposal nobody could accept and whose Undo
-       * would have restored it: the inbox had never been fed, so nothing had ever pressed those
-       * buttons. Moving the controls instead means a proposal and a hand-moved slider arrive at
-       * Apply by exactly the same route, and there is no path to a write that a person could not
-       * have taken themselves.
-       */
-      stagingProposal = true;
-      let staged = false;
-      try {
-        staged = stageWorldProposal(optionsView, candidate, state.preferences);
-      } finally {
-        stagingProposal = false;
-      }
-      if (!staged) {
-        const detail =
-          'That design cannot be shown on this panel, so it was not proposed and nothing changed.';
-        await client.discardActive();
-        syncWorldStyleConnection(state, client);
-        presentWorldStyleAuthority(
-          optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
-        );
-        optionsView.reportWorldLifecycle('failed', detail);
-        worldStyleProposalOutcomes.report({
-          originReference: proposal.originReference ?? '',
-          kind: 'refused',
-          detail,
-        });
-        return;
-      }
-      reflectLocalWorldPreview(
-        candidate,
-        proposal.origin === 'companion' ? 'companion' : 'settings',
-      );
-      syncWorldStyleConnection(state, client);
-      presentWorldStyleAuthority(
-        optionsView, state.worldStyleConnection, state.worldStyleFailure, active,
-      );
-      optionsView.reportWorldLifecycle(active.recoveredFromStale ? 'stale' : 'ready');
-      reportProposalOutcome(active, 'previewed', 'Waiting to be confirmed in Customize.');
+      reportReplaced(replaced, active, client);
+      await stageActive(client, active);
     } catch (error) {
       const detail = describeWorldStyleFailure(error);
       optionsView.reportWorldLifecycle('failed', detail);
@@ -449,6 +606,16 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       });
     }
   });
+  /*
+   * What the page found open when it connected: a proposal still waiting for the person is staged
+   * again. Nothing is closed here; another tab may be looking at the same preview.
+   */
+  const connected = state.worldStyles;
+  const adopted = connected?.activePreview() ?? null;
+  if (connected !== null && adopted !== null && adopted.request.origin !== 'settings') {
+    if (adopted.request.originReference) earlierReferences.add(adopted.request.originReference);
+    void stageActive(connected, adopted, false);
+  }
   const settingsView = buildControlsGuide({
     preferences: state.preferences,
     onChange: applyPreferences,
@@ -560,9 +727,16 @@ function stageWorldProposal(
     candidate.worldArtProfileVersion,
   );
   let moved = 0;
+  const draft = view.preferences().worldStyleParameters;
   for (const definition of definitions) {
-    const wanted = candidate.worldStyleParameters[definition.key];
-    if (wanted === undefined || wanted === applied.worldStyleParameters[definition.key]) continue;
+    const wanted = candidate.worldStyleParameters[definition.key] ??
+      applied.worldStyleParameters[definition.key];
+    // A control the proposal leaves at the applied value is still moved back when the draft
+    // holds something else, such as an earlier proposal's value, so the draft is this proposal.
+    if (
+      wanted === undefined ||
+      (wanted === applied.worldStyleParameters[definition.key] && wanted === draft[definition.key])
+    ) continue;
     const node = view.root.querySelector<HTMLInputElement | HTMLSelectElement>(
       `[aria-label="${escapeAttribute(definition.label)}"]`,
     );
@@ -729,3 +903,4 @@ export function describeWorldStyleFailure(error: unknown): string {
   }
   return error instanceof Error ? error.message : 'The world style request failed.';
 }
+

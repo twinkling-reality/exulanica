@@ -290,12 +290,15 @@ class AppearanceOutcome:
     model_id: str | None = None
     #: The identifier that classified the utterance, on the same terms.
     classified_by: str | None = None
-    #: Every model call this utterance made that RETURNED A RESULT, in the order it made them.
-    #:
-    #: A classifier reply the endpoint truncated, or answered with a body the schema refused,
-    #: raises inside ``ModelClient.structured`` before any result reaches this module, so that
-    #: attempt is absent from a list that is not empty. ``refusal`` is what says one happened.
+    #: Every model call this utterance made, in the order it made them, and every attempt it
+    #: paid for that returned no result, each with its outcome (:class:`CallLog`).
     calls: tuple[ModelCall, ...] = ()
+    #: Each placeholder the proposal's words may carry, and the entity it stands for: the
+    #: request's one record (:class:`~exulanica.selection.request_names.RequestNames`), as the
+    #: answer path returns it. A person, or a place the account holder has not allowed for the
+    #: drafter, reaches the model only as ``[person A]`` or ``[place A]``, and the client restores
+    #: the name from the account holder's own data.
+    names: tuple[tuple[str, uuid.UUID], ...] = ()
 
 
 def source_catalogue(
@@ -580,6 +583,38 @@ def propose_appearance(
     attached reference photograph's viewer bytes must be for it to be citable.
     """
     log = CallLog()
+    try:
+        return _proposed(
+            connection,
+            client.with_attempts(log.attempt),
+            utterance,
+            session,
+            log,
+            registry=registry,
+            current=current,
+            world_id=world_id,
+            store=store,
+        )
+    except Exception as failed:
+        # No outcome exists to carry the record, so the error that ended the request
+        # carries it: a model error, a policy's refusal as a request left, or anything else.
+        log.on_failure(PROMPT_VERSION).note(failed)
+        raise
+
+
+def _proposed(
+    connection: psycopg.Connection,
+    client: ModelClient,
+    utterance: str,
+    session: Session,
+    log: CallLog,
+    *,
+    registry: StyleRegistry,
+    current: StyleReference | None,
+    world_id: str,
+    store: ContentAddressedStore | None,
+) -> AppearanceOutcome:
+    """:func:`propose_appearance` once its log is made, every call recorded in ``log``."""
     # The classifier and the drafter are sent the utterance with every name no right can release
     # replaced, and a place's name left to the boundary, which sends it only under the account
     # holder's right for this role. Both requests carry the one record, so each entity is written
@@ -588,7 +623,9 @@ def propose_appearance(
     sent = names.sendable(utterance)
     kind, classified_by = classify_request(client, sent, log=log, placeholders=names.placeholders)
     if kind is RequestKind.QUESTION:
-        return AppearanceOutcome(kind=kind, classified_by=classified_by, calls=log.calls)
+        return AppearanceOutcome(
+            kind=kind, classified_by=classified_by, calls=log.calls, names=_names(names)
+        )
     if current is None:
         return AppearanceOutcome(
             kind=kind,
@@ -598,6 +635,7 @@ def propose_appearance(
             ),
             classified_by=classified_by,
             calls=log.calls,
+            names=_names(names),
         )
     if not _proposable_profiles(registry):
         # `Literal[()]` is not a type and `create_model` refuses it with a bare AssertionError.
@@ -611,6 +649,7 @@ def propose_appearance(
             ),
             classified_by=classified_by,
             calls=log.calls,
+            names=_names(names),
         )
     catalogue = source_catalogue(connection, session.workspace_id, world_id=world_id, store=store)
     if not catalogue:
@@ -626,6 +665,7 @@ def propose_appearance(
             ),
             classified_by=classified_by,
             calls=log.calls,
+            names=_names(names),
         )
     try:
         draft, model_id = draft_appearance(
@@ -643,6 +683,7 @@ def propose_appearance(
             refusal=ProposalRefusal(RefusalCode.NOT_DRAFTED, str(refused)),
             classified_by=classified_by,
             calls=log.calls,
+            names=_names(names),
         )
     outcome = _validate_draft(draft, current, catalogue, registry=registry)
     if isinstance(outcome, ProposalRefusal):
@@ -652,6 +693,7 @@ def propose_appearance(
             model_id=model_id,
             classified_by=classified_by,
             calls=log.calls,
+            names=_names(names),
         )
     return AppearanceOutcome(
         kind=kind,
@@ -659,7 +701,13 @@ def propose_appearance(
         model_id=model_id,
         classified_by=classified_by,
         calls=log.calls,
+        names=_names(names),
     )
+
+
+def _names(names: RequestNames) -> tuple[tuple[str, uuid.UUID], ...]:
+    """The request's record as the outcome carries it: each placeholder and its entity."""
+    return tuple((label, entity_id) for entity_id, label in names.placeholders.items())
 
 
 # -- the bounded form -------------------------------------------------------------------------

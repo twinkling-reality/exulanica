@@ -81,6 +81,8 @@ const call = (latency: number, servedModel: string = DRAFTER) => ({
   promptTokens: 900,
   completionTokens: 120,
   reasoningTokens: null,
+  outcome: 'completed' as const,
+  costBasis: 'known' as const,
 });
 
 const PROPOSAL: CompanionProposal = {
@@ -291,6 +293,49 @@ describe('a sentence that turns out to be a request to change the world', () => 
     // wrong author.
     expect(remembered[1]?.provenance).toMatchObject({ composed: 'none', servedModel: null });
     expect(remembered[1]?.promptVersion).toBe('proposal-outcome');
+  });
+
+  it('keeps what became of a proposal made before this page opened', async () => {
+    const { mounted, remembered } = harness([]);
+    mounted.summon();
+
+    // The page found it still staged on opening; its sentence belongs to an earlier page.
+    worldStyleProposalOutcomes.report({
+      originReference: 'companion-utterance:from-an-earlier-page',
+      kind: 'accepted',
+      detail: 'Applied as revision 2.',
+      earlier: true,
+    });
+    await settle();
+
+    expect(remembered).toHaveLength(1);
+    expect(remembered[0]?.question).toBe(say('proposal.earlier'));
+    expect(remembered[0]?.text).toContain(say('proposal.outcome.accepted'));
+  });
+
+  it('keeps a proposal that is still open but could not be shown or closed, and remembers it', async () => {
+    const { mounted, remembered, received } = harness([PROPOSAL]);
+    mounted.summon();
+    mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+    const originReference = (received[0] as { readonly originReference: string }).originReference;
+
+    worldStyleProposalOutcomes.report({
+      originReference,
+      kind: 'still_open',
+      detail: 'Another proposal took its place on this panel, and it could not be closed, so it is still open.',
+    });
+    worldStyleProposalOutcomes.report({ originReference, kind: 'accepted', detail: 'Applied as revision 1.' });
+    await settle();
+
+    // Both are kept: the still-open notice is not final, so the later acceptance still has the
+    // sentence it belongs to.
+    expect(remembered.map((answer) => answer.text)).toEqual([
+      expect.stringContaining('The horizon will sit softer'),
+      expect.stringContaining(say('proposal.outcome.still_open')),
+      expect.stringContaining(say('proposal.outcome.accepted')),
+    ]);
+    expect(remembered[1]?.text).toContain('still open');
   });
 
   it('keeps a discard too, because a proposal nobody took is still something that happened', async () => {

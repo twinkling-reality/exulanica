@@ -91,8 +91,12 @@ photograph, its descriptions and its other rights stay, so the photograph can st
 words of its own description, a match made in the database without any model; only the entries the
 search model made are deleted. The deletion is as prompt as the purge worker, and until it runs the
 entries still exist while the search already leaves them out (`exulanica/selection/embeddings.py`),
-as it does a deleted photograph's. An expiry deletes nothing.
-`tests/test_search_entries_on_stop.py` holds this through the runtime and purge roles. A restore
+as it does a deleted photograph's. An expiry deletes nothing. A search right granted again lets
+the photograph be indexed again, and the search ranks the entry made under it: an entry is left out
+only while the stop names it and its purge has not destroyed it, and the stop's record stays. An
+entry is made again only after the purge, since indexing skips a photograph whose entry is still
+stored. `tests/test_search_entries_on_stop.py` holds this through the runtime and purge roles, and
+`tests/test_search_entry_granted_again.py` the right granted again. A restore
 writes the stop again from its checkpoint before it replays the stop's tombstone, so a backup taken
 before the stop comes back with the right stopped and its entries deleted
 ([ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md)).

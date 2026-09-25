@@ -27,6 +27,7 @@ not be a change to the module that decides whether a model's answer enters canon
 
 from __future__ import annotations
 
+import copy
 import random
 import time
 from collections.abc import Callable, Mapping
@@ -109,6 +110,12 @@ class ModelChain:
     def __repr__(self) -> str:
         # No credential, not even a prefix of one. A truncated key in a traceback is still a leak.
         return f"ModelChain(base_url={self._manifest.base_url!r})"
+
+    def with_budget(self, budget: BudgetGuard) -> ModelChain:
+        """This chain, reserving and recording every attempt against ``budget`` instead."""
+        bound = copy.copy(self)
+        bound._budget = budget
+        return bound
 
     def _headers(self) -> dict[str, str]:
         return {

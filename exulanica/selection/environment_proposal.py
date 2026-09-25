@@ -99,11 +99,13 @@ def draft_environment_operation(
     operations: Sequence[EnvironmentOperation],
     *,
     placeholders: Mapping[uuid.UUID, str] | None = None,
+    log: CallLog | None = None,
 ) -> EnvironmentProposalDecision:
     """Select one offered operation, with one repair and no fallback mutation.
 
     ``placeholders`` is the request's record of the names in ``utterance``, handed to the
-    boundary with the request.
+    boundary with the request. ``log`` is the request's own record, which hears every attempt
+    when ``client`` is the request's copy (``ModelClient.with_attempts``).
     """
     if not operations:
         return EnvironmentProposalDecision(
@@ -127,7 +129,7 @@ def draft_environment_operation(
             ),
         },
     ]
-    log = CallLog()
+    log = CallLog() if log is None else log
     for attempt in range(1, _ATTEMPTS + 1):
         try:
             drafted = client.structured(
@@ -185,8 +187,21 @@ def propose_environment_operation(
     session: Session,
     operations: Sequence[EnvironmentOperation],
 ) -> EnvironmentProposalDecision:
-    """Draft the operation an utterance asks for, with the utterance's saved names decided first."""
-    names = RequestNames.read(connection, session.workspace_id)
-    return draft_environment_operation(
-        client, names.sendable(utterance), operations, placeholders=names.placeholders
-    )
+    """Draft the operation an utterance asks for, with the utterance's saved names decided first.
+
+    The request sends through its own copy of the client, so its record lists every attempt it
+    paid for; an error that ends it carries that record to the problem body.
+    """
+    log = CallLog()
+    try:
+        names = RequestNames.read(connection, session.workspace_id)
+        return draft_environment_operation(
+            client.with_attempts(log.attempt),
+            names.sendable(utterance),
+            operations,
+            placeholders=names.placeholders,
+            log=log,
+        )
+    except Exception as failed:
+        log.on_failure(ENVIRONMENT_PROMPT_VERSION).note(failed)
+        raise
