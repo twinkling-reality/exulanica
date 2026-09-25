@@ -117,6 +117,12 @@ export interface SessionState {
    * any other state is absent here and nothing is drawn where it was.
    */
   authoredPointMaps: readonly AuthoredPointMapPlacement[] | undefined;
+  /**
+   * The region id of every placement the person made in the open world's version and has not
+   * removed, one per placement, read with the depth estimates above. Where the world opens is
+   * chosen from it (`openingIsland` in atlas-react). Undefined when no version was read.
+   */
+  placementRegionIds: readonly string[] | undefined;
   trainedGeometry: readonly TrainedSceneGeometry[];
   recoveredCameras: readonly RecoveredSceneCamera[];
   notDrawnScenes: ReadonlySet<string>;
@@ -238,6 +244,7 @@ export function createSessionState(): SessionState {
     pointMaps: undefined,
     placedPointMaps: undefined,
     authoredPointMaps: undefined,
+    placementRegionIds: undefined,
     trainedGeometry: Object.freeze([]),
     recoveredCameras: Object.freeze([]),
     notDrawnScenes: new Set(),

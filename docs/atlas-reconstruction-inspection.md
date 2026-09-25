@@ -68,9 +68,19 @@ so beside the rung.
 - **Grounding.** Every region, reconstructed or not, sits on the solver's y = 0 plane, which is the
   flat datum the visitor stands on, so a reconstruction's local y = 0 is that ground. The authored
   landscape height that reconstructed regions were once lifted onto no longer exists.
-- **Arrival.** A region with recovered cameras arrives where the first photograph was taken,
-  looking where that camera looked (`viewpointForwardLocal`). The first frame is the first
-  photograph's view of the geometry. Regions without a recovered direction keep the offset framing.
+- **Arrival.** A world of scene regions opens in the region holding the most of the person's
+  placements in the version it opens (objects, environment pieces and depth estimates that are not
+  removed); a tie goes to the region earlier in the scene's order, and with no placement in a drawn
+  region the world opens in the scene's first region (`openingIsland` in
+  `web/packages/atlas-react/src/playcanvas/opening-region.ts`). Every placement in a version is the
+  person's own, because each placement table admits only an authored origin, and a photograph is
+  not a placement, so adding photographs never moves the opening. The choice changes no region's
+  order, so the layout and the island cut stay as they are. The placements are read from the
+  version the page reads before the renderer is built, so the first frame is already in that
+  region. The world opens at the region's own viewpoint, not facing any one object. A region with
+  recovered cameras arrives where its first photograph was taken, looking where that camera looked
+  (`viewpointForwardLocal`), so the first frame is that photograph's view of the geometry. Regions
+  without a recovered direction keep the offset framing.
 - **Residency.** A region's point-map cost is capped at the residency budget, so one region can
   always afford its full stage while several still compete; the representation pressure controller
   still steps the stage down under frame pressure without dropping the region to stub.

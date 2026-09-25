@@ -90,7 +90,7 @@ import {
   type OwnedDistrictGround,
   type WorldKind,
 } from './world-kind.js';
-import { cityView, worldStart, type CityView } from './camera-views.js';
+import { cityView, worldStart, type CityView, type OpeningPlacements } from './camera-views.js';
 import { AuthoredRegionSociety } from './society/authored-society.js';
 import type { GeneratedTileAttachment, GeneratedTileMount } from './generated-tile/binding-contract.js';
 import { PlayerAvatar } from './player-avatar.js';
@@ -381,7 +381,7 @@ export function placedCatalogObjectSubject(
   });
 }
 
-export interface AtlasBindingOptions {
+export interface AtlasBindingOptions extends OpeningPlacements {
   readonly canvas: HTMLCanvasElement;
   readonly overlayParent: HTMLElement;
   readonly scene: AtlasScene;
@@ -1073,7 +1073,7 @@ export class AtlasBinding {
       }
     }
 
-    const start = worldStart(kind, options.scene, navigationWorld);
+    const start = worldStart(kind, options.scene, navigationWorld, options.placementRegionIds);
     const controls = new FirstPersonControls(
       options.canvas,
       start.pose,

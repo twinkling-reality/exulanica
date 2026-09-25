@@ -87,6 +87,8 @@ export async function mountAtlas(
     readonly authoredRegion?: AuthoredRegion;
     /** Placed depth estimates for that region; ignored without one, because they have no root. */
     readonly authoredPointMaps?: readonly AuthoredPointMapPlacement[];
+    /** Where the person's placements are, which decides the region the world opens in. */
+    readonly placementRegionIds?: readonly string[];
   },
   beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
@@ -112,6 +114,9 @@ export async function mountAtlas(
     ...(presentation?.authoredPointMaps === undefined
       ? {}
       : { authoredPointMaps: presentation.authoredPointMaps }),
+    ...(presentation?.placementRegionIds === undefined
+      ? {}
+      : { placementRegionIds: presentation.placementRegionIds }),
     ...(presentation === undefined
       ? {}
       : {

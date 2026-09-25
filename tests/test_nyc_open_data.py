@@ -264,7 +264,10 @@ def test_manifest_plan_and_writes_are_reproducible_and_digest_bound(tmp_path):
     )
     proxy = json.loads(first.semantic_proxies[0].data)
     index = json.loads(first.index_inputs[0].data)
-    assert proxy["disclosure"].startswith("Neutral flat semantic proxies")
+    assert proxy["disclosure"] == (
+        "Neutral flat semantic proxies generated only from official NYC Open Data footprints. "
+        "They hold no building geometry beyond each footprint and contain no inferred surfaces."
+    )
     assert proxy["features"][0]["provider_feature_id"] == "doitt_id:2327"
     assert proxy["features"][0]["render_batch_id"] == 0
     assert index["features"][0]["footprint"] == proxy["features"][0]["footprint"]

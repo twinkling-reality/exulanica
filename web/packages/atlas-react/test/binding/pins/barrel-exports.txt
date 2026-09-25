@@ -72,6 +72,7 @@ mapCameraState
 moteAnchorIndices
 nudgedPose
 objectAssetBytesPath
+openingIsland
 opmPointInScene
 ownedDistrictCameraState
 ownedDistrictOverviewCameraState

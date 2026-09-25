@@ -161,6 +161,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       reducedMotion: env.systemReducedMotion.matches,
       ...(district === undefined ? {} : { ownedDistrict: district }),
       ...(generatedTile === undefined ? {} : { generatedTile }),
+      ...(state.placementRegionIds === undefined ? {} : { placementRegionIds: state.placementRegionIds }),
       ...(state.activeWorldEntry?.authoredScene === null ||
           state.activeWorldEntry?.authoredScene === undefined
         ? {}

@@ -162,6 +162,7 @@ export {
   mapCameraState,
 } from './atlas-binding.js';
 export { ownedDistrictCameraState, ownedDistrictOverviewCameraState } from './camera-views.js';
+export { openingIsland, type OpeningPlacements } from './opening-region.js';
 export type {
   OwnedAuthoredEnvironmentInstance,
   OwnedDistrictMetrics,

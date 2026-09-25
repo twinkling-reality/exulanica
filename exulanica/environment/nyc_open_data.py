@@ -486,7 +486,8 @@ def prepare(
             "attribution": ATTRIBUTION,
             "disclosure": (
                 "Neutral flat semantic proxies generated only from official NYC Open Data "
-                "footprints. They are not Google buildings and contain no inferred surfaces."
+                "footprints. They hold no building geometry beyond each footprint and contain "
+                "no inferred surfaces."
             ),
             "features": [
                 {

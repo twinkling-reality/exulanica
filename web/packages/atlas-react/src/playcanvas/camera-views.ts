@@ -10,7 +10,11 @@ import {
   type OwnedDistrict,
 } from '@exulanica/atlas-core';
 import type { CameraHold, CameraState } from './controls.js';
+import { openingIsland } from './opening-region.js';
 import { worldViews, type WorldKind } from './world-kind.js';
+
+/** The binding's option for the opening rule, beside the views it decides. */
+export type { OpeningPlacements } from './opening-region.js';
 
 /*
  * WHERE A WORLD PUTS THE CAMERA, AND WHAT HOLDS IT THERE.
@@ -57,9 +61,18 @@ export function cityView(
   return Object.freeze({ pose, hold: CITY_VIEW_HOLD[view] });
 }
 
-/** Where the session opens: standing at the world's ground entry. */
-export function worldStart(kind: WorldKind, scene: AtlasScene, navigationWorld: NavigationWorld): HeldView {
-  return Object.freeze({ pose: groundEntry(kind, scene, navigationWorld), hold: CITY_VIEW_HOLD.street });
+/**
+ * Where the session opens: standing at the world's ground entry. A world of scene regions stands
+ * in the region `openingIsland` chooses from the person's placements.
+ */
+export function worldStart(
+  kind: WorldKind,
+  scene: AtlasScene,
+  navigationWorld: NavigationWorld,
+  placementRegionIds: readonly string[] = [],
+): HeldView {
+  const pose = groundEntry(kind, scene, navigationWorld, placementRegionIds);
+  return Object.freeze({ pose, hold: CITY_VIEW_HOLD.street });
 }
 
 function overviewOf(kind: WorldKind): CameraState {
@@ -69,9 +82,14 @@ function overviewOf(kind: WorldKind): CameraState {
 
 /**
  * Where this kind of world stands a person on its ground: its spawn, its district's clear spawn,
- * its tile's stated start, or the first region's own viewpoint. Street level is this pose.
+ * its tile's stated start, or the opening region's own viewpoint. Street level is this pose.
  */
-export function groundEntry(kind: WorldKind, scene: AtlasScene, navigationWorld: NavigationWorld): CameraState {
+export function groundEntry(
+  kind: WorldKind,
+  scene: AtlasScene,
+  navigationWorld: NavigationWorld,
+  placementRegionIds: readonly string[] = [],
+): CameraState {
   const ground = kind.ground;
   switch (ground.form) {
     case 'generated-tile':
@@ -90,13 +108,14 @@ export function groundEntry(kind: WorldKind, scene: AtlasScene, navigationWorld:
       };
     }
     case 'scene-regions':
-      return initialAtlasCameraState(scene, navigationWorld);
+      return initialAtlasCameraState(scene, navigationWorld, placementRegionIds);
   }
   throw new TypeError(`No ground entry for a world standing on ${(ground as { form: string }).form}`);
 }
 
 /**
- * Where a session opens.
+ * Where a session opens: in the region `openingIsland` chooses (the one holding most of the
+ * person's placements, else the scene's first).
  *
  * The upward framing is gone with the body it framed. This used to pitch the opening camera up at
  * the source veil hanging 3.45 metres over the region, which is the one thing that made an opening
@@ -106,8 +125,9 @@ export function groundEntry(kind: WorldKind, scene: AtlasScene, navigationWorld:
 export function initialAtlasCameraState(
   scene: AtlasScene,
   navigationWorld: NavigationWorld,
+  placementRegionIds: readonly string[] = [],
 ): CameraState {
-  const first = scene.islands[0];
+  const first = openingIsland(scene, placementRegionIds);
   if (first !== undefined && first.rung !== 4 && first.viewpointForwardLocal !== undefined) {
     // A reconstructed region arrives where its first photograph was taken, looking where that
     // camera looked. The display frame put the recovered cameras at eye height, so this is a

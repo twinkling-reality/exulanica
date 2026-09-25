@@ -39,6 +39,7 @@ import {
 import {
   WorldObjectsClient,
   drawablePointMaps,
+  type AlternateVersion,
   type PointMapInstance,
 } from '../world-objects-api.js';
 import {
@@ -374,7 +375,8 @@ export async function mountSessionGeometry(deps: {
  * settled; every one of them now carries a deadline.
  */
 /**
- * The depth estimates the account holder placed in the world they have open, ready to draw.
+ * The depth estimates the account holder placed in the world they have open, ready to draw, and
+ * the region of every placement in that version, which decides where the world opens.
  *
  * Read from the authored version rather than from the ``/geometry`` list. The list is every
  * estimate this workspace holds; what a world draws is what somebody PUT in it, which is the
@@ -389,6 +391,8 @@ export async function loadAuthoredPointMaps(
   where: { baseUrl: string; token: string },
 ): Promise<void> {
   const entry = state.activeWorldEntry;
+  // A version that cannot be read names no placement, and the world opens in its first region.
+  state.placementRegionIds = undefined;
   if (entry?.authoredVersionId === undefined || entry.authoredVersionId === null) {
     state.authoredPointMaps = undefined;
     return;
@@ -397,6 +401,7 @@ export async function loadAuthoredPointMaps(
     const version = await new WorldObjectsClient({
       ...where, worldId: entry.worldId,
     }).readVersion(entry.authoredVersionId);
+    state.placementRegionIds = placementRegionIds(version);
     const drawable = drawablePointMaps(version);
     if (drawable.length === 0) {
       state.authoredPointMaps = Object.freeze([]);
@@ -431,6 +436,19 @@ export async function loadAuthoredPointMaps(
     // A world opens without its estimates rather than not at all.
     state.authoredPointMaps = Object.freeze([]);
   }
+}
+
+/**
+ * The region of every placement the person made in a version and has not removed: objects,
+ * environment pieces and depth estimates. Every placement is the person's own (the server admits
+ * only authored origins), and photographs are not placements.
+ */
+export function placementRegionIds(version: AlternateVersion): readonly string[] {
+  return Object.freeze([
+    ...version.objects,
+    ...version.environmentInstances ?? [],
+    ...version.pointMapInstances ?? [],
+  ].filter((placement) => !placement.removed).map((placement) => placement.regionId));
 }
 
 /** What the client needs to fetch and check one placed estimate, read from the placement itself. */

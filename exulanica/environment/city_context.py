@@ -3,8 +3,8 @@
 ``POST /selection/ask`` takes a building selected from the independently admitted semantic city
 layer. The building's identity is read from its admitted NYC Open Data record alone, and a
 question about it runs over the memory place a confirmed place bridge ties to the building's
-place. A building with no bridge is stated and nothing is retrieved. Google content is consulted
-for neither.
+place. A building with no bridge is stated and nothing is retrieved. Nothing but that record and
+the confirmed bridge is read for either.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def resolve_city_selection(
     feature_id: str,
     supplied_plan: SelectionPlan | None,
 ) -> tuple[SelectionPlan | None, AnswerClause]:
-    """Resolve semantic identity and its place bridge without consulting Google content.
+    """Resolve semantic identity from the admitted NYC record alone, and its place bridge.
 
     Raises :class:`CitySelectionRefused` for a selection that is not one admitted NYC Open Data
     building, a building record whose identifiers are malformed, and a supplied plan the bridge
@@ -103,7 +103,7 @@ def resolve_city_selection(
     return plan, AnswerClause(
         text=(
             f"{label} is selected from official NYC BUILDING data. Its semantic identifiers "
-            f"are {provider_feature_id.upper()} and BIN {bin_text}; Google supplied no identity."
+            f"are {provider_feature_id.upper()} and BIN {bin_text}, read from that record alone."
         ),
         type=ClauseType.META,
     )

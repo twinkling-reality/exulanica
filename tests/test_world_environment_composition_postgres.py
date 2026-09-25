@@ -1408,7 +1408,9 @@ def test_authenticated_place_bridge_routes_create_list_and_revoke(
         assert unlinked.status_code == 200, unlinked.text
         assert unlinked.json()["deterministic"] is True
         assert unlinked.json()["execution"]["calls"] == []
-        assert "Google supplied no identity" in unlinked.json()["answer"]["clauses"][0]["text"]
+        assert unlinked.json()["answer"]["clauses"][0]["text"].endswith(
+            "read from that record alone."
+        )
         assert "no confirmed memory-place bridge" in unlinked.json()["answer"]["clauses"][1]["text"]
         created = client.post("/selection/place-bridges", json=body, headers=headers)
         assert created.status_code == 201, created.text
