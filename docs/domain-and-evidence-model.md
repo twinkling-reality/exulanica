@@ -5,7 +5,7 @@ against what was actually built also carries **CORRECTED**.
 Retrieval date for every VERIFIED external source: **2026-08-27**.
 
 This contract owns evidence addresses, provenance, identity assertions and their schema. It is
-one part of the [world model architecture](world-memory-model.md), alongside authored state,
+one part of the [world state architecture](world-memory-model.md), alongside authored state,
 simulation and representations. The spine's compatibility rules do not turn a database schema into
 the complete product specification.
 

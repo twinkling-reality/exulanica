@@ -127,7 +127,7 @@ and interrupted jobs remain distinct states with recovery defined by the owning 
 ## 8. Extension boundaries
 
 Use [world composition](world-composition-contract.md) for importing or generating content,
-[world model architecture](world-memory-model.md) for identity and representation semantics,
+[world state architecture](world-memory-model.md) for identity and representation semantics,
 [simulation tooling](product-direction.md#modular-simulation-and-scientific-tooling) for candidate
 solver adapters, and [World Memory Package](world-memory-package.md) for portable projections.
 An exported asset does not automatically transfer behavior, private history or source rights.

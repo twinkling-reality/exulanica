@@ -1,8 +1,8 @@
 # Scene reconstruction
 
-Build 3D places from the media associated with your experiences.
+Build 3D places from photographs of a real place: one way to build a world.
 
-Reconstruction is one way to supply places for a personal world; authored and synthetic creation
+Reconstruction is one way to supply places for a world; authored and synthetic creation
 are independent paths. Names confirmed by the user
 connect people and objects across experiences. Reconstruction remains linked to its source;
 rendered geometry does not establish historical facts.

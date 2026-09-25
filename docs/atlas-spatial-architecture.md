@@ -6,6 +6,10 @@ artifacts, physical asset streaming, or full-library production scale are comple
 
 ## 1. World decision
 
+This contract governs the Atlas: the spatial presentation of a person's photograph library, which
+is one feature of a world and one way to build one. The product is a world that open models run
+([product direction](product-direction.md)).
+
 The Atlas is a **grounded memory archipelago**.
 
 It is one logical semantic world, viewed at three scales:

@@ -7,6 +7,10 @@ scope.
 
 ## 1. Visual thesis
 
+Aeroheart governs how a person's own photographs and memories look where they appear in a world.
+Those are one feature of a world and one way to build it; the product is a world that open models
+run ([product direction](product-direction.md)).
+
 **Aeroheart is source weather.** Atlas is not a low-poly landscape with memories placed on it. It is
 one continuous atmospheric field whose light, clarity, and motion change around evidence. A memory
 is the sharpest part of that field because it carries exact authorized source media. Relationships

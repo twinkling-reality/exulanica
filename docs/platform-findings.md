@@ -431,6 +431,9 @@ https://docs.nebius.com/cli/reference/msp/postgresql/v1alpha1/cluster/create (bo
 
 ## 5. Tavily
 
+No public-entity lookup is built, and no product code calls Tavily; this section records one
+credential check made by `scripts/verify_web_lookup.py`.
+
 Short, because there is little to report, which is the point.
 
 **It worked on the first attempt.** `POST https://api.tavily.com/search` returned HTTP 200 in 2.26 s

@@ -30,7 +30,7 @@ installs no extras and fails a skip that file does not accept.
 | Variable | Needed for | Where to get it |
 | --- | --- | --- |
 | `NEBIUS_API_KEY` | Every model call, and the preflight | https://tokenfactory.nebius.com/ then "Get API key" |
-| `TAVILY_API_KEY` | The opt-in public lookup only | https://tavily.com or the Nebius Builders Program |
+| `TAVILY_API_KEY` | Nothing in the product: no public lookup is built. Only `scripts/verify_web_lookup.py`, a one-off credential check, reads it | https://tavily.com or the Nebius Builders Program |
 
 Neither key is required to run the test suite. Tests do not call external model services or spend
 model credits; database tests connect to the explicitly configured local PostgreSQL server.

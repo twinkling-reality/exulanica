@@ -3,14 +3,14 @@
 This page preserves the address of the earlier product research. The complete research, citations,
 assumptions and original design are available in the [fixed source revision](https://github.com/twinkling-reality/exulanica/blob/857cffe730dad97f9edb34535c773115277e2769/docs/product-specification.md).
 It is historical context, not a second active specification. [Product direction](product-direction.md)
-owns the personal world model's scope and delivery order.
+owns the product's scope and delivery order.
 
 ## Successor owners
 
 | Question | Living owner |
 | --- | --- |
 | What is the product, and what comes first? | [Product direction](product-direction.md) |
-| What does a world represent? | [World model architecture](world-memory-model.md) |
+| What does a world represent? | [World state architecture](world-memory-model.md) |
 | What can reconstruction establish? | [Reconstruction quality](reconstruction-quality-gate.md) and [scene operations](scene-reconstruction-operations.md) |
 | Which geometry earns navigation? | [Spatial architecture](atlas-spatial-architecture.md), [ADR-0008](adr/0008-generated-geometry.md) and [ADR-0009](adr/0009-the-ladder-above-rung-3.md) |
 | What supports identity and factual claims? | [Domain and evidence](domain-and-evidence-model.md) |

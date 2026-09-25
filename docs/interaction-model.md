@@ -43,7 +43,7 @@ links to the application; it does not imitate an empty Atlas or mount mock appli
 
 Rejected alternative: discrete scenes with transitions between an overview map and region interiors,
 which is the conventional structure. Rejected because it forces a loading boundary exactly where the
-product's central claim lives (this person is in both places), and because it makes recomposition a
+Atlas's central claim lives (this person is in both places), and because it makes recomposition a
 rebuild rather than a uniform change.
 
 Five consequences follow mechanically and are not separately decided:
@@ -892,8 +892,8 @@ emits a restricted declarative plan, never an executable query) applied consiste
 new constraint.
 
 The practical test: anything the Companion does must be inspectable and repeatable by clicking, and
-a user who ignores the Companion entirely loses no capability. That matters for a product whose
-thesis is that the user stays in control of what gets asserted.
+a user who ignores the Companion entirely loses no capability. That matters for a product in
+which the user stays in control of what gets asserted.
 
 **OPEN: an island may be a cluster rather than a single capture.** With five curated captures, one
 island is one capture. With a few thousand travel photographs that is thousands of islands and the

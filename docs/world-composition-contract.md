@@ -22,9 +22,10 @@ experience integration (`2026-09-12-experience-integration`) and Earth scope cor
 (`2026-09-12-earth-experience-correction`) records, which are local-only: a clone does not contain
 them.
 
-The personal world model is the system's representation and behavior across memory,
-creation and interaction. It is not a claim that one trained neural network
-already understands or generates an entire world. WMP is a signed projection of
+A world is the system's representation and behavior across creation, simulation,
+model decisions, memory and interaction: the world AI models live in, not a world
+model that generates how a world looks. It is not a claim that one trained neural
+network understands or generates an entire world. WMP is a signed projection of
 authorized state, not the live database or a runnable scene by itself.
 The canonical technical doctrine is
 [world-memory-model.md](world-memory-model.md): every consequential feature is

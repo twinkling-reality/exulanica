@@ -9,7 +9,7 @@ rejected alternatives remain available in the [fixed source revision](https://gi
 | Historical subject | Living owner |
 | --- | --- |
 | Product goal, acceptance and delivery order | [Product direction](product-direction.md) |
-| World planes, persistent identity and research claims | [World model architecture](world-memory-model.md) |
+| World planes, persistent identity and research claims | [World state architecture](world-memory-model.md) |
 | Composition, source admission and authored alternatives | [Composition](world-composition-contract.md) and [world objects](world-objects-contract.md) |
 | Processing and reconstruction | [Worker operations](derivative-worker-operations.md) and [scene operations](scene-reconstruction-operations.md) |
 | Spatial authority and rendering | [Spatial authority](spatial-world-authority.md) and [physical residency](physical-streaming-runtime.md) |

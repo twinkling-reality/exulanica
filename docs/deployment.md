@@ -143,8 +143,7 @@ Five places where code or data lives, and one boundary that matters more than th
         v                     v
   PostgreSQL 18          Nebius Token Factory
   + pgvector             (reasoning, vision, embeddings)
-  (same host)                 |
-                              +--> Tavily (opt-in public entity lookup)
+  (same host)
 
   Out of band, never in a request:
   Nebius Serverless Jobs  -->  ingest, perception, reconstruction
@@ -159,7 +158,6 @@ Five places where code or data lives, and one boundary that matters more than th
 | Asynchronous ingest and perception | Nebius Serverless Jobs, self terminating, per second billing | Failure is retryable and idempotent, which is what makes a self terminating job the right shape |
 | Reconstruction (structure from motion plus splat or point map training) | Nebius Serverless Job on a GPU flavour, preemptible, checkpointed | Minutes to hours. **Never in the live path.** Scenes are reconstructed once, ahead of deployment, and the results are static assets |
 | Reasoning, vision and embedding models | Nebius Token Factory, global base URL only | The identifiers and their fallbacks are in `exulanica/models/models.manifest.json` |
-| Public entity lookup | Tavily, opt in, server constructed query only | Queries are built on the server and never carry corpus content |
 
 **The boundary that matters** is between work that must answer inside a request and work that must
 not. Reconstruction, perception and batch ingest take minutes to hours. They run as jobs that
@@ -430,7 +428,7 @@ Training, conversion and authenticated visual acceptance are separate gates.
 | --- | --- | --- |
 | `EXULANICA_DATABASE_URL` | **The connection string the API, ingest command and derivative worker open.** The API and worker must use a non-owner role such as `exulanica_app`; startup refuses a superuser, BYPASSRLS role, or owner of an RLS table. No default: `Database.from_env` raises rather than connecting somewhere nobody chose. | `exulanica/db/session.py` and `exulanica/db/roles.py`. The one-shot migration service deliberately uses the bootstrap owner URL instead |
 | `NEBIUS_API_KEY` | Bearer credential for Token Factory | The model client. Named in `models.manifest.json` as `api_key_env`, so even the environment variable name is manifest data rather than a literal in code |
-| `TAVILY_API_KEY` | Credential for the public entity lookup | The lookup path only. The feature is opt in and is on the cut list if its egress gate does not hold |
+| `TAVILY_API_KEY` | Tavily credential. No public entity lookup is built, and no product code reads it | `scripts/verify_web_lookup.py` only, a one-off credential check |
 | `EXULANICA_TEST_DATABASE_URL` | Points the database backed tests at a live PostgreSQL 18 server | Tests only. Unset means those tests skip, which is why the suite runs without a database. |
 | `EXULANICA_DATA_DIR` | Where the content addressed store lives | The API and the ingest command must agree on it, or a citation resolves against a store the bytes are not in. Defaults to `.exulanica/local`. It does not look at `.orimera/`. |
 | `EXULANICA_API_TOKENS` | Bearer token to workspace grant, including the `permissions` the token holds | No default, because a default would be a credential in a repository. A grant that names no permissions, or one outside the closed vocabulary in [security-floor.md](security-floor.md), stops startup |
@@ -665,7 +663,7 @@ while a name nothing reads sat here.
 
 ### 5.3 Rules
 
-- **No secret ever reaches the browser.** The Token Factory key and the Tavily key are server side
+- **No secret ever reaches the browser.** The Token Factory key is server side
   only. The client is given public URLs and nothing else. Any design where the browser calls Token
   Factory directly is rejected outright, because a credential in a static bundle is a published
   credential.

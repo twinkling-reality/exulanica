@@ -2,7 +2,7 @@
 
 Status: **PROFILE `exulanica-wmp-1.0`, EXIT-GATED**.
 
-**Creative-world state:** [product-direction.md](product-direction.md#package-and-api-boundaries)
+**Authored world state:** [product-direction.md](product-direction.md#package-and-api-boundaries)
 asks for authored state and behaviour references without changing the 1.0 profile. Objects,
 overrides and schema-version-1 deltas are carried by an optional, separately versioned
 extension, `exulanica-wmp-ext-authored-world`, in versions 1.0 and 1.1, specified in

@@ -1,8 +1,9 @@
 # Exulanica documentation
 
-Exulanica is a persistent, programmable personal world model. Create from imagination, personal
-media or permitted imports; inspect and reshape the world; add synthetic life; and build projects
-using its supported state and actions. The [root README](../README.md) introduces the product.
+Exulanica: Worlds for AI Agents. A person builds a world, and open models run what happens inside
+it, each doing what it is good at; the person can swap one model for another and see the
+difference. World models generate how a world looks; Exulanica is the world AI models live in. The
+[root README](../README.md) introduces the product.
 
 ## Start here
 
@@ -23,8 +24,11 @@ using its supported state and actions. The [root README](../README.md) introduce
 [World API](capabilities/world-api.md) ·
 [Developer client](capabilities/developer-client.md)
 
-The **Companion** is the person's AI partner within the world, helping with exploration, creation
-and understanding events. Its guide separates that role from the implemented tools.
+**Models inside the world** are the product's core: the [simulation guide](capabilities/simulation.md)
+and the [society contract](synthetic-society-contract.md) describe how the people in a world decide
+and how model decisions are validated, stored and replayed. The **Companion**, personal photographs
+and reconstruction from photographs are features and ways to build a world; the Companion's guide
+separates its role from the implemented tools.
 
 ## Contracts
 

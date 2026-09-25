@@ -8,8 +8,8 @@ Status of this document: mixed. Every claim below carries exactly one label.
 - **ASSUMPTION** is unvalidated and names the experiment that settles it.
 - **OPEN** is unresolved. Nothing may be reported against an OPEN item until it is closed.
 
-This document specifies how Exulanica is measured, adapted to the photograph corpus the product
-uses. Where an earlier video-corpus assumption and that corpus disagree, the adaptation is stated
+This document specifies how Exulanica's photograph and memory features are measured, adapted to
+the photograph corpus they use. Where an earlier video-corpus assumption and that corpus disagree, the adaptation is stated
 explicitly rather than smoothed over. It contains no results. Results go in a separate document
 once the corpus is frozen and the harness runs.
 
@@ -518,6 +518,9 @@ Settled by: 20 identical nested-schema requests with `strict: true`, repeated wi
 the model used only for intent classification, and M8's bars move to that architecture.
 
 ### M9. External-lookup gating
+
+No external lookup is built, and no product code calls the web-lookup provider, so M9 has nothing to
+measure; its targets apply to a lookup if one is built.
 
 The only legitimate trigger is the photographed public entity from 1.2, with opt-in ON.
 

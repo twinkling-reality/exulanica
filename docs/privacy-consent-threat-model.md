@@ -798,7 +798,7 @@ These belong in the product copy, not only in this document.
 | --- | --- |
 | Backups | Encrypted backups are retained up to 30 days. Deleted data is removed as backups expire, not instantly. Crypto-shredding makes media unreadable immediately; structured derivatives persist in backups until expiry. |
 | Inference provider | With zero-data-retention enabled, Nebius states inputs and outputs are not stored after each request. **Exulanica relies on that assertion and cannot independently verify it.** Without ZDR, inputs and outputs are retained for speculative decoding. |
-| Outbound lookup | The web-lookup provider's privacy policy permits reuse of query data to improve future responses and sharing with third-party search index providers. **Anything sent must be treated as permanently public.** This is why the outbound query is constructed server-side from a whitelist of public entity fields and never from model output. |
+| Outbound lookup | No outbound lookup is built, and no product code calls the web-lookup provider. Its privacy policy permits reuse of query data to improve future responses and sharing with third-party search index providers. **Anything sent would have to be treated as permanently public**, so a lookup, if one is built, constructs its query server-side from a whitelist of public entity fields and never from model output. |
 | Already exported | Downloaded files, screen recordings of the demo, saved share links: beyond reach. The link can be revoked; the copy cannot. |
 | Logs and traces | Content is kept out of logs by design. Where a stack trace captures a fragment, log retention is 14 days and there is no selective purge within it. |
 | Exported memory packages | An exported package is a projection materialised at a named version. A later deletion cannot recall it. This must be disclosed **at export time**, in the export dialog. |
@@ -832,7 +832,7 @@ Several of these are FTC Section 5 deception exposure, not merely bad manners. E
 | "SOC 2", "ISO 27001" | **Nebius holds those certifications for its infrastructure. Exulanica does not inherit them.** This is the single most common dishonest transitive claim in AI products. |
 | "Fully deleted", "permanently erased", "gone forever" | Provider logs, backups, PITR windows, CDN caches and already-exported artifacts all survive for a period. |
 | "Immutable", "WORM", "tamper-proof" | See 6.3. |
-| "We never share your data" | Derived text and media go to Nebius; public-entity names go to the web-lookup provider. |
+| "We never share your data" | Derived text and media go to Nebius. |
 | "Secure", unqualified | Unfalsifiable. State what is actually done. |
 | "Consent verified" | A record can be verified to exist. That the signer is the person in the frame cannot be. |
 | "Only you can see your memories" | True only once the three isolation proofs in 3.3 are green in CI. Claim it after, not before. |

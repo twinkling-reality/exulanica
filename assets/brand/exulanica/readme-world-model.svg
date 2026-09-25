@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="432" viewBox="0 0 1200 432" role="img" aria-labelledby="title desc">
-  <title id="title">A world to create, inspect and build with</title>
-  <desc id="desc">Product direction. Personal media, imagination and permitted imports connect to a persistent world of identity, space, time, rules and history. Explore and build, inspect and edit, simulate inhabitants, and apply models inside the world.</desc>
+  <title id="title">Worlds for AI Agents</title>
+  <desc id="desc">Product direction. A world you build sits at the centre, and open models run the agents in it, each model in its own role. Swap the model behind a role, compare the two runs side by side and replay every decision. Hand building, photographs and imported content are ways to build the world.</desc>
   <defs>
     <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
       <circle cx="1" cy="1" r="1" fill="#597365" opacity=".12"/>
@@ -14,42 +14,63 @@
   <rect width="1200" height="432" rx="18" fill="url(#grid)"/>
   <g font-family="Arial, Helvetica, sans-serif">
     <text x="44" y="44" font-size="12" font-weight="700" letter-spacing="2.5" fill="#466756">EXULANICA / PRODUCT DIRECTION</text>
-    <text x="44" y="84" font-size="29" font-weight="600" fill="#203a32">One world. Many ways to build.</text>
+    <text x="44" y="84" font-size="29" font-weight="600" fill="#203a32">Worlds for AI Agents.</text>
+
+    <text x="44" y="138" font-size="12" font-weight="700" letter-spacing="1.5" fill="#6d8577">WAYS TO BUILD</text>
+    <text x="900" y="138" font-size="12" font-weight="700" letter-spacing="1.5" fill="#6d8577">SEE THE DIFFERENCE</text>
+
     <g fill="none" stroke="#9fb2a3" stroke-width="1.5">
-      <path d="M290 164H342V249H390M290 249H390M290 334H342V249"/>
-      <path d="M720 249H775V149H820M775 216H820M775 282H820M775 349H820M775 249V349"/>
+      <path d="M264 180H300V264H340M264 264H340M264 348H300V264"/>
+      <path d="M860 264H880V180H900M860 264H900M880 264V348H900"/>
     </g>
+
     <g fill="#fff" stroke="#d1dbce">
-      <rect x="44" y="133" width="246" height="62" rx="9"/>
-      <rect x="44" y="218" width="246" height="62" rx="9"/>
-      <rect x="44" y="303" width="246" height="62" rx="9"/>
-      <rect x="820" y="122" width="336" height="55" rx="9"/>
-      <rect x="820" y="189" width="336" height="55" rx="9"/>
-      <rect x="820" y="255" width="336" height="55" rx="9"/>
-      <rect x="820" y="322" width="336" height="55" rx="9"/>
+      <rect x="44" y="152" width="220" height="56" rx="9"/>
+      <rect x="44" y="236" width="220" height="56" rx="9"/>
+      <rect x="44" y="320" width="220" height="56" rx="9"/>
+      <rect x="900" y="152" width="256" height="56" rx="9"/>
+      <rect x="900" y="236" width="256" height="56" rx="9"/>
+      <rect x="900" y="320" width="256" height="56" rx="9"/>
     </g>
-    <g font-size="18" fill="#294438">
-      <text x="66" y="171">Personal media</text>
-      <text x="66" y="256">Imagination and design</text>
-      <text x="66" y="341">Permitted imports</text>
-      <text x="843" y="156">Explore and build</text>
-      <text x="843" y="223">Inspect and edit world data</text>
-      <text x="843" y="289">Simulate inhabitants and scenarios</text>
-      <text x="843" y="356">Apply models inside the world</text>
+    <g font-size="16" fill="#294438">
+      <text x="64" y="186">By hand, from catalogs</text>
+      <text x="64" y="270">From your photographs</text>
+      <text x="64" y="354">Imported, origin labelled</text>
+      <text x="920" y="186">Swap the model in a role</text>
+      <text x="920" y="270">Compare runs side by side</text>
+      <text x="920" y="354">Replay every decision</text>
     </g>
-    <rect x="390" y="122" width="330" height="255" rx="14" fill="url(#world)"/>
-    <g fill="none" stroke="#8bbaa1" stroke-width="1" opacity=".8">
-      <ellipse cx="555" cy="188" rx="39" ry="39"/>
-      <ellipse cx="555" cy="188" rx="17" ry="39"/>
-      <ellipse cx="555" cy="188" rx="39" ry="14"/>
-      <path d="M516 188H594M555 149V227"/>
+
+    <rect x="340" y="122" width="520" height="284" rx="14" fill="url(#world)"/>
+    <text x="600" y="156" text-anchor="middle" font-size="22" font-weight="600" fill="#f5f8ef">Your world</text>
+    <text x="600" y="180" text-anchor="middle" font-size="14" fill="#b9cfc1">places, objects and the agents that act in them</text>
+
+    <g font-size="14" font-weight="600" text-anchor="middle">
+      <rect x="392" y="200" width="160" height="34" rx="17" fill="#ded88f"/>
+      <text x="472" y="222" fill="#2d3a1f">Open model A</text>
+      <rect x="648" y="200" width="160" height="34" rx="17" fill="#9fcfb0"/>
+      <text x="728" y="222" fill="#17352b">Open model B</text>
     </g>
-    <circle cx="583" cy="177" r="4" fill="#ded88f"/>
-    <circle cx="537" cy="211" r="3" fill="#bbd8bd"/>
-    <text x="555" y="266" text-anchor="middle" font-size="25" font-weight="600" fill="#f5f8ef">Your persistent world</text>
-    <text x="555" y="303" text-anchor="middle" font-size="16" fill="#b9d0c2">Identity · Space · Time</text>
-    <text x="555" y="328" text-anchor="middle" font-size="16" fill="#b9d0c2">Rules · Edits · History</text>
-    <text x="44" y="408" font-size="13" fill="#526d5c">Create → explore → customize → build → reuse</text>
-    <text x="1156" y="408" text-anchor="end" font-size="12" fill="#526d5c">See capability contracts for supported operations.</text>
+
+    <g stroke-width="1.2" opacity=".85">
+      <path d="M472 234V256M430 256H514M430 256V272M472 256V272M514 256V272" fill="none" stroke="#ded88f"/>
+      <path d="M728 234V256M686 256H770M686 256V272M728 256V272M770 256V272" fill="none" stroke="#9fcfb0"/>
+    </g>
+    <g>
+      <circle cx="430" cy="282" r="9" fill="#ded88f"/>
+      <circle cx="472" cy="282" r="9" fill="#ded88f"/>
+      <circle cx="514" cy="282" r="9" fill="#ded88f"/>
+      <circle cx="686" cy="282" r="9" fill="#9fcfb0"/>
+      <circle cx="728" cy="282" r="9" fill="#9fcfb0"/>
+      <circle cx="770" cy="282" r="9" fill="#9fcfb0"/>
+    </g>
+    <g font-size="13" fill="#d8e5dc" text-anchor="middle">
+      <text x="472" y="314">people in one group</text>
+      <text x="728" y="314">people in another group</text>
+    </g>
+
+    <path d="M372 336H828" stroke="#4f7466" stroke-width="1"/>
+    <text x="600" y="362" text-anchor="middle" font-size="14" fill="#f5f8ef">Each model does what it is good at. The engine checks every decision.</text>
+    <text x="600" y="386" text-anchor="middle" font-size="13" fill="#b9cfc1">Every decision is stored, so a run replays without calling a model.</text>
   </g>
 </svg>

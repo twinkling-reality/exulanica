@@ -1,14 +1,14 @@
-# Personal world model architecture
+# World state architecture
 
 Status: **DECISION AND RESEARCH PROGRAM**. Evidence, graph, reconstruction,
 spatial-authority, authored-version, World Read, generated-receipt, and package contracts implement
 parts of this architecture. Exulanica does not claim a learned general world model, reliable
 physical prediction, autonomous open-world simulation, or complete object-level scene memory.
 
-This document defines the architecture of the **personal world model**. World memory is its
-retained state and history, supporting creation, inspection, synthetic life and programmable
-interaction. The product is broader than remembering personal experiences. Product priority
-remains in [product-direction.md](product-direction.md); exact wire,
+This document defines the architecture of a world's state: the retained state and history of
+the world that agents act in, supporting creation, inspection, simulation, model decisions and
+replay. World memory is that retained state and history; remembering personal experiences is one
+use of it. Product priority remains in [product-direction.md](product-direction.md); exact wire,
 database, and package behavior remains in the corresponding implementation contracts.
 
 ## 1. The research position
@@ -23,9 +23,10 @@ The term *world model* names at least three different systems:
 3. a **generative world model** synthesizes plausible observations or environments from prompts and
    controls.
 
-Exulanica implements a substantial part of the first, bounded deterministic behavior,
-and interfaces through which the second and third may read and propose changes. It has not earned a
-claim to the second or third as a general capability.
+Exulanica is none of these. In plain words: world models generate how a world looks; Exulanica is
+the world AI models live in. It stores the kind of state the first describes, runs bounded
+deterministic behavior, and offers interfaces through which models of the second and third kind may
+read and propose changes. It makes no claim to the second or third as a general capability.
 
 That distinction is material. V-JEPA 2 predicts latent future representations and demonstrates
 action-conditioned robot planning, but reports camera sensitivity and error accumulation during
@@ -38,7 +39,7 @@ consent withdrawal, editable historical alternatives, or a signed account of wha
 
 Exulanica's research hypothesis is therefore:
 
-> A personal world becomes more useful to people and models when observations, interpretations,
+> A world becomes more useful to people and models when observations, interpretations,
 > authored alternatives, and simulated consequences share stable identity and spatial context
 > without sharing an epistemic status.
 
@@ -403,8 +404,8 @@ The individual ingredients are not novel:
 - OpenUSD demonstrates non-destructive scene composition; and
 - W3C PROV standardizes derivation records.
 
-The potentially distinctive contribution is their **epistemically typed composition for personal
-worlds**:
+The potentially distinctive contribution is their **epistemically typed composition for worlds
+that people and models share**:
 
 1. exact personal evidence remains reachable underneath semantic and spatial interpretations;
 2. observed, inferred, authored, generated, and simulated states coexist without flattening;

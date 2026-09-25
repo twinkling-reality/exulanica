@@ -1,6 +1,6 @@
 # World API
 
-Connect tools to personal world state through authenticated read and write interfaces.
+Connect tools to a world's state through authenticated read and write interfaces.
 
 The platform design allows creation tools to read a named world version and submit supported
 changes. Edits carry their source version and pass the same permission and acceptance rules as

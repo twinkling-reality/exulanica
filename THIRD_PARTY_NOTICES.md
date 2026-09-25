@@ -163,10 +163,10 @@ API-only consumer is the hosted endpoint's own terms of service and acceptable u
 Nebius Token Factory terms of service and acceptable use policy have not been retrieved or read.
 Item **T-4** in section 9.
 
-The same applies to the Tavily Search API, used for the optional public-entity lookup. Tavily's
-privacy page was read on 2026-08-27 and is quoted in
-[docs/model-and-service-selection.md](docs/model-and-service-selection.md) section 2.5. Its terms of
-service were not.
+The same applies to the Tavily Search API, although no product code calls it: no public-entity
+lookup is built, and `scripts/verify_web_lookup.py` made one credential check with it. Tavily's
+privacy page was read on 2026-08-27 and is summarized in
+[docs/platform-findings.md](docs/platform-findings.md) section 5. Its terms of service were not.
 
 ---
 

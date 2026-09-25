@@ -2,7 +2,8 @@
 
 The Companion is your AI partner within the world: someone to explore and create with, who helps
 you understand what happens and continue shared activities. This is the intended experience; the
-implementation boundaries are described below.
+implementation boundaries are described below. The Companion is one feature of a world; the
+product is a world that open models run ([product direction](../product-direction.md)).
 
 ## Product role
 

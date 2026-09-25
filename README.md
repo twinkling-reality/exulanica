@@ -4,7 +4,7 @@
 
 <h1 align="center">Exulanica</h1>
 
-<p align="center"><strong>A persistent, programmable personal world.</strong><br>Create a world. Shape how it works. Build something with it.</p>
+<p align="center"><strong>Exulanica: Worlds for AI Agents.</strong></p>
 
 <p align="center">
   <a href="https://exulanica.com">Website</a> ·
@@ -20,20 +20,47 @@
   <a href="web/package.json"><img src="https://img.shields.io/badge/Node.js-22%2B-5f7846" alt="Node.js 22 or newer"></a>
 </p>
 
-Exulanica is an open-source platform for persistent, customizable digital worlds. Its goal is a world
-you can create from imagination, your own media or permitted imports, then inhabit and reshape. Design a dream
-landscape, a familiar place or a fantasy city with your own aesthetic, rules and sense of time.
-Populate it with a synthetic society whose activities and interactions become part of its history.
+There are about 3 million open AI models, and 85.6% of them have been downloaded fewer than 200
+times. Most never get seen, let alone used.
 
-Underneath the experience is structured world data: identifiable places, objects and inhabitants,
-their geometry, properties, relationships and recorded changes. The aim is to make that world
-inspectable, queryable, editable and reusable, and to let open or custom models perform tasks
-within it. The same foundation supports personal creation, applications, simulations and experiments.
+Exulanica gives them a place to work. Create your own world, exactly how you want it, and power it
+with open models, each doing what it's good at, all in one place you control. You get hands-on
+exposure to models you'd never have tried. Model makers get their work used.
+
+Built on NVIDIA Nemotron and Nebius Token Factory's open models.
+
+<sub>Figures: Hugging Face, ["State of Open Models: Summer 2026"](https://huggingface.co/blog/state-of-open-models-summer-2026), published 2026-08-14 (about 2.96
+million public model repositories; roughly 85.6% of models with fewer than 200 lifetime
+downloads).</sub>
 
 <p align="center">
-  <img src="assets/brand/exulanica/readme-world-model.svg" width="100%" alt="Product direction: personal media, imagination and permitted imports feed a persistent, customizable world with identity, space, time, rules and history. Explore and build, inspect and edit, simulate inhabitants, and apply models inside the world.">
+  <img src="assets/brand/exulanica/readme-world-model.svg" width="100%" alt="Product direction: a world you build sits at the centre, and open models run the agents in it, each model in its own role. Swap the model behind a role and compare the two runs. Hand building, photographs and imported content are ways to build the world.">
   <br><sub>Product direction. The capability boundaries below distinguish implemented foundations from delivery targets.</sub>
 </p>
+
+## Models inside the world
+
+A person builds a world, and open models run what happens inside it. The things in a world that
+act are its agents: the people in your world, animals, vehicles and decision-makers such as a
+shopkeeper. Each model does what it is good at, in its own role, and the person can swap the model
+behind a role and see the difference. World models generate how a world looks; Exulanica is the
+world AI models live in.
+
+A model is a proposer, not an authority. Each role declares what the model observes and which
+actions it may take; the engine validates every proposed action before it takes effect, and every
+accepted decision is stored, so a run replays without calling a model and two runs from the same
+saved world compare fairly. Every hosted model call passes one policy boundary that enforces the
+egress allowlist, the budget and the person's rights.
+
+Built: several open models serve hosted roles through that boundary (the
+[model manifest](exulanica/models/models.manifest.json)); the people in a world follow a
+deterministic planner, and a society engine version accepts validated, stored model decisions for
+them ([society contract](docs/synthetic-society-contract.md#explicit-model-proposals-and-exact-replay));
+paired runs compare one intervention against its control
+([society experiments](docs/society-experiments.md)). Not built: choosing a model for a person or a
+group, mixed-model runs shown in the application, measured results per model and a retraining
+loop. The [first milestone](docs/product-direction.md#first-milestone) is two open models running
+one town, shown side by side.
 
 ## The world
 
@@ -42,53 +69,41 @@ The [product roadmap](docs/product-direction.md) defines six connected parts of 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3>Create and explore</h3>
-      Build from imagination, personal media or permitted imports. Design your own architecture, landscape and aesthetic, then keep your edits and return to the same world.
-      <p><a href="docs/capabilities/world-creation.md">World creation</a> · <a href="docs/capabilities/scene-reconstruction.md">Reconstruction</a></p>
+      <h3>Models run your world</h3>
+      Open models decide what the agents in your world do, each in its own role. The engine validates every decision and stores it, so a run replays exactly. The society's people accept validated model decisions; choosing a model per person or group is the first milestone.
+      <p><a href="docs/capabilities/simulation.md">Simulation</a> · <a href="docs/model-and-service-selection.md">Model selection</a></p>
     </td>
     <td width="50%" valign="top">
-      <h3>Inspect the data</h3>
-      Inspect a subject's geometry, properties, relationships and origin. Query, edit and extract supported world content as reusable data while keeping its identity across views.
-      <p><a href="docs/atlas-reconstruction-inspection.md">Representation and inspection</a></p>
+      <h3>Swap a model, see the difference</h3>
+      Run the same saved world twice and compare what happened. Paired society runs compare one intervention against its control; comparing two models side by side in the application is the first milestone.
+      <p><a href="docs/society-experiments.md">Controlled comparisons</a> · <a href="docs/product-direction.md#first-milestone">First milestone</a></p>
     </td>
   </tr>
   <tr>
     <td valign="top">
-      <h3>Create with your Companion</h3>
-      Describe what you want to find or change. The Companion is your AI partner within the world, helping you explore, create and understand what happens. Its tools prepare supported changes for review alongside direct editing controls.
-      <p><a href="docs/capabilities/companion.md">Companion</a></p>
+      <h3>Build your world</h3>
+      Place pieces from the catalogs by hand, make a world from photographs of a real place, or import content with its origin labelled. A town, a familiar place or a fantasy city are equally valid, and your edits persist as versions.
+      <p><a href="docs/capabilities/world-creation.md">World creation</a> · <a href="docs/capabilities/scene-reconstruction.md">Reconstruction</a></p>
     </td>
     <td valign="top">
       <h3>Give the world life</h3>
-      Populate your world with synthetic inhabitants, routines and interactions. Your designs can change their opportunities and activities; physical or fictional rules define how the world and its time behave.
-      <p><a href="docs/capabilities/simulation.md">Simulation</a> · <a href="docs/product-direction.md#configurable-world-rules">World rules</a></p>
+      The people in your world follow routines, walk to the places they use and respond to what you change. Physical or fictional rules define how the world and its time behave.
+      <p><a href="docs/synthetic-society-contract.md">Society contract</a> · <a href="docs/product-direction.md#configurable-world-rules">World rules</a></p>
     </td>
   </tr>
   <tr>
     <td valign="top">
-      <h3>Shape behavior and scenarios</h3>
-      Configure supported rules and interactions, connect decision models and explore what happens. A controlled comparison is one way to study a world alongside open-ended creation and simulation.
-      <p><a href="docs/product-direction.md#worlds-as-project-foundations">Projects and scenarios</a> · <a href="docs/society-experiments.md">Controlled experiments</a></p>
+      <h3>Inspect the data</h3>
+      Inspect a subject's geometry, properties, relationships and origin, and what an agent decided. Query, edit and extract supported world content as reusable data while keeping its identity across views.
+      <p><a href="docs/atlas-reconstruction-inspection.md">Representation and inspection</a> · <a href="docs/capabilities/world-api.md">World API</a></p>
     </td>
     <td valign="top">
-      <h3>Put models to work inside the world</h3>
-      Apply open models or your own models to particular world tasks: interpret scene observations, propose inhabitants' actions or evaluate a control policy. Build applications that use the resulting state and events.
-      <p><a href="docs/capabilities/world-api.md">World API</a> · <a href="docs/product-direction.md#worlds-as-project-foundations">Project foundations</a></p>
+      <h3>The Companion and your photographs</h3>
+      Features for building and understanding a world: the Companion is an AI partner that helps you explore, create and understand what happens, and your own photographs can become places and references in a world, under your rights and consent.
+      <p><a href="docs/capabilities/companion.md">Companion</a> · <a href="docs/saved-world-entry.md#reference-photographs">Reference photographs</a></p>
     </td>
   </tr>
 </table>
-
-## Models inside the world
-
-The model-integration goal is to give models defined jobs within a world. For example, a perception
-model could interpret a scene's camera observations, a behavior model could propose an inhabitant's
-actions, and a control model could operate a simulated vehicle in an environment with the required
-physics and sensors. Multiple models can serve different roles in the same project.
-
-These examples describe integration targets. Each adapter must declare its observations, permitted
-actions, timing and resource limits. Its outputs pass the world's validation rules, and accepted
-changes retain their identity and history. A model's availability alone does not supply a compatible
-simulator, usable training data or a validated prediction.
 
 ## The world as data
 
@@ -101,7 +116,7 @@ Meshes, tessellated surfaces, point clouds and Gaussian splats are representatio
 They do not by themselves provide semantic labels, complete object extraction or physical behavior.
 A render vertex need not be a permanent database entity; a selectable object or consequential
 change needs a stable record. This foundation lets different renderers, models and applications
-work with the same world. See the [world model architecture](docs/world-memory-model.md).
+work with the same world. See the [world state architecture](docs/world-memory-model.md).
 
 ## Capability boundaries
 
@@ -110,6 +125,7 @@ supported operations; the full product direction is broader than those component
 
 | Area | Implemented foundation | Delivery target |
 | --- | --- | --- |
+| Models in the world | Open models in hosted roles through one policy boundary; validated, stored model decisions for the society's people | A model chosen per person or group, mixed-model runs shown side by side, measured results per model and a retraining loop |
 | Persistent worlds | Authored starter worlds, saved versions, object edits and undo, appearance state, reference photographs | A complete personal-media-to-editable-world journey |
 | Inspectable data | Supported point and surface representations, subject selection, structured records and source references | Complete reusable object extraction and consistent semantic coverage across sources |
 | Companion | Conversation, selection context and reviewed appearance proposals | Shared activity, durable personal continuity and broader creation tools |
@@ -129,7 +145,7 @@ authored content and simulation results retain distinct origins and meanings.
 
 | Module | Responsibility | Reference |
 | --- | --- | --- |
-| World state | Versions, sources, identities and edit history | [World model architecture](docs/world-memory-model.md) |
+| World state | Versions, sources, identities and edit history | [World state architecture](docs/world-memory-model.md) |
 | Creation and representation | Reconstruction, authored objects, appearance and browser rendering | [World composition](docs/world-composition-contract.md) |
 | Simulation | Supported behaviors, inhabitants and replayable outcomes | [Society contract](docs/synthetic-society-contract.md) |
 | Model integration | Replaceable reconstruction, generation and decision providers, with validated outputs | [Model selection](docs/product-direction.md#model-selection-and-compute-priorities) |
@@ -142,8 +158,8 @@ reviewed proposals. The [model and service selection](docs/model-and-service-sel
 the implemented callers, evaluation evidence and hosting boundaries. This does not imply that the
 whole application or its background workers are deployed on Nebius Serverless.
 
-The world model is structured, versioned state with model integrations, not a single trained
-general-purpose predictor. The portable format is named **World Memory Package** in its technical
+A world is structured, versioned state that models act in, not a single trained general-purpose
+predictor. The portable format is named **World Memory Package** in its technical
 contract; verifying a package does not by itself load a runnable world in another application.
 
 ## Getting started
@@ -161,7 +177,7 @@ pnpm app
 
 Open [http://localhost:5173/?preview=1](http://localhost:5173/?preview=1), or the address Vite
 prints if that port is occupied, with `?preview=1` appended. This development preview uses fixture
-data. It does not create an authenticated personal world or demonstrate media reconstruction.
+data. It does not create an authenticated saved world or demonstrate media reconstruction.
 
 ### Persistent application
 

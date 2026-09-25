@@ -123,6 +123,9 @@ balance rather than producing an unbounded bill.
 
 ## 9. Tavily verified, and the past-to-present boundary holds
 
+This section records one credential check made by `scripts/verify_web_lookup.py`. No public-entity
+lookup is built, and no product code calls Tavily.
+
 **VERIFIED by execution on 2026-08-27.** `POST https://api.tavily.com/search` returned HTTP 200 in
 2.26 s with three sourced results and a synthesised answer. The request and response are written to
 the local archive `.exulanica/experiments/web-lookup/tavily_runtime_call.json`. Findings used here

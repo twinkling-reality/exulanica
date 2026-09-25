@@ -1,8 +1,10 @@
 # Product roadmap
 
-Exulanica is a persistent, programmable personal world model. This document owns product scope,
-delivery order and acceptance criteria. Living contracts describe supported operations; scoped
-evaluation records establish what a particular execution demonstrated.
+Exulanica: Worlds for AI Agents. A person builds a world, and open models run what happens inside
+it, each doing what it is good at; the person can swap one model for another and see the
+difference. This document owns product scope, delivery order and acceptance criteria. Living
+contracts describe supported operations; scoped evaluation records establish what a particular
+execution demonstrated.
 
 <details>
 <summary>Sections</summary>
@@ -32,46 +34,88 @@ evaluation records establish what a particular execution demonstrated.
 
 ## Product purpose
 
-Create a world. Shape how it works. Build something with it.
+Build a world. Let open models run what happens in it. Swap one and see the difference.
 
-A person can create a world from imagination, personal media or permitted imports, then inhabit,
-inspect and reshape it. A familiar place, a fantasy city and a dream landscape are equally valid
-starting points. Architecture, aesthetic, objects, inhabitants, time and supported rules are parts
-of the world a person can customize. Personal photographs are one input, not the product boundary.
+A person builds a world exactly how they want it: a small town, a familiar place, a fantasy city.
+The things in it that act are its agents: the people in the world, animals, vehicles and
+decision-makers such as a shopkeeper or a traffic system. Streets, benches and buildings do not
+act; they are the world the agents act in. Open models run the agents, each model in a role it is
+good at, side by side in one world the person controls. Swapping the model behind a role and
+running the same starting world again shows what each model does differently.
 
-The world is also a foundation for applications, datasets, simulations and experiments. Models
-can have jobs inside it: interpreting scene observations, proposing inhabitants' decisions or
-controlling a simulated vehicle when the required sensors, actions and physics exist. A person
-can supply an open model or their own implementation through a compatible interface. Comparing
-two scenarios is one use of this foundation, not the definition of the product.
+Hugging Face's "State of Open Models: Summer 2026" (published 2026-08-14) counts about 2.96 million
+public model repositories and reports that roughly 85.6% of models have fewer than 200 lifetime
+downloads. Exulanica gives open models a place to work: a person gets hands-on exposure to models
+they would not otherwise try, and model makers get their models used. Whether people want to
+discover models through a world rather than a list or a leaderboard is the hypothesis the
+[first milestone](#first-milestone) tests.
 
-The **Companion** is the person's AI partner within the world. It helps them explore, create,
-understand events and continue shared activities. Conversation and direct controls operate on the
-same supported capabilities. Its intended personality and continuity complement world creation;
-using a world or building an application does not require a conversational interface.
+World models generate how a world looks. Exulanica is the world AI models live in: structured,
+versioned state with fixed engine rules, in which models decide what agents do and the engine
+validates every decision before it takes effect. Exulanica does not generate a world's appearance
+with a learned model, and it is not a learned predictor of what happens next.
 
-Synthetic inhabitants add routines, relationships and an evolving simulated history. Changes to
-places, objects and rules can change what inhabitants do. The combination of persistent creation,
-inspectable data, synthetic life and programmable interaction is the product direction. Each
-capability needs its own acceptance evidence; plausible scenery or moving characters alone do
-not establish a living, usable world.
+A world has three layers, and each is replaceable on its own:
+
+| Layer | What it holds | Who makes it |
+| --- | --- | --- |
+| Engine | General rules of movement and interaction, one module per kind of movement | Written once per kind of movement, never per thing |
+| Content | What exists: kinds of places, people, vehicles and objects, their sizes, looks and abilities | Versioned catalogs, authored by hand or imported with their origin, validated before admission |
+| Decisions | What each agent does from moment to moment | Models and deterministic planners while the world runs; decisions are stored so a run replays without calling a model |
+
+Walking exists for the people in a world ([society contract](synthetic-society-contract.md)).
+Road movement exists as a module that nothing in the application calls
+([`exulanica/traffic`](../exulanica/traffic)); flight does not exist. Objects, vehicles and
+society activities are versioned catalogs under [`assets/catalogs`](../assets/catalogs). The
+people's decisions come from a deterministic planner
+([`society_planner.py`](../exulanica/world/society_planner.py)); a society engine version with an
+opt-in model decision slot validates and stores each model proposal
+([explicit model proposals](synthetic-society-contract.md#explicit-model-proposals-and-exact-replay)).
+Several open models serve hosted roles through one policy boundary (the
+[model manifest](../exulanica/models/models.manifest.json)), and paired society runs compare one
+intervention against its control ([society experiments](society-experiments.md)). No model can be
+chosen for a person or a group of people, and no run in the application mixes models.
+
+Other capabilities are features and ways to build a world, not the product's identity:
+
+- **The Companion** is an AI partner within the world that helps a person explore, create and
+  understand events. Conversation and direct controls operate on the same supported capabilities;
+  using a world does not require a conversational interface ([Companion](capabilities/companion.md)).
+- **Personal photographs and memory** are one way to build a world and one source of its content.
+  Photographs of a real place can be reconstructed into a scene
+  ([scene reconstruction](capabilities/scene-reconstruction.md)); rights and consent govern every use.
+- **Hand building** places pieces from the catalogs; **imported content**, including output of
+  external generators, is admitted with its origin labelled.
+
+Plausible scenery or moving characters alone do not establish a living, usable world; each
+capability needs its own acceptance evidence.
+
+These foundations carry over unchanged and sit beneath every milestone:
+
+| Foundation | Where it sits |
+| --- | --- |
+| Inspectable representations | Inspection extends to agents: each stored decision keeps what the agent observed and the validated action, for a person to inspect. [Inspectable representations and durable worlds](#inspectable-representations-and-durable-worlds) |
+| Durable, versioned worlds | A run starts from an exact saved version, so two models are compared from the same starting world. [World state contract](#world-state-contract) |
+| Rights and consent | A model receives only what the person's rights permit, through one hosted policy boundary. [Privacy and consent](privacy-consent-threat-model.md) |
+| Replay | Stored decisions replay a run exactly without calling a model, which makes side-by-side comparison fair and inspectable. [Society contract](synthetic-society-contract.md#explicit-model-proposals-and-exact-replay) |
 
 The foundation is **structured, addressable world state**: meaningful subjects have identities,
 geometry, properties, relationships and recorded changes. Meshes, points, splats and rendered
 images are representations. They do not automatically provide complete segmentation, reusable
-objects or physics. The [world model architecture](world-memory-model.md) defines this distinction:
+objects or physics. The [world state architecture](world-memory-model.md) defines this distinction:
 everything consequential is addressable; not everything rendered is canonical data.
 
 Observations, interpretations, authored alternatives and simulated events share identity and
 spatial context while retaining distinct meanings. An imported landscape does not prove a visit;
 a generated room does not prove its layout was observed; synthetic behavior does not predict a
-real person's choices. Exulanica implements a descriptive world model with bounded behavior and
-model integrations. A general learned predictive capability requires separate evaluation.
+real person's choices. Exulanica implements structured, descriptive world state with bounded
+behavior and model integrations. A general learned predictive capability requires separate
+evaluation.
 
 The [composition contract](world-composition-contract.md) specifies the relationships between
 sources, creations and representations. The [Companion guide](capabilities/companion.md) defines
-its role. **World Memory Package** remains the technical name of the signed, partial portable
-snapshot format; it is one output of the personal world model.
+its role. **World Memory Package** is the technical name of the signed, partial portable
+snapshot format; it is one output of a world.
 
 ## Inspectable representations and durable worlds
 
@@ -111,10 +155,11 @@ creation use scheduled compute; a stored world does not require a permanently ru
 
 ## Living-world experience requirements
 
-The long-term product is a persistent personal world that a person can create, inspect and
-reshape with a Companion, populate with synthetic life, and use for projects and controlled
-experiments. Personal sources, permitted imports and synthetic creation are independent entry
-paths. Returning users open their saved world; users without one begin in an owned starter space.
+The long-term product is a persistent world that a person builds and open models run: agents
+whose decisions come from the model chosen for their role, recorded so that runs replay and
+compare. A person can inspect and reshape the world directly or with the Companion and use it
+for projects and controlled experiments. Personal sources, permitted imports and synthetic
+creation are independent entry paths. Returning users open their saved world; users without one begin in an owned starter space.
 These are product requirements, not claims of complete implementation or visual acceptance.
 
 People should be able to choose first-person exploration or a third-person view of their own
@@ -183,10 +228,11 @@ The following requirements define that continuity:
 | Life between visits | A world declares whether simulation pauses, continues under a budget or advances through bounded catch-up. Returning users can inspect intervening events. Durable assets do not require repeated generation or continuous expensive inference. |
 | Ownership and collaboration | Visiting, editing, contributing content and running experiments have distinct permissions. Shared world content does not grant access to its private sources. Transfer declares which identities, assets, rules and history a receiver can use. |
 
-Society and experiment execution are optional capabilities over the shared identity, spatial,
-temporal, edit and event foundations. A personal studio, fictional garden and traffic experiment
-can require different capabilities without becoming unrelated world formats. Collaboration and
-scientific simulation do not become prerequisites for the saved-world experience.
+The society and the models that decide for its people are the product's core; experiments
+compare their runs. Both build on the shared identity, spatial, temporal, edit and event
+foundations. A personal studio, fictional garden and traffic experiment can require different
+capabilities without becoming unrelated world formats. Collaboration and scientific simulation
+do not become prerequisites for the saved-world experience.
 
 Controlled model evaluation belongs to the long-term product. Creative simulation explores
 consequences under declared rules. Scientific prediction additionally requires domain-specific
@@ -220,8 +266,7 @@ declared scene, produce images with supported labels, and compare a detector acr
 conditions. A society project can change one supported amenity or rule and examine the recorded
 effects on synthetic inhabitants. These examples describe project capabilities to establish;
 they do not assert a delivered dataset generator, general rule editor or validated human-behavior
-predictor. The personal-world experience remains useful without running an experiment or training
-a model.
+predictor. Using a world does not require training a model.
 
 ### Project delivery sequence
 
@@ -235,7 +280,7 @@ a model.
 These dependencies sequence the project capability without adding every output to the minimum
 release candidate. The saved-world and bounded-experiment implementations can advance independently
 where their contracts permit, then require a connected acceptance check. Dataset training and
-general simulation do not block personal-world entry. Model generation, reconstruction and policy
+general simulation do not block the first milestone. Model generation, reconstruction and policy
 providers remain replaceable; no single provider or downstream application defines the world format.
 
 ## Modular simulation and scientific tooling
@@ -499,9 +544,36 @@ An interpretation of fictional art remains fictional even when rendered realisti
 
 ## First milestone
 
-A person enters their own world, makes a meaningful change, inspects it and returns to the saved
-result. World creation and personal-source reconstruction have separate acceptance paths.
-A source-independent authored starter is a valid world; it is not evidence of reconstruction.
+**Open models run a world; swap one and see the difference.** One small town, built from the
+catalogs. Its people are run by two different open models. The same day runs twice from the same
+saved version with one model swapped, and the application shows the two runs side by side and
+what each model's people did differently. This milestone is a delivery target; the table states
+what accepts it.
+
+| Deliverable | Acceptance evidence |
+| --- | --- |
+| A world to run | A small town from the catalogs opens as a saved version in the application, with its people visible and moving under the deterministic planner. |
+| A model per group | The people are split into named groups, and each group's decisions come from the open model chosen for it, through the one hosted policy boundary. The engine validates every proposed action; an invalid proposal is refused with its reason and the person keeps a valid state. |
+| Recorded decisions | Every decision stores the model that served it, the observation it saw and the validated action. A run replays exactly from those records without calling a model. |
+| Swap and compare | Two runs start from the same saved version and differ only in one group's model. The application shows them side by side, with the people and events that differ. |
+| Honest difference | A control pair with the same model in both arms bounds the difference that run-to-run variation alone produces; a reported difference between models exceeds that bound, or the comparison says it does not. |
+| Independent reading | The runs, their decisions and the models that served them can be read through the authenticated API by a client other than the browser. |
+
+The foundations exist in part: the society's deterministic planner, a society engine version whose
+opt-in model decision slot validates and stores each proposal
+([explicit model proposals](synthetic-society-contract.md#explicit-model-proposals-and-exact-replay)),
+paired runs over one intervention ([society experiments](society-experiments.md)) and hosted roles
+behind one policy boundary ([model and service selection](model-and-service-selection.md)). The
+milestone needs a model chosen per group, mixed-model runs and a side-by-side view in the
+application; none of those exists. The Companion, personal photographs and reconstruction are not
+part of this milestone.
+
+### Saved-world foundation
+
+The milestone runs on a saved world. These gates keep that foundation honest. The Companion and
+personal-media rows are features beside the milestone, which does not depend on them. World
+creation and personal-source reconstruction have separate acceptance paths; a source-independent
+authored starter is a valid world, not evidence of reconstruction.
 
 | Deliverable | Acceptance evidence |
 | --- | --- |
@@ -519,17 +591,20 @@ requires the actual source-to-browser path and source-grounded interaction.
 
 ## Delivery gates for the first demonstration
 
-Release scope follows a complete useful journey, with claims limited to executed capabilities.
+Release scope follows the first milestone's journey, with claims limited to executed capabilities.
 
-1. **Usable environment:** inspect navigation, visual composition and available geometry in the
-   real application. Diagnose source, registration, generation or rendering failures separately.
-2. **Meaningful action:** make a supported change, inspect its consequence and explain the result
-   through the actual Companion or direct controls. Record missing evidence honestly.
-3. **Persistence:** reopen the same world, verify the accepted state and demonstrate supported
-   undo or restoration without rewriting source evidence or simulation history.
-4. **Independent use:** repeat the supported read/edit path through the developer interface.
+1. **Usable world:** open the town in the real application and watch its people move. Diagnose
+   world, simulation and rendering failures separately.
+2. **Models in their roles:** each group's decisions come from its named model through the policy
+   boundary; the engine refuses an invalid action with its reason. Record the served model for
+   every decision and record missing evidence honestly.
+3. **Swap and compare:** run the same saved version twice with one group's model swapped, show
+   both runs side by side in the application, and run the same-model control pair beside them.
+4. **Persistence and replay:** reopen the world, replay both runs exactly from their stored
+   decisions without calling a model, and verify the saved world is unchanged by either run.
+5. **Independent use:** read the runs and decisions through the developer interface.
    Export only declared capabilities; package verification and runnable loading are separate gates.
-5. **Release rehearsal:** repeat from a clean start, observe a person using the experience and
+6. **Release rehearsal:** repeat from a clean start, observe a person using the experience and
    verify setup, access, failure behavior and demonstration footage.
 
 Validation covers the permissions, deletion and integrity boundaries exercised by the journey.
@@ -591,31 +666,57 @@ boundaries are in the operator's compute findings, which `.gitignore` keeps out 
 
 ## Subsequent milestones
 
-The [composition delivery sequence](world-composition-contract.md#existing-implementation-and-staged-delivery)
-connects these milestones: permitted source admission and shared identity, durable
-composition with unified retrieval, natural-language structural creation, then
-compatible transfer and expansion. Frontend Earth rendering is one dependency;
-it does not complete extraction, searchable world integration or persistent edits.
-Each capability needs a scoped acceptance criterion and measured evidence.
+The product's core is movement in the world and models controlling it, not graphics. The
+milestones after the first follow that order. Each is a delivery target with its own scoped
+acceptance criterion and measured evidence; none is built until that evidence exists.
 
-1. **Creative composition:** more editable assets, blending places into authored arrangements,
-   explicit source versus created content, alternate versions, undo, and persistence. A composed
-   arrangement must not imply those places were physically adjacent.
-2. **Assisted creation:** model-generated additions through an asset pipeline with provenance,
-   preview, acceptance, storage, and renderer compatibility. A receipt alone is insufficient.
-3. **Interactive worlds:** an explicit behavior registry, triggers, runtime state, restart rules,
-   and supported motion. Define what persists and what resets. Character behavior is separate work;
-   recognizing someone never implies permission or capability to simulate their personality.
-4. **Simulation:** scope physics, collisions, dynamic objects, and agent behavior through measured
-   prototypes. Select a runtime only after those requirements are concrete. Validate physical behavior against explicit test scenarios.
-5. **Scene segments:** lift per-photograph people and object regions into per-entity 3D
-   segments through the recovered cameras, show them in the scene, and name them there;
-   models and ownership in [scene-segments.md](scene-segments.md).
-6. **Developer interoperability:** document stable read/edit contracts, package compatibility,
-   capability negotiation, and asset resolution. Prove a second tool can make an accepted change
-   without depending on private interface state before claiming interoperability. Extend that proof
-   through the [project delivery sequence](#project-delivery-sequence) to reproducible comparisons
-   and task-specific datasets with independent consumers.
+1. **People move convincingly:** the people in a world go to distinct places for their own reasons,
+   spread across the places they use and do not gather on the same points. Acceptance measures
+   where people are and what they do over a simulated day against a declared bound, and a person
+   watching the world in the application judges it.
+2. **The control loop:** a model socket gives each role its own model. Each acting kind declares
+   what it observes and which actions it may take; each model declares its inputs and outputs; an
+   adapter per model family (language models first, through the standard tool-calling format;
+   vision-language models and driving or robot policies later) connects the two, and the engine
+   validates every action. Providers are data: a provider registry names each provider's address,
+   credential variable, egress declaration and budget, with Nebius Token Factory first, where the
+   [model manifest](../exulanica/models/models.manifest.json) names one base address and one
+   credential variable. A person chooses the model per agent or per group. Every call passes the
+   one hosted policy boundary.
+3. **Movement modules:** each kind of movement is one engine module driven by catalog data:
+   walking, roads and flight. A dragon, a plane and a bird are content that use the flight module,
+   not code written for each. Road movement exists in [`exulanica/traffic`](../exulanica/traffic)
+   with no caller and connects when a world needs vehicles; flight does not exist.
+4. **Measured results per model:** each role's result is computed exactly from world data, with
+   what counts as good declared per role as reviewed data. Model comparisons use a pre-registered
+   held-out set, as the [model selection](#model-selection-and-compute-priorities) rules require.
+5. **The retraining loop:** runs are exported in an existing open environment format, for example
+   Prime Intellect's verifiers, so that existing open training tools retrain a model; Exulanica does
+   not build a trainer. Running uses a hosted API; retraining needs a model's open weights on a GPU.
+   Reward design per role and guards against reward gaming are the hard part. The first proof is
+   one role, one score, one retraining and a measured improvement on held-out runs.
+
+Content generation (concept images, image-to-3D) comes later and is not a pipeline Exulanica
+builds. Generated content is imported from existing tools with its origin labelled generated,
+through the admission path in [how a world is made](#how-a-world-is-made).
+
+Work beside the milestones continues on its own contracts:
+
+- **Creative composition:** the [composition delivery sequence](world-composition-contract.md#existing-implementation-and-staged-delivery)
+  covers editable assets, blending places into authored arrangements, explicit source versus
+  created content, alternate versions, undo and persistence. A composed arrangement must not imply
+  those places were physically adjacent.
+- **Interactive objects:** an explicit behavior registry, triggers, runtime state, restart rules
+  and supported motion. Recognizing someone never implies permission or capability to simulate
+  their personality.
+- **Scene segments:** lift per-photograph people and object regions into per-entity 3D segments
+  through the recovered cameras, so a world made from photographs has separate pieces that roles
+  can apply to; models and ownership in [scene-segments.md](scene-segments.md).
+- **Developer interoperability:** stable read/edit contracts, package compatibility, capability
+  negotiation and asset resolution. A second tool must make an accepted change without depending
+  on private interface state before interoperability is claimed; the
+  [project delivery sequence](#project-delivery-sequence) extends that proof to reproducible
+  comparisons and task-specific datasets with independent consumers.
 
 ## Improvement over time and training boundaries
 
@@ -704,7 +805,9 @@ only for the capabilities and formats demonstrated by both participants.
 
 ## Evaluation
 
-Evaluate whether people can create a meaningful place, customize it, understand its available data
+Evaluate whether a person can see what each model does differently in their world, and whether
+people discover and try models this way rather than from a list or a leaderboard. Evaluate whether
+people can create a meaningful place, customize it, understand its available data
 and resume from the saved result. For reconstructed places, additionally measure source fidelity
 and coverage. Verify that a second client reads the same version and submits a supported change.
 Each milestone retains reproducible evidence for its acceptance criteria.
