@@ -67,10 +67,12 @@ reading order without recombining it. The default presence is a geometric SVG av
 silhouette and two slit eyes, with no humanoid anatomy and no second renderer. The rejected robot,
 Spline path, source-plane mark, and mote placeholder were deleted rather than restyled.
 
-The opening camera is derived from the first region placement and canonical source position. It is
-placed on the source axis, aimed at the aperture centre, and close enough for the evidence to own
-the frame at both 1280×720 and 1440×900. There is no lateral offset reserved for UI. The sun sits
-off-axis and the aperture supplies the highest information density.
+A world opens in the region holding the most of the person's placements, at that region's own
+viewpoint ([`opening-region.ts`](../web/packages/atlas-react/src/playcanvas/opening-region.ts); the
+rule is stated under Arrival in [atlas-reconstruction-inspection.md](atlas-reconstruction-inspection.md)).
+A reconstructed region opens where its first photograph was taken, looking where that camera
+looked; any other region opens level, a few metres from its placement and facing along it, looking
+at its own ground. There is no lateral offset reserved for UI.
 
 The continuity field and sky share one horizon value:
 
