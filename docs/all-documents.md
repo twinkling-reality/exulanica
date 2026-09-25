@@ -32,7 +32,7 @@ Begin here for scope, system boundaries and contributor workflow.
 | [Architecture overview](architecture-overview.md) | overview | System responsibilities, boundaries and source-code entry points |
 | [Development setup and operations](development-setup.md) | guide | Installation, local services and focused verification |
 | [Documentation standard](documentation-standard.md) | standard | Documentation ownership, lifecycle and review rubric |
-| [Personal world model architecture](world-memory-model.md) | contract | World-state planes, identity, representations and research claims |
+| [World state architecture](world-memory-model.md) | contract | World-state planes, identity, representations and research claims |
 
 <a id="capabilities"></a>
 
@@ -43,7 +43,7 @@ Choose a feature or integrate as an external developer.
 | Document | Role | Owns |
 | --- | --- | --- |
 | [World creation](capabilities/world-creation.md) | guide | Creation experience and its supported boundaries |
-| [Scene reconstruction](capabilities/scene-reconstruction.md) | guide | Media-to-scene experience and coverage limits |
+| [Scene reconstruction](capabilities/scene-reconstruction.md) | guide | Photographs-to-scene experience, one way to build a world, and its coverage limits |
 | [Companion](capabilities/companion.md) | guide | Companion role, tools and continuity requirements |
 | [Simulation runtime](capabilities/simulation.md) | guide | Simulation uses and supported behavior boundaries |
 | [World API](capabilities/world-api.md) | guide | Authenticated developer operations and version-safe edits |
@@ -102,8 +102,8 @@ Follow user controls, model proposals and browser representations.
 | [Companion questions, memory and proposals](companion-question.md) | contract | Grounded question, conversation and appearance-proposal path |
 | [Reviewed interaction-policy authority](interaction-policy-backend.md) | contract | Reviewed interaction-policy capabilities and mutations |
 | [Atlas frontend integration](atlas-frontend-integration.md) | contract | Frontend authority boundaries and review lifecycle |
-| [Atlas spatial architecture](atlas-spatial-architecture.md) | contract | Atlas spatial grammar and navigation design |
-| [Atlas visual language: Aeroheart](atlas-visual-language.md) | reference | Visual language and semantic presentation rules |
+| [Atlas spatial architecture](atlas-spatial-architecture.md) | contract | Spatial grammar and navigation of the Atlas, the presentation of a person's photograph library |
+| [Atlas visual language: Aeroheart](atlas-visual-language.md) | reference | Visual language for a person's photographs and memories in a world |
 | [Atlas reconstruction inspection](atlas-reconstruction-inspection.md) | contract | Scene inspection, source selection and representation views |
 | [Atlas world customization contract](atlas-world-customization-contract.md) | contract | Protected topology and appearance customization lifecycle |
 | [Adaptive world backend](world-style-backend.md) | contract | Appearance registry, proposals and persisted style authority |
