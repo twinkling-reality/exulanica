@@ -26,7 +26,7 @@ authored object add/move/remove/undo, bounded motion and reload/conflict recover
 have code and synthetic browser checks. See the
 [object contract](../world-objects-contract.md) and the saved-world evaluation
 (`2026-09-12-world-browser`, a local-only evaluation record a clone does not contain).
-These checks do not prove the complete personal-world journey or visual quality.
+These checks do not prove the complete saved-world journey or visual quality.
 
 A person furnishes a world from the
 [world object catalog](../../assets/catalogs/world-objects/world-object.v2.json), read by
