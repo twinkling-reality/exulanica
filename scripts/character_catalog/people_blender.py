@@ -399,9 +399,11 @@ def build(config):
 
     rest_points = [body.matrix_world @ v for v in base_positions["body"]]
     rest_height = max(p.z for p in rest_points) - min(p.z for p in rest_points)
+    # Baked in the order the definition declares them: each bake leaves the rig's floating-point
+    # state a little changed, so a posture declared after the others leaves their clips as they were.
     posture_measurements = {
         key: postures.bake(rig, body, spec, rest_height, spec["clip"], FPS, ground=idle_floor(rig, body, config))
-        for key, spec in sorted(config.get("postures", {}).items())
+        for key, spec in config.get("postures", {}).items()
     }
     for bone in rig.pose.bones:
         bone.rotation_quaternion.identity()

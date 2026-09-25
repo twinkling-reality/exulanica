@@ -47,10 +47,42 @@
       "breathDegrees": 1.2,
       "breathSeconds": 4.0,
       "seatSink": 0.003
+    },
+    "perched": {
+      "label": "Sitting on a seat",
+      "clip": "HumanPerch",
+      "reason": "Sitting upright on a seat with the feet flat on the ground in front of it and the hands resting on the thighs, for a resting person the world draws on a bench, a chair or a ledge. The seat is 0.27 of the base's rest height above the ground, 448 mm for the feminine base and 478 mm for the masculine at their default heights, between the 450 mm chairs and the 480 mm bench and ledge the world object catalog states; the renderer puts the pelvis on the seat it is drawn on and plants the feet on the ground, so a person of another height or a seat of another height is drawn on the seat with the knees a little more or less bent. The ankles rest 0.29 of the rest height in front of the pelvis, just past the knees; the wrists rest 0.12 of the rest height behind the knees and 0.075 above them, over the tops of the thighs, where the feminine base's arms reach: 0.09 behind and 0.06 above left its wrists 38 mm short. Distances are shares of the base's rest height; the pelvis settles until the lowest point of the skinned buttocks touches the seat's height, the buttocks alone because the thighs slope down to the knees.",
+      "seatHeight": 0.27,
+      "feetForward": 0.29,
+      "feetApart": 0.07,
+      "kneeOut": 0.15,
+      "kneeUp": 1.0,
+      "handForward": -0.12,
+      "handOut": 0.0,
+      "handAbove": 0.075,
+      "elbowOut": 0.5,
+      "elbowBack": 0.5,
+      "wristDropDegrees": 20,
+      "pelvisTiltDegrees": 5,
+      "trunkLeanDegrees": 8,
+      "breathDegrees": 1.2,
+      "breathSeconds": 4.0,
+      "seatSink": 0.003,
+      "seatBones": [
+        "Hips",
+        "LeftButtock",
+        "RightButtock"
+      ]
     }
   },
   "activityPostures": {
     "rest": "seated"
+  },
+  "seatPostures": {
+    "activities": {
+      "rest": "perched"
+    },
+    "reason": "How an activity performed on a seat is drawn: activity key to posture key. A person the world draws at a seat takes this posture; an activity named nowhere here, or a person at no seat, is drawn by activityPostures, so a resting person with no seat still sits on the ground."
   },
   "morphs": [
     {
@@ -763,8 +795,9 @@
   },
   "assetRevisions": {
     "containers": 2,
+    "bases": 3,
     "materials": 1,
-    "reason": "Containers carry the seated clip and baked occlusion from revision 2; material packs are unchanged, so their reviewed imports stay valid."
+    "reason": "Containers carry the seated clip and baked occlusion from revision 2; the bases carry the perched clip from revision 3, and the worn parts, whose bytes it leaves unchanged, keep revision 2; material packs are unchanged, so their reviewed imports stay valid."
   },
   "occlusion": {
     "rays": 48,

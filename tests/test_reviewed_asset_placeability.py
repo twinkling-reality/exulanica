@@ -44,7 +44,8 @@ import prepare_character_people as people  # noqa: E402
 MARKERS = {asset.asset_key for asset in reviewed_assets()}
 CATALOG = json.loads((ROOT / "assets/characters/catalog.json").read_text())
 CONTAINERS = {asset["assetKey"]: asset for asset in people.iter_assets(CATALOG)}
-BODY = CONTAINERS["makehuman.people.feminine.base.v2"]
+#: A body the character catalog publishes, read from it rather than named by its revision.
+BODY = CONTAINERS[CATALOG["families"][0]["bases"][0]["asset"]["assetKey"]]
 
 
 @pytest.fixture

@@ -1,0 +1,1974 @@
+{
+ "cases": [
+  {
+   "asset_key": "cc0.bench",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 0,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1643,
+     -2254
+    ],
+    [
+     2345,
+     -2254
+    ],
+    [
+     3047,
+     -2254
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -702,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        0,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        702,
+        20,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.bench",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 47856,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1595,
+     -2220
+    ],
+    [
+     2296,
+     -2253
+    ],
+    [
+     2998,
+     -2287
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -702,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        0,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        702,
+        20,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.bench",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 1570796,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1324,
+     -532
+    ],
+    [
+     1325,
+     -1235
+    ],
+    [
+     1325,
+     -1937
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -702,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        0,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        702,
+        20,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.bench",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 3141593,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     3048,
+     -214
+    ],
+    [
+     2346,
+     -214
+    ],
+    [
+     1643,
+     -213
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -702,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        0,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        702,
+        20,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.bench",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 2468013,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2257,
+     2
+    ],
+    [
+     1708,
+     -436
+    ],
+    [
+     1160,
+     -874
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -702,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        0,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        702,
+        20,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.bench",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 5555555,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2500,
+     -2463
+    ],
+    [
+     3024,
+     -1996
+    ],
+    [
+     3548,
+     -1529
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -702,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        0,
+        20,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       702,
+       1020
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        702,
+        20,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.cafe-table",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 0,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2345,
+     -2374
+    ],
+    [
+     2345,
+     -94
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1140
+      ],
+      "seat": {
+       "faces": "+x",
+       "position_mm": [
+        -690,
+        0,
+        450
+       ]
+      }
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1140
+      ],
+      "seat": {
+       "faces": "-x",
+       "position_mm": [
+        690,
+        0,
+        450
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.cafe-table",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 47856,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2290,
+     -2373
+    ],
+    [
+     2400,
+     -95
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1140
+      ],
+      "seat": {
+       "faces": "+x",
+       "position_mm": [
+        -690,
+        0,
+        450
+       ]
+      }
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1140
+      ],
+      "seat": {
+       "faces": "-x",
+       "position_mm": [
+        690,
+        0,
+        450
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.cafe-table",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 1570796,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1205,
+     -1235
+    ],
+    [
+     3485,
+     -1233
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1140
+      ],
+      "seat": {
+       "faces": "+x",
+       "position_mm": [
+        -690,
+        0,
+        450
+       ]
+      }
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1140
+      ],
+      "seat": {
+       "faces": "-x",
+       "position_mm": [
+        690,
+        0,
+        450
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.cafe-table",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 3141593,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2346,
+     -94
+    ],
+    [
+     2344,
+     -2374
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1140
+      ],
+      "seat": {
+       "faces": "+x",
+       "position_mm": [
+        -690,
+        0,
+        450
+       ]
+      }
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1140
+      ],
+      "seat": {
+       "faces": "-x",
+       "position_mm": [
+        690,
+        0,
+        450
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.cafe-table",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 2468013,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1633,
+     -342
+    ],
+    [
+     3057,
+     -2126
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1140
+      ],
+      "seat": {
+       "faces": "+x",
+       "position_mm": [
+        -690,
+        0,
+        450
+       ]
+      }
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1140
+      ],
+      "seat": {
+       "faces": "-x",
+       "position_mm": [
+        690,
+        0,
+        450
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.cafe-table",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 5555555,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     3104,
+     -2086
+    ],
+    [
+     1586,
+     -382
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1140
+      ],
+      "seat": {
+       "faces": "+x",
+       "position_mm": [
+        -690,
+        0,
+        450
+       ]
+      }
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1140
+      ],
+      "seat": {
+       "faces": "-x",
+       "position_mm": [
+        690,
+        0,
+        450
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.planter-tree",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 0,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2345,
+     -2624
+    ],
+    [
+     3735,
+     -1234
+    ],
+    [
+     2345,
+     156
+    ],
+    [
+     955,
+     -1234
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-x",
+      "position_mm": [
+       1390,
+       0
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+x",
+      "position_mm": [
+       -1390,
+       0
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.planter-tree",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 47856,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2278,
+     -2623
+    ],
+    [
+     3734,
+     -1301
+    ],
+    [
+     2412,
+     155
+    ],
+    [
+     956,
+     -1167
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-x",
+      "position_mm": [
+       1390,
+       0
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+x",
+      "position_mm": [
+       -1390,
+       0
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.planter-tree",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 1570796,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     955,
+     -1235
+    ],
+    [
+     2346,
+     -2624
+    ],
+    [
+     3735,
+     -1233
+    ],
+    [
+     2344,
+     156
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-x",
+      "position_mm": [
+       1390,
+       0
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+x",
+      "position_mm": [
+       -1390,
+       0
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.planter-tree",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 3141593,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2346,
+     156
+    ],
+    [
+     955,
+     -1233
+    ],
+    [
+     2344,
+     -2624
+    ],
+    [
+     3735,
+     -1235
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-x",
+      "position_mm": [
+       1390,
+       0
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+x",
+      "position_mm": [
+       -1390,
+       0
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.planter-tree",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 2468013,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1477,
+     -147
+    ],
+    [
+     1258,
+     -2102
+    ],
+    [
+     3213,
+     -2321
+    ],
+    [
+     3432,
+     -366
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-x",
+      "position_mm": [
+       1390,
+       0
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+x",
+      "position_mm": [
+       -1390,
+       0
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.planter-tree",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 5555555,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     3270,
+     -2272
+    ],
+    [
+     3383,
+     -309
+    ],
+    [
+     1420,
+     -196
+    ],
+    [
+     1307,
+     -2159
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       0,
+       1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-x",
+      "position_mm": [
+       1390,
+       0
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+y",
+      "position_mm": [
+       0,
+       -1390
+      ],
+      "seat": null
+     },
+     {
+      "faces": "+x",
+      "position_mm": [
+       -1390,
+       0
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.market-stall",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 0,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1994,
+     -2374
+    ],
+    [
+     2696,
+     -2374
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.market-stall",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 47856,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1939,
+     -2356
+    ],
+    [
+     2642,
+     -2390
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.market-stall",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 1570796,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1204,
+     -883
+    ],
+    [
+     1205,
+     -1586
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.market-stall",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 3141593,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2697,
+     -94
+    ],
+    [
+     1994,
+     -93
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.market-stall",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 2468013,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1908,
+     -124
+    ],
+    [
+     1359,
+     -561
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.market-stall",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 5555555,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2842,
+     -2319
+    ],
+    [
+     3366,
+     -1852
+    ]
+   ],
+   "use": {
+    "affordance": "visit",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": null
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": null
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.seating-planter",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 0,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1292,
+     -2374
+    ],
+    [
+     1994,
+     -2374
+    ],
+    [
+     2696,
+     -2374
+    ],
+    [
+     3398,
+     -2374
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -1053,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        1053,
+        190,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.seating-planter",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 47856,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1238,
+     -2323
+    ],
+    [
+     1939,
+     -2356
+    ],
+    [
+     2642,
+     -2390
+    ],
+    [
+     3343,
+     -2424
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -1053,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        1053,
+        190,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.seating-planter",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 1570796,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     1204,
+     -181
+    ],
+    [
+     1204,
+     -883
+    ],
+    [
+     1205,
+     -1586
+    ],
+    [
+     1205,
+     -2288
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -1053,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        1053,
+        190,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.seating-planter",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 3141593,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     3399,
+     -94
+    ],
+    [
+     2697,
+     -94
+    ],
+    [
+     1994,
+     -93
+    ],
+    [
+     1292,
+     -93
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -1053,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        1053,
+        190,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.seating-planter",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 2468013,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2457,
+     314
+    ],
+    [
+     1908,
+     -124
+    ],
+    [
+     1359,
+     -561
+    ],
+    [
+     810,
+     -999
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -1053,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        1053,
+        190,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "asset_key": "cc0.seating-planter",
+   "transform": {
+    "scale_milli": 1000,
+    "x_mm": 2345,
+    "y_mm": 120,
+    "yaw_microradians": 5555555,
+    "z_mm": -1234
+   },
+   "turned_places_mm": [
+    [
+     2316,
+     -2786
+    ],
+    [
+     2842,
+     -2319
+    ],
+    [
+     3366,
+     -1852
+    ],
+    [
+     3890,
+     -1385
+    ]
+   ],
+   "use": {
+    "affordance": "rest",
+    "places": [
+     {
+      "faces": "-y",
+      "position_mm": [
+       -1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -1053,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       -351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        -351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       351,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        351,
+        190,
+        480
+       ]
+      }
+     },
+     {
+      "faces": "-y",
+      "position_mm": [
+       1053,
+       1140
+      ],
+      "seat": {
+       "faces": "+y",
+       "position_mm": [
+        1053,
+        190,
+        480
+       ]
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "profile": "exulanica.society-seating-fixture/v1",
+ "written_by": "tests/test_society_seating_fixture.py"
+}

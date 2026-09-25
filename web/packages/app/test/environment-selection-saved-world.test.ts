@@ -5,6 +5,7 @@ import { ApiError } from '@exulanica/graph-client';
 import type { AtlasScene } from '@exulanica/atlas-core';
 import { mountEnvironmentSelection } from '../src/composition/environment-selection.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
+import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import { parseSociety, parseSocietyActionRecord, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
@@ -77,7 +78,8 @@ function mount() {
     visibleInhabitantIds: ['person-0', 'person-1'], inhabitantRepresentation: vi.fn(() => null),
     inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => ['person-0']),
     societyCounts: { population: 100, outdoors: 100, indoors: 0, near: 2, far: 0, drawn: 2 },
-    drawnInhabitantCount: 2, pickInhabitant: vi.fn(() => 'person-0'),
+    drawnInhabitantCount: 2, pickInhabitant: vi.fn(() => 'person-0'), inhabitantSeatAtPlace: vi.fn(() => false),
+    setSeatingLayout: vi.fn(), seatingMisses: [{ inhabitantId: 'person-7', reason: 'target-unknown' }],
   };
   const controls = { state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }) };
   const binding = {
@@ -103,7 +105,10 @@ function mount() {
     configure: vi.fn(),
     step: vi.fn(async () => { held = society(1, true); return { control: control(1), society: held }; }),
   };
-  const worldClient = { connect: vi.fn(async () => ({ assets: [], version })) };
+  // The registry list the page reads, with what inhabitants do with the plate: rest, at places
+  // the society derives for a marker.
+  const assets = [{ ...plate('unused', 0, 0).asset, placeable: true, use: { affordance: 'rest', places: null } }];
+  const worldClient = { connect: vi.fn(async () => ({ assets, version })), assets: vi.fn(() => assets) };
   const canvas = document.createElement('canvas');
   const mounted = mountEnvironmentSelection({
     env: { canvas, preview: false } as unknown as AppEnvironment,
@@ -119,14 +124,14 @@ function mount() {
   });
   document.body.append(mounted.root);
   const panel = () => mounted.root.querySelector<HTMLElement>('section.world-inhabitants')!;
-  return { mounted, crowd, controls, societyClient, controlClient, worldClient, panel };
+  return { mounted, crowd, controls, societyClient, controlClient, worldClient, panel, canvas };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('a saved world holds inhabitants only when the person asks', () => {
   it('opening reads the saved world and creates nothing; the request brings them in and draws them', async () => {
-    const { mounted, crowd, societyClient, panel } = mount();
+    const { mounted, crowd, societyClient, panel, canvas, worldClient } = mount();
     await mounted.begin();
     expect(societyClient.read).toHaveBeenCalledWith('version', { places: true });
     expect(societyClient.create).not.toHaveBeenCalled();
@@ -141,18 +146,40 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     for (let i = 0; i < 6; i += 1) await settle();
     expect(societyClient.create).toHaveBeenCalledWith('version', null, 'region:starter', 'exulanica-society/v2');
     expect(crowd.setSociety).toHaveBeenCalledTimes(1);
+    // The crowd is handed the seating the drawn objects give: each kind's use, the objects, and
+    // which object each target belongs to.
+    const layout = (crowd.setSociety.mock.calls[0] as unknown[])[3] as SeatingLayout;
+    expect(layout.uses.get('cc0.marker-plate')).toEqual({ affordance: 'rest', places: null });
+    expect(layout.objects.map((object) => [object.objectId, object.xMm, object.zMm, object.yawMicroradians]))
+      .toEqual([['object-near', 3000, 5000, 3_141_593], ['object-far', 0, 14000, 0]]);
+    expect(layout.targets.get('authored:version:object-near:rest')).toBe('object-near');
+    // Whoever the crowd draws as everyone else, it says so by reason on the canvas.
+    expect(canvas.dataset['societySeatingMisses']).toBe('target-unknown');
     expect(panel().dataset['state']).toBe('present');
     const rows = [...panel().querySelectorAll<HTMLElement>('.world-inhabitants-places li')];
     expect(rows.map((row) => [row.dataset['objectId'], row.dataset['status']])).toEqual([
       ['object-near', 'usable'], ['object-far', 'unreachable'],
     ]);
     expect(rows[1]!.textContent).toMatch(/outside the area they walk in/);
+    // An object taken away is taken out of the seating at once, before any new minute is read.
+    const without = { ...version, objects: version.objects.filter((object) => object.objectId !== 'object-near') };
+    worldClient.connect.mockResolvedValueOnce({ assets: worldClient.assets(), version: without as AlternateVersion });
+    await mounted.afterAuthoredEdit('version');
+    const relaid = crowd.setSeatingLayout.mock.calls.at(-1)![0] as SeatingLayout;
+    expect(relaid.objects.map((object) => object.objectId)).toEqual(['object-far']);
+    expect(crowd.setSociety).toHaveBeenCalledTimes(1);
+    expect(canvas.dataset['societySeatingLayout']).toBe('current');
+    // A re-read that fails keeps the last seating it built, so nobody stands up for it, and says so.
+    worldClient.connect.mockRejectedValueOnce(new ApiError(503, 'unavailable', 'the store is restarting'));
+    await mounted.afterAuthoredEdit('version');
+    expect(crowd.setSeatingLayout.mock.calls.at(-1)![0]).toBe(relaid);
+    expect(canvas.dataset['societySeatingLayout']).toBe('kept-after-failed-read');
     mounted.dispose();
     expect(crowd.clearSociety).toHaveBeenCalled();
   });
 
   it('a chosen inhabitant can be asked to rest at a place, and a minute can be advanced', async () => {
-    const { mounted, controls, societyClient, controlClient, panel } = mount();
+    const { mounted, crowd, controls, societyClient, controlClient, panel } = mount();
     await mounted.begin();
     [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring in inhabitants')!.click();
     for (let i = 0; i < 6; i += 1) await settle();
@@ -186,8 +213,15 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     // The recorded explanation and how the person is drawn stay below, in the details.
     const details = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(details).toContainEqual(['Recorded explanation', 'Person 0 (simulated) rests at the plate.']);
-    // Resting is what the simulation says; a catalog person sits on the ground in front of the place.
+    // Resting is what the simulation says; at a plate, which has no seat, a catalog person sits on
+    // the ground in front of the place.
     expect(details).toContainEqual(['Drawn as', 'Sitting on the ground in front of the place.']);
+    // At a place with a seat, the words say the seat, from the place, before they have reached it.
+    crowd.inhabitantSeatAtPlace.mockReturnValue(true);
+    controls.onInteract?.();
+    for (let i = 0; i < 2; i += 1) await settle();
+    const seated = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
+    expect(seated).toContainEqual(['Drawn as', 'Sitting on the seat at the place.']);
     mounted.dispose();
   });
 });

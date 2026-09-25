@@ -67,7 +67,7 @@ describe('deterministic inhabitant looks', () => {
     }
     expect(describeLookBytes(CHARACTER_CATALOG, first, 'near')).not.toBe(describeLookBytes(CHARACTER_CATALOG, first, 'far'));
     expect(sha256Hex(new TextEncoder().encode(describeLookBytes(CHARACTER_CATALOG, first, 'near'))))
-      .toBe('c5d08132b72fdda786be1efdd3a0d335a02dbf16c549ddc4b833ec00fb67ad8d');
+      .toBe('4887007f94763d1a3c55235d235e041065f8506dee2e8a2e2bbb7b554c24dfd3');
   });
 
   it('ignores society, branch and every other field of the identity', () => {

@@ -169,6 +169,8 @@ export type {
   OwnedSocietyState,
 } from './owned-district-runtime.js';
 export { OwnedDistrictRuntime } from './owned-district-runtime.js';
+export { KIND_SIDES } from './society/seating.js';
+export type { KindPlace, KindSeat, KindSide, KindUse, SeatingLayout, SeatingMiss, SeatingObject } from './society/seating.js';
 export type {
   RepresentationDraw,
   RepresentationEntryReport,

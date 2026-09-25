@@ -1,0 +1,986 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-object",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "marker_cube",
+      "asset_key": "cc0.marker-cube",
+      "title": "Marker cube",
+      "summary": "A half-metre cube resting on the ground plane.",
+      "recipe": {
+        "profile": "marker-v1",
+        "solid": "box",
+        "size_x_mm": 500,
+        "size_y_mm": 500,
+        "size_z_mm": 500,
+        "source": "declared/marker"
+      },
+      "dimensions_mm": {
+        "width": 500,
+        "depth": 500,
+        "height": 500
+      },
+      "materials": {},
+      "use": {
+        "affordance": "visit",
+        "blocks_navigation": true,
+        "places": null
+      },
+      "declared": {
+        "marker": "The reviewed marker that migration 0042 pinned: authored for this repository at a size a person sees from a few steps away, and never measured from any object."
+      },
+      "reason": "One of the three grey markers a person's world held first. It stays so every world that holds one keeps its meaning: its bytes, its registry row and its society assignment do not move. Inhabitants visit it, standing in front of a face.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    },
+    {
+      "key": "marker_pillar",
+      "asset_key": "cc0.marker-pillar",
+      "title": "Marker pillar",
+      "summary": "A two-metre square pillar resting on the ground plane.",
+      "recipe": {
+        "profile": "marker-v1",
+        "solid": "box",
+        "size_x_mm": 250,
+        "size_y_mm": 250,
+        "size_z_mm": 2000,
+        "source": "declared/marker"
+      },
+      "dimensions_mm": {
+        "width": 250,
+        "depth": 250,
+        "height": 2000
+      },
+      "materials": {},
+      "use": {
+        "affordance": "visit",
+        "blocks_navigation": true,
+        "places": null
+      },
+      "declared": {
+        "marker": "The reviewed marker that migration 0042 pinned: authored for this repository at a size a person sees from a few steps away, and never measured from any object."
+      },
+      "reason": "One of the three grey markers a person's world held first, kept byte for byte. Inhabitants visit it, standing in front of a face.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    },
+    {
+      "key": "marker_plate",
+      "asset_key": "cc0.marker-plate",
+      "title": "Marker plate",
+      "summary": "A one-metre flat square lying on the ground plane.",
+      "recipe": {
+        "profile": "marker-v1",
+        "solid": "plate",
+        "size_x_mm": 1000,
+        "size_y_mm": 1000,
+        "size_z_mm": 0,
+        "source": "declared/marker"
+      },
+      "dimensions_mm": {
+        "width": 1000,
+        "depth": 1000,
+        "height": 0
+      },
+      "materials": {},
+      "use": {
+        "affordance": "rest",
+        "blocks_navigation": false,
+        "places": null
+      },
+      "declared": {
+        "marker": "The reviewed marker that migration 0042 pinned: authored for this repository at a size a person sees from a few steps away, and never measured from any object."
+      },
+      "reason": "One of the three grey markers a person's world held first, kept byte for byte. It blocks nothing, and inhabitants rest standing on it in a row along its own x axis.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    },
+    {
+      "key": "bench",
+      "asset_key": "cc0.bench",
+      "title": "Bench",
+      "summary": "A timber bench 1.8 metres long with a back, on painted metal legs.",
+      "recipe": {
+        "profile": "parts-v1",
+        "texels": 256,
+        "texels_source": "declared/texels",
+        "parts": [
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 420,
+            "size_x_mm": 1800,
+            "size_y_mm": 450,
+            "size_z_mm": 60,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "street-furniture.v2/bench/0"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": -200,
+            "offset_z_mm": 480,
+            "size_x_mm": 1800,
+            "size_y_mm": 60,
+            "size_z_mm": 420,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "street-furniture.v2/bench/1"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": -700,
+            "offset_y_mm": 0,
+            "offset_z_mm": 0,
+            "size_x_mm": 80,
+            "size_y_mm": 450,
+            "size_z_mm": 420,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "street-furniture.v2/bench/2"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 700,
+            "offset_y_mm": 0,
+            "offset_z_mm": 0,
+            "size_x_mm": 80,
+            "size_y_mm": 450,
+            "size_z_mm": 420,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "street-furniture.v2/bench/3"
+          }
+        ]
+      },
+      "dimensions_mm": {
+        "width": 1800,
+        "depth": 455,
+        "height": 900
+      },
+      "materials": {
+        "object_primary": "cc0.painted-timber",
+        "object_secondary": "cc0.sign-panel"
+      },
+      "use": {
+        "affordance": "rest",
+        "blocks_navigation": true,
+        "places": [
+          {
+            "side": "+y",
+            "count": 3,
+            "seat": {
+              "x_mm": 0,
+              "y_mm": 20,
+              "faces": "+y",
+              "source": "declared/seat_point"
+            }
+          }
+        ]
+      },
+      "declared": {
+        "texels": "Its maps are embedded at 256 texels a side, a texel every 4 mm of a 1000 mm set: the smallest size whose paint chips, grain, bark, leaf edges and stripes still held in a side-by-side render at 1 m of the same kind at 512, 256 and 128 texels, where 128 smeared them. It is a quarter of the bytes 512 would take.",
+        "seat_point": "Where a resting person's pelvis goes on the seat: 20 mm in front of the seat's middle, which leaves 190 mm between the pelvis and the backrest's front face at y -170 mm, room for the perched posture's seat behind its hip joints, and puts the knees past the seat's front edge at y 225 mm. The person faces the bench's front."
+      },
+      "reason": "The city's own bench: every part is the street furniture catalog's bench, unchanged, so the bench in a person's world and the bench on a generated street are one design. Its seat and back are painted timber and its legs painted sheet metal. Three people rest at it, each walking to a place in front of its seat, a standing spacing and the turning margin apart, clear of it by the navigation clearance and a standing radius, and each is drawn sitting on the seat in front of that place.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    },
+    {
+      "key": "cafe_table",
+      "asset_key": "cc0.cafe-table",
+      "title": "Cafe table with two chairs",
+      "summary": "A round cafe table with a chair on each side, timber tops on painted metal legs.",
+      "recipe": {
+        "profile": "parts-v1",
+        "texels": 256,
+        "texels_source": "declared/texels",
+        "parts": [
+          {
+            "shape": "prism",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 720,
+            "size_x_mm": 700,
+            "size_y_mm": 700,
+            "size_z_mm": 30,
+            "top_scale_millionths": 1000000,
+            "segments": 16,
+            "rings": 1,
+            "source": "declared/table"
+          },
+          {
+            "shape": "prism",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 20,
+            "size_x_mm": 60,
+            "size_y_mm": 60,
+            "size_z_mm": 700,
+            "top_scale_millionths": 1000000,
+            "segments": 8,
+            "rings": 1,
+            "source": "declared/table"
+          },
+          {
+            "shape": "prism",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 0,
+            "size_x_mm": 450,
+            "size_y_mm": 450,
+            "size_z_mm": 20,
+            "top_scale_millionths": 1000000,
+            "segments": 16,
+            "rings": 1,
+            "source": "declared/table"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": -650,
+            "offset_y_mm": 0,
+            "offset_z_mm": 410,
+            "size_x_mm": 420,
+            "size_y_mm": 420,
+            "size_z_mm": 40,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": -840,
+            "offset_y_mm": 0,
+            "offset_z_mm": 450,
+            "size_x_mm": 40,
+            "size_y_mm": 420,
+            "size_z_mm": 400,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": -840,
+            "offset_y_mm": -190,
+            "offset_z_mm": 0,
+            "size_x_mm": 30,
+            "size_y_mm": 30,
+            "size_z_mm": 410,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": -840,
+            "offset_y_mm": 190,
+            "offset_z_mm": 0,
+            "size_x_mm": 30,
+            "size_y_mm": 30,
+            "size_z_mm": 410,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": -460,
+            "offset_y_mm": -190,
+            "offset_z_mm": 0,
+            "size_x_mm": 30,
+            "size_y_mm": 30,
+            "size_z_mm": 410,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": -460,
+            "offset_y_mm": 190,
+            "offset_z_mm": 0,
+            "size_x_mm": 30,
+            "size_y_mm": 30,
+            "size_z_mm": 410,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 650,
+            "offset_y_mm": 0,
+            "offset_z_mm": 410,
+            "size_x_mm": 420,
+            "size_y_mm": 420,
+            "size_z_mm": 40,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 840,
+            "offset_y_mm": 0,
+            "offset_z_mm": 450,
+            "size_x_mm": 40,
+            "size_y_mm": 420,
+            "size_z_mm": 400,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 460,
+            "offset_y_mm": -190,
+            "offset_z_mm": 0,
+            "size_x_mm": 30,
+            "size_y_mm": 30,
+            "size_z_mm": 410,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 460,
+            "offset_y_mm": 190,
+            "offset_z_mm": 0,
+            "size_x_mm": 30,
+            "size_y_mm": 30,
+            "size_z_mm": 410,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 840,
+            "offset_y_mm": -190,
+            "offset_z_mm": 0,
+            "size_x_mm": 30,
+            "size_y_mm": 30,
+            "size_z_mm": 410,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 840,
+            "offset_y_mm": 190,
+            "offset_z_mm": 0,
+            "size_x_mm": 30,
+            "size_y_mm": 30,
+            "size_z_mm": 410,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/chair"
+          }
+        ]
+      },
+      "dimensions_mm": {
+        "width": 1720,
+        "depth": 700,
+        "height": 850
+      },
+      "materials": {
+        "object_primary": "cc0.painted-timber",
+        "object_secondary": "cc0.sign-panel"
+      },
+      "use": {
+        "affordance": "rest",
+        "blocks_navigation": true,
+        "places": [
+          {
+            "side": "+y",
+            "count": 1,
+            "seat": {
+              "x_mm": -690,
+              "y_mm": 0,
+              "faces": "+x",
+              "source": "declared/seat_point"
+            }
+          },
+          {
+            "side": "-y",
+            "count": 1,
+            "seat": {
+              "x_mm": 690,
+              "y_mm": 0,
+              "faces": "-x",
+              "source": "declared/seat_point"
+            }
+          }
+        ]
+      },
+      "declared": {
+        "table": "A cafe table: a round top 700 mm across at 750 mm, the height a seated adult eats at, on one column and a round foot. Declared for this catalog, not measured from a product.",
+        "chair": "A cafe chair: a seat 420 mm square at 450 mm, the seat height the table's 750 mm top goes with, a back up to 850 mm and four legs 30 mm square. Declared for this catalog, not measured from a product.",
+        "texels": "Its maps are embedded at 256 texels a side, a texel every 4 mm of a 1000 mm set: the smallest size whose paint chips, grain, bark, leaf edges and stripes still held in a side-by-side render at 1 m of the same kind at 512, 256 and 128 texels, where 128 smeared them. It is a quarter of the bytes 512 would take.",
+        "seat_point": "Where a resting person's pelvis goes on each chair: 40 mm behind the middle of the 420 mm seat, toward the chair's back, whose front face is at 820 mm from the table's centre, so the knees come under the table top and the person faces the table. The person resting at the front place takes the chair at -x and the person at the back place the chair at +x."
+      },
+      "reason": "Somewhere to sit at a table in a square. The table and both chairs block walking as one footprint. Two people rest at it, each walking to a place at one of the table's open sides, clear of it by the navigation clearance and a standing radius, and each is drawn sitting on a chair facing the table.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    },
+    {
+      "key": "planter_tree",
+      "asset_key": "cc0.planter-tree",
+      "title": "Tree in a planter",
+      "summary": "A young broadleaf tree in a square timber planter.",
+      "recipe": {
+        "profile": "parts-v1",
+        "texels": 256,
+        "texels_source": "declared/texels",
+        "parts": [
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 0,
+            "size_x_mm": 1200,
+            "size_y_mm": 1200,
+            "size_z_mm": 430,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/planter"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_tertiary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 430,
+            "size_x_mm": 1080,
+            "size_y_mm": 1080,
+            "size_z_mm": 20,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/planter"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 570,
+            "offset_z_mm": 430,
+            "size_x_mm": 1200,
+            "size_y_mm": 60,
+            "size_z_mm": 50,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/planter"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": -570,
+            "offset_z_mm": 430,
+            "size_x_mm": 1200,
+            "size_y_mm": 60,
+            "size_z_mm": 50,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/planter"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 570,
+            "offset_y_mm": 0,
+            "offset_z_mm": 430,
+            "size_x_mm": 60,
+            "size_y_mm": 1080,
+            "size_z_mm": 50,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/planter"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": -570,
+            "offset_y_mm": 0,
+            "offset_z_mm": 430,
+            "size_x_mm": 60,
+            "size_y_mm": 1080,
+            "size_z_mm": 50,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/planter"
+          },
+          {
+            "shape": "prism",
+            "surface_role": "trunk",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 450,
+            "size_x_mm": 200,
+            "size_y_mm": 200,
+            "size_z_mm": 2200,
+            "top_scale_millionths": 800000,
+            "segments": 8,
+            "rings": 1,
+            "source": "declared/tree"
+          },
+          {
+            "shape": "ellipsoid",
+            "surface_role": "canopy",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 2650,
+            "size_x_mm": 3200,
+            "size_y_mm": 3200,
+            "size_z_mm": 3000,
+            "top_scale_millionths": 1000000,
+            "segments": 16,
+            "rings": 8,
+            "source": "declared/tree"
+          }
+        ]
+      },
+      "dimensions_mm": {
+        "width": 3200,
+        "depth": 3200,
+        "height": 5650
+      },
+      "materials": {
+        "object_primary": "cc0.painted-timber",
+        "object_tertiary": "cc0.tree-pit-soil",
+        "trunk": "cc0.tree-bark",
+        "canopy": "cc0.broadleaf-foliage"
+      },
+      "use": {
+        "affordance": "visit",
+        "blocks_navigation": true,
+        "places": [
+          {
+            "side": "+y",
+            "count": 1,
+            "seat": null
+          },
+          {
+            "side": "+x",
+            "count": 1,
+            "seat": null
+          },
+          {
+            "side": "-y",
+            "count": 1,
+            "seat": null
+          },
+          {
+            "side": "-x",
+            "count": 1,
+            "seat": null
+          }
+        ]
+      },
+      "declared": {
+        "planter": "A square timber planter 1200 mm across, filled to 450 mm, with a rim 60 mm wide up to 480 mm, the top of the street furniture catalog's bench seat (420 mm plus 60 mm). Declared for this catalog.",
+        "tree": "A young street tree in the city grammar's form (exulanica/grammar/grammars/city/generation/streetlife.py): a trunk prism of eight sides tapering to 80 percent and an ellipsoid crown of sixteen meridians and eight bands. Its sizes lie inside the grammar's declared street tree bounds in city.v3.json: trunk 200 mm across (tree_trunk_diameter_mm, 150 to 450), clear of branches 2650 mm above the ground (tree_trunk_clear_height_mm, 2200 to 3500), crown radius 1600 mm (tree_crown_radius_mm, 1500 to 4500) and crown height 3000 mm (tree_crown_height_mm, 3000 to 9000).",
+        "texels": "Its maps are embedded at 256 texels a side, a texel every 4 mm of a 1000 mm set: the smallest size whose paint chips, grain, bark, leaf edges and stripes still held in a side-by-side render at 1 m of the same kind at 512, 256 and 128 texels, where 128 smeared them. It is a quarter of the bytes 512 would take."
+      },
+      "reason": "A tree for the middle of a square. The planter blocks walking and the crown is overhead. People stop by it, one in front of each side of the planter, clear of it by the navigation clearance and a standing radius.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    },
+    {
+      "key": "lamp_post",
+      "asset_key": "cc0.lamp-post",
+      "title": "Lamp post",
+      "summary": "A painted metal lamp post six metres high with an arm and a lamp.",
+      "recipe": {
+        "profile": "parts-v1",
+        "texels": 256,
+        "texels_source": "declared/texels",
+        "parts": [
+          {
+            "shape": "prism",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 0,
+            "size_x_mm": 150,
+            "size_y_mm": 150,
+            "size_z_mm": 6000,
+            "top_scale_millionths": 1000000,
+            "segments": 8,
+            "rings": 1,
+            "source": "street-furniture.v2/street_lamp/0"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 600,
+            "offset_y_mm": 0,
+            "offset_z_mm": 5800,
+            "size_x_mm": 1200,
+            "size_y_mm": 80,
+            "size_z_mm": 80,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "street-furniture.v2/street_lamp/1"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 1100,
+            "offset_y_mm": 0,
+            "offset_z_mm": 5650,
+            "size_x_mm": 500,
+            "size_y_mm": 250,
+            "size_z_mm": 150,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "street-furniture.v2/street_lamp/2"
+          }
+        ]
+      },
+      "dimensions_mm": {
+        "width": 1425,
+        "depth": 250,
+        "height": 6000
+      },
+      "materials": {
+        "object_primary": "cc0.sign-panel",
+        "object_secondary": "cc0.sign-panel"
+      },
+      "use": {
+        "affordance": "none",
+        "blocks_navigation": true,
+        "places": []
+      },
+      "declared": {
+        "texels": "Its maps are embedded at 256 texels a side, a texel every 4 mm of a 1000 mm set: the smallest size whose paint chips, grain, bark, leaf edges and stripes still held in a side-by-side render at 1 m of the same kind at 512, 256 and 128 texels, where 128 smeared them. It is a quarter of the bytes 512 would take."
+      },
+      "reason": "The city's own street lamp: every part is the street furniture catalog's street_lamp, unchanged. Inhabitants walk round its post and do nothing at it; the arm and the lamp are overhead.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    },
+    {
+      "key": "market_stall",
+      "asset_key": "cc0.market-stall",
+      "title": "Market stall",
+      "summary": "A timber serving counter under a striped canvas awning on painted metal posts.",
+      "recipe": {
+        "profile": "parts-v1",
+        "texels": 256,
+        "texels_source": "declared/texels",
+        "parts": [
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 0,
+            "size_x_mm": 2000,
+            "size_y_mm": 700,
+            "size_z_mm": 900,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/stall"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": -970,
+            "offset_y_mm": -320,
+            "offset_z_mm": 0,
+            "size_x_mm": 60,
+            "size_y_mm": 60,
+            "size_z_mm": 2400,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/stall"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": -970,
+            "offset_y_mm": 320,
+            "offset_z_mm": 0,
+            "size_x_mm": 60,
+            "size_y_mm": 60,
+            "size_z_mm": 2400,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/stall"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 970,
+            "offset_y_mm": -320,
+            "offset_z_mm": 0,
+            "size_x_mm": 60,
+            "size_y_mm": 60,
+            "size_z_mm": 2400,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/stall"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_secondary",
+            "offset_x_mm": 970,
+            "offset_y_mm": 320,
+            "offset_z_mm": 0,
+            "size_x_mm": 60,
+            "size_y_mm": 60,
+            "size_z_mm": 2400,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/stall"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_tertiary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 2400,
+            "size_x_mm": 2400,
+            "size_y_mm": 1200,
+            "size_z_mm": 80,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/stall"
+          }
+        ]
+      },
+      "dimensions_mm": {
+        "width": 2400,
+        "depth": 1200,
+        "height": 2480
+      },
+      "materials": {
+        "object_primary": "cc0.painted-timber",
+        "object_secondary": "cc0.sign-panel",
+        "object_tertiary": "cc0.awning-canvas"
+      },
+      "use": {
+        "affordance": "visit",
+        "blocks_navigation": true,
+        "places": [
+          {
+            "side": "+y",
+            "count": 2,
+            "seat": null
+          }
+        ]
+      },
+      "declared": {
+        "stall": "A market stall: a serving counter 2000 mm long, 700 mm deep and 900 mm high, the height a person stands at to be served; four posts 60 mm square to 2400 mm; and a canvas awning 2400 by 1200 mm, 80 mm deep, over the counter and the people at it. Declared for this catalog.",
+        "texels": "Its maps are embedded at 256 texels a side, a texel every 4 mm of a 1000 mm set: the smallest size whose paint chips, grain, bark, leaf edges and stripes still held in a side-by-side render at 1 m of the same kind at 512, 256 and 128 texels, where 128 smeared them. It is a quarter of the bytes 512 would take."
+      },
+      "reason": "Somewhere to stop and be served in a square. The counter and its posts block walking; the awning is overhead. Two people visit at the front of the counter, clear of it by the navigation clearance and a standing radius.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    },
+    {
+      "key": "seating_planter",
+      "asset_key": "cc0.seating-planter",
+      "title": "Planter seat",
+      "summary": "A long timber planter with a seat along its front and a low hedge along its back.",
+      "recipe": {
+        "profile": "parts-v1",
+        "texels": 256,
+        "texels_source": "declared/texels",
+        "parts": [
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 0,
+            "offset_z_mm": 0,
+            "size_x_mm": 3000,
+            "size_y_mm": 700,
+            "size_z_mm": 430,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/seat"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_primary",
+            "offset_x_mm": 0,
+            "offset_y_mm": 190,
+            "offset_z_mm": 430,
+            "size_x_mm": 3000,
+            "size_y_mm": 320,
+            "size_z_mm": 50,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/seat"
+          },
+          {
+            "shape": "box",
+            "surface_role": "object_tertiary",
+            "offset_x_mm": 0,
+            "offset_y_mm": -170,
+            "offset_z_mm": 430,
+            "size_x_mm": 3000,
+            "size_y_mm": 360,
+            "size_z_mm": 20,
+            "top_scale_millionths": 1000000,
+            "segments": 4,
+            "rings": 1,
+            "source": "declared/seat"
+          },
+          {
+            "shape": "ellipsoid",
+            "surface_role": "canopy",
+            "offset_x_mm": 0,
+            "offset_y_mm": -170,
+            "offset_z_mm": 450,
+            "size_x_mm": 2800,
+            "size_y_mm": 360,
+            "size_z_mm": 600,
+            "top_scale_millionths": 1000000,
+            "segments": 16,
+            "rings": 4,
+            "source": "declared/seat"
+          }
+        ]
+      },
+      "dimensions_mm": {
+        "width": 3000,
+        "depth": 700,
+        "height": 1050
+      },
+      "materials": {
+        "object_primary": "cc0.painted-timber",
+        "object_tertiary": "cc0.tree-pit-soil",
+        "canopy": "cc0.broadleaf-foliage"
+      },
+      "use": {
+        "affordance": "rest",
+        "blocks_navigation": true,
+        "places": [
+          {
+            "side": "+y",
+            "count": 4,
+            "seat": {
+              "x_mm": 0,
+              "y_mm": 190,
+              "faces": "+y",
+              "source": "declared/seat_point"
+            }
+          }
+        ]
+      },
+      "declared": {
+        "seat": "A planter seat 3000 mm long and 700 mm deep: a timber planter body to 430 mm, a timber seat 320 mm deep along its front with its top at 480 mm, the top of the street furniture catalog's bench seat (420 mm plus 60 mm), and a bed of soil along its back holding a low hedge 600 mm high. Declared for this catalog.",
+        "texels": "Its maps are embedded at 256 texels a side, a texel every 4 mm of a 1000 mm set: the smallest size whose paint chips, grain, bark, leaf edges and stripes still held in a side-by-side render at 1 m of the same kind at 512, 256 and 128 texels, where 128 smeared them. It is a quarter of the bytes 512 would take.",
+        "seat_point": "Where a resting person's pelvis goes on the planter's seat: the middle of its 320 mm ledge, which runs from y 30 mm to y 350 mm in front of the planting. The person faces away from the planting, toward the front."
+      },
+      "reason": "A low wall people sit on at the edge of a square. It blocks walking. Four people rest at it, each walking to a place in front of its seat, a standing spacing and the turning margin apart, clear of it by the navigation clearance and a standing radius, and each is drawn sitting on the ledge in front of that place.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/world-objects-contract.md"
+      }
+    }
+  ]
+}

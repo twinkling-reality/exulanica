@@ -1262,11 +1262,35 @@ objects are placed in. A resting inhabitant is one whose `action.kind` is `rest`
 `action.status` `active`, and it rests at its own place, a standing spacing from anybody else. The
 crowd hands the kind of an action under way to whatever draws the person, as `activity` in
 `CrowdPose` (`web/packages/atlas-react/src/playcanvas/society/types.ts`), once the path recorded for
-the minute has been walked. A renderable whose catalog declares a posture for that activity draws
-it: resting is drawn sitting on the ground in front of the destination, not on a seat surface. An
-activity with no declared posture, such as making room, is drawn standing, and so is everybody
-drawn by a renderable with no postures. While everyone is away the state holds nobody, so the crowd
-draws nobody.
+the minute has been walked. With each state the page hands the crowd a seating layout
+([`society/seating.ts`](../web/packages/atlas-react/src/playcanvas/society/seating.ts)): each kind's
+use as `GET /world/assets` serves it from the world object catalog, the drawn version's objects, and
+the object each target of the consumed input belongs to. A person whose action, under way or just
+completed, names a target holds the catalog place whose position, carried into the object's frame,
+lies within the turn's outward rounding of their recorded position (`PLACE_MATCH_MM`, the square
+root of two millimetres and a micrometre). They face as their activity's rule says
+([`society/activity-facing.ts`](../web/packages/atlas-react/src/playcanvas/society/activity-facing.ts)):
+`rest` and `visit` face the object across the place, so a visitor at the market stall faces its
+counter and one at the tree faces the tree, also in the minute after a visit completes, while the
+visitor still stands there; `talk` faces the partner the goal names; the rest keep the way they last
+walked. Where the place has a seat and the character catalog declares a seat posture for the
+activity (`seatPostures`, `rest` to `perched`), the person sits on it: they walk at their own pace
+to stand before the seat (in front of it, or beside it when their place is off to its side, as at
+the cafe chairs, so the walk does not pass through the table), then turn and lower onto it over the
+posture's 0.8 s blend, pelvis on the seat at its height and facing: a full character with its feet
+planted on the ground below, a far figure lifted to the same height. Getting up runs the same way
+back, feet planted as they rise, before they walk on. Moved without walking (a named jump), they
+leave the seat at once rather than glide from it. After an object is moved or taken away the page
+hands the crowd a new layout at once, so a person whose seat is gone gets up without waiting for the
+next minute. The move from the place to the seat is presentation, and the person's recorded position
+stays the place. A place with no seat, such as a marker plate's, keeps the ground rule: resting is
+drawn sitting on the ground in front of it. A person matched to no place, or performing an activity
+with no facing rule, is drawn as everyone else is and named with its reason
+(`SocietyCrowd.seatingMisses`, which the page records on the canvas as
+`data-society-seating-misses`); the owned district hands no layout. An activity with no declared
+posture, such as making room, is drawn standing, and so is everybody drawn by a renderable with no
+postures, which also stays standing at its place rather than being lifted onto a seat. While
+everyone is away the state holds nobody, so the crowd draws nobody.
 
 The app draws the whole population by distance: up to 24 nearest outdoor
 inhabitants as full characters (the native character runtime's resident limit) and every other
@@ -1277,7 +1301,12 @@ tick's worth per interval, and stops where the path ends. A v2 state records onl
 `movement_budget_mm_per_tick`, which is usually far longer than the path a person walks in a
 tick; a v2 person therefore walks what they have left evenly until the next tick is expected (the
 interval plus the caller's start lag), never faster than 1.5 times the bound's own pace, so
-nobody sprints and then stands. Nothing is interpolated off the path. Each later tick's path is
+nobody sprints and then stands. A v2 person whose newly read tick adds nothing to walk finishes what
+is left at no slower than their own walking pace, the walk clip's measured ground speed at their
+height: a remainder spread again at every tick would shrink by the same share each time and never
+end (measured with host playback: ticks read every 8.1 s against 10 s of spreading left a fifth each
+tick, and nobody ever arrived to rest or face anything). Nothing is interpolated off the path. Each
+later tick's path is
 appended to what the person has still to walk when it starts where that ends, so a walk through
 several minutes does not stop between them, and a caller that learns of ticks late passes that
 delay as a start lag. A v4 person behind catches up along the path at most 1.5 times their speed;

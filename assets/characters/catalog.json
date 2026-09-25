@@ -8,9 +8,9 @@
    "bases": [
     {
      "asset": {
-      "assetKey": "makehuman.people.feminine.base.v2",
-      "byteSize": 1710824,
-      "contentSha256": "dc2e7058e2ac4b184073e504cd019d996cea7c5aaef0ae2d11730e8f1630b69c",
+      "assetKey": "makehuman.people.feminine.base.v3",
+      "byteSize": 1767432,
+      "contentSha256": "2a54b5b4eeb6cad184c593e401f35458bb358fe710f4cfeef214e7562b23e95d",
       "file": "makehuman-people-v1/bases/feminine.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -847,6 +847,106 @@
       }
      ],
      "postures": {
+      "perched": {
+       "clip": {
+        "durationMilli": 4000,
+        "name": "HumanPerch",
+        "speedMillimetresPerSecond": 0
+       },
+       "jointsMillimetres": {
+        "chest": [
+         0,
+         738,
+         4
+        ],
+        "head": [
+         0,
+         1137,
+         51
+        ],
+        "leftAnkle": [
+         111,
+         57,
+         461
+        ],
+        "leftElbow": [
+         159,
+         725,
+         83
+        ],
+        "leftHip": [
+         95,
+         505,
+         18
+        ],
+        "leftKnee": [
+         124,
+         428,
+         381
+        ],
+        "leftShoulder": [
+         154,
+         950,
+         24
+        ],
+        "leftToe": [
+         118,
+         0,
+         570
+        ],
+        "leftWrist": [
+         124,
+         547,
+         190
+        ],
+        "neck": [
+         0,
+         1033,
+         6
+        ],
+        "pelvis": [
+         0,
+         517,
+         23
+        ],
+        "rightAnkle": [
+         -111,
+         57,
+         461
+        ],
+        "rightElbow": [
+         -159,
+         725,
+         83
+        ],
+        "rightHip": [
+         -95,
+         505,
+         18
+        ],
+        "rightKnee": [
+         -124,
+         428,
+         381
+        ],
+        "rightShoulder": [
+         -154,
+         950,
+         24
+        ],
+        "rightToe": [
+         -118,
+         0,
+         570
+        ],
+        "rightWrist": [
+         -124,
+         547,
+         190
+        ]
+       },
+       "seatMillimetres": 425
+      },
       "seated": {
        "clip": {
         "durationMilli": 4000,
@@ -944,7 +1044,8 @@
          320,
          356
         ]
-       }
+       },
+       "seatMillimetres": -5
       }
      },
      "restHeightMillimetres": 1591,
@@ -956,9 +1057,9 @@
     },
     {
      "asset": {
-      "assetKey": "makehuman.people.masculine.base.v2",
-      "byteSize": 1740200,
-      "contentSha256": "1f5e7df604d74dcd69341cb11d8b8a71d266ad812ce0950b2a69201e1250ab5a",
+      "assetKey": "makehuman.people.masculine.base.v3",
+      "byteSize": 1797372,
+      "contentSha256": "9b91cc9b783a24ec18aa81a76b03683609e9ec3d9c8f5fa0419589eca2e2c451",
       "file": "makehuman-people-v1/bases/masculine.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -1742,6 +1843,106 @@
       }
      ],
      "postures": {
+      "perched": {
+       "clip": {
+        "durationMilli": 4000,
+        "name": "HumanPerch",
+        "speedMillimetresPerSecond": 0
+       },
+       "jointsMillimetres": {
+        "chest": [
+         0,
+         755,
+         -37
+        ],
+        "head": [
+         0,
+         1190,
+         57
+        ],
+        "leftAnkle": [
+         121,
+         57,
+         501
+        ],
+        "leftElbow": [
+         246,
+         747,
+         -5
+        ],
+        "leftHip": [
+         109,
+         534,
+         -7
+        ],
+        "leftKnee": [
+         140,
+         481,
+         406
+        ],
+        "leftShoulder": [
+         186,
+         990,
+         20
+        ],
+        "leftToe": [
+         125,
+         -6,
+         627
+        ],
+        "leftWrist": [
+         140,
+         611,
+         199
+        ],
+        "neck": [
+         0,
+         1094,
+         19
+        ],
+        "pelvis": [
+         0,
+         541,
+         3
+        ],
+        "rightAnkle": [
+         -121,
+         57,
+         501
+        ],
+        "rightElbow": [
+         -246,
+         747,
+         -5
+        ],
+        "rightHip": [
+         -109,
+         534,
+         -7
+        ],
+        "rightKnee": [
+         -140,
+         481,
+         406
+        ],
+        "rightShoulder": [
+         -186,
+         990,
+         20
+        ],
+        "rightToe": [
+         -125,
+         -6,
+         627
+        ],
+        "rightWrist": [
+         -140,
+         611,
+         199
+        ]
+       },
+       "seatMillimetres": 462
+      },
       "seated": {
        "clip": {
         "durationMilli": 4000,
@@ -1839,7 +2040,8 @@
          349,
          362
         ]
-       }
+       },
+       "seatMillimetres": -5
       }
      },
      "restHeightMillimetres": 1729,
@@ -3372,11 +3574,18 @@
    ],
    "postures": [
     {
+     "key": "perched",
+     "label": "Sitting on a seat"
+    },
+    {
      "key": "seated",
      "label": "Sitting"
     }
    ],
    "rigId": "makehuman-mixamo-unity/v1",
+   "seatPostures": {
+    "rest": "perched"
+   },
    "slots": [
     {
      "kind": "part",

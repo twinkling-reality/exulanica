@@ -68,6 +68,8 @@ describe('catalog validation refuses', () => {
   it('a posture a base lacks, an activity drawn in no posture, or a malformed joint', () => {
     refuses((c) => { c.families[0].bases[0].postures = {}; }, /postures must be exactly/);
     refuses((c) => { c.families[0].activityPostures.rest = 'kneeling'; }, /unknown posture kneeling/);
+    refuses((c) => { c.families[0].seatPostures.rest = 'kneeling'; }, /unknown posture kneeling/);
+    refuses((c) => { c.families[0].bases[0].postures.perched.seatMillimetres = 0.5; }, /seat height is malformed/);
     refuses((c) => { c.families[0].bases[1].postures.seated.jointsMillimetres.leftKnee = [0, 1.5, 2]; }, /joint leftKnee is malformed/);
     refuses((c) => { c.families[0].bases[0].farForm.hipWidthMillimetres = 0; }, /far form widths/);
   });

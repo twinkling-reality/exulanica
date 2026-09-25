@@ -345,14 +345,24 @@ why none exists; a reviewed CC0 mesh is global, carries no evidence and makes no
 source world.
 
 The generated objects are the kinds of the
-[world object catalog](../assets/catalogs/world-objects/world-object.v1.json), in its order: the
+[world object catalog](../assets/catalogs/world-objects/world-object.v2.json), in its order: the
 three grey markers `cc0.marker-cube`, `cc0.marker-pillar` and `cc0.marker-plate`, generated exactly
 as 0042 pinned them and drawn matte, and the furniture 0105 pins, `cc0.bench`, `cc0.cafe-table`,
 `cc0.planter-tree`, `cc0.lamp-post`, `cc0.market-stall` and `cc0.seating-planter`, generated from
 the city grammar's form parts and drawn in the texture sets each names. Every kind's digest is
 pinned, and tests regenerate each kind from source and compare it with its pin: the markers in
 `tests/test_world_objects.py`, the furniture in `tests/test_world_object_catalog.py`. The
-furniture's licence text covers its geometry and the texture maps it embeds.
+furniture's licence text covers its geometry and the texture maps it embeds. Version 2 of the
+catalog is version 1 with seats: a row of places at a kind people rest at states the point, in the
+kind's part frame, where the pelvis of the person resting at its middle place goes and the side that
+person faces; each place's seat is moved along the row by the place's offset, and its height is the
+top of the box part under it, derived rather than stated (480 mm on the bench and the planter seat's
+ledge, 450 mm on the cafe chairs, where the front place's person takes the chair at `-x` and faces
+the table). Nothing a society reads changes, so the meshes, 0105's pins and every registry row are
+version 1's (`tests/test_world_object_seats.py`). `GET /world/assets` and `GET /world/assets/{asset_key}`
+serve each kind's `use` as the catalog derives it: every place in the part frame, the side a person
+standing there faces, and its seat or `null`; `use` is `null` for an asset the catalog does not
+state, and the row embedded in a version carries none.
 
 `seed_reviewed_assets(store)` writes the GLB and licence bytes into the content-addressed store.
 The registry row is the reviewed decision; the store holds the bytes; the two are separate because
@@ -499,7 +509,7 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/behaviour` | Give one object a reviewed behaviour, replace it, or take it away with `null` |
 | `POST` | `/world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
-| `GET` | `/world/assets` | The reviewed assets a person may place, with availability |
+| `GET` | `/world/assets` | The reviewed assets a person may place, with availability and each kind's use |
 | `GET` | `/world/assets/{asset_key}` | One reviewed asset of any kind, and whether it may be placed |
 | `GET` | `/world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET` | `/world/assets/{asset_key}/licence` | The licence text those bytes are published under |

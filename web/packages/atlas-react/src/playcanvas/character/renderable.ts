@@ -25,6 +25,18 @@ export interface CharacterPose {
    * activity it declares no posture for is drawn standing. Never inferred from motion.
    */
   readonly activity?: string | null;
+  /**
+   * Whether the person performs the activity on a seat, as the caller resolved it from the object
+   * they use. The catalog's seat posture for the activity is drawn where it declares one, and the
+   * activity's own posture otherwise. Absent means no seat.
+   */
+  readonly seated?: boolean;
+  /**
+   * The height of the ground under the person, in the parent's space, when `position` is above it,
+   * as it is for someone drawn on a seat. The full form plants its feet on it. Absent means the
+   * position is on the ground.
+   */
+  readonly groundY?: number;
 }
 
 export type CharacterRenderableStatus = 'pending' | 'ready' | 'unavailable';
@@ -38,6 +50,8 @@ export interface CharacterRenderable {
   readonly status: CharacterRenderableStatus;
   readonly standingHeight: number;
   readonly facing: number;
+  /** The catalog person draws an activity on a seat in the posture its family declares for it. */
+  readonly drawsSeats: true;
   pose(pose: CharacterPose): void;
   /**
    * Carry the body to a new ground contact without solving a new pose.
@@ -100,6 +114,7 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
   private readonly farDescription: CharacterRenderableDescription;
   private readonly family: CatalogFamily;
   private posture: string | null = null;
+  readonly drawsSeats = true as const;
 
   constructor(
     private readonly host: CharacterHost,
@@ -252,10 +267,11 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
     this.root.setLocalPosition(x, y, z);
     this.root.setLocalEulerAngles(0, (heading * 180) / Math.PI, 0);
     const reduced = pose.reducedMotion === true;
-    this.posture = activityPosture(this.family, pose.activity);
+    this.posture = activityPosture(this.family, pose.activity, pose.seated === true);
     this.far.setPosture(this.posture);
     this.far.update(this.speed, dt, reduced);
-    this.near?.update({ speed: this.speed, turnRate: this.turnRate, deltaSeconds: dt, reducedMotion: reduced, discontinuity, posture: this.posture });
+    const footDrop = pose.groundY === undefined ? 0 : y - pose.groundY;
+    this.near?.update({ speed: this.speed, turnRate: this.turnRate, deltaSeconds: dt, reducedMotion: reduced, discontinuity, posture: this.posture, footDropMetres: footDrop });
   }
 
   // Members the district runtime reads from its display avatars. They keep that code unchanged.

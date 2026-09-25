@@ -7874,7 +7874,7 @@
     "tags": [
      "world"
     ],
-    "summary": "The reviewed assets a person may place as objects, with real byte availability.",
+    "summary": "The reviewed assets a person may place as objects, with real byte availability and what inhabitants do with each.",
     "operationId": "reviewed_asset_catalog_world_assets_get",
     "parameters": [
      {
@@ -7902,7 +7902,7 @@
         "schema": {
          "type": "array",
          "items": {
-          "$ref": "#/components/schemas/ReviewedAssetView"
+          "$ref": "#/components/schemas/PlaceableAssetView"
          },
          "title": "Response Reviewed Asset Catalog World Assets Get"
         }
@@ -7963,7 +7963,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ReviewedAssetView"
+         "$ref": "#/components/schemas/PlaceableAssetView"
         }
        }
       }
@@ -18262,6 +18262,37 @@
     ],
     "title": "ObjectOriginView"
    },
+   "ObjectUseView": {
+    "properties": {
+     "affordance": {
+      "type": "string",
+      "title": "Affordance"
+     },
+     "places": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/PlaceView"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Places",
+      "description": "One place per person, in the order the society fills them; null for a marker, whose places the society derives from its footprint and whose people stand."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "affordance",
+     "places"
+    ],
+    "title": "ObjectUseView",
+    "description": "What inhabitants do with a kind and where, derived by the world object catalog."
+   },
    "OccurrenceRow": {
     "properties": {
      "occurrence_id": {
@@ -19234,6 +19265,114 @@
     ],
     "title": "PlaceSelector",
     "description": "Places, as entity ids.\n\nA place is an entity like any other, so this is not a second entity dimension: it is the\nsame dimension named separately because the interface presents it separately, and because\ncombining \"Julie\" with \"Gullfoss\" is an AND across dimensions while combining \"Julie\" with\n\"Leo\" may be an ANY within one."
+   },
+   "PlaceView": {
+    "properties": {
+     "position_mm": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Position Mm",
+      "description": "Where an inhabitant stands to use the kind, [x, y]. Millimetres in the kind's own part frame, about the bottom centre of what it draws: +x runs across the kind, +y is its front, the side that faces the person who places it, and +z is up. A placed object carries this frame by its transform: turned by its yaw about +z and scaled by its scale, with the part frame's +y toward the region's -z, so a point [x, y, z] is [x, z, -y] in the region's east, up and south axes before the turn."
+     },
+     "faces": {
+      "type": "string",
+      "title": "Faces",
+      "description": "The side of the kind a person standing here faces, across the place's side."
+     },
+     "seat": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SeatView"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Where a person resting here is drawn sitting, or null where people stand."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "position_mm",
+     "faces",
+     "seat"
+    ],
+    "title": "PlaceView"
+   },
+   "PlaceableAssetView": {
+    "properties": {
+     "asset_key": {
+      "type": "string",
+      "title": "Asset Key"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "summary": {
+      "type": "string",
+      "title": "Summary"
+     },
+     "media_type": {
+      "type": "string",
+      "title": "Media Type"
+     },
+     "content_sha256": {
+      "type": "string",
+      "title": "Content Sha256"
+     },
+     "byte_size": {
+      "type": "integer",
+      "title": "Byte Size"
+     },
+     "licence_id": {
+      "type": "string",
+      "title": "Licence Id"
+     },
+     "licence_sha256": {
+      "type": "string",
+      "title": "Licence Sha256"
+     },
+     "availability": {
+      "type": "string",
+      "title": "Availability"
+     },
+     "placeable": {
+      "type": "boolean",
+      "title": "Placeable"
+     },
+     "use": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ObjectUseView"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The kind's use, as the world object catalog derives it; null for an asset the catalog does not state, such as a character part."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "asset_key",
+     "title",
+     "summary",
+     "media_type",
+     "content_sha256",
+     "byte_size",
+     "licence_id",
+     "licence_sha256",
+     "availability",
+     "placeable",
+     "use"
+    ],
+    "title": "PlaceableAssetView",
+    "description": "A reviewed asset as the registry reads serve it, with what inhabitants do with it."
    },
    "PrepareExperimentBody": {
     "properties": {
@@ -22448,6 +22587,30 @@
     ],
     "title": "SceneUnposedPointMapRow",
     "description": "A member's own point map, offered because its scene's pose recovered no photograph.\n\nNo transform, on purpose. Pose recovery found no position for any member, so there is no\nmeasured relation between one photograph's depth and another's, and saying where each one\nstands would be a claim nothing recorded. The client lays these out in an arrangement it\nlabels as unmeasured. The bytes are the ones the scene's own placement record names by digest,\nread under the same live checks as a placed member's, so the lineage is the scene's and not a\nloose derivative's. Offered only when no member registered: a scene that placed some members\nkeeps its excluded members as photographs, because mixing measured and unmeasured panels in\none frame would let the unmeasured ones borrow the measured ones' authority, and a pose that\nregistered members but was refused keeps its recorded meaning until that is decided."
+   },
+   "SeatView": {
+    "properties": {
+     "position_mm": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Position Mm",
+      "description": "Where the resting person's pelvis is drawn, [x, y, z]. Millimetres in the kind's own part frame, about the bottom centre of what it draws: +x runs across the kind, +y is its front, the side that faces the person who places it, and +z is up. A placed object carries this frame by its transform: turned by its yaw about +z and scaled by its scale, with the part frame's +y toward the region's -z, so a point [x, y, z] is [x, z, -y] in the region's east, up and south axes before the turn."
+     },
+     "faces": {
+      "type": "string",
+      "title": "Faces",
+      "description": "The side of the kind the seated person faces: +y, +x, -y or -x."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "position_mm",
+     "faces"
+    ],
+    "title": "SeatView"
    },
    "SegmentBoundsView": {
     "properties": {

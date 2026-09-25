@@ -74,6 +74,7 @@ function mount(options: { mode: 'playing' | 'paused'; host: unknown }) {
     societyCounts: { population: 1, outdoors: 1, indoors: 0, near: 1, far: 0, drawn: 1 },
     drawnInhabitantCount: 1, pickInhabitant: vi.fn(() => 'ada'),
     societyJumps: [] as readonly unknown[],
+    setSeatingLayout: vi.fn(), seatingMisses: [] as readonly unknown[], inhabitantSeatAtPlace: vi.fn(() => false),
   };
   const controls = { state: { x: 0, y: 1.68, z: 4 }, onInteract: null, forward: () => ({ x: 0, y: 0, z: -1 }) };
   const binding = {
@@ -93,7 +94,7 @@ function mount(options: { mode: 'playing' | 'paused'; host: unknown }) {
     }),
     step: vi.fn(),
   };
-  const worldClient = { connect: vi.fn(async () => ({ assets: [], version })) };
+  const worldClient = { connect: vi.fn(async () => ({ assets: [], version })), assets: vi.fn(() => []) };
   const mounted = mountEnvironmentSelection({
     env: { canvas: document.createElement('canvas'), preview: false } as unknown as AppEnvironment,
     state: {

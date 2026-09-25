@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import { activityPosture, catalogFamily } from '../character/catalog.js';
+import { activityPosture, catalogBase, catalogFamily, seatPosture } from '../character/catalog.js';
 import { CHARACTER_CATALOG } from '../character/catalog-data.js';
 import { FAR_REGIONS, FarPerson, farAppearance, farTemplateBytes, type FarAppearance } from '../character/far.js';
 import { applicationOf } from '../character/host.js';
@@ -22,6 +22,10 @@ export interface FarFigure {
   readonly facing: number;
   /** The activity the state says this person is performing, or null. */
   readonly activity?: string | null;
+  /** Height of the figure's root above the ground, metres; absent is on the ground. */
+  readonly y?: number;
+  /** Whether the activity is performed on a seat, which the catalog may draw in its own posture. */
+  readonly seated?: boolean;
 }
 
 interface Drawn {
@@ -71,10 +75,29 @@ export class FarFigures {
     return held;
   }
 
-  /** The posture a person's far figure is drawn in for the activity the state gives them. */
-  postureOf(id: string, activity: string | null | undefined): string | null {
+  /**
+   * The posture a person's far figure is drawn in for the activity the state gives them, on a seat
+   * when `seated` says the activity is performed on one.
+   */
+  postureOf(id: string, activity: string | null | undefined, seated = false): string | null {
     this.appearanceOf(id);
-    return activityPosture(catalogFamily(CHARACTER_CATALOG, this.families.get(id)!), activity);
+    return activityPosture(catalogFamily(CHARACTER_CATALOG, this.families.get(id)!), activity, seated);
+  }
+
+  /**
+   * How fast this person's full form walks at its walk clip's own cadence, metres per second: the
+   * clip's measured ground speed at the base's rest height, scaled as the body is to theirs.
+   */
+  walkSpeedOf(id: string): number {
+    const appearance = this.appearanceOf(id);
+    const base = catalogBase(catalogFamily(CHARACTER_CATALOG, this.families.get(id)!), appearance.baseId);
+    return (base.clips.walk.speedMillimetresPerSecond / base.restHeightMillimetres) * appearance.heightMetres;
+  }
+
+  /** The posture a person is drawn in on a seat for an activity, or null where none is declared. */
+  seatPostureOf(id: string, activity: string | null | undefined): string | null {
+    this.appearanceOf(id);
+    return seatPosture(catalogFamily(CHARACTER_CATALOG, this.families.get(id)!), activity);
   }
 
   /** Place exactly these figures this frame; everyone else in the crowd is drawn elsewhere or not at all. */
@@ -92,9 +115,9 @@ export class FarFigures {
       const speed = deltaSeconds > 0 ? Math.hypot(figure.x - drawn.x, figure.z - drawn.z) / deltaSeconds : 0;
       drawn.x = figure.x;
       drawn.z = figure.z;
-      drawn.person.root.setLocalPosition(figure.x, 0, figure.z);
+      drawn.person.root.setLocalPosition(figure.x, figure.y ?? 0, figure.z);
       drawn.person.root.setLocalEulerAngles(0, (figure.facing * 180) / Math.PI, 0);
-      drawn.person.setPosture(this.postureOf(figure.id, figure.activity));
+      drawn.person.setPosture(this.postureOf(figure.id, figure.activity, figure.seated === true));
       drawn.person.update(speed, deltaSeconds, reducedMotion);
     }
     for (const [id, drawn] of this.people) {

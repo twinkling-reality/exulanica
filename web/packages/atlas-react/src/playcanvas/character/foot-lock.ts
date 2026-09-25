@@ -138,6 +138,19 @@ export class FootLock {
     }
   }
 
+  /**
+   * Plant both feet `metres` below where the animation put them, keeping their orientation, as for
+   * a person drawn on a seat whose clip carries the feet up with the body. Nothing is remembered
+   * between calls: each frame's animation is corrected afresh.
+   */
+  lower(metres: number): void {
+    for (const leg of this.legs) {
+      leg.offset.set(0, -metres, 0);
+      this.solve(leg, 1);
+    }
+    for (const leg of this.legs) leg.offset.set(0, 0, 0);
+  }
+
   private solve(leg: Leg, weight: number): void {
     footRotation.copy(leg.ankle.getRotation());
     a.copy(leg.hip.getPosition());

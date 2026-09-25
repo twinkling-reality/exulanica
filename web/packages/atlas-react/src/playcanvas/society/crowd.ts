@@ -6,7 +6,10 @@ import { NEAR_INHABITANT_BUDGET } from '../character/budget.js';
 import { CharacterHost } from '../character/host.js';
 import { inhabitantRenderable } from '../character/inhabitant.js';
 import type { CharacterPose } from '../character/renderable.js';
-import type { FarAppearance } from '../character/far.js';
+import { postureSeatMetres, type FarAppearance } from '../character/far.js';
+import { POSTURE_BLEND_SECONDS } from '../character/person.js';
+import { placeDrawing, seatApproach, type PlaceDrawing, type SeatingLayout, type SeatingMiss } from './seating.js';
+import { facingRule, type FacingRule } from './activity-facing.js';
 import type {
   CrowdJump,
   CrowdJumpReason,
@@ -36,7 +39,10 @@ import type {
  * the bound's own pace. Each later snapshot's path is appended to what the person has still to walk
  * when it starts where that ends, so a person walking through several minutes never stops between
  * them; a v4 person behind catches up along the recorded path at most `CATCH_UP_SPEED_LIMIT` times
- * their speed. Anything else, a path that starts somewhere the person was not, minutes this crowd
+ * their speed. A v2 person whose newly read minute adds nothing to walk finishes what is left at no
+ * slower than their own walking pace (`FarFigures.walkSpeedOf`): spreading a walk to the next minute
+ * keeps it continuous into that minute's walk, and with none to continue into, a remainder spread
+ * again each minute would shrink without ever ending, and they would never arrive to do anything. Anything else, a path that starts somewhere the person was not, minutes this crowd
  * never saw, or more waiting than can be caught up, moves the person without walking, and every
  * such move is a named jump (`jumps`) rather than a silent one. An older snapshot without a pace is
  * eased along its path over the whole interval. No position is invented between path points.
@@ -49,11 +55,25 @@ import type {
  * the path recorded for the tick has been walked, so a person asked to rest walks there and then
  * sits. How an activity is drawn is the character catalog's decision.
  *
- * Everyone is drawn on the ground plane. A recorded point is a plan point and the height each
+ * Everyone walks on the ground plane. A recorded point is a plan point and the height each
  * walker is drawn at is 0, which is the ground a tile bake draws; a person who states the height
  * of the surface they stand on is refused rather than drawn under it. When a place's stated
  * heights are wired through to a person, that refusal is what says the ground-plane zeros here
  * and in the far figures must be read from the person instead of written.
+ *
+ * A person using a placed object is drawn as its kind says, from the seating layout handed with
+ * the snapshot (`./seating.ts`): once their recorded path is walked, and while their state names
+ * the action they are at, under way or just completed, they face as that activity's rule says
+ * (`./activity-facing.ts`), and where the place has a seat and the catalog draws their activity
+ * under way on one, they sit on it. Sitting down is one timeline: they walk at their own pace from
+ * the place to where they stand before the seat (`seatApproach`), in front of it or beside it, then
+ * turn and lower onto it over the posture's own blend, pelvis on the seat and, in full, feet planted
+ * on the ground; getting up runs the same timeline backward before they walk on. The move is
+ * presentation: their position, and every answer about where they are, stays the recorded place.
+ * Moved without walking (a named jump), they drop the seat at once rather than glide from it.
+ * Anyone whose place cannot be found is drawn by the rule above, and the reason is named
+ * (`seatingMisses`). A layout handed later (`setLayout`) finds everyone's place again, so a seat
+ * that is moved or taken away is got up from without waiting for the next state.
  *
  * Detail by distance applies to time as well as shape. Every drawn inhabitant is placed at its
  * recorded point every frame, but only the nearest few full characters are posed every frame;
@@ -110,6 +130,57 @@ interface Walker {
   facing: number;
   /** Whether the path recorded for this tick has been walked to its end. */
   arrived: boolean;
+  /** How the object this person's action uses is drawn at their place, or null for none. */
+  place: PlaceDrawing | null;
+  /**
+   * How the action the person is at faces (`ACTIVITY_FACING`), under way or just completed, or
+   * null for none or an activity with no rule.
+   */
+  readonly facingRule: FacingRule | null;
+  /** The partner the state names for the activity, or null. */
+  readonly partnerId: string | null;
+  /** The target their action names, under way or just completed, or null. */
+  readonly target: string | null;
+  /** Their recorded position, millimetres, which their place is found from. */
+  readonly recordedMm: readonly [number, number];
+  /** Their walk to a seat and onto it, or null when they are nowhere near sitting. */
+  settle: Settle | null;
+  /** How far onto their seat they are drawn, from 0 standing to 1 seated. */
+  seatBlend: number;
+  /** Whether they are drawn in the seat posture: lowering onto the seat or sitting on it. */
+  onSeat: boolean;
+  /** Where they are drawn this frame: east, height of the root, south. */
+  drawn: readonly [number, number, number];
+}
+
+/**
+ * Sitting down as one path: the place, where the person stands before the seat, and the seat, in
+ * plan metres, walked at their own pace to the second point and lowered onto the seat over the
+ * posture's blend. `progress` is metres along it; getting up walks it back to 0.
+ */
+interface Settle {
+  readonly path: readonly [Point, Point, Point];
+  /** Metres from the place to where they stand before the seat, and from there onto it. */
+  readonly toFront: number;
+  readonly ontoSeat: number;
+  /** Height of the root on the seat. */
+  readonly lift: number;
+  /** Facing on the seat. */
+  readonly facing: number;
+  /** Which object's which place the seat belongs to. */
+  readonly key: string;
+  /** Metres per second they walk the first part at. */
+  readonly walkSpeed: number;
+  progress: number;
+}
+
+/**
+ * An inhabitant drawn as everyone else is although their state says what they are doing, and why:
+ * a place that was not found (`SeatingMiss`), or an activity with no facing rule.
+ */
+export interface CrowdSeatingMiss {
+  readonly inhabitantId: string;
+  readonly reason: SeatingMiss | 'activity-has-no-facing';
 }
 
 /**
@@ -119,6 +190,7 @@ interface Walker {
 const NEAR_LIMIT = NEAR_INHABITANT_BUDGET;
 const REFRESH_METRES = 4;
 const DEFAULT_INTERVAL_MS = 1_850;
+const MILLISECONDS_PER_SECOND = 1000;
 /** Two recorded points this close are one point: the state's unit is the millimetre. */
 const SAME_POINT_METRES = 0.001;
 /**
@@ -177,6 +249,23 @@ function stateActivity(person: SocietyInhabitantSnapshot): string | null {
   return person.action?.status === 'active' ? person.action.kind : null;
 }
 
+/**
+ * The action a person is at: one under way, or one just completed where they still stand, as a
+ * visit is completed within the minute its visitor arrives. A blocked action is none.
+ */
+function stateAction(person: SocietyInhabitantSnapshot): { kind: string; target: string | null } | null {
+  const action = person.action;
+  if (action?.status !== 'active' && action?.status !== 'completed') return null;
+  return { kind: action.kind, target: action.target_id ?? null };
+}
+
+/** The partner a person's goal names, for a state whose goals name one. */
+function statePartner(person: SocietyInhabitantSnapshot): string | null {
+  const goal: object | null | undefined = person.goal;
+  if (!goal || !('partner_id' in goal)) return null;
+  return typeof goal.partner_id === 'string' ? goal.partner_id : null;
+}
+
 export class SocietyCrowd {
   private readonly factory: CrowdRenderableFactory;
   private readonly nearLimit: number;
@@ -197,6 +286,7 @@ export class SocietyCrowd {
   /** Up to when every paced walker has been walked, in the caller's clock. */
   private lastWalkMs = 0;
   private jumpsRead: readonly CrowdJump[] = [];
+  private missesRead: readonly CrowdSeatingMiss[] = [];
   private observer: readonly [number, number] | null = null;
   private selectedId: string | null = null;
   /** The native runtime's own flag, read once per frame by `nativeFrames`. */
@@ -227,6 +317,7 @@ export class SocietyCrowd {
     state: OwnedSocietyState,
     observer?: readonly [number, number],
     options: CrowdTiming = {},
+    layout: SeatingLayout | null = null,
   ): CrowdCounts {
     const scope = `${state.society_id ?? 'preview'}:${state.branch_id ?? ''}`;
     if (scope !== this.scope) this.releaseNear();
@@ -261,6 +352,7 @@ export class SocietyCrowd {
     const pathful = state.inhabitants.every((person) => Array.isArray(person.motion_path_mm));
     const walkers = new Map<string, Walker>();
     const jumps: CrowdJump[] = [];
+    const misses: CrowdSeatingMiss[] = [];
     for (const person of state.inhabitants) {
       if (person.synthetic !== true) continue;
       if (person.support_z_mm !== undefined && person.support_z_mm !== null) {
@@ -278,8 +370,10 @@ export class SocietyCrowd {
       let route: readonly Point[];
       let walked = 0;
       let startsAtMs = nowMs;
+      let jumped = false;
       const jump = (reason: CrowdJumpReason, metres: number) => {
         if (metres <= SAME_POINT_METRES) return;
+        jumped = true;
         jumps.push({ inhabitantId: person.id, reason, tick: state.tick, unreadTicks, metres });
         if (this.near.has(person.id)) this.fresh.add(person.id);
         this.discontinuity = true;
@@ -308,11 +402,23 @@ export class SocietyCrowd {
         jump(consecutive ? 'path-starts-elsewhere' : 'minutes-not-read', apart(previous.position, recorded[0]!));
       }
       const { lengths, total } = polyline(route);
+      // What this minute adds to their walk: nothing for a person staying where they are.
+      const adds = recorded && recorded.length > 1 ? polyline(recorded).total : 0;
       if (budget !== null && total - walked > budget * BEHIND_LIMIT_TICKS) {
         const skipped = total - walked - budget;
         walked += skipped;
         jump('too-far-behind', skipped);
       }
+      const activity = stateActivity(person);
+      const at = stateAction(person);
+      const rule = at === null ? null : facingRule(at.kind);
+      const target = layout === null ? null : at?.target ?? null;
+      const found = target === null ? null : placeDrawing(layout!, target, person.position_mm);
+      if (found?.kind === 'miss') misses.push({ inhabitantId: person.id, reason: found.reason });
+      if (layout !== null && at !== null && rule === null) {
+        misses.push({ inhabitantId: person.id, reason: 'activity-has-no-facing' });
+      }
+      const position = sampleMotionPath(route, total === 0 ? 1 : walked / total);
       const walker: Walker = {
         id: person.id,
         route,
@@ -321,19 +427,36 @@ export class SocietyCrowd {
         walked,
         budget,
         rate: spread
-          ? Math.min((total - walked) / (this.intervalMs + this.startLagMs), (CATCH_UP_SPEED_LIMIT * budget!) / this.intervalMs)
+          ? Math.min(
+            Math.max(
+              (total - walked) / (this.intervalMs + this.startLagMs),
+              adds <= SAME_POINT_METRES ? this.far.walkSpeedOf(person.id) / MILLISECONDS_PER_SECOND : 0,
+            ),
+            (CATCH_UP_SPEED_LIMIT * budget!) / this.intervalMs,
+          )
           : null,
         startsAtMs,
         indoors: person.indoors === true,
-        activity: stateActivity(person),
-        position: sampleMotionPath(route, total === 0 ? 1 : walked / total),
+        activity,
+        position,
         facing: previous?.facing ?? 0,
         arrived: walked >= total,
+        place: found?.kind === 'place' ? found.drawing : null,
+        facingRule: rule,
+        partnerId: statePartner(person),
+        target: at?.target ?? null,
+        recordedMm: person.position_mm,
+        // Moved without walking, they are drawn where they now are, off any seat at once.
+        settle: jumped ? null : previous?.settle ?? null,
+        seatBlend: jumped ? 0 : previous?.seatBlend ?? 0,
+        onSeat: jumped ? false : previous?.onSeat ?? false,
+        drawn: jumped || previous === undefined ? [position[0], 0, position[1]] : previous.drawn,
       };
       walkers.set(person.id, walker);
     }
     this.walkers = walkers;
     this.jumpsRead = jumps;
+    this.missesRead = misses;
     if (this.selectedId && !walkers.has(this.selectedId)) this.selectedId = null;
     this.assignDetail();
     this.place(nowMs, 1 / 60, false);
@@ -371,6 +494,7 @@ export class SocietyCrowd {
     this.tick = -1;
     this.moving = false;
     this.jumpsRead = [];
+    this.missesRead = [];
     this.observer = null;
     this.selectedId = null;
     this.discontinuity = true;
@@ -396,6 +520,45 @@ export class SocietyCrowd {
   /** Every person the latest snapshot moved without walking, and why; empty when nobody. */
   get jumps(): readonly CrowdJump[] {
     return this.jumpsRead;
+  }
+
+  /**
+   * Everyone in the latest snapshot using an object whose place the layout could not find, and
+   * why; they are drawn as everyone else is. Empty when nobody, or when no layout was handed.
+   */
+  get seatingMisses(): readonly CrowdSeatingMiss[] {
+    return this.missesRead;
+  }
+
+  /** Whether an inhabitant is drawn settling onto, or sitting on, a seat. */
+  seatedOn(id: string): boolean {
+    const walker = this.walkers.get(id);
+    return walker !== undefined && this.wantsSeat(walker);
+  }
+
+  /**
+   * Whether an inhabitant's activity is drawn on a seat once they reach it: their place has one
+   * and the catalog draws the activity on it, whether or not they have arrived.
+   */
+  seatAtPlace(id: string): boolean {
+    const walker = this.walkers.get(id);
+    return walker !== undefined && this.seatable(walker);
+  }
+
+  /**
+   * Find everyone's place again from a layout drawn after the latest state, as when an object is
+   * moved or removed: a person whose seat is gone gets up from it now, not at the next minute.
+   * Everything else about them stays as the latest state has it.
+   */
+  setLayout(layout: SeatingLayout | null): void {
+    const misses: CrowdSeatingMiss[] = this.missesRead.filter((miss) => miss.reason === 'activity-has-no-facing');
+    for (const walker of this.walkers.values()) {
+      const found = layout === null || walker.target === null ? null : placeDrawing(layout, walker.target, walker.recordedMm);
+      if (found?.kind === 'miss') misses.push({ inhabitantId: walker.id, reason: found.reason });
+      walker.place = found?.kind === 'place' ? found.drawing : null;
+    }
+    this.missesRead = misses;
+    this.moving = true;
   }
 
   get counts(): CrowdCounts {
@@ -435,7 +598,7 @@ export class SocietyCrowd {
   /** The activity drawn for an inhabitant now: the state's, once its recorded path is walked. */
   activityOf(id: string): string | null {
     const walker = this.walkers.get(id);
-    return walker?.arrived ? walker.activity : null;
+    return walker === undefined ? null : this.drawnActivity(walker);
   }
 
   /** Inhabitants presented at exactly this inhabitant's point, including itself. */
@@ -513,15 +676,138 @@ export class SocietyCrowd {
       if (renderable && (!renderable.root.enabled || renderable.root.tags.has('native-character-hidden'))) continue;
       const walker = this.walkers.get(id);
       if (!walker) continue;
-      const [x, z] = walker.position;
+      const [x, y, z] = walker.drawn;
       const height = renderable?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
-      const distance = hit([x - 0.34, 0, z - 0.34], [x + 0.34, height, z + 0.34]);
+      const distance = hit([x - 0.34, y, z - 0.34], [x + 0.34, y + height, z + 0.34]);
       if (distance !== null && distance < nearest) {
         nearest = distance;
         selected = id;
       }
     }
     return selected;
+  }
+
+  /** Whether a walker's activity is drawn on the seat of their place, arrived or not. */
+  private seatable(walker: Walker): boolean {
+    if (walker.activity === null || walker.place?.seat == null || walker.indoors) return false;
+    if (this.near.has(walker.id) && this.near.get(walker.id)!.drawsSeats !== true) return false;
+    return this.far.seatPostureOf(walker.id, walker.activity) !== null;
+  }
+
+  /** Whether a walker is to be drawn on a seat: at their place, with a seat the catalog draws on. */
+  private wantsSeat(walker: Walker): boolean {
+    return walker.arrived && this.seatable(walker);
+  }
+
+  /**
+   * Turn a walker to face what their place says, and move them one frame along their walk to their
+   * seat and onto it, or back off it. Returns whether they are still on the way.
+   */
+  private settle(walker: Walker, dt: number, reduced: boolean): boolean {
+    const wanted = this.wantsSeat(walker);
+    const place = walker.place;
+    const key = wanted ? `${place!.objectId}:${place!.placeIndex}` : null;
+    if (wanted && walker.settle === null) {
+      const seat = place!.seat!;
+      const posture = this.far.seatPostureOf(walker.id, walker.activity)!;
+      const at: Point = [seat.position[0], seat.position[2]];
+      const front = seatApproach(at, seat.facing, walker.position);
+      walker.settle = {
+        path: [walker.position, front, at],
+        toFront: apart(walker.position, front),
+        ontoSeat: apart(front, at),
+        lift: seat.position[1] - postureSeatMetres(this.far.appearanceOf(walker.id), posture),
+        facing: seat.facing,
+        key: key!,
+        walkSpeed: this.far.walkSpeedOf(walker.id),
+        progress: 0,
+      };
+    }
+    const settle = walker.settle;
+    if (settle === null) {
+      walker.drawn = [walker.position[0], 0, walker.position[1]];
+      walker.seatBlend = 0;
+      walker.onSeat = false;
+      if (walker.arrived) walker.facing = this.facingOf(walker);
+      return false;
+    }
+    // A seat that is no longer theirs, or no longer there, is got up from before another is sat on.
+    const staying = wanted && settle.key === key;
+    const end = settle.toFront + settle.ontoSeat;
+    const goal = staying ? end : 0;
+    const before = settle.progress;
+    if (reduced) settle.progress = goal;
+    else {
+      let left = dt;
+      while (left > 0 && settle.progress !== goal) {
+        // The walk to the seat at their own pace; lowering onto it, or rising, over the posture's blend.
+        const rising = goal < settle.progress;
+        const walking = rising ? settle.progress <= settle.toFront : settle.progress < settle.toFront;
+        const speed = walking ? settle.walkSpeed : settle.ontoSeat / POSTURE_BLEND_SECONDS;
+        const edge = rising ? (walking ? 0 : settle.toFront) : (walking ? settle.toFront : end);
+        const reach = Math.abs(edge - settle.progress);
+        if (!(speed > 0)) {
+          settle.progress = edge;
+          continue;
+        }
+        const step = Math.min(reach, speed * left);
+        settle.progress = step === reach ? edge : settle.progress + (rising ? -step : step);
+        left -= step / speed;
+      }
+    }
+    const onto = settle.ontoSeat > 0
+      ? Math.min(1, Math.max(0, (settle.progress - settle.toFront) / settle.ontoSeat))
+      : (settle.progress >= end ? 1 : 0);
+    const [x, z] = sampleMotionPath(settle.path, end > 0 ? settle.progress / end : 1);
+    walker.drawn = [x, settle.lift * onto, z];
+    walker.seatBlend = onto;
+    walker.onSeat = staying && settle.progress >= settle.toFront;
+    if (settle.progress > settle.toFront || walker.onSeat) {
+      walker.facing = settle.facing;
+    } else if (settle.progress !== before) {
+      // Walking to where they stand before the seat, or back to their place, they face the way they go.
+      walker.facing = goal > before
+        ? heading(settle.path[0], settle.path[1], walker.facing)
+        : heading(settle.path[1], settle.path[0], walker.facing);
+    }
+    if (settle.progress <= 0 && !staying) {
+      walker.settle = null;
+      if (walker.arrived) walker.facing = this.facingOf(walker);
+      return false;
+    }
+    return settle.progress !== goal;
+  }
+
+  /** The way a walker standing at the end of their path faces, by their activity's rule. */
+  private facingOf(walker: Walker): number {
+    if (walker.facingRule === 'place' && walker.place !== null) return walker.place.facing;
+    if (walker.facingRule === 'partner' && walker.partnerId !== null) {
+      const partner = this.walkers.get(walker.partnerId);
+      if (partner !== undefined && !partner.indoors) return heading(walker.position, partner.position, walker.facing);
+    }
+    return walker.facing;
+  }
+
+  /**
+   * The activity a walker is drawn doing: the state's once their path is walked, and none while
+   * they walk to a seat or back from it, when they are on their feet.
+   */
+  private drawnActivity(walker: Walker): string | null {
+    if (!walker.arrived) return null;
+    // Someone whose activity is drawn on a seat is on their feet until they are on it.
+    return (walker.settle !== null || this.seatable(walker)) && !walker.onSeat ? null : walker.activity;
+  }
+
+  /** Where and how a full character is posed for a walker, apart from its timing. */
+  private poseOf(walker: Walker): Omit<CharacterPose, 'deltaSeconds'> {
+    const seated = walker.onSeat;
+    return {
+      position: walker.drawn,
+      yaw: walker.facing,
+      activity: this.drawnActivity(walker),
+      ...(seated ? { seated } : {}),
+      ...(walker.drawn[1] !== 0 ? { groundY: 0 } : {}),
+    };
   }
 
   private releaseNear(): void {
@@ -566,14 +852,7 @@ export class SocietyCrowd {
       const walker = this.walkers.get(id)!;
       // Posed at once, so a new full character is drawn and pickable before the next frame.
       renderable.setVisible(!walker.indoors);
-      const pose: CharacterPose = {
-        position: [walker.position[0], 0, walker.position[1]],
-        yaw: walker.facing,
-        deltaSeconds: 1 / 60,
-        discontinuity: true,
-        activity: walker.arrived ? walker.activity : null,
-      };
-      renderable.pose(pose);
+      renderable.pose({ ...this.poseOf(walker), deltaSeconds: 1 / 60, discontinuity: true });
       this.near.set(id, renderable);
       this.discontinuity = true;
     }
@@ -588,7 +867,8 @@ export class SocietyCrowd {
     if (!reduced) this.lastWalkMs = Math.max(this.lastWalkMs, nowMs);
     let moving = false;
     for (const walker of this.walkers.values()) {
-      if (walker.total > 0) {
+      // Someone getting up from a seat walks on once they are back at their place.
+      if (walker.total > 0 && walker.settle === null) {
         if (reduced) walker.walked = walker.total;
         else if (walker.budget === null) walker.walked = eased * walker.total;
         else {
@@ -608,7 +888,8 @@ export class SocietyCrowd {
       walker.facing = heading(walker.position, position, walker.facing);
       walker.position = position;
       walker.arrived = walker.walked >= walker.total;
-      moving ||= !walker.arrived;
+      const settling = this.settle(walker, dt, reduced);
+      moving ||= !walker.arrived || settling;
     }
     this.moving = moving;
     if (!draw) return;
@@ -616,24 +897,18 @@ export class SocietyCrowd {
     for (const [id, renderable] of this.near) {
       const walker = this.walkers.get(id)!;
       const slot = this.slots.get(id)!;
-      const position = [walker.position[0], 0, walker.position[1]] as const;
+      const position = walker.drawn;
       const discontinuity = this.fresh.delete(id);
       renderable.setVisible(!walker.indoors);
       slot.pendingSeconds += dt;
       // Frames, not seconds: a slow frame must not make more posing due. The gait advances by
       // the distance walked since the last pose, so a longer gap costs update rate, not stride.
       const interval = id === this.selectedId ? 1 : Math.max(1, Math.floor(this.poseInterval(slot.rank)));
-      const due = discontinuity || !renderable.follow || interval === 1 || (this.frame + slot.rank) % interval === 0;
+      // Someone above the ground has their feet planted afresh on every frame the clip moves them.
+      const due = discontinuity || !renderable.follow || interval === 1 || position[1] !== 0 ||
+        (this.frame + slot.rank) % interval === 0;
       if (due) {
-        const pose: CharacterPose = {
-          position,
-          yaw: walker.facing,
-          deltaSeconds: slot.pendingSeconds,
-          reducedMotion: reduced,
-          discontinuity,
-          activity: walker.arrived ? walker.activity : null,
-        };
-        renderable.pose(pose);
+        renderable.pose({ ...this.poseOf(walker), deltaSeconds: slot.pendingSeconds, reducedMotion: reduced, discontinuity });
         slot.pendingSeconds = 0;
       } else {
         renderable.follow!(position);
@@ -644,10 +919,12 @@ export class SocietyCrowd {
         const walker = this.walkers.get(id)!;
         return {
           id,
-          x: walker.position[0],
-          z: walker.position[1],
+          x: walker.drawn[0],
+          y: walker.drawn[1],
+          z: walker.drawn[2],
           facing: walker.facing,
-          activity: walker.arrived ? walker.activity : null,
+          activity: this.drawnActivity(walker),
+          seated: walker.onSeat,
         };
       }),
       dt,

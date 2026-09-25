@@ -5,7 +5,8 @@ the hands go, how the pelvis and trunk tilt and how the chest breathes, every di
 the base's rest height, so each base gets the same posture fitted to its own body. The limbs are
 placed with a two-bone solve in the plane their declared pole gives, the feet stay flat at their
 standing height, and the pelvis is then lowered until the lowest point of the seat, measured on the
-skinned surface, rests on the ground. Nothing here is tuned for a person: a look differs only in the
+skinned surface, rests on the ground, or on a seat ``seatHeight`` above it where the posture is one
+drawn on a seat (0 where it states none). Nothing here is tuned for a person: a look differs only in the
 morph weights and height the renderer applies over the same clip.
 """
 
@@ -16,7 +17,9 @@ from mathutils import Matrix, Vector
 
 PREFIX = "mixamorig:"
 SIDES = (("Left", 1.0), ("Right", -1.0))
-#: Bones whose surface is what a seated body rests on.
+#: Bones whose surface is what a seated body rests on, unless a posture states its own
+#: (``seatBones``): on a seat the thighs slope down to the knees, so their lowest point is not what
+#: the body rests on.
 SEAT_BONES = ("Hips", "LeftUpLeg", "RightUpLeg", "LeftButtock", "RightButtock")
 #: Pelvis settling: each round solves the limbs, measures the seat and moves the pelvis by the gap.
 #: The gap shrinks by a steady share each round; a pose not settled within the rounds is refused.
@@ -95,13 +98,13 @@ def _limb(rig, upper, lower, end, target, pole, end_rotation):
     return (tip - target).length
 
 
-def _seat_height(rig, body):
-    """The lowest point of the seat, in the rig's space, from the skinned surface."""
+def _seat_height(rig, body, bones=SEAT_BONES):
+    """The lowest point of the seat, in the rig's space, from the skinned surface of ``bones``."""
     depsgraph = bpy.context.evaluated_depsgraph_get()
     evaluated = body.evaluated_get(depsgraph)
     mesh = evaluated.to_mesh()
     groups = {group.index: group.name for group in body.vertex_groups}
-    seat = {PREFIX + name for name in SEAT_BONES}
+    seat = {PREFIX + name for name in bones}
     lowest = math.inf
     for vertex in mesh.vertices:
         source = body.data.vertices[vertex.index]
@@ -115,6 +118,11 @@ def _seat_height(rig, body):
     return lowest
 
 
+def seat_target(posture, rest_height, ground=0.0):
+    """Where the lowest point of the seat settles, in the rig's space."""
+    return ground + (posture.get("seatHeight", 0.0) - posture["seatSink"]) * rest_height
+
+
 def pose(rig, body, posture, rest_height, phase=0.0, ground=0.0):
     """Pose ``rig`` in ``posture`` at a breathing ``phase`` in [0, 1). Returns measurements.
 
@@ -123,6 +131,7 @@ def pose(rig, body, posture, rest_height, phase=0.0, ground=0.0):
     renderer's ground sits at in the rig's space: the idle clip's measured floor, which the
     renderer lifts to its ground, so a posture rests on the same ground a standing person does.
     """
+    seat_bones = tuple(posture.get("seatBones", SEAT_BONES))
     for bone in rig.pose.bones:
         bone.rotation_mode = "QUATERNION"
         bone.rotation_quaternion.identity()
@@ -189,8 +198,9 @@ def pose(rig, body, posture, rest_height, phase=0.0, ground=0.0):
                 _bone(rig, side + "Hand"),
                 _bone(rig, side + "Hand").matrix.translation + wrist @ forearm,
             )
-        # The seat settles a declared depth into the ground, so no gap of light shows beneath it.
-        gap = _seat_height(rig, body) - (ground - posture["seatSink"] * rest_height)
+        # The seat settles a declared depth into what it rests on, the ground or a seat
+        # ``seatHeight`` above it, so no gap of light shows beneath it.
+        gap = _seat_height(rig, body, seat_bones) - seat_target(posture, rest_height, ground)
         if abs(gap) < SETTLED_METRES:
             break
         placed = hips.matrix.copy()
@@ -202,7 +212,7 @@ def pose(rig, body, posture, rest_height, phase=0.0, ground=0.0):
     return {
         "footReachErrorMetres": round(worst["foot"], 6),
         "handReachErrorMetres": round(worst["hand"], 6),
-        "seatMetres": round(_seat_height(rig, body), 6),
+        "seatMetres": round(_seat_height(rig, body, seat_bones), 6),
         "pelvisMetres": round(hips.matrix.translation.z, 6),
     }
 

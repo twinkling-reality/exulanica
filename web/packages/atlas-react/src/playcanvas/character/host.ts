@@ -49,6 +49,26 @@ export interface ContainerLease {
   release(): void;
 }
 
+/**
+ * A container the host refused because its bytes are not the catalog's: another fetch of the same
+ * reference returns the same bytes, so the refusal stands.
+ */
+class RefusedContainer extends Error {}
+
+/**
+ * Statuses that say the container is not there to fetch: asking again returns the same answer.
+ * Anything else (a network failure, a server error, an authorization about to be refreshed) may
+ * pass, and is asked again.
+ */
+const ABSENT_STATUSES: ReadonlySet<number> = new Set([404, 410]);
+
+/** Whether a failed fetch or check will fail the same way however often it is asked again. */
+function lasting(error: unknown): boolean {
+  if (error instanceof RefusedContainer) return true;
+  const status = (error as { readonly status?: unknown } | null)?.status;
+  return typeof status === 'number' && ABSENT_STATUSES.has(status);
+}
+
 function cancelled(): DOMException {
   return new DOMException('Character request cancelled', 'AbortError');
 }
@@ -219,6 +239,12 @@ export class CharacterHost {
   private readonly containers = new SharedResources<LoadedContainer>((container) => this.disposeContainer(container));
   private readonly packs = new SharedResources<LoadedPack>((pack) => { for (const texture of pack.textures) texture.destroy(); });
   private readonly materials = new SharedResources<BuiltMaterial>((built) => { built.material.destroy(); built.pack.release(); });
+  /**
+   * Containers that are not there or not the catalog's, by content digest, with the failure: every
+   * person who comes near would otherwise ask again for the same missing body. Only failures that
+   * a retry cannot change are kept, and a new loader asks afresh.
+   */
+  private readonly failures = new Map<string, Error>();
   private readonly variants = new Map<string, BodyVariant>();
   private readonly loaderListeners = new Set<() => void>();
   private loader: CharacterAssetLoader | null = null;
@@ -295,6 +321,7 @@ export class CharacterHost {
   setLoader(loader: CharacterAssetLoader): void {
     if (this.destroyed) return;
     this.loader = loader;
+    this.failures.clear();
     for (const listener of [...this.loaderListeners]) listener();
   }
 
@@ -306,9 +333,19 @@ export class CharacterHost {
   private async verifiedBytes(ref: CatalogAssetRef, signal: AbortSignal): Promise<ArrayBuffer> {
     const loader = this.loader;
     if (!loader) throw new Error('No character asset loader is registered');
-    const bytes = await loader(ref, signal);
-    if (bytes.byteLength !== ref.byteSize) throw new Error(`Character asset ${ref.assetKey} has the wrong length`);
-    if ((await containerSha256(bytes)) !== ref.contentSha256) throw new Error(`Character asset ${ref.assetKey} failed its digest`);
+    const failed = this.failures.get(ref.contentSha256);
+    if (failed) throw failed;
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await loader(ref, signal);
+      if (bytes.byteLength !== ref.byteSize) throw new RefusedContainer(`Character asset ${ref.assetKey} has the wrong length`);
+      if ((await containerSha256(bytes)) !== ref.contentSha256) throw new RefusedContainer(`Character asset ${ref.assetKey} failed its digest`);
+    } catch (error) {
+      if (!signal.aborted && !this.destroyed && lasting(error)) {
+        this.failures.set(ref.contentSha256, error instanceof Error ? error : new Error(String(error)));
+      }
+      throw error;
+    }
     if (signal.aborted || this.destroyed) throw cancelled();
     return bytes;
   }

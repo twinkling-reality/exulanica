@@ -29,7 +29,7 @@ have code and synthetic browser checks. See the
 These checks do not prove the complete personal-world journey or visual quality.
 
 A person furnishes a world from the
-[world object catalog](../../assets/catalogs/world-objects/world-object.v1.json), read by
+[world object catalog](../../assets/catalogs/world-objects/world-object.v2.json), read by
 [`exulanica/world/object_catalog.py`](../../exulanica/world/object_catalog.py): the three grey
 markers, and a bench, a cafe table with two chairs, a tree in a planter, a lamp post, a market stall
 and a planter seat. Each kind states its title and summary, its dimensions, the recipe its mesh is
@@ -39,7 +39,8 @@ recipe cites the street furniture catalog or a declared measurement. The Create 
 kind by its title, with the chosen kind's summary under the choice. Inhabitants rest at the benches,
 the planter seat and the cafe table and stop at the tree and the stall, in rows along the sides each
 kind names, spaced so that turning an object never crowds two of them together; a lamp post stands
-in their way and offers nothing to do.
+in their way and offers nothing to do. A resting person is drawn sitting on the seat of the bench,
+the chair or the ledge their place has, and a visitor faces the stall's counter or the tree.
 
 "Place a small square before me" asks for the
 [small square](../../assets/catalogs/world-objects/world-arrangement.v1.json): a tree between two

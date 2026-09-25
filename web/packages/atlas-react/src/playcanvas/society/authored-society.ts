@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
 import type { NativeCharacterFrame } from '../native-character-runtime.js';
-import { SocietyCrowd, type CrowdCounts } from './crowd.js';
+import { SocietyCrowd, type CrowdCounts, type CrowdSeatingMiss } from './crowd.js';
+import type { SeatingLayout } from './seating.js';
 import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
 
 /**
@@ -29,13 +30,36 @@ export class AuthoredRegionSociety {
     this.crowd = new SocietyCrowd(device, this.root);
   }
 
-  /** Present one canonical snapshot; returns how many inhabitants are drawn. */
+  /**
+   * Present one canonical snapshot; returns how many inhabitants are drawn. `layout` says how the
+   * objects people use are drawn at their places (`./seating.ts`); without one, everyone is drawn
+   * where the snapshot puts them, facing the way they walked.
+   */
   setSociety(
     state: OwnedSocietyState,
     observer?: readonly [number, number],
     options?: CrowdTiming,
+    layout: SeatingLayout | null = null,
   ): number {
-    return this.crowd.set(state, observer, options).drawn;
+    return this.crowd.set(state, observer, options, layout).drawn;
+  }
+
+  /** Everyone drawn as everyone else is although their state says what they do, and why. */
+  get seatingMisses(): readonly CrowdSeatingMiss[] {
+    return this.crowd.seatingMisses;
+  }
+
+  /** Whether an inhabitant's rest is drawn on a seat: their place has one the catalog draws it on. */
+  inhabitantSeatAtPlace(id: string): boolean {
+    return this.crowd.seatAtPlace(id);
+  }
+
+  /**
+   * Find everyone's place again from the objects drawn now (`SocietyCrowd.setLayout`), as after an
+   * object is moved or removed, without waiting for the next state.
+   */
+  setSeatingLayout(layout: SeatingLayout | null): void {
+    this.crowd.setLayout(layout);
   }
 
   /** Everyone the latest snapshot moved without walking, and why (`SocietyCrowd.jumps`). */

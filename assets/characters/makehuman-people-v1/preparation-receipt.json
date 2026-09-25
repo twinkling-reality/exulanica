@@ -1,5 +1,5 @@
 {
- "definitionSha256": "3fe58fe2df0973f2ab90d8088dd86e5db575cd462aecd3d74a01feb1813829bf",
+ "definitionSha256": "eb93cb2857bb343c78421ce4049d9d12a40b1bf98d5d20b3065785e3d02f5319",
  "inputs": {
   "animationSha256": "7d026bd1bac1a4c2e9e4785af4a1c3ed13d0abae2c870798654f816ec8d78d2d",
   "blenderBinarySha256": "3d297c91a96ef848bdb987da48cad2b4591ffa51f4f3591b231ce075b1c8af48",
@@ -143,6 +143,22 @@
     }
    },
    "postures": {
+    "perched": {
+     "durationSeconds": 4.0,
+     "first": {
+      "footReachErrorMetres": 0.0,
+      "handReachErrorMetres": 0.0,
+      "pelvisMetres": 0.51667,
+      "seatMetres": 0.413943
+     },
+     "frames": 97,
+     "seatMetres": [
+      0.413943,
+      0.413943
+     ],
+     "worstFootReachErrorMetres": 0.0,
+     "worstHandReachErrorMetres": 0.0
+    },
     "seated": {
      "durationSeconds": 4.0,
      "first": {
@@ -279,6 +295,22 @@
     }
    },
    "postures": {
+    "perched": {
+     "durationSeconds": 4.0,
+     "first": {
+      "footReachErrorMetres": 0.0,
+      "handReachErrorMetres": 0.0,
+      "pelvisMetres": 0.540527,
+      "seatMetres": 0.44763
+     },
+     "frames": 97,
+     "seatMetres": [
+      0.44763,
+      0.44763
+     ],
+     "worstFootReachErrorMetres": 0.0,
+     "worstHandReachErrorMetres": 0.0
+    },
     "seated": {
      "durationSeconds": 4.0,
      "first": {
@@ -300,8 +332,8 @@
   }
  },
  "outputs": {
-  "bases/feminine.glb": "dc2e7058e2ac4b184073e504cd019d996cea7c5aaef0ae2d11730e8f1630b69c",
-  "bases/masculine.glb": "1f5e7df604d74dcd69341cb11d8b8a71d266ad812ce0950b2a69201e1250ab5a",
+  "bases/feminine.glb": "2a54b5b4eeb6cad184c593e401f35458bb358fe710f4cfeef214e7562b23e95d",
+  "bases/masculine.glb": "9b91cc9b783a24ec18aa81a76b03683609e9ec3d9c8f5fa0419589eca2e2c451",
   "materials/brows.eyebrow001.glb": "f2affdc83785b0b7002cc21e407c65460f5f82bac0c2fa509c98dd2622c643b3",
   "materials/brows.eyebrow003.glb": "757cff1146bb81f2aff39144a9af5861338830d30abef6ebc60e1db750f2172c",
   "materials/brows.eyebrow006.glb": "8290fc63122a411f59ba5fc5871bc2775584aa8e3339cd44e996e64215abb396",
@@ -399,9 +431,9 @@
  "scripts": {
   "glb.py": "43a3f7633076c99b37a514ffb1aeb9e1336da606d95c16a7dd30d2e63369b860",
   "packs.py": "d5173e66bdfa3e0f34cb50f35949323e5520fd2381330eb43f2a4b0b6b9d0365",
-  "people.py": "db2077b2506fe4000e0345c9cdb43f99eed07cbc66e76947ef6710bb7b255338",
-  "people_blender.py": "3a2c3b8f0f1f5cc182b9c51db6cf51f3cae24bc3ad9efd3739f790e9770566f5",
-  "posture.py": "6bf55f241579c2f116d5f276f2fe113c607fd203af486c57d639bfa6ad722b86",
+  "people.py": "14f62a50559566b9d591b3c46e792027415fd6e3dd592f660b62f2eaf62da82a",
+  "people_blender.py": "f8b801485a9d441f6062051119c16a24a890442a50e0d14a7076d49ece1ea742",
+  "posture.py": "d952287d76eeda06744faa3be8be18242286085613947ae8e31145391cd347c8",
   "retarget.py": "cf98c1ef5b4ccbb45547a904b713079ce345092ba83cfbc82c0219f9654fba45",
   "split.py": "ac3f9741f482592b5437c8abbf47609db161f24508a418ec258e0f7327b7d352"
  }

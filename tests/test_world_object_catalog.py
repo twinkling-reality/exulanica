@@ -10,7 +10,7 @@ import re
 import struct
 import zlib
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Final
 
 import pytest
 from exulanica.grammar.errors import CatalogError
@@ -21,6 +21,7 @@ from exulanica.world.assets import (
 )
 from exulanica.world.object_catalog import (
     CATALOG_DIRECTORY,
+    CATALOG_VERSION,
     MarkerRecipe,
     PartsRecipe,
     load_world_object_catalog,
@@ -31,7 +32,7 @@ from exulanica.world.object_meshes import form_triangles
 from exulanica.world.texture_assets import decode_texture_set, load_texture_catalog
 
 _MIGRATIONS = pathlib.Path(__file__).resolve().parents[1] / "exulanica" / "migrations"
-_CATALOG_FILE = CATALOG_DIRECTORY / "world-object.v1.json"
+_CATALOG_FILE = CATALOG_DIRECTORY / f"world-object.v{CATALOG_VERSION}.json"
 _ROW = re.compile(
     r"\('(?P<key>[a-z][a-z0-9.-]*)','(?P<title>(?:[^']|'')*)',\s*"
     r"'(?P<summary>(?:[^']|'')*)',\s*'model/gltf-binary',\s*"
@@ -102,7 +103,11 @@ def _entry(document: dict[str, Any], key: str) -> dict[str, Any]:
 
 
 def _load(tmp_path: pathlib.Path, document: dict[str, Any]):
-    (tmp_path / "world-object.v1.json").write_text(json.dumps(document))
+    """Load ``document`` as the current version, beside a copy of every earlier published one."""
+    for earlier in range(1, CATALOG_VERSION):
+        name = f"world-object.v{earlier}.json"
+        (tmp_path / name).write_bytes((CATALOG_DIRECTORY / name).read_bytes())
+    (tmp_path / _CATALOG_FILE.name).write_text(json.dumps(document))
     return load_world_object_catalog(tmp_path)
 
 
@@ -126,16 +131,37 @@ def _set(path: list[Any], value: Any) -> Callable[[dict[str, Any]], None]:
 
 
 def _grow_the_cafe_table_to(side_mm: int) -> Callable[[dict[str, Any]], None]:
-    """A table top ``side_mm`` across, with the dimensions it then draws, and nothing else moved."""
+    """A table top ``side_mm`` across, with the dimensions it then draws, and nothing else moved.
+
+    A top that wide covers the chairs, so their seats would lie on it; the seats and the
+    declaration they cite are taken away with it, and only the places are left to refuse.
+    """
 
     def mutate(document: dict[str, Any]) -> None:
         entry = _entry(document, "cafe_table")
         top = entry["recipe"]["parts"][0]
         top["size_x_mm"] = top["size_y_mm"] = side_mm
         entry["dimensions_mm"]["width"] = entry["dimensions_mm"]["depth"] = side_mm
+        for row in entry["use"]["places"]:
+            row["seat"] = None
+        del entry["declared"]["seat_point"]
 
     return mutate
 
+
+def _standing_rows(key: str, rows: list[dict[str, Any]]) -> Callable[[dict[str, Any]], None]:
+    """Rows with no seat, and no seat declaration left over, so only the rows are refused."""
+
+    def mutate(document: dict[str, Any]) -> None:
+        entry = _entry(document, key)
+        entry["use"]["places"] = rows
+        entry["declared"].pop("seat_point", None)
+
+    return mutate
+
+
+#: The bench's published seat, for rows a refusal restates, so only what the refusal names differs.
+_BENCH_SEAT: Final = _entry(_document(), "bench")["use"]["places"][0]["seat"]
 
 REFUSALS: list[tuple[str, Callable[[dict[str, Any]], None], str]] = [
     ("unknown recipe profile", _set(["bench", "recipe", "profile"], "parts-v9"), "profile"),
@@ -186,17 +212,23 @@ REFUSALS: list[tuple[str, Callable[[dict[str, Any]], None], str]] = [
     ),
     (
         "two rows on one side, whose places coincide",
-        _set(["bench", "use", "places"], [{"side": "+y", "count": 1}, {"side": "+y", "count": 1}]),
+        _set(
+            ["bench", "use", "places"],
+            [
+                {"side": "+y", "count": 1, "seat": _BENCH_SEAT},
+                {"side": "+y", "count": 1, "seat": _BENCH_SEAT},
+            ],
+        ),
         "closer than a standing spacing and the turning margin",
     ),
     (
         "a row longer than the side it stands along",
-        _set(["bench", "use", "places"], [{"side": "+y", "count": 4}]),
+        _standing_rows("bench", [{"side": "+y", "count": 4, "seat": None}]),
         "do not fit along its",
     ),
     (
         "a side the part frame does not have",
-        _set(["bench", "use", "places"], [{"side": "up", "count": 1}]),
+        _set(["bench", "use", "places"], [{"side": "up", "count": 1, "seat": None}]),
         "side is one of",
     ),
     (
@@ -216,12 +248,12 @@ REFUSALS: list[tuple[str, Callable[[dict[str, Any]], None], str]] = [
     ),
     (
         "a marker that states places",
-        _set(["marker_cube", "use", "places"], [{"side": "+y", "count": 1}]),
+        _set(["marker_cube", "use", "places"], [{"side": "+y", "count": 1, "seat": None}]),
         "a marker states no places",
     ),
     (
         "a kind nobody uses that states places",
-        _set(["lamp_post", "use", "places"], [{"side": "+y", "count": 1}]),
+        _set(["lamp_post", "use", "places"], [{"side": "+y", "count": 1, "seat": None}]),
         "nobody uses",
     ),
     (
@@ -243,7 +275,7 @@ def test_the_loader_refuses_by_name(tmp_path, mutate, match):
 
 
 def test_a_file_no_schema_claims_is_refused(tmp_path):
-    (tmp_path / "world-object.v2.json").write_text("{}")
+    (tmp_path / f"world-object.v{CATALOG_VERSION + 1}.json").write_text("{}")
     with pytest.raises(CatalogError, match="files with no schema"):
         _load(tmp_path, _document())
 

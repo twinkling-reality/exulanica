@@ -17,7 +17,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Request, Response
 
 from exulanica.api.dependencies import ReadOnlyConnection, get_services
-from exulanica.api.world_version_document import ReviewedAssetView, asset_view
+from exulanica.api.world_version_document import PlaceableAssetView, placeable_asset_view
 from exulanica.evidence.blob import BlobId
 from exulanica.world import GLB_MEDIA_TYPE, UnavailableAsset
 from exulanica.world.reviewed_catalog import ReviewedCatalog
@@ -34,25 +34,26 @@ ReadCatalog = Annotated[ReviewedCatalog, Depends(reviewed_catalog)]
 
 @router.get(
     "/assets",
-    response_model=list[ReviewedAssetView],
-    summary="The reviewed assets a person may place as objects, with real byte availability.",
+    response_model=list[PlaceableAssetView],
+    summary="The reviewed assets a person may place as objects, with real byte availability and "
+    "what inhabitants do with each.",
 )
-def reviewed_asset_catalog(catalog: ReadCatalog, request: Request) -> list[ReviewedAssetView]:
+def reviewed_asset_catalog(catalog: ReadCatalog, request: Request) -> list[PlaceableAssetView]:
     store = get_services(request).store
-    return [asset_view(asset) for asset in catalog.placeable_assets(store)]
+    return [placeable_asset_view(asset) for asset in catalog.placeable_assets(store)]
 
 
 @router.get(
     "/assets/{asset_key}",
-    response_model=ReviewedAssetView,
+    response_model=PlaceableAssetView,
     summary="One reviewed asset of any kind, whether it may be placed and whether its bytes exist.",
 )
 def reviewed_asset(
     asset_key: Annotated[str, Path(max_length=200)],
     catalog: ReadCatalog,
     request: Request,
-) -> ReviewedAssetView:
-    return asset_view(catalog.asset(asset_key, get_services(request).store))
+) -> PlaceableAssetView:
+    return placeable_asset_view(catalog.asset(asset_key, get_services(request).store))
 
 
 @router.get(

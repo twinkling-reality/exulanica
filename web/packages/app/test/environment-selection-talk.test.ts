@@ -63,7 +63,8 @@ async function inspect(held: SocietySnapshot) {
     visibleInhabitantIds: ['person-0', 'person-1'], inhabitantRepresentation: vi.fn(() => null),
     inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => ['person-0']),
     societyCounts: { population: 2, outdoors: 2, indoors: 0, near: 2, far: 0, drawn: 2 },
-    drawnInhabitantCount: 2, pickInhabitant: vi.fn(() => 'person-0'),
+    drawnInhabitantCount: 2, pickInhabitant: vi.fn(() => 'person-0'), inhabitantSeatAtPlace: vi.fn(() => false),
+    setSeatingLayout: vi.fn(), seatingMisses: [],
   };
   const controls = { state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }) };
   const binding = {

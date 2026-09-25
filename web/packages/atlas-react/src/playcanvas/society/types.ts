@@ -159,6 +159,10 @@ export interface CrowdPose {
    * it; one that draws none, like the abstract figure, stands.
    */
   readonly activity?: string | null;
+  /** Whether the activity is performed on a seat (`CharacterPose.seated`); absent means no seat. */
+  readonly seated?: boolean;
+  /** The ground's height under a person drawn above it (`CharacterPose.groundY`). */
+  readonly groundY?: number;
 }
 
 /**
@@ -179,6 +183,12 @@ export interface CrowdRenderable {
   readonly representation?: ResolvedCharacterRepresentation;
   readonly standingHeight: number;
   readonly facing: number;
+  /**
+   * Optional: whether this renderable draws an activity on a seat in a seat posture. The catalog
+   * person does; one that omits it, like the abstract figure, draws every activity standing, and the
+   * crowd then keeps it standing at its place rather than lifting it onto a seat it would hover over.
+   */
+  readonly drawsSeats?: boolean;
   /**
    * Optional: bytes this renderable owns outright, for a renderable that holds its own geometry and
    * textures. A renderable drawn from shared containers omits both, because its bytes belong to the

@@ -35,7 +35,16 @@ export interface CrowdEvaluationOptions {
    * People among those standing who are shown doing an activity, as a society states one, so the
    * posture the catalog draws for it can be looked at: the first `count` standing figures.
    */
-  readonly performing?: { readonly count: number; readonly activity: string };
+  readonly performing?: {
+    readonly count: number;
+    readonly activity: string;
+    /**
+     * Draw them on a seat this many metres above the ground, as a society's seat puts a resting
+     * person: the seat posture, the root lifted and the feet planted on the ground. Absent is on
+     * the ground.
+     */
+    readonly seatLiftMetres?: number;
+  };
 }
 
 /** Slow walk, walk, brisk walk and run, metres per second. */
@@ -47,6 +56,8 @@ const SOCIETY = 'character-evaluation';
 interface Figure {
   readonly renderable: CharacterRenderable;
   readonly activity: string | null;
+  /** How far above the ground the figure is drawn on a seat, or null for on the ground. */
+  readonly seatLift: number | null;
   readonly home: readonly [number, number];
   readonly lane: { readonly from: readonly [number, number]; readonly to: readonly [number, number]; readonly speed: number; readonly phase: number } | null;
 }
@@ -94,6 +105,7 @@ export class CharacterCrowdEvaluation {
         this.figures.push({
           renderable,
           activity: null,
+          seatLift: null,
           home: centre,
           lane: {
             from: [centre[0] - across[0] * half, centre[1] - across[1] * half],
@@ -110,6 +122,7 @@ export class CharacterCrowdEvaluation {
         this.figures.push({
           renderable,
           activity: index < (options.performing?.count ?? 0) ? options.performing!.activity : null,
+          seatLift: index < (options.performing?.count ?? 0) ? options.performing!.seatLiftMetres ?? null : null,
           home: [s.x + forward[0] * ahead + across[0] * (column * 1.25 + stagger), s.z + forward[1] * ahead + across[1] * (column * 1.25 + stagger)],
           lane: null,
         });
@@ -161,7 +174,9 @@ export class CharacterCrowdEvaluation {
     for (const { figure, x, z, yaw } of placed) {
       const detail: CharacterDetail = near.has(figure) ? 'near' : 'far';
       if (figure.renderable.detail !== detail) figure.renderable.setDetail(detail);
-      figure.renderable.pose({ position: [x, this.ground(x, z), z], yaw, deltaSeconds: dt, discontinuity, activity: figure.activity });
+      const ground = this.ground(x, z);
+      const seat = figure.seatLift === null ? {} : { seated: true, groundY: ground };
+      figure.renderable.pose({ position: [x, ground + (figure.seatLift ?? 0), z], yaw, deltaSeconds: dt, discontinuity, activity: figure.activity, ...seat });
     }
   }
 

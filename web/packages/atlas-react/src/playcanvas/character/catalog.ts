@@ -107,6 +107,12 @@ export type PostureJoint = (typeof POSTURE_JOINTS)[number];
 /** A posture on one base: its clip, and where its joints are at the clip's first frame. */
 export interface CatalogBasePosture {
   readonly clip: CatalogClip;
+  /**
+   * How high the lowest point of the seat rests above the ground a standing person stands on, at
+   * the base's rest height and the clip's first frame. A posture drawn on a seat puts this point
+   * on it; one drawn on the ground rests it a little into the ground.
+   */
+  readonly seatMillimetres: number;
   /** Millimetres in the asset's own frame: +Y up, the body facing +Z. */
   readonly jointsMillimetres: Readonly<Record<PostureJoint, readonly [number, number, number]>>;
 }
@@ -182,6 +188,12 @@ export interface CatalogFamily {
    * named nowhere here is drawn standing.
    */
   readonly activityPostures: Readonly<Record<string, string>>;
+  /**
+   * How an activity performed on a seat is drawn: activity key to posture key. A person drawn at a
+   * seat takes this posture; an activity named nowhere here, or a person at no seat, is drawn by
+   * `activityPostures`.
+   */
+  readonly seatPostures: Readonly<Record<string, string>>;
 }
 
 /** Weighted choices for a named draw domain. Weights are positive integers. */
@@ -268,7 +280,7 @@ export function validateCharacterCatalog(catalog: CharacterCatalog): CharacterCa
     for (const shown of [...family.slots.map((s) => ({ key: s.slot, ...s })), ...family.parameters]) checkPresentation(shown, `${at} ${shown.key}`);
     unique(family.postures.map((p) => p.key), `${at} postures`);
     for (const posture of family.postures) if (!KEY.test(posture.key)) fail(`${at} posture ${posture.key}`, 'key is malformed');
-    for (const [activity, posture] of Object.entries(family.activityPostures)) {
+    for (const [activity, posture] of [...Object.entries(family.activityPostures), ...Object.entries(family.seatPostures)]) {
       if (!KEY.test(activity)) fail(`${at} activity ${activity}`, 'key is malformed');
       if (!family.postures.some((p) => p.key === posture)) fail(`${at} activity ${activity}`, `unknown posture ${posture}`);
     }
@@ -291,6 +303,7 @@ export function validateCharacterCatalog(catalog: CharacterCatalog): CharacterCa
       if (postureKeys.length !== declared.length || postureKeys.some((k, i) => k !== declared[i])) fail(where, 'postures must be exactly the family\'s');
       for (const [key, posture] of Object.entries(base.postures)) {
         if (!Number.isSafeInteger(posture.clip.durationMilli) || posture.clip.durationMilli <= 0 || posture.clip.speedMillimetresPerSecond !== 0) fail(`${where} posture ${key}`, 'clip is malformed');
+        if (!Number.isSafeInteger(posture.seatMillimetres) || Math.abs(posture.seatMillimetres) > base.restHeightMillimetres) fail(`${where} posture ${key}`, 'seat height is malformed');
         for (const joint of POSTURE_JOINTS) {
           const point = posture.jointsMillimetres[joint];
           if (!point || point.length !== 3 || !point.every(Number.isSafeInteger)) fail(`${where} posture ${key}`, `joint ${joint} is malformed`);
@@ -374,9 +387,18 @@ export function catalogBase(family: CatalogFamily, baseId: string): CatalogBase 
   return base;
 }
 
-/** The posture an activity is drawn in, or null for standing. */
-export function activityPosture(family: CatalogFamily, activity: string | null | undefined): string | null {
-  return activity ? family.activityPostures[activity] ?? null : null;
+/**
+ * The posture an activity is drawn in, or null for standing. `seated` says the person is drawn at a
+ * seat, where the family's seat posture for the activity is taken when it declares one.
+ */
+export function activityPosture(family: CatalogFamily, activity: string | null | undefined, seated = false): string | null {
+  if (!activity) return null;
+  return (seated ? family.seatPostures[activity] : undefined) ?? family.activityPostures[activity] ?? null;
+}
+
+/** The posture an activity performed on a seat is drawn in, or null where none is declared. */
+export function seatPosture(family: CatalogFamily, activity: string | null | undefined): string | null {
+  return activity ? family.seatPostures[activity] ?? null : null;
 }
 
 export function catalogMaterial(family: CatalogFamily, materialId: string): CatalogMaterial {

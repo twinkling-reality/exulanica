@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 
-from pydantic import BaseModel, ConfigDict, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world import (
@@ -25,6 +25,7 @@ from exulanica.world import (
     scale_statement,
     truth_statement,
 )
+from exulanica.world.object_catalog import world_object_catalog
 
 
 class ReviewedAssetView(BaseModel):
@@ -42,6 +43,64 @@ class ReviewedAssetView(BaseModel):
     #: Whether a person may place this asset as an object, as its declared kind says. An object a
     #: version already holds embeds its asset whatever this says, and keeps drawing.
     placeable: bool
+
+
+#: The frame every position in an asset's use is stated in, as the world object catalog states it.
+PART_FRAME = (
+    "Millimetres in the kind's own part frame, about the bottom centre of what it draws: +x runs "
+    "across the kind, +y is its front, the side that faces the person who places it, and +z is "
+    "up. A placed object carries this frame by its transform: turned by its yaw about +z and "
+    "scaled by its scale, with the part frame's +y toward the region's -z, so a point [x, y, z] "
+    "is [x, z, -y] in the region's east, up and south axes before the turn."
+)
+
+
+class SeatView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    position_mm: list[int] = Field(
+        description="Where the resting person's pelvis is drawn, [x, y, z]. " + PART_FRAME
+    )
+    faces: str = Field(
+        description="The side of the kind the seated person faces: +y, +x, -y or -x."
+    )
+
+
+class PlaceView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    position_mm: list[int] = Field(
+        description="Where an inhabitant stands to use the kind, [x, y]. " + PART_FRAME
+    )
+    faces: str = Field(
+        description="The side of the kind a person standing here faces, across the place's side."
+    )
+    seat: SeatView | None = Field(
+        description="Where a person resting here is drawn sitting, or null where people stand."
+    )
+
+
+class ObjectUseView(BaseModel):
+    """What inhabitants do with a kind and where, derived by the world object catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    affordance: str
+    places: list[PlaceView] | None = Field(
+        description=(
+            "One place per person, in the order the society fills them; null for a marker, "
+            "whose places the society derives from its footprint and whose people stand."
+        )
+    )
+
+
+class PlaceableAssetView(ReviewedAssetView):
+    """A reviewed asset as the registry reads serve it, with what inhabitants do with it."""
+
+    use: ObjectUseView | None = Field(
+        description="The kind's use, as the world object catalog derives it; null for an asset "
+        "the catalog does not state, such as a character part."
+    )
 
 
 class ObjectBehaviourView(BaseModel):
@@ -146,6 +205,41 @@ def asset_view(asset: ReviewedAssetRow) -> ReviewedAssetView:
         licence_sha256=asset.licence_sha256,
         availability=asset.availability,
         placeable=asset.placeable,
+    )
+
+
+def object_use_view(asset_key: str) -> ObjectUseView | None:
+    """The use the world object catalog derives for an asset, or ``None`` for one it lacks.
+
+    Served from the catalog's own derivation, the one the society's registry rows read, so the
+    page draws people at the places the society fills and at no other.
+    """
+    kind = world_object_catalog().by_asset_key().get(asset_key)
+    if kind is None:
+        return None
+    use = kind.use
+    if use.places is None:
+        return ObjectUseView(affordance=use.affordance, places=None)
+    facing = use.facing or ()
+    seats = use.seats or ()
+    return ObjectUseView(
+        affordance=use.affordance,
+        places=[
+            PlaceView(
+                position_mm=list(place),
+                faces=faces,
+                seat=None
+                if seat is None
+                else SeatView(position_mm=list(seat.position_mm), faces=seat.faces),
+            )
+            for place, faces, seat in zip(use.places, facing, seats, strict=True)
+        ],
+    )
+
+
+def placeable_asset_view(asset: ReviewedAssetRow) -> PlaceableAssetView:
+    return PlaceableAssetView(
+        **asset_view(asset).model_dump(), use=object_use_view(asset.asset_key)
     )
 
 

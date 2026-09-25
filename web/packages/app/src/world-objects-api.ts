@@ -36,6 +36,7 @@
  */
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
+import { KIND_SIDES, type KindPlace, type KindSide, type KindUse } from '@exulanica/atlas-react/playcanvas';
 import { worldPath } from './world-scope.js';
 
 // -- the read model ------------------------------------------------------------------------------
@@ -80,6 +81,13 @@ export interface ReviewedAsset {
    * already holds carries its asset whatever this says, and keeps drawing.
    */
   readonly placeable: boolean;
+  /**
+   * What inhabitants do with the kind and where, as the registry reads serve it from the world
+   * object catalog: each place in the kind's part frame, the way a person there faces, and the
+   * seat a resting person is drawn on. Null for an asset the catalog does not state; absent where
+   * the row was read embedded in a version, which does not carry it.
+   */
+  readonly use?: KindUse | null;
 }
 
 export interface ObjectTransform {
@@ -775,6 +783,36 @@ function digest(value: unknown, label: string): string {
   return parsed;
 }
 
+function side(value: unknown, label: string): KindSide {
+  if (!KIND_SIDES.includes(value as KindSide)) throw invalid(label);
+  return value as KindSide;
+}
+
+/** Whole millimetres, exactly `count` of them. */
+function millimetres(value: unknown, count: number, label: string): readonly number[] {
+  const items = array(value, label);
+  if (items.length !== count) throw invalid(label);
+  return Object.freeze(items.map((item) => integer(item, label)));
+}
+
+function parseUse(value: unknown): KindUse | null {
+  if (value === null) return null;
+  const row = record(value, 'asset use');
+  const places = row['places'] === null ? null : array(row['places'], 'asset use places').map((item): KindPlace => {
+    const place = record(item, 'asset use place');
+    const seat = place['seat'] === null ? null : record(place['seat'], 'asset use seat');
+    return Object.freeze({
+      positionMm: millimetres(place['position_mm'], 2, 'asset use place position') as readonly [number, number],
+      faces: side(place['faces'], 'asset use place facing'),
+      seat: seat === null ? null : Object.freeze({
+        positionMm: millimetres(seat['position_mm'], 3, 'asset use seat position') as readonly [number, number, number],
+        faces: side(seat['faces'], 'asset use seat facing'),
+      }),
+    });
+  });
+  return Object.freeze({ affordance: text(row['affordance'], 'asset use affordance'), places: places && Object.freeze(places) });
+}
+
 export function parseAsset(value: unknown): ReviewedAsset {
   const row = record(value, 'reviewed asset');
   return Object.freeze({
@@ -788,6 +826,7 @@ export function parseAsset(value: unknown): ReviewedAsset {
     licenceSha256: digest(row['licence_sha256'], 'reviewed asset licence hash'),
     availability: text(row['availability'], 'reviewed asset availability'),
     placeable: flag(row['placeable'], 'reviewed asset placeability'),
+    ...('use' in row ? { use: parseUse(row['use']) } : {}),
   });
 }
 

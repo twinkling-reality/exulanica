@@ -24,6 +24,8 @@ export interface FarForm {
   readonly hipWidthMillimetres: number;
   /** Each posture's joints at its clip's first frame, millimetres in the asset's frame. */
   readonly postures: Readonly<Record<string, Readonly<Record<PostureJoint, readonly [number, number, number]>>>>;
+  /** Each posture's seat height above the ground at the base's rest height, millimetres. */
+  readonly seats: Readonly<Record<string, number>>;
 }
 
 /** What a far form draws of a person: their body, their height and their look's region colours. */
@@ -58,8 +60,19 @@ export function farAppearance(catalog: CharacterCatalog, look: CharacterLook): F
       shoulderWidthMillimetres: base.farForm.shoulderWidthMillimetres,
       hipWidthMillimetres: base.farForm.hipWidthMillimetres,
       postures: Object.fromEntries(Object.entries(base.postures).map(([key, posture]) => [key, posture.jointsMillimetres])),
+      seats: Object.fromEntries(Object.entries(base.postures).map(([key, posture]) => [key, posture.seatMillimetres])),
     },
   };
+}
+
+/**
+ * How high a person's seat rests above the ground in a posture, at their own height, in metres:
+ * the base's measured seat height scaled as the whole body is, from its rest height to theirs.
+ */
+export function postureSeatMetres(appearance: FarAppearance, posture: string): number {
+  const seat = appearance.form.seats[posture];
+  if (seat === undefined) throw new TypeError(`The ${appearance.baseId} body has no ${posture} posture`);
+  return (seat / appearance.form.restHeightMillimetres) * appearance.heightMetres;
 }
 
 const TEMPLATE_STEP = 0.045;

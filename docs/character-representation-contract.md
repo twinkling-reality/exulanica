@@ -5,9 +5,9 @@ character foundation for the player, synthetic inhabitants, and people observed 
 committed catalog of fitted, textured people supplies the player's default body, every
 inhabitant's look in saved, starter and district worlds, the character studio and saved looks,
 with near and distant detail levels, planted feet, a seated rest drawn for the activity a society
-states, and a frame budget measured on a production build. It does not establish likeness
-reconstruction, automatic rigging of new source material, sitting on furniture, or crowd collision
-avoidance.
+states, on the ground or on the seat of the furniture a person uses, and a frame budget measured on a
+production build. It does not establish likeness reconstruction, automatic rigging of new source
+material, or crowd collision avoidance.
 
 ## One foundation, distinct subjects
 
@@ -88,8 +88,9 @@ reads it for ambient and specular light, and every double-sided material (hair, 
 a back face with its own normal (`host.ts`). The settings are data in the definition's `occlusion`.
 
 Containers are revision 2 (`assetRevisions` in the definition): their bytes changed when the seated
-clip and occlusion were added, so their reviewed asset keys end `.v2`; material packs kept their bytes
-and their `.v1` keys.
+clip and occlusion were added, so their reviewed asset keys end `.v2`; the two bases are revision 3,
+because they carry the perched clip as well (each about 57 KB more), while the worn parts kept their
+bytes and their `.v2` keys, and material packs kept their bytes and their `.v1` keys.
 
 A look (`exulanica.character-look/v1`) is a recipe over one body: part ids per slot, material ids,
 colour keys and the integer parameters. Nothing else describes a person. Every slot and parameter also
@@ -123,7 +124,9 @@ targets.
 `activity` is what the person is doing where they stand as the simulation states it: the kind of an
 action under way, such as `rest`, or null. The catalog family maps activities to postures
 (`activityPostures`, `rest` to `seated`); both forms draw the mapped posture, and an activity the
-catalog maps to nothing is drawn standing. The renderable never infers an activity from motion.
+catalog maps to nothing is drawn standing. A caller that draws the person at a seat says so
+(`seated`), and the family's seat posture for the activity is drawn instead where it declares one
+(`seatPostures`, `rest` to `perched`). The renderable never infers an activity from motion.
 
 The society display (`society/crowd.ts`), which saved, starter and district worlds share, draws every
 inhabitant this way. The nearest inhabitants within 60 m are catalog people, up to
@@ -134,9 +137,11 @@ so nobody changes colour or build crossing the boundary. The crowd reads `action
 snapshot when `action.status` is `active` and hands it on once the path recorded for the tick has been
 walked, so a person asked to rest walks there and then sits. Everyone faces the way their recorded
 path last took them and keeps that facing when they stop, in either form, so a person first drawn in
-full after arriving, or again after a spell in the far form, faces as their far figure did. The
-abstract figure remains a factory a caller can name (`society/near-character.ts`); it has no seated
-posture.
+full after arriving, or again after a spell in the far form, faces as their far figure did, except
+where their activity's facing rule says otherwise, as at an object they use
+([synthetic society contract](synthetic-society-contract.md)). The abstract figure remains a factory
+a caller can name (`society/near-character.ts`); it has no seated posture, so it stands at a place
+rather than being lifted onto a seat.
 
 ### Player, studio and saved looks
 
@@ -310,9 +315,20 @@ lowest point of the skinned seat rests a declared depth into that same floor. Th
 reach errors and seat heights, and `tests/test_character_postures.py` holds them to a millimetre. A
 full person settles into the posture and rises from it over 0.8 s, and one first drawn already
 resting appears seated; the contact lock rests while seated. The far form sits too: the shared sculpt
-bent by the abstract rig along the baked clip's joints. This is sitting on the ground, not sitting
-at seat height on an object: a person resting at a bench or a wall sits on the ground at the point
-the state gives them. Sitting on furniture, conversational gestures, gaze, reaching, contact-aware
+bent by the abstract rig along the baked clip's joints. That is the rest at a place with no seat.
+
+A person resting on a seat sits upright on it (`postures.perched`): the seat 0.27 of the rest height
+above the floor, the ankles 0.29 in front of the pelvis, the wrists over the thighs, the pelvis lowered
+until the lowest point of the skinned buttocks (`seatBones`) rests at that height, because on a seat the
+thighs slope down to the knees. The catalog states each base posture's measured seat height
+(`seatMillimetres`), and the crowd lifts the person so that point rests on the seat their place has,
+scaled to their height. The full form then plants its feet on the ground below with the contact lock's
+two-bone solve, so a person taller or shorter than the seat suits is drawn with the knees a little more
+or less bent; the far form is lifted without planting. The perched clip, like the seated one, is
+generated by this repository's own posture script from the definition's numbers, and is CC0 under the
+family's licence; the bases' reviewed import summary says so. Postures are baked in the order the
+definition declares them, the order is part of the build's cache stamp, and adding `perched` left the
+seated clip's keyed bytes as they were (`tests/test_character_postures.py`). Conversational gestures, gaze, reaching, contact-aware
 interaction and individual motion styles remain absent.
 
 ## Detail levels and frame budget

@@ -71,6 +71,9 @@ import {
   type ObjectRole,
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
+import { seatingLayout } from './seating-layout.js';
+import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
+import type { SocietyPlaces } from '../society-api.js';
 
 /** Where the development preview's real-engine society recording is served. */
 const SOCIETY_RECORDING_URL = '/preview-api/society/recording';
@@ -533,9 +536,11 @@ export function mountEnvironmentSelection(
       ? 'Unavailable'
       : `${state.input_seq === undefined ? 'Sequence unavailable' : `Sequence ${state.input_seq}`} · ${state.input_sha256}`;
     const nativeCharacter = representation ? deps.state.atlas?.binding.nativeCharacters?.inspect(representation.subject) : null;
-    // Resting is the simulation's state. A catalog person sits on the ground in front of the
-    // place; the abstract figure stands.
+    // Resting is the simulation's state. A catalog person sits on the seat their place has, or on
+    // the ground in front of a place with none; the abstract figure stands.
     const resting = v2 && inhabitant.action?.kind === 'rest' && inhabitant.action.status === 'active';
+    const onSeat = deps.state.atlas?.binding.authoredSociety?.inhabitantSeatAtPlace(id) === true;
+    const restDrawn = onSeat ? 'Sitting on the seat at the place.' : 'Sitting on the ground in front of the place.';
     // In a person's own world the top says who this is, what they are doing and why, in words,
     // naming places by the titles of the person's objects; the recorded details stay below.
     const words = savedWorld !== null && v2 && society?.places
@@ -548,12 +553,12 @@ export function mountEnvironmentSelection(
       activity: words !== null
         ? `${words.doing} ${words.why}`
         : v2
-          ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ' Drawn sitting on the ground in front of the place.' : ''}`
+          ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ` Drawn ${onSeat ? 'sitting on the seat at' : 'sitting on the ground in front of'} the place.` : ''}`
           : 'No persisted goal or action is available in this preview or legacy society.',
       details: [
         ...(words !== null ? [
           ['Recorded explanation', inhabitant.explanation?.summary ?? 'Unavailable'],
-          ...(resting ? [['Drawn as', 'Sitting on the ground in front of the place.'] as const] : []),
+          ...(resting ? [['Drawn as', restDrawn] as const] : []),
         ] as const : []),
         ['Plane / origin', 'Simulation · synthetic'],
         ['Visibility', crowd()?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
@@ -1397,6 +1402,7 @@ export function mountEnvironmentSelection(
       if (phase === 'disposed' || versionId !== savedWorld.versionId || !liveSociety) return;
       const before = new Map((savedObjects() ?? []).map((object) => [object.objectId, object]));
       await readSavedVersion();
+      refreshSeatingLayout();
       noticeChangedObject(before);
       await liveSociety.afterAuthoredEdit();
       renderInhabitantsPanel();
@@ -1488,6 +1494,37 @@ export function mountEnvironmentSelection(
   }
 
   /**
+   * Hand the crowd the seating the drawn objects give now, so a seat moved or taken away is got up
+   * from at once, and record anyone drawn as everyone is although their state says what they do.
+   */
+  function refreshSeatingLayout(): void {
+    const runtime = deps.state.atlas?.binding.authoredSociety ?? null;
+    if (runtime === null || society === null) return;
+    runtime.setSeatingLayout(seatingNow(society.places));
+    reflectSeatingMisses(runtime);
+  }
+
+  /** The seating last built from a version the page read, kept while a re-read fails. */
+  let lastSeating: SeatingLayout | null = null;
+
+  /**
+   * The seating the drawn objects give, or, when the saved version could not be read again, the
+   * last one built from a version that was: people stay on their seats rather than all standing
+   * up, and the canvas says which (`data-society-seating-layout`).
+   */
+  function seatingNow(places: SocietyPlaces | null): SeatingLayout | null {
+    const kept = current === null && authoredWorldFailure !== null && lastSeating !== null;
+    deps.env.canvas.dataset.societySeatingLayout = kept ? 'kept-after-failed-read' : 'current';
+    if (kept) return lastSeating;
+    lastSeating = seatingLayout(worldClient.assets(), current, places);
+    return lastSeating;
+  }
+
+  function reflectSeatingMisses(runtime: NonNullable<NonNullable<SessionState['atlas']>['binding']['authoredSociety']>): void {
+    deps.env.canvas.dataset.societySeatingMisses = runtime.seatingMisses.map((miss) => miss.reason).sort().join(' ');
+  }
+
+  /**
    * Hand the crowd a saved world's new state, walked at the host's pace. Minutes the page never
    * read are walked first where the events record them; the crowd names anyone it could not walk.
    */
@@ -1509,10 +1546,12 @@ export function mountEnvironmentSelection(
     const unread = shown !== null && events !== null ? unreadMinutes(shown, next.state, events) : [];
     // One line per person, however many of the minutes moved them: the latest reason stands.
     const named = new Map<string, MovedWithoutWalking>();
+    const layout = seatingNow(next.places);
     for (const minute of [...unread, next.state]) {
-      runtime.setSociety(minute, observer, timing);
+      runtime.setSociety(minute, observer, timing, layout);
       for (const jump of runtime.societyJumps ?? []) named.set(jump.inhabitantId, jump);
     }
+    reflectSeatingMisses(runtime);
     moved = [...named.values()];
   }
 

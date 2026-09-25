@@ -24,6 +24,11 @@ export interface PersonPose {
   readonly discontinuity: boolean;
   /** A posture the family declares, or null to stand and move. */
   readonly posture: string | null;
+  /**
+   * How far above the ground the root is placed, metres; the feet of a held posture are planted
+   * that far below where the clip puts them. Absent or 0 means the root is on the ground.
+   */
+  readonly footDropMetres?: number;
 }
 
 const LOCOMOTION = 'Locomotion';
@@ -34,7 +39,7 @@ const POSTURE = 'posture';
  * How long settling into a posture or rising from it takes. A chosen presentation time: the
  * clips cross-fade over it, so a person lowers into a seat rather than snapping into one.
  */
-const POSTURE_BLEND_SECONDS = 0.8;
+export const POSTURE_BLEND_SECONDS = 0.8;
 /** Half the distance between the feet: how far a foot travels per radian of turning in place. */
 const TURN_RADIUS_METRES = 0.18;
 
@@ -248,6 +253,11 @@ export class CharacterPerson {
           ...this.postures.flatMap((key, index) => [
             { from: LOCOMOTION, to: postureState(key), time: POSTURE_BLEND_SECONDS, conditions: held(index + 1) },
             { from: postureState(key), to: LOCOMOTION, time: POSTURE_BLEND_SECONDS, conditions: held(0) },
+            // From one posture straight to another, as when a seat is found for someone already
+            // sitting on the ground: without it the graph would hold the first posture for ever.
+            ...this.postures.flatMap((other, to) => (to === index ? [] : [
+              { from: postureState(other), to: postureState(key), time: POSTURE_BLEND_SECONDS, conditions: held(index + 1) },
+            ])),
           ]),
         ],
       }],
@@ -293,12 +303,15 @@ export class CharacterPerson {
   update(pose: PersonPose): void {
     if (this.disposed || !this.model?.anim || !this.visible) return;
     const anim = this.model.anim;
+    let snapped = false;
     if (pose.posture !== this.posture) {
       const index = pose.posture === null ? 0 : this.postures.indexOf(pose.posture) + 1;
       if (index === 0 && pose.posture !== null) throw new TypeError(`Unknown posture ${pose.posture}`);
       anim.setInteger(POSTURE, index);
-      // Someone first drawn, or moved without travelling, is shown as they are, not getting there.
-      if (this.fresh || pose.discontinuity) anim.baseLayer?.transition(pose.posture === null ? LOCOMOTION : postureState(pose.posture), 0);
+      // Someone first drawn, or moved without travelling, is shown as they are, not getting there;
+      // so is anyone under reduced motion, where the clips do not play through a blend.
+      snapped = this.fresh || pose.discontinuity || pose.reducedMotion;
+      if (snapped) anim.baseLayer?.transition(pose.posture === null ? LOCOMOTION : postureState(pose.posture), 0);
       this.posture = pose.posture;
       this.footLock?.reset();
     }
@@ -307,7 +320,10 @@ export class CharacterPerson {
       // A held posture plays its own clip; the gait and the contact lock rest until it ends.
       this.smoothedSpeed = 0;
       anim.setFloat(SPEED, 0);
-      anim.speed = pose.reducedMotion ? 0 : 1;
+      // Held still under reduced motion, except for the one update that completes a snap: a
+      // transition of no length never ends while the clips advance by nothing.
+      anim.speed = pose.reducedMotion && !snapped ? 0 : 1;
+      this.plantAbove(pose);
       return;
     }
     const target = pose.reducedMotion || pose.discontinuity
@@ -322,6 +338,16 @@ export class CharacterPerson {
     anim.speed = pose.reducedMotion ? 0 : gait.cadence;
     if (pose.discontinuity) this.footLock?.reset();
     else this.footLock?.apply(dt, speed);
+    this.plantAbove(pose);
+  }
+
+  /**
+   * Drawn above the ground, as on a seat or getting up from one, the clip's feet are carried up with
+   * the root: they go back to the ground, whichever clip is playing.
+   */
+  private plantAbove(pose: PersonPose): void {
+    const drop = pose.footDropMetres ?? 0;
+    if (drop !== 0) this.footLock?.lower(drop);
   }
 
   destroy(): void {

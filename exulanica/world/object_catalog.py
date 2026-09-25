@@ -44,6 +44,17 @@ markers state no rows, and the society keeps the rules it has always applied to 
 front of each face of a blocking marker, a row along a plate); every other kind with an activity
 states its rows, and a kind with no activity states none.
 
+**Seats** (version 2). A row of a kind people rest at may state a seat: the point in the part frame
+where the pelvis of the person resting at the row's middle place goes, a ``declared/<key>`` that
+says why, and the side of the kind the seated person faces. Each place's seat is that point moved
+along the row by the place's own offset along it, so a row's seats keep its spacing. The height of
+a seat is not stated: it is the top of the highest part over the seat point among the parts lower
+than the walker capsule, and that part must be a box with a level top, or the seat is refused. The
+society never reads a seat. A seat is where a renderer draws a resting person, not where the person
+is: the simulation's person stands at the place. A person at a place with no seat faces across the
+place's side, toward the kind (:attr:`ObjectUse.facing`). Version 1 is the same kinds without seats,
+kept because the reviewed rows migration 0105 pinned were generated from it.
+
 Pure: no connection, no store and no network. The catalog is read once per process.
 """
 
@@ -86,12 +97,15 @@ __all__ = [
     "MARKER_PROFILE",
     "NO_ACTIVITY",
     "PARTS_PROFILE",
+    "SEATED_ACTIVITY",
     "SIDES",
     "CatalogPart",
     "MarkerRecipe",
     "ObjectUse",
     "PartsRecipe",
     "PlaceRow",
+    "RowSeat",
+    "Seat",
     "WorldObjectCatalog",
     "WorldObjectKind",
     "load_world_object_catalog",
@@ -104,11 +118,15 @@ CATALOG_DIRECTORY: Final = (
 CATALOG_ID: Final = "world-object"
 #: The version a running host reads. A new version is published beside this one and never edits
 #: it, because the reviewed rows a migration pinned name the meshes this version's recipes make.
-CATALOG_VERSION: Final = 1
+CATALOG_VERSION: Final = 2
+#: The first version whose rows may state a seat.
+_SEATS_FROM_VERSION: Final = 2
 MARKER_PROFILE: Final = "marker-v1"
 PARTS_PROFILE: Final = "parts-v1"
 #: The use of a kind inhabitants do nothing with: it is an obstacle, or nothing at all.
 NO_ACTIVITY: Final = "none"
+#: The society's activity a seat serves (:data:`exulanica.world.society_planner.DURATIONS`).
+SEATED_ACTIVITY: Final = "rest"
 #: The street furniture catalog a part may cite, and where it lives. Only this version is read:
 #: a part that cites another is refused rather than compared with a catalog nobody loaded.
 _STREET_FURNITURE: Final = ("street-furniture", 2)
@@ -133,6 +151,8 @@ _DIMENSIONS: Final = ("width", "depth", "height")
 #: The sides a row of places stands along, in the part frame: ``+y`` is the front, the side that
 #: faces the person who places the kind, and ``+x`` runs across it.
 SIDES: Final = ("+y", "+x", "-y", "-x")
+#: The side a person standing along a row faces: across the row's side, toward the kind.
+_FACING: Final = MappingProxyType({"+y": "-y", "-y": "+y", "+x": "-x", "-x": "+x"})
 
 Place = tuple[int, int]
 
@@ -174,11 +194,41 @@ Recipe = MarkerRecipe | PartsRecipe
 
 
 @dataclass(frozen=True, slots=True)
+class RowSeat:
+    """Where the person resting at a row's middle place sits, as the row states it.
+
+    ``x_mm`` and ``y_mm`` are in the part frame; ``faces`` is the side of the kind the seated
+    person faces; ``source`` is the ``declared/<key>`` that says why.
+    """
+
+    x_mm: int
+    y_mm: int
+    faces: str
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
 class PlaceRow:
-    """People standing side by side along one side of a kind, facing it: ``count`` of them."""
+    """People standing side by side along one side of a kind, facing it: ``count`` of them.
+
+    ``seat`` is where the person resting at the row's middle place is drawn sitting, or ``None``
+    where people stand.
+    """
 
     side: str
     count: int
+    seat: RowSeat | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Seat:
+    """Where one place's resting person is drawn: ``[x, y, z]`` in the part frame, and facing.
+
+    ``z`` is the top of the part the seat lies on, derived rather than stated.
+    """
+
+    position_mm: tuple[int, int, int]
+    faces: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,8 +237,10 @@ class ObjectUse:
 
     ``rows`` is what the entry states: ``None`` for a marker, whose places the society derives
     from its footprint as it always has, and ``()`` for a kind nobody uses. ``places`` is derived
-    from them, one person to a place, ``[x, y]`` in the part frame in the rows' order.
-    ``footprint_half_extents_mm`` is derived from the recipe, in the object's own ``x`` and depth.
+    from them, one person to a place, ``[x, y]`` in the part frame in the rows' order, and so are
+    ``facing``, the side of the kind a person standing at each place faces, and ``seats``, each
+    place's seat or ``None``. ``footprint_half_extents_mm`` is derived from the recipe, in the
+    object's own ``x`` and depth.
     """
 
     affordance: str
@@ -196,6 +248,8 @@ class ObjectUse:
     footprint_half_extents_mm: tuple[int, int]
     rows: tuple[PlaceRow, ...] | None
     places: tuple[Place, ...] | None
+    facing: tuple[str, ...] | None = None
+    seats: tuple[Seat | None, ...] | None = None
 
     @property
     def capacity(self) -> int | None:
@@ -336,12 +390,29 @@ def _read_materials(where: str, value: object) -> Mapping[str, str]:
     return MappingProxyType(dict(value))
 
 
-def _read_row(where: str, value: object) -> PlaceRow:
-    item = _object(where, value, ("side", "count"))
+def _read_seat(where: str, value: object) -> RowSeat | None:
+    if value is None:
+        return None
+    item = _object(where, value, ("x_mm", "y_mm", "faces", "source"))
+    faces = item["faces"]
+    if faces not in SIDES:
+        raise CatalogError(f"{where}.faces is one of {SIDES}, got {faces!r}")
+    return RowSeat(
+        _int(f"{where}.x_mm", item["x_mm"], -_MAX_SIZE_MM, _MAX_SIZE_MM),
+        _int(f"{where}.y_mm", item["y_mm"], -_MAX_SIZE_MM, _MAX_SIZE_MM),
+        faces,
+        _citation(f"{where}.source", item["source"]),
+    )
+
+
+def _read_row(where: str, value: object, version: int) -> PlaceRow:
+    seats = version >= _SEATS_FROM_VERSION
+    item = _object(where, value, ("side", "count", "seat") if seats else ("side", "count"))
     side = item["side"]
     if side not in SIDES:
         raise CatalogError(f"{where}.side is one of {SIDES}, got {side!r}")
-    return PlaceRow(side, _int(f"{where}.count", item["count"], 1, _MAX_SIZE_MM))
+    count = _int(f"{where}.count", item["count"], 1, _MAX_SIZE_MM)
+    return PlaceRow(side, count, _read_seat(f"{where}.seat", item["seat"]) if seats else None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -353,7 +424,7 @@ class _StatedUse:
     rows: tuple[PlaceRow, ...] | None
 
 
-def _read_use(where: str, value: object) -> _StatedUse:
+def _read_use(where: str, value: object, version: int) -> _StatedUse:
     item = _object(where, value, ("affordance", "blocks_navigation", "places"))
     affordance = item["affordance"]
     if affordance not in _affordances():
@@ -371,7 +442,9 @@ def _read_use(where: str, value: object) -> _StatedUse:
     return _StatedUse(
         affordance,
         blocks,
-        tuple(_read_row(f"{where}.places[{index}]", row) for index, row in enumerate(rows)),
+        tuple(
+            _read_row(f"{where}.places[{index}]", row, version) for index, row in enumerate(rows)
+        ),
     )
 
 
@@ -398,24 +471,27 @@ def _affordances() -> tuple[str, ...]:
     return (*sorted(DURATIONS), NO_ACTIVITY)
 
 
+def _schema(version: int) -> CatalogSchema:
+    """One version's envelope: the same fields, with the rows a version admits."""
+    return CatalogSchema(
+        CATALOG_ID,
+        version,
+        (
+            ("asset_key", _asset_key),
+            ("title", text_field),
+            ("summary", text_field),
+            ("recipe", _nested(_read_recipe)),
+            ("dimensions_mm", _nested(_read_dimensions)),
+            ("materials", _nested(_read_materials)),
+            ("use", _nested(lambda where, value: _read_use(where, value, version))),
+            ("declared", _nested(_read_declared)),
+            ("reason", text_field),
+        ),
+    )
+
+
 _SCHEMAS: Final[Mapping[int, CatalogSchema]] = MappingProxyType(
-    {
-        1: CatalogSchema(
-            CATALOG_ID,
-            1,
-            (
-                ("asset_key", _asset_key),
-                ("title", text_field),
-                ("summary", text_field),
-                ("recipe", _nested(_read_recipe)),
-                ("dimensions_mm", _nested(_read_dimensions)),
-                ("materials", _nested(_read_materials)),
-                ("use", _nested(_read_use)),
-                ("declared", _nested(_read_declared)),
-                ("reason", text_field),
-            ),
-        )
-    }
+    {version: _schema(version) for version in (1, 2)}
 )
 
 
@@ -464,6 +540,8 @@ def _check_citations(kind: WorldObjectKind, furniture: Mapping[str, tuple[FormPa
         if isinstance(recipe, MarkerRecipe)
         else [(recipe.texels_source, None), *((part.source, part.form) for part in recipe.parts)]
     )
+    rows = kind.use.rows or ()
+    sources += [(row.seat.source, None) for row in rows if row.seat is not None]
     for source, form in sources:
         match = _CITATION.fullmatch(source)
         assert match is not None
@@ -604,13 +682,73 @@ def _place_figures() -> tuple[int, int]:
     )
 
 
+def _seat_height(where: str, recipe: Recipe, point: Place) -> int:
+    """The top of the part a seat at ``point`` lies on: the highest low part over it, a box.
+
+    Only parts lower than the walker capsule count, as for the footprint, so a crown or an awning
+    over a seat is not what it lies on. A seat over nothing, or whose highest part is not a box
+    with a level top, is refused rather than drawn in the air or on a curve.
+    """
+    if not isinstance(recipe, PartsRecipe):
+        raise CatalogError(f"{where}: a marker has no parts to sit on")
+    x, y = point
+    over = [
+        part.form
+        for part in recipe.parts
+        if part.form.offset_z_mm < _capsule_height_mm()
+        and 2 * abs(x - part.form.offset_x_mm) <= part.form.size_x_mm
+        and 2 * abs(y - part.form.offset_y_mm) <= part.form.size_y_mm
+    ]
+    if not over:
+        raise CatalogError(f"{where}: no part lies under the seat at {list(point)}")
+    top = max(over, key=lambda form: form.offset_z_mm + form.size_z_mm)
+    if top.shape != "box" or top.top_scale_millionths != 1_000_000:
+        raise CatalogError(
+            f"{where}: the seat at {list(point)} lies on a {top.shape}, and a seat lies on the "
+            "level top of a box"
+        )
+    return top.offset_z_mm + top.size_z_mm
+
+
+def _row_seats(
+    where: str, recipe: Recipe, row: PlaceRow, places: Sequence[Place]
+) -> list[Seat | None]:
+    """Each place's seat in one row: the row's seat moved along the row by the place's offset."""
+    seat = row.seat
+    if seat is None:
+        return [None] * len(places)
+    along_x = row.side in ("+y", "-y")
+    seats: list[Seat | None] = []
+    for index, (px, py) in enumerate(places):
+        point = (seat.x_mm + px, seat.y_mm) if along_x else (seat.x_mm, seat.y_mm + py)
+        height = _seat_height(f"{where} seat {index}", recipe, point)
+        seats.append(Seat((point[0], point[1], height), seat.faces))
+    return seats
+
+
 def _derived_use(where: str, recipe: Recipe, stated: _StatedUse) -> ObjectUse:
     footprint = _footprint_of(where, recipe)
     if stated.rows is None:
         return ObjectUse(stated.affordance, stated.blocks_navigation, footprint, None, None)
     out, step = _place_figures()
-    places = tuple(place for row in stated.rows for place in _row_places(row, footprint, out, step))
-    return ObjectUse(stated.affordance, stated.blocks_navigation, footprint, stated.rows, places)
+    by_row = [_row_places(row, footprint, out, step) for row in stated.rows]
+    return ObjectUse(
+        stated.affordance,
+        stated.blocks_navigation,
+        footprint,
+        stated.rows,
+        tuple(place for places in by_row for place in places),
+        tuple(
+            _FACING[row.side]
+            for row, places in zip(stated.rows, by_row, strict=True)
+            for _ in places
+        ),
+        tuple(
+            seat
+            for row, places in zip(stated.rows, by_row, strict=True)
+            for seat in _row_seats(where, recipe, row, places)
+        ),
+    )
 
 
 def _check_use(kind: WorldObjectKind) -> None:
@@ -628,6 +766,11 @@ def _check_use(kind: WorldObjectKind) -> None:
         return
     if (use.affordance == NO_ACTIVITY) != (not use.rows):
         raise CatalogError(f"{where}: a kind nobody uses has no places, and a used kind has some")
+    if any(row.seat is not None for row in use.rows) and use.affordance != SEATED_ACTIVITY:
+        raise CatalogError(
+            f"{where}: a seat is where a resting person sits, and this kind's activity is "
+            f"{use.affordance}"
+        )
     if use.rows and not use.blocks_navigation:
         raise CatalogError(
             f"{where}: places stand out from what a kind blocks, and this kind blocks nothing"
@@ -678,7 +821,7 @@ def _check_kind(
     _check_use(kind)
 
 
-def _kind(catalog: Catalog, index: int) -> WorldObjectKind:
+def _kind(catalog: Catalog, index: int, version: int) -> WorldObjectKind:
     entry = catalog.entries[index]
     values = dict(entry.values)
     where = f"{CATALOG_ID} {entry.key}"
@@ -695,7 +838,7 @@ def _kind(catalog: Catalog, index: int) -> WorldObjectKind:
         recipe=recipe,
         dimensions_mm=_read_dimensions(f"{where}.dimensions_mm", nested("dimensions_mm")),
         materials=_read_materials(f"{where}.materials", nested("materials")),
-        use=_derived_use(where, recipe, _read_use(f"{where}.use", nested("use"))),
+        use=_derived_use(where, recipe, _read_use(f"{where}.use", nested("use"), version)),
         declared=_read_declared(f"{where}.declared", nested("declared")),
         reason=str(values["reason"]),
         licence=entry.licence,
@@ -725,7 +868,7 @@ def load_world_object_catalog(
     if schema is None:
         raise CatalogError(f"{CATALOG_ID} v{version} has no schema")
     catalog = load_catalog(directory.joinpath(f"{CATALOG_ID}.v{version}.json"), schema)
-    kinds = tuple(_kind(catalog, index) for index in range(len(catalog.entries)))
+    kinds = tuple(_kind(catalog, index, version) for index in range(len(catalog.entries)))
     asset_keys = [kind.asset_key for kind in kinds]
     if len(set(asset_keys)) != len(asset_keys):
         raise CatalogError(f"{CATALOG_ID} v{version} names one registry key for two kinds")
