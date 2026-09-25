@@ -26,6 +26,7 @@ refusal that says "predicate 'name_is' does not accept an 'inference' assertion;
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from collections.abc import Sequence
 from typing import Any
@@ -196,7 +197,13 @@ class AssertionWriter:
         return None if row is None else row["assertion_id"]
 
     def retract(
-        self, assertion_id: uuid.UUID, *, retracted_by: uuid.UUID, reason: str
+        self,
+        assertion_id: uuid.UUID,
+        *,
+        retracted_by: uuid.UUID,
+        reason: str,
+        retraction_id: uuid.UUID | None = None,
+        retracted_at: dt.datetime | None = None,
     ) -> uuid.UUID:
         """Withdraw a claim without erasing that it was made.
 
@@ -205,11 +212,21 @@ class AssertionWriter:
         ``retraction`` row records who withdrew it and why. Rewriting the assertion in place
         instead is refused outright by ``tg_assertion_no_in_place_rewrite``, because every
         citation already issued against the row would then point at a different claim.
+
+        ``retraction_id`` and ``retracted_at`` are the table's own defaults when omitted. A
+        restore names both, so the retraction it writes again is the one the person made
+        (``exulanica.deletion.withdrawals``).
         """
+        given = {
+            column: value
+            for column, value in (("retraction_id", retraction_id), ("retracted_at", retracted_at))
+            if value is not None
+        }
+        columns = ["workspace_id", "assertion_id", "retracted_by", "reason", *given]
         row = self._db.execute(
-            "insert into retraction (workspace_id, assertion_id, retracted_by, reason) "
-            "values (%s, %s, %s, %s) returning retraction_id",
-            (self.workspace_id, assertion_id, retracted_by, reason),
+            f"insert into retraction ({', '.join(columns)}) "
+            f"values ({', '.join(['%s'] * len(columns))}) returning retraction_id",
+            (self.workspace_id, assertion_id, retracted_by, reason, *given.values()),
         ).fetchone()
         assert row is not None
         self._db.execute(

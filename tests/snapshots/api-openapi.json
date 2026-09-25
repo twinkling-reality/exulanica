@@ -8206,7 +8206,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/AlternateVersionView"
+         "$ref": "#/components/schemas/BranchedVersionView"
         }
        }
       }
@@ -13389,6 +13389,154 @@
     ],
     "title": "BoundedAuthoredGroundView"
    },
+   "BranchedVersionView": {
+    "properties": {
+     "schema_version": {
+      "type": "integer",
+      "title": "Schema Version"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "source_snapshot_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Source Snapshot Id"
+     },
+     "parent_version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Version Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "origin": {
+      "type": "string",
+      "title": "Origin"
+     },
+     "style_version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Style Version Id"
+     },
+     "state_sha256": {
+      "type": "string",
+      "title": "State Sha256"
+     },
+     "edit_seq": {
+      "type": "integer",
+      "title": "Edit Seq"
+     },
+     "source_invalidated": {
+      "type": "boolean",
+      "title": "Source Invalidated"
+     },
+     "created_by": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Created By"
+     },
+     "created_at": {
+      "type": "string",
+      "title": "Created At"
+     },
+     "objects": {
+      "items": {
+       "$ref": "#/components/schemas/AuthoredObjectView"
+      },
+      "type": "array",
+      "title": "Objects"
+     },
+     "element_overrides": {
+      "items": {
+       "$ref": "#/components/schemas/ElementOverrideView"
+      },
+      "type": "array",
+      "title": "Element Overrides"
+     },
+     "environment_instances": {
+      "items": {
+       "additionalProperties": {
+        "$ref": "#/components/schemas/JsonValue"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Environment Instances"
+     },
+     "point_map_instances": {
+      "items": {
+       "additionalProperties": {
+        "$ref": "#/components/schemas/JsonValue"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Point Map Instances"
+     },
+     "edits": {
+      "items": {
+       "$ref": "#/components/schemas/VersionEditView"
+      },
+      "type": "array",
+      "title": "Edits"
+     },
+     "left_behind": {
+      "items": {
+       "$ref": "#/components/schemas/LeftBehindView"
+      },
+      "type": "array",
+      "title": "Left Behind"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "schema_version",
+     "version_id",
+     "world_id",
+     "source_snapshot_id",
+     "parent_version_id",
+     "title",
+     "origin",
+     "style_version_id",
+     "state_sha256",
+     "edit_seq",
+     "source_invalidated",
+     "created_by",
+     "created_at",
+     "objects",
+     "element_overrides",
+     "environment_instances",
+     "point_map_instances",
+     "edits",
+     "left_behind"
+    ],
+    "title": "BranchedVersionView",
+    "description": "The version a branch made, and each of its parent's rows it left out.\n\nA branch's rows are new placements, so a row whose source may no longer be written into a\nversion (a withdrawn environment source, an ended depth right, a deleted photograph) stays in\nthe parent only, and is named here. Empty for a version made from a snapshot."
+   },
    "CaptureSelector": {
     "properties": {
      "processing_states": {
@@ -15035,6 +15183,17 @@
      "silhouette"
     ],
     "title": "Edit"
+   },
+   "EditSubject": {
+    "type": "string",
+    "enum": [
+     "object",
+     "element",
+     "environment_instance",
+     "point_map_instance"
+    ],
+    "title": "EditSubject",
+    "description": "What an edit changes, and so which id column of the log names it."
    },
    "ElementOverrideView": {
     "properties": {
@@ -17464,6 +17623,34 @@
      "completed_at"
     ],
     "title": "LastBatchExecution"
+   },
+   "LeftBehindView": {
+    "properties": {
+     "subject": {
+      "$ref": "#/components/schemas/EditSubject"
+     },
+     "subject_id": {
+      "type": "string",
+      "title": "Subject Id"
+     },
+     "removed": {
+      "type": "boolean",
+      "title": "Removed"
+     },
+     "reason": {
+      "$ref": "#/components/schemas/StayReason"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "subject",
+     "subject_id",
+     "removed",
+     "reason"
+    ],
+    "title": "LeftBehindView",
+    "description": "One of the parent's rows a branch did not copy, and why, as carrying it would say."
    },
    "LinkRequest": {
     "properties": {
@@ -23045,6 +23232,19 @@
      "records"
     ],
     "title": "StageRecordCount"
+   },
+   "StayReason": {
+    "type": "string",
+    "enum": [
+     "source_withdrawn",
+     "composition_denied",
+     "binding_drift",
+     "source_deleted",
+     "right_ended",
+     "not_readable"
+    ],
+    "title": "StayReason",
+    "description": "Why ``carry_plan`` leaves a row in the previous version: every reason it can give.\n\nThe words a person reads for each are the addition preview's\n(``exulanica.world.personal_composition``), and a test holds the two sets equal."
    },
    "StaysBehindView": {
     "properties": {

@@ -25,6 +25,7 @@ from exulanica.deletion.restore import (
 )
 from exulanica.graph import read_snapshot
 from exulanica.ingest.scenes import run_scene_grouping
+from exulanica.orchestration.restore import WRITERS
 from fastapi.testclient import TestClient
 
 from test_purge import (
@@ -180,7 +181,15 @@ def test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates(pur
     with pytest.raises(RestoreRefused, match="pending"), TestClient(pending_app):
         pass
     assert (
-        replay(purged.database(), _purge_database(purged), purged.store, source, marker) == attempt
+        replay(
+            purged.database(),
+            _purge_database(purged),
+            purged.store,
+            source,
+            marker,
+            writers=WRITERS,
+        )
+        == attempt
     )
     assert not any(purged.store.exists(blob) for blob in objects)
     assert purged.rows("select tombstone_id from tombstone where tombstone_id=%s", original_id)
@@ -196,7 +205,9 @@ def test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates(pur
     assert receipt["restore_id"] == attempt and receipt["checkpoint_sha256"] == digest
     assert receipt["tombstone_count"] == 1
     count = purged.rows("select count(*) as n from tombstone")[0]["n"]
-    replay(purged.database(), _purge_database(purged), purged.store, source, marker)
+    replay(
+        purged.database(), _purge_database(purged), purged.store, source, marker, writers=WRITERS
+    )
     assert purged.rows("select count(*) as n from tombstone")[0]["n"] == count
     assert purged.rows("select * from restore_replay_receipt") == [receipt]
 
@@ -214,7 +225,14 @@ def test_partial_replay_refuses_startup_before_any_worker_can_start(purged, tmp_
             lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("disk offline")),
         )
         with pytest.raises(RestoreRefused, match="purge incomplete"):
-            replay(purged.database(), _purge_database(purged), purged.store, source, marker)
+            replay(
+                purged.database(),
+                _purge_database(purged),
+                purged.store,
+                source,
+                marker,
+                writers=WRITERS,
+            )
     assert not purged.rows("select * from restore_replay_receipt")
     app, _ = _app(purged, marker)
     started = []
@@ -222,7 +240,9 @@ def test_partial_replay_refuses_startup_before_any_worker_can_start(purged, tmp_
     with pytest.raises(RestoreRefused, match="pending"), TestClient(app):
         pass
     assert started == []
-    replay(purged.database(), _purge_database(purged), purged.store, source, marker)
+    replay(
+        purged.database(), _purge_database(purged), purged.store, source, marker, writers=WRITERS
+    )
     verify_restore(purged.database(), marker)
 
 
@@ -236,7 +256,9 @@ def test_completed_database_jobs_do_not_certify_restored_old_object_bytes(purged
     prepare_restore(source, marker)
     for payload in objects.values():
         purged.store.put_bytes(payload)
-    replay(purged.database(), _purge_database(purged), purged.store, source, marker)
+    replay(
+        purged.database(), _purge_database(purged), purged.store, source, marker, writers=WRITERS
+    )
     assert not any(purged.store.exists(blob) for blob in objects)
     assert len(purged.rows("select * from restore_replay_receipt")) == 1
 
@@ -286,7 +308,9 @@ def test_corrupt_checkpoint_and_restored_receipt_cannot_authorize_a_new_attempt(
         prepare_restore(source, marker)
     source.write_bytes(original)
     prepare_restore(source, marker)
-    replay(purged.database(), _purge_database(purged), purged.store, source, marker)
+    replay(
+        purged.database(), _purge_database(purged), purged.store, source, marker, writers=WRITERS
+    )
     # A fresh attempt invalidates a real previous receipt, even if a restore would retain it.
     prepare_restore(source, marker)
     state = json.loads(marker.read_bytes())
@@ -315,7 +339,14 @@ def test_shared_live_bytes_leave_restore_refusing_and_foreign_capture_intact(pur
     checkpoint(purged.database(), source)
     prepare_restore(source, marker)
     with pytest.raises(RestoreRefused, match="purge incomplete"):
-        replay(purged.database(), _purge_database(purged), purged.store, source, marker)
+        replay(
+            purged.database(),
+            _purge_database(purged),
+            purged.store,
+            source,
+            marker,
+            writers=WRITERS,
+        )
     assert purged.store.exists(blob)
     assert purged.rows("select deleted_at from capture where capture_id=%s", foreign_capture) == [
         {"deleted_at": None}
@@ -348,7 +379,14 @@ def test_backup_older_than_blocklisted_capture_refuses_missing_address_binding(p
     _restore(purged, dump, blobs)
     assert not purged.rows("select capture_id from capture where capture_id=%s", outcome.capture_id)
     with pytest.raises(RestoreRefused, match="capture binding"):
-        replay(purged.database(), _purge_database(purged), purged.store, source, marker)
+        replay(
+            purged.database(),
+            _purge_database(purged),
+            purged.store,
+            source,
+            marker,
+            writers=WRITERS,
+        )
     assert not purged.rows("select * from restore_replay_receipt")
     with pytest.raises(RestoreRefused, match="pending"):
         verify_restore(purged.database(), marker)

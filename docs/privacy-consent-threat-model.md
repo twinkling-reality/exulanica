@@ -780,7 +780,11 @@ Rules:
    a path between its schema and its rows (`tests/test_local_database_restores_older_dumps.py`).
    Every withdrawal that is not a tombstone, a stopped model right or a withdrawn consent among
    them, is in the checkpoint too and is written again before any tombstone, and a checkpoint older
-   than its backup is refused ([ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md)).
+   than its backup is refused ([ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md)). A
+   person's retraction of a claim they made is written again by the product's retract, so a name
+   they retracted stays off its place and a place-name right resting on it stays ended
+   (`tests/test_restore_replay_retractions.py`); a place-name withdrawal whose chain gained a grant
+   after the backup withdraws the chain the backup holds as its next decision.
 6. A nightly **verifier** samples completed tombstones and independently proves absence in the primary
    database, the vector index files, the object store including non-current versions, the search index,
    and the cache. `verified_at` is set only by the verifier, never by the worker that performed the

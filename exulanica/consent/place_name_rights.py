@@ -62,6 +62,7 @@ __all__ = [
     "read_place_name_rights",
     "released_place_names",
     "withdraw_place_name",
+    "withdraw_place_name_chain",
 ]
 
 #: Why a grant was refused, as a closed vocabulary a screen can say in words.
@@ -371,6 +372,38 @@ def grant_place_name(
             )
 
 
+def _withdraw_after(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    *,
+    entity_id: uuid.UUID,
+    identity: ModelIdentity,
+    destination: str,
+    previous: _Stored | None,
+    actor: uuid.UUID,
+    at: dt.datetime,
+) -> bool:
+    """Append a withdrawal after ``previous`` when it is a grant; say whether one was appended.
+
+    Whether or not the grant still counts: a withdrawn right stays withdrawn whatever happens to
+    the place afterwards. A chain that does not exist or already ends withdrawn records nothing.
+    """
+    if previous is None or previous.decision.event != "granted":
+        return False
+    _append(
+        connection,
+        workspace_id,
+        entity_id=entity_id,
+        identity=identity,
+        destination=destination,
+        previous=previous,
+        event="withdrawn",
+        actor=actor,
+        at=at,
+    )
+    return True
+
+
 def withdraw_place_name(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
@@ -395,19 +428,55 @@ def withdraw_place_name(
         for (identity, destination), previous in sorted(
             stored.items(), key=lambda item: (item[0][0].model_id, item[0][1])
         ):
-            if identity.role != role or previous.decision.event != "granted":
+            if identity.role != role:
                 continue
-            _append(
+            _withdraw_after(
                 connection,
                 workspace_id,
                 entity_id=entity_id,
                 identity=identity,
                 destination=destination,
                 previous=previous,
-                event="withdrawn",
                 actor=actor,
                 at=at,
             )
+
+
+def withdraw_place_name_chain(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    *,
+    entity_id: uuid.UUID,
+    identity: ModelIdentity,
+    destination: str,
+    actor: uuid.UUID,
+    at: dt.datetime | None = None,
+) -> bool:
+    """Stop this place's name going to one model at one destination: exactly one chain.
+
+    Appends a withdrawal after the chain's last decision when that decision is a grant, as
+    :func:`withdraw_place_name` does for each chain of a role, and returns whether it appended one.
+    ``at`` is when the account holder decided, now by default. The database refuses a decision
+    recorded earlier than the one it follows or later than now (migration 0097). A restore uses
+    this to continue a chain its backup ends at a grant the carried withdrawal cannot follow,
+    because a grant was made after the backup (``exulanica.deletion.withdrawals``).
+    """
+    actor = uuid.UUID(str(actor))
+    with connection.transaction():
+        connection.execute("select privacy_currency_lock(%s)", (workspace_id,))
+        _place_class(connection, workspace_id, entity_id)
+        now = _now(connection)
+        stored = _last_decisions(connection, workspace_id, [entity_id], now).get(entity_id, {})
+        return _withdraw_after(
+            connection,
+            workspace_id,
+            entity_id=entity_id,
+            identity=identity,
+            destination=destination,
+            previous=stored.get((identity, destination)),
+            actor=actor,
+            at=now if at is None else at,
+        )
 
 
 def _released(

@@ -97,6 +97,7 @@ from exulanica.world.society_engines import INPUT_ENGINES
 from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = [
+    "BranchedVersion",
     "CarriedPart",
     "CarryOutcome",
     "CarryPlan",
@@ -154,6 +155,18 @@ class CarriedPart:
     def __post_init__(self) -> None:
         if (self.outcome is CarryOutcome.STAYS) != (self.reason is not None):
             raise ValueError("a row that stays names why, and a row that carries names no reason")
+
+
+@dataclass(frozen=True, slots=True)
+class BranchedVersion:
+    """A version branched from a snapshot or another version, and what of the parent it left out.
+
+    ``left_behind`` holds each of the parent's rows the branch did not copy, with the reason
+    :meth:`WorldObjectRepository.carry_plan` gives; a branch from a snapshot leaves nothing out.
+    """
+
+    version: AlternateVersion
+    left_behind: tuple[CarriedPart, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,45 +266,78 @@ class WorldObjectRepository:
         style_version_id: uuid.UUID | None = None,
         created_by: uuid.UUID,
     ) -> AlternateVersion:
+        """Branch a new alternate version; :meth:`branch_version` also says what it left out."""
+        return self.branch_version(
+            source_snapshot_id=source_snapshot_id,
+            parent_version_id=parent_version_id,
+            title=title,
+            style_version_id=style_version_id,
+            created_by=created_by,
+        ).version
+
+    def branch_version(
+        self,
+        *,
+        source_snapshot_id: uuid.UUID | None = None,
+        parent_version_id: uuid.UUID | None = None,
+        title: str,
+        style_version_id: uuid.UUID | None = None,
+        created_by: uuid.UUID,
+    ) -> BranchedVersion:
         """Branch a new alternate version from a source snapshot or from another version.
 
         Branching from a version copies its delta, so the two are independent from that point on.
         This is the operation the structural plane cannot express: it has one linear revision
         chain behind one current pointer, and two alternates of one place cannot both exist there.
+
+        A branch's rows are new placements, so each of the parent's rows is asked what carrying
+        it would ask (:meth:`carry_plan`, the question the binding triggers ask as a row is
+        written), and a row that would stay in the previous version is left out of the branch and
+        named, with its reason, in ``left_behind``. The parent keeps every row, so leaving one out
+        loses nothing the person has; refusing the branch instead would stop a person whose one
+        right ended from branching at all. The question is asked under the global asset read lock,
+        after the parent is locked and before anything is written, as :meth:`carry_version` asks
+        it: a right that ended before it is seen and its row left out, and a withdrawal that comes
+        after it cannot commit until the branch does. A right that passes its end between the
+        question and a row's write is refused by the row's trigger, and the branch is refused as
+        stale with nothing written.
         """
         if not title or not title.strip():
             raise InvalidObjectData("title is required")
         if (source_snapshot_id is None) == (parent_version_id is None):
             raise InvalidObjectData("name exactly one of source_snapshot_id or parent_version_id")
+        sections: dict[str, tuple[Any, ...]] = {section.key: () for section in DELTA_SECTIONS}
+        left_behind: tuple[CarriedPart, ...] = ()
         with self.connection.transaction():
             self._lock_workspace()
             if parent_version_id is not None:
-                parent = self._version_row(parent_version_id)
-                source_snapshot_id = parent["source_snapshot_id"]
-                objects = self._objects(parent_version_id)
-                overrides = self._overrides(parent_version_id)
-                environments = self._environment_instances(parent_version_id)
-                # ONLY THE ONES THAT CAN STILL BE DRAWN. A branch is a new version and its rows
-                # are new placements, so copying an estimate whose depth right has ended would
-                # write a fresh placement of a reading the person has already stopped. The
-                # insert trigger would refuse it and take the whole branch with it; leaving it
-                # behind lets the branch succeed and states the loss.
-                point_maps = tuple(
-                    instance
-                    for instance in self._point_map_instances(parent_version_id)
-                    if instance.availability == "available"
+                parent = self._version_row(parent_version_id, for_update=True)
+                lock_asset_reads_until_commit(
+                    self.connection,
+                    outside="a version is branched only inside the transaction that writes it",
                 )
-            else:
-                objects, overrides, environments, point_maps = (), (), (), ()
+                source_snapshot_id = parent["source_snapshot_id"]
+                plan = self.carry_plan(parent_version_id)
+                copied = {
+                    (part.subject, part.subject_id)
+                    for part in plan.parts
+                    if part.outcome is CarryOutcome.CARRIED
+                }
+                left_behind = tuple(
+                    part for part in plan.parts if part.outcome is CarryOutcome.STAYS
+                )
+                parent_delta = self._delta(parent_version_id)
+                sections = {
+                    section.key: tuple(
+                        row
+                        for row in parent_delta[section.key]
+                        if (section.subject, section.sort_key(row)) in copied
+                    )
+                    for section in DELTA_SECTIONS
+                }
             self._require_snapshot(source_snapshot_id)
             self._require_style_version(style_version_id)
             version_id = uuid.uuid4()
-            state = delta_sha256(
-                objects=objects,
-                element_overrides=overrides,
-                environment_instances=environments,
-                point_map_instances=point_maps,
-            )
             self.connection.execute(
                 "insert into world_alternate_version (version_id,workspace_id,world_id,"
                 "source_snapshot_id,parent_version_id,title,origin,style_version_id,"
@@ -305,32 +351,18 @@ class WorldObjectRepository:
                     parent_version_id,
                     title.strip(),
                     style_version_id,
-                    state,
+                    delta_sha256(**sections),
                     created_by,
                 ),
             )
-            # Copied rows carry the parent's edit ids. They record which edit authored the
-            # document, which stays true across a branch; the branch itself is the version row.
-            for obj in objects:
-                self._insert_object(version_id, obj, self._object_edit_ids(parent_version_id, obj))
-            for override in overrides:
-                self._write_override(
-                    version_id, override, self._override_edit_id(parent_version_id, override)
-                )
-            for instance in environments:
-                self._require_pinned_environment_current(instance, require_bytes=True)
-                self._insert_environment(
-                    version_id,
-                    instance,
-                    self._environment_edit_ids(parent_version_id, instance.instance_id),
-                )
-            for placed in point_maps:
-                self._insert_point_map(
-                    version_id,
-                    placed,
-                    self._point_map_edit_ids(parent_version_id, placed.instance_id),
-                )
-        return self.version(version_id)
+            # Copied rows carry the parent's edit ids, written as a carry writes them. They record
+            # which edit authored the document, which stays true across a branch; the branch
+            # itself is the version row, and its change list starts empty.
+            for section in DELTA_SECTIONS:
+                write = getattr(self, self._CARRY_RULES[section.subject][1])
+                for row in sections[section.key]:
+                    write(parent_version_id, version_id, row, {})
+        return BranchedVersion(self.version(version_id), left_behind)
 
     # -- carrying a version onto the next snapshot ------------------------------------------
     #
@@ -340,29 +372,49 @@ class WorldObjectRepository:
     # writing so it can be shown before anything is written; carry_version writes exactly that.
 
     def carry_plan(self, version_id: uuid.UUID) -> CarryPlan:
-        """Whether each row of the version's delta can be written into a new version now."""
-        version = self.version(version_id)
+        """Whether each row of the version's delta can be written into a new version now.
+
+        Asked from the database alone, so a writer may ask it while it holds the asset read lock.
+        """
+        delta = self._delta(version_id)
+        stored = self._version_row(version_id)
         parts = []
         for section in DELTA_SECTIONS:
             carries = getattr(self, self._CARRY_RULES[section.subject][0])
-            for row in getattr(version, section.key):
-                outcome, reason = carries(row)
+            for item in delta[section.key]:
+                outcome, reason = carries(item)
                 parts.append(
                     CarriedPart(
                         section.subject,
-                        section.sort_key(row),
-                        bool(getattr(row, "removed", False)),
+                        section.sort_key(item),
+                        bool(getattr(item, "removed", False)),
                         outcome,
                         reason,
                     )
                 )
         return CarryPlan(
-            version.version_id,
-            version.state_sha256,
-            version.edit_seq,
+            stored["version_id"],
+            delta_sha256(**delta),
+            stored["edit_seq"],
             tuple(parts),
-            len(version.edits),
+            len(self._edits(version_id)),
         )
+
+    def _delta(self, version_id: uuid.UUID) -> dict[str, tuple[Any, ...]]:
+        """The version's delta rows by section, read without their availability.
+
+        Availability reads and hashes stored bytes, and a writer holding the global asset read lock
+        reads none: every guarded write in every workspace is refused while it is held
+        (``docs/asset-read-currency.md``). Nothing written or digested depends on availability.
+        """
+        return {
+            "objects": self._objects(version_id),
+            "element_overrides": self._overrides(version_id),
+            "environment_instances": self._environment_instances(
+                version_id, with_availability=False
+            ),
+            "point_map_instances": self._point_map_instances(version_id, with_availability=False),
+        }
 
     def carry_version(
         self, plan: CarryPlan, *, source_snapshot_id: uuid.UUID, created_by: uuid.UUID
@@ -414,11 +466,11 @@ class WorldObjectRepository:
                 for part in plan.parts
                 if part.outcome is CarryOutcome.CARRIED
             }
-            version = self.version(plan.version_id)
+            delta = self._delta(plan.version_id)
             sections = {
                 section.key: tuple(
                     row
-                    for row in getattr(version, section.key)
+                    for row in delta[section.key]
                     if (section.subject, section.sort_key(row)) in carried
                 )
                 for section in DELTA_SECTIONS
@@ -463,7 +515,9 @@ class WorldObjectRepository:
                 write = getattr(self, self._CARRY_RULES[section.subject][1])
                 for row in sections[section.key]:
                     write(plan.version_id, version_id, row, edit_ids)
-        return self.version(version_id)
+        # A carry is written inside the addition's own transaction, which holds the asset read
+        # lock until it commits, so the new version is read without availability.
+        return self.version(version_id, with_availability=False)
 
     def _object_carries(self, obj: AuthoredObject) -> tuple[CarryOutcome, StayReason | None]:
         # A reviewed catalog asset, pinned by digest, is the only thing an object names.
@@ -509,7 +563,12 @@ class WorldObjectRepository:
         version; so does one whose photograph was deleted, because removed data is never written
         back.
         """
-        if instance.unavailable_reason == "source_deleted":
+        # The point map authority's own rule for a deleted photograph, asked without a store:
+        # every term of it is a row, and this is asked under the asset read lock.
+        unread = PointMapSourceAuthority(
+            self.connection, self.workspace_id, world_id=self.world_id, store=None
+        )
+        if unread.state(instance)[1] == "source_deleted":
             return CarryOutcome.STAYS, StayReason.SOURCE_DELETED
         source = instance.source
         row = self.connection.execute(
@@ -666,8 +725,11 @@ class WorldObjectRepository:
         ).fetchall()
         return tuple(self.version(row["version_id"]) for row in rows)
 
-    def version(self, version_id: uuid.UUID) -> AlternateVersion:
+    def version(self, version_id: uuid.UUID, *, with_availability: bool = True) -> AlternateVersion:
         """One version, with the returned token guaranteed to describe the returned delta.
+
+        ``with_availability=False`` leaves each placement's availability ``unknown`` and reads no
+        stored bytes, for a caller that may still hold the asset read lock.
 
         The digest is recomputed from the object and override rows this call actually read,
         rather than copied from the version row. Under READ COMMITTED each statement takes its
@@ -682,8 +744,8 @@ class WorldObjectRepository:
         """
         objects = self._objects(version_id)
         overrides = self._overrides(version_id)
-        environments = self._environment_instances(version_id)
-        point_maps = self._point_map_instances(version_id)
+        environments = self._environment_instances(version_id, with_availability=with_availability)
+        point_maps = self._point_map_instances(version_id, with_availability=with_availability)
         row = self._version_row(version_id)
         return AlternateVersion(
             version_id=row["version_id"],

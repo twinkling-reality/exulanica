@@ -24,10 +24,10 @@ import psycopg
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.deletion.restore import RestoreRefused, verify_restore
-from exulanica.deletion.restore import main as restore_command
 from exulanica.env import resolve_data_dir
 from exulanica.epistemics.caption_embeddings import embed_capture
 from exulanica.models.manifest import Role
+from exulanica.orchestration.restore import main as restore_command
 from exulanica.selection.embeddings import QueryEmbedding
 from exulanica.store.namespaces import BLOB_NAMESPACE
 

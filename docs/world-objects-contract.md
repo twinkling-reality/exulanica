@@ -131,6 +131,24 @@ workspace and world. `parent_version_id` is the lineage the structural plane can
 alternates may branch from one source, and an alternate may branch from another alternate. Both
 sit on the same source snapshot, and neither moves the structural current pointer.
 
+Branching from a version copies its delta, and the branch's rows are new placements, so each of the
+parent's rows is asked what carrying it onto a later snapshot asks (`carry_plan` in
+[`object_repository.py`](../exulanica/world/object_repository.py), the question the binding
+triggers ask as a row is written). An environment piece whose source was withdrawn, may no longer be
+composed or no longer resolves to its pinned binding, and a depth estimate whose right ended, whose
+photograph was deleted or whose bytes may no longer be read, stays in the parent only. A piece
+whose source still stands and whose stored files are missing is copied, as a carry copies it, and
+the branch shows it as `unavailable_bytes`: the question reads rows, never stored bytes. `POST
+/world/versions` answers with the new version and `left_behind`: each row left out, with its
+subject, id, whether it was removed, and the reason. The parent keeps every row. The question is
+asked under the global asset read lock, after the parent row is locked and before anything is
+written: a withdrawal that comes after it cannot commit until the branch does, and a source that
+ends between the question and a row's write refuses the branch as `stale_object_base` with nothing
+written (`tests/test_version_branch_authorization.py`). A deadlock or serialization refusal from
+another write in flight, such as a stopped search right whose tombstone waits for the workspace lock
+while it holds the asset read lock, answers `409 busy` with nothing written. A branch's change list
+starts empty.
+
 `state_sha256` is the digest of the canonical delta document, computed with the same JCS subset as
 every snapshot section. It is the optimistic concurrency token, chosen to be content-derived rather
 than a counter so that two edits producing identical state are identical bases, exactly as
@@ -474,7 +492,7 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | Method | Route | Result |
 | --- | --- | --- |
 | `GET` | `/world/versions` | Every alternate version of this world, newest first |
-| `POST` | `/world/versions` | Create an alternate from a source snapshot or another version |
+| `POST` | `/world/versions` | Create an alternate from a source snapshot or another version, with the parent's rows it left out |
 | `GET` | `/world/versions/{version_id}` | One version with its objects, overrides and edit history |
 | `POST` | `/world/versions/{version_id}/objects` | Add one authored object |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/move` | Replace one object's transform |
@@ -507,7 +525,8 @@ The problem codes are distinct, because the recovery differs:
 | HTTP | Code | Recovery |
 | --- | --- | --- |
 | `422` | `invalid_object_data` | Correct the asset, region, transform, origin role, behaviour or parameter |
-| `409` | `stale_object_base` | Read the version again and re-issue the edit against the new `state_sha256` |
+| `409` | `stale_object_base` | Read the version again and re-issue the edit against the new `state_sha256`; for `POST /world/versions`, a source ended while the branch was written: branch again |
+| `409` | `busy` | `POST /world/versions` only: another write was in flight and nothing was written; branch again |
 | `409` | `invalid_object_state` | Do not move, remove or change the behaviour of an already-removed object, re-add an existing id, set the behaviour an object already has, or undo an empty history |
 | `409` | `invalidated_source_version` | The source was deleted; branch from a live snapshot instead |
 | `424` | `unavailable_asset` | Restore the reviewed bytes; an addition is refused, and the recorded state renders without a substitute |

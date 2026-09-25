@@ -10,16 +10,20 @@ A checkpoint seals raw SQL tombstone writes as well as application writes, and e
 that is not a tombstone (``exulanica.deletion.withdrawals``), which replay writes again before its
 tombstones. Replay is an administrative operation, but physical destruction still runs through the
 existing purge role.
+
+The operator's command is ``python -m exulanica.orchestration.restore``: a replay writes some
+withdrawals by the product's own writers (a retraction, a continued place-name chain), which sit
+above this package, so the command that gives replay those writers sits above them.
 """
 
 from __future__ import annotations
 
-import argparse
 import datetime as dt
 import hashlib
 import json
 import os
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Final
 
@@ -35,17 +39,17 @@ from exulanica.deletion.withdrawals import (
     CATALOG_IDENTITY,
     Carried,
     CarryRefused,
+    Writer,
     kind_of,
     read_withdrawals,
     reapply,
+    require_writers,
     stale_withdrawals,
 )
 from exulanica.deletion.worker import PurgeWorker
-from exulanica.env import env_get, resolve_data_dir
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
-from exulanica.store.local import LocalContentAddressedStore
-from exulanica.store.namespaces import BLOB_NAMESPACE, WorkspaceStores, material_stores
+from exulanica.store.namespaces import WorkspaceStores
 
 __all__ = ["RestoreRefused", "checkpoint", "prepare_restore", "replay", "verify_restore"]
 
@@ -120,7 +124,10 @@ def _checkpoint(path: Path) -> tuple[dict[str, Any], str]:
         raise RestoreRefused("tombstone checkpoint digest does not match its contents")
     if CHECKPOINT_PROFILES[record["profile"]]:
         if record.get("withdrawal_catalog") != CATALOG_IDENTITY:
-            raise RestoreRefused("the checkpoint was sealed under another withdrawal catalog")
+            raise RestoreRefused(
+                "the checkpoint was sealed under another withdrawal catalog; finish that restore "
+                "with the release that sealed it"
+            )
         if not isinstance(record.get("withdrawals"), list):
             raise RestoreRefused("checkpoint is not a sealed tombstone checkpoint")
         try:
@@ -168,7 +175,9 @@ def _refuse_a_stale_checkpoint(connection: psycopg.Connection, record: dict[str,
         )
 
 
-def _carry_withdrawals(database: Database, record: dict[str, Any]) -> None:
+def _carry_withdrawals(
+    database: Database, record: dict[str, Any], writers: Mapping[str, Writer]
+) -> None:
     """Write every withdrawal the checkpoint carries into the restored database, before replay.
 
     Each write is the product's own, so its triggers run: a stopped search or training right
@@ -192,7 +201,7 @@ def _carry_withdrawals(database: Database, record: dict[str, Any]) -> None:
             for carried in owned[owner]:
                 try:
                     with connection.transaction():
-                        reapply(connection, carried)
+                        reapply(connection, carried, writers)
                 except CarryRefused as refused:
                     raise RestoreRefused(str(refused)) from refused
 
@@ -351,6 +360,7 @@ def replay(
     checkpoint_path: Path,
     marker_path: Path,
     *,
+    writers: Mapping[str, Writer],
     materials: WorkspaceStores | None = None,
 ) -> uuid.UUID:
     """Reapply authoritative deletions, purge, verify, then issue an idempotent receipt.
@@ -369,11 +379,19 @@ def replay(
     first attempt refuses a restored database holding a tombstone or a withdrawal the checkpoint
     lacks, and every attempt writes each carried withdrawal again before any tombstone.
 
+    ``writers`` are the product's writers the withdrawal catalog names, by the names it uses
+    (``exulanica.orchestration.restore.WRITERS``); anything else is refused before anything is
+    replayed.
+
     ``materials`` holds each workspace's material bakes (migration 0066). A checkpoint that names
     a bake is refused without it, before anything is replayed, because the purge could not reach
     those bytes and the receipt would then be withheld only after the replay had begun.
     """
     record, digest = _checkpoint(checkpoint_path)
+    try:
+        require_writers(writers)
+    except CarryRefused as refused:
+        raise RestoreRefused(str(refused)) from refused
     if materials is None and any(
         target["target_kind"] == "material_bake"
         for item in record["tombstones"]
@@ -409,7 +427,7 @@ def replay(
             "state='replaying',restore_id=excluded.restore_id,updated_at=now()",
             (record["checkpoint_id"], digest, restore_id),
         )
-    _carry_withdrawals(database, record)
+    _carry_withdrawals(database, record, writers)
     for item in record["tombstones"]:
         original = item["tombstone"]
         workspace_id = uuid.UUID(original["workspace_id"])
@@ -534,32 +552,16 @@ def replay(
     return restore_id
 
 
+#: Where the operator's restore command is: replay needs writers this package cannot import.
+COMMAND: Final = "python -m exulanica.orchestration.restore"
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("checkpoint", "prepare", "replay"))
-    parser.add_argument("--checkpoint", required=True, type=Path)
-    parser.add_argument("--marker", type=Path)
-    args = parser.parse_args(argv)
-    if args.action == "checkpoint":
-        checkpoint(Database.from_env(), args.checkpoint)
-    elif args.marker is None:
-        parser.error("prepare and replay require --marker outside both backup domains")
-    elif args.action == "prepare":
-        prepare_restore(args.checkpoint, args.marker)
-    else:
-        purge_url = env_get("PURGE_DATABASE_URL")
-        if not purge_url:
-            parser.error("PURGE_DATABASE_URL must name the separately provisioned purge role")
-        data_dir = resolve_data_dir()
-        replay(
-            Database.from_env(),
-            Database(purge_url),
-            LocalContentAddressedStore(data_dir / BLOB_NAMESPACE),
-            args.checkpoint,
-            args.marker,
-            materials=material_stores(data_dir),
-        )
-    return 0
+    """The restore command's old place, which refuses and names where it is."""
+    raise SystemExit(
+        f"exulanica.deletion.restore is not the restore command; run `{COMMAND}` with the same "
+        "arguments"
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

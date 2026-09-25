@@ -3,7 +3,7 @@
 A tombstone is not the only way a person ends something. Stopping a model right, withdrawing a
 consent or logging out is recorded in the row it ends, or as a row of its own, and a database
 restored from a backup taken before it holds the thing as current again: the tombstone replay of
-``exulanica.deletion.restore`` never sees it. ``withdrawals.v1.json`` names every such withdrawal,
+``exulanica.deletion.restore`` never sees it. ``withdrawals.v2.json`` names every such withdrawal,
 the rows each one writes and how a withdrawn row is recognised, and this module does three things
 with it for a checkpoint of profile ``exulanica.restore-tombstone-checkpoint/v2``:
 
@@ -14,8 +14,11 @@ with it for a checkpoint of profile ``exulanica.restore-tombstone-checkpoint/v2`
 * :func:`reapply` writes one carried withdrawal into a restored database with the statement the
   product writes: a column kind sets its columns on a row whose withdrawal is still open, so every
   trigger that update fires runs (migration 0104's search-entry erasure among them); an event kind
-  appends its row when the database holds what it ends. A row the backup does not hold needs
-  nothing, because a restore never brings back a row its backup lacks.
+  appends its row when the database holds what it ends, through the product's own writer where the
+  catalog names one (a retraction also retracts its claim). A chain the backup ends at a grant made
+  before one the carried withdrawal follows is continued with a withdrawal of its own, by the writer
+  the catalog names. A row the backup does not hold needs nothing, because a restore never brings
+  back a row its backup lacks.
 * :func:`stale_withdrawals` names a withdrawal the restored database holds that the checkpoint
   does not, which means the checkpoint is older than the backup.
 
@@ -27,6 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Literal
@@ -42,18 +46,20 @@ __all__ = [
     "CATALOG_IDENTITY",
     "CATALOG_PATH",
     "EXCLUSIONS",
+    "WRITER_KEYS",
     "Carried",
     "CarryRefused",
     "Exclusion",
     "WithdrawalKind",
+    "Writer",
     "kind_of",
     "read_withdrawals",
     "reapply",
     "stale_withdrawals",
 ]
 
-CATALOG_PATH: Final = Path(__file__).with_name("withdrawals.v1.json")
-CATALOG_PROFILE: Final = "exulanica.restore-withdrawal-catalog/v1"
+CATALOG_PATH: Final = Path(__file__).with_name("withdrawals.v2.json")
+CATALOG_PROFILE: Final = "exulanica.restore-withdrawal-catalog/v2"
 
 
 class CarryRefused(RuntimeError):
@@ -61,14 +67,33 @@ class CarryRefused(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class Join:
+    """The row of ``table`` a carried row names, matched on ``on``, which both tables share."""
+
+    table: str
+    on: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Condition:
-    """One test on one column: ``is null``, ``is not null``, or membership in a set of values."""
+    """One test on one column: ``is null``, ``is not null``, or membership in a set of values.
+
+    The column is the row's own, or with ``of`` the column of the row it names in another table.
+    """
 
     column: str
     is_: Literal["null", "not null"] | None = None
     in_: tuple[str, ...] | None = None
+    of: Join | None = None
 
     def over(self, alias: str) -> sql.Composable:
+        if self.of is not None:
+            return sql.SQL("exists (select 1 from {} j where ({}) = ({}) and {})").format(
+                sql.Identifier(self.of.table),
+                _names(self.of.on, "j"),
+                _names(self.of.on, alias),
+                Condition(self.column, self.is_, self.in_).over("j"),
+            )
         column = sql.Identifier(alias, self.column)
         if self.is_ == "null":
             return sql.SQL("{} is null").format(column)
@@ -101,6 +126,10 @@ class WithdrawalKind:
     workspace: str | None
     ends: Ends | None
     order: str | None
+    #: The name of the product's writer of the carried row, or None for the generic insert.
+    writer: str | None = None
+    #: The name of the writer that continues a chain the carried row cannot follow.
+    continues: str | None = None
 
     def carried(self, alias: str) -> sql.Composable:
         """The rows a checkpoint carries: withdrawn, and whatever else the catalog requires."""
@@ -134,11 +163,20 @@ def _condition(value: dict[str, Any]) -> Condition:
     if "is" in value and value["is"] not in ("null", "not null"):
         raise ValueError(f"unknown test {value['is']!r} on {value['column']}")
     values = value.get("in")
+    of = value.get("of")
     return Condition(
         column=value["column"],
         is_=value.get("is"),
         in_=None if values is None else tuple(values),
+        of=None if of is None else Join(of["table"], tuple(of["on"])),
     )
+
+
+#: A product writer: the restored database's connection, in the carried row's own workspace
+#: session, and the carried row as the checkpoint records it. Deletion knows nothing about how a
+#: claim or a consent is written, so the writers a catalog names are given to replay by its caller
+#: (``exulanica.orchestration.restore``), keyed by the names the catalog uses.
+Writer = Callable[[psycopg.Connection[Any], Mapping[str, Any]], None]
 
 
 def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...], dict[str, Any]]:
@@ -162,6 +200,8 @@ def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...]
                 workspace=entry["workspace"],
                 ends=None if ends is None else Ends(ends["table"], tuple(ends["columns"])),
                 order=entry.get("order"),
+                writer=entry.get("writer"),
+                continues=entry.get("continues"),
             )
         )
     names = [kind.kind for kind in kinds]
@@ -174,6 +214,10 @@ def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...]
             raise ValueError(
                 f"{kind.kind}: a column kind names columns, an event kind what it ends"
             )
+        if kind.shape == "column" and kind.writer is not None:
+            raise ValueError(f"{kind.kind}: a column kind is written by its own update")
+        if kind.continues is not None and not (kind.chained and kind.order):
+            raise ValueError(f"{kind.kind}: only an ordered chain can be continued")
     exclusions = tuple(Exclusion(e["table"], e["reason"]) for e in document["excluded"])
     return tuple(kinds), exclusions, document
 
@@ -189,6 +233,11 @@ CATALOG_IDENTITY: Final = {
 }
 
 _BY_KIND: Final = {kind.kind: kind for kind in CATALOG}
+
+#: Every writer name the catalog uses: what a replay must be given, and all it may be given.
+WRITER_KEYS: Final = frozenset(
+    name for kind in CATALOG for name in (kind.writer, kind.continues) if name is not None
+)
 
 
 def _names(columns: tuple[str, ...], alias: str | None = None) -> sql.Composable:
@@ -248,19 +297,38 @@ def _matches(columns: tuple[str, ...], left: str, right: str) -> sql.Composable:
     )
 
 
-def reapply(connection: psycopg.Connection[Any], carried: Carried) -> str:
+def require_writers(writers: Mapping[str, Writer]) -> None:
+    """Refuse writers other than exactly the ones the catalog names, each by its name."""
+    missing = sorted(WRITER_KEYS - writers.keys())
+    if missing:
+        raise CarryRefused(
+            f"replay was not given the writers the withdrawal catalog names: {missing}"
+        )
+    unnamed = sorted(writers.keys() - WRITER_KEYS)
+    if unnamed:
+        raise CarryRefused(
+            f"replay was given writers the withdrawal catalog does not name: {unnamed}"
+        )
+
+
+def reapply(
+    connection: psycopg.Connection[Any], carried: Carried, writers: Mapping[str, Writer]
+) -> str:
     """Write one carried withdrawal into this database, the product's way, and say what happened.
 
-    Returns ``carried`` when this wrote it, ``present`` when the database already held it exactly,
-    ``absent`` when the database holds nothing it ends, and ``already`` when an event withdrawal's
-    chain already ends withdrawn here. Raises :class:`CarryRefused` when the database holds the
-    row with another withdrawal than the checkpoint records, or refuses the write.
+    Returns ``carried`` when this wrote it, ``continued`` when it withdrew the chain the carried
+    row ended after a decision the backup holds and the carried row cannot follow, ``present`` when
+    the database already held it exactly, ``absent`` when the database holds nothing it ends, and
+    ``already`` when an event withdrawal's chain already ends withdrawn here. Raises
+    :class:`CarryRefused` when the database holds the row with another withdrawal than the
+    checkpoint records, refuses the write, or ``writers`` is not exactly the catalog's.
     """
+    require_writers(writers)
     kind = kind_of(carried)
     parameters = {"row": Jsonb(carried.row)}
     if kind.shape == "column":
         return _reapply_column(connection, kind, parameters)
-    return _reapply_event(connection, kind, parameters)
+    return _reapply_event(connection, kind, carried, writers)
 
 
 def _reapply_column(
@@ -304,56 +372,103 @@ def _reapply_column(
 
 
 def _reapply_event(
-    connection: psycopg.Connection[Any], kind: WithdrawalKind, parameters: dict[str, Any]
+    connection: psycopg.Connection[Any],
+    kind: WithdrawalKind,
+    carried: Carried,
+    writers: Mapping[str, Writer],
 ) -> str:
     assert kind.ends is not None  # an event kind names what it ends; _load refuses otherwise
     table = sql.Identifier(kind.table)
-    held = connection.execute(
-        sql.SQL(
-            "select to_jsonb(t) = to_jsonb(r) as same from {table} t join {record} r "
-            "on ({identity_t}) = ({identity_r})"
-        ).format(
-            table=table,
-            record=_record(kind),
-            identity_t=_names(kind.identity, "t"),
-            identity_r=_names(kind.identity, "r"),
-        ),
-        parameters,
-    ).fetchone()
+    parameters = {"row": Jsonb(carried.row)}
+    same = sql.SQL(
+        "select to_jsonb(t) = to_jsonb(r) as same from {table} t join {record} r "
+        "on ({identity_t}) = ({identity_r})"
+    ).format(
+        table=table,
+        record=_record(kind),
+        identity_t=_names(kind.identity, "t"),
+        identity_r=_names(kind.identity, "r"),
+    )
+    held = connection.execute(same, parameters).fetchone()
     if held is not None:
         if not held["same"]:
             raise CarryRefused(
                 f"the restored {kind.table} row differs from the withdrawal the checkpoint records"
             )
         return "present"
-    ends = sql.SQL("select {} from {} e join {} r on {}").format(
+    ordered = kind.chained and kind.order is not None
+    ends = sql.SQL("select {} as withdrawn, {} as position from {} e join {} r on {}").format(
         kind.withdrawn.over("e") if kind.chained else sql.SQL("true"),
+        sql.Identifier("e", kind.order) if ordered else sql.SQL("null"),
         sql.Identifier(kind.ends.table),
         _record(kind),
         _matches(kind.ends.columns, "e", "r"),
     )
     ends = (
         sql.SQL("{} order by {} desc limit 1").format(ends, sql.Identifier("e", kind.order))
-        if kind.chained and kind.order
+        if ordered
         else sql.SQL("{} limit 1").format(ends)
     )
-    last = connection.execute(sql.SQL("select ({}) as withdrawn").format(ends), parameters)
-    found = last.fetchone()
+    found = connection.execute(ends, parameters).fetchone()
     if found is None or found["withdrawn"] is None:
         return "absent"
     if kind.chained and found["withdrawn"]:
         return "already"
+    # A chain whose last decision here comes more than one before the carried row's lacks the
+    # decisions made after the backup, so the carried row cannot follow it: the chain is
+    # continued with a withdrawal of its own. Any other position is written as it is, and the
+    # database refuses one it cannot follow.
+    continues, writer = kind.continues, kind.writer
+    if (
+        continues is not None
+        and kind.order is not None
+        and carried.row[kind.order] > found["position"] + 1
+    ):
+        _write(connection, kind, "continue", lambda: writers[continues](connection, carried.row))
+        # Checked, as a writer's row is: the writer asks the chain at its own instant and may find
+        # nothing to withdraw (a decision recorded ahead of this host's clock is not yet one to
+        # it), and a replay that completed with the chain still ending in a grant would serve it.
+        after = connection.execute(ends, parameters).fetchone()
+        if after is None or not after["withdrawn"]:
+            raise CarryRefused(
+                f"the checkpoint's {kind.kind} withdrawal was not continued: the chain this "
+                "backup holds still ends in a decision it does not withdraw"
+            )
+        return "continued"
+    if writer is None:
+        _write(
+            connection,
+            kind,
+            "follow",
+            lambda: connection.execute(
+                sql.SQL("insert into {} select ({}).*").format(table, _record(kind)), parameters
+            ),
+        )
+        return "carried"
+    _write(connection, kind, "follow", lambda: writers[writer](connection, carried.row))
+    written = connection.execute(same, parameters).fetchone()
+    if written is None or not written["same"]:
+        raise CarryRefused(
+            f"the {kind.kind} writer did not write the {kind.table} row the checkpoint records"
+        )
+    return "carried"
+
+
+def _write(
+    connection: psycopg.Connection[Any],
+    kind: WithdrawalKind,
+    verb: str,
+    write: Callable[[], object],
+) -> None:
+    """Run one write in its own savepoint; the database's refusal becomes one naming the kind."""
     try:
         with connection.transaction():
-            connection.execute(
-                sql.SQL("insert into {} select ({}).*").format(table, _record(kind)), parameters
-            )
+            write()
     except psycopg.Error as error:
         raise CarryRefused(
-            f"the checkpoint's {kind.kind} withdrawal cannot follow what this backup holds: "
+            f"the checkpoint's {kind.kind} withdrawal cannot {verb} what this backup holds: "
             f"{error.diag.message_primary or error}"
         ) from error
-    return "carried"
 
 
 def stale_withdrawals(

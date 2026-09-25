@@ -21,20 +21,28 @@ the replayed stop's cascade erases only what no current right covers.
 ## Decision
 
 A checkpoint of profile `exulanica.restore-tombstone-checkpoint/v2` carries every withdrawal
-[`exulanica/deletion/withdrawals.v1.json`](../../exulanica/deletion/withdrawals.v1.json) names,
+[`exulanica/deletion/withdrawals.v2.json`](../../exulanica/deletion/withdrawals.v2.json) names,
 beside every tombstone, and the catalog's identity (its profile and the SHA-256 of its canonical
 JSON). The catalog states, for each table, the rows a withdrawal writes and how a withdrawn row is
 recognised, in two shapes: a column kind is a row that records its own withdrawal once and is
 carried as its identity and those columns, nothing else; an event kind is a withdrawal that is a row
-of its own and is carried whole.
+of its own and is carried whole. A person's retraction of a claim they made is an event kind whose
+row is not the whole withdrawal: retracting also sets the claim's status, which takes a retracted
+name off its place (migration 0002) and ends a place-name right resting on that claim (0097). The
+catalog names the product's writer for such a kind, and the writer that continues a chain, and the
+restore command (`python -m exulanica.orchestration.restore`) gives replay those writers, because
+the deletion package sits below the claim and consent writers and does not import them. A replay
+given other writers than the catalog names refuses before it writes anything.
 
 - **Sealed the same way.** Checkpoint creation locks every catalog table against writes while it
   reads them, and migration 0107 refuses every withdrawal write while `restore_control` says
-  sealed, as 0036 refuses tombstones, direct SQL included.
+  sealed, as 0036 refuses tombstones, direct SQL included; migration 0109 adds the retraction row.
 - **Replayed first.** Replay writes every carried withdrawal into the restored database before any
   tombstone, by the statement the product writes: a column kind sets its columns on a row whose
   withdrawal is still open, so every trigger that update fires runs; an event kind appends its row
-  when the database holds what it ends and the chain does not already end withdrawn. A row the
+  when the database holds what it ends and the chain does not already end withdrawn, through the
+  product's writer where the catalog names one: a retraction is written by the product's retract,
+  with the identity, time, actor and reason the person's retraction had. A row the
   backup lacks needs nothing: a restore never brings back what its backup does not hold. A row held
   with another withdrawal, or an event the database refuses, refuses the replay by name. A stopped
   search or training right writes a tombstone of its own again, whose cascade erases what the stop
@@ -45,6 +53,9 @@ of its own and is carried whole.
   checkpoint is sealed from the source after every backup of it, so a current checkpoint holds
   everything its restored database holds. The first attempt of a replay refuses a restored database
   holding a tombstone or a withdrawal the checkpoint lacks: the checkpoint is older than the backup.
+- **Sealed under one catalog.** A checkpoint sealed under another catalog is refused by name. A
+  checkpoint lives within one restore, so the restore it belongs to is finished with the release
+  that sealed it.
 - **Profile v1 stays readable.** It carries no withdrawal. A v1 replay refuses to complete while a
   search entry its checkpoint erased is present and was made before the deletion took effect, so a
   lost search stop is refused rather than served; a lost stop of any other kind is not visible to it.
@@ -60,14 +71,26 @@ again (0104).
 Every other table shaped like a withdrawal is named in the catalog's `excluded` list with its
 reason, and `tests/test_restore_replay_withdrawal_catalog.py` fails on one the catalog neither
 carries nor names: identity decisions and a place bridge's revocation, which a later decision or
-undo reverses; a retraction, which writes two rows no trigger ties together; a photograph taken out
-of a saved world, which is an authored edit; columns nothing writes; and rows a replayed tombstone
-writes again. A restore returns those to the backup's state like any other authored edit.
+undo reverses; a photograph taken out of a saved world, which is an authored edit; columns nothing
+writes; and rows a replayed tombstone writes again. A restore returns those to the backup's state
+like any other authored edit. A retraction is carried only when its claim is one a person stated
+(kind `user`): the only other retractions are those a tombstone's cascade writes (0031), of claims
+only an inference may state, and the replayed tombstone writes them again.
+
+The identity log is not carried with a retraction. When the retraction was an undo of a rename,
+the restored `identity_event` history still shows the rename as not undone, so the rename can be
+undone a second time, which writes a second retraction of the same claim. The claim stays retracted
+and the display name stays cleared (0002) either way; only the history of identity decisions
+differs from the source's.
 
 A place name's decisions form a chain the database checks: each follows the last one exactly. When
 the backup ends that chain at a grant the checkpoint's withdrawal does not follow, because a later
-grant it follows was made after the backup, the replay refuses by name rather than leave the grant
-current.
+grant it follows was made after the backup, the replay withdraws the chain the backup holds with a
+decision of its own, appended as that chain's next one with the account holder and time of the
+carried withdrawal. The replay then reads the chain again, and a chain that still does not end
+withdrawn, as when the host's clock stands before the backup's last decision, refuses the replay by
+name ("was not continued") with the marker left pending. A resumed replay finds the chain withdrawn
+and appends nothing.
 
 ## Rejected alternatives
 
@@ -93,8 +116,12 @@ current.
 `tests/test_restore_replay_withdrawals.py` restores a real dump for a stopped description right, a
 withdrawn training right, a deleted Companion memory, a withdrawn place-name right, a withdrawn
 presentation consent, a withdrawn training consent, a withdrawn recipe, a logged-out session and a
-disabled account, and holds the seal, the stale refusal, the catalog identity and the chain
-refusal. `tests/test_restore_replay_search_entries.py` holds the search stop in both profiles. The
+disabled account, and holds the seal, the stale refusal, the catalog identity, a place-name chain
+continued after a second grant made after the backup (and continued once when the replay resumes),
+and the refusal of a carried decision the restored chain has passed.
+`tests/test_restore_replay_retractions.py` restores a real dump for a place name retracted after the
+backup, whose right it ended, and holds the retraction's branches, the census that keeps a
+tombstone's retractions out, its seal and the writers a replay must be given. `tests/test_restore_replay_search_entries.py` holds the search stop in both profiles. The
 environment source and asset kinds and the account workspace and membership kinds are written by
 the same column statement; their statements are run against the schema in
 `tests/test_restore_replay_withdrawal_catalog.py`, which no real restore here repeats.

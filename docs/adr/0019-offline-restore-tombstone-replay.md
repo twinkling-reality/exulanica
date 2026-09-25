@@ -99,7 +99,9 @@ not be restored at all. `exulanica-local-db` gives such functions a path between
 rows of a dump taken before 0106. An ordinary instance with no declared restore keeps its existing startup
 behaviour; a sealed or replaying database refuses. `EXULANICA_RESTORE_STATE_PATH` configures the
 independent marker for API startup. `Services.restore_state_path` is the injectable equivalent.
-`exulanica.deletion.restore` supplies checkpoint, prepare and replay commands. Runtime provisioning
+`exulanica.deletion.restore` supplies checkpoint, prepare and replay, and
+`exulanica.orchestration.restore` is their command, which gives replay the product's writers
+([ADR-0026](0026-a-restore-carries-every-withdrawal.md)). Runtime provisioning
 revokes INSERT/UPDATE on the two administrative control tables. Purge grants and DELETE privileges
 are unchanged. No HTTP route, browser payload, worker algorithm, export format or model call is
 added. The checkpoint is a private operational artifact, not a world-package export.
@@ -111,14 +113,14 @@ contents. Configure the API process with `EXULANICA_RESTORE_STATE_PATH` pointing
 The API must remain stopped until the marker exists and replay completes.
 
 1. Stop traffic and all writers. With the current source's administrative database URL, run
-   `uv run python -m exulanica.deletion.restore checkpoint --checkpoint /independent/checkpoint.json`.
+   `uv run python -m exulanica.orchestration.restore checkpoint --checkpoint /independent/checkpoint.json`.
 2. Before restoring anything, run
-   `uv run python -m exulanica.deletion.restore prepare --checkpoint /independent/checkpoint.json --marker /independent/restore.json`.
+   `uv run python -m exulanica.orchestration.restore prepare --checkpoint /independent/checkpoint.json --marker /independent/restore.json`.
 3. Restore the database and object-store backups while keeping the checkpoint and marker intact.
    Apply forward migrations and reprovision normal runtime/purge roles. Reprovisioning is
    mandatory: existing default grants can otherwise leave the new control tables writable.
 4. With the restored administrative URL and the separate `EXULANICA_PURGE_DATABASE_URL`, run
-   `uv run python -m exulanica.deletion.restore replay --checkpoint /independent/checkpoint.json --marker /independent/restore.json`.
+   `uv run python -m exulanica.orchestration.restore replay --checkpoint /independent/checkpoint.json --marker /independent/restore.json`.
 5. Start the API with the same configured marker path. Failed replay is resumed with the same
    command and pending attempt; a completed attempt may be repeated without extra receipts.
 

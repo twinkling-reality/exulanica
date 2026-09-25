@@ -45,6 +45,7 @@ from exulanica.materials.workspace import (
     bake_request,
 )
 from exulanica.migrations import migration_directory
+from exulanica.orchestration.restore import WRITERS
 from exulanica.store.namespaces import LocalWorkspaceStores
 from exulanica.world.material_bakes import (
     BakeLimits,
@@ -1082,13 +1083,21 @@ def test_restore_replays_a_bake_s_purge_over_restored_bytes(materials, tmp_path)
     # An object-store backup older than the deletion brings the bytes back.
     materials.stores.for_workspace(materials.workspace_id).put_bytes(container)
     with pytest.raises(RestoreRefused, match="no material store"):
-        replay(materials.owner, purge_database, materials.purged.store, source, marker)
+        replay(
+            materials.owner,
+            purge_database,
+            materials.purged.store,
+            source,
+            marker,
+            writers=WRITERS,
+        )
     replay(
         materials.owner,
         purge_database,
         materials.purged.store,
         source,
         marker,
+        writers=WRITERS,
         materials=materials.stores,
     )
     assert not materials.in_namespace(container)
@@ -1296,6 +1305,7 @@ def test_restore_finishes_when_the_restored_database_predates_the_bake(materials
         materials.purged.store,
         source,
         marker,
+        writers=WRITERS,
         materials=materials.stores,
     )
     assert not materials.in_namespace(container)

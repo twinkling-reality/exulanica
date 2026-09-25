@@ -9,7 +9,7 @@ opposite: a withdrawn right is never restored, only granted again.
 Each test below makes one kind current, takes an actual ``pg_dump`` backup, withdraws it the way
 the product does, seals the checkpoint and writes the marker with the restore command, restores
 the dump with ``psql`` and replays with the command, and asks whether the thing is withdrawn
-again. The catalog of kinds is ``exulanica/deletion/withdrawals.v1.json``; the kinds a real
+again. The catalog of kinds is ``exulanica/deletion/withdrawals.v2.json``; the kinds a real
 restore here does not reach are held by ``tests/test_restore_replay_withdrawal_catalog.py``.
 """
 
@@ -27,18 +27,20 @@ from exulanica.api.account_repository import AccountRejected, AccountRepository,
 from exulanica.canonical import canonical_json
 from exulanica.consent.training import TrainingTerms
 from exulanica.deletion.restore import RestoreRefused, verify_restore
-from exulanica.deletion.restore import main as restore_command
 from exulanica.deletion.withdrawals import CATALOG
+from exulanica.identity import rename_entity
 from exulanica.ingest.person_review import create_subject, record_consent
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.training_rights import grant_training_right, withdraw_training_right
 from exulanica.models.manifest import Role
+from exulanica.orchestration.restore import main as restore_command
 from exulanica.world.companion_memory import AnswerCitation, CompanionMemoryRepository
 from exulanica.world_package.training_store import record_training_decision
 
 from test_companion_memory import _answer
 from test_material_recipes import BRICK, _small
 from test_material_recipes import materials as materials
+from test_place_name_rights import _events as _place_name_events
 from test_place_name_rights import _grant as _grant_place_name
 from test_place_name_rights import _state as _place_name_state
 from test_place_name_rights import _withdraw as _withdraw_place_name
@@ -472,21 +474,151 @@ def test_a_checkpoint_sealed_under_another_catalog_is_refused(purged, commands, 
         _prepare(source, marker)
 
 
-def test_an_event_withdrawal_that_cannot_follow_its_backup_is_refused_by_name(
+def _regranted(named) -> None:
+    """Grant, rename, and grant again: two grants in each chain, the second after the backup."""
+    _, identity, assertions, actor, entities = named
+    rename_entity(
+        identity, assertions, entity_id=entities["place"], display_name="The Old Mill", actor=actor
+    )
+    assert _place_name_state(named, "structured_extraction") == "name_changed"
+    _grant_place_name(named, "structured_extraction")
+
+
+def _chains(named) -> dict[tuple[str, str], list[dict]]:
+    """Each chain of the planner's models at its destination, its decisions in order."""
+    chains: dict[tuple[str, str], list[dict]] = {}
+    for event in _place_name_events(named):
+        if event["model_role"] == "structured_extraction":
+            chains.setdefault((event["model_id"], event["destination"]), []).append(event)
+    return chains
+
+
+def test_a_place_name_withdrawal_after_a_grant_the_backup_lacks_continues_its_chain(
     named, purged, commands, tmp_path
 ):
-    """The database refuses a decision out of its chain, and the replay says which kind it was."""
+    """A rename ends a grant and a new grant follows it; the backup holds only the first.
+
+    The carried withdrawal follows the second grant and cannot be written after the first, so the
+    replay withdraws the chain the backup holds with a decision of its own: the same account
+    holder, at the same time, as the next in that chain.
+    """
+    _grant_place_name(named, "structured_extraction")
+    dump, blobs = _backup(purged, tmp_path)
+    _regranted(named)
+    _withdraw_place_name(named, "structured_extraction")
+    source, marker = _seal(tmp_path)
+    carried = {
+        (event["model_id"], event["destination"]): event
+        for chain in _chains(named).values()
+        for event in chain
+        if event["event"] == "withdrawn"
+    }
+    assert {event["sequence"] for event in carried.values()} == {2}, "after the second grant"
+    _restore(purged, dump, blobs)
+    assert _place_name_state(named, "structured_extraction") == "allowed", "the backup allows it"
+
+    _replay(source, marker)
+    verify_restore(purged.database(), marker)
+
+    assert _place_name_state(named, "structured_extraction") == "withdrawn"
+    chains = _chains(named)
+    assert chains.keys() == carried.keys()
+    for key, chain in chains.items():
+        assert [event["event"] for event in chain] == ["granted", "withdrawn"], key
+        continued = chain[-1]
+        assert continued["sequence"] == 1
+        assert bytes(continued["previous_sha256"]) == bytes(chain[0]["receipt_sha256"])
+        assert continued["decided_by"] == carried[key]["decided_by"]
+        assert continued["decided_at"] == carried[key]["decided_at"]
+        assert continued["event_id"] != carried[key]["event_id"], "a decision of its own"
+
+
+def test_a_continued_chain_is_continued_once_when_the_replay_resumes(
+    named, purged, commands, tmp_path, monkeypatch
+):
+    """An attempt that stops after the withdrawals were written finds each chain withdrawn."""
+    from exulanica.deletion import restore
+
+    _grant_place_name(named, "structured_extraction")
+    dump, blobs = _backup(purged, tmp_path)
+    _regranted(named)
+    _withdraw_place_name(named, "structured_extraction")
+    source, marker = _seal(tmp_path)
+    _restore(purged, dump, blobs)
+
+    class Interrupted(RuntimeError):
+        pass
+
+    def stopped(*args, **kwargs):
+        raise Interrupted("the purge never started")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(restore, "PurgeWorker", stopped)
+        with pytest.raises(Interrupted):
+            _replay(source, marker)
+    assert _place_name_state(named, "structured_extraction") == "withdrawn", "carried first"
+    with pytest.raises(RestoreRefused, match="pending"):
+        verify_restore(purged.database(), marker)
+
+    _replay(source, marker)
+    verify_restore(purged.database(), marker)
+    for key, chain in _chains(named).items():
+        assert [event["event"] for event in chain] == ["granted", "withdrawn"], key
+
+
+def test_a_chain_the_writer_cannot_see_is_refused_rather_than_left_granted(
+    named, purged, commands, tmp_path
+):
+    """A decision recorded ahead of the restore host's clock is not yet one to the writer.
+
+    The replay sees the backup's grant as the chain's last decision, but the writer asks the chain
+    at its own instant and finds nothing to withdraw. Replay checks the chain afterwards and
+    refuses by name, so it never completes with the chain still ending in a grant.
+    """
+    _grant_place_name(named, "structured_extraction")
+    dump, blobs = _backup(purged, tmp_path)
+    _regranted(named)
+    _withdraw_place_name(named, "structured_extraction")
+    source, marker = _seal(tmp_path)
+    _restore(purged, dump, blobs)
+    # The backup's decisions, moved ahead of this host's clock as a clock running behind the
+    # source's would see them. Only the schema owner can, with the append-only trigger idle.
+    connection = purged.repository.connection
+    with connection.transaction():
+        connection.execute("set local session_replication_role = replica")
+        moved = connection.execute(
+            "update place_name_right_event set decided_at = clock_timestamp() + interval '1 day' "
+            "where model_role = 'structured_extraction'"
+        ).rowcount
+    assert moved == len(_chains(named)), "one grant per chain in the backup"
+
+    with pytest.raises(RestoreRefused, match="place_name_right withdrawal was not continued"):
+        _replay(source, marker)
+    for key, chain in _chains(named).items():
+        assert [event["event"] for event in chain] == ["granted"], key
+    with pytest.raises(RestoreRefused, match="pending"):
+        verify_restore(purged.database(), marker)
+
+
+def test_a_place_name_withdrawal_the_backups_chain_has_passed_is_refused_by_name(
+    named, purged, commands, tmp_path
+):
+    """A carried decision at a position the restored chain already holds follows nothing here.
+
+    A backup the checkpoint was sealed after never holds such a chain; the database refuses the
+    write, and the replay names the kind rather than continuing a chain it cannot place.
+    """
     _grant_place_name(named, "structured_extraction")
     dump, blobs = _backup(purged, tmp_path)
     _withdraw_place_name(named, "structured_extraction")
     source, marker = _checkpoint_only(tmp_path)
 
-    def out_of_its_chain(record) -> None:
+    def passed(record) -> None:
         for item in record["withdrawals"]:
             if item["kind"] == "place_name_right":
-                item["row"]["sequence"] = 7
+                item["row"]["sequence"] = 0
 
-    _edited(source, out_of_its_chain)
+    _edited(source, passed)
     _prepare(source, marker)
     _restore(purged, dump, blobs)
     with pytest.raises(RestoreRefused, match="place_name_right withdrawal cannot follow"):

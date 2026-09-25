@@ -1,9 +1,10 @@
 """The withdrawal catalog a restore carries, held to the schema it describes.
 
-``exulanica/deletion/withdrawals.v1.json`` names every withdrawal outside the tombstone table and
+``exulanica/deletion/withdrawals.v2.json`` names every withdrawal outside the tombstone table and
 how a restore writes each again. These tests ask the migrated schema, not a list: every table or
-column shaped like a withdrawal is either carried or excluded by name with a reason; migration
-0107's seal guards exactly the catalog's tables; every kind is stated in the schema's own terms;
+column shaped like a withdrawal is either carried or excluded by name with a reason; the seal of
+migrations 0107 and 0109 guards exactly the catalog's tables; every kind is stated in the schema's
+own terms;
 and every kind's statements run against it. The real restores are in
 ``tests/test_restore_replay_withdrawals.py``; the branches of a single write are held here.
 """
@@ -25,6 +26,7 @@ from exulanica.deletion.withdrawals import (
 )
 from exulanica.ingest.person_review import create_subject, record_consent
 from exulanica.models.manifest import Role
+from exulanica.orchestration.restore import WRITERS
 
 from test_purge import purged as purged
 from test_search_entries_on_stop import ACCOUNT, _stop
@@ -97,12 +99,16 @@ def test_every_withdrawal_shaped_table_is_carried_or_excluded_by_name(repository
     assert {"personal_model_right", "place_name_right_event", "retraction"} <= set(found)
     uncovered = sorted(set(found) - _TABLES - _EXCLUDED)
     assert uncovered == [], (
-        f"carry these in withdrawals.v1.json or exclude them by name: {uncovered}"
+        f"carry these in withdrawals.v2.json or exclude them by name: {uncovered}"
     )
     for kind in CATALOG:
         if kind.shape == "event":
             continue  # an event kind carries its whole row
-        named = {*kind.columns, kind.withdrawn.column, *(c.column for c in kind.carried_when)}
+        named = {
+            *kind.columns,
+            kind.withdrawn.column,
+            *(c.column for c in kind.carried_when if c.of is None),
+        }
         assert found.get(kind.table, set()) <= named, (kind.kind, found.get(kind.table))
     tables = {
         row["relname"]
@@ -181,19 +187,29 @@ def test_every_kind_is_stated_in_the_schemas_own_terms(repository, spine_schema)
     unique = {(table.split(".")[-1], key) for table, key in unique}
     for kind in CATALOG:
         named = [
-            *kind.identity,
-            *kind.columns,
-            kind.withdrawn.column,
-            *(c.column for c in kind.carried_when),
-            *((kind.order,) if kind.order else ()),
+            (kind.table, column)
+            for column in (
+                *kind.identity,
+                *kind.columns,
+                kind.withdrawn.column,
+                *((kind.order,) if kind.order else ()),
+            )
         ]
-        missing = [c for c in named if (kind.table, c) not in columns]
+        for condition in kind.carried_when:
+            joined = condition.of
+            if joined is None:
+                named.append((kind.table, condition.column))
+                continue
+            named.append((joined.table, condition.column))
+            named.extend((table, c) for c in joined.on for table in (kind.table, joined.table))
+        missing = [pair for pair in named if pair not in columns]
         assert missing == [], (kind.kind, missing)
         assert (kind.table, tuple(sorted(kind.identity))) in unique, (kind.kind, kind.identity)
         if kind.ends is not None:
             assert all((kind.ends.table, c) in columns for c in kind.ends.columns), kind.kind
             assert all((kind.table, c) in columns for c in kind.ends.columns), kind.kind
         for condition in (kind.withdrawn, *kind.carried_when):
+            table = kind.table if condition.of is None else condition.of.table
             for value in condition.in_ or ():
                 admitted = _rows(
                     connection,
@@ -201,9 +217,9 @@ def test_every_kind_is_stated_in_the_schemas_own_terms(repository, spine_schema)
                     "and pg_get_constraintdef(c.oid) like %s) or exists (select 1 from pg_enum e "
                     "join pg_attribute a on a.atttypid=e.enumtypid where a.attrelid=%s::regclass "
                     "and a.attname=%s and e.enumlabel=%s) as admitted",
-                    kind.table,
+                    table,
                     f"%'{value}'%",
-                    kind.table,
+                    table,
                     condition.column,
                     value,
                 )[0]["admitted"]
@@ -253,7 +269,7 @@ def test_every_kinds_statements_run_against_the_schema(repository, spine_schema)
             elif type_name in _SYNTHETIC:
                 row[column] = _SYNTHETIC[type_name]()
         with connection.transaction(force_rollback=True):
-            assert reapply(connection, Carried(kind.kind, row)) == "absent", kind.kind
+            assert reapply(connection, Carried(kind.kind, row), WRITERS) == "absent", kind.kind
 
 
 # -- one write's branches ---------------------------------------------------------------------
@@ -275,10 +291,12 @@ def test_a_column_write_that_finds_another_withdrawal_than_the_checkpoints_refus
     held = _right_row(fixture, right.right_id)
     connection = fixture.repository.connection
 
-    assert reapply(connection, Carried("model_right", held)) == "present"
+    assert reapply(connection, Carried("model_right", held), WRITERS) == "present"
     with pytest.raises(CarryRefused, match="another withdrawal than the checkpoint records"):
         reapply(
-            connection, Carried("model_right", {**held, "withdrawn_at": "2099-01-01T00:00:00Z"})
+            connection,
+            Carried("model_right", {**held, "withdrawn_at": "2099-01-01T00:00:00Z"}),
+            WRITERS,
         )
 
 
@@ -300,15 +318,19 @@ def test_an_event_write_finds_it_present_differing_already_ended_or_absent(purge
     )
     row = withdrawal["row"]
 
-    assert reapply(connection, Carried("presentation_consent", row)) == "present"
+    assert reapply(connection, Carried("presentation_consent", row), WRITERS) == "present"
     with pytest.raises(CarryRefused, match="differs from the withdrawal the checkpoint records"):
-        reapply(connection, Carried("presentation_consent", {**row, "actor_id": str(uuid.uuid4())}))
+        reapply(
+            connection,
+            Carried("presentation_consent", {**row, "actor_id": str(uuid.uuid4())}),
+            WRITERS,
+        )
     later = {**row, "consent_id": str(uuid.uuid4()), "sequence": row["sequence"] + 2}
-    assert reapply(connection, Carried("presentation_consent", later)) == "already"
+    assert reapply(connection, Carried("presentation_consent", later), WRITERS) == "already"
     nobody = {**later, "subject_id": str(uuid.uuid4())}
-    assert reapply(connection, Carried("presentation_consent", nobody)) == "absent"
+    assert reapply(connection, Carried("presentation_consent", nobody), WRITERS) == "absent"
 
 
 def test_a_carried_withdrawal_of_a_kind_the_catalog_does_not_name_is_refused(purged):
     with pytest.raises(CarryRefused, match="unknown kind 'rumour'"):
-        reapply(purged.repository.connection, Carried("rumour", {}))
+        reapply(purged.repository.connection, Carried("rumour", {}), WRITERS)

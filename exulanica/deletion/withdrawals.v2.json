@@ -1,6 +1,6 @@
 {
-  "profile": "exulanica.restore-withdrawal-catalog/v1",
-  "note": "Every withdrawal a person can make that lives outside the tombstone table, which a restore from an older backup would otherwise undo. A restore checkpoint of profile exulanica.restore-tombstone-checkpoint/v2 carries each row this names, and replay writes each one again into the restored database, before any tombstone, by the same statement the product writes: a column kind sets the columns a withdrawal sets on a row whose withdrawal is still open, and an event kind appends the withdrawal's own row. `withdrawn` is the condition a withdrawn row meets; `carried_when` narrows it; `workspace` names the column that says which workspace a row belongs to, or null for a row no workspace owns. An event kind's `ends` names the rows the withdrawal ends, and `order` the column that orders a chain of decisions. `excluded` names every other withdrawal-shaped table or column in the schema and why it is not carried; tests/test_restore_replay_withdrawal_catalog.py fails on any the catalog neither carries nor excludes.",
+  "profile": "exulanica.restore-withdrawal-catalog/v2",
+  "note": "Every withdrawal a person can make that lives outside the tombstone table, which a restore from an older backup would otherwise undo. A restore checkpoint of profile exulanica.restore-tombstone-checkpoint/v2 carries each row this names, and replay writes each one again into the restored database, before any tombstone, by the same statement the product writes: a column kind sets the columns a withdrawal sets on a row whose withdrawal is still open, and an event kind appends the withdrawal's own row. `withdrawn` is the condition a withdrawn row meets; `carried_when` narrows it; `workspace` names the column that says which workspace a row belongs to, or null for a row no workspace owns. A condition with `of` tests a column of the row the carried row names in another table, joined on the `on` columns. An event kind's `ends` names the rows the withdrawal ends, and `order` the column that orders a chain of decisions. `writer` names the product's own writer that writes the carried row, where a row alone is not the whole withdrawal; `continues` names the writer that continues a chain whose restored last decision the carried row cannot follow, because a decision was made after the backup. Both are names of the writers the restore command gives replay (WRITERS in exulanica/orchestration/restore.py); replay refuses, when it starts and before it writes anything, writers other than exactly the names this catalog uses (require_writers in exulanica/deletion/withdrawals.py). `excluded` names every other withdrawal-shaped table or column in the schema and why it is not carried; tests/test_restore_replay_withdrawal_catalog.py fails on any the catalog neither carries nor excludes.",
   "kinds": [
     {
       "kind": "model_right",
@@ -95,7 +95,8 @@
         "table": "place_name_right_event",
         "columns": ["workspace_id", "entity_id", "model_provider", "model_role", "model_id", "model_revision", "destination"]
       },
-      "order": "sequence"
+      "order": "sequence",
+      "continues": "place_name_chain"
     },
     {
       "kind": "presentation_consent",
@@ -132,6 +133,21 @@
       "workspace": "workspace_id",
       "ends": {"table": "material_recipe", "columns": ["workspace_id", "recipe_id"]},
       "order": null
+    },
+    {
+      "kind": "retraction",
+      "table": "retraction",
+      "shape": "event",
+      "note": "A person withdrawing a claim they made: the retraction row, and assertion.status 'retracted', which the product's retract writes together (exulanica/epistemics/assertions.py). Retracting a name clears the place or person's display name (migration 0002), and a place-name right rests on an active naming claim (0097), so a retraction can end a right. Every row is a retraction; only a retraction of a claim a person stated (kind 'user') is carried. The other writer, a tombstone's cascade (0031), retracts reconstruction_scene_rung_is claims, which only an inference may state, and the replayed tombstone retracts them again.",
+      "identity": ["retraction_id"],
+      "withdrawn": {"column": "retraction_id", "is": "not null"},
+      "carried_when": [
+        {"column": "kind", "in": ["user"], "of": {"table": "assertion", "on": ["workspace_id", "assertion_id"]}}
+      ],
+      "workspace": "workspace_id",
+      "ends": {"table": "assertion", "columns": ["workspace_id", "assertion_id"]},
+      "order": null,
+      "writer": "retract"
     }
   ],
   "excluded": [
@@ -152,12 +168,8 @@
       "reason": "A decision about how a place record and an entity relate, which a later decision can reverse. It withdraws no permission and no consent."
     },
     {
-      "table": "retraction",
-      "reason": "A retraction withdraws a claim, and one retraction writes two rows no trigger ties together: this row and assertion.status (exulanica/epistemics/assertions.py retract). The generic event insert would record it without retracting the claim. A claim is not a permission or a consent; a restore returns claims to the backup's state like any other authored edit."
-    },
-    {
       "table": "assertion",
-      "reason": "assertion.status 'retracted' is the second row of a retraction; see retraction."
+      "reason": "assertion.status 'retracted' is the second row of a retraction, written again with it by the retraction kind's writer. A status a tombstone's cascade sets (migrations 0030 and 0031) is written again by the replayed tombstone."
     },
     {
       "table": "consent_record",

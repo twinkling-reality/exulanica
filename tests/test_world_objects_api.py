@@ -96,7 +96,11 @@ class ObjectsApi:
             {"title": title, "source_snapshot_id": str(self.snapshot_id)},
         )
         assert response.status_code == 201, response.text
-        return response.json()
+        # A version made from a snapshot copies nothing, so it leaves nothing out; the rest of the
+        # body is the version every other route answers with.
+        body = response.json()
+        assert body.pop("left_behind") == []
+        return body
 
     def add(self, version, **overrides):
         """Add an object to ``version``, in the world the version document names (this
