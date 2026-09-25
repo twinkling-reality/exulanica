@@ -30,7 +30,7 @@ from exulanica.world.society_action_repository import SocietyActionRepository
 from exulanica.world.society_actions import ActionIntent
 from exulanica.world.society_authored_ground import LATTICE_MM, NAVIGATION_PROFILE
 from exulanica.world.society_composition import reviewed_affordance_registry
-from exulanica.world.society_input_policy import AUTHORED_GROUND_INPUT_V2
+from exulanica.world.society_input_policy import AUTHORED_GROUND_INPUT_V3
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.starter import (
     AUTHORED_GROUND_MODULE_VERSION,
@@ -219,8 +219,8 @@ def create_society(world, profile="exulanica-society/v2"):
 def test_an_empty_starter_has_a_walkable_area_and_nothing_to_do_in_it(saved_world):
     document = initial(saved_world)
     navigation = document["navigation"]
-    # A saved world's new input is composed under the second saved-world profile.
-    assert document["profile"] == AUTHORED_GROUND_INPUT_V2
+    # A saved world's new input is composed under the newest saved-world profile.
+    assert document["profile"] == AUTHORED_GROUND_INPUT_V3
     assert document["availability"] == "available"
     assert navigation["profile"] == NAVIGATION_PROFILE
     assert document["frame"]["name"] == "authored-ground-local-mm"

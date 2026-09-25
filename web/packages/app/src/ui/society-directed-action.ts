@@ -67,6 +67,11 @@ export function describeSocietyActionRecord(record: SocietyActionRecord): string
     + 'This is a synthetic society record, not personal evidence.';
 }
 
+/** Words for a refusal the server names by a code a person would not read as a reason. */
+const REFUSAL_WORDS: Readonly<Record<string, string>> = {
+  inhabitant_already_there: 'They are already there, using it now.',
+};
+
 export function describeSocietyActionFailure(error: unknown): string {
   if (error instanceof ApiError) {
     const prefix = `${error.code}: `;
@@ -80,7 +85,7 @@ export function describeSocietyActionFailure(error: unknown): string {
       return `Directed action unavailable: ${detail}`;
     }
     if (error.status === 409 || error.code === 'invalid_society_action' || error.code === 'stale_society_state') {
-      return `Directed action refused: ${detail}`;
+      return `Directed action refused: ${REFUSAL_WORDS[detail] ?? detail}`;
     }
     return `Directed action unavailable (${error.code}): ${detail}`;
   }

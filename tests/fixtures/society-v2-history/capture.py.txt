@@ -1,0 +1,206 @@
+"""Record a saved world's v2 society, as the product stores it, for a replay test.
+
+Run on the tree before the routine change. It makes a starter world, places the small square in
+front of where a person arrives, brings in inhabitants with the browser's seed, and advances
+TICKS minutes through the routes a browser calls, with a directed request, an edit, and everyone
+sent away and brought back on the way. It checks the product's own replay, then writes every
+stored row replay reads, as canonical JSON, to the path given.
+"""
+
+import hashlib
+import json
+import subprocess
+import sys
+import tempfile
+import uuid
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from measure_living_square import Api, _database, make_square, viewer_facing  # noqa: E402,F401
+from measure_living_world_pace import place  # noqa: E402
+
+from exulanica.canonical import canonical_json  # noqa: E402
+
+SEED = "7a" * 32
+TICKS = 30
+DIRECT_AT = 5
+EDIT_AT = 10
+AWAY_AT = 15
+BACK_AT = 18
+
+
+def main(out: Path) -> None:
+    import psycopg
+    from fastapi.testclient import TestClient
+    from psycopg.rows import dict_row
+
+    from exulanica.api.app import create_app
+    from exulanica.api.authorisation import API_TOKENS_ENV
+    from exulanica.api.permissions import Permission
+    from exulanica.api.services import (
+        DATA_DIR_ENV,
+        DERIVATIVE_WORKER_ENV,
+        READONLY_DATABASE_URL_ENV,
+        build_services,
+    )
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.db.session import DATABASE_URL_ENV
+
+    grant = {"id": uuid.uuid4(), "actor": uuid.uuid4(), "token": f"capture-{uuid.uuid4().hex}"}
+    as_run = Path(__file__).read_bytes()
+    with _database() as urls:
+        with psycopg.connect(urls["owner"], autocommit=True) as owner:
+            provision_workspace(owner, grant["id"])
+        environ = {
+            DATABASE_URL_ENV: urls["runtime"],
+            READONLY_DATABASE_URL_ENV: urls["readonly"],
+            DATA_DIR_ENV: tempfile.mkdtemp(prefix="v2-history-"),
+            DERIVATIVE_WORKER_ENV: "off",
+            API_TOKENS_ENV: json.dumps(
+                {
+                    grant["token"]: {
+                        "workspace_id": str(grant["id"]),
+                        "actor": str(grant["actor"]),
+                        "permissions": [str(p) for p in Permission],
+                    }
+                }
+            ),
+        }
+        with TestClient(create_app(build_services(environ), verify=False)) as http:
+            api = Api(http, grant["token"])
+            world = make_square(api, "Recorded v2 society")
+            society = f"/world/versions/{world['version']}/society"
+            scope = world["scope"]
+            state = api(
+                "POST",
+                society,
+                params=scope,
+                json={"region_id": world["region"], "seed": SEED, "profile": "exulanica-society/v2"},
+            )
+            places = api("GET", society, params={**scope, "places": "true"})["places"]
+            rest = next(t for t in places["targets"] if t["affordance"] == "rest" and t["enabled"])
+            directed = False
+            while state["current_tick"] < TICKS:
+                tick = state["current_tick"]
+                base = {"base_tick": tick, "base_state_sha256": state["state_sha256"]}
+                free = [
+                    p for p in state["state"]["inhabitants"]
+                    if p["action"]["status"] == "completed"
+                ]
+                if tick >= DIRECT_AT and not directed and free:
+                    directed = True
+                    api(
+                        "POST",
+                        society + "/actions",
+                        params=scope,
+                        json={
+                            **base,
+                            "idempotency_key": str(uuid.uuid4()),
+                            "subject_id": free[0]["id"],
+                            "intent": {"kind": "go_to", "target_id": rest["target_id"]},
+                        },
+                    )
+                if tick == EDIT_AT:
+                    by_key = {a["asset_key"]: a for a in api("GET", "/world/assets")}
+                    cube = by_key["cc0.marker-cube"]
+                    place(
+                        api,
+                        world,
+                        {
+                            "object_id": "object:placed-later",
+                            "asset_sha256": cube["content_sha256"],
+                            "x_mm": 8000,
+                            "z_mm": 0,
+                            "yaw_microradians": 0,
+                        },
+                    )
+                if tick in (AWAY_AT, BACK_AT):
+                    state = api(
+                        "POST",
+                        society + "/presence",
+                        params=scope,
+                        json={
+                            **base,
+                            "idempotency_key": str(uuid.uuid4()),
+                            "presence": "away" if tick == AWAY_AT else "here",
+                        },
+                    )
+                    continue
+                state = api("POST", society + "/steps", params=scope, json=base)
+            replay = api("GET", society + "/replay", params=scope)
+            assert replay["replay_verified"] is True
+            assert directed
+        with psycopg.connect(urls["owner"], row_factory=dict_row) as owner:
+            ws = grant["id"]
+            row = owner.execute(
+                "select society_id,world_id,version_id,place_id,region_id,engine_version,seed,"
+                "population_size,current_tick,state,state_sha256 from world_society "
+                "where workspace_id=%s and world_id=%s",
+                (ws, scope["world_id"]),
+            ).fetchone()
+            sid = row["society_id"]
+            inputs = owner.execute(
+                "select input_seq,document,document_sha256 from world_society_input "
+                "where workspace_id=%s and society_id=%s order by input_seq",
+                (ws, sid),
+            ).fetchall()
+            transitions = owner.execute(
+                "select tick,from_input_seq,to_input_seq,previous_state_sha256,state_sha256,"
+                "event_ids,events_sha256 from world_society_transition "
+                "where workspace_id=%s and society_id=%s order by tick",
+                (ws, sid),
+            ).fetchall()
+            events = owner.execute(
+                "select event_id,tick,event_kind,subject_id,object_id,document,document_sha256 "
+                "from world_society_event where workspace_id=%s and society_id=%s "
+                "order by tick,(document->>'order')::integer,event_id",
+                (ws, sid),
+            ).fetchall()
+            actions = owner.execute(
+                "select request.action_seq,request.document,request.document_sha256,"
+                "binding.tick,binding.disposition,binding.event_id "
+                "from world_society_action_request request "
+                "left join world_society_transition_action binding "
+                "using(workspace_id,society_id,action_seq) "
+                "where request.workspace_id=%s and request.society_id=%s "
+                "order by request.action_seq",
+                (ws, sid),
+            ).fetchall()
+            presences = owner.execute(
+                "select tick,document,document_sha256 from world_society_presence "
+                "where workspace_id=%s and society_id=%s order by tick",
+                (ws, sid),
+            ).fetchall()
+
+    def plain(value):
+        return json.loads(json.dumps(value, default=str))
+
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    diff = subprocess.run(
+        ["git", "diff", "HEAD", "--binary", "--", "exulanica"], cwd=ROOT, capture_output=True, check=True
+    ).stdout
+    document = {
+        "profile": "exulanica.recorded-society-history/v1",
+        "recorded_on": {
+            "head": head,
+            "exulanica_diff_head_sha256": hashlib.sha256(diff).hexdigest(),
+            "capture_script_sha256": hashlib.sha256(as_run).hexdigest(),
+        },
+        "society": plain({k: v for k, v in row.items() if k not in ("world_id", "region_id")}),
+        "inputs": plain(inputs),
+        "transitions": plain(transitions),
+        "events": plain(events),
+        "actions": plain(actions),
+        "presences": plain(presences),
+    }
+    out.write_bytes(canonical_json(document))
+    print(f"wrote {out}: {len(inputs)} inputs, {len(transitions)} transitions, "
+          f"{len(events)} events, {len(actions)} actions, {len(presences)} presences")
+
+
+if __name__ == "__main__":
+    main(Path(sys.argv[1]))

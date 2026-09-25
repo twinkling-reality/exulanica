@@ -7,11 +7,18 @@ export type SocietyProfile =
   | 'exulanica-society/v3'
   | 'exulanica-society/v4';
 
-/** The v2 goal: one reviewed affordance at one target, or a walk that makes room at a busy destination, which names no target. */
+/**
+ * The v2 goal: one reviewed affordance at one target, a walk that makes room at a busy
+ * destination, standing a while at an open spot, or talking with one other person. Only the first
+ * names a target.
+ */
 export interface PurposefulGoal {
-  readonly kind: 'visit' | 'rest' | 'make_room';
+  readonly kind: 'visit' | 'rest' | 'make_room' | 'stand' | 'talk';
   readonly target_id: string | null;
   readonly reason: string;
+  /** Talking: the other person, and the minutes the two talk once both are there. */
+  readonly partner_id?: string;
+  readonly duration_ticks?: number;
 }
 
 /** The v4 goal: a catalogued activity, where it happens, and why it was the most pressing. */
@@ -37,6 +44,8 @@ export interface SocietyInhabitantSnapshot {
     readonly destination_id?: string | null;
     readonly remaining_ticks?: number;
     readonly reason: string;
+    /** What finishing a stay relieves, carried by a stay begun under a routine an input records. */
+    readonly relief_milli?: number;
   };
   readonly route?: null | {
     readonly node_ids: readonly string[];

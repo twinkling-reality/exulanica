@@ -13,8 +13,10 @@ from exulanica.world.society_planner import (
     PLACE_INPUTS,
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,
+    ends_on_request,
     held_nodes,
     input_graph,
+    routine_of,
     supports,
     validate_society_input,
 )
@@ -168,6 +170,21 @@ def _reachable(person: dict[str, Any], document: dict[str, Any], target: dict[st
     return target["node_id"] in visited
 
 
+def may_be_directed(person: dict[str, Any], document: dict[str, Any]) -> bool:
+    """Whether a direct request may send ``person`` somewhere, under the input it is made against.
+
+    Nobody is doing anything, what they did is over or blocked, or it is a stay the request ends
+    (``ends_on_request``: a stay under a routine that draws its stays). A walk is left to arrive.
+    The database holds a recorded request to this same rule (``society_person_may_be_directed``,
+    migration 0108), and tests/test_society_request_rule_parity.py holds the two equal.
+    """
+    return (
+        person["goal"] is None
+        or person["action"]["status"] in ("completed", "blocked")
+        or ends_on_request(routine_of(document), person)
+    )
+
+
 def _request_reason(
     state: dict[str, Any], document: dict[str, Any], request: dict[str, Any]
 ) -> tuple[ActionDispositionKind, str]:
@@ -185,8 +202,15 @@ def _request_reason(
     person = _people(state).get(request["subject_id"])
     if person is None:
         return "rejected", "unknown_inhabitant"
-    if person["goal"] is not None and person["action"]["status"] not in ("completed", "blocked"):
+    if not may_be_directed(person, document):
         return "rejected", "inhabitant_action_in_progress"
+    if (
+        ends_on_request(routine_of(document), person)
+        and (person["target"] or {}).get("target_id") == request["intent"]["target_id"]
+    ):
+        # Asked to go where they already are, doing it now: there is nothing to end, and ending
+        # it would only start the same stay again.
+        return "rejected", "inhabitant_already_there"
     target = _target(document, request["intent"]["target_id"])
     if target is None or not target["enabled"] or target != request["target"]:
         return "stale", "canonical_target_changed"

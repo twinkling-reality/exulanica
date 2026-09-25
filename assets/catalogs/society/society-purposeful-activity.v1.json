@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-purposeful-activity",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "rest",
+      "label": "resting",
+      "setting": "object",
+      "affordance": "rest",
+      "object_kind": "any",
+      "choice": "nearest",
+      "duration_minimum_ticks": 3,
+      "duration_maximum_ticks": 3,
+      "relief_milli": 500,
+      "preferred_at_need_milli": 750,
+      "weight_milli": 0,
+      "reach_mm": 0,
+      "spacing_mm": 0,
+      "reason": "The rest the purposeful society was first released with, and every input that records no routine is read under: three minutes at the nearest rest place a person has not just used, the reviewed rest duration a district declares, taken once a person's need reaches 750 and relieving 500 of it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica purposeful society; see the entry reason"
+      }
+    },
+    {
+      "key": "visit",
+      "label": "visiting",
+      "setting": "object",
+      "affordance": "visit",
+      "object_kind": "any",
+      "choice": "nearest",
+      "duration_minimum_ticks": 1,
+      "duration_maximum_ticks": 1,
+      "relief_milli": 20,
+      "preferred_at_need_milli": 0,
+      "weight_milli": 1000,
+      "reach_mm": 0,
+      "spacing_mm": 0,
+      "reason": "The visit the purposeful society was first released with, and every input that records no routine is read under: one minute at the nearest visit place a person has not just used, the reviewed visit duration a district declares, chosen whenever rest is not preferred and relieving 20 of the need.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica purposeful society; see the entry reason"
+      }
+    }
+  ]
+}

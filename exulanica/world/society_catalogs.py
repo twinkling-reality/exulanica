@@ -12,14 +12,24 @@ Schemas are keyed by catalog id and version, so two versions of one catalog can 
 side. The directory keeps every version any schema names, and holds nothing a schema does not
 name. A model reads one version of each catalog: a new society reads ``ROUTINE_VERSIONS``, and a
 stored society reads the versions it recorded.
+
+The purposeful society (``exulanica-society/v2`` and ``v3``) reads a routine of its own from the
+same directory, :func:`load_purposeful_routine`: one catalog, ``society-purposeful-activity``, of
+what its people do, how long each stay lasts and how it varies, what it relieves and how often it
+is chosen. It is not the living society's activity catalog, whose activities relieve that model's
+five needs and whose versions living states record by digest. An input a saved world composes
+records the purposeful routine it was composed under (``PURPOSEFUL_ROUTINE_VERSIONS``), and an
+input that records none is read under ``UNRECORDED_ROUTINE_VERSIONS``, the rules the society was
+first released with, so no stored input changes meaning.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from exulanica.grammar.catalogs import (
     Catalog,
@@ -34,15 +44,26 @@ from exulanica.grammar.catalogs import (
 from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.records import KEY_PATTERN
 
+if TYPE_CHECKING:
+    from exulanica.world.object_catalog import WorldObjectCatalog
+
 __all__ = [
+    "PURPOSEFUL_CATALOG",
+    "PURPOSEFUL_ROUTINE_VERSIONS",
     "ROUTINE_DIRECTORY",
     "ROUTINE_VERSIONS",
+    "UNRECORDED_ROUTINE_VERSIONS",
     "Activity",
     "CapacityRule",
     "Need",
+    "PurposefulActivity",
+    "PurposefulRoutine",
     "RoutineModel",
     "UseClass",
+    "check_object_kinds",
+    "load_purposeful_routine",
     "load_routine_model",
+    "purposeful_routine",
 ]
 
 ROUTINE_DIRECTORY: Final = (
@@ -58,6 +79,24 @@ ROUTINE_VERSIONS: Final = {
     "society-policy": 1,
     "society-use-class": 1,
 }
+#: The one catalog the purposeful society's routine reads.
+PURPOSEFUL_CATALOG: Final = "society-purposeful-activity"
+#: The purposeful routine a saved world's new input records: people stay a while, varied, at what
+#: they use, and some stand or stop to talk.
+PURPOSEFUL_ROUTINE_VERSIONS: Final = {PURPOSEFUL_CATALOG: 2}
+#: The purposeful routine an input that records none is read under: every input composed before
+#: inputs recorded a routine, and every district input, keeps the rules it was recorded with.
+UNRECORDED_ROUTINE_VERSIONS: Final = {PURPOSEFUL_CATALOG: 1}
+#: Where a purposeful activity happens: at a place an object states, at an open spot of the
+#: ground, or at two open spots beside each other, one for each of two people.
+PURPOSEFUL_SETTINGS: Final = ("object", "open", "pair")
+#: How a person picks where: the nearest free place they have not just used, the rule the society
+#: was released with, or a draw from the seed among every free one.
+PURPOSEFUL_CHOICES: Final = ("nearest", "drawn")
+#: An object entry's kind that stands for every kind of its affordance with no entry of its own,
+#: and the kind of an activity that is at no object.
+ANY_KIND: Final = "any"
+NO_KIND: Final = "none"
 MINUTES_PER_DAY: Final = 1440
 MODES: Final = ("need", "shift")
 SETTINGS: Final = ("destination", "home", "standing", "work")
@@ -102,6 +141,8 @@ def _choice(options: tuple[str, ...]) -> Callable[[str, object], FieldValue]:
 _MILLI = integer_field(0, 1000)
 _MINUTE = integer_field(0, MINUTES_PER_DAY)
 _TICKS = integer_field(1, MINUTES_PER_DAY)
+#: A reach or a spacing on a saved world's ground, bounded as every reach is (``MAX_REACH_MM``).
+_REACH = integer_field(0, 10_000)
 
 
 def _need_bounds(where: str, values: dict[str, FieldValue]) -> None:
@@ -118,6 +159,34 @@ def _activity_bounds(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: only a shift activity takes place at work")
     if values["indoors"] not in (0, 1):
         raise CatalogError(f"{where}: indoors is 0 or 1")
+
+
+def _purposeful_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    if values["duration_minimum_ticks"] > values["duration_maximum_ticks"]:  # type: ignore[operator]
+        raise CatalogError(f"{where}: duration_minimum_ticks is at most duration_maximum_ticks")
+    setting, affordance, kind = values["setting"], values["affordance"], values["object_kind"]
+    if (setting == "object") == (affordance == NO_KIND) or (setting == "object") == (
+        kind == NO_KIND
+    ):
+        raise CatalogError(f"{where}: exactly the object activities name an affordance and a kind")
+    reach, spacing = values["reach_mm"], values["spacing_mm"]
+    if (setting == "object") != (reach == 0) or (setting == "pair") != (spacing != 0):
+        raise CatalogError(
+            f"{where}: an open or pair activity states how far it reaches, and only a pair how "
+            "far apart its two people stand; an object's reach is its registry row's"
+        )
+    if (
+        values["choice"] == "nearest"
+        and values["duration_minimum_ticks"] != values["duration_maximum_ticks"]
+    ):
+        raise CatalogError(f"{where}: the nearest-place rule stays a fixed time")
+    if kind not in (ANY_KIND, NO_KIND) and (
+        values["weight_milli"] != 0 or values["preferred_at_need_milli"] != 0
+    ):
+        raise CatalogError(
+            f"{where}: how often an activity is chosen is its affordance's, so an entry for one "
+            "kind states weight 0 and preference 0"
+        )
 
 
 def _use_class_bounds(where: str, values: dict[str, FieldValue]) -> None:
@@ -200,6 +269,30 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         1,
         (("value", integer_field(0, 10**9)), ("reason", text_field)),
     ),
+    **{
+        (PURPOSEFUL_CATALOG, version): CatalogSchema(
+            PURPOSEFUL_CATALOG,
+            version,
+            (
+                ("label", text_field),
+                ("setting", _choice(PURPOSEFUL_SETTINGS)),
+                ("affordance", _key),
+                ("object_kind", _key),
+                ("choice", _choice(PURPOSEFUL_CHOICES)),
+                ("duration_minimum_ticks", _TICKS),
+                ("duration_maximum_ticks", _TICKS),
+                ("relief_milli", _MILLI),
+                # 0 is never: no need is below zero, so a threshold of 0 would always prefer it.
+                ("preferred_at_need_milli", _MILLI),
+                ("weight_milli", integer_field(0, 10_000)),
+                ("reach_mm", _REACH),
+                ("spacing_mm", _REACH),
+                ("reason", text_field),
+            ),
+            entry_check=_purposeful_bounds,
+        )
+        for version in (1, 2)
+    },
 }
 
 
@@ -276,8 +369,92 @@ class RoutineModel:
         return {"catalog_versions": dict(sorted(self.versions.items())), "sha256": self.sha256}
 
 
+@dataclass(frozen=True, slots=True)
+class PurposefulActivity:
+    """One thing a purposeful society's people do: where, for how long, and how it is chosen."""
+
+    key: str
+    label: str
+    setting: str
+    affordance: str
+    object_kind: str
+    choice: str
+    duration_minimum: int
+    duration_maximum: int
+    relief: int
+    #: The need at or above which a person prefers this to every other activity; 0 is never.
+    preferred_at_need: int
+    weight: int
+    reach_mm: int
+    spacing_mm: int
+
+
+@dataclass(frozen=True, slots=True)
+class PurposefulRoutine:
+    """The activities of one purposeful routine version, looked up as the planner asks for them."""
+
+    activities: Mapping[str, PurposefulActivity]
+    versions: Mapping[str, int]
+    sha256: str
+
+    def binding(self) -> dict[str, object]:
+        """What an input records about the routine it was composed under."""
+        return {"catalog_versions": dict(sorted(self.versions.items())), "sha256": self.sha256}
+
+    @property
+    def choice(self) -> str:
+        """How a person picks where, the same for every activity of one routine."""
+        return next(iter(self.activities.values())).choice
+
+    def default(self, affordance: str) -> PurposefulActivity:
+        """The activity of an affordance at a kind that states none of its own."""
+        return next(
+            activity
+            for activity in self.activities.values()
+            if activity.affordance == affordance and activity.object_kind == ANY_KIND
+        )
+
+    def at_object(self, affordance: str, kind: str) -> PurposefulActivity:
+        """What people do at an object of ``kind`` offering ``affordance``: its own entry, else
+        the affordance's default."""
+        for activity in self.activities.values():
+            if activity.affordance == affordance and activity.object_kind == kind:
+                return activity
+        return self.default(affordance)
+
+    def in_setting(self, setting: str) -> PurposefulActivity | None:
+        """The one open or pair activity, or None when this routine has none."""
+        return next((a for a in self.activities.values() if a.setting == setting), None)
+
+    @property
+    def affordances(self) -> tuple[str, ...]:
+        """The affordances an object may offer under this routine, in order."""
+        return tuple(
+            sorted(a.affordance for a in self.activities.values() if a.object_kind == ANY_KIND)
+        )
+
+
 def _values(catalog: Catalog) -> dict[str, dict[str, FieldValue]]:
     return {entry.key: dict(entry.values) for entry in catalog.entries}
+
+
+def _claimed(directory: Path) -> None:
+    """Refuse a directory holding a file no schema claims, or missing one a schema names.
+
+    The directory is asked what is in it, rather than the versions a model reads being taken as an
+    account of it: a catalog dropped in here therefore cannot sit outside every model and every
+    digest a society records, and a version a stored society names cannot quietly leave it.
+    """
+    claimed = {
+        f"{schema.catalog_id}.v{schema.catalog_version}.json": schema for schema in SCHEMAS.values()
+    }
+    present = sorted(path.name for path in directory.glob("*.json"))
+    unexpected = sorted(set(present) - set(claimed))
+    absent = sorted(set(claimed) - set(present))
+    if unexpected or absent:
+        raise CatalogError(
+            f"{directory}: files with no schema {unexpected}, schemas with no file {absent}"
+        )
 
 
 def load_routine_model(
@@ -295,20 +472,7 @@ def load_routine_model(
     for catalog_id, version in sorted(chosen.items()):
         if (catalog_id, version) not in SCHEMAS:
             raise CatalogError(f"{catalog_id} v{version} has no schema")
-    # The directory is asked what is in it, rather than the versions above being taken as an
-    # account of it: a file no schema claims and a schema with no file are both refused. A catalog
-    # dropped in here therefore cannot sit outside every model and every digest a society records,
-    # and a version a stored society names cannot quietly leave the directory.
-    claimed = {
-        f"{schema.catalog_id}.v{schema.catalog_version}.json": schema for schema in SCHEMAS.values()
-    }
-    present = sorted(path.name for path in directory.glob("*.json"))
-    unexpected = sorted(set(present) - set(claimed))
-    absent = sorted(set(claimed) - set(present))
-    if unexpected or absent:
-        raise CatalogError(
-            f"{directory}: files with no schema {unexpected}, schemas with no file {absent}"
-        )
+    _claimed(directory)
     catalogs = [
         load_catalog(
             directory.joinpath(f"{catalog_id}.v{version}.json"), SCHEMAS[(catalog_id, version)]
@@ -403,4 +567,115 @@ def load_routine_model(
         policy=policy,
         versions=chosen,
         sha256=catalog_digest(catalogs),
+    )
+
+
+def load_purposeful_routine(
+    directory: Path = ROUTINE_DIRECTORY, versions: Mapping[str, int] | None = None
+) -> PurposefulRoutine:
+    """Read and cross-check one version of the purposeful routine. Every inconsistency is a
+    CatalogError.
+
+    ``versions`` names the version of each catalog to read; left out, it is the routine a new input
+    records. A kind with no entry of its own is used at its affordance's default entry. Reading a
+    version never consults the world object catalog, so an input that recorded this version stays
+    readable whatever that catalog later drops: whether an entry names a kind that catalog states,
+    offering the entry's own affordance, is asked of a routine about to be recorded
+    (:func:`check_object_kinds`).
+    """
+    chosen = dict(PURPOSEFUL_ROUTINE_VERSIONS if versions is None else versions)
+    if set(chosen) != set(PURPOSEFUL_ROUTINE_VERSIONS):
+        raise CatalogError(
+            f"a purposeful routine reads exactly {sorted(PURPOSEFUL_ROUTINE_VERSIONS)}"
+        )
+    for catalog_id, version in sorted(chosen.items()):
+        if (catalog_id, version) not in SCHEMAS:
+            raise CatalogError(f"{catalog_id} v{version} has no schema")
+    _claimed(directory)
+    catalogs = [
+        load_catalog(
+            directory.joinpath(f"{catalog_id}.v{version}.json"), SCHEMAS[(catalog_id, version)]
+        )
+        for catalog_id, version in sorted(chosen.items())
+    ]
+    activities = {
+        key: PurposefulActivity(
+            key,
+            str(v["label"]),
+            str(v["setting"]),
+            str(v["affordance"]),
+            str(v["object_kind"]),
+            str(v["choice"]),
+            int(v["duration_minimum_ticks"]),  # type: ignore[arg-type]
+            int(v["duration_maximum_ticks"]),  # type: ignore[arg-type]
+            int(v["relief_milli"]),  # type: ignore[arg-type]
+            int(v["preferred_at_need_milli"]),  # type: ignore[arg-type]
+            int(v["weight_milli"]),  # type: ignore[arg-type]
+            int(v["reach_mm"]),  # type: ignore[arg-type]
+            int(v["spacing_mm"]),  # type: ignore[arg-type]
+        )
+        for key, v in _values(catalogs[0]).items()
+    }
+    if len({activity.choice for activity in activities.values()}) != 1:
+        raise CatalogError("every activity of one routine is chosen by the same rule")
+    objects = [a for a in activities.values() if a.setting == "object"]
+    defaults = [a.affordance for a in objects if a.object_kind == ANY_KIND]
+    if not defaults or len(defaults) != len(set(defaults)):
+        raise CatalogError("each affordance has exactly one entry for every kind without its own")
+    kinds = [a.object_kind for a in objects if a.object_kind != ANY_KIND]
+    if len(kinds) != len(set(kinds)):
+        raise CatalogError("an object kind has at most one entry")
+    for setting in ("open", "pair"):
+        if sum(1 for a in activities.values() if a.setting == setting) > 1:
+            raise CatalogError(f"a routine has at most one {setting} activity")
+    if any(activity.affordance not in defaults for activity in objects):
+        raise CatalogError(
+            "every affordance a kind entry offers has an entry for every kind without its own"
+        )
+    return PurposefulRoutine(
+        activities=activities, versions=chosen, sha256=catalog_digest(catalogs)
+    )
+
+
+def check_object_kinds(
+    routine: PurposefulRoutine, catalog: WorldObjectCatalog | None = None
+) -> None:
+    """Refuse by name an entry whose kind the world object catalog lacks or uses otherwise.
+
+    Asked of the routine an input is about to record, against ``catalog`` (left out, the one a
+    running host reads), and by a parity test of the catalogs as they are; never when a recorded
+    routine is read.
+    """
+    from exulanica.world.object_catalog import world_object_catalog
+
+    stated = (world_object_catalog() if catalog is None else catalog).by_key()
+    for activity in routine.activities.values():
+        if activity.setting != "object" or activity.object_kind == ANY_KIND:
+            continue
+        kind = stated.get(activity.object_kind)
+        if kind is None:
+            raise CatalogError(
+                f"{activity.key} names object kind {activity.object_kind!r}, which the world "
+                "object catalog does not state"
+            )
+        if kind.use.affordance != activity.affordance:
+            raise CatalogError(
+                f"{activity.key}: object kind {activity.object_kind!r} offers "
+                f"{kind.use.affordance!r}, not {activity.affordance!r}"
+            )
+
+
+@cache
+def _purposeful(versions: tuple[tuple[str, int], ...], directory: Path) -> PurposefulRoutine:
+    return load_purposeful_routine(directory, versions=dict(versions))
+
+
+def purposeful_routine(versions: Mapping[str, int] | None = None) -> PurposefulRoutine:
+    """The purposeful routine of these catalog versions from the directory as it is, read once.
+
+    Left out, the routine a new input records.
+    """
+    chosen = PURPOSEFUL_ROUTINE_VERSIONS if versions is None else versions
+    return _purposeful(
+        tuple(sorted((str(k), int(v)) for k, v in chosen.items())), ROUTINE_DIRECTORY
     )

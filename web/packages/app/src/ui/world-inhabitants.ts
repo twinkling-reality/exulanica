@@ -145,7 +145,7 @@ const PRESENCE_WORDS: Readonly<Record<string, string>> = {
 export function refusalWords(refusal: NonNullable<InhabitantsView['refusal']>): string {
   const presence = PRESENCE_WORDS[refusal.code];
   if (presence !== undefined) return presence;
-  if (/reachable targets/.test(refusal.detail)) {
+  if (refusal.code === 'no_reachable_targets') {
     return 'Nobody came in: there is nowhere in this world they could reach yet. Put something they can '
       + `rest on or visit near where you arrive, then ask again. ${say('inhabitants.whereToPlace')}`;
   }
@@ -262,22 +262,38 @@ export function noticeWords(noticing: Noticing): string {
 
 type Inhabitant = OwnedSocietyState['inhabitants'][number];
 
-/** Why a person is doing what they do, by the engine's reason code (`society_planner.py`). */
+/**
+ * Why a person is doing what they do, by the engine's reason code: exactly the codes
+ * `REASON_CODES` in `society_planner.py` states, held to it by society-words-parity.test.ts.
+ */
 export const REASON_WORDS: Readonly<Record<string, string>> = {
   restore_need: 'they need a rest, and it is the nearest place to rest they have not just used',
   visit_place: 'they are rested enough to look around, and it is the nearest place to visit they have not just used',
+  needs_a_rest: 'they need a rest, and this place had room',
+  sitting_a_while: 'they chose to sit a while',
+  looking_around: 'they are rested enough to look around, and chose this place',
+  stopping_a_while: 'they chose to stop and stand a while',
+  stopped_to_talk: 'they met someone and stopped to talk',
   remembered_target_selected: 'you asked them to go there',
+  called_away: 'you asked them to go somewhere else',
   making_room: 'they have finished there, and someone else may need the place',
   awaiting_goal: 'they have only just arrived',
   following_reachable_route: 'it is on their way',
   arrived_at_access_node: 'they have arrived',
-  reviewed_duration_elapsed: 'they have spent as long there as it takes',
+  standing_a_while: 'they stopped to stand a while',
+  talking: 'they met and stopped to talk',
+  waiting_for_partner: 'the person they are meeting is still on the way',
+  partner_left: 'the person they were talking with left',
+  reviewed_duration_elapsed: 'they have been at it as long as they meant to',
   made_room: 'they stepped out of the way',
   place_moved: 'the place they stood at moved',
   standing_node_removed: 'the ground they stood on changed',
   current_position_invalidated: 'the ground where they stand changed',
   target_disabled_or_removed: 'the place they were heading for is gone',
   authored_affordance_unreachable: 'the place they were heading for can no longer be reached',
+  authored_object_moves: 'the thing they were heading for moves, and nobody uses it while it does',
+  authored_object_off_ground: 'the thing they were heading for is not resting on the ground',
+  unsupported_active_behaviour: 'the thing they were heading for moves in a way they cannot follow',
   target_changed: 'the place they were heading for changed',
   route_invalidated: 'their way there changed',
   no_reachable_affordance: 'there is nowhere they can reach to go',
@@ -304,9 +320,14 @@ export interface InhabitantWords {
 /**
  * Who a simulated person is and what they are doing, in words. Places are named by the titles of
  * the person's own objects (`placeRows`); a place the rows do not name is said to be gone rather
- * than guessed at.
+ * than guessed at. Somebody talking is named with the other person, by the display name `people`
+ * gives them; talking has no content, so nothing here says what about.
  */
-export function inhabitantWords(person: Inhabitant, rows: readonly PlaceRow[]): InhabitantWords {
+export function inhabitantWords(
+  person: Inhabitant,
+  rows: readonly PlaceRow[],
+  people: readonly Inhabitant[] = [],
+): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
   const place = (targetId: string | null | undefined) =>
@@ -317,21 +338,38 @@ export function inhabitantWords(person: Inhabitant, rows: readonly PlaceRow[]): 
   const goal = person.goal && 'kind' in person.goal ? person.goal : null;
   if (action === undefined) return { who, what, doing: 'Nothing is recorded about what they are doing.', why: '' };
   const minutes = (n: number) => (n === 1 ? 'one more simulated minute' : `${n} more simulated minutes`);
+  const partner = people.find((other) => other.id === goal?.partner_id)?.display_name ?? 'someone nearby';
+  const still = action.remaining_ticks ? `, ${minutes(action.remaining_ticks)}` : '';
   let doing: string;
   if (action.status === 'blocked') doing = 'Waiting.';
   else if (action.kind === 'move') {
-    doing = goal?.kind === 'make_room' || action.target_id == null
-      ? 'Walking to a free spot nearby.'
-      : `Walking to ${place(action.target_id)} to ${goal?.kind === 'rest' ? 'rest' : 'visit'}.`;
+    doing = goal?.kind === 'stand'
+      ? 'Walking to a spot to stand a while.'
+      : goal?.kind === 'talk'
+        ? `Walking over to talk with ${partner}.`
+        : goal?.kind === 'make_room' || action.target_id == null
+          ? 'Walking to a free spot nearby.'
+          : `Walking to ${place(action.target_id)} to ${goal?.kind === 'rest' ? 'rest' : 'visit'}.`;
   } else if (action.kind === 'rest' || action.kind === 'visit') {
     const verb = action.kind === 'rest' ? 'Resting at' : 'Visiting';
     doing = action.status === 'completed'
       ? `Just finished ${action.kind === 'rest' ? 'resting at' : 'visiting'} ${place(action.target_id)}.`
-      : `${verb} ${place(action.target_id)}${action.remaining_ticks ? `, ${minutes(action.remaining_ticks)}` : ''}.`;
+      : `${verb} ${place(action.target_id)}${still}.`;
+  } else if (action.kind === 'stand') {
+    doing = action.status === 'completed' ? 'Just finished standing a while.' : `Standing a while${still}.`;
+  } else if (action.kind === 'talk') {
+    doing = action.status === 'completed'
+      ? `Just finished talking with ${partner}.`
+      : action.reason === 'waiting_for_partner'
+        ? `Waiting for ${partner}, to talk.`
+        : `Talking with ${partner}${still}.`;
   } else if (action.status === 'completed') doing = 'Standing aside.';
   else doing = 'Standing, deciding where to go.';
-  // The goal says why a person set out; once they have stopped or are blocked, the action says why.
-  const code = action.status !== 'blocked' && goal !== null ? goal.reason : action.reason;
+  // The goal says why a person set out. Once they are blocked, the action says why; so it does for
+  // standing and talking, under way or over, where only the action knows whether the other person
+  // is still on the way, is there, or has gone.
+  const acting = action.status === 'blocked' || action.kind === 'stand' || action.kind === 'talk';
+  const code = !acting && goal !== null ? goal.reason : action.reason;
   return { who, what, doing, why: `Because ${reasonWords(code)}.` };
 }
 

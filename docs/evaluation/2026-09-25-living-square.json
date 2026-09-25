@@ -1,0 +1,382 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "after": {
+      "summary": {
+        "blocked_person_minutes": {},
+        "dwell_minutes_by_object_kind": {
+          "bench": {
+            "completed": 273,
+            "dwell": {
+              "count": 273,
+              "max": 15,
+              "median_milli": 10000,
+              "min": 5
+            },
+            "interrupted": 0,
+            "stays": 294,
+            "unfinished": 21
+          },
+          "cafe_table": {
+            "completed": 89,
+            "dwell": {
+              "count": 89,
+              "max": 25,
+              "median_milli": 18000,
+              "min": 10
+            },
+            "interrupted": 0,
+            "stays": 102,
+            "unfinished": 13
+          },
+          "market_stall": {
+            "completed": 269,
+            "dwell": {
+              "count": 269,
+              "max": 6,
+              "median_milli": 4000,
+              "min": 2
+            },
+            "interrupted": 0,
+            "stays": 281,
+            "unfinished": 12
+          },
+          "planter_tree": {
+            "completed": 372,
+            "dwell": {
+              "count": 372,
+              "max": 4,
+              "median_milli": 3000,
+              "min": 1
+            },
+            "interrupted": 0,
+            "stays": 377,
+            "unfinished": 5
+          },
+          "seating_planter": {
+            "completed": 140,
+            "dwell": {
+              "count": 140,
+              "max": 10,
+              "median_milli": 6000,
+              "min": 3
+            },
+            "interrupted": 0,
+            "stays": 143,
+            "unfinished": 3
+          }
+        },
+        "dwell_minutes_by_other_activity": {
+          "stand": {
+            "completed": 186,
+            "dwell": {
+              "count": 186,
+              "max": 4,
+              "median_milli": 2000,
+              "min": 1
+            },
+            "interrupted": 28,
+            "stays": 218,
+            "unfinished": 4
+          },
+          "talk": {
+            "completed": 432,
+            "dwell": {
+              "count": 432,
+              "max": 6,
+              "median_milli": 4000,
+              "min": 2
+            },
+            "interrupted": 0,
+            "stays": 446,
+            "unfinished": 14
+          }
+        },
+        "minutes_between_walks": {
+          "count": 1680,
+          "max": 25,
+          "median_milli": 4000,
+          "min": 1
+        },
+        "nearest_doing_the_same_mm": {
+          "stand": {
+            "alone": 355,
+            "distance": {
+              "count": 113,
+              "max": 18974,
+              "median_milli": 8944000,
+              "min": 2000
+            },
+            "person_minutes": 468
+          },
+          "talk": {
+            "alone": 29,
+            "distance": {
+              "count": 1905,
+              "max": 12806,
+              "median_milli": 2000000,
+              "min": 2000
+            },
+            "person_minutes": 1934
+          }
+        },
+        "never_used": [],
+        "person_minutes": 11520,
+        "share_of_person_minutes_milli": {
+          "stand": 40,
+          "talk": 167,
+          "using": 644,
+          "using:bench": 245,
+          "using:cafe_table": 144,
+          "using:market_stall": 95,
+          "using:planter_tree": 81,
+          "using:seating_planter": 77,
+          "walking": 146
+        },
+        "usable_objects": 72,
+        "usable_objects_never_used": 0,
+        "walking_per_minute_mean_milli": 1172,
+        "with_a_partner": {
+          "talk": {
+            "apart_mm_when_both": {
+              "count": 1888,
+              "max": 2000,
+              "median_milli": 2000000,
+              "min": 2000
+            },
+            "partner_by_category": {
+              "talk": 1888,
+              "walking": 46
+            },
+            "partner_doing_the_same": 1888,
+            "person_minutes": 1934
+          },
+          "walking": {
+            "apart_mm_when_both": {
+              "count": 234,
+              "max": 2000,
+              "median_milli": 2000000,
+              "min": 2000
+            },
+            "partner_by_category": {
+              "talk": 46,
+              "walking": 234
+            },
+            "partner_doing_the_same": 234,
+            "person_minutes": 280
+          }
+        },
+        "worlds": 12
+      },
+      "tree": {
+        "diff_head_sha256": "6eb5dda159aeb8b1f9f05ef1d31975ec9c00a31019cd4cb58a19000dacd51469",
+        "head": "374dfc6a77546699af98d5398ed68aad43208d6a"
+      }
+    },
+    "artifacts": {
+      "directory": "docs/evaluation/artifacts/2026-09-25-living-square",
+      "files": [
+        {
+          "byte_size": 501246,
+          "is": "the after arm as the script wrote it, as canonical JSON",
+          "path": "docs/evaluation/artifacts/2026-09-25-living-square/after.json",
+          "sha256": "eaf4d588f294e25c97b41d54faa0ca01f1bde2c474a3fadc36b6787b2f83c5d9"
+        }
+      ]
+    },
+    "before": {
+      "summary": {
+        "blocked_person_minutes": {},
+        "dwell_minutes_by_object_kind": {
+          "bench": {
+            "completed": 666,
+            "dwell": {
+              "count": 666,
+              "max": 3,
+              "median_milli": 3000,
+              "min": 3
+            },
+            "interrupted": 0,
+            "stays": 681,
+            "unfinished": 15
+          },
+          "cafe_table": {
+            "completed": 14,
+            "dwell": {
+              "count": 14,
+              "max": 3,
+              "median_milli": 3000,
+              "min": 3
+            },
+            "interrupted": 0,
+            "stays": 14,
+            "unfinished": 0
+          },
+          "market_stall": {
+            "completed": 1150,
+            "dwell": {
+              "count": 1150,
+              "max": 1,
+              "median_milli": 1000,
+              "min": 1
+            },
+            "interrupted": 0,
+            "stays": 1150,
+            "unfinished": 0
+          },
+          "planter_tree": {
+            "completed": 2121,
+            "dwell": {
+              "count": 2121,
+              "max": 1,
+              "median_milli": 1000,
+              "min": 1
+            },
+            "interrupted": 0,
+            "stays": 2121,
+            "unfinished": 0
+          },
+          "seating_planter": {
+            "completed": 552,
+            "dwell": {
+              "count": 552,
+              "max": 3,
+              "median_milli": 3000,
+              "min": 3
+            },
+            "interrupted": 0,
+            "stays": 562,
+            "unfinished": 10
+          }
+        },
+        "dwell_minutes_by_other_activity": {},
+        "minutes_between_walks": {
+          "count": 4528,
+          "max": 3,
+          "median_milli": 1000,
+          "min": 1
+        },
+        "nearest_doing_the_same_mm": {},
+        "never_used": [
+          {
+            "object_kind": "cafe_table",
+            "seed": "904c813de96626ff61a947da370c5fdc287be51955e1688eb8b152df8f1bc454"
+          },
+          {
+            "object_kind": "cafe_table",
+            "seed": "e939242707f6837166c56686e94297104c07a9a356615f41680a03dd4f42c540"
+          },
+          {
+            "object_kind": "cafe_table",
+            "seed": "8872c62a1278905fc8041225f3425994c8ee81d04b0c9ae60fcba3e2fd3e6c6f"
+          },
+          {
+            "object_kind": "cafe_table",
+            "seed": "7bc43c3257781c0e89440b507b7e997c335aa08f8e099a95a5d59eb8a77126c4"
+          }
+        ],
+        "person_minutes": 11520,
+        "share_of_person_minutes_milli": {
+          "using": 606,
+          "using:bench": 174,
+          "using:cafe_table": 3,
+          "using:market_stall": 99,
+          "using:planter_tree": 184,
+          "using:seating_planter": 144,
+          "walking": 393
+        },
+        "usable_objects": 72,
+        "usable_objects_never_used": 4,
+        "walking_per_minute_mean_milli": 3144,
+        "with_a_partner": {},
+        "worlds": 12
+      },
+      "tree": {
+        "diff_head_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "374dfc6a77546699af98d5398ed68aad43208d6a"
+      }
+    },
+    "how_to_rerun": "uv run python scripts/measure_living_square.py --arm after --out <file>",
+    "judged": [
+      {
+        "id": "walking-share",
+        "passed": true,
+        "value": 146
+      },
+      {
+        "id": "bench-stay",
+        "passed": true,
+        "value": 10000
+      },
+      {
+        "id": "planter-seat-stay",
+        "passed": true,
+        "value": 6000
+      },
+      {
+        "id": "cafe-table-stay",
+        "passed": true,
+        "value": 18000
+      },
+      {
+        "id": "stall-stay",
+        "passed": true,
+        "value": 4000
+      },
+      {
+        "id": "tree-stay",
+        "passed": true,
+        "value": 3000
+      },
+      {
+        "id": "standing",
+        "passed": true,
+        "value": 40
+      },
+      {
+        "id": "talking",
+        "passed": true,
+        "value": 167
+      },
+      {
+        "id": "talking-together",
+        "passed": true,
+        "value": 976
+      },
+      {
+        "id": "talking-distance",
+        "passed": true,
+        "value": 2000
+      },
+      {
+        "id": "talking-not-on-one-spot",
+        "passed": true,
+        "value": 2000
+      },
+      {
+        "id": "every-object-used",
+        "passed": true,
+        "value": 0
+      },
+      {
+        "id": "nobody-stuck",
+        "passed": true,
+        "value": 0
+      },
+      {
+        "id": "stays-between-walks",
+        "passed": true,
+        "value": 4000
+      }
+    ],
+    "measured_with_sha256": "3aab6a8ef5ecdc8c19f3bdafd49c87028e7065c618edea8286b7bfd68e3bfae1",
+    "passed": true,
+    "profile": "exulanica.living-square/v1",
+    "targets_record": {
+      "path": "docs/evaluation/2026-09-25-living-square-targets.json",
+      "record_sha256": "f3f46e354df9e961e69f0d824f88537cee7a9136f972ad6ad7df813f7e292e42"
+    },
+    "written_at": "2026-09-25T14:59:03+00:00"
+  },
+  "record_sha256": "ec059d0ef3e6435209e4f7cce22a747d2fbd1f2575ec95efbc23664834602931"
+}

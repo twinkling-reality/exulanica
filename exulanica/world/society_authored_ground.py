@@ -23,10 +23,19 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
+import psycopg
+from psycopg.rows import dict_row
+
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
 from exulanica.world.errors import InvalidStructuralData
+from exulanica.world.object_catalog import world_object_catalog
 from exulanica.world.objects import AuthoredObject, ElementOverride, Transform
 from exulanica.world.society import society_state_sha256
+from exulanica.world.society_catalogs import (
+    PurposefulRoutine,
+    check_object_kinds,
+    purposeful_routine,
+)
 from exulanica.world.society_composition import (
     PLACES_FIELD,
     ComposedObject,
@@ -48,6 +57,7 @@ from exulanica.world.society_composition import (
 from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_COMPOSITION,
     AUTHORED_GROUND_COMPOSITION_V2,
+    AUTHORED_GROUND_COMPOSITION_V3,
     MOVES,
     NO_AUTHORED_FRAME,
     OFF_GROUND,
@@ -653,6 +663,11 @@ def _squared(a: Sequence[int], b: Sequence[int]) -> int:
     return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
 
 
+def _fixed_duration(item: _UsableObject) -> dict[str, Any]:
+    """What an input that records no routine states of an activity: its reviewed duration."""
+    return {"duration_ticks": item.reviewed["duration_ticks"]}
+
+
 def _place_targets(
     nav: dict[str, Any],
     usable: Sequence[_UsableObject],
@@ -660,6 +675,7 @@ def _place_targets(
     *,
     version_id: uuid.UUID,
     standing: StandingPolicy,
+    terms: Callable[[_UsableObject], dict[str, Any]] = _fixed_duration,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Give each usable activity the places its occupants stand at, joined to the lattice.
 
@@ -717,7 +733,7 @@ def _place_targets(
                 "subject_id": subject_id,
                 "node_id": chosen[0][2]["node_id"],
                 "affordance": reviewed["affordance"],
-                "duration_ticks": reviewed["duration_ticks"],
+                **terms(item),
                 "origin": "authored",
                 "object_id": obj.object_id,
                 "version_id": str(version_id),
@@ -726,6 +742,58 @@ def _place_targets(
             }
         )
     return targets, records
+
+
+def build_authored_ground_society_input_v3(
+    *,
+    ground: SocietyGround,
+    version: AlternateVersion,
+    input_seq: int,
+    dependency_refs: Sequence[dict[str, str]],
+    availability: str,
+    unavailable_reason: str | None,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    segment_blocked: SegmentBlocked,
+    standing: StandingPolicy,
+    routine: PurposefulRoutine | None = None,
+) -> dict[str, Any]:
+    """Compose a saved world under ``exulanica.society-composition/authored-ground-v3``.
+
+    The second composition's projection, object by object and with every place stated, which also
+    records the purposeful routine it was composed under (left out, the one a new input records)
+    and names, for each activity, the routine's entry for its object's kind, or its affordance's
+    default where the kind has none, in place of a fixed duration. The society reads how long a
+    stay there lasts, and how it varies, from that entry. A routine naming a kind the world object
+    catalog does not state, or states with another affordance, is refused by name here, before any
+    input records it; an input that recorded a routine is never read against that catalog.
+    """
+    chosen = purposeful_routine() if routine is None else routine
+    catalog = world_object_catalog()
+    check_object_kinds(chosen, catalog)
+    kinds = catalog.by_asset_key()
+
+    def activity(item: _UsableObject) -> dict[str, Any]:
+        kind = kinds[item.reviewed["asset_key"]].key
+        return {"activity": chosen.at_object(item.reviewed["affordance"], kind).key}
+
+    document = _authored_ground_input(
+        AUTHORED_GROUND_COMPOSITION_V3,
+        activity,
+        ground=ground,
+        version=version,
+        input_seq=input_seq,
+        dependency_refs=dependency_refs,
+        availability=availability,
+        unavailable_reason=unavailable_reason,
+        reviewed_affordances=reviewed_affordances,
+        segment_blocked=segment_blocked,
+        standing=standing,
+    )
+    del document["document_sha256"]
+    document["routine"] = chosen.binding()
+    document["document_sha256"] = input_sha256(document)
+    validate_society_input(document)
+    return document
 
 
 def build_authored_ground_society_input_v2(
@@ -749,6 +817,38 @@ def build_authored_ground_society_input_v2(
     no such placement in a saved world. Like the first composition it adds no authority of its
     own and refuses malformed binding, digest or registry data.
     """
+    document = _authored_ground_input(
+        AUTHORED_GROUND_COMPOSITION_V2,
+        _fixed_duration,
+        ground=ground,
+        version=version,
+        input_seq=input_seq,
+        dependency_refs=dependency_refs,
+        availability=availability,
+        unavailable_reason=unavailable_reason,
+        reviewed_affordances=reviewed_affordances,
+        segment_blocked=segment_blocked,
+        standing=standing,
+    )
+    validate_society_input(document)
+    return document
+
+
+def _authored_ground_input(
+    composition: str,
+    terms: Callable[[_UsableObject], dict[str, Any]],
+    *,
+    ground: SocietyGround,
+    version: AlternateVersion,
+    input_seq: int,
+    dependency_refs: Sequence[dict[str, str]],
+    availability: str,
+    unavailable_reason: str | None,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    segment_blocked: SegmentBlocked,
+    standing: StandingPolicy,
+) -> dict[str, Any]:
+    """The projection the second and third compositions share, with its digest, unvalidated."""
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
@@ -776,7 +876,7 @@ def build_authored_ground_society_input_v2(
     refs = [dict(ref) for ref in dependency_refs]
     refs.extend(
         policy_dependency_refs(
-            composition_profile=AUTHORED_GROUND_COMPOSITION_V2,
+            composition_profile=composition,
             version_id=version.version_id,
             registration=ground.registration(),
             reviewed_affordances=reviewed_affordances,
@@ -803,7 +903,7 @@ def build_authored_ground_society_input_v2(
             reason = "authored_obstacles_block_navigation"
     if reason is None:
         targets, unreachable = _place_targets(
-            nav, usable, clear, version_id=version.version_id, standing=standing
+            nav, usable, clear, version_id=version.version_id, standing=standing, terms=terms
         )
         records.extend(unreachable)
         unread = [
@@ -821,7 +921,7 @@ def build_authored_ground_society_input_v2(
     targets.sort(key=lambda target: target["target_id"])
     deduplicated = {(r["kind"], r["identity"], r["sha256"]): r for r in refs}
     document = {
-        "profile": input_profile(AUTHORED_GROUND_COMPOSITION_V2),
+        "profile": input_profile(composition),
         "input_seq": input_seq,
         "world_id": version.world_id,
         "version_id": str(version.version_id),
@@ -839,8 +939,38 @@ def build_authored_ground_society_input_v2(
         "unread_placements": unread,
     }
     document["document_sha256"] = input_sha256(document)
-    validate_society_input(document)
     return document
+
+
+def read_authored_ground(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+) -> SocietyGround | None:
+    """The society's reading of one world's structural snapshot, the one place it is read.
+
+    None when the workspace holds no such snapshot for the world. A snapshot the society has no
+    rule for raises ``InvalidStructuralData`` with the reason
+    (:func:`authored_ground_from_snapshot`). The runtime refuses on either; an arrangement treats
+    either as a world with no ground to stand on. Both read the same row by the same rule, so they
+    cannot disagree about a world's ground.
+    """
+    with connection.cursor(row_factory=dict_row) as cursor:
+        row = cursor.execute(
+            "select composer_key,composer_version,topology,placement,snapshot_sha256 "
+            "from world_structure_snapshot where workspace_id=%s and world_id=%s "
+            "and snapshot_id=%s",
+            (workspace_id, world_id, snapshot_id),
+        ).fetchone()
+    if row is None:
+        return None
+    return authored_ground_from_snapshot(
+        world_id=world_id,
+        snapshot_id=snapshot_id,
+        snapshot_sha256=row["snapshot_sha256"],
+        composer_key=row["composer_key"],
+        composer_version=row["composer_version"],
+        topology=row["topology"],
+        placement=row["placement"],
+    )
 
 
 def authored_ground_from_snapshot(

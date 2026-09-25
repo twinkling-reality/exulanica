@@ -1,0 +1,730 @@
+#!/usr/bin/env python3
+"""Measure what the people in a small square do, minute by minute, before and after a change.
+
+    uv run python scripts/measure_living_square.py --arm NAME --out PATH
+    uv run python scripts/measure_living_square.py --preregister TARGETS --before PATH
+    uv run python scripts/measure_living_square.py --write --after PATH
+
+**The question.** A person makes a starter world, stands where it puts them, asks for the small
+square and brings in inhabitants. How do those people spend their minutes? What share of
+person-minutes is walking, using an object, doing something else or waiting; how long a person
+stays at each kind of object once there; whether every object people can use in the square is
+used; and how long anybody goes without walking. Nothing here calls a model, and the engine is
+deterministic, so running an arm again on the same tree reproduces every number exactly.
+
+**The run** is the product, in process, over a private PostgreSQL made for it and removed after
+(``scripts/test_postgres.py``), with the API connecting as the non-owner runtime role, exactly as
+``scripts/measure_living_world_pace.py`` runs it and through its helpers. Every world is made
+through the routes a browser calls: ``POST /world-entries/starter``, ``POST
+/world/versions/{id}/arrangements/preview`` and ``.../apply`` with the small square, the viewer
+standing at the world's arrival point and facing the way it faces a person who arrives, then
+``POST /world/versions/{id}/society`` with the v2 profile ("Bring in inhabitants") and one of
+``SEED_COUNT`` seeds. Each world is advanced ``TICKS`` simulated minutes through ``POST
+.../society/control/steps``, the step the playback worker executes, reading every state it
+commits. Each world lives in a workspace of its own.
+
+**What a minute is.** A person *walks* in a minute when the path the state records for it has more
+than one point. Otherwise they *use* an object when their action is the activity their target
+offers at an object; they do *another activity* when their action is under way or just completed
+and is neither a walk nor idling, counted under the action's own kind; and they *wait* otherwise.
+The four are exclusive and cover every person-minute. A *stay* is one person's run of one activity
+at one target, from the minute its action first appears to the minute the state says it
+completed; its length in minutes is what the summary calls a dwell. A stay the state interrupts
+is counted as interrupted, and one still under way when the run ends is counted as unfinished;
+neither has a dwell. A person whose goal names a partner is measured against that partner in the
+same minute: what the partner is doing and how far apart they stand.
+
+**Before and after.** ``--arm`` measures the tree it runs on and writes that arm's document, which
+names the tree and this script's digest. ``--preregister`` writes the targets, each with its
+reason, into a digest-bound record together with the before arm, before any after arm is measured.
+``--write`` measures nothing: it binds the after arm, judges it against the pre-registered
+targets, and writes the result record. Both arms and both writes must be this script's exact bytes.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import math
+import statistics
+import sys
+import tempfile
+import time
+import uuid
+from collections import Counter, defaultdict
+from pathlib import Path
+from typing import Any, Final
+
+ROOT: Final = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from measure_living_world_pace import Api, _database, seeds, tree  # noqa: E402
+
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.world.arrangements import arrangement_catalog  # noqa: E402
+from exulanica.world.object_catalog import world_object_catalog  # noqa: E402
+from exulanica.world.society_authored_ground import AUTHORED_GROUND_POPULATION  # noqa: E402
+
+PROFILE: Final = "exulanica.living-square/v1"
+EVALUATION: Final = ROOT / "docs" / "evaluation"
+#: The engine a person's "Bring in inhabitants" asks for (``web/packages/app/src/society-api.ts``).
+ENGINE: Final = "exulanica-society/v2"
+#: The arrangement the Create panel places, by key and the version a running host reads.
+ARRANGEMENT_KEY: Final = "small_square"
+ARRANGEMENT_VERSION: Final = 1
+#: Seeds, the same ones the living-world pace record ran: the browser's own seed first.
+SEED_COUNT: Final = len(seeds())
+#: Two simulated hours: long enough for every inhabitant's need to cross the rest threshold.
+TICKS: Final = 120
+MICRORADIANS: Final = 1_000_000
+#: A full turn and half of one in microradians, the units every yaw on the routes is stated in.
+FULL_TURN_MICRORADIANS: Final = round(2 * math.pi * MICRORADIANS)
+HALF_TURN_MICRORADIANS: Final = round(math.pi * MICRORADIANS)
+MILLI: Final = 1000
+#: The action kinds that are not an activity: moving along a route and idling.
+NOT_AN_ACTIVITY: Final = ("move", "idle")
+#: A state where an action is under way or finished in this minute, rather than blocked.
+PERFORMED: Final = ("active", "completed")
+
+
+def viewer_facing(spawn: dict[str, int]) -> dict[str, int]:
+    """Where the person stands and the yaw the page sends for them, at the world's arrival point.
+
+    The page states the viewer as the yaw an object placed facing the person would take:
+    ``atan2(forward_x, forward_z)`` of where they look (``placementPoseBeforeVisitor``). A camera
+    at yaw ``t`` looks along ``(-sin t, -cos t)``, whose ``atan2`` is ``t`` plus half a turn.
+    """
+    return {
+        "x_mm": spawn["x_mm"],
+        "z_mm": spawn["z_mm"],
+        "yaw_microradians": (spawn["yaw_microradians"] + HALF_TURN_MICRORADIANS)
+        % FULL_TURN_MICRORADIANS,
+    }
+
+
+# -- reading a state ------------------------------------------------------------------------------
+
+
+def minute_of(person: dict[str, Any]) -> tuple[str, str | None]:
+    """What one person did in one minute: the category and, for a use, the object used."""
+    if len(person["motion_path_mm"]) > 1:
+        return "walking", None
+    action, target = person["action"], person["target"]
+    if action["status"] in PERFORMED and action["kind"] not in NOT_AN_ACTIVITY:
+        if (
+            target is not None
+            and target.get("object_id")
+            and action["kind"] == target["affordance"]
+        ):
+            return "using", target["object_id"]
+        return action["kind"], None
+    return "waiting", None
+
+
+def stay_key(person: dict[str, Any]) -> tuple[str, str | None] | None:
+    """The activity and target a person's action is a stay at, or None when it is none."""
+    action = person["action"]
+    if action["status"] not in PERFORMED or action["kind"] in NOT_AN_ACTIVITY:
+        return None
+    return action["kind"], action["target_id"]
+
+
+# -- the run --------------------------------------------------------------------------------------
+
+
+def make_square(api: Api, title: str) -> dict[str, Any]:
+    """A starter world with the small square placed in front of where a person arrives."""
+    entry = api("POST", "/world-entries/starter", json={"title": title})
+    region = entry["authored_scene"]["region"]
+    world = {
+        "version": entry["authored_version_id"],
+        "scope": {"world_id": entry["world_id"]},
+        "region": region["region_id"],
+    }
+    route = f"/world/versions/{world['version']}"
+    base = api("GET", route, params=world["scope"])["state_sha256"]
+    body = {
+        "base_state_sha256": base,
+        "arrangement_key": ARRANGEMENT_KEY,
+        "arrangement_version": ARRANGEMENT_VERSION,
+        "viewer": viewer_facing(region["spawn"]),
+        "origin_role": "fictional",
+    }
+    preview = api("POST", route + "/arrangements/preview", params=world["scope"], json=body)
+    if preview["availability"] != "ready":
+        raise SystemExit(f"the square does not fit: {preview['blocked_reason']}")
+    applied = api(
+        "POST", route + "/arrangements/apply", expected=201, params=world["scope"], json=body
+    )
+    placements = arrangement_catalog().by_key()[ARRANGEMENT_KEY].placements
+    added = applied["added_object_ids"]
+    if len(added) != len(placements):
+        raise SystemExit(f"apply added {len(added)} objects for {len(placements)} placements")
+    previewed = [placed["object_id"] for placed in preview["would_add"]]
+    if previewed != added:
+        raise SystemExit(f"apply added {added}, preview showed {previewed}")
+    world["objects"] = {
+        object_id: placement.kind.key
+        for object_id, placement in zip(added, placements, strict=True)
+    }
+    world["viewer"] = body["viewer"]
+    world["anchor"] = preview["anchor"]
+    return world
+
+
+def bring_in(api: Api, world: dict[str, Any], seed: str) -> None:
+    api(
+        "POST",
+        f"/world/versions/{world['version']}/society",
+        params=world["scope"],
+        json={"region_id": world["region"], "seed": seed, "profile": ENGINE},
+    )
+
+
+def behave(api: Api, world: dict[str, Any]) -> dict[str, Any]:
+    """Advance one world ``TICKS`` minutes by control steps, reading every state it commits."""
+    society = f"/world/versions/{world['version']}/society"
+    control = api("GET", society + "/control", params=world["scope"])
+    state = api("GET", society, params=world["scope"])
+    usable = {
+        target["object_id"]
+        for target in api("GET", society, params={**world["scope"], "places": "true"}).get(
+            "places", {"targets": []}
+        )["targets"]
+        if target["enabled"] and target["object_id"] is not None
+    }
+    minutes: list[dict[str, int]] = []
+    open_stays: dict[str, dict[str, Any]] = {}
+    stays: list[dict[str, Any]] = []
+    still: dict[str, int] = defaultdict(int)
+    runs: list[int] = []
+    blocked: Counter[str] = Counter()
+    nearest: dict[str, list[int | None]] = defaultdict(list)
+    partnered: list[list[Any]] = []
+    for _ in range(TICKS):
+        stepped = api(
+            "POST",
+            society + "/control/steps",
+            params=world["scope"],
+            json={
+                "base_revision": control["revision"],
+                "base_tick": state["current_tick"],
+                "base_state_sha256": state["state_sha256"],
+            },
+        )
+        control, state = stepped["control"], stepped["society"]
+        tick = state["current_tick"]
+        counts: Counter[str] = Counter()
+        people = state["state"]["inhabitants"]
+        _neighbours(people, nearest)
+        _partners(people, partnered)
+        for person in people:
+            category, object_id = minute_of(person)
+            counts[category] += 1
+            if category == "using":
+                counts[f"using:{world['objects'][object_id]}"] += 1
+            if person["action"]["status"] == "blocked":
+                blocked[person["action"]["reason"]] += 1
+            if category == "walking":
+                if still[person["id"]]:
+                    runs.append(still[person["id"]])
+                still[person["id"]] = 0
+            else:
+                still[person["id"]] += 1
+            _follow(person, tick, world["objects"], open_stays, stays)
+        minutes.append({"tick": tick, **dict(sorted(counts.items()))})
+    for held in open_stays.values():
+        stays.append({**held, "outcome": "unfinished"})
+    stays = [_kept(stay) for stay in stays]
+    runs.extend(value for value in still.values() if value)
+    return {
+        "objects": world["objects"],
+        "usable_object_ids": sorted(usable),
+        "viewer": world["viewer"],
+        "anchor": world["anchor"],
+        "minutes": minutes,
+        "stays": stays,
+        "still_runs": runs,
+        "nearest_doing_the_same_mm": dict(sorted(nearest.items())),
+        "with_a_partner": partnered,
+        "blocked": dict(sorted(blocked.items())),
+        "state_sha256": state["state_sha256"],
+    }
+
+
+def _neighbours(people: list[dict[str, Any]], nearest: dict[str, list[int | None]]) -> None:
+    """For everyone doing an activity that is not at an object, how far away the nearest other
+    person doing the same is this minute, in whole millimetres, or None when nobody else is."""
+    doing: dict[str, list[list[int]]] = defaultdict(list)
+    for person in people:
+        category, _ = minute_of(person)
+        if category not in ("walking", "using", "waiting"):
+            doing[category].append(person["position_mm"])
+    for category, points in doing.items():
+        for index, point in enumerate(points):
+            others = [math.dist(point, other) for j, other in enumerate(points) if j != index]
+            nearest[category].append(round(min(others)) if others else None)
+
+
+def _partners(people: list[dict[str, Any]], partnered: list[list[Any]]) -> None:
+    """For everyone whose goal names a partner: what each is doing and how far apart they are."""
+    by_id = {person["id"]: person for person in people}
+    for person in people:
+        goal = person["goal"]
+        if goal is None or goal.get("partner_id") not in by_id:
+            continue
+        partner = by_id[goal["partner_id"]]
+        partnered.append(
+            [
+                minute_of(person)[0],
+                minute_of(partner)[0],
+                round(math.dist(person["position_mm"], partner["position_mm"])),
+            ]
+        )
+
+
+def _follow(
+    person: dict[str, Any],
+    tick: int,
+    objects: dict[str, str],
+    open_stays: dict[str, dict[str, Any]],
+    stays: list[dict[str, Any]],
+) -> None:
+    """Open, extend or close the stay a person's action is, as of this minute."""
+    key = stay_key(person)
+    held = open_stays.get(person["id"])
+    if held is not None and (key is None or key != (held["kind"], held["target_id"])):
+        stays.append({**held, "outcome": "interrupted"})
+        del open_stays[person["id"]]
+        held = None
+    if key is None:
+        return
+    action = person["action"]
+    if held is None:
+        target = person["target"]
+        object_id = target.get("object_id") if target is not None else None
+        held = {
+            "person": person["ordinal"],
+            "kind": action["kind"],
+            "target_id": action["target_id"],
+            "object_id": object_id,
+            "object_kind": objects.get(object_id) if object_id else None,
+            "started": tick,
+            "planned": action["remaining_ticks"],
+        }
+        open_stays[person["id"]] = held
+    if action["status"] == "completed":
+        stays.append({**held, "outcome": "completed", "minutes": tick - held["started"]})
+        del open_stays[person["id"]]
+
+
+def _kept(stay: dict[str, Any]) -> dict[str, Any]:
+    """A stay as an arm document keeps it: by object, not by the target's long identity."""
+    return {key: value for key, value in stay.items() if key != "target_id"}
+
+
+def run() -> list[dict[str, Any]]:
+    import psycopg
+    from fastapi.testclient import TestClient
+
+    from exulanica.api.app import create_app
+    from exulanica.api.authorisation import API_TOKENS_ENV
+    from exulanica.api.permissions import Permission
+    from exulanica.api.services import (
+        DATA_DIR_ENV,
+        DERIVATIVE_WORKER_ENV,
+        READONLY_DATABASE_URL_ENV,
+        build_services,
+    )
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.db.session import DATABASE_URL_ENV
+
+    grants = {
+        seed: {"id": uuid.uuid4(), "actor": uuid.uuid4(), "token": f"square-{uuid.uuid4().hex}"}
+        for seed in seeds()
+    }
+    data_dir = Path(tempfile.mkdtemp(prefix="living-square-"))
+    worlds = []
+    with _database() as urls:
+        with psycopg.connect(urls["owner"], autocommit=True) as owner:
+            for grant in grants.values():
+                provision_workspace(owner, grant["id"])
+        environ = {
+            DATABASE_URL_ENV: urls["runtime"],
+            READONLY_DATABASE_URL_ENV: urls["readonly"],
+            DATA_DIR_ENV: str(data_dir),
+            DERIVATIVE_WORKER_ENV: "off",
+            API_TOKENS_ENV: json.dumps(
+                {
+                    grant["token"]: {
+                        "workspace_id": str(grant["id"]),
+                        "actor": str(grant["actor"]),
+                        "permissions": [str(permission) for permission in Permission],
+                    }
+                    for grant in grants.values()
+                }
+            ),
+        }
+        with TestClient(create_app(build_services(environ), verify=False)) as http:
+            for seed in seeds():
+                api = Api(http, grants[seed]["token"])
+                world = make_square(api, "Living square")
+                bring_in(api, world, seed)
+                started = time.monotonic()
+                outcome = behave(api, world)
+                worlds.append(
+                    {
+                        "seed": seed,
+                        "wall_seconds_milli": round((time.monotonic() - started) * MILLI),
+                        **outcome,
+                    }
+                )
+                print(f"seed {seed[:8]}: {len(outcome['stays'])} stays", flush=True)
+    return worlds
+
+
+# -- summarising ----------------------------------------------------------------------------------
+
+
+def spread(values: list[int]) -> dict[str, int] | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return {
+        "count": len(ordered),
+        "min": ordered[0],
+        "median_milli": round(statistics.median(ordered) * MILLI),
+        "max": ordered[-1],
+    }
+
+
+def summarise(worlds: list[dict[str, Any]]) -> dict[str, Any]:
+    person_minutes = sum(
+        sum(value for key, value in minute.items() if key != "tick" and ":" not in key)
+        for world in worlds
+        for minute in world["minutes"]
+    )
+    totals: Counter[str] = Counter()
+    for world in worlds:
+        for minute in world["minutes"]:
+            totals.update({key: value for key, value in minute.items() if key != "tick"})
+    share = {key: value * MILLI // person_minutes for key, value in sorted(totals.items())}
+    stays = [stay for world in worlds for stay in world["stays"]]
+    at_objects: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    elsewhere: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for stay in stays:
+        if stay["object_kind"] is not None:
+            at_objects[stay["object_kind"]].append(stay)
+        else:
+            elsewhere[stay["kind"]].append(stay)
+    unused = []
+    for world in worlds:
+        used = {stay["object_id"] for stay in world["stays"]}
+        unused.extend(
+            {"seed": world["seed"], "object_kind": world["objects"][object_id]}
+            for object_id in world["usable_object_ids"]
+            if object_id not in used
+        )
+    blocked: Counter[str] = Counter()
+    for world in worlds:
+        blocked.update(world["blocked"])
+    beside: dict[str, list[int | None]] = defaultdict(list)
+    for world in worlds:
+        for category, distances in world["nearest_doing_the_same_mm"].items():
+            beside[category].extend(distances)
+    return {
+        "worlds": len(worlds),
+        "person_minutes": person_minutes,
+        "share_of_person_minutes_milli": share,
+        "walking_per_minute_mean_milli": totals["walking"] * MILLI // (len(worlds) * TICKS),
+        "dwell_minutes_by_object_kind": {
+            kind: _stays(held) for kind, held in sorted(at_objects.items())
+        },
+        "dwell_minutes_by_other_activity": {
+            kind: _stays(held) for kind, held in sorted(elsewhere.items())
+        },
+        "minutes_between_walks": spread([run for world in worlds for run in world["still_runs"]]),
+        "nearest_doing_the_same_mm": {
+            category: {
+                "person_minutes": len(distances),
+                "alone": sum(1 for distance in distances if distance is None),
+                "distance": spread([d for d in distances if d is not None]),
+            }
+            for category, distances in sorted(beside.items())
+        },
+        "with_a_partner": _with_a_partner(
+            [row for world in worlds for row in world["with_a_partner"]]
+        ),
+        "usable_objects": sum(len(world["usable_object_ids"]) for world in worlds),
+        "usable_objects_never_used": len(unused),
+        "never_used": unused,
+        "blocked_person_minutes": dict(sorted(blocked.items())),
+    }
+
+
+def _with_a_partner(rows: list[list[Any]]) -> dict[str, Any]:
+    """By what a person with a partner is doing: what the partner does that minute, and how far
+    apart the two stand when both do the same."""
+    by_category: dict[str, list[list[Any]]] = defaultdict(list)
+    for row in rows:
+        by_category[row[0]].append(row)
+    return {
+        category: {
+            "person_minutes": len(held),
+            "partner_doing_the_same": sum(1 for _, theirs, _ in held if theirs == category),
+            "partner_by_category": dict(sorted(Counter(theirs for _, theirs, _ in held).items())),
+            "apart_mm_when_both": spread(
+                [apart for _, theirs, apart in held if theirs == category]
+            ),
+        }
+        for category, held in sorted(by_category.items())
+    }
+
+
+def _stays(held: list[dict[str, Any]]) -> dict[str, Any]:
+    outcomes = Counter(stay["outcome"] for stay in held)
+    return {
+        "stays": len(held),
+        "completed": outcomes["completed"],
+        "interrupted": outcomes["interrupted"],
+        "unfinished": outcomes["unfinished"],
+        "dwell": spread([stay["minutes"] for stay in held if stay["outcome"] == "completed"]),
+    }
+
+
+# -- judging --------------------------------------------------------------------------------------
+
+
+def metric(summary: dict[str, Any], address: list[str]) -> Any:
+    """The value at ``address`` in a summary, or None where the summary holds none.
+
+    A share nobody spent a minute on is 0, since every category not seen is a share of nothing; any
+    other address the summary does not hold, a dwell for an activity nobody did, is None.
+    """
+    value: Any = summary
+    for key in address:
+        if not isinstance(value, dict):
+            raise SystemExit(f"{address} does not address a value")
+        if key not in value:
+            return 0 if address[0] == "share_of_person_minutes_milli" else None
+        value = value[key]
+    return value
+
+
+def judge(target: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
+    """Whether one pre-registered target holds of a summary. A value the summary lacks fails."""
+    value = metric(summary, target["metric"])
+    rule = target["rule"]
+    if rule == "share_at_least":
+        whole = metric(summary, target["of"])
+        value = None if value is None or not whole else value * MILLI // whole
+    if value is None:
+        return {"id": target["id"], "value": None, "passed": False}
+    if rule == "within":
+        low, high = target["bounds"]
+        passed = low <= value <= high
+    elif rule in ("at_least", "share_at_least"):
+        passed = value >= target["bound"]
+    elif rule == "at_most":
+        passed = value <= target["bound"]
+    elif rule == "equals":
+        passed = value == target["value"]
+    else:
+        raise SystemExit(f"target {target['id']} has no rule named {rule!r}")
+    return {"id": target["id"], "value": value, "passed": passed}
+
+
+# -- records --------------------------------------------------------------------------------------
+
+
+def _envelope(body: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "profile": "exulanica.digest-bound-record/v1",
+        "record": body,
+        "record_sha256": hashlib.sha256(canonical_json(body)).hexdigest(),
+    }
+
+
+def _artifact(path: Path, data: bytes, what: str) -> dict[str, Any]:
+    return {
+        "path": path.relative_to(ROOT).as_posix(),
+        "byte_size": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "is": what,
+    }
+
+
+def _read_arm(path: Path, as_run: bytes) -> dict[str, Any]:
+    arm = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        arm["profile"] != PROFILE
+        or arm["measured_with_sha256"] != hashlib.sha256(as_run).hexdigest()
+    ):
+        raise SystemExit(f"{path} was not measured by these exact script bytes")
+    return arm
+
+
+def _today() -> str:
+    return dt.datetime.now(dt.UTC).date().isoformat()
+
+
+def preregister(targets_path: Path, before_path: Path, as_run: bytes) -> Path:
+    """Write the targets and the before arm into one record, before any after arm exists."""
+    targets = json.loads(targets_path.read_text(encoding="utf-8"))
+    before = _read_arm(before_path, as_run)
+    for target in targets["targets"]:
+        if not {"id", "metric", "rule", "reason"} <= set(target):
+            raise SystemExit(f"a target states an id, metric, rule and reason: {target}")
+        judge(target, before["summary"])
+    # The seeds judged are the ones the before arm ran, and none the routine was developed on.
+    seeds = targets["seeds"]
+    if seeds["judged"] != before["inputs"]["seeds"] or set(seeds["judged"]) & set(
+        seeds["development"]
+    ):
+        raise SystemExit("the judged seeds are the before arm's, and no development seed is one")
+    name = f"{_today()}-living-square-targets"
+    record = EVALUATION / f"{name}.json"
+    artifacts = EVALUATION / "artifacts" / name
+    if record.exists() or artifacts.exists():
+        raise SystemExit(f"{record.name} or its artifacts exist; a record is written once")
+    before_bytes = canonical_json(before)
+    body = {
+        "profile": f"{PROFILE}/targets",
+        "written_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+        "measured_with_sha256": before["measured_with_sha256"],
+        "artifacts": {
+            "directory": artifacts.relative_to(ROOT).as_posix(),
+            "files": [
+                _artifact(
+                    artifacts / "measure_living_square.py.txt",
+                    as_run,
+                    "the script that measured the before arm and will measure the after arm, as "
+                    "it ran; copy it to a .py name to run it",
+                ),
+                _artifact(
+                    artifacts / "before.json",
+                    before_bytes,
+                    "the before arm as the script wrote it, as canonical JSON",
+                ),
+            ],
+        },
+        "question": targets["question"],
+        "seeds": seeds,
+        "targets": targets["targets"],
+        "before": {
+            "tree": before["tree"],
+            "summary": before["summary"],
+            "judged": [judge(target, before["summary"]) for target in targets["targets"]],
+        },
+    }
+    artifacts.mkdir(parents=True)
+    (artifacts / "measure_living_square.py.txt").write_bytes(as_run)
+    (artifacts / "before.json").write_bytes(before_bytes)
+    record.write_text(json.dumps(_envelope(body), indent=2, sort_keys=True) + "\n", "utf-8")
+    return record
+
+
+def write(after_path: Path, as_run: bytes) -> Path:
+    """Judge the after arm against the pre-registered targets and write the result record."""
+    registered = sorted(EVALUATION.glob("*-living-square-targets.json"))
+    if len(registered) != 1:
+        raise SystemExit(f"expected one pre-registered targets record, found {len(registered)}")
+    envelope = json.loads(registered[0].read_text(encoding="utf-8"))
+    targets_record = envelope["record"]
+    if hashlib.sha256(canonical_json(targets_record)).hexdigest() != envelope["record_sha256"]:
+        raise SystemExit(f"{registered[0].name} does not match its own digest")
+    if targets_record["measured_with_sha256"] != hashlib.sha256(as_run).hexdigest():
+        raise SystemExit("the targets were registered with other script bytes")
+    after = _read_arm(after_path, as_run)
+    if after["inputs"]["seeds"] != targets_record["seeds"]["judged"]:
+        raise SystemExit("the after arm ran other seeds than the ones registered to judge it")
+    name = f"{_today()}-living-square"
+    record = EVALUATION / f"{name}.json"
+    artifacts = EVALUATION / "artifacts" / name
+    if record.exists() or artifacts.exists():
+        raise SystemExit(f"{record.name} or its artifacts exist; a record is written once")
+    after_bytes = canonical_json(after)
+    judged = [judge(target, after["summary"]) for target in targets_record["targets"]]
+    body = {
+        "profile": PROFILE,
+        "written_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+        "measured_with_sha256": after["measured_with_sha256"],
+        "targets_record": {
+            "path": registered[0].relative_to(ROOT).as_posix(),
+            "record_sha256": envelope["record_sha256"],
+        },
+        "artifacts": {
+            "directory": artifacts.relative_to(ROOT).as_posix(),
+            "files": [
+                _artifact(
+                    artifacts / "after.json",
+                    after_bytes,
+                    "the after arm as the script wrote it, as canonical JSON",
+                )
+            ],
+        },
+        "how_to_rerun": "uv run python scripts/measure_living_square.py --arm after --out <file>",
+        "before": {
+            "tree": targets_record["before"]["tree"],
+            "summary": targets_record["before"]["summary"],
+        },
+        "after": {"tree": after["tree"], "summary": after["summary"]},
+        "judged": judged,
+        "passed": all(result["passed"] for result in judged),
+    }
+    artifacts.mkdir(parents=True)
+    (artifacts / "after.json").write_bytes(after_bytes)
+    record.write_text(json.dumps(_envelope(body), indent=2, sort_keys=True) + "\n", "utf-8")
+    return record
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--arm", help="measure this tree as the named arm")
+    mode.add_argument("--preregister", type=Path, help="a targets file to register")
+    mode.add_argument("--write", action="store_true", help="judge an after arm and write a record")
+    parser.add_argument("--out", type=Path, help="where --arm writes its document")
+    parser.add_argument("--before", type=Path, help="the before arm --preregister binds")
+    parser.add_argument("--after", type=Path, help="the after arm --write judges")
+    arguments = parser.parse_args()
+    # The bytes that run, read before anything else can change the file.
+    as_run = Path(__file__).read_bytes()
+    if arguments.arm:
+        if arguments.out is None or arguments.out.resolve().is_relative_to(EVALUATION):
+            raise SystemExit("--arm writes to --out, outside docs/evaluation")
+        worlds = run()
+        document = {
+            "profile": PROFILE,
+            "arm": arguments.arm,
+            "measured_with_sha256": hashlib.sha256(as_run).hexdigest(),
+            "measured_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+            "tree": tree(),
+            "inputs": {
+                "engine": ENGINE,
+                "population": AUTHORED_GROUND_POPULATION,
+                "arrangement": {"key": ARRANGEMENT_KEY, "version": ARRANGEMENT_VERSION},
+                "object_catalog_sha256": world_object_catalog().sha256,
+                "seeds": seeds(),
+                "ticks": TICKS,
+            },
+            "summary": summarise(worlds),
+            "worlds": worlds,
+        }
+        arguments.out.write_bytes(canonical_json(document))
+        print(json.dumps(document["summary"], indent=2))
+    elif arguments.preregister:
+        if arguments.before is None:
+            raise SystemExit("--preregister needs --before")
+        print(f"wrote {preregister(arguments.preregister, arguments.before, as_run)}")
+    else:
+        if arguments.after is None:
+            raise SystemExit("--write needs --after")
+        print(f"wrote {write(arguments.after, as_run)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

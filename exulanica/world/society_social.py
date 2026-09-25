@@ -19,6 +19,7 @@ from exulanica.world.society_planner import (
     advance_purposeful_society,
     initial_purposeful_society,
     input_sha256,
+    same_destination,
     validate_society_input,
 )
 
@@ -128,7 +129,7 @@ def validate_proposal(context: dict, document: dict, proposal: Any) -> str | Non
         ),
         None,
     )
-    if target is None or target != belief["target"]:
+    if target is None or not same_destination(belief["target"], target):
         return "remembered_affordance_changed"
     nodes, adjacent, _ = _graph(document)
     starts = [key for key, node in nodes.items() if node["position_mm"] == context["position_mm"]]
@@ -249,11 +250,15 @@ def advance_social_society(
                     ):
                         continue
                     target = old["target"]
-                available = name in authored and authored[name] == target and target["enabled"]
+                available = (
+                    name in authored
+                    and same_destination(target, authored[name])
+                    and target["enabled"]
+                )
                 if (
                     old
                     and old["origin"] == "observation"
-                    and old["target"] == target
+                    and same_destination(old["target"], target)
                     and old["available"] == available
                 ):
                     continue
@@ -373,7 +378,7 @@ def advance_social_society(
             or (
                 t["target_id"] in known
                 and known[t["target_id"]]["available"]
-                and known[t["target_id"]]["target"] == t
+                and same_destination(known[t["target_id"]]["target"], t)
             )
         ]
     people_by_id = {person["id"]: person for person in state["inhabitants"]}

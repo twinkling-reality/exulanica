@@ -1,0 +1,420 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifacts": {
+      "directory": "docs/evaluation/artifacts/2026-09-25-living-square-targets",
+      "files": [
+        {
+          "byte_size": 31893,
+          "is": "the script that measured the before arm and will measure the after arm, as it ran; copy it to a .py name to run it",
+          "path": "docs/evaluation/artifacts/2026-09-25-living-square-targets/measure_living_square.py.txt",
+          "sha256": "3aab6a8ef5ecdc8c19f3bdafd49c87028e7065c618edea8286b7bfd68e3bfae1"
+        },
+        {
+          "byte_size": 863575,
+          "is": "the before arm as the script wrote it, as canonical JSON",
+          "path": "docs/evaluation/artifacts/2026-09-25-living-square-targets/before.json",
+          "sha256": "c2b0484f96c9ec71a43e9c06cd30c6274e07500eb6000fafb282e070c929a941"
+        }
+      ]
+    },
+    "before": {
+      "judged": [
+        {
+          "id": "walking-share",
+          "passed": false,
+          "value": 393
+        },
+        {
+          "id": "bench-stay",
+          "passed": false,
+          "value": 3000
+        },
+        {
+          "id": "planter-seat-stay",
+          "passed": false,
+          "value": 3000
+        },
+        {
+          "id": "cafe-table-stay",
+          "passed": false,
+          "value": 3000
+        },
+        {
+          "id": "stall-stay",
+          "passed": false,
+          "value": 1000
+        },
+        {
+          "id": "tree-stay",
+          "passed": false,
+          "value": 1000
+        },
+        {
+          "id": "standing",
+          "passed": false,
+          "value": 0
+        },
+        {
+          "id": "talking",
+          "passed": false,
+          "value": 0
+        },
+        {
+          "id": "talking-together",
+          "passed": false,
+          "value": null
+        },
+        {
+          "id": "talking-distance",
+          "passed": false,
+          "value": null
+        },
+        {
+          "id": "talking-not-on-one-spot",
+          "passed": false,
+          "value": null
+        },
+        {
+          "id": "every-object-used",
+          "passed": false,
+          "value": 4
+        },
+        {
+          "id": "nobody-stuck",
+          "passed": true,
+          "value": 0
+        },
+        {
+          "id": "stays-between-walks",
+          "passed": false,
+          "value": 1000
+        }
+      ],
+      "summary": {
+        "blocked_person_minutes": {},
+        "dwell_minutes_by_object_kind": {
+          "bench": {
+            "completed": 666,
+            "dwell": {
+              "count": 666,
+              "max": 3,
+              "median_milli": 3000,
+              "min": 3
+            },
+            "interrupted": 0,
+            "stays": 681,
+            "unfinished": 15
+          },
+          "cafe_table": {
+            "completed": 14,
+            "dwell": {
+              "count": 14,
+              "max": 3,
+              "median_milli": 3000,
+              "min": 3
+            },
+            "interrupted": 0,
+            "stays": 14,
+            "unfinished": 0
+          },
+          "market_stall": {
+            "completed": 1150,
+            "dwell": {
+              "count": 1150,
+              "max": 1,
+              "median_milli": 1000,
+              "min": 1
+            },
+            "interrupted": 0,
+            "stays": 1150,
+            "unfinished": 0
+          },
+          "planter_tree": {
+            "completed": 2121,
+            "dwell": {
+              "count": 2121,
+              "max": 1,
+              "median_milli": 1000,
+              "min": 1
+            },
+            "interrupted": 0,
+            "stays": 2121,
+            "unfinished": 0
+          },
+          "seating_planter": {
+            "completed": 552,
+            "dwell": {
+              "count": 552,
+              "max": 3,
+              "median_milli": 3000,
+              "min": 3
+            },
+            "interrupted": 0,
+            "stays": 562,
+            "unfinished": 10
+          }
+        },
+        "dwell_minutes_by_other_activity": {},
+        "minutes_between_walks": {
+          "count": 4528,
+          "max": 3,
+          "median_milli": 1000,
+          "min": 1
+        },
+        "nearest_doing_the_same_mm": {},
+        "never_used": [
+          {
+            "object_kind": "cafe_table",
+            "seed": "904c813de96626ff61a947da370c5fdc287be51955e1688eb8b152df8f1bc454"
+          },
+          {
+            "object_kind": "cafe_table",
+            "seed": "e939242707f6837166c56686e94297104c07a9a356615f41680a03dd4f42c540"
+          },
+          {
+            "object_kind": "cafe_table",
+            "seed": "8872c62a1278905fc8041225f3425994c8ee81d04b0c9ae60fcba3e2fd3e6c6f"
+          },
+          {
+            "object_kind": "cafe_table",
+            "seed": "7bc43c3257781c0e89440b507b7e997c335aa08f8e099a95a5d59eb8a77126c4"
+          }
+        ],
+        "person_minutes": 11520,
+        "share_of_person_minutes_milli": {
+          "using": 606,
+          "using:bench": 174,
+          "using:cafe_table": 3,
+          "using:market_stall": 99,
+          "using:planter_tree": 184,
+          "using:seating_planter": 144,
+          "walking": 393
+        },
+        "usable_objects": 72,
+        "usable_objects_never_used": 4,
+        "walking_per_minute_mean_milli": 3144,
+        "with_a_partner": {},
+        "worlds": 12
+      },
+      "tree": {
+        "diff_head_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "374dfc6a77546699af98d5398ed68aad43208d6a"
+      }
+    },
+    "measured_with_sha256": "3aab6a8ef5ecdc8c19f3bdafd49c87028e7065c618edea8286b7bfd68e3bfae1",
+    "profile": "exulanica.living-square/v1/targets",
+    "question": "When a person places the small square in front of where they arrive and brings in inhabitants, do the people linger, stand and talk the way people in a square do: fewer of their minutes spent walking, stays as long as people use a bench, a stall or a tree, some people just standing, pairs talking side by side, and every usable object in the square still used?",
+    "seeds": {
+      "development": [
+        "a3db77e1deb7be778f69bbfbb5603b2f65a92fdf3f5b13a0dc85c4d1618879d9",
+        "d79b78076211a98006e80c88c81feb9e36232099c2aa63884215fded7f564081",
+        "f00cd6ccf42a1d2c42141bd5de38cfd45942ee40abce26228034b677c1312d96",
+        "768df339d126513717b4c381dc44451e7bed1de0f06e4727fbcd02e9afa371a7",
+        "6a736404de6c282792195ff30f8cce0360aa2444440f8f7eb5fa0551500294a3",
+        "d7ce9415a7b8628e4ed27bee1a321583a5da01b072e6188e382a5b0f3d99d5b0",
+        "4c3d15454d4a12b714e71d777cc918c4ec5c502807bf92f1925a0386629492a2",
+        "58d375b7d2a02f1af3e6012d2b26cf38fac69311f97b4ed7da8e0298837baa76",
+        "b958a4c55a6bfa97d392ff390e3b73c2a539e5741acbe1e73461ee08e388d4f2",
+        "7494f36ce95ba888c571870ca046dea74d944eb4660434133319219f529ec63a",
+        "bcc95cf3a62d31911e9caeedea20d9dbf53e39c3065486713cbf5e1ad2ae75e6",
+        "55bf5d8e74496898c83d72fb3df1815cbf16239eb7e3829580dd7c1f4f7215df"
+      ],
+      "judged": [
+        "7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+        "e373bfb343fb9252b49bd363a000b9ab720b0c35c9168b2583374cfdd20355c9",
+        "904c813de96626ff61a947da370c5fdc287be51955e1688eb8b152df8f1bc454",
+        "595686aba032b63fe81c9d437612d12f4a4e9f37f9166ff4c7ddd4bdacc3c26b",
+        "12728396fe786bbb9ce9079d83ad49fe028b2a1914847fde1a2edceb26223789",
+        "e939242707f6837166c56686e94297104c07a9a356615f41680a03dd4f42c540",
+        "f52e92ea2b596c68c26fb52cc83a7e9b70bff8dd1396175ccf63def712f7cc81",
+        "4aba960e49928b0e69869f6055cc01acadc5d2a1e48916d9774b669bc19b682d",
+        "8872c62a1278905fc8041225f3425994c8ee81d04b0c9ae60fcba3e2fd3e6c6f",
+        "33ebdd4fbb7ecdd85c913ce261d190711c57f6442adec990e1831e95f572a773",
+        "c51f86893e76cabfc4999f2b8d6c9af4a1483a1e6068b75fd6fb5f77032cc456",
+        "7bc43c3257781c0e89440b507b7e997c335aa08f8e099a95a5d59eb8a77126c4"
+      ]
+    },
+    "targets": [
+      {
+        "bounds": [
+          100,
+          250
+        ],
+        "id": "walking-share",
+        "metric": [
+          "share_of_person_minutes_milli",
+          "walking"
+        ],
+        "reason": "In a square most people are somewhere rather than on their way. Each stay now lasts several minutes and still costs one walking minute, so walking falls from 393 per mille, when every visit lasted one minute, to between one person in ten and one in four at any moment.",
+        "rule": "within"
+      },
+      {
+        "bounds": [
+          8000,
+          12000
+        ],
+        "id": "bench-stay",
+        "metric": [
+          "dwell_minutes_by_object_kind",
+          "bench",
+          "dwell",
+          "median_milli"
+        ],
+        "reason": "People sit on a bench with a back five to fifteen minutes, to rest and watch the square; drawn evenly over that range, the median stay is near ten minutes.",
+        "rule": "within"
+      },
+      {
+        "bounds": [
+          5000,
+          8000
+        ],
+        "id": "planter-seat-stay",
+        "metric": [
+          "dwell_minutes_by_object_kind",
+          "seating_planter",
+          "dwell",
+          "median_milli"
+        ],
+        "reason": "A planter wall with no back is a perch: three to ten minutes, the median near six and a half.",
+        "rule": "within"
+      },
+      {
+        "bounds": [
+          14000,
+          21000
+        ],
+        "id": "cafe-table-stay",
+        "metric": [
+          "dwell_minutes_by_object_kind",
+          "cafe_table",
+          "dwell",
+          "median_milli"
+        ],
+        "reason": "A table with chairs keeps people the time a drink or a snack takes: ten to twenty-five minutes, the median near seventeen and a half.",
+        "rule": "within"
+      },
+      {
+        "bounds": [
+          3000,
+          5000
+        ],
+        "id": "stall-stay",
+        "metric": [
+          "dwell_minutes_by_object_kind",
+          "market_stall",
+          "dwell",
+          "median_milli"
+        ],
+        "reason": "Browsing a stall's counter and being served takes two to six minutes, the median near four.",
+        "rule": "within"
+      },
+      {
+        "bounds": [
+          2000,
+          3000
+        ],
+        "id": "tree-stay",
+        "metric": [
+          "dwell_minutes_by_object_kind",
+          "planter_tree",
+          "dwell",
+          "median_milli"
+        ],
+        "reason": "People pause by a tree in passing, one to four minutes, so the median is two or three.",
+        "rule": "within"
+      },
+      {
+        "bound": 20,
+        "id": "standing",
+        "metric": [
+          "share_of_person_minutes_milli",
+          "stand"
+        ],
+        "reason": "Some people just stop and stand at an open spot: at least one person-minute in fifty.",
+        "rule": "at_least"
+      },
+      {
+        "bound": 40,
+        "id": "talking",
+        "metric": [
+          "share_of_person_minutes_milli",
+          "talk"
+        ],
+        "reason": "Pairs stop and talk: at least one person-minute in twenty-five is somebody talking.",
+        "rule": "at_least"
+      },
+      {
+        "bound": 950,
+        "id": "talking-together",
+        "metric": [
+          "with_a_partner",
+          "talk",
+          "partner_doing_the_same"
+        ],
+        "of": [
+          "with_a_partner",
+          "talk",
+          "person_minutes"
+        ],
+        "reason": "Talking takes two. A talker's partner is talking too in every minute but the one in which one of them walks over to the other, at most one talking minute in twenty.",
+        "rule": "share_at_least"
+      },
+      {
+        "bound": 2000,
+        "id": "talking-distance",
+        "metric": [
+          "with_a_partner",
+          "talk",
+          "apart_mm_when_both",
+          "max"
+        ],
+        "reason": "Two people talking stand at most two metres apart, the close phase of social distance.",
+        "rule": "at_most"
+      },
+      {
+        "bound": 1,
+        "id": "talking-not-on-one-spot",
+        "metric": [
+          "with_a_partner",
+          "talk",
+          "apart_mm_when_both",
+          "min"
+        ],
+        "reason": "Two people talking never stand on one spot.",
+        "rule": "at_least"
+      },
+      {
+        "id": "every-object-used",
+        "metric": [
+          "usable_objects_never_used"
+        ],
+        "reason": "Everything in the square that people can use is used, in every world. Under the released rules the cafe table went unused in 4 of the 12 worlds, because everybody took the nearest free place; drawn among the free places, nothing is left out.",
+        "rule": "equals",
+        "value": 0
+      },
+      {
+        "bound": 10,
+        "id": "nobody-stuck",
+        "metric": [
+          "share_of_person_minutes_milli",
+          "waiting"
+        ],
+        "reason": "Lingering must not become waiting: at most one person-minute in a hundred is spent blocked or with nothing to do.",
+        "rule": "at_most"
+      },
+      {
+        "bound": 3000,
+        "id": "stays-between-walks",
+        "metric": [
+          "minutes_between_walks",
+          "median_milli"
+        ],
+        "reason": "People stay a while between walks: the median run of minutes without walking is at least three, where the released rules gave one.",
+        "rule": "at_least"
+      }
+    ],
+    "written_at": "2026-09-25T14:54:47+00:00"
+  },
+  "record_sha256": "f3f46e354df9e961e69f0d824f88537cee7a9136f972ad6ad7df813f7e292e42"
+}

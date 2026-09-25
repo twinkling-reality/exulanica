@@ -14,7 +14,7 @@ const places = (overrides: Partial<SocietyPlaces> = {}): SocietyPlaces => ({
   inputSeq: 2, inputSha256: 'b'.repeat(64), available: true, unavailableReason: null,
   walkableArea: { source: 'declared', centreMm: [0, 0], halfWidthMm: 12000, halfDepthMm: 12000 },
   clearanceMm: 450,
-  targets: [{ targetId: 't-near', subjectId: 's-near', objectId: 'near', affordance: 'rest', durationTicks: 3, enabled: true, placeNodeIds: [] }],
+  targets: [{ targetId: 't-near', subjectId: 's-near', objectId: 'near', affordance: 'rest', durationTicks: 3, activity: null, enabled: true, placeNodeIds: [] }],
   unreachable: [
     { targetId: 't-far', objectId: 'far', affordance: 'rest', reason: 'authored_affordance_unreachable' },
     { targetId: 't-edge', objectId: 'edge', affordance: 'visit', reason: 'authored_affordance_unreachable' },
@@ -47,7 +47,7 @@ describe('where each object stands for inhabitants', () => {
 
   it('says how many use a destination at once, and why an object nobody uses is unused', () => {
     const rows = placeRows(objects, places({
-      targets: [{ targetId: 't-near', subjectId: 's-near', objectId: 'near', affordance: 'rest', durationTicks: 3, enabled: true,
+      targets: [{ targetId: 't-near', subjectId: 's-near', objectId: 'near', affordance: 'rest', durationTicks: 3, activity: null, enabled: true,
         placeNodeIds: ['place:near:0', 'place:near:1'] }],
       unreachable: [
         { targetId: 't-far', objectId: 'far', affordance: 'rest', reason: 'authored_object_moves' },
@@ -74,8 +74,12 @@ describe('where each object stands for inhabitants', () => {
   });
 
   it('says a refusal in words and keeps the code for the details', () => {
-    expect(refusalWords({ status: 422, code: 'invalid_society_state', detail: 'initial society requires reachable targets' }))
+    expect(refusalWords({ status: 409, code: 'no_reachable_targets', detail: 'initial society requires reachable targets' }))
       .toMatch(/^Nobody came in: there is nowhere in this world they could reach yet/);
+    // The code is what is read, never the detail: the same sentence under another code is shown as
+    // it is, not taken for the refusal it happens to describe.
+    expect(refusalWords({ status: 422, code: 'invalid_society_state', detail: 'initial society requires reachable targets' }))
+      .toBe('Inhabitants were not brought in. initial society requires reachable targets');
     expect(refusalWords({ status: 424, code: 'unavailable_society_input', detail: 'required exact asset bytes are unavailable' }))
       .toBe('Inhabitants cannot come in right now. required exact asset bytes are unavailable');
   });
@@ -104,13 +108,14 @@ describe('the inhabitants panel', () => {
   it('shows a refusal until the next request, with its code only in the details', () => {
     const panel = buildWorldInhabitants({ onBringIn: vi.fn(), onAdvance: vi.fn() , onSendAway: vi.fn(), onBringBack: vi.fn() });
     panel.render({
-      society: view({ refusal: { status: 422, code: 'invalid_society_state', detail: 'initial society requires reachable targets' } }),
+      society: view({ refusal: { status: 409, code: 'no_reachable_targets', detail: 'initial society requires reachable targets' } }),
       objects: [], walked: 0, advanceBlocked: null,
     });
     const refusal = panel.root.querySelector('.world-inhabitants-refusal') as HTMLElement;
     expect(refusal.hidden).toBe(false);
-    expect(refusal.textContent).not.toMatch(/invalid_society_state/);
-    expect(panel.root.querySelector('details code')?.textContent).toBe('invalid_society_state: initial society requires reachable targets');
+    expect(refusal.textContent).toMatch(/^Nobody came in/);
+    expect(refusal.textContent).not.toMatch(/no_reachable_targets/);
+    expect(panel.root.querySelector('details code')?.textContent).toBe('no_reachable_targets: initial society requires reachable targets');
   });
 
   it('with inhabitants: counts them, lists each object in the server\'s words, and offers the minute', () => {

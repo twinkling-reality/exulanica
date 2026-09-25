@@ -539,7 +539,7 @@ export function mountEnvironmentSelection(
     // In a person's own world the top says who this is, what they are doing and why, in words,
     // naming places by the titles of the person's objects; the recorded details stay below.
     const words = savedWorld !== null && v2 && society?.places
-      ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places))
+      ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places), state.inhabitants)
       : null;
     inspector.show({
       subject: id,
@@ -558,7 +558,7 @@ export function mountEnvironmentSelection(
         ['Plane / origin', 'Simulation · synthetic'],
         ['Visibility', crowd()?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
         ['Current activity', v2 && inhabitant.action ? `${inhabitant.action.kind} · ${inhabitant.action.status}: ${inhabitant.action.reason}` : 'Unavailable'],
-        ['Goal / destination', v2 && goal ? (goal.target_id === null ? 'Making room at a busy place' : `${goal.kind} · ${goal.target_id}: ${goal.reason}`) : 'Unavailable'],
+        ['Goal / destination', v2 && goal ? (goal.target_id === null ? (goal.kind === 'make_room' ? 'Making room at a busy place' : `${goal.kind}: ${goal.reason}`) : `${goal.kind} · ${goal.target_id}: ${goal.reason}`) : 'Unavailable'],
         ['Recorded event details', eventText || (liveSociety?.view.eventsAvailable ? 'No event references for this activity.' : 'Event documents unavailable in this view.')],
         ['Event references', v2 ? inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references' : 'Unavailable'],
         ['Producer', state.profile ?? 'Static preview fixture'],

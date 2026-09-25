@@ -733,28 +733,15 @@ def _crowds(item: PlacedObject, used: Sequence[Point]) -> bool:
 def _read_ground(repository: WorldObjectRepository, snapshot_id: uuid.UUID) -> Any:
     """The society's reading of the version's authored ground, or ``None`` when it has none.
 
-    The same row and the same rule the society runtime reads a saved world's ground by
-    (``exulanica/api/society_runtime.py``, ``_read_ground``).
+    Read by the one reader the society runtime reads a saved world's ground by
+    (:func:`~exulanica.world.society_authored_ground.read_authored_ground`); a ground the society
+    has no rule for is no ground to stand an arrangement on.
     """
-    from exulanica.world.society_authored_ground import authored_ground_from_snapshot
+    from exulanica.world.society_authored_ground import read_authored_ground
 
-    row = repository.connection.execute(
-        "select composer_key,composer_version,topology,placement,snapshot_sha256 "
-        "from world_structure_snapshot where workspace_id=%s and world_id=%s "
-        "and snapshot_id=%s",
-        (repository.workspace_id, repository.world_id, snapshot_id),
-    ).fetchone()
-    if row is None:
-        return None
     try:
-        return authored_ground_from_snapshot(
-            world_id=repository.world_id,
-            snapshot_id=snapshot_id,
-            snapshot_sha256=row["snapshot_sha256"],
-            composer_key=row["composer_key"],
-            composer_version=row["composer_version"],
-            topology=row["topology"],
-            placement=row["placement"],
+        return read_authored_ground(
+            repository.connection, repository.workspace_id, repository.world_id, snapshot_id
         )
     except InvalidStructuralData:
         return None

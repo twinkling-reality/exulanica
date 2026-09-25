@@ -45,8 +45,8 @@ from exulanica.world.society import UnavailableSocietyInput, society_state_sha25
 from exulanica.world.society_authored_ground import (
     SocietyGround,
     StandingPolicy,
-    authored_ground_from_snapshot,
-    build_authored_ground_society_input_v2,
+    build_authored_ground_society_input_v3,
+    read_authored_ground,
 )
 from exulanica.world.society_composition import (
     build_society_input,
@@ -720,26 +720,13 @@ class SocietyRuntime:
         world_id: str,
         snapshot_id: uuid.UUID,
     ) -> SocietyGround:
-        row = connection.execute(
-            "select composer_key,composer_version,topology,placement,snapshot_sha256 "
-            "from world_structure_snapshot where workspace_id=%s and world_id=%s "
-            "and snapshot_id=%s",
-            (session.workspace_id, world_id, snapshot_id),
-        ).fetchone()
-        if row is None:
-            raise UnavailableSocietyInput("registered structural snapshot is unavailable")
         try:
-            return authored_ground_from_snapshot(
-                world_id=world_id,
-                snapshot_id=snapshot_id,
-                snapshot_sha256=row["snapshot_sha256"],
-                composer_key=row["composer_key"],
-                composer_version=row["composer_version"],
-                topology=row["topology"],
-                placement=row["placement"],
-            )
+            ground = read_authored_ground(connection, session.workspace_id, world_id, snapshot_id)
         except InvalidStructuralData as exc:
             raise UnavailableSocietyInput(f"authored ground is unreadable: {exc}") from exc
+        if ground is None:
+            raise UnavailableSocietyInput("registered structural snapshot is unavailable")
+        return ground
 
     def _authored_ground(
         self,
@@ -825,7 +812,7 @@ class SocietyRuntime:
                 self._asset(connection, assignment["asset_key"], obj.asset_sha256, registry)
         except UnavailableSocietyInput as exc:
             reason = str(exc)
-        return build_authored_ground_society_input_v2(
+        return build_authored_ground_society_input_v3(
             ground=ground,
             version=version,
             input_seq=seq,

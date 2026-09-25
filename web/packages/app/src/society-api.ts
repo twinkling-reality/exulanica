@@ -60,6 +60,15 @@ function presenceOf(state: Readonly<Record<string, unknown>>): SocietyPresence {
 
 export type SocietyAffordance = 'visit' | 'rest';
 
+/**
+ * What a person in a purposeful society can be doing: an affordance at an object, standing a
+ * while at an open spot, or talking with one other person. The society's routine catalogs state
+ * them (`assets/catalogs/society/society-purposeful-activity.v*.json`); society-words-parity.test.ts
+ * holds this list to them.
+ */
+export const PURPOSEFUL_ACTIVITIES = ['visit', 'rest', 'stand', 'talk'] as const;
+const ACTION_KINDS: readonly string[] = ['idle', 'move', ...PURPOSEFUL_ACTIVITIES];
+
 /** One activity an inhabitant can be directed to, as the consumed input states it. */
 export interface SocietyPlace {
   readonly targetId: string;
@@ -67,7 +76,10 @@ export interface SocietyPlace {
   /** The authored object the activity belongs to, or null for a district's own destination. */
   readonly objectId: string | null;
   readonly affordance: SocietyAffordance;
-  readonly durationTicks: number;
+  /** The fixed minutes a stay lasts, for an input that records no routine; otherwise null. */
+  readonly durationTicks: number | null;
+  /** The routine's activity a stay here is, for an input that records a routine; otherwise null. */
+  readonly activity: string | null;
   readonly enabled: boolean;
   /**
    * Where its occupants stand, one person to a place, when the input states places; empty for
@@ -255,9 +267,12 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
     targets: Object.freeze(targets.map((value) => {
       const target = record(value);
       const places = target['place_node_ids'];
+      // An input states a fixed duration, or names its routine's activity: exactly one of the two.
+      const timed = integer(target['duration_ticks'], 1) && target['activity'] === undefined;
+      const named = textValue(target['activity']) && target['duration_ticks'] === undefined;
       if (!textValue(target['target_id']) || !textValue(target['subject_id']) ||
           !(target['object_id'] === null || textValue(target['object_id'])) ||
-          !affordance(target['affordance']) || !integer(target['duration_ticks'], 1) ||
+          !affordance(target['affordance']) || !(timed || named) ||
           typeof target['enabled'] !== 'boolean' ||
           !(places === undefined || (Array.isArray(places) && places.length > 0 && places.every(textValue)))) {
         throw new Error('Invalid society place');
@@ -265,7 +280,9 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
       return Object.freeze({
         targetId: target['target_id'], subjectId: target['subject_id'],
         objectId: target['object_id'] as string | null, affordance: target['affordance'],
-        durationTicks: target['duration_ticks'] as number, enabled: target['enabled'] as boolean,
+        durationTicks: timed ? target['duration_ticks'] as number : null,
+        activity: named ? target['activity'] as string : null,
+        enabled: target['enabled'] as boolean,
         placeNodeIds: Object.freeze([...((places ?? []) as string[])]),
       });
     })),
@@ -315,6 +332,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
     throw new Error('Invalid society response');
   }
   const ids = new Set<string>();
+  const partners: string[] = [];
   for (const value of inhabitants) {
     const inhabitant = record(value);
     if (!textValue(inhabitant['id']) || ids.has(inhabitant['id']) || inhabitant['synthetic'] !== true ||
@@ -324,7 +342,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
     const action = record(inhabitant['action']), explanation = record(inhabitant['explanation']);
     const path = inhabitant['motion_path_mm'];
     if (!textValue(inhabitant['display_name']) || !textValue(inhabitant['role']) ||
-        !['idle', 'move', 'visit', 'rest'].includes(String(action['kind'])) ||
+        !ACTION_KINDS.includes(String(action['kind'])) ||
         !['active', 'completed', 'blocked'].includes(String(action['status'])) ||
         !(action['target_id'] === null || textValue(action['target_id'])) ||
         !integer(action['remaining_ticks']) || !textValue(action['reason']) ||
@@ -334,12 +352,18 @@ export function parseSociety(value: unknown): SocietySnapshot {
     const end = path[path.length - 1] as readonly number[];
     if (end[0] !== inhabitant['position_mm'][0] || end[1] !== inhabitant['position_mm'][1]) throw new Error('Invalid society motion endpoint');
     if (inhabitant['goal'] !== null) {
-      // A goal is an activity at a target, or a walk that makes room at a busy destination,
-      // which names no target.
+      // A goal is an activity at a target, a walk that makes room at a busy destination,
+      // standing a while at an open spot, or talking with another inhabitant for a stated time;
+      // only the first names a target.
       const goal = record(inhabitant['goal']);
       const activity = ['visit', 'rest'].includes(String(goal['kind'])) && textValue(goal['target_id']);
-      const makingRoom = goal['kind'] === 'make_room' && goal['target_id'] === null;
-      if (!(activity || makingRoom) || !textValue(goal['reason'])) throw new Error('Invalid society goal');
+      const spot = goal['target_id'] === null;
+      const makingRoom = goal['kind'] === 'make_room' && spot;
+      const standing = goal['kind'] === 'stand' && spot;
+      const talking = goal['kind'] === 'talk' && spot && textValue(goal['partner_id']) &&
+        goal['partner_id'] !== inhabitant['id'] && integer(goal['duration_ticks'], 1);
+      if (!(activity || makingRoom || standing || talking) || !textValue(goal['reason'])) throw new Error('Invalid society goal');
+      if (talking) partners.push(goal['partner_id'] as string);
     }
     if (inhabitant['route'] !== null) {
       const route = record(inhabitant['route']);
@@ -348,6 +372,8 @@ export function parseSociety(value: unknown): SocietySnapshot {
           !textValue(route['destination_node_id']) || !digest(route['input_sha256'])) throw new Error('Invalid society route');
     }
   }
+  // Somebody talks with a person the same state holds, never with anybody else.
+  if (!partners.every((partner) => ids.has(partner))) throw new Error('Invalid society goal');
   if (v2 && (state['society_id'] !== row['society_id'] || state['branch_id'] !== row['version_id'] ||
       row['branch_id'] !== state['branch_id'] || !integer(state['input_seq'], 1) ||
       row['input_seq'] !== state['input_seq'] || !digest(state['input_sha256']) ||

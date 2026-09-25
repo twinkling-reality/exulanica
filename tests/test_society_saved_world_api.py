@@ -155,11 +155,14 @@ def test_one_request_brings_inhabitants_in_and_asking_again_changes_nothing(worl
     scope, _, society_route = routes(world)
     derived_place = saved_world_place_id(world["binding"].version_id)
     with TestClient(make_app()) as client:
-        # An empty world has somewhere to stand and nothing to do. The refusal says so, and the
-        # place it would have bound is not left behind.
+        # An empty world has somewhere to stand and nothing to do. The refusal says so by name,
+        # and the place it would have bound is not left behind.
         response = bring_inhabitants(client, world)
-        assert response.status_code == 422, response.text
-        assert "reachable targets" in response.json()["detail"]
+        assert response.status_code == 409, response.text
+        assert response.json() == {
+            "code": "no_reachable_targets",
+            "detail": "initial society requires reachable targets",
+        }
         assert held(world) == NOTHING
 
         place(client, world, "object:cushion", 3_000, 5_000)
@@ -482,14 +485,14 @@ def test_a_society_recorded_under_the_old_rule_still_reads_and_moves_on(saved_wo
     first part, so the society records what it recorded then. With today's composition restored,
     every stored input still authorises (they are matched by their stored bytes, never composed
     again), the society still reads and replays, and the next edit composes a usable world again
-    under the second profile, with nobody stranded.
+    under the newest profile, with nobody stranded.
     """
     import exulanica.api.society_runtime as runtime_module
     import exulanica.world.society_composition as composition
     from exulanica.world.society_authored_ground import build_authored_ground_society_input
     from exulanica.world.society_input_policy import (
         AUTHORED_GROUND_INPUT,
-        AUTHORED_GROUND_INPUT_V2,
+        AUTHORED_GROUND_INPUT_V3,
     )
 
     def first_composition(*, standing, **arguments):
@@ -506,7 +509,7 @@ def test_a_society_recorded_under_the_old_rule_still_reads_and_moves_on(saved_wo
     )
     society = helpers.society_repository(world, runtime)
     monkeypatch.setattr(composition, "AUTHORED_GROUND_COMPOSITION", "the rule before turns")
-    monkeypatch.setattr(runtime_module, "build_authored_ground_society_input_v2", first_composition)
+    monkeypatch.setattr(runtime_module, "build_authored_ground_society_input_v3", first_composition)
 
     add_turned(world, runtime, "object:cushion", 3_000, 5_000, 0)
     with connection.transaction():
@@ -548,7 +551,7 @@ def test_a_society_recorded_under_the_old_rule_still_reads_and_moves_on(saved_wo
         (world["workspace"],),
     ).fetchone()["document"]
     assert latest["input_seq"] == 3 and latest["availability"] == "available"
-    assert latest["profile"] == AUTHORED_GROUND_INPUT_V2
+    assert latest["profile"] == AUTHORED_GROUND_INPUT_V3
     assert sorted(t["object_id"] for t in latest["targets"]) == [
         "object:cushion",
         "object:facing",

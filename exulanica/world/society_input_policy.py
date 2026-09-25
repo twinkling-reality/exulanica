@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Any, Final
 
 LEGACY_COMPOSITION = "exulanica.society-composition/v1"
@@ -15,10 +15,16 @@ AUTHORED_GROUND_COMPOSITION = "exulanica.society-composition/authored-ground-v1"
 #: activity the places its occupants stand at. It never rewrites a stored authored-ground-v1
 #: input; a society holding those replays them with their own semantics.
 AUTHORED_GROUND_COMPOSITION_V2 = "exulanica.society-composition/authored-ground-v2"
+#: The same projection again, recording the purposeful routine it was composed under
+#: (``exulanica.world.society_catalogs``) and naming, for each activity, the routine's entry for the
+#: object's kind in place of a fixed duration. It never rewrites a stored authored-ground-v2 input;
+#: an input that records no routine is read under the rules it was recorded with.
+AUTHORED_GROUND_COMPOSITION_V3 = "exulanica.society-composition/authored-ground-v3"
 LEGACY_INPUT = "exulanica.society-input/v1"
 LOCAL_INPUT = "exulanica.society-input/v2"
 AUTHORED_GROUND_INPUT = "exulanica.society-input/authored-ground-v1"
 AUTHORED_GROUND_INPUT_V2 = "exulanica.society-input/authored-ground-v2"
+AUTHORED_GROUND_INPUT_V3 = "exulanica.society-input/authored-ground-v3"
 UNREACHABLE = "authored_affordance_unreachable"
 #: An object that moves offers no activity: where it stands when an inhabitant arrives is a phase
 #: the renderer holds and the society does not.
@@ -37,6 +43,7 @@ _PAIRS = (
     (LOCAL_COMPOSITION, LOCAL_INPUT),
     (AUTHORED_GROUND_COMPOSITION, AUTHORED_GROUND_INPUT),
     (AUTHORED_GROUND_COMPOSITION_V2, AUTHORED_GROUND_INPUT_V2),
+    (AUTHORED_GROUND_COMPOSITION_V3, AUTHORED_GROUND_INPUT_V3),
 )
 #: Compositions that record a known unreachable authored activity against that activity alone,
 #: type-check authored transforms strictly, and publish an ``unavailable_affordances`` list.
@@ -44,11 +51,24 @@ LOCAL_FAILURE_COMPOSITIONS = (
     LOCAL_COMPOSITION,
     AUTHORED_GROUND_COMPOSITION,
     AUTHORED_GROUND_COMPOSITION_V2,
+    AUTHORED_GROUND_COMPOSITION_V3,
 )
-LOCAL_FAILURE_INPUTS = (LOCAL_INPUT, AUTHORED_GROUND_INPUT, AUTHORED_GROUND_INPUT_V2)
+LOCAL_FAILURE_INPUTS = (
+    LOCAL_INPUT,
+    AUTHORED_GROUND_INPUT,
+    AUTHORED_GROUND_INPUT_V2,
+    AUTHORED_GROUND_INPUT_V3,
+)
 #: Every input profile a saved world's own ground produces, oldest first. A society's inputs may
 #: move forward along this order and never back.
-AUTHORED_GROUND_INPUTS: Final = (AUTHORED_GROUND_INPUT, AUTHORED_GROUND_INPUT_V2)
+AUTHORED_GROUND_INPUTS: Final = (
+    AUTHORED_GROUND_INPUT,
+    AUTHORED_GROUND_INPUT_V2,
+    AUTHORED_GROUND_INPUT_V3,
+)
+#: Input profiles that record the purposeful routine they were composed under. Every other profile
+#: records none and is read under the routine the society was first released with.
+ROUTINE_INPUTS: Final = (AUTHORED_GROUND_INPUT_V3,)
 #: Why an activity may be recorded as unavailable on its own, per input profile. A profile only
 #: ever gains reasons in a new version, so a stored input is read with the vocabulary it was
 #: written under.
@@ -56,10 +76,12 @@ LOCAL_RECORD_REASONS: Final[Mapping[str, frozenset[str]]] = {
     LOCAL_INPUT: frozenset({UNREACHABLE}),
     AUTHORED_GROUND_INPUT: frozenset({UNREACHABLE}),
     AUTHORED_GROUND_INPUT_V2: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
+    AUTHORED_GROUND_INPUT_V3: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
 }
 #: Why a placement may be named as unread, per input profile that carries the list.
 UNREAD_PLACEMENT_REASONS: Final[Mapping[str, frozenset[str]]] = {
     AUTHORED_GROUND_INPUT_V2: frozenset({NO_AUTHORED_FRAME}),
+    AUTHORED_GROUND_INPUT_V3: frozenset({NO_AUTHORED_FRAME}),
 }
 #: The bound on a local record list, shared with targets as the input bound always was.
 LOCAL_RECORD_BOUND: Final = 4096
@@ -84,7 +106,9 @@ def is_authored_ground(profile: object) -> bool:
     return profile in AUTHORED_GROUND_INPUTS
 
 
-def validate_local_affordances(document: dict, durations: dict) -> None:
+def validate_local_affordances(document: dict, affordances: Collection[str]) -> None:
+    """Check the activities an input records as unavailable on their own, against the affordances
+    its routine states."""
     records = document["unavailable_affordances"]
     if (
         not isinstance(records, list)
@@ -105,7 +129,7 @@ def validate_local_affordances(document: dict, durations: dict) -> None:
             raise ValueError("invalid unavailable affordance fields")
         if any(not isinstance(v, str) or not 1 <= len(v) <= 1000 for v in row.values()):
             raise ValueError("invalid unavailable affordance reference")
-        if row["version_id"] != document["version_id"] or row["affordance"] not in durations:
+        if row["version_id"] != document["version_id"] or row["affordance"] not in affordances:
             raise ValueError("unavailable affordance scope or action mismatch")
         subject = f"authored:{row['version_id']}:{row['object_id']}"
         if (

@@ -67,12 +67,12 @@ describe('a saved world society is created only when the person asks', () => {
     const { live, client } = setup();
     await live.connect();
     client.create.mockRejectedValueOnce(
-      new ApiError(422, 'invalid_society_state', 'initial society requires reachable targets'),
+      new ApiError(409, 'no_reachable_targets', 'initial society requires reachable targets'),
     );
     await live.bringIn();
     expect(live.view.status).toBe('absent');
     expect(live.view.refusal).toEqual({
-      status: 422, code: 'invalid_society_state', detail: 'initial society requires reachable targets',
+      status: 409, code: 'no_reachable_targets', detail: 'initial society requires reachable targets',
     });
     client.read.mockResolvedValue(snapshot());
     await live.bringIn();

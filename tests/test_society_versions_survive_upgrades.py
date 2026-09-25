@@ -143,13 +143,19 @@ def test_released_catalog_versions_never_change_in_place():
     assert released == RELEASED_CATALOGS
 
 
-#: Read from the files as released with the living society (05120886 and 5acc7cdf); a new
-#: version adds a line here, and no line ever changes.
+#: Read from the files as released with the living society (05120886 and 5acc7cdf), and with the
+#: purposeful routine the inputs record; a new version adds a line here, and no line ever changes.
 RELEASED_CATALOGS = {
     "society-activity.v1.json": "0ac08e1e351bc93adae7e175f0fe07b46b73ccfcfcefc8e2744b540bd39d3a31",
     "society-capacity.v1.json": "dc9a9a2b337524a3856c69d62626179a8b31587d561b76dff101a4d9f0f93e66",
     "society-need.v1.json": "fde86f793eac317b3899ba384a204e57683773b48ac588c527173511ffccd563",
     "society-policy.v1.json": "789243cd93f0b83274870919df34427fb3b75dc3e8df926cac59d40c2476bb3f",
+    "society-purposeful-activity.v1.json": (
+        "6e504ccb454c16b359d9a7a9e801bb3a960c3d03281f468bbbe65971cb8c075b"
+    ),
+    "society-purposeful-activity.v2.json": (
+        "2898207d7570d9534cdf1884de58dcf0848c6888b234ff295b6baa8e4ccc1b61"
+    ),
     "society-use-class.v1.json": "ba1f7f4971412bf8c612d32ce0144367f237008116d08b78ca19a9b95df9e541",
 }
 

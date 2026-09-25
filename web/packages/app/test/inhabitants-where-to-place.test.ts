@@ -24,7 +24,7 @@ describe('where inhabitants need somewhere, the panel says where to place it', (
       .toMatch(/^They cannot come back yet: .* then ask again\. /);
     expect(refusalWords({ status: 409, code: 'nowhere_to_arrive', detail: '' }).endsWith(POINTER)).toBe(true);
     const fallback = refusalWords({
-      status: 422, code: 'invalid_society_state', detail: 'initial society requires reachable targets',
+      status: 409, code: 'no_reachable_targets', detail: 'initial society requires reachable targets',
     });
     expect(fallback).toMatch(/^Nobody came in: /);
     expect(fallback.endsWith(POINTER)).toBe(true);

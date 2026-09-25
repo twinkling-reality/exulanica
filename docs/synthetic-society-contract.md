@@ -148,7 +148,8 @@ from browser request JSON. Inputs contain:
   origin for a saved world's own ground (below);
 - `authored_state: {edit_seq, delta_sha256}`;
 - `bounded-sidewalk-graph/v1` nodes, undirected edges, destinations and unavailable reason;
-- targets with stable `target_id`, spatial `subject_id`, `node_id`, `affordance`, `duration_ticks`,
+- targets with stable `target_id`, spatial `subject_id`, `node_id`, `affordance`, `duration_ticks`
+  (in an input that records a routine, the routine's `activity` in its place),
   `origin`, authored string `object_id` or null, `version_id`, and boolean `enabled`;
 - digest-bound dependency references, availability and its explicit reason; and
 - `document_sha256`, covering canonical no-float JSON excluding only that field.
@@ -172,27 +173,77 @@ Each tick is one simulated minute. The travel budget is the one the state record
 simulated second; an advance reads the state's figure, never the module's, so a stored society
 walks at the budget it was created with. Shortest routes minimize integer edge length with
 lexicographic node-path ties (in every profile).
-A scalar need of at least 750 (`NEED_PREFERS_REST_MILLI`) prefers rest; otherwise visit is
-preferred. Among reachable candidates,
-the policy prefers a different target from the last completed one, then lower route cost and target
-ID. This is a small deterministic utility policy, not learned preference or biography.
+What people do, how long each stay lasts and how it varies, what it relieves and how often it is
+chosen are the purposeful routine's: versioned data in
+`assets/catalogs/society/society-purposeful-activity.v<N>.json`, read by
+`exulanica/world/society_catalogs.py`, with a reason for every figure, and no such figure in the
+planner. The routine an input records selects them (`routine: {catalog_versions, sha256}`, which
+`exulanica.society-input/authored-ground-v3` records and no earlier profile does); an input that
+records none, every district input and every saved-world input of an earlier profile, is read under
+version 1, the rules the society was released with, so nothing already recorded changes meaning. A
+new routine is a new catalog version beside the old, never an edit of one an input names. A recorded
+routine is read by its versions and digest alone, never against the world object catalog, so a
+stored input stays readable whatever that catalog later drops; whether the kinds a routine names
+are kinds that catalog states, offering the entry's affordance, is asked when an input is composed,
+and a parity test holds the routine a new input records to the catalogs as they are
+(`tests/test_society_purposeful_routine.py`). Every choice is a deterministic draw from the seed,
+`sha256(seed:domain:tick:ordinal)`
+(`exulanica/world/society.py`), so a replay makes the same choices in the same minutes. This is a
+small deterministic utility policy, not learned preference or biography.
 
-Only two object affordances are supported: `visit` takes one subsequent tick; `rest` takes three.
+Version 1: a scalar need of at least 750 prefers rest; otherwise visit is preferred. Among
+reachable candidates, the policy prefers a different target from the last completed one, then
+lower route cost and target ID. `visit` takes one subsequent tick and `rest` three, and completion
+reduces the need by 20 for a visit or 500 for rest, clamped at zero. A v2 history through twelve
+minutes and 24 completed activities is pinned by its state digest, produced by the code before
+places existed (`tests/test_society_destination_room.py`), and a saved world's v2 society stored
+before inputs recorded a routine, with a directed request, an edit, and everyone sent away and
+brought back, replays byte for byte (`tests/test_society_v2_history_replay.py`).
+
+Version 2, which a saved world's input records: a person whose need has reached 750 rests where a
+rest place has room. Before anybody picks anything else in a minute, everybody else free to choose,
+in ordinal order, draws once over all four activities' weights (rest 700, visit 1,000, stand 300
+and talk 500 of 2,500), and that draw decides only whether they look for somebody to talk to: one
+draw in five does. One who does is paired with the nearest person within 8 m who is free to choose
+and not tired, or standing, the lower ordinal winning a tie. Anybody not paired, one who drew talk
+and found nobody included, then picks among rest, visit and stand with room for them by those three
+weights alone (700, 1,000 and 300 of 2,000 when all three have room), then among the free targets
+of that activity by a draw rather than the nearest. A stay lasts a draw within its entry's range: a
+kind the routine names has its own (a bench 5 to 15 minutes, the planter seat 3 to 10, the cafe
+table 10 to 25, the market stall 2 to 6, the tree 1 to 4), and any other kind its affordance's
+(rest 3 to 10, visit 1 to 3). Standing is a stay of 1 to 4 minutes at an open lattice node within
+6 m: no place, not beside one, and nobody else's. The two people talking stand at two open nodes
+joined by an edge of the lattice, so nothing stands between them, at most 2 m apart, and talk for
+one shared drawn duration of 2 to 6 minutes, which runs only while both are there: the first to
+arrive waits for the other with the clock stopped, and when either leaves, the other stops in the
+same minute, as `partner_left`, walking over or already there. Talking has no content: no words,
+topic, memory or belief is recorded or implied, and an event says only that two simulated people
+stopped to talk. Rest and visit relieve what version 1's do; standing and talking relieve nothing. A
+stay carries what finishing it relieves (`relief_milli` on its action), so it relieves what the
+routine it began under says, whatever routine a later input records; a stay begun under an input
+that records no routine carries nothing and relieves what version 1 says. Only a routine that draws
+its stays states one for a target naming an activity, so an input recording a routine that picks the
+nearest place is refused by name (`the recorded routine does not state every target's stay`). A
+person's direct request ends a stay under this routine ("Typed user-directed actions"). Measured on
+the small square with eight people over twelve seeds and 120 minutes,
+against targets registered before the measurement (`docs/evaluation/2026-09-25-living-square.json`):
+walking fell from 393 to 146 per mille of person-minutes, the median stay is 10 minutes on a
+bench, 18 at the cafe table, 4 at the stall and 3 by the tree, standing is 40 and talking 167 per
+mille, and every usable object is used in every world.
+
 Arrival starts the action timer and does not spend its first tick. Each subsequent tick validates
-availability and access position before progressing. Completion reduces the scalar need by 20 for
-a visit or 500 for rest (`RELIEF_MILLI`), clamped at zero. These figures are part of what
-`exulanica-society/v2` is; a v2 history through twelve minutes and 24 completed activities is
-pinned by its state digest, produced by the code before places existed
-(`tests/test_society_destination_room.py`). Over an input that states no places, no capacity,
-crowd avoidance, resource depletion, conversation or newly learned relationship is implied by the
-v2 movement policy; over one that does, the rules under "Room at a destination" apply. Existing role/household/relationship fields
-remain explicitly synthetic labels and do not create extra supported activities.
+availability and access position before progressing. Over an input that states no places, no
+capacity, crowd avoidance, resource depletion, conversation or newly learned relationship is
+implied by the v2 movement policy; over one that does, the rules under "Room at a destination"
+apply. Existing role/household/relationship fields remain explicitly synthetic labels and do not
+create extra supported activities.
 
 The existing envelope and synthetic inhabitant fields remain. V2 adds:
 
 - envelope/state `branch_id`, consumed `input_seq` and `input_sha256`;
 - state `movement_budget_mm_per_tick` and `seed_sha256`;
-- inhabitant `goal: {kind, target_id, reason}` or null;
+- inhabitant `goal: {kind, target_id, reason}` or null, with the other person's `partner_id` and
+  the shared `duration_ticks` for a talk;
 - `route: {node_ids, edge_index, edge_progress_mm, destination_node_id, input_sha256}` or null;
 - `action: {kind, status, target_id, remaining_ticks, reason}`;
 - `motion_path_mm`, every segment traversed last tick, including start/end, or one stationary point;
@@ -255,17 +306,19 @@ stored input document for authorized adapters; no new browser endpoint is introd
 A world a person saved has no district. Its spatial authority is the flat authored ground its own
 structural snapshot states: one authored region, an elevation, a spawn point and, depending on
 the ground module version, either a horizontal extent or an explicit statement that it has none.
-`exulanica.society-composition/authored-ground-v2` projects that ground, and the reviewed objects
-the person placed on it, into `exulanica.society-input/authored-ground-v2`, which the same v2
-policy, persistence and replay consume. Every input composed for a saved world uses it. The first
-saved-world pair, `exulanica.society-composition/authored-ground-v1` and
-`exulanica.society-input/authored-ground-v1`, is never composed again and is never rewritten: a
-stored input of that profile is authorised by its stored bytes and replays with its own semantics,
-and a society holding such inputs receives inputs of the second profile from its next edit on. A
+`exulanica.society-composition/authored-ground-v3` projects that ground, and the reviewed objects
+the person placed on it, into `exulanica.society-input/authored-ground-v3`, which the same v2
+policy, persistence and replay consume. Every input composed for a saved world uses it. It is the
+second profile's projection, which also records the purposeful routine it was composed under and
+names each activity's routine entry in place of a fixed duration. The earlier saved-world pairs,
+`authored-ground-v1` and `authored-ground-v2`, are never composed again and never rewritten: a
+stored input of either is authorised by its stored bytes and replays with its own semantics, and a
+society holding such inputs receives inputs of the newest profile from its next edit on. A
 society's input profile only moves forward along that order; a successor of an earlier saved-world
-profile than its predecessor is refused. There is no second engine and no second
-affordance vocabulary: `visit` and `rest` remain the only two activities, and the reviewed
-footprint, collision and reach table is the one the district projection already uses.
+profile than its predecessor is refused. There is no second engine and no second affordance
+vocabulary: `visit` and `rest` remain the only activities an object offers, standing and talking
+happen at no object, and the reviewed footprint, collision and reach table is the one the district
+projection already uses.
 
 Where inhabitants walk is the society's walkable area, and it is kept apart from what the ground
 is, because the ground module no longer always states an edge.
@@ -319,8 +372,9 @@ origin would be a claim about the Earth that nothing measured.
 `navigation.destinations` is empty. A ground declares somewhere to stand, not something to do, and
 calling the spawn point a visit would invent an affordance the world never declared. Every target
 in a saved world comes from a reviewed object with an affordance, so a starter with nothing in it
-has a walkable area and nothing to do in it, and society creation refuses with
-`initial society requires reachable targets` until the person puts something there.
+has a walkable area and nothing to do in it, and society creation refuses by name,
+`409 no_reachable_targets` (`initial society requires reachable targets`), until the person puts
+something there.
 
 A society on a saved world's own ground starts with `AUTHORED_GROUND_POPULATION`, 8 people,
 where a district starts with 128: an area about 23 metres across with 121 places to stand would
@@ -441,7 +495,11 @@ Over such an input the v2 policy keeps room (`exulanica/world/society_planner.py
 - a position an edit left behind holds no place against anybody, and a directed request reads
   positions against the input its minute consumes;
 - somebody part way through an activity at a place an edit left where it was, for the same
-  activity and duration, keeps going to its end.
+  activity, keeps going to its end with the time it had left, even when the edit moves the society
+  to a newer routine; somebody standing or talking at an open node an edit leaves open keeps at it;
+- a place an input of a newer profile only restates, naming a routine's activity where the older
+  input stated a fixed duration, is the same place: nobody walking there or just finished there
+  replans, a stay begun there is the newer input's, and the v3 cast's memory of it still holds.
 
 Measured over three seeds and 240 minutes with eight people (`tests/test_society_destination_room.py`):
 no two people standing still are closer than 700 mm, a destination never holds more people than
@@ -513,7 +571,15 @@ states none of them, so creation says that rather than publishing a place of emp
 Migration 0094 admits the third input profile and applies the bounded, availability-consistent
 local-record rule 0057 wrote for `exulanica.society-input/v2` to it unchanged. Migration 0098 admits
 the fourth, `exulanica.society-input/authored-ground-v2`, under the same rule, and holds its
-`unread_placements` to it too. Migration 0095 lets a v2 or v3 society hold 1 to 512 people, keeping
+`unread_placements` to it too. Migration 0108 admits the fifth,
+`exulanica.society-input/authored-ground-v3`, holds its `unread_placements` to the same rule, and
+holds that it records a routine and no earlier profile does. A check passes when its condition is
+null, so each of these rules is asked whether it holds: a newest-profile row whose routine names no
+catalog versions, or that omits its `unread_placements`, is refused rather than admitted by a null.
+0108 also re-creates the request binding 0060 wrote, which refused a request for anybody part way
+through anything: it now asks `society_person_may_be_directed`, which admits exactly whom the
+society may direct ("Typed user-directed actions").
+Migration 0095 lets a v2 or v3 society hold 1 to 512 people, keeping
 v1 at 100 to 512 and v4 as 0075 left it. A row does
 not say which kind of ground its society stands on, so the district's floor of 100 is held by the
 initializer that every creation and every replay passes through.
@@ -526,9 +592,12 @@ in sequence before moving or acting. The repository checks contiguous input sequ
 authored edit cursors; the adapter must ensure no relevant accepted edit is omitted. Equal authored
 cursors require equal delta digests; a rights-only input can retain the cursor.
 
-Moving, disabling or removing a current target invalidates its plan before action use. Changed
-navigation conservatively invalidates plans, except that over an input that states places somebody
-performing an activity at a place the edit left where it was keeps going. New enabled reachable
+Moving, disabling or removing a current target invalidates its plan before action use; a target an
+input of a newer profile only restates, naming a routine's activity for a fixed duration, is the
+same target and invalidates nothing. Changed navigation conservatively invalidates plans, except
+that over an input that states places somebody
+performing an activity at a place the edit left where it was keeps going, and somebody standing or
+talking at an open node the edit leaves open keeps at it. New enabled reachable
 targets wake blocked inhabitants. Over an input that states no places, if a changed graph no longer
 supports the inhabitant's current node/edge position, it stops there with
 `current_position_invalidated`; there is no nearest-node snap or teleport. Over one that states
@@ -544,8 +613,10 @@ replay must verify both. Earlier simulated observations remain in their original
 
 ## Events, persistence and replay
 
-V2 emits `goal_selected`, `route_progressed`, `action_completed`, `replanned` and `blocked`.
-Event documents contain deterministic `summary`, `synthetic: true`, profile, branch, subject, tick,
+V2 emits `goal_selected`, `route_progressed`, `action_completed`, `replanned` and `blocked`, and
+`social_contact` when two people start talking under a routine that has talking; its document names
+no words, only that the two stopped to talk. Event documents contain deterministic `summary`,
+`synthetic: true`, profile, branch, subject, tick,
 order, input sequence/digest, typed target, reason/outcome, goal/action facts, position/path and
 previous-state/seed lineage. Event UUIDs bind society, tick, order and document digest. Authored
 string IDs stay inside typed targets; SQL `object_id` remains null rather than coercing a string
@@ -963,8 +1034,13 @@ The authenticated base route is
 The client supplies no position, route, target document, workspace, actor or branch. Under the
 workspace lock the server resolves the current v2/v3 society and latest consumed input, rechecks
 current source authority, freezes the exact canonical target and records the requesting actor.
-Requests require an idle/blocked/completed inhabitant, current available input, an enabled reachable
-target and no other request for that inhabitant at the same state. Exact retries return the existing
+Requests require an idle/blocked/completed inhabitant, or one part way through a stay under a
+routine that draws its stays, current available input, an enabled reachable target and no other
+request for that inhabitant at the same state. The database's request binding holds a recorded
+request to the same rule about the person (`society_person_may_be_directed`, migration 0108), and
+`tests/test_society_request_rule_parity.py` holds the two equal. A request to go where the person
+already is, part way through a stay there, is refused `inhabitant_already_there`, which the page
+says in words: ending the stay would only begin it again. Exact retries return the existing
 envelope; changed reuse or stale bases fail without another write.
 
 Recording a request does not advance society time. The next normal deterministic step consumes
@@ -976,8 +1052,15 @@ input span, tick and event digest. Replay regenerates the disposition and event 
 the stored request and original inputs; it never calls a model or treats the request itself as
 completed movement.
 
-There is no cancellation, expiry or mid-action interruption in this version. A request can direct
-only the next eligible goal and ordinary navigation/action checks remain authoritative. Over an
+There is no cancellation or expiry. A stay drawn from a routine's range can last up to 25 minutes,
+so under such a routine a request to somebody part way through one ends it in the minute the
+request is consumed, before anybody chooses: a `replanned` event with reason `called_away` and
+outcome `stay_ended`, no relief, and for a talk the other person stops in that same minute
+(`partner_left`), whichever of the two the minute reaches first. A walk is left to arrive, and
+under the rules the society was released with, which every input that records no routine is read
+under, a request to anybody mid-action is refused `inhabitant_action_in_progress` as it always was
+(`tests/test_society_square_requests.py`). A request can direct only the next eligible goal and
+ordinary navigation/action checks remain authoritative. Over an
 input that states places, a request is refused `destination_full` when every place of its target is
 held by somebody else, and an applied request is promised its place before the minute, so nobody
 choosing freely in the same minute takes it first. It cannot

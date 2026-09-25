@@ -16,6 +16,7 @@ from exulanica.api.world_scope import WorldId
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import DEFAULT_ENGINE, ENGINES, society_engine
+from exulanica.world.society_planner import SocietyStartRefused
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.worlds import require_world
@@ -81,6 +82,9 @@ def _call(operation: Callable[[], Any], *, invalid_status: int = 422) -> Any:
         return JSONResponse(
             status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
         )
+    except SocietyStartRefused as exc:
+        # The world as it is gives its people nowhere to be: named, so a caller acts on the code.
+        return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
     except ValueError as exc:
         return JSONResponse(
             status_code=invalid_status,

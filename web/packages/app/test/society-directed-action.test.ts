@@ -204,6 +204,12 @@ describe('society directed-action control', () => {
       new ApiError(424, 'unavailable_society_input', 'current society input authorization is not configured'),
     )).toMatch(/^Directed action unavailable:/);
   });
+
+  it('says in words that somebody is already where they were asked to go', () => {
+    expect(describeSocietyActionFailure(
+      new ApiError(409, 'invalid_society_action', 'inhabitant_already_there'),
+    )).toBe('Directed action refused: They are already there, using it now.');
+  });
 });
 
 describe('society directed-action control refresh', () => {
