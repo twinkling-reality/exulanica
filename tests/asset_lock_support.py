@@ -15,7 +15,9 @@ import re
 import traceback
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 
+import exulanica
 from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.evidence.blob import BlobId
 
@@ -23,6 +25,9 @@ from exulanica.evidence.blob import BlobId
 READS = ("get", "open", "exists", "size")
 #: Where a read the test itself made is said to come from.
 FROM_THE_TEST = "the test"
+#: The product package's own directory. A frame is the product's when its file is under it, whatever
+#: the checkout is called: a checkout named ``exulanica`` puts every path under ``/exulanica/``.
+_PACKAGE = Path(exulanica.__file__).resolve().parent
 
 
 @dataclass
@@ -47,9 +52,9 @@ def _lock_key(connection) -> int:
 def _asked_by() -> str:
     """The product functions on the stack, innermost first, each as ``path:function``."""
     chain = [
-        f"{frame.filename.rsplit('/exulanica/', 1)[-1]}:{frame.name}"
+        f"{path.relative_to(_PACKAGE).as_posix()}:{frame.name}"
         for frame in reversed(traceback.extract_stack()[:-2])
-        if "/exulanica/" in frame.filename and "/tests/" not in frame.filename
+        if (path := Path(frame.filename).resolve()).is_relative_to(_PACKAGE)
     ]
     return " < ".join(chain) if chain else FROM_THE_TEST
 
