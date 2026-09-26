@@ -152,6 +152,7 @@ from exulanica.world import (
     WorldNotConfigured,
     seed_reviewed_assets,
 )
+from exulanica.world.society import SocietyBytesNotRead
 
 __all__ = ["create_app"]
 
@@ -384,6 +385,11 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     @app.exception_handler(NeverSame)
     async def _never_same(_request: Request, exc: NeverSame) -> JSONResponse:
         return _problem(409, "never_same", str(exc))
+
+    @app.exception_handler(SocietyBytesNotRead)
+    async def _society_race(_request: Request, exc: SocietyBytesNotRead) -> JSONResponse:
+        # A race, not a refusal: whatever route met it, the whole request is asked again.
+        return _problem(exc.status, exc.code, str(exc))
 
     @app.exception_handler(NotUndoable)
     async def _not_undoable(_request: Request, exc: NotUndoable) -> JSONResponse:

@@ -152,7 +152,10 @@ under the global asset read lock before it writes anything (`lock_asset_reads_un
 withdrawn before that question refuses the addition as `personal_world_preview_changed`, and one
 withdrawn after it cannot commit until the addition has; a withdrawal of a depth right waits for the
 addition to commit, because the addition's reads of rights hold the workspace's privacy currency
-lock the withdrawal takes (`tests/test_personal_world_addition.py` measures both). A placement the
+lock the withdrawal takes (`tests/test_personal_world_addition.py` measures both). Nothing is read
+from the object store while that lock is held: the saved world's entry is written, not read back,
+and its photographs' viewer images are checked when the entry is read after the addition commits
+(`tests/test_store_reads_under_the_asset_lock.py`). A placement the
 database refuses as it is written, because its right passed its end after that question, refuses the
 addition the same way. In each case nothing is written. A society and its history stay in the
 previous version, and the preview says where its inhabitants are only when its engine keeps that;

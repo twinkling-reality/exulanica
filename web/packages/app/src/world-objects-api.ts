@@ -88,6 +88,21 @@ export interface ReviewedAsset {
    * the row was read embedded in a version, which does not carry it.
    */
   readonly use?: KindUse | null;
+  /**
+   * What inhabitants do at the kind and how long each stays, as the server's purposeful routine
+   * states it for a saved world's next society input. Null for a kind nobody uses and for an asset
+   * the catalog does not state; absent where the row was read embedded in a version.
+   */
+  readonly activity?: KindActivity | null;
+}
+
+/** What inhabitants do at a kind, in the routine's words, and the shortest and longest stay. */
+export interface KindActivity {
+  readonly key: string;
+  readonly label: string;
+  /** In the society's ticks, one simulated minute each. */
+  readonly durationMinimumTicks: number;
+  readonly durationMaximumTicks: number;
 }
 
 export interface ObjectTransform {
@@ -813,8 +828,28 @@ function parseUse(value: unknown): KindUse | null {
   return Object.freeze({ affordance: text(row['affordance'], 'asset use affordance'), places: places && Object.freeze(places) });
 }
 
+function parseActivity(value: unknown): KindActivity | null {
+  if (value === null) return null;
+  const row = record(value, 'asset activity');
+  const shortest = integer(row['duration_minimum_ticks'], 'asset activity shortest stay');
+  const longest = integer(row['duration_maximum_ticks'], 'asset activity longest stay');
+  // A stay lasts at least one tick, and the longest is never shorter than the shortest.
+  if (shortest < 1 || longest < shortest) throw invalid('asset activity stay');
+  return Object.freeze({
+    key: text(row['key'], 'asset activity key'),
+    label: text(row['label'], 'asset activity label'),
+    durationMinimumTicks: shortest,
+    durationMaximumTicks: longest,
+  });
+}
+
 export function parseAsset(value: unknown): ReviewedAsset {
   const row = record(value, 'reviewed asset');
+  const use = 'use' in row ? parseUse(row['use']) : undefined;
+  const activity = 'activity' in row ? parseActivity(row['activity']) : undefined;
+  // Inhabitants do something only where the kind gives them somewhere to be: places it states,
+  // or none stated for a marker, whose places the society derives.
+  if (activity && (!use || use.places?.length === 0)) throw invalid('asset activity');
   return Object.freeze({
     assetKey: text(row['asset_key'], 'reviewed asset key'),
     title: anyText(row['title'], 'reviewed asset title'),
@@ -826,7 +861,8 @@ export function parseAsset(value: unknown): ReviewedAsset {
     licenceSha256: digest(row['licence_sha256'], 'reviewed asset licence hash'),
     availability: text(row['availability'], 'reviewed asset availability'),
     placeable: flag(row['placeable'], 'reviewed asset placeability'),
-    ...('use' in row ? { use: parseUse(row['use']) } : {}),
+    ...(use === undefined ? {} : { use }),
+    ...(activity === undefined ? {} : { activity }),
   });
 }
 

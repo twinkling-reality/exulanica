@@ -1129,7 +1129,10 @@ def _add_photographs(
     CharacterAppearanceRepository(
         connection, workspace_id, actor, world_id=world_id
     ).carry_avatar_history(entry.authored_version_id, version.version_id)
-    moved = entries.update(
+    # Written, not read back: the carry holds the asset read lock until this transaction commits,
+    # and reading the entry checks its photographs' viewer images in the store. The answer names the
+    # entry's own id and the appearance this write keeps.
+    entries.update(
         entry.entry_id,
         base_revision=entry.revision,
         authored_version_id=version.version_id,
@@ -1140,6 +1143,6 @@ def _add_photographs(
     return {
         "world_id": world_id,
         "topology_digest": registered["topology_digest"],
-        "style_version_id": str(moved.style_version_id),
-        "saved_entry_id": moved.entry_id,
+        "style_version_id": str(entry.style_version_id),
+        "saved_entry_id": entry.entry_id,
     }

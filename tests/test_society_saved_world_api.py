@@ -95,9 +95,15 @@ def routes(world):
 
 
 def place(client, world, object_id, x_mm, z_mm, asset="plate", yaw=FACING_THE_PERSON):
+    response = place_request(client, world, object_id, x_mm, z_mm, asset, yaw)
+    assert response.status_code == 201, response.text
+
+
+def place_request(client, world, object_id, x_mm, z_mm, asset="plate", yaw=FACING_THE_PERSON):
+    """Ask to place an object, and return the answer, whatever it is."""
     scope, version, _ = routes(world)
     base = client.get(version, headers=OWNER, params=scope).json()["state_sha256"]
-    response = client.post(
+    return client.post(
         version + "/objects",
         headers=OWNER,
         params=scope,
@@ -116,7 +122,6 @@ def place(client, world, object_id, x_mm, z_mm, asset="plate", yaw=FACING_THE_PE
             "origin_role": "fictional",
         },
     )
-    assert response.status_code == 201, response.text
 
 
 def bring_inhabitants(client, world, profile=V2):

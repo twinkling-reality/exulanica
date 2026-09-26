@@ -1,0 +1,105 @@
+"""Store reads made while a session holds the global asset read lock, recorded for a test.
+
+A writer that takes the lock inside its transaction (``lock_asset_reads_until_commit``) holds it
+until the commit and reads nothing from the object store until then, as a reader's final check
+reads nothing while it holds the lock (``docs/asset-read-currency.md``). The recorder wraps a
+store's reads and records each one made while ``pg_locks`` shows the lock held exclusively in the
+test's own database. Every test using it runs one request at a time against its own database
+server, so the holder is the request under test. Whether the recorder sees a read under the lock
+at all is :func:`planted_read_is_recorded`'s question, asked before an empty record is trusted.
+"""
+
+from __future__ import annotations
+
+import re
+import traceback
+import uuid
+from dataclasses import dataclass, field
+
+from exulanica.db.read_check import lock_asset_reads_until_commit
+from exulanica.evidence.blob import BlobId
+
+#: The store's reads. ``put`` writes, and a write is not what the rule is about.
+READS = ("get", "open", "exists", "size")
+#: Where a read the test itself made is said to come from.
+FROM_THE_TEST = "the test"
+
+
+@dataclass
+class StoreReads:
+    """Each store read, as (method, the product functions that asked, innermost first): every
+    one, and those made while the lock was held."""
+
+    every: list[tuple[str, str]] = field(default_factory=list)
+    under_the_lock: list[tuple[str, str]] = field(default_factory=list)
+
+
+def _lock_key(connection) -> int:
+    """The advisory key ``asset_read_lock()`` takes, read from the function (migration 0041)."""
+    [source] = connection.execute(
+        "select prosrc from pg_proc where proname = 'asset_read_lock' "
+        "and pronamespace = current_schema()::regnamespace"
+    ).fetchall()
+    [key] = re.findall(r"pg_advisory_xact_lock\((\d+)\)", source["prosrc"])
+    return int(key)
+
+
+def _asked_by() -> str:
+    """The product functions on the stack, innermost first, each as ``path:function``."""
+    chain = [
+        f"{frame.filename.rsplit('/exulanica/', 1)[-1]}:{frame.name}"
+        for frame in reversed(traceback.extract_stack()[:-2])
+        if "/exulanica/" in frame.filename and "/tests/" not in frame.filename
+    ]
+    return " < ".join(chain) if chain else FROM_THE_TEST
+
+
+def record_store_reads(connection, store, monkeypatch) -> StoreReads:
+    """Wrap ``store``'s reads; ``connection`` is a session of the test's own, for ``pg_locks``."""
+    key = _lock_key(connection)
+    held = (
+        "select count(*) as n from pg_locks where locktype = 'advisory' and classid = 0 "
+        "and objid = %s and objsubid = 1 and mode = 'ExclusiveLock' and granted "
+        "and database = (select oid from pg_database where datname = current_database())"
+    )
+    reads = StoreReads()
+    for name in READS:
+        original = getattr(store, name)
+
+        def reading(blob_id, _name=name, _original=original):
+            call = (_name, _asked_by())
+            reads.every.append(call)
+            if connection.execute(held, (key,)).fetchone()["n"]:
+                reads.under_the_lock.append(call)
+            return _original(blob_id)
+
+        monkeypatch.setattr(store, name, reading)
+    return reads
+
+
+def planted_read_is_recorded(
+    database, workspace_id: uuid.UUID, store, reads: StoreReads, digest: str
+) -> None:
+    """Positive control: a read made while a transaction holds the lock is recorded as under it,
+    and the same read once that transaction has committed is not. The record starts empty after.
+    """
+    assert reads == StoreReads(), "the control runs before anything else is recorded"
+    with database.session(workspace_id) as connection, connection.transaction():
+        lock_asset_reads_until_commit(connection, outside="the planted read takes it in a write")
+        store.exists(BlobId.from_hex(digest))
+    assert reads.under_the_lock == [("exists", FROM_THE_TEST)], reads.under_the_lock
+    store.exists(BlobId.from_hex(digest))
+    assert reads.under_the_lock == [("exists", FROM_THE_TEST)], "after the commit is not under it"
+    assert reads.every == [("exists", FROM_THE_TEST)] * 2
+    reads.every.clear()
+    reads.under_the_lock.clear()
+
+
+def recorded_store_reads(
+    connection, database, workspace_id: uuid.UUID, store, monkeypatch, *, planted: str
+) -> StoreReads:
+    """:func:`record_store_reads`, trusted only once the planted control on ``planted``, a digest
+    the store holds, has shown a read under a held lock is recorded."""
+    reads = record_store_reads(connection, store, monkeypatch)
+    planted_read_is_recorded(database, workspace_id, store, reads, planted)
+    return reads

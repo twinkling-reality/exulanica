@@ -37,9 +37,41 @@
  * leave the object where it stands.
  */
 
+import type { KindUse } from '@exulanica/atlas-react/playcanvas';
+import type { KindActivity } from '../world-objects-api.js';
+import { fill, say } from './copy.js';
 import { el, replace } from './dom.js';
 
 export type MotionAxisKey = string;
+
+/**
+ * What inhabitants do with a kind, in words, from the server's asset row alone.
+ *
+ * How many at a time is the number of places the kind states, what they do is the purposeful
+ * routine's label, and how long they stay is its shortest and longest, one simulated minute a
+ * tick. The words are copy's templates. Nothing here names a kind, an activity or a duration: a
+ * kind the row gives no activity is one inhabitants do not use, and a row that states no use (an
+ * asset the catalog does not state, or a row read embedded in a version) gets no sentence.
+ */
+export function objectUseWords(
+  use: KindUse | null | undefined,
+  activity: KindActivity | null | undefined,
+): string | null {
+  if (use === null || use === undefined || activity === undefined) return null;
+  if (activity === null) return say('objectUse.unused');
+  const shortest = activity.durationMinimumTicks;
+  const longest = activity.durationMaximumTicks;
+  const stay = shortest !== longest
+    ? fill('objectUse.stay.range', { minimum: String(shortest), maximum: String(longest) })
+    : shortest === 1
+      ? say('objectUse.stay.oneMinute')
+      : fill('objectUse.stay.minutes', { minutes: String(shortest) });
+  if (use.places === null) return fill('objectUse.withoutPlaces', { activity: activity.label, stay });
+  if (use.places.length === 1) return fill('objectUse.withOnePlace', { activity: activity.label, stay });
+  return fill('objectUse.withPlaces', {
+    count: String(use.places.length), activity: activity.label, stay,
+  });
+}
 
 export type BehaviourControlKey = 'trigger' | 'stop' | 'reset';
 
@@ -53,6 +85,11 @@ export interface ObjectAssetOption {
   readonly label: string;
   /** What the object is, in the reviewed catalog's words, shown under the choice. */
   readonly summary: string;
+  /**
+   * What inhabitants do with it, shown under the summary: `objectUseWords` of the served row, or
+   * null where the row states no use.
+   */
+  readonly useWords: string | null;
   /** False when the reviewed bytes are not in storage. Listed anyway, and said so. */
   readonly available: boolean;
   /** The recorded state, when it is not `available`. Shown rather than smoothed over. */
@@ -201,11 +238,14 @@ export function buildObjectPlacement(
     type: 'button', class: 'primary object-placement-place', text: 'Place before me',
   });
   const assetSummary = el('p', { class: 'object-placement-summary' });
+  const assetUse = el('p', { class: 'object-placement-use' });
   const arrangeButton = el('button', {
     type: 'button', class: 'object-placement-arrange', text: 'Place a small square before me',
   });
   /** Each offered asset's summary, by key, for the line under the choice. */
   let summaries = new Map<string, string>();
+  /** Each offered asset's use in words, by key, for the line under its summary. */
+  let uses = new Map<string, string | null>();
   const objectList = el('ul', { class: 'object-placement-list' });
   const status = el('p', { class: 'object-placement-status', role: 'status', 'aria-live': 'polite' });
   const undoButton = el('button', { type: 'button', class: 'ghost', text: 'Take back the last change' });
@@ -233,6 +273,9 @@ export function buildObjectPlacement(
     const chosen = assetSelect.selectedOptions[0];
     placeButton.disabled = chosen === undefined || chosen.disabled;
     assetSummary.textContent = chosen === undefined ? '' : summaries.get(chosen.value) ?? '';
+    const use = chosen === undefined ? null : uses.get(chosen.value) ?? null;
+    assetUse.textContent = use ?? '';
+    assetUse.hidden = use === null;
   };
 
   motionToggle.addEventListener('change', reflectMotion);
@@ -264,6 +307,7 @@ export function buildObjectPlacement(
     el('div', { class: 'object-placement-form' }, [
       field('object-placement-asset', 'Object', assetSelect),
       assetSummary,
+      assetUse,
       field('object-placement-role', 'What this is to you', roleSelect),
       el('label', { class: 'object-placement-check', for: 'object-placement-motion' }, [
         motionToggle,
@@ -429,6 +473,7 @@ export function buildObjectPlacement(
 
     showAssets(assets, roles) {
       summaries = new Map(assets.map((asset) => [asset.assetKey, asset.summary]));
+      uses = new Map(assets.map((asset) => [asset.assetKey, asset.useWords]));
       replace(assetSelect, assets.map((asset) => {
         const option = el('option', {
           value: asset.assetKey,

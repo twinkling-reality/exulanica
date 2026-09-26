@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, ClassVar, Final
 
 from exulanica.canonical import canonical_json
 
@@ -30,6 +30,22 @@ class UnknownSociety(SocietyError):
 
 class UnavailableSocietyInput(SocietyError):
     pass
+
+
+class SocietyBytesNotRead(RuntimeError):
+    """Rows read under the asset read lock named stored bytes nobody read before it was taken.
+
+    A saved world's input depends on the reviewed bytes and licence of every object it places, and
+    they are read and checked before the lock, because a holder reads nothing from the store
+    (``docs/asset-read-currency.md``). Rows naming other bytes once the lock is held changed in
+    between, so the whole request is refused and asking again reads the bytes first. It is a race,
+    not an unavailable input: it is not an :class:`UnavailableSocietyInput`, so no input records
+    it and playback does not pause for it (the round fails and the next claim retries). The
+    application answers ``status`` with ``code``, the product's retry code, for every route.
+    """
+
+    status: ClassVar[int] = 409
+    code: ClassVar[str] = "busy"
 
 
 class StaleSocietyState(SocietyError):

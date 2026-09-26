@@ -209,6 +209,35 @@ describe('the published version body, as the fixture publishes it', () => {
     }
   });
 
+  it('reads what inhabitants do at a kind, and refuses a stay or a place the server cannot serve', () => {
+    const [row] = registryRows() as Record<string, unknown>[];
+    const served = {
+      key: 'rest_bench', label: 'resting on a bench', duration_minimum_ticks: 5, duration_maximum_ticks: 15,
+    };
+    const places = [{ position_mm: [0, 450], faces: '-y', seat: null }];
+    const withUse = { ...row, use: { affordance: 'rest', places } };
+    expect(parseAsset({ ...withUse, activity: served }).activity).toEqual({
+      key: 'rest_bench', label: 'resting on a bench', durationMinimumTicks: 5, durationMaximumTicks: 15,
+    });
+    expect(parseAsset({ ...withUse, activity: null }).activity).toBeNull();
+    // A marker states no places and still has an activity; a row read embedded in a version has
+    // neither field, and says nothing either way.
+    expect(parseAsset({ ...row, use: { affordance: 'visit', places: null }, activity: served }).activity)
+      .not.toBeNull();
+    expect('activity' in parseAsset(row!)).toBe(false);
+    for (const stay of [
+      { duration_minimum_ticks: 0 },
+      { duration_minimum_ticks: 9, duration_maximum_ticks: 3 },
+      { duration_maximum_ticks: 2.5 },
+    ]) {
+      expect(() => parseAsset({ ...withUse, activity: { ...served, ...stay } })).toThrow(/asset activity/);
+    }
+    // Something to do needs somewhere to do it: an activity at a kind with no places is refused.
+    expect(() => parseAsset({ ...row, use: { affordance: 'rest', places: [] }, activity: served }))
+      .toThrow(/asset activity/);
+    expect(() => parseAsset({ ...row, use: null, activity: served })).toThrow(/asset activity/);
+  });
+
   it('refuses two objects sharing an id', () => {
     const duplicated = clone(FIXTURE) as { objects: unknown[] };
     duplicated.objects.push(clone(duplicated.objects[0]));

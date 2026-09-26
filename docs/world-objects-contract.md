@@ -138,8 +138,10 @@ triggers ask as a row is written). An environment piece whose source was withdra
 composed or no longer resolves to its pinned binding, and a depth estimate whose right ended, whose
 photograph was deleted or whose bytes may no longer be read, stays in the parent only. A piece
 whose source still stands and whose stored files are missing is copied, as a carry copies it, and
-the branch shows it as `unavailable_bytes`: the question reads rows, never stored bytes. `POST
-/world/versions` answers with the new version and `left_behind`: each row left out, with its
+the branch shows it as `unavailable_bytes`: the question reads rows, never stored bytes. The branch
+returns what it wrote without availability, and `POST /world/versions` reads availability after
+the branch commits, so a branch made inside a caller's transaction reads no stored bytes under the
+lock either. The route answers with the new version and `left_behind`: each row left out, with its
 subject, id, whether it was removed, and the reason. The parent keeps every row. The question is
 asked under the global asset read lock, after the parent row is locked and before anything is
 written: a withdrawal that comes after it cannot commit until the branch does, and a source that
@@ -362,7 +364,13 @@ the table). Nothing a society reads changes, so the meshes, 0105's pins and ever
 version 1's (`tests/test_world_object_seats.py`). `GET /world/assets` and `GET /world/assets/{asset_key}`
 serve each kind's `use` as the catalog derives it: every place in the part frame, the side a person
 standing there faces, and its seat or `null`; `use` is `null` for an asset the catalog does not
-state, and the row embedded in a version carries none.
+state, and the row embedded in a version carries none. Each row also serves `activity`, what
+inhabitants do at the kind and how long each stays: the purposeful routine's entry for the kind, or
+its affordance's entry for every kind, as a saved world's next society input records it, with its
+`key`, `label` and shortest and longest stay in the society's ticks of one simulated minute
+(`object_activity_view` in
+[`world_version_document.py`](../exulanica/api/world_version_document.py)). `activity` is `null` for
+a kind nobody uses, such as the lamp post, and for an asset the catalog does not state.
 
 `seed_reviewed_assets(store)` writes the GLB and licence bytes into the content-addressed store.
 The registry row is the reviewed decision; the store holds the bytes; the two are separate because
@@ -509,7 +517,7 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/behaviour` | Give one object a reviewed behaviour, replace it, or take it away with `null` |
 | `POST` | `/world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
-| `GET` | `/world/assets` | The reviewed assets a person may place, with availability and each kind's use |
+| `GET` | `/world/assets` | The reviewed assets a person may place, with availability, each kind's use and what inhabitants do there |
 | `GET` | `/world/assets/{asset_key}` | One reviewed asset of any kind, and whether it may be placed |
 | `GET` | `/world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET` | `/world/assets/{asset_key}/licence` | The licence text those bytes are published under |
@@ -753,8 +761,13 @@ repository asks inside its own transaction; a placed photo point map's source is
 `exulanica/world/point_map_source_authority.py` the same way. The repository repeats the binding
 and authorization checks under `asset_read_lock()` immediately before transaction commit, after
 the edit row and its society hook, so a concurrent withdrawal cannot pass an earlier check and then
-commit. `tests/test_source_authorities_postgres.py` pins that lock order. New publications do not
-rewrite existing placement history.
+commit. `tests/test_source_authorities_postgres.py` pins that lock order. That repeat asks rows
+alone, and the edit returns what it wrote without availability: each placement's availability is
+read after the transaction commits, so nothing is read from the store under the lock
+(`tests/test_store_reads_under_the_asset_lock.py`). Bytes lost from the store with no row recording
+why, between the edit's own check and that repeat, therefore do not refuse the edit: it is written,
+and the placement reads `unavailable_bytes`. New publications do not rewrite existing placement
+history.
 
 Availability is read separately from canonical authored state:
 

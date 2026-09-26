@@ -276,12 +276,14 @@ def _in_world(composed: Composed) -> str:
 
 
 def _add(composed: Composed, placement: EnvironmentPlacement):
-    composed.version = composed.worlds.add_environment(
+    written = composed.worlds.add_environment(
         composed.version.version_id,
         placement,
         base_state_sha256=composed.version.state_sha256,
         actor=uuid.uuid4(),
     )
+    # An edit returns what it wrote; its availability is read afterwards, as a route reads it.
+    composed.version = composed.worlds.with_availability(written)
     return composed.version
 
 
@@ -664,7 +666,8 @@ def test_withdrawal_retains_history_allows_remove_and_undo_but_refuses_move(comp
         version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
     )
     assert not version.environment_instances[0].removed
-    assert version.environment_instances[0].availability == "withdrawn"
+    restored = composed.worlds.with_availability(version)
+    assert restored.environment_instances[0].availability == "withdrawn"
 
 
 def test_missing_exact_bytes_are_reported_without_substitution(composed) -> None:

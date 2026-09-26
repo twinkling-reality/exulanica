@@ -24,13 +24,21 @@ only its own plane.
 **Undo restores a document, not an intention.** Each edit stores the object's canonical document
 on both sides. Undo reads ``before_document`` back and writes it, so replaying an inverse operation
 is never necessary and an edit whose inverse is ambiguous cannot exist.
+
+**A writer answers with what it wrote, not with availability.** An edit, a branch or a carry may
+hold the global asset read lock until its transaction commits (a placement's final authorization
+and a society's input take it), and a holder reads nothing from the object store
+(``docs/asset-read-currency.md``). Each returns its version as rows, every placement's availability
+``unknown``, and the caller resolves availability with
+:meth:`WorldObjectRepository.with_availability` once that transaction has committed.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextlib import contextmanager
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, ClassVar, Final
@@ -232,6 +240,9 @@ class WorldObjectRepository:
         self.world_id = world_id
         self.store = store
         self.on_edit = on_edit
+        #: Whether each reviewed digest's bytes were in the store when a run of additions began,
+        #: which those additions take instead of looking again (:meth:`reviewed_bytes_read_first`).
+        self._bytes_read_first: Mapping[str, bool] = MappingProxyType({})
 
     # -- reviewed catalogs ------------------------------------------------------------------
 
@@ -362,7 +373,7 @@ class WorldObjectRepository:
                 write = getattr(self, self._CARRY_RULES[section.subject][1])
                 for row in sections[section.key]:
                     write(parent_version_id, version_id, row, {})
-        return BranchedVersion(self.version(version_id), left_behind)
+        return BranchedVersion(self._written(version_id), left_behind)
 
     # -- carrying a version onto the next snapshot ------------------------------------------
     #
@@ -515,9 +526,7 @@ class WorldObjectRepository:
                 write = getattr(self, self._CARRY_RULES[section.subject][1])
                 for row in sections[section.key]:
                     write(plan.version_id, version_id, row, edit_ids)
-        # A carry is written inside the addition's own transaction, which holds the asset read
-        # lock until it commits, so the new version is read without availability.
-        return self.version(version_id, with_availability=False)
+        return self._written(version_id)
 
     def _object_carries(self, obj: AuthoredObject) -> tuple[CarryOutcome, StayReason | None]:
         # A reviewed catalog asset, pinned by digest, is the only thing an object names.
@@ -771,6 +780,32 @@ class WorldObjectRepository:
             edits=self._edits(version_id),
         )
 
+    def _written(self, version_id: uuid.UUID) -> AlternateVersion:
+        """What a writer wrote, read inside its own transaction, without availability.
+
+        Every edit, branch and carry answers with this. The transaction may hold the global asset
+        read lock until it commits, and a holder reads nothing from the store; the caller reads
+        availability with :meth:`with_availability` after the commit.
+        """
+        return self.version(version_id, with_availability=False)
+
+    def with_availability(self, version: AlternateVersion) -> AlternateVersion:
+        """``version`` with each placement's availability resolved now, reading stored bytes.
+
+        For a version a writer returned: call it once the transaction that wrote the version has
+        committed. Availability is not part of ``state_sha256``, so the version's token and delta
+        are the ones the writer returned.
+        """
+        return replace(
+            version,
+            environment_instances=tuple(
+                self._environment_resolved(instance) for instance in version.environment_instances
+            ),
+            point_map_instances=tuple(
+                self._point_map_resolved(instance) for instance in version.point_map_instances
+            ),
+        )
+
     # -- environment edits ------------------------------------------------------------------
 
     def add_environment(
@@ -796,7 +831,7 @@ class WorldObjectRepository:
                 actor=actor,
             )
             self._final_environment_authorization(instance)
-        return self.version(version_id)
+        return self._written(version_id)
 
     def edit_base_row(self, version_id: uuid.UUID) -> Mapping[str, Any]:
         """The stored version row an edit compares against, read without a lock.
@@ -883,7 +918,7 @@ class WorldObjectRepository:
             self._final_environment_authorization(
                 self._require_environment(version_id, instance_id)
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     def remove_environment(
         self,
@@ -916,7 +951,7 @@ class WorldObjectRepository:
                 ),
                 actor=actor,
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     # -- object edits -----------------------------------------------------------------------
 
@@ -942,7 +977,7 @@ class WorldObjectRepository:
                 after=object_document(checked),
                 actor=actor,
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     def validate_object_placement(
         self,
@@ -1003,7 +1038,7 @@ class WorldObjectRepository:
                 after=object_document(self._require_object(version_id, object_id)),
                 actor=actor,
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     def remove_object(
         self,
@@ -1033,7 +1068,7 @@ class WorldObjectRepository:
                 after=object_document(self._require_object(version_id, object_id)),
                 actor=actor,
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     def set_object_behaviour(
         self,
@@ -1093,7 +1128,7 @@ class WorldObjectRepository:
                 after=object_document(self._require_object(version_id, object_id)),
                 actor=actor,
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     def undo(
         self, version_id: uuid.UUID, *, base_state_sha256: str, actor: uuid.UUID
@@ -1152,7 +1187,7 @@ class WorldObjectRepository:
                 undone_edit_id=newest["edit_id"],
                 **{each.column: newest[each.column] for each in EditSubject},
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     def _undo_object(
         self,
@@ -1261,7 +1296,7 @@ class WorldObjectRepository:
                 after=override_document(override),
                 actor=actor,
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     # -- edit plumbing ----------------------------------------------------------------------
 
@@ -1298,6 +1333,28 @@ class WorldObjectRepository:
             raise InvalidObjectState(f"{checked.object_id} already exists in this version")
         return checked
 
+    @contextmanager
+    def reviewed_bytes_read_first(self, digests: Iterable[str]) -> Iterator[None]:
+        """Look for these reviewed assets' bytes now, and let additions inside the block use that.
+
+        For several additions in one transaction. An addition in a world whose society takes
+        inputs takes the global asset read lock and holds it until the commit, and a holder reads
+        nothing from the store, so the byte checks of the additions after it are made here,
+        before the first: bytes found are taken as present, and bytes missing are refused from
+        what was found, without looking again. A repository with no store looks for nothing and
+        refuses as it always has.
+        """
+        found = (
+            {}
+            if self.store is None
+            else {digest: self.store.exists(BlobId.from_hex(digest)) for digest in set(digests)}
+        )
+        held, self._bytes_read_first = self._bytes_read_first, MappingProxyType(found)
+        try:
+            yield
+        finally:
+            self._bytes_read_first = held
+
     def _require_reviewed_asset_bytes(self, asset_sha256: str) -> None:
         """Refuse an addition that could never draw.
 
@@ -1308,7 +1365,10 @@ class WorldObjectRepository:
         """
         if self.store is None:
             raise UnavailableAsset("object composition requires the content-addressed store")
-        if not self.store.exists(BlobId.from_hex(asset_sha256)):
+        present = self._bytes_read_first.get(asset_sha256)
+        if present is None:
+            present = self.store.exists(BlobId.from_hex(asset_sha256))
+        if not present:
             raise UnavailableAsset("the reviewed asset row exists and its bytes do not")
 
     def _validated_environment_placement(
@@ -1674,7 +1734,7 @@ class WorldObjectRepository:
                 actor=actor,
             )
             self._final_point_map_authorization(instance)
-        return self.version(version_id)
+        return self._written(version_id)
 
     def validate_point_map_placement(
         self,
@@ -1744,7 +1804,7 @@ class WorldObjectRepository:
                 actor=actor,
             )
             self._final_point_map_authorization(self._require_point_map(version_id, instance_id))
-        return self.version(version_id)
+        return self._written(version_id)
 
     def remove_point_map(
         self,
@@ -1780,7 +1840,7 @@ class WorldObjectRepository:
                 after=point_map_instance_document(self._require_point_map(version_id, instance_id)),
                 actor=actor,
             )
-        return self.version(version_id)
+        return self._written(version_id)
 
     # -- point map source authority ---------------------------------------------------------
     #
@@ -2005,22 +2065,20 @@ class WorldObjectRepository:
             origin=ObjectOrigin(row["origin_kind"], row["origin_role"]),
             removed=row["removed"],
         )
-        if not with_availability:
-            return instance
+        return self._point_map_resolved(instance) if with_availability else instance
+
+    def _point_map_resolved(self, instance: PointMapInstance) -> PointMapInstance:
+        """The placed estimate with its availability resolved now, checking its stored bytes."""
         availability, reason = self._point_map_state(instance)
-        return PointMapInstance(
-            instance_id=instance.instance_id,
-            source=instance.source,
-            region_id=instance.region_id,
-            transform=instance.transform,
-            origin=instance.origin,
-            removed=instance.removed,
+        return replace(
+            instance,
             availability=availability,  # type: ignore[arg-type]
             unavailable_reason=reason,
         )
 
     def _require_point_map(self, version_id: uuid.UUID, instance_id: str) -> PointMapInstance:
-        for instance in self._point_map_instances(version_id):
+        # Read by writers only, from rows: a writer may hold the asset read lock.
+        for instance in self._point_map_instances(version_id, with_availability=False):
             if instance.instance_id == instance_id:
                 return instance
         raise UnknownWorldResource(f"no point map instance {instance_id} in this version")
@@ -2246,17 +2304,11 @@ class WorldObjectRepository:
             origin=ObjectOrigin(row["origin_kind"], row["origin_role"]),
             removed=row["removed"],
         )
-        if not with_availability:
-            return instance
-        return EnvironmentInstance(
-            instance_id=instance.instance_id,
-            source=instance.source,
-            region_id=instance.region_id,
-            transform=instance.transform,
-            origin=instance.origin,
-            removed=instance.removed,
-            availability=self._environment_availability(instance),
-        )
+        return self._environment_resolved(instance) if with_availability else instance
+
+    def _environment_resolved(self, instance: EnvironmentInstance) -> EnvironmentInstance:
+        """The instance with its availability resolved now, reading its pinned bytes."""
+        return replace(instance, availability=self._environment_availability(instance))
 
     def _edits(self, version_id: uuid.UUID) -> tuple[VersionEdit, ...]:
         rows = self.connection.execute(
@@ -2287,7 +2339,8 @@ class WorldObjectRepository:
         raise UnknownWorldResource("no such authored object")
 
     def _require_environment(self, version_id: uuid.UUID, instance_id: str) -> EnvironmentInstance:
-        for instance in self._environment_instances(version_id):
+        # Read by writers only, from rows: a writer may hold the asset read lock.
+        for instance in self._environment_instances(version_id, with_availability=False):
             if instance.instance_id == instance_id:
                 return instance
         raise UnknownWorldResource("no such environment instance")

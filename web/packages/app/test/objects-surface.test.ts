@@ -641,6 +641,49 @@ describe('nothing reaches the authority without a confirmation', () => {
     expect(h.mounted.panel.root.textContent).toContain('unavailable_asset');
     expect(button(h.mounted.panel.root, 'Place before me').disabled).toBe(true);
   });
+
+  it('says under the chosen kind what inhabitants do there, from the served row alone', async () => {
+    const seated = (x: number) => Object.freeze({
+      positionMm: [x, 450] as const,
+      faces: '-y' as const,
+      seat: Object.freeze({ positionMm: [x, 20, 480] as const, faces: '+y' as const }),
+    });
+    // A bench and a lamp post as `GET /world/assets` serves them: three seated places and the
+    // routine's entry for the bench; no places and no activity for the post.
+    const bench = asset({
+      assetKey: 'cc0.bench',
+      title: 'Bench',
+      summary: 'A park bench with a back.',
+      use: Object.freeze({ affordance: 'rest', places: Object.freeze([seated(-600), seated(0), seated(600)]) }),
+      activity: Object.freeze({
+        key: 'rest_bench', label: 'resting on a bench', durationMinimumTicks: 5, durationMaximumTicks: 15,
+      }),
+    });
+    const lampPost = asset({
+      assetKey: 'cc0.lamp-post',
+      title: 'Lamp post',
+      summary: 'A street lamp.',
+      use: Object.freeze({ affordance: 'none', places: Object.freeze([]) }),
+      activity: null,
+    });
+    const h = harness();
+    (h.authority.client as unknown as { connect: unknown }).connect = vi.fn(async () => ({
+      assets: [bench, lampPost], version: version(),
+    }));
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    const root = h.mounted.panel.root;
+    const use = root.querySelector<HTMLElement>('.object-placement-use')!;
+    expect(root.querySelector('.object-placement-summary')?.textContent).toBe('A park bench with a back.');
+    expect(use.hidden).toBe(false);
+    expect(use.textContent).toBe('Up to 3 inhabitants at a time spend 5 to 15 minutes here, resting on a bench.');
+
+    const choice = root.querySelector<HTMLSelectElement>('.object-placement-asset')!;
+    choice.value = 'cc0.lamp-post';
+    choice.dispatchEvent(new Event('change'));
+    expect(root.querySelector('.object-placement-summary')?.textContent).toBe('A street lamp.');
+    expect(use.textContent).toBe('Inhabitants do not use this.');
+  });
 });
 
 describe('adding goes through the server’s preview, then the same request is applied', () => {

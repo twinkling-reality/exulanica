@@ -557,8 +557,8 @@ class _Depth(FlatDepthModel):
         self.model_handoff = ModelHandoff.local(self.identity)
 
 
-def _placed_estimate(api, entry: dict, capture: uuid.UUID, region: str) -> tuple[dict, object]:
-    """Attach ``capture`` to the saved world, make its estimate and place it; returns the entry."""
+def _attach(api, entry: dict, capture: uuid.UUID) -> tuple[dict, ReviewedSource]:
+    """Attach ``capture`` to the saved world as a reference; returns the entry and the review."""
     [reviewed] = reviewed_personal_sources(
         api.repository.connection,
         api.repository.workspace_id,
@@ -581,7 +581,11 @@ def _placed_estimate(api, entry: dict, capture: uuid.UUID, region: str) -> tuple
         },
     )
     assert attached.status_code == 200, attached.text
-    entry = attached.json()
+    return attached.json(), reviewed
+
+
+def _estimate(api, capture: uuid.UUID, reviewed: ReviewedSource) -> object:
+    """Grant a depth right on an attached ``capture`` and make its estimate; returns the right."""
     now = api.repository.connection.execute("select clock_timestamp() as at").fetchone()["at"]
     right = grant_model_right(
         api.repository,
@@ -599,8 +603,13 @@ def _placed_estimate(api, entry: dict, capture: uuid.UUID, region: str) -> tuple
     )
     assert outcome.error is None, outcome.error
     api.repository.connection.commit()
+    return right
+
+
+def _place_estimate(api, entry: dict, region: str):
+    """Ask to place the saved world's first reference's estimate in ``region``; the response."""
     version = api.version(entry)
-    placed = api.post(
+    return api.post(
         f"/world/versions/{entry['authored_version_id']}/compositions/photo-point-maps/apply"
         f"?world_id={entry['world_id']}",
         {
@@ -625,6 +634,13 @@ def _placed_estimate(api, entry: dict, capture: uuid.UUID, region: str) -> tuple
             "saved_entry": binding(entry),
         },
     )
+
+
+def _placed_estimate(api, entry: dict, capture: uuid.UUID, region: str) -> tuple[dict, object]:
+    """Attach ``capture`` to the saved world, make its estimate and place it; returns the entry."""
+    entry, reviewed = _attach(api, entry, capture)
+    right = _estimate(api, capture, reviewed)
+    placed = _place_estimate(api, entry, region)
     assert placed.status_code == 201, placed.text
     return api.entry(entry["entry_id"]), right
 

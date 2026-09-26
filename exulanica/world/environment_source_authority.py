@@ -454,11 +454,13 @@ class EnvironmentSourceAuthority:
         self.require_current(instance, require_bytes=False, validate_feature_bytes=False)
 
     def availability(self, instance: EnvironmentInstance) -> str:
+        """Whether the placement may be drawn now. Stored bytes that are missing or fail their
+        digest are ``unavailable_bytes``; a store that cannot be read at all fails the read."""
         try:
             self.require_current(instance, require_bytes=False)
         except EnvironmentSourceWithdrawn:
             return "withdrawn"
-        except UnavailableAsset:
+        except (UnavailableAsset, IntegrityError):
             return "unavailable_bytes"
         except (EnvironmentBindingDrift, EnvironmentCompositionDenied, UnknownWorldResource):
             return "binding_drift"
@@ -471,6 +473,6 @@ class EnvironmentSourceAuthority:
                 bytes.fromhex(source.render_sha256),
                 None if source.index_sha256 is None else bytes.fromhex(source.index_sha256),
             )
-        except UnavailableAsset:
+        except (UnavailableAsset, IntegrityError):
             return "unavailable_bytes"
         return "available"

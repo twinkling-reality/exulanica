@@ -36,7 +36,10 @@ and a planter seat. Each kind states its title and summary, its dimensions, the 
 generated from ([`exulanica/world/assets.py`](../../exulanica/world/assets.py)) and the CC0 texture
 sets it is drawn in, whose maps travel inside its container at 256 texels a side; each number in a
 recipe cites the street furniture catalog or a declared measurement. The Create panel lists every
-kind by its title, with the chosen kind's summary under the choice. Inhabitants rest at the benches,
+kind by its title, with the chosen kind's summary under the choice and, under that, what inhabitants
+do there, built only from the server's row for the kind: how many come at a time, what they do and
+for how long, or that nobody uses it, as with a lamp post
+([`objectUseWords`](../../web/packages/app/src/ui/object-placement.ts)). Inhabitants rest at the benches,
 the planter seat and the cafe table and stop at the tree and the stall, in rows along the sides each
 kind names, spaced so that turning an object never crowds two of them together; a lamp post stands
 in their way and offers nothing to do. A resting person is drawn sitting on the seat of the bench,

@@ -76,6 +76,28 @@ are visible. A writer or expiry ordered afterward affects later requests and can
 already-authorized response. Network completion is not the linearization point. Buffers are local to
 the request, not transferable permission tokens.
 
+A writer's own last question takes the same exclusive barrier inside its write transaction, through
+[`lock_asset_reads_until_commit`](../exulanica/db/read_check.py), and holds it until that
+transaction commits. The rule for a writer is the reader's: no store read, stat or stream while it
+holds the barrier. It reads and checks the stored bytes it depends on before taking the barrier,
+asks only rows under it, and answers with what it wrote, without availability, which its caller
+reads after the commit. The rule gives up one refusal: bytes lost from the store with no row
+recording why, between that read and the last question, no longer refuse the write. It commits, and
+what it placed reads `unavailable_bytes`, as it would had the bytes been lost just after the commit.
+The product erases stored bytes only for a committed deletion (`mark_purged` in
+[`deletion/queue.py`](../exulanica/deletion/queue.py)), and a depth estimate's last question reads
+that deletion's rows. Authored edits, branches, the carry that adds photographs to a made world, a
+saved world's society input from an edit, and a read of a society's current state follow the rule
+([`tests/test_store_reads_under_the_asset_lock.py`](../tests/test_store_reads_under_the_asset_lock.py)).
+A saved world's society breaks it where its own transaction took the barrier for an earlier question
+and asks again, reading its objects' bytes under that barrier: in the second and later
+authorizations of one simulated minute; in a playback round after its first question (its readiness
+check, then each minute it advances); in every input after the first when a history is replayed,
+when a decision is read, and when a question's answer reads the society (the selection executor
+authorizes every input in one transaction); in a decision's preparation and its finish, each of
+which authorizes several inputs; when inhabitants are brought in; and for each object after the
+first of a small square. A district society's inputs read theirs under the barrier.
+
 Dependency mutations take the shared side of the global barrier with **try-lock**, retaining it
 through commit. If a reader already owns the exclusive barrier, mutation raises retryable 40001
 rather than waiting while holding another lock. This prevents a cycle even when a caller acquired
@@ -154,7 +176,7 @@ explicit producer activation dependency. Manual review has no new unmasked bypas
 
 ## The investigation that preceded this contract
 
-The 152 lines above are the live read contract. The investigation that preceded it, committed before
+Everything above this section is the live read contract. The investigation that preceded it, committed before
 implementation and superseded by it, was lifted on 2026-09-09 into the operator's dated records,
 which `.gitignore` keeps out of this repository.
 

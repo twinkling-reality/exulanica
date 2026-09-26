@@ -7,6 +7,10 @@ fill. The expected values here are worked out from those two, not read from the 
 reads: the places from the society's own registry row (its ``[x, -y]`` places), the facing from
 each row's side, and each seat from the row's stated point, the place's offset along the row and
 the top of the box part the file puts under it.
+
+Each row also carries what inhabitants do there and how long they stay, which the page says under
+the chosen kind. That is worked out here from the purposeful routine's own file, the version a new
+society input records, read as JSON rather than through the routine loader the route calls.
 """
 
 from __future__ import annotations
@@ -16,8 +20,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from exulanica.api.world_version_document import object_use_view
+from exulanica.api.world_version_document import object_activity_view, object_use_view
 from exulanica.world.object_catalog import CATALOG_DIRECTORY, CATALOG_VERSION
+from exulanica.world.society_catalogs import (
+    PURPOSEFUL_CATALOG,
+    PURPOSEFUL_ROUTINE_VERSIONS,
+    ROUTINE_DIRECTORY,
+)
 from exulanica.world.society_composition import (
     PLACES_FIELD,
     REVIEWED_REACH_MM,
@@ -34,6 +43,13 @@ DOCUMENT = json.loads((CATALOG_DIRECTORY / f"world-object.v{CATALOG_VERSION}.jso
 ENTRIES = {entry["asset_key"]: entry for entry in DOCUMENT["entries"]}
 #: A person standing along a side faces across it, toward the kind.
 ACROSS = {"+y": "-y", "-y": "+y", "+x": "-x", "-x": "+x"}
+#: The purposeful routine a new society input records, as its file states it.
+ROUTINE = json.loads(
+    (
+        ROUTINE_DIRECTORY
+        / f"{PURPOSEFUL_CATALOG}.v{PURPOSEFUL_ROUTINE_VERSIONS[PURPOSEFUL_CATALOG]}.json"
+    ).read_text()
+)
 
 
 def _society_places(asset_key: str) -> list[list[int]] | None:
@@ -97,9 +113,56 @@ def test_every_listed_kind_serves_what_the_file_and_the_society_rows_state(objec
     assert seated == 9
 
 
+def _expected_activity(asset_key: str) -> tuple[str, dict[str, Any] | None]:
+    """What the routine file says people do at a kind, and which of its entries says it.
+
+    The kind's own entry at an object, else the entry its affordance states for every kind; a kind
+    whose affordance has no entry at an object is one nobody uses there.
+    """
+    entry = ENTRIES[asset_key]
+    at_objects = [
+        each
+        for each in ROUTINE["entries"]
+        if each["setting"] == "object" and each["affordance"] == entry["use"]["affordance"]
+    ]
+    own = [each for each in at_objects if each["object_kind"] == entry["key"]]
+    shared = [each for each in at_objects if each["object_kind"] == "any"]
+    if not at_objects:
+        return "nobody", None
+    [chosen] = own or shared
+    return ("own" if own else "shared"), {
+        "key": chosen["key"],
+        "label": chosen["label"],
+        "duration_minimum_ticks": chosen["duration_minimum_ticks"],
+        "duration_maximum_ticks": chosen["duration_maximum_ticks"],
+    }
+
+
+def test_every_listed_kind_serves_what_inhabitants_do_there_as_the_routine_file_states(
+    objects_api,
+):
+    listed = objects_api.get("/world/assets")
+    assert listed.status_code == 200, listed.text
+    rows = {row["asset_key"]: row for row in listed.json()}
+    assert set(rows) == set(ENTRIES)
+    sources = []
+    for key, row in rows.items():
+        source, expected = _expected_activity(key)
+        sources.append(source)
+        assert row["activity"] == expected, key
+        one = objects_api.get(f"/world/assets/{key}")
+        assert one.status_code == 200, one.text
+        assert one.json()["activity"] == row["activity"], key
+    # Positive control: the loop compared a kind served from its own entry, one served from the
+    # entry its affordance states for every kind, and one nobody uses, so each rule was exercised.
+    assert set(sources) == {"own", "shared", "nobody"}
+
+
 def test_an_asset_the_catalog_does_not_state_has_no_use():
     characters = json.loads((ROOT / "assets/characters/catalog.json").read_text())
     component = characters["families"][0]["bases"][0]["asset"]["assetKey"]
     # Positive control: a kind the catalog states has one, so the null below is the key's.
     assert object_use_view(next(iter(ENTRIES))) is not None
+    assert object_activity_view(next(iter(ENTRIES))) is not None
     assert object_use_view(component) is None
+    assert object_activity_view(component) is None

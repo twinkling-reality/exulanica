@@ -113,6 +113,7 @@ import {
 import { buildConfirm, type GatedConfirmPanel } from '../ui/confirm.js';
 import {
   buildObjectPlacement,
+  objectUseWords,
   type BehaviourControlKey,
   type MotionAxisKey,
   type MotionDraft,
@@ -1552,6 +1553,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         assetKey: asset.assetKey,
         label: asset.title,
         summary: asset.summary,
+        useWords: objectUseWords(asset.use, asset.activity),
         available: asset.availability === 'available',
         unavailableReason: asset.availability === 'available' ? null : asset.availability,
         licenceId: asset.licenceId,

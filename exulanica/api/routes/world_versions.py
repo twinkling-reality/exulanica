@@ -184,4 +184,8 @@ def alternate_version(
     repository: ReadObjects,
     request: Request,
 ) -> AlternateVersionView:
-    return rendered_version(repository, repository.version(version_id), get_services(request).store)
+    return rendered_version(
+        repository,
+        repository.version(version_id, with_availability=False),
+        get_services(request).store,
+    )

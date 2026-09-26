@@ -973,15 +973,19 @@ def apply_arrangement(
     assert resolved.arrangement is not None
     base = request.base_state_sha256
     version: AlternateVersion | None = None
-    for obj in resolved.objects:
-        try:
-            version = repository.add_object(version_id, obj, base_state_sha256=base, actor=actor)
-        except Exception as exc:
-            reason = _reason(exc)
-            if reason is None:
-                raise
-            raise ArrangementRefused(reason, str(exc)) from exc
-        base = version.state_sha256
+    # Every object's bytes are looked for before the first add, which may take the asset read lock.
+    with repository.reviewed_bytes_read_first(obj.asset_sha256 for obj in resolved.objects):
+        for obj in resolved.objects:
+            try:
+                version = repository.add_object(
+                    version_id, obj, base_state_sha256=base, actor=actor
+                )
+            except Exception as exc:
+                reason = _reason(exc)
+                if reason is None:
+                    raise
+                raise ArrangementRefused(reason, str(exc)) from exc
+            base = version.state_sha256
     assert version is not None, "a published arrangement places at least one object"
     return AppliedArrangement(
         version=version,

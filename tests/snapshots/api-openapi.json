@@ -18216,6 +18216,40 @@
     ],
     "title": "NoopIntervention"
    },
+   "ObjectActivityView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key",
+      "description": "The routine's entry for the kind, or its affordance's entry for every kind that states none of its own."
+     },
+     "label": {
+      "type": "string",
+      "title": "Label",
+      "description": "What a person there is doing, in the routine's words."
+     },
+     "duration_minimum_ticks": {
+      "type": "integer",
+      "title": "Duration Minimum Ticks",
+      "description": "The shortest stay, in the society's ticks of one simulated minute each."
+     },
+     "duration_maximum_ticks": {
+      "type": "integer",
+      "title": "Duration Maximum Ticks",
+      "description": "The longest stay, in the society's ticks of one simulated minute each."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "duration_minimum_ticks",
+     "duration_maximum_ticks"
+    ],
+    "title": "ObjectActivityView",
+    "description": "What inhabitants do at a kind and how long each stays, in the purposeful routine's words."
+   },
    "ObjectBehaviourView": {
     "properties": {
      "behaviour_key": {
@@ -19354,6 +19388,17 @@
        }
       ],
       "description": "The kind's use, as the world object catalog derives it; null for an asset the catalog does not state, such as a character part."
+     },
+     "activity": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ObjectActivityView"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What inhabitants do at the kind and for how long, as the purposeful routine a saved world's next society input records states it; null for a kind inhabitants do not use and for an asset the catalog does not state."
      }
     },
     "additionalProperties": false,
@@ -19369,7 +19414,8 @@
      "licence_sha256",
      "availability",
      "placeable",
-     "use"
+     "use",
+     "activity"
     ],
     "title": "PlaceableAssetView",
     "description": "A reviewed asset as the registry reads serve it, with what inhabitants do with it."

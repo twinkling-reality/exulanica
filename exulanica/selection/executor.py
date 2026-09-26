@@ -50,7 +50,7 @@ from exulanica.selection.plan import (
 )
 from exulanica.selection.validation import STATEMENT_TIMEOUT_MS, ValidatedPlan
 from exulanica.store.base import ContentAddressedStore
-from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput
 from exulanica.world.society_engines import INPUT_ENGINES, LEGACY_ENGINES
 from exulanica.world.society_planner import validate_input_successor, validate_society_input
 
@@ -482,7 +482,9 @@ def _authorized_societies(
                     validate_input_successor(previous, document)
                 authorize(document)
                 previous = document
-        except (UnavailableSocietyInput, ValueError):
+        except (UnavailableSocietyInput, SocietyBytesNotRead, ValueError):
+            # A race between reading the society's stored bytes and taking the asset read lock
+            # leaves it out this time, as an unavailable input does; the next question asks again.
             continue
         allowed.append(society["society_id"])
     return allowed

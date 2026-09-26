@@ -381,10 +381,9 @@ def update_entry(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> SavedWorldEntryView | JSONResponse:
+    entries = SavedWorldEntryRepository(connection, session.workspace_id, services.store)
     try:
-        updated = SavedWorldEntryRepository(
-            connection, session.workspace_id, services.store
-        ).update(
+        entries.update(
             entry_id,
             base_revision=body.base_revision,
             authored_version_id=body.authored_version_id,
@@ -403,7 +402,8 @@ def update_entry(
             status_code=422,
             content={"code": "invalid_saved_world_entry", "detail": str(exc)},
         )
-    return _view(updated)
+    # Read after the write's own transaction has committed: the read checks viewer images.
+    return _view(entries.entry(entry_id))
 
 
 @router.post("/{entry_id}/source-attachments", response_model=SavedWorldEntryView)

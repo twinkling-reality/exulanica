@@ -3,9 +3,9 @@
 Every route that answers with an authored version answers with :class:`AlternateVersionView`,
 built here from the domain version, so the reviewed asset catalog, the objects, the environment
 instances and the placed depth estimates reach a client in one shape whichever route produced
-them. Asset availability is resolved against the actual store by :func:`rendered_version` rather
-than assumed: a renderer holding the body must be able to tell a reviewed mesh it may draw from one
-whose bytes are gone.
+them. Asset and placement availability are resolved against the actual store by
+:func:`rendered_version` rather than assumed: a renderer holding the body must be able to tell a
+reviewed mesh it may draw from one whose bytes are gone.
 """
 
 from __future__ import annotations
@@ -25,7 +25,8 @@ from exulanica.world import (
     scale_statement,
     truth_statement,
 )
-from exulanica.world.object_catalog import world_object_catalog
+from exulanica.world.object_catalog import NO_ACTIVITY, world_object_catalog
+from exulanica.world.society_catalogs import purposeful_routine
 
 
 class ReviewedAssetView(BaseModel):
@@ -94,12 +95,35 @@ class ObjectUseView(BaseModel):
     )
 
 
+class ObjectActivityView(BaseModel):
+    """What inhabitants do at a kind and how long each stays, in the purposeful routine's words."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(
+        description="The routine's entry for the kind, or its affordance's entry for every kind "
+        "that states none of its own."
+    )
+    label: str = Field(description="What a person there is doing, in the routine's words.")
+    duration_minimum_ticks: int = Field(
+        description="The shortest stay, in the society's ticks of one simulated minute each."
+    )
+    duration_maximum_ticks: int = Field(
+        description="The longest stay, in the society's ticks of one simulated minute each."
+    )
+
+
 class PlaceableAssetView(ReviewedAssetView):
     """A reviewed asset as the registry reads serve it, with what inhabitants do with it."""
 
     use: ObjectUseView | None = Field(
         description="The kind's use, as the world object catalog derives it; null for an asset "
         "the catalog does not state, such as a character part."
+    )
+    activity: ObjectActivityView | None = Field(
+        description="What inhabitants do at the kind and for how long, as the purposeful routine "
+        "a saved world's next society input records states it; null for a kind inhabitants do "
+        "not use and for an asset the catalog does not state."
     )
 
 
@@ -237,9 +261,31 @@ def object_use_view(asset_key: str) -> ObjectUseView | None:
     )
 
 
+def object_activity_view(asset_key: str) -> ObjectActivityView | None:
+    """What inhabitants do at an asset's kind, or ``None`` where they do nothing there.
+
+    The routine's own answer, asked as the society's composer asks it for a placed object of the
+    kind (``build_authored_ground_society_input_v3``): the kind's entry, else its affordance's, in
+    the routine a new input records. A kind nobody uses is never asked, as the composer never asks
+    for it, and neither is an asset the world object catalog does not state.
+    """
+    kind = world_object_catalog().by_asset_key().get(asset_key)
+    if kind is None or kind.use.affordance == NO_ACTIVITY:
+        return None
+    activity = purposeful_routine().at_object(kind.use.affordance, kind.key)
+    return ObjectActivityView(
+        key=activity.key,
+        label=activity.label,
+        duration_minimum_ticks=activity.duration_minimum,
+        duration_maximum_ticks=activity.duration_maximum,
+    )
+
+
 def placeable_asset_view(asset: ReviewedAssetRow) -> PlaceableAssetView:
     return PlaceableAssetView(
-        **asset_view(asset).model_dump(), use=object_use_view(asset.asset_key)
+        **asset_view(asset).model_dump(),
+        use=object_use_view(asset.asset_key),
+        activity=object_activity_view(asset.asset_key),
     )
 
 
@@ -348,12 +394,15 @@ def alternate_version_view(
 def rendered_version(
     repository: WorldObjectRepository, version: AlternateVersion, store: ContentAddressedStore
 ) -> AlternateVersionView:
-    """One version body, with every asset's availability resolved against the actual store.
+    """One version body, with every asset's and placement's availability resolved against the store.
 
     Resolved rather than assumed. A renderer holding this body must be able to tell a reviewed
     mesh it may draw from one whose bytes are gone, and the answer to that has to come from
-    looking.
+    looking. Looking reads the store, so a route calls this after the transaction that wrote
+    ``version`` has committed: a writer returns its version without availability, because it may
+    hold the global asset read lock until then (``docs/asset-read-currency.md``).
     """
     return alternate_version_view(
-        version, {asset.content_sha256: asset for asset in repository.reviewed_assets(store)}
+        repository.with_availability(version),
+        {asset.content_sha256: asset for asset in repository.reviewed_assets(store)},
     )

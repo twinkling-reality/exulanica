@@ -287,12 +287,17 @@ class PointMapSourceAuthority:
             raise PointMapNotReadable(f"this estimate's bytes are not placeable: {exc}") from exc
 
     def final_authorization(self, instance: PointMapInstance) -> None:
-        """Ask again under the global asset read lock, after the row is written.
+        """Ask again under the global asset read lock, after the row is written, of rows alone.
 
         The same discipline ``EnvironmentSourceAuthority.final_authorization`` follows and the
         same one ``require_model_right`` follows before a hand-over: a withdrawal cannot commit
         while this runs, so it is either seen here or it waits, and an edit that committed against
-        a permission that ended mid-transaction cannot exist.
+        a permission that ended mid-transaction cannot exist. Nothing is read from the store while
+        the lock is held (``docs/asset-read-currency.md``): the bytes were read before it, when the
+        placement was resolved or a move checked it, and every erasure the product makes is
+        preceded by a row these checks read. Bytes lost with no row saying why, between that read
+        and this question, are not refused here; the placement is written and reads
+        ``unavailable_bytes`` afterwards.
         """
         lock_asset_reads_until_commit(
             self.connection,
@@ -300,7 +305,9 @@ class PointMapSourceAuthority:
                 "a photograph's point map is authorized only inside the transaction that writes it"
             ),
         )
-        self.require_current(instance)
+        current = self._row_state(instance)[0]
+        if current != "available":
+            raise PointMapNotPermitted(f"this estimate cannot be used right now ({current})")
 
     def require_current(self, instance: PointMapInstance) -> None:
         current = self.availability(instance)
@@ -315,8 +322,18 @@ class PointMapSourceAuthority:
 
         Every branch names a state a person can act on. ``withdrawn`` carries which end of
         permission it was, because a stopped right, an expired review, a deleted photograph and a
-        withdrawn person are four different situations with four different recoveries.
+        withdrawn person are four different situations with four different recoveries. What the
+        rows allow is then held to the store: bytes it cannot find are ``unavailable_bytes``.
         """
+        current = self._row_state(instance)
+        if current[0] != "available" or self.store is None:
+            return current
+        if not self.store.exists(BlobId.from_hex(instance.source.point_map_sha256)):
+            return "unavailable_bytes", None
+        return "available", None
+
+    def _row_state(self, instance: PointMapInstance) -> tuple[str, str | None]:
+        """:meth:`state` from rows alone, which is what may be asked under the asset read lock."""
         source = instance.source
         row = self.connection.execute(
             """
@@ -358,9 +375,5 @@ class PointMapSourceAuthority:
         if not row["readable"]:
             # The permission terms above all stood, so what is left is the bytes or a person
             # whose likeness was withdrawn from this derivative.
-            return "unavailable_bytes", None
-        if self.store is not None and not self.store.exists(
-            BlobId.from_hex(source.point_map_sha256)
-        ):
             return "unavailable_bytes", None
         return "available", None

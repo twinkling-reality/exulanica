@@ -13,7 +13,6 @@ role (``personal_world_support.personal_world_api``).
 
 from __future__ import annotations
 
-import re
 import uuid
 
 import psycopg
@@ -21,7 +20,15 @@ import pytest
 from exulanica.environment.repository import EnvironmentRepository
 from exulanica.world.object_repository import WorldObjectRepository
 
-from personal_world_support import group, make_world, personal_world_api, photograph, source_media
+from asset_lock_support import recorded_store_reads
+from personal_world_support import (
+    CUBE,
+    group,
+    make_world,
+    personal_world_api,
+    photograph,
+    source_media,
+)
 from test_personal_world_addition import (
     _add_what_the_read_offers,
     _end_in_this_transaction,
@@ -263,56 +270,43 @@ def test_a_source_that_ends_before_the_branchs_question_is_left_out(api, monkeyp
 # -- nothing is read from the store while the asset read lock is held -----------------------------
 
 
-def _reads_under_the_lock(api, monkeypatch) -> list[str]:
-    """Record each store read made while any session holds the asset read lock exclusively.
+def _reads_under_the_lock(api, monkeypatch):
+    """Each store read made while the asset read lock is held, with its planted control first.
 
     Every guarded write in every workspace is refused while the lock is held
-    (``docs/asset-read-currency.md``), so a holder reads no stored bytes. The lock's key is read
-    from ``asset_read_lock()`` itself (migration 0041), not restated here.
+    (``docs/asset-read-currency.md``), so a holder reads no stored bytes.
     """
-    [source] = api.repository.connection.execute(
-        "select prosrc from pg_proc where proname = 'asset_read_lock' "
-        "and pronamespace = current_schema()::regnamespace"
-    ).fetchall()
-    [key] = re.findall(r"pg_advisory_xact_lock\((\d+)\)", source["prosrc"])
-    held = (
-        "select count(*) as n from pg_locks where locktype = 'advisory' and classid = 0 "
-        "and objid = %s and objsubid = 1 and mode = 'ExclusiveLock' and granted"
+    return recorded_store_reads(
+        api.repository.connection,
+        api.database,
+        api.repository.workspace_id,
+        api.store,
+        monkeypatch,
+        planted=CUBE,
     )
-    under: list[str] = []
-    for name in ("get", "open", "exists", "size"):
-        original = getattr(api.store, name)
-
-        def reading(blob_id, _name=name, _original=original):
-            if api.repository.connection.execute(held, (int(key),)).fetchone()["n"]:
-                under.append(_name)
-            return _original(blob_id)
-
-        monkeypatch.setattr(api.store, name, reading)
-    return under
 
 
 def test_a_branch_reads_no_stored_bytes_while_it_holds_the_asset_read_lock(
     api, tmp_path, monkeypatch
 ):
     entry, _ = _with_an_environment(api, tmp_path)
-    under = _reads_under_the_lock(api, monkeypatch)
-    api.version(entry)
-    assert under == [], "the positive control: a read outside the lock records nothing"
+    reads = _reads_under_the_lock(api, monkeypatch)
     branched = _branch(api, entry)
     assert branched.status_code == 201, branched.text
     assert [i["availability"] for i in branched.json()["environment_instances"]] == ["available"]
-    assert under == []
+    assert reads.under_the_lock == []
+    assert reads.every, "the answer's availability was read from the store, after the commit"
 
 
 def test_a_carry_reads_no_stored_bytes_while_it_holds_the_asset_read_lock(
     api, tmp_path, monkeypatch
 ):
     entry, _ = _world_with_a_placed_environment_and_a_new_photograph(api, tmp_path)
-    under = _reads_under_the_lock(api, monkeypatch)
+    reads = _reads_under_the_lock(api, monkeypatch)
     carried = _add_what_the_read_offers(api, entry)
     assert [i["instance_id"] for i in carried["environment_instances"]] == ["environment:yard"]
-    assert under == []
+    assert reads.under_the_lock == []
+    assert reads.every, "the addition's reads of stored bytes were seen, outside the lock"
 
 
 def test_a_branch_copies_some_rows_leaves_a_removed_one_out_and_takes_an_edit_on_its_token(

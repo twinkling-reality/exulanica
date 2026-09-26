@@ -340,7 +340,14 @@ class SavedWorldEntryRepository:
         expected_authored_edit_seq: int,
         style_version_id: uuid.UUID,
         title: str | None = None,
-    ) -> SavedWorldEntry:
+    ) -> None:
+        """Move the entry's resume point, title and appearance; read it with :meth:`entry` after.
+
+        Writes only. A caller may be inside a transaction that holds the global asset read lock
+        (adding photographs carries the world's version under it), and reading the entry back
+        checks each attachment's viewer image in the store, which a holder never does
+        (``docs/asset-read-currency.md``). The caller reads the entry once its transaction commits.
+        """
         with self.connection.transaction():
             self._lock_workspace()
             row = self.connection.execute(
@@ -381,7 +388,6 @@ class SavedWorldEntryRepository:
                     entry_id,
                 ),
             )
-        return self.entry(entry_id)
 
     def attach_sources(
         self,

@@ -11,7 +11,7 @@ from fastapi import Request
 from exulanica.api.dependencies import get_services
 from exulanica.epistemics.hosted_requests import no_place_released
 from exulanica.selection.validation import Session
-from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_decisions import SocietyDecisionProvider
 from exulanica.world.society_repository import SocietyRepository
@@ -90,8 +90,18 @@ def request_decision(
                 "proposal": None,
                 "provider": None,
             }
-    with services.database.session(session.workspace_id) as connection, connection.transaction():
-        completed = repository(connection).finish(version_id, request_id, result)
+
+    def finish() -> dict:
+        with services.database.session(session.workspace_id) as db, db.transaction():
+            return repository(db).finish(version_id, request_id, result)
+
+    try:
+        completed = finish()
+    except SocietyBytesNotRead:
+        # A race between reading an input's stored bytes and taking the asset read lock. The
+        # finish rolled back and holds nothing, and finishing is idempotent, so it is asked once
+        # more, reading the bytes first, rather than losing the answer the model was paid for.
+        completed = finish()
     if completed["decision"]["reason"] == "decision_sources_unavailable":
         raise UnavailableSocietyInput("decision sources became unavailable during inference")
     return completed

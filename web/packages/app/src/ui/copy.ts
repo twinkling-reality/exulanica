@@ -351,6 +351,22 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'firstUse.walk': 'Walk',
   'firstUse.callCompanion': 'Call your Companion',
 
+  // -- what inhabitants do with the kind chosen in Create (`objectUseWords`) ----------------
+  //
+  // Filled only from the server's asset row: how many at a time from the places the kind states,
+  // what they do from the purposeful routine's label, and the stay from its shortest and longest,
+  // in the society's ticks of one simulated minute each. The label ends the sentence, so every
+  // label the routine states reads as what they are doing there ("resting on a bench", "visiting",
+  // "by a tree"). A marker states no places, because the society derives them, so its sentence
+  // gives no number.
+  'objectUse.withPlaces': 'Up to {count} inhabitants at a time spend {stay} here, {activity}.',
+  'objectUse.withOnePlace': 'One inhabitant at a time spends {stay} here, {activity}.',
+  'objectUse.withoutPlaces': 'Inhabitants spend {stay} here, {activity}.',
+  'objectUse.unused': 'Inhabitants do not use this.',
+  'objectUse.stay.oneMinute': 'a minute',
+  'objectUse.stay.minutes': '{minutes} minutes',
+  'objectUse.stay.range': '{minimum} to {maximum} minutes',
+
   // -- what the About panel says the open world is ----------------------------------------
   //
   // One sentence per ground the renderer can stand a world on, chosen by the ground's form in

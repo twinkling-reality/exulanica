@@ -235,6 +235,9 @@ def commit_edit(
     for another writer to move the base first. The saved entry, the version and the base come from
     ``version_id`` and ``body`` here rather than from every caller, so no route can bind a saved
     world to a different base than the one its edit names.
+
+    ``operation`` answers with what it wrote, without availability: the transaction may hold the
+    global asset read lock until it commits. The body's availability is read after the block.
     """
     saved_entry = body.saved_entry
     try:
@@ -265,4 +268,5 @@ def commit_edit(
         if problem is None:
             raise
         return problem
+    # After the commit, which released any asset read lock the edit took.
     return rendered_version(repository, version, get_services(request).store)
