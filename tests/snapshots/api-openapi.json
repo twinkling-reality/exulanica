@@ -2317,6 +2317,154 @@
     }
    }
   },
+  "/world/versions/{version_id}/society/models": {
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Society Models",
+    "operationId": "society_models_world_versions__version_id__society_models_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Society Models World Versions  Version Id  Society Models Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Choose Society Model",
+    "operationId": "choose_society_model_world_versions__version_id__society_models_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelChoiceBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Choose Society Model World Versions  Version Id  Society Models Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/society/district": {
    "get": {
     "tags": [
@@ -13809,6 +13957,29 @@
     ],
     "title": "ChoiceParameterView"
    },
+   "ChosenModel": {
+    "properties": {
+     "provider": {
+      "type": "string",
+      "maxLength": 63,
+      "minLength": 1,
+      "title": "Provider"
+     },
+     "model_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Model Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "provider",
+     "model_id"
+    ],
+    "title": "ChosenModel"
+   },
    "CitationBody": {
     "properties": {
      "span_id": {
@@ -18073,6 +18244,43 @@
     ],
     "title": "ModelCallView",
     "description": "One model call the answer path made, as the response to it reported, or one attempt it\npaid for that returned no result.\n\nRead off the response and never off the manifest. ``requested_model`` is what the chain\nasked for and ``served_model`` is what answered; they differ exactly when ``used_fallback``\nis true, which is the case a record derived from configuration would report wrongly. An\nattempt that returned no result names the model it was sent to, its ``outcome`` and its\n``cost_basis``, and never the provider's or the transport's words about the failure."
+   },
+   "ModelChoiceBody": {
+    "properties": {
+     "idempotency_key": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Idempotency Key"
+     },
+     "people": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 512,
+      "minItems": 1,
+      "title": "People"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ChosenModel"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "idempotency_key",
+     "people",
+     "model"
+    ],
+    "title": "ModelChoiceBody"
    },
    "ModelRightRequest": {
     "properties": {

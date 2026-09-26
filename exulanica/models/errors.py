@@ -19,6 +19,7 @@ from exulanica.errors import ExulanicaError
 __all__ = [
     "AmbiguousStructuredOutputError",
     "BudgetExceededError",
+    "BudgetShareExceeded",
     "GuidedJsonForbiddenError",
     "ManifestError",
     "MaxTokensTooLowError",
@@ -26,6 +27,7 @@ __all__ = [
     "ModelUnavailableError",
     "NoFallbackError",
     "PreflightError",
+    "ProviderRefused",
     "SchemaViolationError",
     "StructuredOutputError",
     "TransportError",
@@ -97,6 +99,21 @@ class ModelUnavailableError(ModelError):
 
 class NoFallbackError(ModelError):
     """The primary is unavailable and the role has no declared fallback left to try."""
+
+
+class ProviderRefused(ModelError):
+    """A request to a provider this process may not reach, refused before anything was sent.
+
+    ``reason`` names why: ``provider_not_admitted`` when the deployment's egress allowlist does
+    not declare the provider's origin, ``provider_credential_absent`` when the variable the
+    manifest names for its credential is not set. Deliberately not a ``TransportError``, so the
+    chain neither retries it nor fails over on it: the provider will be just as refused next time.
+    """
+
+    def __init__(self, message: str, *, provider: str, reason: str) -> None:
+        super().__init__(message)
+        self.provider = provider
+        self.reason = reason
 
 
 class MaxTokensTooLowError(ModelError, ValueError):
@@ -172,3 +189,10 @@ class BudgetExceededError(ModelError):
         super().__init__(message)
         self.spent_usd = spent_usd
         self.ceiling_usd = ceiling_usd
+
+
+class BudgetShareExceeded(BudgetExceededError):
+    """A call that fits the process's budget but not the part of it the caller may spend.
+
+    The rest is kept for the process's other work, which goes on; nothing was sent.
+    """

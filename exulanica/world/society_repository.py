@@ -44,6 +44,7 @@ from exulanica.world.society_living import (
     living_places,
     routine_for,
 )
+from exulanica.world.society_model_decisions import append_decision_events, model_goal_policies
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,
@@ -376,16 +377,18 @@ class SocietyRepository:
             snapshot["places"] = consumed_places(current)
         return snapshot
 
-    def _decisions(self, row: dict) -> list[dict]:
+    def _decisions(self, row: dict, *, after: int = 0) -> list[dict]:
+        """The stored receipts after ``after``, in decision order, each held to its request."""
         rows = self.connection.execute(
             "select d.document,d.document_sha256,r.document as request "
             "from world_society_decision d "
             "join world_society_decision_request r using(workspace_id,society_id,request_id) "
-            "where d.workspace_id=%s and d.society_id=%s order by d.decision_seq",
-            (self.workspace_id, row["society_id"]),
+            "where d.workspace_id=%s and d.society_id=%s and d.decision_seq>%s "
+            "order by d.decision_seq",
+            (self.workspace_id, row["society_id"], after),
         ).fetchall()
         documents = []
-        for sequence, value in enumerate(rows, 1):
+        for sequence, value in enumerate(rows, after + 1):
             document = value["document"]
             validate_decision_receipt(document, value["request"])
             if (
@@ -395,6 +398,28 @@ class SocietyRepository:
                 raise ValueError("stored decision sequence or digest mismatch")
             documents.append(document)
         return documents
+
+    def _consumed_decisions(self, row: dict) -> int:
+        """The last receipt a committed minute consumed; every later one is queued."""
+        return int(
+            self.connection.execute(
+                "select coalesce(max(decision_seq),0) as seq "
+                "from world_society_transition_decision where workspace_id=%s and society_id=%s",
+                (self.workspace_id, row["society_id"]),
+            ).fetchone()["seq"]
+        )
+
+    def _bindings(self, row: dict) -> dict[int, list[dict]]:
+        """The receipts each committed minute consumed, with what each did, by minute and in
+        decision order: one read for a whole replay."""
+        by_tick: dict[int, list[dict]] = {}
+        for binding in self.connection.execute(
+            "select tick,decision_seq,disposition from world_society_transition_decision "
+            "where workspace_id=%s and society_id=%s order by decision_seq",
+            (self.workspace_id, row["society_id"]),
+        ).fetchall():
+            by_tick.setdefault(binding["tick"], []).append(binding)
+        return by_tick
 
     def _actions(self, row: dict, documents: list[dict]) -> list[dict]:
         rows = self.connection.execute(
@@ -483,9 +508,16 @@ class SocietyRepository:
                         external_goal_policy=goal_policy,
                     )
                 else:
-                    state, events = advance_purposeful_society(
-                        row["state"], row["seed"], inputs, goal_policy=goal_policy
+                    # A person's model decisions are receipts asked before this minute; with
+                    # none, the policies are the direct requests' alone and nothing is added.
+                    receipts = self._decisions(row, after=self._consumed_decisions(row))
+                    policies, decided = model_goal_policies(
+                        row["state"], inputs[-1], receipts, goal_policy
                     )
+                    state, events = advance_purposeful_society(
+                        row["state"], row["seed"], inputs, goal_policy=policies
+                    )
+                    processed = [(d.decision_seq, d.disposition) for d in decided]
                 events = append_action_events(
                     row["state"],
                     state,
@@ -494,11 +526,15 @@ class SocietyRepository:
                     action_dispositions,
                     events,
                 )
+                if row["engine_version"] == PURPOSEFUL_PROFILE:
+                    events = append_decision_events(
+                        row["state"], state, inputs[-1], receipts, decided, events
+                    )
             else:
                 raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
             self._record(row, state, events)
             if row["engine_version"] in INPUT_PROFILES:
-                if row["engine_version"] == SOCIAL_PROFILE:
+                if row["engine_version"] in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE):
                     for sequence, disposition in processed:
                         self.connection.execute(
                             "insert into world_society_transition_decision("
@@ -631,6 +667,23 @@ class SocietyRepository:
                 # A directed request is consumed by the next ordinary minute; this minute would
                 # pass it by and leave it bound to a state that no longer exists.
                 raise PresenceRefused("a_request_is_waiting")
+            deciding = self.connection.execute(
+                "select 1 from world_society_decision_request request "
+                "left join world_society_decision receipt "
+                "using(workspace_id,society_id,request_id) "
+                "left join world_society_transition_decision consumed "
+                "on consumed.workspace_id=receipt.workspace_id "
+                "and consumed.society_id=receipt.society_id "
+                "and consumed.decision_seq=receipt.decision_seq "
+                "where request.workspace_id=%s and request.society_id=%s "
+                "and (request.base_tick=%s "
+                "or (receipt.decision_seq is not null and consumed.decision_seq is null)) limit 1",
+                (self.workspace_id, row["society_id"], row["current_tick"]),
+            ).fetchone()
+            if deciding is not None:
+                # A model's decision is being asked for this minute, or answered and not yet
+                # consumed: like a directed request, the next ordinary minute takes it.
+                raise PresenceRefused("a_request_is_waiting")
             inputs = self._pending_inputs(row)
             self._authorize(inputs[-1])
             request = presence_request(
@@ -735,6 +788,12 @@ class SocietyRepository:
                 if len(transitions) != row["current_tick"]:
                     raise ValueError("missing or extra society transition")
                 presences = self._presences(row)
+                # Replayed from what was stored and bound, never asked again.
+                person_decisions, person_bindings = (
+                    ({d["decision_seq"]: d for d in self._decisions(row)}, self._bindings(row))
+                    if row["engine_version"] == PURPOSEFUL_PROFILE
+                    else ({}, {})
+                )
                 for transition in transitions:
                     previous_state = state
                     if (
@@ -799,8 +858,17 @@ class SocietyRepository:
                         if processed != [(b["decision_seq"], b["disposition"]) for b in bindings]:
                             raise ValueError("social decision disposition replay mismatch")
                     else:
+                        bindings = person_bindings.get(transition["tick"], [])
+                        receipts = [person_decisions[b["decision_seq"]] for b in bindings]
+                        policies, decided = model_goal_policies(
+                            state, inputs[-1], receipts, goal_policy
+                        )
+                        if [(d.decision_seq, d.disposition) for d in decided] != [
+                            (b["decision_seq"], b["disposition"]) for b in bindings
+                        ]:
+                            raise ValueError("person decision disposition replay mismatch")
                         state, events = advance_purposeful_society(
-                            state, row["seed"], inputs, goal_policy=goal_policy
+                            state, row["seed"], inputs, goal_policy=policies
                         )
                     events = append_action_events(
                         previous_state,
@@ -810,6 +878,10 @@ class SocietyRepository:
                         action_dispositions,
                         events,
                     )
+                    if row["engine_version"] == PURPOSEFUL_PROFILE:
+                        events = append_decision_events(
+                            previous_state, state, inputs[-1], receipts, decided, events
+                        )
                     action_events = [
                         event for event in events if event.kind == "user_action_requested"
                     ]

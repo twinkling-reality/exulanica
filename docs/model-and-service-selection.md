@@ -25,6 +25,7 @@ Provider availability and prices must be checked again before an execution campa
 | Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. A pre-registered held-out comparison kept Nano against Super and Ultra: neither cleared the margin on hard grounded questions ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). |
 | Request classification, search planning and appearance drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request` and `draft_appearance` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
 | Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. On synthetic held-out photographs M3 omitted and misplaced fewer objects than MiniCPM, which also reported people who were not there ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). Synthetic drawings do not establish accuracy on real photographs. |
+| A person's decisions in a world | The open model the world's owner chose for that person, among those the manifest offers the `society_decision` role; none unless chosen | `exulanica/api/society_person_decisions.py` asks through `ModelClient.choose` before a minute of play, and the planner takes only a validated answer ([below](#providers-chosen-roles-and-a-persons-decisions)). Each offered model's mechanism was verified by a pre-registered probe ([record](evaluation/2026-09-25-society-person-models-probe.json)); the measurement compares what four models decide ([record](evaluation/2026-09-25-society-person-models.json)). |
 | Caption/text semantic retrieval | Nebius Token Factory: Qwen3-Embedding-8B, 4096 dimensions | `exulanica/epistemics/caption_embeddings.py` and `exulanica/selection/embeddings.py`; lexical and cosine retrieval, not direct image embeddings. No model fallback is configured for embeddings. |
 | Object boxes | Grounding DINO Tiny; OWLv2 Base Patch16 Ensemble fallback | `exulanica/ingest/stages/segmentation.py`; local inference when hosted observations lack suitable boxes. |
 | Object masks | SAM 2.1 Hiera Tiny | Same segmentation module; masks are distinct from human identity confirmation, source rights and placement into recovered shared coordinates. |
@@ -39,9 +40,10 @@ Google OIDC account resolution, deterministic society stepping and playback, typ
 society actions, reviewed-asset admission, scene-surface candidate extraction, scene-run preflight,
 character appearance history, native character playback and the representation inspector are
 deterministic application/runtime paths. They do not invoke a model merely because a model client is
-configured. Optional v3 society decisions remain the only model proposal path in that foundation,
-and they are explicitly requested, schema-validated and replayed from stored receipts rather than
-recalled during stepping.
+configured. Two paths let a model decide for a simulated person: an explicitly requested v3
+society decision, and a purposeful society's person whose world's owner chose a model, asked by
+the host's playback before a minute. Both are validated against the offered choice and replayed
+from stored receipts rather than recalled during stepping.
 
 Nemotron Super and Ultra are configured roles but have no production caller in the reviewed
 Python code. Fallback in the hosted client is provider-error handling, not a quality escalation
@@ -108,6 +110,87 @@ that returned no result. A request a policy or the budget guard refuses sends no
 row. The Companion's execution record is built this way, one copy per question or proposal, and
 never read back from the process ledger
 ([Companion question: execution provenance](companion-question.md#execution-provenance)).
+
+### Providers, chosen roles and a person's decisions
+
+The [model manifest](../exulanica/models/models.manifest.json) states providers as data. Each
+provider under `providers` names its OpenAI-compatible endpoint, the environment variable its
+credential is read from and the catalog the preflight checks its models against; every model names
+its provider and says in plain words what it is. A role's chain stays on one provider, and each
+provider's egress origin is derived from its endpoint rather than written twice
+([security floor](security-floor.md#3-egress-allowlist)). Nebius Token Factory is the one provider
+declared.
+
+A role in `chosen_roles` has no model of its own: the world names one. `society_decision` is the
+first, a person in a purposeful society deciding what to do next
+([society contract](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose)).
+A model is offered to it only when its `answering` entry names a mechanism the client asks by, a
+function the request forces by name (`tool_call`) or a strict JSON schema (`json_schema`), with the
+evaluation record whose probe verified that mechanism for that model; a model with neither is not
+offered. `tests/test_model_providers.py` reads each named record and holds the manifest to its
+verdicts. A chosen model has no fallback, because a choice names one model, and no manifest
+timeout: the decision contract bounds each ask at 20 seconds, inside the playback lease. The host
+asks each model with its own default token bound, never below its floor, so a reasoning model has
+room to reason before it answers.
+
+Four open models were probed on six recorded choices each, once by each mechanism
+([probe record](evaluation/2026-09-25-society-person-models-probe.json)), under one
+[pre-registration](evaluation/2026-09-25-society-person-models-preregistration.json) that states
+the probe and the measurement below, and the tree they were to measure, before either asked
+anything. All four were verified by both: Nemotron 3 Nano 30B, Nemotron 3.5 Lightning, Qwen3 235B
+Instruct and DeepSeek V4 Flash, and every first answer was one of the offered actions. What a model
+writes before answering depends on the mechanism: on average Nemotron 3 Nano wrote 762 completion
+tokens to a forced call and 222 to a schema, Nemotron 3.5 Lightning 282 and 1,222, DeepSeek V4
+Flash 196 and 131, and Qwen3 16 and 17. The contract asks by a forced call whenever it is verified,
+its first-ranked mechanism. The probe cost 0.006226 USD.
+
+The [measurement](evaluation/2026-09-25-society-person-models.json) gave each model the eight
+people of the small square for 60 simulated minutes, on the seed the browser sends first, beside
+the routine alone on the same seed. Every minute was a claim of the playback worker the application
+builds for the workspaces it lists: the claim, the host's decision phase, then the minute. The
+harness made each claim due at once rather than waiting the host's base interval, so the worker's
+own polling and pacing were not measured.
+
+| Model | Decisions | Acted on | Not acted on | Chose to wait | Answer p50 / p95 | Cost per simulated hour |
+| --- | --- | --- | --- | --- | --- | --- |
+| Qwen3 235B Instruct | 91 | 89 | 2: another person took the place first | 40 | 791 / 2,803 ms | 0.0082 USD |
+| DeepSeek V4 Flash | 361 | 360 | 1: another person took the place first | 347 | 1,902 / 3,887 ms | 0.0391 USD |
+| Nemotron 3 Nano 30B | 148 | 141 | 7: no answer within 20 s (5), another person took the place first (2) | 106 | 6,543 / 17,615 ms | at most 0.0262 USD |
+| Nemotron 3.5 Lightning | 188 | 188 | none | 151 | 1,747 / 3,679 ms | 0.0193 USD |
+
+Measured: every model chose waiting more often than any one kind of place, and the more a model
+waited, the more decisions it made. Of 480 person-minutes, the routine's people spent 69 walking,
+310 at objects, 75 talking and 26 standing, and never waited; DeepSeek's spent 347 waiting and 119
+at objects, Qwen's 40 waiting and 389 at objects. No person run by a model talked; Nemotron 3 Nano's
+people stood for 6 person-minutes, the other models' never. The contract offers places and
+waiting, not the routine's own talking and standing. Every claim advanced one minute, and half the
+claims took at most 0.9 s for Qwen, 2.1 s for Lightning, 2.9 s for DeepSeek and 8.5 s for
+Nemotron 3 Nano; a claim waits for its minute's slowest ask. Every world replayed and verified with
+no billed call. The run cost at most 0.092699 USD of its 0.11 USD bound, the five calls that timed
+out counted at their reservations. One square, one seed and one hour per model were measured;
+whether a model's choices serve its people better than the routine is not judged.
+
+Inferred, not measured: a person who waits reaches a choice point again a minute later, so a model
+that chooses waiting more is asked more often, which fits the decision counts above; the run did
+not vary waiting to test it.
+
+**Spend.** Two bounds apply to a person's decisions. The decision contract bounds each world: at
+most 600 asked decisions and 0.25 USD of their cost in its last hour, counted from its receipts with
+an unknown cost at its bound and each ask already admitted that minute at its bound; past either,
+the routine decides and each receipt says which. The process's budget guard (`EXULANICA_BUDGET_USD`,
+`EXULANICA_BUDGET_MAX_CALLS`) bounds everything the process asks for the life of the process: it
+does not refill while the process runs, and it holds each admitted call's reservation until the
+call's usage is recorded, so calls admitted at once never cross it together. People's decisions may
+use all of it but the contract's `process_reserve_percent`, 50, which is kept for the Companion,
+photograph ingestion, vision and caption search, since they share the ceiling. By arithmetic from
+the bounds, not a measurement: a world at the hourly bound asks 600 decisions, up to 1,200 calls
+with the one retry, which would use the default 2,000 calls in under two hours without the share.
+Decided on what the process has spent, never on what calls under way hold: once what is left, beside
+the part kept for other work, fits no ask of an offered model, the host asks nobody and writes
+nothing until the process restarts, and a person whose own model's ask no longer fits is not asked
+either; playback keeps advancing minutes with the routine deciding, `/readyz` says which ceiling
+where a playback host runs, and the models route and the page tell the world's owner. A host that
+plays people run by models sizes both ceilings for how long it runs between restarts.
 
 ### Decision and evidence
 
@@ -198,8 +281,11 @@ with the fallback disabled; the fallback's sign judgement is refused by name, ne
 
 The living-world preview uses source-footprint building meshes and catalog-backed rigged characters,
 with an abstract procedural fallback. Its appearance is not evidence of frontier scene-generation
-or character-generation quality. The live society uses the deterministic v2 visit/rest policy.
-The opt-in v3 backend adds local simulated observations, communicated beliefs and a bounded decision
+or character-generation quality. The district's live society (`exulanica-society/v4`) is
+deterministic and refuses model decisions. A saved world's purposeful society
+(`exulanica-society/v2`) follows its routine too, except for a person whose world's owner chose a
+model: the host asks that model at the routine's choice points, before a minute of play. The
+opt-in v3 backend adds local simulated observations, communicated beliefs and a bounded decision
 adapter through the existing ModelClient. No model role is enabled for that adapter by default.
 Its authenticated persistence and provider path are tested with scripted responses; live-model
 quality, dialogue and memory reflection remain separate evaluation work. A configured model role,

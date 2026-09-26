@@ -4,21 +4,24 @@ This is a cost control before it is a correctness one. A full corpus pass costs 
 ten development iterations over the same photographs cost ten times that for identical answers.
 Re-running ingest must not re-bill.
 
-**The key is ``(input content hash, pipeline version, role, prompt version)``.** Each of the four
-is load bearing:
+**The key is ``(provider, model, input content hash, pipeline version, role, prompt version)``.**
+Each of the six is load bearing:
 
+*   *provider* and *model*, so an answer is only ever served for the model that gave it. A call
+    looks up the model it addresses (a role's primary, or the model a world chose), and an entry
+    is stored under the model that served it, so a fallback's answer never answers for the
+    primary and one model's answer never answers for another. The cost of the rule is stated
+    rather than hidden: while a primary is withdrawn, an identical request asks the fallback
+    again, because an answer from another model is another answer.
 *   *input content hash* over the canonical request, so identical work hits.
-*   *pipeline version* from the manifest, so replacing a model identifier invalidates every
-    answer the replaced model produced. A cache that outlives the model that filled it is a
-    correctness bug wearing a cost saving's coat.
+*   *pipeline version* from the manifest, so the stored work of a replaced configuration is not
+    served under a new one.
 *   *role*, so vision answers and reasoning answers cannot collide.
 *   *prompt version*, so editing a prompt invalidates the answers it produced. Editing a prompt
     and silently getting the old prompt's answers is the failure that wastes an afternoon.
 
-**The resolved model identifier is deliberately NOT in the key.** A fallback swap during a
-deprecation must still hit the cache, otherwise a withdrawal turns into a full re-bill on top of
-a quality regression. The identifier that actually served each entry is recorded *in* the entry,
-so provenance survives even though it does not participate in lookup.
+The identifier that served each entry is recorded *in* the entry too, and a lookup refuses an
+entry whose recorded model is not the one it addressed.
 
 Digest input goes through ``exulanica.canonical``, the same canonical JSON the evidence spine uses.
 That module refuses floats outright, which is right for a citation digest and inconvenient here
@@ -52,8 +55,8 @@ __all__ = [
     "request_digest",
 ]
 
-#: Keys excluded from the digest. ``model`` is excluded so a fallback shares the primary's cache
-#: (see the module docstring). ``stream`` and ``user`` do not change the answer.
+#: Keys excluded from the digest. ``model`` is written by the chain for the model each attempt
+#: reaches and is named in the key itself; ``stream`` and ``user`` do not change the answer.
 _NON_SEMANTIC: Final = frozenset({"model", "stream", "stream_options", "user"})
 
 
@@ -96,21 +99,28 @@ def request_digest(payload: Mapping[str, Any]) -> str:
 
 @dataclass(frozen=True, slots=True)
 class CacheKey:
-    """The four-part key, and its flat string form."""
+    """The six-part key, and its flat string form."""
 
+    provider: str
+    model_id: str
     input_digest: str
     pipeline_version: int
     role: Role
     prompt_version: str
 
     def __str__(self) -> str:
-        return f"{self.role}/{self.pipeline_version}/{self.prompt_version}/{self.input_digest}"
+        return (
+            f"{self.provider}/{self.model_id}/{self.role}/{self.pipeline_version}/"
+            f"{self.prompt_version}/{self.input_digest}"
+        )
 
     @property
     def digest(self) -> str:
         """A hash of the whole key. Used as a filename, so no key component can escape a path."""
         return sha256_of_canonical(
             {
+                "provider": self.provider,
+                "model_id": self.model_id,
                 "input_digest": self.input_digest,
                 "pipeline_version": self.pipeline_version,
                 "role": str(self.role),
@@ -120,9 +130,17 @@ class CacheKey:
 
 
 def cache_key(
-    payload: Mapping[str, Any], *, pipeline_version: int, role: Role, prompt_version: str
+    payload: Mapping[str, Any],
+    *,
+    provider: str,
+    model_id: str,
+    pipeline_version: int,
+    role: Role,
+    prompt_version: str,
 ) -> CacheKey:
     return CacheKey(
+        provider=provider,
+        model_id=model_id,
         input_digest=request_digest(payload),
         pipeline_version=pipeline_version,
         role=role,

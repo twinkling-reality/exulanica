@@ -128,8 +128,8 @@ exulanica-gsplat-scene-v1 = "exulanica.reconstruction.gsplat_container:main"
 exulanica-ingest = "exulanica.ingest.cli:main"
 # `uv run exulanica-preflight`. Checks every model identifier the manifest can reach against the
 # live catalog. Exit 0 clean, 1 on any failure, so CI and the weekly uptime check on a running
-# deployment can both call it without parsing output. `--catalog-file` checks a saved snapshot
-# instead of the network, which is how the offline test runs it.
+# deployment can both call it without parsing output. `--catalog-file PROVIDER=PATH` checks a
+# provider against a saved snapshot instead of the network, which is how the offline test runs it.
 exulanica-preflight = "exulanica.models.preflight:main"
 # `uv run exulanica-corpus`. Writes the synthetic corpus and the ground truth manifest that goes
 # with it. Deterministic from its seed, so a rebuild followed by an ingest recomputes nothing.

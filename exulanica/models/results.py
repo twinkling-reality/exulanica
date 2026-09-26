@@ -15,10 +15,16 @@ from typing import Any, Final, Generic, TypeVar
 
 from pydantic import BaseModel
 
-from exulanica.models.manifest import PROVIDER, Role
+from exulanica.models.manifest import AnsweringMechanism, Role
 from exulanica.models.usage import CallUsage
 
-__all__ = ["NO_MODEL_IN_RESPONSE", "ChatResult", "EmbeddingResult", "StructuredResult"]
+__all__ = [
+    "NO_MODEL_IN_RESPONSE",
+    "ChatResult",
+    "ChoiceResult",
+    "EmbeddingResult",
+    "StructuredResult",
+]
 
 #: Why a result names no served model: the response body carried no ``model`` field. The one
 #: reason there is, named so a record can say it rather than leave a bare null.
@@ -33,6 +39,8 @@ class ChatResult:
 
     role: Role
     model_id: str
+    #: The key of the provider that served ``model_id``, as the manifest names it.
+    provider: str
     served_model_id: str
     answer: str
     reasoning: str | None
@@ -63,7 +71,16 @@ class ChatResult:
         serverless endpoints, and a field invented here would be a fact the ledger cannot
         support.
         """
-        return {"provider": PROVIDER, "model_id": self.model_id, "endpoint": self.endpoint}
+        return {"provider": self.provider, "model_id": self.model_id, "endpoint": self.endpoint}
+
+
+@dataclass(frozen=True, slots=True)
+class ChoiceResult:
+    """The option a model chose, how it was asked, and the call that produced the answer."""
+
+    label: str
+    mechanism: AnsweringMechanism
+    call: ChatResult
 
 
 @dataclass(frozen=True, slots=True)

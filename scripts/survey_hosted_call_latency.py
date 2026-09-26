@@ -162,10 +162,12 @@ def _tracked_records() -> list[Path]:
 
 def survey() -> dict[str, Any]:
     manifest = load_manifest_from(MANIFEST_PATH)
-    primaries = {str(role): manifest[role].primary.model_id for role in Role}
+    # Every role the manifest binds to a model. A chosen role has no model of its own to survey.
+    bound = [role for role in Role if role in manifest.roles]
+    primaries = {str(role): manifest[role].primary.model_id for role in bound}
     fallbacks = {
         str(role): (manifest[role].fallback.model_id if manifest[role].fallback else None)
-        for role in Role
+        for role in bound
     }
     seen: set[tuple[Any, ...]] = set()
     rows: list[dict[str, Any]] = []
@@ -194,7 +196,7 @@ def survey() -> dict[str, Any]:
         by_model[(row["role"], row["model"])].append(row)
 
     roles: dict[str, Any] = {}
-    for role in Role:
+    for role in bound:
         name = str(role)
         entry: dict[str, Any] = {"primary": primaries[name], "fallback": fallbacks[name]}
         for which in ("primary", "fallback"):

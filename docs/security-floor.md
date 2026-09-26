@@ -198,15 +198,34 @@ never retried and never failed over, and the API answers it with `502 egress_ref
 
 - Declared in `EXULANICA_EGRESS_ALLOWLIST`, a JSON array of origins, for example
   `["https://api.tokenfactory.nebius.com"]`. Absent, empty or malformed refuses at load time.
-  A deployment that runs the catalog preflight also needs the catalog's origin,
-  `https://tokenfactory.nebius.com`, which is a different host from the endpoint.
+  A deployment that runs the catalog preflight also needs each provider's catalog origin, from
+  its `catalog_url` in the manifest: `https://tokenfactory.nebius.com` for Nebius Token Factory,
+  a different host from its endpoint.
 - Enforced in `exulanica/models/transport.py`. `HttpxTransport` will not build its network client
   without an allowlist. It checks each URL before the client is called, and a transport mounted
   inside the client checks each request again immediately before a connection is opened, which is
   the check a redirect hop would pass through. Redirects are not followed. Environment proxy
   variables are ignored by the client it builds.
-- Enforced at startup in `exulanica/models/client.py`: `ModelClient` refuses to construct when the
-  manifest's `base_url` is not declared.
+- Enforced per provider in `exulanica/models/client.py`. The [model manifest](../exulanica/models/models.manifest.json)
+  declares each provider once, with its endpoint and the variable its credential is read from,
+  and a provider's origin is derived from that endpoint by `declared_origin` in
+  `exulanica/models/egress.py`; no origin is written a second time. `ModelClient` refuses to
+  construct when the origin of a provider serving a role the manifest binds is not declared. A
+  provider that serves no bound role, such as one whose models are offered only to a role a world
+  chooses a model for, is not required at startup: when its origin is not declared or its
+  credential is not set, the client records the provider as refused, never builds a request for
+  it, and refuses each call to one of its models by name (`provider_not_admitted`,
+  `provider_credential_absent`). `/readyz` names every refused provider. The development
+  rehearsal (`scripts/rehearsal/rehearse.py`) builds its allowlist from the same derivation,
+  `Manifest.bound_origins()`, and `tests/test_rehearsal_launcher.py` holds the two equal.
+- Each provider's credential is its own. The manifest parser holds a provider's `api_key_env` to
+  a `NAME_API_KEY` name that is never an `EXULANICA_` setting, so no manifest entry can send a
+  database URL or another setting as a bearer token. A key a caller passes to `ModelClient` is
+  given by provider, and one key is never sent to a second provider. When the variable is not in
+  the environment, `exulanica/models/credentials.py` reads that one variable from a `.env` file
+  in the working directory or a parent and exports nothing: that is how a development checkout
+  supplies a key, kept for every provider alike. A deployment sets the variable in its
+  environment.
 - Enforced for Google sign-in in `exulanica/api/account_runtime.py`. When sign-in is configured,
   `load_account_runtime` stops startup unless the list includes `https://accounts.google.com`
   (discovery), `https://oauth2.googleapis.com` (token) and `https://www.googleapis.com` (JWKS),

@@ -106,6 +106,8 @@ function mount(options: { mode: 'playing' | 'paused'; host: unknown }) {
     credentials: { baseUrl: 'https://example.test', token: 'token' },
     showStatus: vi.fn(), admissionId: null,
     worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
+    // Who decides for them is read by its own tests (environment-selection-saved-world.test.ts).
+    societyModelsClient: { read: vi.fn(async () => Promise.reject(new Error('not read here'))), choose: vi.fn() } as never,
   });
   document.body.append(mounted.root);
   const panel = () => mounted.root.querySelector<HTMLElement>('section.world-inhabitants')!;

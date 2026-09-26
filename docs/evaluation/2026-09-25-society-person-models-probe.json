@@ -1,0 +1,181 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "answering": {
+      "Qwen/Qwen3-235B-A22B-Instruct-2507": [
+        "json_schema",
+        "tool_call"
+      ],
+      "deepseek-ai/DeepSeek-V4-Flash-0731": [
+        "json_schema",
+        "tool_call"
+      ],
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": [
+        "json_schema",
+        "tool_call"
+      ],
+      "nvidia/Nemotron-3_5-Lightning": [
+        "json_schema",
+        "tool_call"
+      ]
+    },
+    "bound_usd": "0.01",
+    "manifest_sha256": "35d1436a2ec1b7e36f398cf717182e9803fcfd11126bd380342de31b0a5377ba",
+    "preregistration": "docs/evaluation/2026-09-25-society-person-models-preregistration.json",
+    "preregistration_record_sha256": "d535fbd3402a225c1339cf7edeb13fc6bbc3e0ac14721c3879ddac93c7170558",
+    "run_artifact": "docs/evaluation/artifacts/2026-09-25-society-person-models/probe-run.json",
+    "run_sha256": "af6b8a821a8a0708c0b0b3012571f1eedadb53ec067ba1353fb9ad07f3bbff58",
+    "script_as_run": "docs/evaluation/artifacts/2026-09-25-society-person-models/measure_society_person_models-probe-as-run.py.txt",
+    "script_sha256": "d784961fd686de54250320e15cf7934d78d6d7afeda0a5aa460b11b8bd8595d7",
+    "spent_usd": "0.00622600",
+    "tree": {
+      "files_sha256": {
+        "assets/catalogs/society-words/society-inhabitant-words.v1.json": "d2d7fad39684e607d01e7cf0b2a1fcee05adbacdca04d57486daccaca918f57f",
+        "assets/catalogs/society/society-decision-action.v1.json": "23d3c50df4e2beeb758cd8ce7f2f0598cc5bf78ed4fcd9d1d26272ce0db5c3ac",
+        "assets/catalogs/society/society-decision-policy.v1.json": "321df0734ed47b2edfa9be8099a9c085638779f88f50bb180f45b0334a7625d8",
+        "docs/deployment.md": "e64e1f908f5c27a1f1efe82ba08163c88f0aa5bdd4cd97ecc97f9623662ca9d1",
+        "docs/development-setup.md": "a7e567550f930c44cafa73d783b97238bd3317d60f6e579bf337c1880df5ddc9",
+        "docs/evaluation/2026-09-25-society-person-models-preregistration.json": "4d93d59de16891d8b4ab6f12e8a533b988d4644057b4bd390e8801a90be9c06f",
+        "docs/evaluation/artifacts/2026-09-25-society-person-models/contexts.json": "08c8a2ce0b325fb73b81910fc3fd3275a9fd1e022347dfe18c63f34a2bccbc93",
+        "docs/evaluation/artifacts/2026-09-25-society-person-models/dry-run.json": "76b3aa1f55899961cde230a4d8c8651e4ce2347e22eed9e8b2c7c596667d15ea",
+        "docs/model-and-service-selection.md": "32a497af6b071794766d436f92c687a3ed03ec67d114b0f0a8dd81d5e865f9d7",
+        "docs/security-floor.md": "3c1a8ef7dc9f415a92ac340e117811342cc9450db8af55d96d685d0969b5182d",
+        "docs/synthetic-society-contract.md": "af766453501ba20fa282432a6e370f79e8e7f025042601472f183d3148dd0fb6",
+        "exulanica/api/app.py": "43660fd2ec4e7977250f9c7c73d68bc26ca049d9804a3159140db9f08324e483",
+        "exulanica/api/permissions.py": "a525850df4a65eb971e37485daff4e48adf701f9b2c035dc22af2db96c88b9ee",
+        "exulanica/api/routes/health.py": "8741c63a672ef450748f05cf0e4a07caf2bbe01bf474e0b10c1bba3a56d93f99",
+        "exulanica/api/routes/society_models.py": "c5280e5530ee7450a5e5dff55cc2ab4bdc8daf5609269cc40908dfaaa1ac26f4",
+        "exulanica/api/services.py": "506e039c35fed965d3f10869e770a6de462e5617a3d0ded9a45b0d0663a99fbe",
+        "exulanica/api/society_control_worker.py": "e6413c0d2e85ba42d7cc316e7c124545ea19afcbfeb879b523c91dff4995c5f4",
+        "exulanica/api/society_person_decisions.py": "fb8bd1cf84989abd1275243ec5c1dc95128809c2f74ec6e5af392e14e23b6307",
+        "exulanica/db/roles.py": "f519c21d9fe988142812d5fb07b9492f1f0d8b27eb43497c3372098df5bb04b2",
+        "exulanica/evaluation/provenance.py": "d478f7a92e90563e18b38275fca31099f13d1bee0c215c73fecb3d3815ae4e38",
+        "exulanica/migrations/0110_a_person_may_be_run_by_a_model_their_world_s_owner_chose.sql": "241fdc02045f896b6063a27335ddcbd222873d8ab26cb100b3974b508cdc2211",
+        "exulanica/models/__init__.py": "4a8e3812d015f82f06994e03975305f6b4ad23b5b1613212caa16a1cae781164",
+        "exulanica/models/budget.py": "27b0a83a8022a2d08a09dacf0903bddb0ea8d8a027d875b33722b0845f35bb7a",
+        "exulanica/models/cache.py": "33bb7de190951fe6dbb3d2c678dec3d5c4c3431633178924be170cbd72834704",
+        "exulanica/models/chain.py": "44c2ec78372d0d8cfc0c96f468b66ba9c10214bb6ba0c04039f74470af005458",
+        "exulanica/models/choice.py": "3e824cb0f0663408c4083202d5565aebc63a28dd0600e984403250097cc16a47",
+        "exulanica/models/client.py": "e34d6b87fa2ab057d158b6c26582c0bc7b73239e2cb26b76d156b158ee68012b",
+        "exulanica/models/egress.py": "8f4082c56bed143f5585b7f3bdfdc9fc65da6bb68b65d336a08174cd5ff9a688",
+        "exulanica/models/errors.py": "145b350cedfc5a2f6db420ffcbbbfb3f211e0b994d49f0e5f02aa16ed8384cc9",
+        "exulanica/models/handoff.py": "20eef9e5accc9a7a5fd27cf184c04373a2cc4b400853b4da0ebb85329e296cb2",
+        "exulanica/models/lens_budget.py": "719a403e2f606206deae2334e8134178dd48f8fc2faad3b3f2d8a5aa526fa143",
+        "exulanica/models/manifest.py": "da3de9d9128abf00604d8aef308e32fdbbd153bd79600c478a3657c7eccb8957",
+        "exulanica/models/models.manifest.json": "35d1436a2ec1b7e36f398cf717182e9803fcfd11126bd380342de31b0a5377ba",
+        "exulanica/models/policy.py": "545d11b819b59ef579d8933be684cf7d1c3763a77ac1e3d4005d4188b801421b",
+        "exulanica/models/preflight.py": "7017adb79a25e62615e4364ba9d1e0af63d894f42208681871d7b94835a0d16b",
+        "exulanica/models/response.py": "7af74a0188c1d0dfdef5295e0bdadc0ead357cb857afb0f4f4de844153fe1540",
+        "exulanica/models/results.py": "90400b585673a4b448146bd06031842516d8b7fbaa9baf07169bd19757376860",
+        "exulanica/models/usage.py": "7c3233f5a22a81ac2eabaa9b68d0df080f4d10ed14c5d8f9718e6c4b0342c8e1",
+        "exulanica/orchestration/preflight.py": "9a04c6c02d7f3fcd15bb2b90d1656653af7faa31f75493e2e3e430c32daf55d9",
+        "exulanica/selection/society_question.py": "618127ad8e6ebd352768ad54ec846e420a37596c729dfabe688bf46d8838d268",
+        "exulanica/world/society-engines.v1.json": "a35f8d25af34a809cbddf93eebd8ddc45f2c29e373b3c1a8dd99e02707ecfb0d",
+        "exulanica/world/society_catalogs.py": "e75fd4f6514b57bfc548f1670720feed7d8a55d449131c88c4b834266dbd3324",
+        "exulanica/world/society_control_repository.py": "500c5889729e9c4302ea16c66c1af0ab6de65737c141b106b22eaf9c519a59c6",
+        "exulanica/world/society_decision_contract.py": "fd8a3fce4e59c1603c7b026dcab655b504c4b3dae1bf022ac9ed02d3949536cb",
+        "exulanica/world/society_decision_repository.py": "ffa2d9db5ba143184f08eb7cb828915d9b39dba23307223efb0514dbc10a2fea",
+        "exulanica/world/society_decisions.py": "19a85bcbb4dbc4023c704a2c4739de81597a0766a4065614f4fbc897ec0a1fda",
+        "exulanica/world/society_model_choice_repository.py": "505cfd2d19471defacfaddf6182e4d26bb195e30e9058bdf91b3d2c0df4bb1bd",
+        "exulanica/world/society_model_decisions.py": "4374cd7b95866dcda1519cd8ce5594d9ec56e6ffd12ba1f7d87831d76c51329e",
+        "exulanica/world/society_planner.py": "b8908acc3aa1dfb08459f4eb41eeea442ffa289c54614d3663cd5464cbd7b053",
+        "exulanica/world/society_repository.py": "d0c16c2a85d23ae71e4be7693493742917045f60da0c5fe184fe181b88bf007a",
+        "pyproject.toml": "0f43648ec70c01731152ca6d533e6b5fb899726954385ad4937d0780e089601c",
+        "scripts/measure_companion_absent_place.py": "6681414393f60fee8db4b2f56ee1fd77afb58ece1e94a1a5db996d5e674e1dbb",
+        "scripts/measure_companion_memory.py": "9dd136e3e227da7bb3bbe0d553995f3c4d34dcc3df4c15914e80876a1128383b",
+        "scripts/measure_companion_person_link.py": "dfd0f122deb911b63cc7b8f1a2ea5445720034d4d8527a69d53ad1b5a21409f7",
+        "scripts/measure_society_person_models.py": "d784961fd686de54250320e15cf7934d78d6d7afeda0a5aa460b11b8bd8595d7",
+        "scripts/rehearsal/rehearse.py": "2b30ca15148a996a8bae96f17a6926b256e3096d5ca2f1e25e5162ba37ae2179",
+        "scripts/survey_hosted_call_latency.py": "0aecaa9631a2d9caf19a523faa7675f6cbfc47749306a9d09bc7c8dc0da358b8",
+        "scripts/write_model_selection_preregistration.py": "a1246f01246be6c36bcee967a12c8e9b12c10ebf22397981484495020f842782",
+        "tests/account_fixtures.py": "ae5b08c93ae06f73f5db85791bb5e486718c1264968fb3dad3076e0476410ad8",
+        "tests/route_probes.py": "a4c2829fd65b07918f1d7d977edaba481a17be56d4a3ad580850d4a17ee12a9c",
+        "tests/snapshots/api-openapi.json": "2ca93c0730bdc5ed7574b219ee1cb29e5d65e6b206d843a6df70c9ab5ed7b3ff",
+        "tests/snapshots/api-routes.json": "564c4fefdd1945391a983dabf25f70c9d5f55daa6181b546855f9a63aaab31d8",
+        "tests/test_catalog_provenance.py": "7c9d4eae375000988e88fed186dd3e4735795bcf3be20702e2162d165a40163d",
+        "tests/test_companion_ask_deadline.py": "a4f8038716091dd3a03f88cfea75442dcea709bdc44e9c668567749fe27fbf93",
+        "tests/test_egress_allowlist.py": "ff4efc40398d3bc9374ff5cf0489f8b98fc77985eb6ca0a097ee4ae6681b2dc4",
+        "tests/test_hosted_boundary.py": "dd194e27b3fc14d20cc42ead1ab9b7197f0f003360a58157c14c23a2ec53aaa3",
+        "tests/test_ingest_cli.py": "a7d71dd00d670347c8ad61c5ed70a00756c603829a93998eb69fefa64d011ce5",
+        "tests/test_model_budget_holds.py": "c4d85df0ca6efa9104fee59aa897b1f9a2ed9b678fc815b643cede0feccfb6d5",
+        "tests/test_model_choice.py": "bc8d108f1d20eaa81b3655f498ab3817e8ddd9c15124d691b6d5471ddd84d0fb",
+        "tests/test_model_providers.py": "9a1379ca1eb192ca2011f7d2df0ab5f8509d768448c3304e2a29086791797418",
+        "tests/test_models_call_bounds.py": "83f9902d399afd2505ed0cae76282c7155a017176fbff56f52a3ca829b54b6eb",
+        "tests/test_models_cost.py": "2c3875167671447af610b6dd7cd57a1124f289f58f22f335353e30b3158c6a8f",
+        "tests/test_models_manifest.py": "a567a0c5537d91328ab5817e8174f20301c31a6bfbd4871a09a468b7783bd42a",
+        "tests/test_personal_model_right.py": "dd531fc9e5cdb3f364828a70cc23c9852ae6fffa7511c6132fd931f510e32cf5",
+        "tests/test_place_name_release_paths.py": "8ed858ae62b29e19b2f5b84101d1d6126819d4e46ab3ae7325fc5b2c23be88c3",
+        "tests/test_rehearsal_launcher.py": "2cabcd3305767d75ffb8ee1c68e3ec20dc1ccb5f2ad970f41a62931765a309c0",
+        "tests/test_society_engine_table.py": "31c71a40c573f002581c2bfbb9b3d4707e159f8dd42a01a37b340d9fdb2ca3da",
+        "tests/test_society_person_decisions.py": "92cc353360573d13397e707aa105e8563a1e72eaa696c100f1195011cb53b6e5",
+        "tests/test_society_person_decisions_postgres.py": "d8530a54f7acb5ca0fbfa1053a076b57f7615a6b174bfd5d2ff73321e31615e3",
+        "tests/test_society_versions_survive_upgrades.py": "db294de8322f4ab8651f3f9caa06934a27ea72b57ac83ee7d3e0565016cc9739",
+        "tests/test_vision_contract.py": "d93085bd089d7c7d2154f19a01fc4f6551b34be4d7c6ad4782349713f6fd4c09",
+        "web/packages/app/src/composition/environment-selection.ts": "187e711a8f7acdb40ec583fd18ab47572e3f6e2d88aaf464a11673c017165d6a",
+        "web/packages/app/src/composition/society-models-mount.ts": "5b5c601100df88a5543f53a74988222bb5035c0aba6a9b31eeffd56effcb2606",
+        "web/packages/app/src/society-engines.generated.ts": "a8cd544735cddf1ed64c7847ab946ada04eddc4a80b48c1f8e83a85ac0080d75",
+        "web/packages/app/src/society-models-api.ts": "165862541607bc3a0836978307b7e33ebafc3e42ec8b53be58f511a4f8ed9417",
+        "web/packages/app/src/ui/society-models.css": "9c6f92234f1e652f8aa1ba444b47d0d490a16e2b894debf59b94fd0c4b932076",
+        "web/packages/app/src/ui/society-models.ts": "70539caeec107079c34c28f7b1d0153304ece3c87502a8574ac2487871fdcadc",
+        "web/packages/app/src/ui/world-inhabitants.ts": "3288953d15fc11177ea5a7fde551ea05ce41d56f08f97574db3b8787916d9d25",
+        "web/packages/app/test/environment-selection-saved-world.test.ts": "5ab87ae057bf25e432886521533a3b2e26fef335b8ff599bbeda600aec3e8640",
+        "web/packages/app/test/environment-selection-watch-live.test.ts": "81fbfc8bf587c4fdf10702ff62f148a91a47ed491e7d43c7ed18489c51b15970",
+        "web/packages/app/test/society-models-words-parity.test.ts": "4211289ea171c8955063f5e79d8f972e9178287a8e70e3c88da4164e2046c74a",
+        "web/packages/app/test/society-models.test.ts": "b50c4a5931ffc7ef545f1ce10db693061d57bad35396872544d9dfef31bceac2"
+      },
+      "head": "42a466abd622b8f88a53e3596fcf305671fa94a5"
+    },
+    "verdicts": {
+      "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+        "json_schema": {
+          "asked": 6,
+          "offered_action": 6,
+          "verified": true
+        },
+        "tool_call": {
+          "asked": 6,
+          "offered_action": 6,
+          "verified": true
+        }
+      },
+      "deepseek-ai/DeepSeek-V4-Flash-0731": {
+        "json_schema": {
+          "asked": 6,
+          "offered_action": 6,
+          "verified": true
+        },
+        "tool_call": {
+          "asked": 6,
+          "offered_action": 6,
+          "verified": true
+        }
+      },
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+        "json_schema": {
+          "asked": 6,
+          "offered_action": 6,
+          "verified": true
+        },
+        "tool_call": {
+          "asked": 6,
+          "offered_action": 6,
+          "verified": true
+        }
+      },
+      "nvidia/Nemotron-3_5-Lightning": {
+        "json_schema": {
+          "asked": 6,
+          "offered_action": 6,
+          "verified": true
+        },
+        "tool_call": {
+          "asked": 6,
+          "offered_action": 6,
+          "verified": true
+        }
+      }
+    },
+    "verified_when": "at least 5 of the 6 first answers are one of the offered actions as the product reads them"
+  },
+  "record_sha256": "1b641b310466f160b408e3c0a10c15b509aca95f38c4e58c745f4d958ea926e2"
+}

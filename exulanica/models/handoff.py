@@ -19,12 +19,11 @@ with a stored right.
 from __future__ import annotations
 
 import re
-import urllib.parse
 from dataclasses import dataclass
 from typing import Any, Final
 
-from exulanica.models.egress import EgressError, parse_egress_allowlist
-from exulanica.models.manifest import PROVIDER, Manifest, Role
+from exulanica.models.egress import declared_origin
+from exulanica.models.manifest import Manifest, Role
 
 __all__ = [
     "LOCAL_PROCESS",
@@ -45,26 +44,9 @@ _MODEL_ID: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$")
 _REVISION: Final = re.compile(r"^[0-9a-f]{40}$")
 
 
-def egress_origin(url: str) -> str:
-    """The origin the egress allowlist would have to declare for ``url``, in its one spelling.
-
-    Parsed by :func:`exulanica.models.egress.parse_egress_allowlist`, so anything that list would
-    refuse to declare, an address, userinfo, plain http to a remote host, is refused here too, and
-    a default port is written the way :class:`~exulanica.models.egress.Origin` writes it.
-    """
-    if not isinstance(url, str) or not url:
-        raise ValueError("a destination must be a URL or an origin")
-    parts = urllib.parse.urlsplit(url)
-    if not parts.scheme or not parts.netloc:
-        raise ValueError(f"{url!r} names no origin")
-    try:
-        allowlist = parse_egress_allowlist([f"{parts.scheme}://{parts.netloc}"])
-    except EgressError as exc:
-        raise ValueError(
-            f"{url!r} names no origin the egress allowlist could declare: {exc}"
-        ) from exc
-    (origin,) = allowlist.origins
-    return str(origin)
+#: The origin the egress allowlist would have to declare for a URL, in its one spelling. The
+#: function lives beside the allowlist, so the manifest derives a provider's origin with it too.
+egress_origin = declared_origin
 
 
 def canonical_destination(value: str) -> str:
@@ -150,23 +132,44 @@ class ModelHandoff:
 
     @classmethod
     def hosted(cls, manifest: Manifest, role: Role | str) -> ModelHandoff:
-        """A manifest role's whole chain, sent to the manifest's endpoint.
+        """A manifest role's whole chain, sent to the origin of the provider serving it.
 
         The chain rather than the primary: the client falls back on a withdrawn identifier, so
         either model can receive the same request, and a right for one is not a right for both.
+        A role's chain stays on one provider, so the hand-over names one destination.
         """
         binding = manifest[role]
         return cls(
             identities=tuple(
                 ModelIdentity(
-                    provider=PROVIDER,
+                    provider=spec.provider,
                     role=str(binding.role),
                     model_id=spec.model_id,
                     revision=None,
                 )
                 for spec in binding.chain
             ),
-            destination=egress_origin(manifest.base_url),
+            destination=manifest.provider(binding.provider).origin,
+        )
+
+    @classmethod
+    def chosen(cls, manifest: Manifest, role: Role | str, model_id: str) -> ModelHandoff:
+        """One model a world chose for a chosen role, sent to its provider's origin.
+
+        A choice names one model and its calls have no fallback, so the hand-over names exactly
+        that model. A model the manifest does not offer the role is refused by the manifest.
+        """
+        spec = manifest.offered(role, model_id)
+        return cls(
+            identities=(
+                ModelIdentity(
+                    provider=spec.provider,
+                    role=str(Role(role)),
+                    model_id=spec.model_id,
+                    revision=None,
+                ),
+            ),
+            destination=manifest.provider(spec.provider).origin,
         )
 
     def as_record(self) -> dict[str, Any]:

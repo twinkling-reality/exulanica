@@ -598,42 +598,64 @@ def stream_probe(
         # null, which would be honest and useless.
         "stream_options": {"include_usage": True},
     }
-    guard.reserve(
+    reserved = guard.reserve(
         spec,
         role=Role.REASONING_CHEAP,
         prompt_chars=sum(len(str(m)) for m in messages),
         max_tokens=ceiling,
     )
-    url = f"{manifest.base_url}/chat/completions"
+    url = f"{manifest.provider(spec.provider).base_url}/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "Accept": "text/event-stream",
     }
-    with httpx.Client(timeout=timeout) as client, client.stream(
-        "POST", url, headers=headers, json=payload
-    ) as response:
-        if response.status_code != 200:
-            response.read()
-            return {
-                "model_id": model_id,
-                "composer_max_tokens": ceiling,
-                "question_key": None,
-                "http_status": response.status_code,
-                "refused": response.text[:400],
-            }
-        timing = read_stream(response.iter_lines(), now=time.monotonic)
-    usage = CallUsage.from_response(
-        role=Role.REASONING_CHEAP,
-        spec=spec,
-        usage={
-            "prompt_tokens": timing.prompt_tokens or 0,
-            "completion_tokens": timing.completion_tokens or 0,
-            "completion_tokens_details": {"reasoning_tokens": timing.reasoning_tokens or 0},
-        },
-        latency_s=timing.total_ms / 1000,
-    )
-    guard.record(usage)
+    started = time.monotonic()
+    recorded = False
+    try:
+        with httpx.Client(timeout=timeout) as client, client.stream(
+            "POST", url, headers=headers, json=payload
+        ) as response:
+            if response.status_code != 200:
+                response.read()
+                return {
+                    "model_id": model_id,
+                    "composer_max_tokens": ceiling,
+                    "question_key": None,
+                    "http_status": response.status_code,
+                    "refused": response.text[:400],
+                }
+            timing = read_stream(response.iter_lines(), now=time.monotonic)
+        usage = CallUsage.from_response(
+            role=Role.REASONING_CHEAP,
+            spec=spec,
+            usage={
+                "prompt_tokens": timing.prompt_tokens or 0,
+                "completion_tokens": timing.completion_tokens or 0,
+                "completion_tokens_details": {"reasoning_tokens": timing.reasoning_tokens or 0},
+            },
+            latency_s=timing.total_ms / 1000,
+            usd_bound=reserved,
+        )
+        guard.record(usage, released=reserved)
+        recorded = True
+    finally:
+        if not recorded:
+            # A refused status or a stream that broke: charged at its reservation, which is
+            # given back, as the client's chain records a failed attempt.
+            guard.record(
+                CallUsage.failed(
+                    role=Role.REASONING_CHEAP,
+                    spec=spec,
+                    reached_provider=None,
+                    timed_out=False,
+                    failure="the streamed call did not complete",
+                    usd_bound=reserved,
+                    used_fallback=False,
+                    latency_s=time.monotonic() - started,
+                ),
+                released=reserved,
+            )
     return {
         "model_id": model_id,
         "composer_max_tokens": ceiling,
@@ -1043,7 +1065,7 @@ def live_run(*, manifest: Manifest, guard: BudgetGuard, scene: str) -> dict[str,
 
     # The streamed half, once per model per ceiling, on one question. Four calls, and they are
     # four separate requests whose tokens are their own.
-    api_key = api_key_from_env(manifest.api_key_env)
+    api_key = api_key_from_env(manifest.provider(manifest[Role.REASONING_CHEAP].provider).api_key_env)
     streamed: list[dict[str, Any]] = []
     stream_key = "when"
     question = next(q for k, q, _ in QUESTIONS if k == stream_key)

@@ -131,10 +131,14 @@ class FakeGoogle:
         )
 
 
+def model_origins() -> list[str]:
+    """The origin of every provider serving a role the manifest binds, as a deployment declares."""
+    return sorted(load_manifest().bound_origins())
+
+
 def production_shaped_allowlist():
-    """The model endpoint and the three sign-in origins, as one deployment declares them."""
-    scheme, _, host, _ = load_manifest().base_url.split("/", 3)
-    return parse_egress_allowlist([f"{scheme}//{host}", *GOOGLE_EGRESS_ORIGINS])
+    """The model endpoints and the three sign-in origins, as one deployment declares them."""
+    return parse_egress_allowlist([*model_origins(), *GOOGLE_EGRESS_ORIGINS])
 
 
 @dataclass

@@ -46,6 +46,7 @@ refusal is the lens lane's, and :meth:`LensBudgetExceeded.record` is the shape i
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -213,6 +214,8 @@ class LensBudgetExceeded(BudgetExceededError):
 class _Reservation:
     tokens: int
     usd: Decimal
+    #: What the process-wide guard held for the same request, given back as it is settled.
+    process_usd: Decimal | None = None
 
 
 class LensBudgetGuard(BudgetGuard):
@@ -253,6 +256,11 @@ class LensBudgetGuard(BudgetGuard):
         self._open: list[_Reservation] = []
         self._settled_tokens = 0
         self._settled_usd = Decimal(0)
+
+    def __copy__(self) -> LensBudgetGuard:
+        # A lens guard of its own, as any guard's copy is, held to the same process guard: a copy
+        # of that would be a second process ceiling.
+        return copy.deepcopy(self, {id(self._process): self._process})
 
     # -- what has been committed, reservations included --------------------------------------
 
@@ -311,6 +319,8 @@ class LensBudgetGuard(BudgetGuard):
         prompt_chars: int = 0,
         max_tokens: int = 0,
         extra_prompt_tokens: int = 0,
+        keep_usd: Decimal = Decimal(0),
+        keep_calls: int = 0,
     ) -> Decimal:
         """Admit one request against all four ceilings, or raise ``LensBudgetExceeded``.
 
@@ -338,19 +348,30 @@ class LensBudgetGuard(BudgetGuard):
         usd = usd.quantize(USD_QUANTUM)
         if self.usd_committed + usd > budget.max_cost_usd:
             raise self._refuse(LensBudgetAxis.COST, budget.max_cost_usd, self.usd_committed, usd)
+        process_usd = None
         if self._process is not None:
-            self._process.reserve(
+            process_usd = self._process.reserve(
                 spec,
                 role=role,
                 prompt_chars=prompt_chars,
                 max_tokens=max_tokens,
                 extra_prompt_tokens=extra_prompt_tokens,
+                keep_usd=keep_usd,
+                keep_calls=keep_calls,
             )
         self._calls += 1
-        self._open.append(_Reservation(tokens=tokens, usd=usd))
+        self._open.append(_Reservation(tokens=tokens, usd=usd, process_usd=process_usd))
         return usd
 
-    def record(self, usage: CallUsage) -> CallUsage:
+    def release(self, reserved: Decimal) -> None:
+        """Give back the most recent open reservation, whose request never left."""
+        if self._open:
+            reservation = self._open.pop()
+            self._calls -= 1
+            if self._process is not None and reservation.process_usd is not None:
+                self._process.release(reservation.process_usd)
+
+    def record(self, usage: CallUsage, *, released: Decimal | None = None) -> CallUsage:
         """Replace the most recent open reservation with what the provider reported.
 
         A cache hit issued no request and was never reserved, so it is recorded in the ledger
@@ -358,8 +379,10 @@ class LensBudgetGuard(BudgetGuard):
         costs nothing, and one whose cost is unknown stays charged at its reservation, tokens and
         dollars, because the provider may have done all of it.
         """
+        process_released = None
         if not usage.cache_hit and self._open:
             reservation = self._open.pop()
+            process_released = reservation.process_usd
             if usage.cost_basis is CostBasis.UNKNOWN:
                 self._settled_tokens += reservation.tokens
                 self._settled_usd += max(reservation.usd, usage.usd)
@@ -367,7 +390,7 @@ class LensBudgetGuard(BudgetGuard):
                 self._settled_tokens += usage.total_tokens
                 self._settled_usd += usage.usd
         if self._process is not None:
-            self._process.record(usage)
+            self._process.record(usage, released=process_released)
         return self.ledger.record(usage)
 
     @property

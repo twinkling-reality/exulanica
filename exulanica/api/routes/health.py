@@ -234,7 +234,10 @@ def _manifest_check() -> dict[str, Any]:
     """
     try:
         manifest = load_manifest()
-        resolved = {str(role): manifest[role].primary.model_id for role in Role}
+        # Every role the manifest binds to a model; a chosen role's model is a world's.
+        resolved = {
+            str(role): manifest[role].primary.model_id for role in Role if role in manifest.roles
+        }
     except Exception as exc:
         return {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
     return {

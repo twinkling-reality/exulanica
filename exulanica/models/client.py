@@ -31,10 +31,18 @@ Everything here exists because of something that was measured, not assumed:
     object is the answer, and the call fails rather than guessing. See
     ``exulanica.models.schema.extract_json_object``.
 
-*   **The endpoint is checked against the egress allowlist when the client is built.** A
-    deployment whose ``EXULANICA_EGRESS_ALLOWLIST`` does not declare ``manifest.base_url`` fails
-    here, at startup, instead of at its first question. The transport checks every call again;
-    see :mod:`exulanica.models.egress` for what that does and does not cover.
+*   **Every provider's endpoint is checked against the egress allowlist when the client is
+    built.** A deployment whose ``EXULANICA_EGRESS_ALLOWLIST`` does not declare the origin of a
+    provider serving a manifest-bound role fails here, at startup, instead of at its first
+    question. Any other provider the allowlist does not declare, or whose credential is not set,
+    is refused by name at every call to it (:attr:`ModelClient.refusals`), never skipped. The
+    transport checks every call again; see :mod:`exulanica.models.egress` for what that does and
+    does not cover.
+*   **A world's choice of model is asked one way only.** :meth:`ModelClient.choose` asks the
+    model a world chose for a chosen role to pick one option of a
+    :class:`~exulanica.models.choice.ChoiceRequest`, by a mechanism the model's manifest entry
+    names as verified, with no fallback and no cache: a choice is an event in the world, asked
+    each time it happens.
 *   **Every request passes the client's policies before anything else happens to it.** ``chat``
     (and so ``structured`` and ``vision``) and ``embed`` hand the request to each attached policy
     before the cache key is computed, and send exactly the text the policies return. A client with
@@ -65,17 +73,20 @@ from typing import Any, Final, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from exulanica.models.budget import BudgetGuard
-from exulanica.models.cache import NullResponseCache, ResponseCache, cache_key
+from exulanica.models.cache import CacheKey, NullResponseCache, ResponseCache, cache_key
 from exulanica.models.chain import ModelChain
+from exulanica.models.choice import ChoiceRefused, ChoiceRequest
 from exulanica.models.credentials import api_key_from_env
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV, EgressConfigurationError, EgressRefused
 from exulanica.models.errors import (
     GuidedJsonForbiddenError,
     MaxTokensTooLowError,
+    ModelError,
+    ProviderRefused,
     StructuredOutputError,
 )
 from exulanica.models.handoff import ModelHandoff
-from exulanica.models.manifest import Manifest, Role, load_manifest
+from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec, Role, load_manifest
 from exulanica.models.messages import image_part, text_part
 from exulanica.models.policy import (
     HostedRequest,
@@ -86,7 +97,7 @@ from exulanica.models.policy import (
     request_parts,
 )
 from exulanica.models.response import embedding_from_body, result_from_body
-from exulanica.models.results import ChatResult, EmbeddingResult, StructuredResult
+from exulanica.models.results import ChatResult, ChoiceResult, EmbeddingResult, StructuredResult
 from exulanica.models.schema import (
     response_format_for,
 )
@@ -94,7 +105,10 @@ from exulanica.models.transport import HttpxTransport, Transport
 from exulanica.models.usage import CallUsage, CostLedger
 
 __all__ = [
+    "PROVIDER_CREDENTIAL_ABSENT",
+    "PROVIDER_NOT_ADMITTED",
     "ChatResult",
+    "ChoiceResult",
     "EmbeddingResult",
     "ModelClient",
     "StructuredResult",
@@ -119,6 +133,11 @@ _ANSWER_EXCERPT_CHARS: Final = 1000
 #: How many of a refusal's reasons it names, the same bound the JSON Schema check uses.
 _MAX_REFUSAL_REASONS: Final = 8
 
+#: Why a provider is refused by this client, by name: the deployment's allowlist does not declare
+#: its origin, or the variable the manifest names for its credential is not set.
+PROVIDER_NOT_ADMITTED: Final = "provider_not_admitted"
+PROVIDER_CREDENTIAL_ABSENT: Final = "provider_credential_absent"
+
 
 def _refusal_reasons(exc: ValidationError) -> str:
     """Each reason a schema refused an answer, with where it applies, in the schema's own words.
@@ -140,7 +159,7 @@ class ModelClient:
     def __init__(
         self,
         *,
-        api_key: str | None = None,
+        api_key: str | Mapping[str, str] | None = None,
         manifest: Manifest | None = None,
         transport: Transport | None = None,
         cache: ResponseCache | None = None,
@@ -160,27 +179,53 @@ class ModelClient:
         #: with one request's observers after it (``with_attempts``).
         self._recorder: BudgetGuard = self._budget
         network = transport if transport is not None else HttpxTransport()
-        # Checked before the credential is read, so a misconfigured deployment is told about its
+        # Checked before any credential is read, so a misconfigured deployment is told about its
         # allowlist rather than about a key it may not need yet. A transport that carries no
         # allowlist is a test double that reaches no network; HttpxTransport always carries one
-        # when it built its own client.
+        # when it built its own client. A provider serving a role the manifest binds must be
+        # declared; any other is refused by name at each call, never quietly left out.
         egress = getattr(network, "egress", None)
-        if egress is not None:
+        bound = {binding.provider for binding in self._manifest.roles.values()}
+        self._refusals: dict[str, str] = {}
+        for provider in sorted(self._manifest.providers.values(), key=lambda p: p.provider_id):
+            if egress is None:
+                continue
             try:
-                egress.require(self._manifest.base_url)
+                egress.require(provider.base_url)
             except EgressRefused as exc:
-                raise EgressConfigurationError(
-                    f"the model endpoint {self._manifest.base_url} is not declared in "
-                    f"{EGRESS_ALLOWLIST_ENV}, so this client could never reach it. Declare it, or "
-                    "do not start a model client in this deployment."
-                ) from exc
-        # The credential is read here and handed to the chain, which is the only thing that
-        # needs it. It is not kept on this object: a client that does not hold a key cannot leak
-        # one through a repr, a traceback or a cache entry.
+                if provider.provider_id in bound:
+                    raise EgressConfigurationError(
+                        f"the model endpoint {provider.base_url} of provider "
+                        f"{provider.provider_id} is not declared in {EGRESS_ALLOWLIST_ENV}, so "
+                        "this client could never reach it. Declare it, or do not start a model "
+                        "client in this deployment."
+                    ) from exc
+                self._refusals[provider.provider_id] = PROVIDER_NOT_ADMITTED
+        # Each credential is read here and handed to the chain, which is the only thing that
+        # needs them. None is kept on this object: a client that does not hold a key cannot leak
+        # one through a repr, a traceback or a cache entry. ``api_key`` is one key only for a
+        # manifest with one provider; with several, it names each provider's key, so no provider
+        # is ever sent another's.
+        if isinstance(api_key, str) and len(self._manifest.providers) > 1:
+            raise ValueError(
+                "a manifest with several providers is given each provider's key by provider, "
+                "never one key for all of them"
+            )
+        keys: dict[str, str] = {}
+        for provider in self._manifest.providers.values():
+            if provider.provider_id in self._refusals:
+                continue
+            given = api_key.get(provider.provider_id) if isinstance(api_key, Mapping) else api_key
+            try:
+                keys[provider.provider_id] = given or api_key_from_env(provider.api_key_env)
+            except ModelError:
+                if provider.provider_id in bound:
+                    raise
+                self._refusals[provider.provider_id] = PROVIDER_CREDENTIAL_ABSENT
         self._chain = ModelChain(
             manifest=self._manifest,
             transport=network,
-            api_key=api_key or api_key_from_env(self._manifest.api_key_env),
+            api_keys=keys,
             budget=self._budget,
             timeout=timeout,
             max_attempts=max_attempts,
@@ -201,10 +246,15 @@ class ModelClient:
     def ledger(self) -> CostLedger:
         return self._budget.ledger
 
+    @property
+    def refusals(self) -> Mapping[str, str]:
+        """Each provider this client refuses, by key, and why, by name."""
+        return MappingProxyType(dict(self._refusals))
+
     def __repr__(self) -> str:
         # No credential, not even a prefix of one. A truncated key in a traceback is still a leak.
         return (
-            f"ModelClient(base_url={self._manifest.base_url!r}, "
+            f"ModelClient(providers={sorted(self._manifest.providers)!r}, "
             f"pipeline_version={self._manifest.pipeline_version})"
         )
 
@@ -243,17 +293,61 @@ class ModelClient:
         bound._chain = self._chain.with_budget(recorder)
         return bound
 
+    def unchanged_by_policies(
+        self, role: Role | str, model_id: str, texts: Sequence[str]
+    ) -> tuple[bool, ...]:
+        """Which of ``texts`` every policy of this client would let leave exactly as it is.
+
+        Asked of the options of a choice before it is built, for ``model_id`` chosen in ``role``,
+        so that an option a policy would change is left out of the offer, rather than the whole
+        request refused when it is sent (``_admit``). Sends nothing and records nothing; a client
+        with no policy refuses as it would to send.
+        """
+        role = Role(role)
+        if not self._policies:
+            raise NoHostedRequestPolicy(
+                f"this client has no hosted-request policy, so it sends nothing to the {role} role"
+            )
+        handoff = ModelHandoff.chosen(self._manifest, role, model_id)
+        admitted = tuple(texts)
+        for policy in self._policies:
+            admitted = tuple(
+                policy.admit(
+                    HostedRequest(
+                        role=role,
+                        handoff=handoff,
+                        texts=admitted,
+                        instructions=(),
+                        photographs=frozenset(),
+                        images=0,
+                    )
+                )
+            )
+            if len(admitted) != len(texts):
+                raise HostedRequestRefused(
+                    f"a policy returned {len(admitted)} texts for a request carrying {len(texts)}"
+                )
+        return tuple(after == before for after, before in zip(admitted, texts, strict=True))
+
     def _admit(
         self,
         role: Role,
         payload: dict[str, Any],
         photographs: Iterable[uuid.UUID],
         placeholders: Mapping[uuid.UUID, str] | None = None,
+        *,
+        handoff: ModelHandoff | None = None,
+        choice: ChoiceRequest | None = None,
     ) -> dict[str, Any]:
         """The one point every hosted request passes, before the cache key and before the chain.
 
         Each policy judges the request as the one before it left it, and the payload that goes on
-        carries exactly the texts the last one returned.
+        carries exactly the texts the last one returned. A choice's options ride in the request's
+        function or schema, where no text can be replaced, so each option and the choice's
+        description are shown to every policy as texts, the description as an instruction too,
+        and the request is refused unless every policy returns them exactly as they came. The
+        function's name and its argument's are fixed values (``CHOICE_FUNCTION``,
+        ``CHOICE_ARGUMENT``), no caller's text, so no policy is shown them.
         """
         if not self._policies:
             raise NoHostedRequestPolicy(
@@ -270,8 +364,16 @@ class ModelClient:
             for entity, label in record.items()
         ):
             raise TypeError("a request's placeholders map an entity id to its placeholder")
-        texts, instructions, images = request_parts(payload)
-        handoff = ModelHandoff.hosted(self._manifest, role)
+        texts, instructions, images = request_parts(payload, choice)
+        carried: tuple[str, ...] = ()
+        if choice is not None:
+            # Everything a caller wrote that leaves in the request's function or schema: the
+            # choice's options and its description.
+            carried = (*choice.options, choice.description)
+            texts = (*texts, *carried)
+            instructions = (*instructions, choice.description)
+        if handoff is None:
+            handoff = ModelHandoff.hosted(self._manifest, role)
         for policy in self._policies:
             admitted = tuple(
                 policy.admit(
@@ -291,6 +393,13 @@ class ModelClient:
                     f"a policy returned {len(admitted)} texts for a request carrying {len(texts)}"
                 )
             texts = admitted
+        if carried:
+            if texts[len(texts) - len(carried) :] != carried:
+                raise HostedRequestRefused(
+                    "a policy would change an option or the description of the choice, and a "
+                    "choice is sent exactly as it is offered or not at all"
+                )
+            texts = texts[: len(texts) - len(carried)]
         return admitted_payload(payload, texts)
 
     def worst_case_seconds(self, role: Role) -> float:
@@ -304,6 +413,37 @@ class ModelClient:
         one of them.
         """
         return self._chain.worst_case_seconds(role)
+
+    # -- providers and the cache ---------------------------------------------------------------
+
+    def _endpoint(self, spec: ModelSpec) -> str:
+        """The endpoint of the provider serving ``spec``, as results record it."""
+        return self._manifest.provider(spec.provider).base_url
+
+    def _key(
+        self, payload: Mapping[str, Any], spec: ModelSpec, role: Role, prompt_version: str
+    ) -> CacheKey:
+        return cache_key(
+            payload,
+            provider=spec.provider,
+            model_id=spec.model_id,
+            pipeline_version=self._manifest.pipeline_version,
+            role=role,
+            prompt_version=prompt_version,
+        )
+
+    def _cached(
+        self, payload: Mapping[str, Any], addressed: ModelSpec, role: Role, prompt_version: str
+    ) -> dict[str, Any] | None:
+        """The stored answer of the model a call addresses, never another model's.
+
+        Looked up under the addressed model's key, and refused when the entry records another
+        model, so no path serves one model's answer for another.
+        """
+        cached = self._cache.get(self._key(payload, addressed, role, prompt_version))
+        if cached is None or cached.get("model_id") != addressed.model_id:
+            return None
+        return cached
 
     # -- request construction --------------------------------------------------------------
 
@@ -424,20 +564,15 @@ class ModelClient:
             placeholders,
         )
 
-        key = cache_key(
-            payload,
-            pipeline_version=self._manifest.pipeline_version,
-            role=role,
-            prompt_version=prompt_version,
-        )
+        addressed = self._manifest[role].primary
         if use_cache:
-            cached = self._cache.get(key)
+            cached = self._cached(payload, addressed, role, prompt_version)
             if cached is not None:
                 served = self._manifest.spec(cached["model_id"])
                 return result_from_body(
                     role=role,
                     budget=self._recorder,
-                    endpoint=self._manifest.base_url,
+                    endpoint=self._endpoint(served),
                     spec=served,
                     body=cached["response"],
                     cache_hit=True,
@@ -466,7 +601,7 @@ class ModelClient:
         result = result_from_body(
             role=role,
             budget=self._recorder,
-            endpoint=self._manifest.base_url,
+            endpoint=self._endpoint(served.spec),
             spec=served.spec,
             body=served.body,
             cache_hit=False,
@@ -478,9 +613,10 @@ class ModelClient:
             usd_bound=served.reserved_usd,
         )
         if use_cache:
-            # Only the response is cached. Headers carry the credential and never go to disk.
+            # Only the response is cached, under the model that gave it. Headers carry the
+            # credential and never go to disk.
             self._cache.put(
-                key,
+                self._key(payload, served.spec, role, prompt_version),
                 {
                     "model_id": served.spec.model_id,
                     "role": str(role),
@@ -555,6 +691,114 @@ class ModelClient:
                 f"{_refusal_reasons(exc)}. Answer was {call.answer[:_ANSWER_EXCERPT_CHARS]!r}"
             ) from exc
         return StructuredResult(value=value, call=call)
+
+    # -- a world's choice ------------------------------------------------------------------------
+
+    def choose(
+        self,
+        role: Role | str,
+        model_id: str,
+        messages: Sequence[Mapping[str, Any]],
+        request: ChoiceRequest,
+        *,
+        mechanism: AnsweringMechanism,
+        prompt_version: str,
+        timeout: float,
+        max_tokens: int | None = None,
+        temperature: float = 0.0,
+        keep_usd: Decimal = Decimal(0),
+        keep_calls: int = 0,
+    ) -> ChoiceResult:
+        """One option of ``request``, picked by the model a world chose for a chosen role.
+
+        The model must be one the manifest offers the role, asked by a mechanism its entry names
+        as verified, at a provider this client admits and holds a credential for; anything else is
+        refused by name before a request is built. There is no fallback, because a choice names
+        one model, and no cache, because a choice is an event asked each time it happens. The
+        reply must be exactly one of the options, or :class:`ChoiceRefused` says why it is not.
+        ``timeout`` bounds the wait, as the caller's contract gives it, and ``keep_usd`` and
+        ``keep_calls`` are the part of this process's budget the ask must leave for other work.
+        """
+        role = Role(role)
+        spec = self._manifest.offered(role, model_id)
+        if mechanism not in spec.answering:
+            raise ChoiceRefused(
+                f"{model_id} is not verified to answer by {mechanism}; its manifest entry names "
+                f"{sorted(str(m) for m in spec.answering)}"
+            )
+        refusal = self._refusals.get(spec.provider)
+        if refusal is not None:
+            raise ProviderRefused(
+                f"provider {spec.provider} is refused by this process ({refusal}), so nothing is "
+                f"sent to {model_id}",
+                provider=spec.provider,
+                reason=refusal,
+            )
+        floor = spec.min_max_tokens or 0
+        resolved = floor if max_tokens is None else max_tokens
+        if resolved < floor:
+            raise MaxTokensTooLowError(
+                f"max_tokens={resolved} is below {model_id}'s floor of {floor}; it would return "
+                "HTTP 200 with an empty answer, which reads as a model failure and is not one."
+            )
+        response_format = (
+            request.response_format() if mechanism is AnsweringMechanism.JSON_SCHEMA else None
+        )
+        built = self._build_payload(
+            messages=messages,
+            max_tokens=resolved,
+            temperature=temperature,
+            response_format=response_format,
+            extra=None,
+        )
+        if mechanism is AnsweringMechanism.TOOL_CALL:
+            built.update(request.payload_fields(mechanism))
+        admitted = self._admit(
+            role,
+            built,
+            (),
+            handoff=ModelHandoff.chosen(self._manifest, role, model_id),
+            choice=request,
+        )
+        served = self._chain.walk_one(
+            role,
+            spec,
+            "/chat/completions",
+            admitted,
+            timeout=timeout,
+            prompt_chars=sum(len(str(m)) for m in admitted["messages"]),
+            extra_prompt_tokens=0,
+            max_tokens=resolved,
+            keep_usd=keep_usd,
+            keep_calls=keep_calls,
+        )
+        try:
+            result = result_from_body(
+                role=role,
+                budget=self._recorder,
+                endpoint=self._endpoint(spec),
+                spec=served.spec,
+                body=served.body,
+                cache_hit=False,
+                used_fallback=False,
+                latency_s=served.latency_s,
+                attempts=served.attempts,
+                tried=served.tried,
+                response_format=response_format,
+                usd_bound=served.reserved_usd,
+                choice_request=request if mechanism is AnsweringMechanism.TOOL_CALL else None,
+            )
+        except StructuredOutputError as exc:
+            # Under a schema, an answer outside the enum fails the schema before the choice reads
+            # it; it is the same refusal as a function's argument outside it, and is named so.
+            if mechanism is AnsweringMechanism.JSON_SCHEMA and not isinstance(exc, ChoiceRefused):
+                raise ChoiceRefused(
+                    f"{model_id} did not answer with one of the offered actions"
+                ) from exc
+            raise
+        if result.payload is None:  # pragma: no cover - both mechanisms return a checked payload
+            raise ChoiceRefused(f"{model_id} returned no answer to the choice")
+        return ChoiceResult(label=request.answer(result.payload), mechanism=mechanism, call=result)
 
     # -- vision ------------------------------------------------------------------------------
 
@@ -646,13 +890,8 @@ class ModelClient:
         """
         role = Role(role)
         payload = self._admit(role, {"input": list(texts)}, photographs)
-        key = cache_key(
-            payload,
-            pipeline_version=self._manifest.pipeline_version,
-            role=role,
-            prompt_version=prompt_version,
-        )
-        cached = self._cache.get(key) if use_cache else None
+        addressed = self._manifest[role].primary
+        cached = self._cached(payload, addressed, role, prompt_version) if use_cache else None
         if cached is not None:
             spec = self._manifest.spec(cached["model_id"])
             return embedding_from_body(
@@ -674,19 +913,10 @@ class ModelClient:
             extra_prompt_tokens=0,
             max_tokens=0,
         )
-        if use_cache:
-            self._cache.put(
-                key,
-                {
-                    "model_id": served.spec.model_id,
-                    "role": str(role),
-                    "pipeline_version": self._manifest.pipeline_version,
-                    "prompt_version": prompt_version,
-                    "used_fallback": served.used_fallback,
-                    "response": served.body,
-                },
-            )
-        return embedding_from_body(
+        # Recorded, and checked, before it is cached: a cache that cannot be written must not
+        # keep the call's reservation or the call out of the ledger, and only a whole answer is
+        # stored.
+        result = embedding_from_body(
             role,
             served.spec,
             served.body,
@@ -698,6 +928,19 @@ class ModelClient:
             tried=served.tried,
             usd_bound=served.reserved_usd,
         )
+        if use_cache:
+            self._cache.put(
+                self._key(payload, served.spec, role, prompt_version),
+                {
+                    "model_id": served.spec.model_id,
+                    "role": str(role),
+                    "pipeline_version": self._manifest.pipeline_version,
+                    "prompt_version": prompt_version,
+                    "used_fallback": served.used_fallback,
+                    "response": served.body,
+                },
+            )
+        return result
 
 
 class _ObservedBudget(BudgetGuard):
@@ -724,10 +967,17 @@ class _ObservedBudget(BudgetGuard):
             raise AttributeError(name) from None
         return getattr(guard, name)
 
+    def __copy__(self) -> _ObservedBudget:
+        # The same guard, observed the same way: a copy of the guard would be a second ceiling.
+        return _ObservedBudget(self._guard, self._observe)
+
     def reserve(self, *args: Any, **kwargs: Any) -> Decimal:
         return self._guard.reserve(*args, **kwargs)
 
-    def record(self, usage: CallUsage) -> CallUsage:
-        recorded = self._guard.record(usage)
+    def release(self, reserved: Decimal) -> None:
+        self._guard.release(reserved)
+
+    def record(self, usage: CallUsage, *, released: Decimal | None = None) -> CallUsage:
+        recorded = self._guard.record(usage, released=released)
         self._observe(usage)
         return recorded

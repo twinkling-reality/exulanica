@@ -143,11 +143,18 @@ def test_released_catalog_versions_never_change_in_place():
     assert released == RELEASED_CATALOGS
 
 
-#: Read from the files as released with the living society (05120886 and 5acc7cdf), and with the
-#: purposeful routine the inputs record; a new version adds a line here, and no line ever changes.
+#: Read from the files as released with the living society (05120886 and 5acc7cdf), with the
+#: purposeful routine the inputs record, and with the decision contract a person's requests record;
+#: a new version adds a line here, and no line ever changes.
 RELEASED_CATALOGS = {
     "society-activity.v1.json": "0ac08e1e351bc93adae7e175f0fe07b46b73ccfcfcefc8e2744b540bd39d3a31",
     "society-capacity.v1.json": "dc9a9a2b337524a3856c69d62626179a8b31587d561b76dff101a4d9f0f93e66",
+    "society-decision-action.v1.json": (
+        "900e91eabcdb60a3d373639a096a7ee3be037bfc2e80431ec6e9f37c715c823f"
+    ),
+    "society-decision-policy.v1.json": (
+        "b36e936008f79f0b1debe19c5c2355691c9ec8496fc09f4cf0cc1e69de8b79de"
+    ),
     "society-need.v1.json": "fde86f793eac317b3899ba384a204e57683773b48ac588c527173511ffccd563",
     "society-policy.v1.json": "789243cd93f0b83274870919df34427fb3b75dc3e8df926cac59d40c2476bb3f",
     "society-purposeful-activity.v1.json": (

@@ -20,8 +20,9 @@ names. In order, refusing at the first precondition that does not hold:
     declared pace and ``up`` refuses unless readiness reports it played. With ``--model-env``
     the launcher runs with ``--model``: a short child process reads the one variable
     ``NEBIUS_API_KEY`` from that file, puts it in its own
-    environment with ``EXULANICA_EGRESS_ALLOWLIST`` set to the origin of the model manifest's
-    ``base_url`` in the worktree, and replaces itself with the launcher, with the run's bound as
+    environment with ``EXULANICA_EGRESS_ALLOWLIST`` set to the origins of the providers the
+    worktree's model manifest binds a role to, as the worktree's own code derives them
+    (``Manifest.bound_origins``), and replaces itself with the launcher, with the run's bound as
     ``EXULANICA_BUDGET_USD`` so the API itself refuses a call past it. The run's bound is the step
     list's ``spend.bound_usd``, or the lower one ``--bound-usd`` names for a run whose spending
     allowance is smaller. The key never enters this process, and nothing here prints, logs or
@@ -256,11 +257,37 @@ def page_deadlines(worktree: Path, source: Mapping[str, Any]) -> dict[str, int]:
     return found
 
 
+#: What the worktree's own interpreter prints for ``model_allowlist``: the manifest's one derivation.
+_BOUND_ORIGINS = (
+    "import json; from exulanica.models.manifest import load_manifest; "
+    "print(json.dumps(sorted(load_manifest().bound_origins())))"
+)
+
+
 def model_allowlist(worktree: Path) -> str:
-    """The egress allowlist the API needs: the origin of the manifest's endpoint, nothing more."""
-    manifest = json.loads((worktree / "exulanica/models/models.manifest.json").read_text())
-    endpoint = urllib.parse.urlsplit(manifest["base_url"])
-    return json.dumps([f"{endpoint.scheme}://{endpoint.netloc}"])
+    """The egress allowlist the API needs: the origins of the providers its bound roles use.
+
+    Asked of the worktree's own interpreter, so this process still imports nothing it measures,
+    and the origins are the manifest's one derivation (``Manifest.bound_origins``) rather than a
+    second reading of its JSON. The child is given no variable of this process's environment but
+    where to find its interpreter and its home.
+    """
+    python = worktree / ".venv" / "bin" / "python"
+    with subprocess.Popen(
+        [str(python), "-c", _BOUND_ORIGINS],
+        cwd=worktree,
+        env={"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ) as child:
+        out, err = child.communicate(timeout=120)
+    if child.returncode != 0:
+        raise Refused(f"the worktree could not name its model origins: {err.strip()[-300:]}")
+    origins = json.loads(out)
+    if not isinstance(origins, list) or not origins:
+        raise Refused("the worktree's manifest names no model origin")
+    return json.dumps(origins)
 
 
 class Run:

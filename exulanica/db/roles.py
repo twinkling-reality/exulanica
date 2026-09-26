@@ -134,6 +134,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0103 keeps a remembered answer's placeholder map and refuses every update and
     # delete of it.
     "companion_answer_name",
+    # Migration 0110 appends a world owner's choices of who decides for its people and refuses
+    # every update and delete of one.
+    "world_society_model_choice",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

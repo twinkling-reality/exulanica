@@ -210,19 +210,17 @@ def test_the_vision_stage_is_built_with_a_cache_under_the_data_dir(tmp_path, mon
     import argparse
     import io
     import json
-    import urllib.parse
 
     from exulanica.ingest.cli import _build_vision
     from exulanica.ingest.vision import NebiusVisionModel
-    from exulanica.models.manifest import load_manifest
+    from exulanica.models.manifest import Role, load_manifest
 
-    monkeypatch.setenv("NEBIUS_API_KEY", "test-key-not-real")
+    manifest = load_manifest()
+    provider = manifest.provider(manifest[Role.VISION].provider)
+    monkeypatch.setenv(provider.api_key_env, "test-key-not-real")
     # A real client is built here, and a real client refuses to exist without an egress
     # allowlist naming its endpoint. No request is made.
-    endpoint = urllib.parse.urlsplit(load_manifest().base_url)
-    monkeypatch.setenv(
-        "EXULANICA_EGRESS_ALLOWLIST", json.dumps([f"{endpoint.scheme}://{endpoint.netloc}"])
-    )
+    monkeypatch.setenv("EXULANICA_EGRESS_ALLOWLIST", json.dumps([provider.origin]))
     data_dir = tmp_path / "state"
     args = argparse.Namespace(offline=False, skip_preflight=True, data_dir=str(data_dir))
 

@@ -17,20 +17,29 @@ The reservation is deliberately pessimistic. Before a call, the true prompt-toke
 unknown, so the guard reserves the caller's ``max_tokens`` at the output price plus an estimate
 of the prompt at the input price. Reserving less than the call can cost would let the very last
 call cross the ceiling, which is the one thing the guard exists to prevent.
+
+A reservation is held until the call's usage is recorded, or released when no request left, under
+one lock: two calls admitted at once each see the other's reservation, so together they never
+take the process past a ceiling one of them alone could not cross. A caller may also name a part
+of the budget its call must leave untouched (``keep_usd``, ``keep_calls``), so work that is
+bounded by a share of the process's budget stops at its share and the rest stays for everything
+else; that refusal is :class:`BudgetShareExceeded`.
 """
 
 from __future__ import annotations
 
+import copy
+import threading
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-from typing import Final
+from typing import Any, Final
 
 from exulanica.env import env_get, env_name
-from exulanica.models.errors import BudgetExceededError
+from exulanica.models.errors import BudgetExceededError, BudgetShareExceeded
 from exulanica.models.manifest import ModelSpec, Role
 from exulanica.models.usage import USD_QUANTUM, CallUsage, CostLedger
 
-__all__ = ["DEFAULT_CEILING_USD", "DEFAULT_MAX_CALLS", "BudgetGuard"]
+__all__ = ["DEFAULT_CEILING_USD", "DEFAULT_MAX_CALLS", "BudgetGuard", "BudgetShareExceeded"]
 
 #: A full corpus pass was measured at roughly $0.41, and twenty development iterations at about
 #: $10. Five dollars is generous for one process and small against a $25 prepaid balance, so a
@@ -88,6 +97,28 @@ class BudgetGuard:
     )
     max_calls: int = field(default_factory=lambda: _env_int(_MAX_CALLS_ENV, DEFAULT_MAX_CALLS))
     ledger: CostLedger = field(default_factory=CostLedger)
+    #: What the calls admitted and not yet recorded may cost, and how many they are.
+    _held_usd: Decimal = field(default=Decimal(0), init=False, repr=False, compare=False)
+    _held_calls: int = field(default=0, init=False, repr=False, compare=False)
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False, compare=False
+    )
+
+    def __getstate__(self) -> dict[str, Any]:
+        # A lock belongs to the guard that made it: a deepcopy or an unpickled guard takes its
+        # own (``__setstate__``), and a lock cannot be copied at all.
+        state = dict(self.__dict__)
+        state.pop("_lock", None)
+        return state
+
+    def __copy__(self) -> BudgetGuard:
+        # A copy is a guard of its own, as a deepcopy is: a shallow one would share the ledger and
+        # not the holds, and so count a call's spend in both but its reservation in one.
+        return copy.deepcopy(self)
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._lock = threading.Lock()
 
     @property
     def spent_usd(self) -> Decimal:
@@ -100,6 +131,26 @@ class BudgetGuard:
     @property
     def billed_calls(self) -> int:
         return self.ledger.billed_calls
+
+    @property
+    def held_usd(self) -> Decimal:
+        """What the calls admitted and not yet recorded may cost."""
+        return self._held_usd
+
+    @property
+    def held_calls(self) -> int:
+        """How many calls are admitted and not yet recorded."""
+        return self._held_calls
+
+    @property
+    def available_usd(self) -> Decimal:
+        """What a new call may still reserve: the ceiling less what is spent and what is held."""
+        return self.ceiling_usd - self.spent_usd - self._held_usd
+
+    @property
+    def available_calls(self) -> int:
+        """How many more calls may be admitted: the limit less those billed and those held."""
+        return self.max_calls - self.billed_calls - self._held_calls
 
     def estimate_usd(
         self,
@@ -127,36 +178,73 @@ class BudgetGuard:
         prompt_chars: int = 0,
         max_tokens: int = 0,
         extra_prompt_tokens: int = 0,
+        keep_usd: Decimal = Decimal(0),
+        keep_calls: int = 0,
     ) -> Decimal:
-        """Check that this call may proceed. Raises ``BudgetExceededError`` if it may not.
+        """Admit this call and hold its reservation, or raise ``BudgetExceededError``.
 
-        Never retry a ``BudgetExceededError``. Retrying is the loop the guard is stopping.
+        ``keep_usd`` and ``keep_calls`` are the part of the budget this call must leave
+        untouched; a call that fits the budget but not the part left above them raises
+        :class:`BudgetShareExceeded`. Never retry a ``BudgetExceededError``. Retrying is the loop
+        the guard is stopping.
         """
-        if self.billed_calls >= self.max_calls:
-            raise BudgetExceededError(
-                f"call ceiling reached: {self.billed_calls} billed calls in this process, limit "
-                f"{self.max_calls}. This is a runaway loop, not a workload. Raise "
-                f"{_MAX_CALLS_ENV} only after establishing why.",
-                spent_usd=self.spent_usd,
-                ceiling_usd=self.ceiling_usd,
-            )
         projected = self.estimate_usd(
             spec,
             prompt_chars=prompt_chars,
             max_tokens=max_tokens,
             extra_prompt_tokens=extra_prompt_tokens,
         )
-        if self.spent_usd + projected > self.ceiling_usd:
-            raise BudgetExceededError(
-                f"budget ceiling would be crossed: spent ${self.spent_usd.quantize(USD_QUANTUM)}, "
-                f"this {role} call could cost up to ${projected}, ceiling "
-                f"${self.ceiling_usd}. No request was sent. Raise {_CEILING_ENV} deliberately if "
-                "this is real work.",
-                spent_usd=self.spent_usd,
-                ceiling_usd=self.ceiling_usd,
-            )
+        with self._lock:
+            committed_calls = self.billed_calls + self._held_calls
+            if committed_calls >= self.max_calls:
+                raise BudgetExceededError(
+                    f"call ceiling reached: {committed_calls} calls billed or under way in this "
+                    f"process, limit {self.max_calls}. This is a runaway loop, not a workload. "
+                    f"Raise {_MAX_CALLS_ENV} only after establishing why.",
+                    spent_usd=self.spent_usd,
+                    ceiling_usd=self.ceiling_usd,
+                )
+            committed = self.spent_usd + self._held_usd
+            if committed + projected > self.ceiling_usd:
+                raise BudgetExceededError(
+                    f"budget ceiling would be crossed: spent or held "
+                    f"${committed.quantize(USD_QUANTUM)}, this {role} call could cost up to "
+                    f"${projected}, ceiling ${self.ceiling_usd}. No request was sent. Raise "
+                    f"{_CEILING_ENV} deliberately if this is real work.",
+                    spent_usd=self.spent_usd,
+                    ceiling_usd=self.ceiling_usd,
+                )
+            if (
+                committed_calls >= self.max_calls - keep_calls
+                or committed + projected > self.ceiling_usd - keep_usd
+            ):
+                raise BudgetShareExceeded(
+                    f"this {role} call would take the process into the part of its budget kept "
+                    f"for other work: ${keep_usd} and {keep_calls} calls of ${self.ceiling_usd} "
+                    f"and {self.max_calls}. No request was sent.",
+                    spent_usd=self.spent_usd,
+                    ceiling_usd=self.ceiling_usd,
+                )
+            self._held_usd += projected
+            self._held_calls += 1
         return projected
 
-    def record(self, usage: CallUsage) -> CallUsage:
-        """Record what the call actually cost, replacing the reservation with the real number."""
-        return self.ledger.record(usage)
+    def release(self, reserved: Decimal) -> None:
+        """Give back a reservation whose request never left, with nothing to record."""
+        with self._lock:
+            self._settle(reserved)
+
+    def record(self, usage: CallUsage, *, released: Decimal | None = None) -> CallUsage:
+        """Record what the call actually cost, replacing its reservation with the real number.
+
+        ``released`` is the reservation the call was admitted under, given back as its usage is
+        recorded; a record with none, a cache hit, held nothing.
+        """
+        with self._lock:
+            if released is not None:
+                self._settle(released)
+            return self.ledger.record(usage)
+
+    def _settle(self, reserved: Decimal) -> None:
+        self._held_usd = max(Decimal(0), self._held_usd - reserved)
+        self._held_calls = max(0, self._held_calls - 1)

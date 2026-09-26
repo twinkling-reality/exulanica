@@ -28,7 +28,7 @@ from exulanica.evidence.blob import BlobId
 from exulanica.ingest.repository import IngestRepository
 from exulanica.migrations import migrations, verify_applied
 from exulanica.models.credentials import api_key_from_env
-from exulanica.models.manifest import load_manifest
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.orchestration.manifest import BuildManifest, load_build_manifest
 from exulanica.world_package.package import load_private_key
 
@@ -276,7 +276,8 @@ def run_frontier_preflight(
     if manifest and manifest.pipeline.vision == "configured":
 
         def credential() -> str:
-            name = load_manifest().api_key_env
+            manifest = load_manifest()
+            name = manifest.provider(manifest[Role.VISION].provider).api_key_env
             if not api_key_from_env(name).strip():
                 raise ValueError(f"Set {name} to your model credential.")
             return "Configured credential is present; validity and live catalog are not checked."

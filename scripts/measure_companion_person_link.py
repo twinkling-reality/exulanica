@@ -551,7 +551,7 @@ def run(split: str, out: Path, model_env: Path, runs: int) -> None:
     from exulanica.models.cache import InMemoryResponseCache
     from exulanica.models.client import ModelClient
     from exulanica.models.egress import EGRESS_ALLOWLIST_ENV, load_egress_allowlist
-    from exulanica.models.manifest import load_manifest
+    from exulanica.models.manifest import Role, load_manifest
     from exulanica.models.transport import HttpxTransport
     from exulanica.selection import Session
     from exulanica.selection import packet as packet_module
@@ -576,12 +576,12 @@ def run(split: str, out: Path, model_env: Path, runs: int) -> None:
         )
 
     manifest = load_manifest()
-    origin = re.match(r"^https?://[^/]+", manifest.base_url)
-    assert origin is not None, manifest.base_url
-    egress = load_egress_allowlist({EGRESS_ALLOWLIST_ENV: json.dumps([origin.group(0)])})
-    if manifest.api_key_env != KEY_VARIABLE:
+    # The composer role's provider: where every request of this run goes, and its credential.
+    provider = manifest.provider(manifest[Role.REASONING_CHEAP].provider)
+    egress = load_egress_allowlist({EGRESS_ALLOWLIST_ENV: json.dumps([provider.origin])})
+    if provider.api_key_env != KEY_VARIABLE:
         raise SystemExit(
-            f"the manifest reads {manifest.api_key_env}, and only {KEY_VARIABLE} may be read"
+            f"the manifest reads {provider.api_key_env}, and only {KEY_VARIABLE} may be read"
         )
     key = _model_key(model_env, KEY_VARIABLE)
     transport = HttpxTransport(egress=egress)

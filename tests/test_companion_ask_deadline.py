@@ -77,7 +77,9 @@ def test_the_page_waits_at_least_the_answer_bound_and_its_read_allowance():
 
 def _roles_sent(transport: FakeTransport) -> list[Role]:
     manifest = load_manifest()
-    by_model = {spec.model_id: role for role in Role for spec in manifest[role].chain}
+    by_model = {
+        spec.model_id: role for role, binding in manifest.roles.items() for spec in binding.chain
+    }
     return [by_model[request["payload"]["model"]] for request in transport.requests]
 
 

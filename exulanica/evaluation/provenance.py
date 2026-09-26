@@ -112,7 +112,8 @@ def model_snapshot(path: str | pathlib.Path = MANIFEST_PATH) -> tuple[dict[str, 
     raw = manifest_path.read_bytes()
     manifest = load_manifest_from(manifest_path)
     roles: dict[str, object] = {}
-    for role in Role:
+    # Every role the manifest binds to a model; a chosen role's model is a world's.
+    for role in (role for role in Role if role in manifest.roles):
         binding = manifest[role]
         roles[role.value] = {
             "primary": {"model_id": binding.primary.model_id, "revision": None},

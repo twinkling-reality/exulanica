@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-decision-policy",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "answer_attempts_maximum",
+      "value": 2,
+      "reason": "A model is asked at most twice for one choice: its answer, then once more quoting why the first was refused. A second answer that is still not one of the offered actions hands the turn to the person's routine, and the receipt says why.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "answer_rank_json_schema",
+      "value": 2,
+      "reason": "Asked second by a strict JSON schema whose only property is the enum of offered actions, for a model whose manifest entry verifies this mechanism and not the first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "answer_rank_tool_call",
+      "value": 1,
+      "reason": "Asked first by one OpenAI-format function named act, forced by name, whose only argument is the enum of offered actions. A model is asked a way only when its manifest entry names the probe record that verified it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "concurrent_calls_maximum",
+      "value": 8,
+      "reason": "Everyone at a choice point in one minute is asked at once rather than in turn, so the minute waits for its slowest answer rather than the sum of them; eight is the population a saved world holds.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "context_bytes_maximum",
+      "value": 12000,
+      "reason": "What a person is shown is at most 12,000 bytes, about 4,000 input tokens at the three characters per token the budget guard reserves by. A context over it is not asked: nothing is reserved or recorded, and the routine decides that turn.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "decision_deadline_ms",
+      "value": 20000,
+      "reason": "A choice is asked after the host's playback claims a minute and before it advances it, inside the claim's 30 second lease, so 20 seconds leaves the rest for the advance to commit. A call still waiting when the time is up is abandoned and the routine decides.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "decisions_per_world_hour_maximum",
+      "value": 600,
+      "reason": "A declared ceiling on the choices one world asks of models in an hour of wall-clock time, counted from that world's receipts and the asks the host admits in the same minute. Past it the routine decides until the hour's count falls, and every receipt says why.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "model_people_maximum",
+      "value": 8,
+      "reason": "At most eight people in one world are run by models, the population a saved world holds, so every person in it may be; a choice that would run more is refused by name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "options_maximum",
+      "value": 24,
+      "reason": "A person is offered at most 24 places, the nearest kept when there are more, before their order is shuffled, so the list of actions stays well inside the context bound.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "process_reserve_percent",
+      "value": 50,
+      "reason": "Half of the host process's model budget, in dollars and in calls, is kept for its other work: the Companion, photograph ingestion, vision and caption search share one lifetime ceiling with people's decisions, and nothing refills it until the process restarts. People's decisions stop before the process's remaining budget falls into that half, the host says so, and the other work goes on.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "spend_per_world_hour_microusd",
+      "value": 250000,
+      "reason": "A declared ceiling of 25 cents of model spend per world in an hour of wall-clock time, summed from that world's receipts, unknown costs at their bound, and from the bound of every ask the host admits in the same minute. It bounds one world's rate, not the process's lifetime budget, which process_reserve_percent protects. Past it the routine decides and every receipt says why.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    }
+  ]
+}

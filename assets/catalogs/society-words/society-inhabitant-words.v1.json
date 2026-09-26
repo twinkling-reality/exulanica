@@ -63,6 +63,13 @@
       "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
     },
     {
+      "key": "reason.chosen_by_their_model",
+      "kind": "reason",
+      "code": "chosen_by_their_model",
+      "words": "the model you chose for them picked it",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
       "key": "reason.called_away",
       "kind": "reason",
       "code": "called_away",

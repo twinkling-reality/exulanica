@@ -412,7 +412,14 @@ class SocietyControlRepository:
         ):
             raise LeaseLost("playback lease expired or was replaced")
 
-    def execute(self, claim: ControlClaim) -> dict:
+    def execute(self, claim: ControlClaim, *, max_ticks: int | None = None) -> dict:
+        """Run a claimed batch: the minutes due, at most ``MAX_CATCHUP_TICKS``, or ``max_ticks``.
+
+        A world that runs people by models is advanced one minute per claim (``max_ticks=1``), so
+        each minute's choice points are asked before it; the minutes skipped are recorded.
+        """
+        if max_ticks is not None and not 1 <= max_ticks <= MAX_CATCHUP_TICKS:
+            raise ValueError(f"a claim runs 1 to {MAX_CATCHUP_TICKS} minutes, not {max_ticks}")
         if claim.workspace_id != self.workspace_id:
             raise LeaseLost("playback claim belongs to another workspace")
         if claim.world_id != self.world_id:
@@ -426,7 +433,7 @@ class SocietyControlRepository:
             started = self._now()
             interval = control["base_tick_interval_ms"] // control["speed"]
             due = ticks_due(started, control["next_due_at"], interval)
-            count = min(MAX_CATCHUP_TICKS, due)
+            count = min(MAX_CATCHUP_TICKS if max_ticks is None else max_ticks, due)
             before_tick = society["current_tick"]
             before_hash = society["state_sha256"]
             details = {

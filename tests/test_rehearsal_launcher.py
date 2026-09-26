@@ -16,6 +16,7 @@ never read.
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
@@ -117,6 +118,19 @@ def test_a_model_run_asks_for_a_production_build_and_hands_over_the_step_lists_b
     assert "--production" in command
     assert "--society-playback" in command
     assert str(LAUNCHER) in command
+
+
+def test_the_model_allowlist_is_the_manifests_own_derivation_of_its_origins():
+    """What the API is handed to reach is what the worktree's manifest derives, and nothing else.
+
+    Asked of the worktree's own interpreter (this repository here), so a second reading of the
+    manifest's JSON cannot drift from the one the client checks its providers against.
+    """
+    from exulanica.models.manifest import load_manifest
+
+    handed = json.loads(REHEARSE.model_allowlist(ROOT))
+    assert handed == sorted(load_manifest().bound_origins())
+    assert handed, "the positive control: the manifest binds a role to some provider"
 
 
 def test_a_run_may_lower_the_bound_it_hands_over_and_never_raise_it(tmp_path, monkeypatch):

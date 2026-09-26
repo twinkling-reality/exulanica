@@ -130,7 +130,8 @@ def endpoint() -> Iterator[_Endpoint]:
 
 def _manifest_at(origin: str):
     document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal)
-    document["base_url"] = f"{origin}/v1"
+    for provider in document["providers"].values():
+        provider["base_url"] = f"{origin}/v1"
     return parse_manifest(document)
 
 
@@ -378,7 +379,7 @@ def test_each_role_is_sent_with_its_manifest_timeout(manifest):
         seen.clear()
         client.chat(role, MESSAGES, prompt_version="v", use_cache=False)
         assert seen == [float(manifest[role].timeout_seconds)], role
-    assert len({manifest[role].timeout_seconds for role in Role}) > 1
+    assert len({binding.timeout_seconds for binding in manifest.roles.values()}) > 1
 
 
 def test_an_explicit_timeout_overrides_every_role(manifest):
@@ -395,8 +396,7 @@ def test_an_explicit_timeout_overrides_every_role(manifest):
 
 def test_every_role_timeout_follows_from_its_basis_and_the_record_it_names(manifest):
     """The basis is the survey record's own numbers, and the timeout is the rule applied to them."""
-    for role in Role:
-        binding = manifest[role]
+    for role, binding in manifest.roles.items():
         basis = binding.timeout_basis
         record = json.loads((ROOT / basis["record"]).read_text(encoding="utf-8"))["record"]
         measured = record["measured"]["roles"][str(role)]

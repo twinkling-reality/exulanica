@@ -86,6 +86,7 @@ from exulanica.api.routes import (
     society_control,
     society_district,
     society_experiments,
+    society_models,
     tiles,
     world,
     world_arrangements,
@@ -296,6 +297,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(society.router)
     app.include_router(society_actions.router)
     app.include_router(society_control.router)
+    app.include_router(society_models.router)
     app.include_router(society_district.router)
     app.include_router(society_experiments.router)
     app.include_router(character_appearance.router)

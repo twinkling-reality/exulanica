@@ -1,0 +1,54 @@
+/*
+ * Who decides for the people of a saved world, beside the inhabitants panel: its buttons and
+ * headings as that panel draws its own, and the choice laid out.
+ */
+#shell .world-workspace .society-models button {
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  min-height: 38px;
+  margin: 0 8px 16px 0;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 550;
+}
+#shell .world-workspace .society-models button:hover:not(:disabled) { border-color: var(--accent); }
+#shell .world-workspace .society-models button:disabled {
+  color: var(--ink-faint);
+  background: var(--surface);
+  opacity: .75;
+}
+#shell .society-models h4 { margin: 16px 0 8px; font-size: 13px; }
+#shell .society-models-model {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--ink);
+}
+#shell .society-models-model select {
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  font-size: 13px;
+}
+#shell .society-models-people {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+#shell .society-models-people legend { padding: 0 4px; font-size: 12px; color: var(--ink-faint); }
+#shell :is(.society-models-host, .society-models-result) { margin: 0 0 12px; font-size: 13px; line-height: 1.5; }
+#shell .society-models-summaries { margin: 0 0 16px; padding-left: 18px; font-size: 13px; line-height: 1.6; }

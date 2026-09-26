@@ -94,6 +94,7 @@ REASON_CODES: Final = frozenset(
         "arrived_at_access_node",
         "awaiting_goal",
         "called_away",
+        "chosen_by_their_model",
         "current_position_invalidated",
         "following_reachable_route",
         "input_unavailable",
@@ -1552,7 +1553,12 @@ def advance_purposeful_society(
                 goal = {
                     "kind": target["affordance"],
                     "target_id": target["target_id"],
-                    "reason": "remembered_target_selected"
+                    # A model's choice for a person records its own code, never a request's.
+                    "reason": (
+                        "chosen_by_their_model"
+                        if policy.get("chosen_by") == "model"
+                        else "remembered_target_selected"
+                    )
                     if policy and target["target_id"] == policy.get("preferred_target_id")
                     else "restore_need"
                     if target["affordance"] == "rest"

@@ -46,7 +46,7 @@ uv run ruff check .                 # lints backend, tests and scripts
 uv run lint-imports                 # backend layering contracts
 uv run exulanica-preflight            # checks every manifest id against the live catalog
 uv run uvicorn --factory exulanica.api.app:create_app   # the HTTP API, on port 8000
-uv run exulanica-preflight --catalog-file <snapshot.json>   # same check, offline
+uv run exulanica-preflight --catalog-file <provider>=<snapshot.json>   # same check, offline
 uv run exulanica-ingest ingest ./photos   # safe to run repeatedly; a second run issues no model calls
 uv run exulanica-ingest ingest ./photos --offline           # skip the vision stage entirely
 uv run scripts/verify_platform.py      # the runtime verification harness, needs NEBIUS_API_KEY

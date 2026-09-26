@@ -353,7 +353,7 @@ def test_a_refusal_is_never_retried_or_failed_over():
     chain = ModelChain(
         manifest=manifest,
         transport=transport,
-        api_key="test-key-not-real",
+        api_keys={provider: "test-key-not-real" for provider in manifest.providers},
         budget=BudgetGuard(),
         timeout=1.0,
         max_attempts=3,
@@ -373,16 +373,16 @@ def test_a_refusal_is_never_retried_or_failed_over():
 
 def test_the_model_client_checks_its_endpoint_at_construction(monkeypatch, sockets):
     manifest = load_manifest()
+    endpoint = manifest.provider(manifest[Role.REASONING_CHEAP].provider)
     monkeypatch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps(["https://elsewhere.example"]))
-    with pytest.raises(EgressConfigurationError, match=re.escape(manifest.base_url)):
+    with pytest.raises(EgressConfigurationError, match=re.escape(endpoint.base_url)):
         ModelClient(api_key="test-key-not-real")
     monkeypatch.delenv(EGRESS_ALLOWLIST_ENV)
     with pytest.raises(EgressConfigurationError, match="no default"):
         ModelClient(api_key="test-key-not-real")
-    origin = manifest.base_url.split("/", 3)
-    monkeypatch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps([f"{origin[0]}//{origin[2]}"]))
+    monkeypatch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps(model_origins()))
     client = ModelClient(api_key="test-key-not-real")
-    assert client.manifest.base_url == manifest.base_url
+    assert dict(client.refusals) == {}
     # Construction opened nothing.
     assert sockets == []
 
@@ -395,10 +395,10 @@ def test_a_model_client_over_a_test_double_needs_no_allowlist(monkeypatch):
 def test_the_catalog_fetch_is_held_to_the_allowlist_too(monkeypatch, sockets):
     """The preflight builds its own transport, and the catalog is on a different host."""
     manifest = load_manifest()
-    origin = manifest.base_url.split("/", 3)
-    monkeypatch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps([f"{origin[0]}//{origin[2]}"]))
+    provider = manifest.provider(manifest[Role.VISION].provider)
+    monkeypatch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps([provider.origin]))
     with pytest.raises(EgressRefused):
-        fetch_catalog(manifest.catalog_url)
+        fetch_catalog(provider.catalog_url)
     assert sockets == []
 
 
@@ -491,11 +491,10 @@ def test_a_deployment_with_a_model_key_and_no_allowlist_does_not_start(tmp_path,
         patch.delenv(EGRESS_ALLOWLIST_ENV, raising=False)
         with pytest.raises(EgressConfigurationError, match="no default"):
             build_services(environ)
-        endpoint = load_manifest().base_url.split("/", 3)
         patch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps(["https://elsewhere.example"]))
         with pytest.raises(EgressConfigurationError, match="not declared"):
             build_services(environ)
-        patch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps([f"{endpoint[0]}//{endpoint[2]}"]))
+        patch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps(model_origins()))
         services = build_services(environ)
     assert services.model_client is not None
     assert sockets == []
@@ -514,7 +513,7 @@ from exulanica.api.account_runtime import (  # noqa: E402
 
 from account_fixtures import account_api as account_api  # noqa: E402
 from account_fixtures import account_role as account_role  # noqa: E402
-from account_fixtures import production_shaped_allowlist  # noqa: E402
+from account_fixtures import model_origins, production_shaped_allowlist  # noqa: E402
 
 _CONFIG = GoogleAccountConfig(
     client_id="test-google-client",
@@ -526,14 +525,15 @@ _CONFIG = GoogleAccountConfig(
 
 
 def _model_origin() -> str:
-    scheme, _, host, _ = load_manifest().base_url.split("/", 3)
-    return f"{scheme}//{host}"
+    """The one model origin these sign-in tests name beside Google's."""
+    (origin,) = model_origins()
+    return origin
 
 
 def test_sign_in_needs_the_list_to_include_the_google_origins_among_others():
     """Includes, not equals: the ordinary list also names the model endpoint."""
     shared = production_shaped_allowlist()
-    assert Origin("https", load_manifest().base_url.split("/")[2], 443) in shared.origins
+    assert parse_egress_allowlist(model_origins()).origins <= shared.origins
     narrowed = shared.narrowed_to(GOOGLE_EGRESS_ORIGINS, purpose="Google sign-in")
     assert {str(origin) for origin in narrowed.origins} == set(GOOGLE_EGRESS_ORIGINS)
 

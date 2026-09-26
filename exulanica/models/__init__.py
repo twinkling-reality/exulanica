@@ -37,9 +37,9 @@ from exulanica.models.errors import (
     TruncatedResponseError,
 )
 from exulanica.models.manifest import (
-    PROVIDER,
     Manifest,
     ModelSpec,
+    Provider,
     Role,
     RoleBinding,
     load_manifest,
@@ -62,7 +62,6 @@ from exulanica.models.usage import CallUsage, CostLedger
 __all__ = [
     "DEFAULT_CEILING_USD",
     "DEFAULT_MAX_CALLS",
-    "PROVIDER",
     "AmbiguousStructuredOutputError",
     "BudgetExceededError",
     "BudgetGuard",
@@ -89,6 +88,7 @@ __all__ = [
     "NullResponseCache",
     "PreflightError",
     "PreflightReport",
+    "Provider",
     "ResponseCache",
     "Role",
     "RoleBinding",

@@ -249,9 +249,7 @@ def test_a_reply_the_sent_schema_forbids_is_refused_even_though_pydantic_would_c
     ignored on this platform; there is no reason to assume ``json_schema`` never will be.
     """
     coercible = VALID | {
-        "legible_text": [
-            {"text": "OPEN", "is_signage": "true", "confidence": "high", "box": None}
-        ]
+        "legible_text": [{"text": "OPEN", "is_signage": "true", "confidence": "high", "box": None}]
     }
     assert validate_observation(coercible).legible_text[0].is_signage is True
 
@@ -374,7 +372,7 @@ def test_the_vision_model_reports_usage_and_the_model_that_actually_ran(transpor
     assert result.model_ref == {
         "provider": "nebius_token_factory",
         "model_id": binding.primary.model_id,
-        "endpoint": load_manifest().base_url,
+        "endpoint": load_manifest().provider(binding.provider).base_url,
     }
 
 

@@ -638,7 +638,13 @@ def test_a_society_decision_carries_no_place_allowed_for_the_embedding_use(insta
 
 def _elsewhere(manifest: Manifest) -> Manifest:
     """The same models, reached at an origin the grant does not name."""
-    return dataclasses.replace(manifest, base_url="https://elsewhere.example/v1")
+    return dataclasses.replace(
+        manifest,
+        providers={
+            key: dataclasses.replace(provider, base_url="https://elsewhere.example/v1")
+            for key, provider in manifest.providers.items()
+        },
+    )
 
 
 def _unallowed(manifest: Manifest) -> Any:
@@ -685,7 +691,7 @@ def test_a_grant_reaches_only_the_models_and_destination_it_names(instance, hand
         assert (_carries_the_place if released else _withholds_the_place)(body), handover
     # Positive controls: the requests went where the varied manifest sends them, and its
     # hand-over differs from the granted one exactly where the name was held back.
-    endpoint = f"{manifest.base_url}/embeddings"
+    endpoint = f"{manifest.provider(manifest[Role.EMBEDDING].provider).base_url}/embeddings"
     assert transport.urls_of("caption embedding") == [endpoint]
     assert transport.urls_of("query embedding") == [endpoint]
     granted = ModelHandoff.hosted(MANIFEST, Role.EMBEDDING)

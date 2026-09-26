@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 from exulanica.canonical import canonical_json
-from exulanica.models.manifest import load_manifest
+from exulanica.models.manifest import Role, load_manifest
 
 #: Questions for the reasoning comparison. Each names what it is FOR, because a question set
 #: whose choices are not argued is a question set that was chosen to pass. "hard" marks the
@@ -113,7 +113,7 @@ def record() -> dict:
         },
         "manifest": {
             "pipeline_version": manifest.pipeline_version,
-            "base_url": manifest.base_url,
+            "base_url": manifest.provider(manifest[Role.REASONING_CHEAP].provider).base_url,
             "frozen_roles": {
                 str(role): {
                     "primary": manifest[role].primary.model_id,

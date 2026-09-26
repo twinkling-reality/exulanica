@@ -18,10 +18,15 @@ Three checks, and each one catches a different real failure:
     failure, because a price change breaks the cost report rather than the service, but silent
     price drift is how a cost report becomes fiction.
 
+Each model is checked against the catalog of the provider serving it, read by that provider's
+declared ``catalog_format``. Every model a role reaches is checked, and so is every model offered
+to a role a world chooses, because a world may have chosen it.
+
 Run it as ``exulanica-preflight``, the console script, or as
 ``python -m exulanica.models.preflight``. Exit status 0 clean, 1 on any failure, so CI and the
 weekly uptime check on a running deployment can both call it without parsing output.
-Pass ``--catalog-file`` to check against a saved snapshot, which is how the offline test runs.
+Pass ``--catalog-file PROVIDER=PATH`` to check a provider against a saved snapshot, which is how
+the offline test runs.
 """
 
 from __future__ import annotations
@@ -36,12 +41,19 @@ from pathlib import Path
 from typing import Any, Final
 
 from exulanica.models.errors import PreflightError, TransportError
-from exulanica.models.manifest import Manifest, load_manifest, load_manifest_from
+from exulanica.models.manifest import (
+    CatalogFormat,
+    Manifest,
+    Provider,
+    load_manifest,
+    load_manifest_from,
+)
 from exulanica.models.transport import HttpxTransport, Transport
 
 __all__ = [
     "PreflightIssue",
     "PreflightReport",
+    "catalog_entries",
     "catalog_flavors",
     "fetch_catalog",
     "main",
@@ -141,34 +153,85 @@ def fetch_catalog(url: str, *, transport: Transport | None = None) -> list[dict[
     return body
 
 
-def _roles_using(manifest: Manifest, model_id: str) -> tuple[str, ...]:
-    return tuple(
-        sorted(
-            str(binding.role)
-            for binding in manifest.roles.values()
-            if any(spec.model_id == model_id for spec in binding.chain)
-        )
+def catalog_entries(
+    provider: Provider, catalog: Sequence[Mapping[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """A provider's catalog as callable identifier to entry, read by its declared format."""
+    if provider.catalog_format is CatalogFormat.MODEL_FLAVORS:
+        return catalog_flavors(catalog)
+    raise PreflightError(
+        f"provider {provider.provider_id} declares catalog format {provider.catalog_format!r}, "
+        "which the preflight has no reader for"
     )
+
+
+def _roles_using(manifest: Manifest, model_id: str) -> tuple[str, ...]:
+    bound = (
+        str(binding.role)
+        for binding in manifest.roles.values()
+        if any(spec.model_id == model_id for spec in binding.chain)
+    )
+    chosen = (
+        str(role)
+        for role in manifest.chosen_roles
+        if any(spec.model_id == model_id for spec in manifest.offered_models(role))
+    )
+    return tuple(sorted((*bound, *chosen)))
+
+
+def _required_use_cases(manifest: Manifest, model_id: str) -> list[tuple[str, tuple[str, ...]]]:
+    """Each role reaching ``model_id``, bound or chosen, with the use cases it needs."""
+    needs = [
+        (str(binding.role), binding.required_use_cases)
+        for binding in manifest.roles.values()
+        if any(spec.model_id == model_id for spec in binding.chain)
+    ]
+    needs.extend(
+        (str(role), manifest.chosen(role).required_use_cases)
+        for role in manifest.chosen_roles
+        if any(spec.model_id == model_id for spec in manifest.offered_models(role))
+    )
+    return needs
 
 
 def run_preflight(
     *,
     manifest: Manifest | None = None,
-    catalog: Sequence[Mapping[str, Any]] | None = None,
+    catalogs: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     transport: Transport | None = None,
 ) -> PreflightReport:
-    """Run all three checks. Fetches the catalog unless one is supplied."""
+    """Run all three checks. Fetches each provider's catalog unless ``catalogs`` supplies them.
+
+    ``catalogs`` maps a provider key to that provider's catalog document. When it is given, it
+    must hold every provider a checked model is served by: a provider it leaves out is refused by
+    name rather than skipped.
+    """
     manifest = manifest or load_manifest()
-    if catalog is None:
-        catalog = fetch_catalog(manifest.catalog_url, transport=transport)
-    live = catalog_flavors(catalog)
+    referenced = sorted(manifest.referenced_model_ids())
+    # By provider and identifier: two providers may list one identifier, and a model is checked
+    # against its own provider's entry only.
+    live: dict[tuple[str, str], dict[str, Any]] = {}
+    size = 0
+    for provider_id in sorted({manifest.spec(model_id).provider for model_id in referenced}):
+        provider = manifest.provider(provider_id)
+        if catalogs is None:
+            catalog = fetch_catalog(provider.catalog_url, transport=transport)
+        elif provider_id in catalogs:
+            catalog = catalogs[provider_id]
+        else:
+            raise PreflightError(
+                f"no catalog was supplied for provider {provider_id}, which serves a checked model"
+            )
+        entries = catalog_entries(provider, catalog)
+        size += len(entries)
+        live.update({(provider_id, model_id): entry for model_id, entry in entries.items()})
 
     issues: list[PreflightIssue] = []
-    referenced = sorted(manifest.referenced_model_ids())
 
     for model_id in referenced:
         roles = _roles_using(manifest, model_id)
-        flavor = live.get(model_id)
+        spec = manifest.spec(model_id)
+        flavor = live.get((spec.provider, model_id))
         if flavor is None:
             issues.append(
                 PreflightIssue(
@@ -176,27 +239,25 @@ def run_preflight(
                     model_id=model_id,
                     roles=roles,
                     detail=(
-                        "not present in flavors[].model_id. It has been withdrawn, or the "
-                        "identifier is misspelled. Check casing before assuming a deprecation."
+                        f"not present in {spec.provider}'s flavors[].model_id. It has been "
+                        "withdrawn, or the identifier is misspelled. Check casing before assuming "
+                        "a deprecation."
                     ),
                 )
             )
             continue
 
-        spec = manifest.spec(model_id)
         declared = {str(u) for u in (flavor.get("use_cases") or ())}
-        for binding in manifest.roles.values():
-            if not any(s.model_id == model_id for s in binding.chain):
-                continue
-            missing = [u for u in binding.required_use_cases if u not in declared]
+        for role, required in _required_use_cases(manifest, model_id):
+            missing = [u for u in required if u not in declared]
             if missing:
                 issues.append(
                     PreflightIssue(
                         kind="use_case_lost",
                         model_id=model_id,
-                        roles=(str(binding.role),),
+                        roles=(role,),
                         detail=(
-                            f"role needs use_cases {sorted(binding.required_use_cases)}, catalog "
+                            f"role needs use_cases {sorted(required)}, catalog "
                             f"now declares {sorted(declared)}; missing {missing}"
                         ),
                     )
@@ -223,37 +284,51 @@ def run_preflight(
                     )
                 )
 
-    return PreflightReport(
-        checked=tuple(referenced), catalog_size=len(live), issues=tuple(issues)
-    )
+    return PreflightReport(checked=tuple(referenced), catalog_size=size, issues=tuple(issues))
+
+
+def _catalog_file(value: str) -> tuple[str, Path]:
+    provider, separator, path = value.partition("=")
+    if not separator or not provider or not path:
+        raise argparse.ArgumentTypeError(f"{value!r} is not PROVIDER=PATH")
+    return provider, Path(path)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="exulanica-preflight",
-        description="Check every model identifier in the manifest against the live catalog.",
+        description="Check every model identifier in the manifest against its provider's catalog.",
     )
     parser.add_argument("--manifest", type=Path, default=None, help="alternate manifest JSON")
     parser.add_argument(
         "--catalog-file",
-        type=Path,
+        type=_catalog_file,
+        action="append",
         default=None,
-        help="check against a saved catalog snapshot instead of the network",
+        metavar="PROVIDER=PATH",
+        help="check PROVIDER against a saved catalog snapshot instead of the network; repeat it "
+        "for each provider a checked model is served by",
     )
     parser.add_argument("--json", action="store_true", help="emit the report as JSON")
     args = parser.parse_args(argv)
 
     manifest = load_manifest_from(args.manifest) if args.manifest else load_manifest()
-    catalog = None
+    catalogs = None
     if args.catalog_file is not None:
-        catalog = json.loads(args.catalog_file.read_text(encoding="utf-8"))
+        catalogs = {
+            provider: json.loads(path.read_text(encoding="utf-8"))
+            for provider, path in args.catalog_file
+        }
 
     try:
-        report = run_preflight(manifest=manifest, catalog=catalog)
+        report = run_preflight(manifest=manifest, catalogs=catalogs)
     except TransportError as exc:
         # A catalog that cannot be reached is not a passing preflight. Saying so is the whole
         # point: the check exists to be believed when it is green.
         print(f"[FAIL] catalog unreachable: {exc}", file=sys.stderr)
+        return 1
+    except PreflightError as exc:
+        print(f"[FAIL] {exc}", file=sys.stderr)
         return 1
 
     if args.json:

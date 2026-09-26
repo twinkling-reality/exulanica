@@ -28,6 +28,7 @@ rather than a thing that would need to be discovered.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import uuid
@@ -43,6 +44,12 @@ from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
 from exulanica.api.composer_rights import photograph_text_right
 from exulanica.api.society_control_worker import SocietyControlWorker
+from exulanica.api.society_person_decisions import (
+    PersonDecisionHost,
+    host_refusal,
+    model_refusal,
+    question_refusal,
+)
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.session import DATABASE_URL_ENV, Database
@@ -56,9 +63,9 @@ from exulanica.epistemics.hosted_requests import (
 )
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
-from exulanica.models.client import ModelClient
+from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores, tile_store
@@ -71,6 +78,7 @@ from exulanica.world.society_controls import (
     DEFAULT_BASE_TICK_INTERVAL_MS,
     validate_settings,
 )
+from exulanica.world.society_decision_contract import decision_contract
 from exulanica.world.texture_assets import load_material_catalog
 
 if TYPE_CHECKING:
@@ -246,6 +254,70 @@ class Services:
             )
         )
 
+    def person_decision_host(self) -> PersonDecisionHost | None:
+        """What asks a purposeful society's chosen models before a minute, or None without one.
+
+        Only the workspaces this host's environment lists are asked for; a workspace account
+        discovery adds is played by its routine alone. Each ask carries the workspace's rules,
+        with no place's name released: a person's decision is not a use a place-name right offers.
+        """
+        if self.society_runtime is None:
+            return None
+
+        def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
+            return self.request_policy(
+                workspace_id,
+                lambda: self.readonly_database.session(workspace_id),
+                released_places=no_place_released,
+            )
+
+        return PersonDecisionHost(
+            database=self.database,
+            runtime=self.society_runtime,
+            client=self.model_client,
+            workspaces=frozenset(self.society_control_workspaces),
+            policy_for=policy_for,
+            manifest=load_manifest(),
+            manifest_sha256=hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest(),
+        )
+
+    def model_host_refusal(self, workspace_id: uuid.UUID) -> str | None:
+        """Why this host asks no model for a workspace's people, or None when it asks them.
+
+        The facts :meth:`person_decision_host` acts on: the workspaces the environment lists, the
+        process's client, and what is left of its budget and of the share people's decisions may
+        spend. A code from ``HOST_REFUSALS``.
+        """
+        if workspace_id not in self.society_control_workspaces:
+            return "models_not_run_here"
+        return host_refusal(self.model_client, load_manifest(), decision_contract())
+
+    def provider_refusal(self, provider: str) -> str | None:
+        """Why this process asks no model a provider serves, or None when it may ask them."""
+        if self.model_client is None:
+            return PROVIDER_CREDENTIAL_ABSENT
+        return self.model_client.refusals.get(provider)
+
+    def choice_refusal(
+        self, model: Mapping[str, str], connection: psycopg.Connection, workspace_id: uuid.UUID
+    ) -> str | None:
+        """Why a person's chosen model is not asked here, or None: a code from MODEL_REFUSALS.
+
+        The question is judged by the workspace's rules as the host judges it, on ``connection``,
+        which the caller lends idle.
+        """
+        refusal = model_refusal(self.model_client, load_manifest(), decision_contract(), model)
+        if refusal is not None or self.model_client is None:
+            return refusal
+        return question_refusal(
+            self.model_client.with_policy(
+                self.request_policy(
+                    workspace_id, borrowing(connection), released_places=no_place_released
+                )
+            ),
+            model["model_id"],
+        )
+
     def build_society_control_worker(self) -> SocietyControlWorker | None:
         if not self.society_control_enabled:
             return None
@@ -263,6 +335,9 @@ class Services:
                 else None
             ),
             base_tick_interval_ms=self.society_base_tick_interval_ms,
+            before_minute=(
+                None if (host := self.person_decision_host()) is None else host.before_minute
+            ),
         )
 
     @property
@@ -280,6 +355,34 @@ class Services:
                 "no model credential is configured, so the endpoints that plan a Selection from "
                 "a question or compose an answer will refuse rather than guess."
             )
+        else:
+            # Said only where a playback host asks models for people, which is only for the
+            # workspaces the environment lists: one enabled by account discovery alone asks nobody.
+            spent = (
+                host_refusal(self.model_client, load_manifest(), decision_contract())
+                if self.society_control_workspaces
+                else None
+            )
+            if spent == "process_budget_spent":
+                notes.append(
+                    "this process has spent its model budget (EXULANICA_BUDGET_USD or "
+                    "EXULANICA_BUDGET_MAX_CALLS): what is left fits no ask of a person's chosen "
+                    "model, until it restarts. People a model runs are decided by their routine, "
+                    "and nothing is asked for them."
+                )
+            elif spent == "process_share_spent":
+                notes.append(
+                    "this process's model budget is down to the part its decision contract keeps "
+                    "for other work (process_reserve_percent of EXULANICA_BUDGET_USD and "
+                    "EXULANICA_BUDGET_MAX_CALLS): until it restarts, people a model runs are "
+                    "decided by their routine, and the rest stays for the Companion and "
+                    "ingestion."
+                )
+            for provider, reason in sorted(self.model_client.refusals.items()):
+                notes.append(
+                    f"provider {provider} is refused by this process ({reason}), so no model it "
+                    "serves is asked here, and a person run by one is decided by their routine."
+                )
         if not self.runs_derivative_worker:
             notes.append(
                 f"{DERIVATIVE_WORKER_ENV} is off, so this process serves POST /intake and does "
@@ -403,7 +506,7 @@ def build_services(
     )
 
     client = model_client
-    if client is None and environ.get("NEBIUS_API_KEY"):
+    if client is None and _role_credentials_set(environ):
         client = ModelClient()
     store = LocalContentAddressedStore(data_dir / BLOB_NAMESPACE)
 
@@ -433,6 +536,19 @@ def build_services(
         ),
         released_place_names=released_place_names,
     )
+
+
+def _role_credentials_set(environ: Mapping[str, str]) -> bool:
+    """Whether the credential of every provider serving a manifest-bound role is set.
+
+    The variable names are the manifest's (``providers[].api_key_env``), never written here: a
+    process without them serves no model and says so in ``Services.warnings``.
+    """
+    manifest = load_manifest()
+    variables = {
+        manifest.provider(binding.provider).api_key_env for binding in manifest.roles.values()
+    }
+    return all(environ.get(name) for name in variables)
 
 
 def _society_runtime(store: ContentAddressedStore, environ: Mapping[str, str]) -> SocietyRuntime:
@@ -605,7 +721,7 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         SOCIETY_CONTROL_WORKSPACES_ENV,
         SOCIETY_TICK_INTERVAL_MS_ENV,
         API_TOKENS_ENV,
-        "NEBIUS_API_KEY",
+        *sorted({provider.api_key_env for provider in load_manifest().providers.values()}),
         "EXULANICA_GOOGLE_CLIENT_ID",
         "EXULANICA_GOOGLE_CLIENT_SECRET",
         "EXULANICA_GOOGLE_CALLBACK_URI",

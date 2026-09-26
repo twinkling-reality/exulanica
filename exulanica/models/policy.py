@@ -27,6 +27,10 @@ carries.
 
 Text anywhere else in a request, in a caller's extra parameter or in a message field other than
 its content, is refused before any policy is asked, because it is text no policy would be shown.
+The one exception is a choice's function: ``tools`` and ``tool_choice`` pass as structure only
+when they are exactly the ones the request's :class:`~exulanica.models.choice.ChoiceRequest`
+built, whose option labels are product vocabulary it has already checked. Any other tool is
+refused.
 
 **What this layer does not do** is decide. It knows nothing of the database, the workspace or
 the account holder's rules. The policy that applies them is
@@ -46,6 +50,7 @@ from types import MappingProxyType
 from typing import Any, Protocol
 
 from exulanica.errors import ExulanicaError, PrivacyAdmissionError
+from exulanica.models.choice import ChoiceRequest
 from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
 
@@ -69,6 +74,8 @@ INSTRUCTION_ROLE = "system"
 #: text no policy is shown.
 _JUDGED_FIELDS = frozenset({"messages", "input"})
 _STRUCTURE_FIELDS = frozenset({"max_tokens", "temperature", "response_format", "model"})
+#: The fields that ask for a choice by a function. Structure only when a choice request built them.
+_CHOICE_FIELDS = frozenset({"tools", "tool_choice"})
 #: A message carries its text in ``content`` and nothing else; ``role`` says whose it is.
 _MESSAGE_FIELDS = frozenset({"role", "content"})
 
@@ -144,13 +151,37 @@ class BenchmarkInputs:
 
 
 def request_parts(
-    payload: Mapping[str, Any],
+    payload: Mapping[str, Any], choice: ChoiceRequest | None = None
 ) -> tuple[tuple[str, ...], tuple[str, ...], int]:
-    """``(texts, instructions, images)`` of a chat or embedding payload, in payload order."""
+    """``(texts, instructions, images)`` of a chat or embedding payload, in payload order.
+
+    ``choice`` is the request's choice, when it asks a model to pick one of its options: its
+    ``tools`` and ``tool_choice`` are admitted only when they are exactly that choice's, and so is
+    its ``response_format``. The choice's own options and description are not among the parts
+    returned here; the client shows them to every policy beside these (``ModelClient._admit``).
+    """
     texts: list[str] = []
     instructions: list[str] = []
     images = 0
+    if _CHOICE_FIELDS & set(payload) and (
+        choice is None or not choice.carries(payload.get("tools"), payload.get("tool_choice"))
+    ):
+        raise HostedRequestRefused(
+            "the request carries a tool that no choice request built, so its text is text no "
+            "policy is shown"
+        )
+    if (
+        choice is not None
+        and "response_format" in payload
+        and payload["response_format"] != choice.response_format()
+    ):
+        raise HostedRequestRefused(
+            "the request's response format is not the one its choice built, so the options it "
+            "carries are options no policy is shown"
+        )
     for field, value in payload.items():
+        if field in _CHOICE_FIELDS:
+            continue
         if field not in _JUDGED_FIELDS | _STRUCTURE_FIELDS and _carries_text(value):
             raise HostedRequestRefused(
                 f"the request field {field!r} carries text outside its messages and inputs, "

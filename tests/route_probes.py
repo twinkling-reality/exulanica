@@ -475,6 +475,14 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"attempt_id": str(uuid.uuid4()), "seed_sha256": DEVELOPMENT_SEEDS[0]},
     },
+    "POST /world/versions/{version_id}/society/models": {
+        **_IN_WORLD,
+        "json": {
+            "idempotency_key": str(uuid.uuid4()),
+            "people": [str(uuid.uuid4())],
+            "model": None,
+        },
+    },
     "POST /world/versions/{version_id}/society/presence": {
         **_IN_WORLD,
         "json": {

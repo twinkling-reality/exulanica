@@ -65,7 +65,7 @@ from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
-from exulanica.models.manifest import PROVIDER, Role, load_manifest
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.reconstruction.moge import MoGeDepthModel
 from exulanica.reconstruction.testing import FlatDepthModel
@@ -88,6 +88,8 @@ MIGRATION = (
 )
 
 HOSTED = ModelHandoff.hosted(load_manifest(), Role.VISION)
+#: The provider the vision role is served by, as the manifest names it.
+HOSTED_PROVIDER = load_manifest()[Role.VISION].provider
 DEPTH_DOUBLE = ModelIdentity.local("depth", "test/plane-depth", "1" * 40)
 SEGMENTER = ModelIdentity.local("object_segmentation", "test/segmenter", "3" * 40)
 DETECTOR = ModelIdentity.local("open_vocabulary_detection", "test/detector", "4" * 40)
@@ -307,9 +309,10 @@ def test_a_hosted_hand_over_names_the_whole_chain_at_the_exact_egress_origin():
         spec.model_id for spec in binding.chain
     ]
     assert len(HOSTED.identities) == 2, "the vision role declares a fallback"
-    assert all(identity.provider == PROVIDER for identity in HOSTED.identities)
+    provider = manifest.provider(binding.provider)
+    assert all(identity.provider == provider.provider_id for identity in HOSTED.identities)
     assert all(identity.revision is None for identity in HOSTED.identities)
-    assert HOSTED.destination == egress_origin(manifest.base_url)
+    assert HOSTED.destination == egress_origin(provider.base_url)
     assert HOSTED.destination == "https://api.tokenfactory.nebius.com"
 
 
@@ -335,7 +338,7 @@ def test_an_identity_or_hand_over_that_cannot_be_named_is_refused():
     with pytest.raises(ValueError, match="revision"):
         ModelIdentity.local("depth", "test/depth", "main")
     with pytest.raises(ValueError, match="identifier"):
-        ModelIdentity(provider=PROVIDER, role="vision", model_id="has space", revision=None)
+        ModelIdentity(provider=HOSTED_PROVIDER, role="vision", model_id="has space", revision=None)
     with pytest.raises(ValueError, match="local checkpoints"):
         ModelHandoff(identities=HOSTED.identities, destination=LOCAL_PROCESS)
     with pytest.raises(ValueError, match="at least one"):
@@ -449,7 +452,9 @@ def test_a_withdrawn_right_is_refused_and_stays_withdrawn(personal):
 
 
 def test_a_right_naming_another_model_is_refused(personal):
-    other = ModelIdentity(provider=PROVIDER, role="vision", model_id="another/model", revision=None)
+    other = ModelIdentity(
+        provider=HOSTED_PROVIDER, role="vision", model_id="another/model", revision=None
+    )
     grant(personal, other, HOSTED.destination)
     assert refusal(personal, HOSTED) == "other_model"
 
@@ -844,7 +849,7 @@ def test_the_database_refuses_a_right_nobody_with_authority_granted(personal):
     with pytest.raises(psycopg.errors.CheckViolation):
         insert(destination=elsewhere, receipt_record=tampered)
     with pytest.raises(psycopg.errors.CheckViolation):
-        insert(model_provider=PROVIDER)
+        insert(model_provider=HOSTED_PROVIDER)
     with pytest.raises(psycopg.errors.CheckViolation, match="granted now"):
         insert(
             granted_at=stored["granted_at"] + dt.timedelta(minutes=10),

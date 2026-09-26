@@ -19,6 +19,10 @@ this walks it. Three policies live here and nowhere else, each because of someth
 *   **Each role waits for its own timeout**, read from the manifest, where it is derived from the
     longest latency measured for the role's primary. A caller may pass one explicit timeout for
     every role instead, as a lens budget does for the per-call timeout it reserves wall clock by.
+*   **Each request goes to its model's provider**, at the provider's own endpoint with the
+    provider's own credential, both the manifest's. A model a world chose is walked alone, with
+    no fallback and the timeout its caller's contract gives: a choice names one model, and a
+    withdrawn one is reported as withdrawn, never answered by another.
 
 Split out of the client because these are decisions about the network, and the client's own job
 is what a request means and whether a reply may be believed. A change to the retry policy should
@@ -36,7 +40,12 @@ from decimal import Decimal
 from typing import Any, Final
 
 from exulanica.models.budget import BudgetGuard
-from exulanica.models.errors import ModelUnavailableError, NoFallbackError, TransportError
+from exulanica.models.errors import (
+    ModelUnavailableError,
+    NoFallbackError,
+    ProviderRefused,
+    TransportError,
+)
 from exulanica.models.manifest import Manifest, ModelSpec, Role
 from exulanica.models.transport import HttpResponse, Transport
 from exulanica.models.usage import CallUsage, usd_string
@@ -89,7 +98,7 @@ class ModelChain:
         *,
         manifest: Manifest,
         transport: Transport,
-        api_key: str,
+        api_keys: Mapping[str, str],
         budget: BudgetGuard,
         timeout: float | None,
         max_attempts: int,
@@ -101,7 +110,9 @@ class ModelChain:
             raise ValueError(f"an explicit timeout must be positive, got {timeout!r}")
         self._manifest = manifest
         self._transport = transport
-        self._api_key = api_key
+        # Each provider's credential, by provider key. A provider with none here is refused by
+        # name before anything is sent to it.
+        self._api_keys = dict(api_keys)
         self._budget = budget
         self._timeout = timeout
         self._max_attempts = max_attempts
@@ -109,7 +120,7 @@ class ModelChain:
 
     def __repr__(self) -> str:
         # No credential, not even a prefix of one. A truncated key in a traceback is still a leak.
-        return f"ModelChain(base_url={self._manifest.base_url!r})"
+        return f"ModelChain(providers={sorted(self._manifest.providers)!r})"
 
     def with_budget(self, budget: BudgetGuard) -> ModelChain:
         """This chain, reserving and recording every attempt against ``budget`` instead."""
@@ -117,9 +128,18 @@ class ModelChain:
         bound._budget = budget
         return bound
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self, spec: ModelSpec) -> dict[str, str]:
+        key = self._api_keys.get(spec.provider)
+        if key is None:
+            variable = self._manifest.provider(spec.provider).api_key_env
+            raise ProviderRefused(
+                f"no credential for provider {spec.provider}: {variable} is not set, so nothing "
+                f"is sent to {spec.model_id}",
+                provider=spec.provider,
+                reason="provider_credential_absent",
+            )
         return {
-            "Authorization": f"Bearer {self._api_key}",
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -143,9 +163,9 @@ class ModelChain:
     def _post(
         self, path: str, payload: Mapping[str, Any], spec: ModelSpec, *, timeout: float
     ) -> dict[str, Any]:
-        url = f"{self._manifest.base_url}{path}"
+        url = f"{self._manifest.provider(spec.provider).base_url}{path}"
         response = self._transport.post_json(
-            url, headers=self._headers(), payload=payload, timeout=timeout
+            url, headers=self._headers(spec), payload=payload, timeout=timeout
         )
         if self._is_model_missing(response):
             raise ModelUnavailableError(
@@ -221,6 +241,9 @@ class ModelChain:
         extra_prompt_tokens: int,
         max_tokens: int,
         used_fallback: bool,
+        timeout: float,
+        keep_usd: Decimal = Decimal(0),
+        keep_calls: int = 0,
     ) -> tuple[dict[str, Any], int, Decimal]:
         """One model, up to ``max_attempts`` requests. Returns the body, requests issued, and the
         answering attempt's reservation.
@@ -231,7 +254,6 @@ class ModelChain:
         separately, so a retry storm is spend the guard can see, and each one that fails is
         recorded against it, so the storm is also spend the ledger shows.
         """
-        timeout = self.timeout_seconds(role)
         for attempt in range(1, self._max_attempts + 1):
             reserved = self._budget.reserve(
                 spec,
@@ -239,6 +261,11 @@ class ModelChain:
                 prompt_chars=prompt_chars,
                 max_tokens=max_tokens,
                 extra_prompt_tokens=extra_prompt_tokens,
+                **(
+                    {"keep_usd": keep_usd, "keep_calls": keep_calls}
+                    if keep_usd or keep_calls
+                    else {}
+                ),
             )
             started = time.monotonic()
             try:
@@ -255,6 +282,11 @@ class ModelChain:
                 if not exc.retryable or attempt == self._max_attempts:
                     raise _with_cost(exc, usage, attempt) from exc
                 self._backoff(attempt)
+            except BaseException:
+                # Refused before it left (a credential, an allowlist): nothing to record, and
+                # the reservation it held is given back.
+                self._budget.release(reserved)
+                raise
         raise AssertionError("unreachable: the last attempt either returns or raises")
 
     def _record_failure(
@@ -277,7 +309,8 @@ class ModelChain:
                 usd_bound=reserved,
                 used_fallback=used_fallback,
                 latency_s=time.monotonic() - started,
-            )
+            ),
+            released=reserved,
         )
 
     def walk(
@@ -292,6 +325,7 @@ class ModelChain:
     ) -> ChainResponse:
         """Try the primary, then the fallback. Returns the body and which model served it."""
         binding = self._manifest[role]
+        timeout = self.timeout_seconds(role)
         failures: list[str] = []
         tried: list[str] = []
         attempts = 0
@@ -308,6 +342,7 @@ class ModelChain:
                     extra_prompt_tokens=extra_prompt_tokens,
                     max_tokens=max_tokens,
                     used_fallback=index > 0,
+                    timeout=timeout,
                 )
             except ModelUnavailableError as exc:
                 # Not retried, so exactly one request was issued against this identifier.
@@ -333,6 +368,53 @@ class ModelChain:
         raise NoFallbackError(
             f"role {role}: every model in the chain is unavailable. This is what a deprecation "
             f"round looks like. Run the preflight against the live catalog. Failures: {detail}"
+        )
+
+    def walk_one(
+        self,
+        role: Role,
+        spec: ModelSpec,
+        path: str,
+        payload: Mapping[str, Any],
+        *,
+        timeout: float,
+        prompt_chars: int,
+        extra_prompt_tokens: int,
+        max_tokens: int,
+        keep_usd: Decimal = Decimal(0),
+        keep_calls: int = 0,
+    ) -> ChainResponse:
+        """Reach one model a world chose, with no fallback, waiting at most ``timeout`` seconds.
+
+        An explicit timeout this chain was built with bounds it as well. A withdrawn model raises
+        :class:`ModelUnavailableError` to the caller, whose contract decides what happens next.
+        ``keep_usd`` and ``keep_calls`` are the part of the process's budget the call must leave.
+        """
+        if not timeout > 0:
+            raise ValueError(f"a chosen model's timeout must be positive, got {timeout!r}")
+        bound = timeout if self._timeout is None else min(timeout, self._timeout)
+        started = time.monotonic()
+        body, made, reserved = self._post_with_retries(
+            path,
+            {**payload, "model": spec.model_id},
+            spec,
+            role=role,
+            prompt_chars=prompt_chars,
+            extra_prompt_tokens=extra_prompt_tokens,
+            max_tokens=max_tokens,
+            used_fallback=False,
+            timeout=bound,
+            keep_usd=keep_usd,
+            keep_calls=keep_calls,
+        )
+        return ChainResponse(
+            body=body,
+            spec=spec,
+            used_fallback=False,
+            latency_s=time.monotonic() - started,
+            attempts=made,
+            tried=(spec.model_id,),
+            reserved_usd=reserved,
         )
 
 

@@ -1,0 +1,399 @@
+{
+  "cases": [
+    {
+      "branch_id": "2ac4d0e3-19cc-417f-90c0-c824e8adcea6",
+      "doing": {
+        "kind": "visit",
+        "reason": "reviewed_duration_elapsed",
+        "status": "completed"
+      },
+      "last_activity": "by a tree",
+      "need_milli": 507,
+      "options": [
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 9 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-4-market_stall:visit",
+          "walk_mm": 8611
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 5 m away (2)",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-3-bench:rest",
+          "walk_mm": 4611
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 7 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-5-seating_planter:rest",
+          "walk_mm": 6611
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 5 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-2-bench:rest",
+          "walk_mm": 4611
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "53a86966-7171-5f3e-b525-c5fbe4174f35",
+      "tick": 3
+    },
+    {
+      "branch_id": "2ac4d0e3-19cc-417f-90c0-c824e8adcea6",
+      "doing": {
+        "kind": "visit",
+        "reason": "reviewed_duration_elapsed",
+        "status": "completed"
+      },
+      "last_activity": "at a market stall",
+      "need_milli": 371,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 5 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-2-bench:rest",
+          "walk_mm": 4930
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 9 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-3-bench:rest",
+          "walk_mm": 8930
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 9 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-1-planter_tree:visit",
+          "walk_mm": 8930
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 3 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-5-seating_planter:rest",
+          "walk_mm": 2930
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "66cb7c12-c319-5033-a3aa-87dbc0f8b0ba",
+      "tick": 14
+    },
+    {
+      "branch_id": "2ac4d0e3-19cc-417f-90c0-c824e8adcea6",
+      "doing": {
+        "kind": "stand",
+        "reason": "reviewed_duration_elapsed",
+        "status": "completed"
+      },
+      "last_activity": null,
+      "need_milli": 549,
+      "options": [
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 8 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-4-market_stall:visit",
+          "walk_mm": 8000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 16 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-3-bench:rest",
+          "walk_mm": 16000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 12 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-2-bench:rest",
+          "walk_mm": 12000
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 10 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-5-seating_planter:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 12 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-1-planter_tree:visit",
+          "walk_mm": 12000
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "e2598c4e-d68d-5a0a-b17f-598bc90f9ede",
+      "tick": 3
+    },
+    {
+      "branch_id": "2ac4d0e3-19cc-417f-90c0-c824e8adcea6",
+      "doing": {
+        "kind": "visit",
+        "reason": "reviewed_duration_elapsed",
+        "status": "completed"
+      },
+      "last_activity": "by a tree",
+      "need_milli": 324,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 5 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-2-bench:rest",
+          "walk_mm": 4611
+        },
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 9 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-4-market_stall:visit",
+          "walk_mm": 8611
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 5 m away (2)",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-3-bench:rest",
+          "walk_mm": 4611
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 7 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-5-seating_planter:rest",
+          "walk_mm": 6611
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 9 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-6-cafe_table:rest",
+          "walk_mm": 8611
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "66cb7c12-c319-5033-a3aa-87dbc0f8b0ba",
+      "tick": 27
+    },
+    {
+      "branch_id": "2ac4d0e3-19cc-417f-90c0-c824e8adcea6",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "last_activity": null,
+      "need_milli": 897,
+      "options": [
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 10 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-4-market_stall:visit",
+          "walk_mm": 10000
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 10 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-1-planter_tree:visit",
+          "walk_mm": 10000
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 2 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-6-cafe_table:rest",
+          "walk_mm": 2000
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 8 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-5-seating_planter:rest",
+          "walk_mm": 8000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 10 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-2-bench:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 6 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-3-bench:rest",
+          "walk_mm": 6000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "66cb7c12-c319-5033-a3aa-87dbc0f8b0ba",
+      "tick": 0
+    },
+    {
+      "branch_id": "2ac4d0e3-19cc-417f-90c0-c824e8adcea6",
+      "doing": {
+        "kind": "stand",
+        "reason": "reviewed_duration_elapsed",
+        "status": "completed"
+      },
+      "last_activity": "by a tree",
+      "need_milli": 555,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 10 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-3-bench:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 14 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-2-bench:rest",
+          "walk_mm": 14000
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 10 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-1-planter_tree:visit",
+          "walk_mm": 10000
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 16 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-5-seating_planter:rest",
+          "walk_mm": 16000
+        },
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 18 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-4-market_stall:visit",
+          "walk_mm": 18000
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 10 m away",
+          "target_id": "authored:2ac4d0e3-19cc-417f-90c0-c824e8adcea6:small_square-1-6-cafe_table:rest",
+          "walk_mm": 10000
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "e2598c4e-d68d-5a0a-b17f-598bc90f9ede",
+      "tick": 29
+    }
+  ],
+  "choices_found": 37,
+  "contract": {
+    "catalog_versions": {
+      "society-decision-action": 1,
+      "society-decision-policy": 1
+    },
+    "sha256": "79d662b6566f0a3c367d9509747bd30f3f648c2e75e09159a3bffc8b18c57862"
+  },
+  "minutes": 30,
+  "profile": "exulanica.society-person-model-contexts/v1",
+  "seed": "7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a"
+}

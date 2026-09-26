@@ -31,9 +31,11 @@ import ast
 import dataclasses
 import json
 import sys
+import time
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +44,7 @@ from exulanica.api.authorisation import TokenDirectory
 from exulanica.api.composer_rights import composer_rights_check
 from exulanica.api.routes.selection import society_answer_model
 from exulanica.api.services import Services
+from exulanica.api.society_person_decisions import PersonAsk, ask_person
 from exulanica.db.migrate import provision_workspace
 from exulanica.db.session import Database
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
@@ -50,8 +53,15 @@ from exulanica.epistemics.saved_names import Redacted, saved_names
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.vision import NebiusVisionModel
+from exulanica.models.choice import CHOICE_ARGUMENT, CHOICE_FUNCTION, ChoiceRequest
 from exulanica.models.client import ModelClient
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import (
+    MANIFEST_PATH,
+    AnsweringMechanism,
+    Role,
+    load_manifest,
+    parse_manifest,
+)
 from exulanica.models.policy import HostedRequestRefused, request_parts
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
@@ -70,6 +80,7 @@ from exulanica.selection.plan import (
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import answer_question
 from exulanica.selection.society_question import answer_about_society, build_scene
+from exulanica.world.society_decision_contract import decision_contract
 from exulanica.world.society_decisions import SocietyDecisionProvider
 
 from conftest import ingest_observed, write_photo
@@ -116,9 +127,12 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
         "exulanica.world.society_decisions",
         "SocietyDecisionProvider.propose",
     ),
+    "society person choice": ("exulanica.api.society_person_decisions", "ask_person"),
 }
 
 _PATH_AT = {site: path for path, site in HOSTED_CALL_PATHS.items()}
+#: The request fields a choice's function rides in.
+_CHOICE = frozenset({"tools", "tool_choice"})
 
 
 # -- the registry is the code's own list ---------------------------------------------------------
@@ -198,8 +212,8 @@ def _call_sites() -> set[tuple[str, str]]:
 
 
 def test_the_client_sends_through_exactly_the_methods_the_boundary_names():
-    # Positive control for the reading: the four methods a caller sends with.
-    assert _sending_methods() == {"chat", "structured", "vision", "embed"}
+    # Positive control for the reading: the five methods a caller sends with.
+    assert _sending_methods() == {"chat", "structured", "vision", "embed", "choose"}
 
 
 def test_every_hosted_call_in_the_product_is_a_registered_path():
@@ -498,6 +512,90 @@ def run_society(world: World) -> Witness:
     return transport
 
 
+def _chosen_manifest():
+    """The manifest with one chat model verified to answer by a forced function."""
+    document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal)
+    model_id = next(
+        model_id
+        for model_id, raw in sorted(document["models"].items())
+        if raw["min_max_tokens"] is not None and "text" in raw["catalog_use_cases"]
+    )
+    document["models"][model_id]["answering"] = {
+        "tool_call": "docs/evaluation/2026-09-25-society-person-models-probe.json"
+    }
+    return parse_manifest(document), model_id
+
+
+def _person_client(world: World, manifest, model_id: str) -> tuple[Any, Witness]:
+    """The process's client with the workspace's rules attached, as the host attaches them."""
+    body = chat_body("", model=model_id, finish_reason="tool_calls")
+    body["choices"][0]["message"]["content"] = None
+    body["choices"][0]["message"]["tool_calls"] = [
+        {
+            "id": "c",
+            "type": "function",
+            "function": {"name": "act", "arguments": json.dumps({"action": "wait here a minute"})},
+        }
+    ]
+    transport = Witness([HttpResponse(status_code=200, text=json.dumps(body))])
+    client = ModelClient(api_key="test-key-not-real", manifest=manifest, transport=transport)
+    return (
+        client.with_policy(
+            world.services.request_policy(
+                world.repository.workspace_id,
+                lambda: _lent(world.connection),
+                released_places=no_place_released,
+            )
+        ),
+        transport,
+    )
+
+
+def _ask_person(world: World, labels: tuple[str, ...]) -> tuple[dict[str, Any], Witness]:
+    """A person's decision, asked as the host asks it, over a situation that names both."""
+    manifest, model_id = _chosen_manifest()
+    client, transport = _person_client(world, manifest, model_id)
+    wait = {"kind": "wait", "action": "wait", "target_id": None, "activity": None}
+    context = {
+        "tick": 3,
+        "need_milli": 400,
+        "rest_at_need_milli": 750,
+        "doing": {"kind": "idle", "status": "completed", "reason": "reviewed_duration_elapsed"},
+        "last_activity": f"{PERSON} waits at {PLACE}",
+        "options": [
+            {**wait, "label": "wait here a minute", "walk_mm": None},
+            *(
+                {
+                    "kind": "target",
+                    "action": "go",
+                    "target_id": f"t{index}",
+                    "activity": "rest_bench",
+                    "label": label,
+                    "walk_mm": 12000,
+                }
+                for index, label in enumerate(labels)
+            ),
+        ],
+    }
+    result = ask_person(
+        client,
+        PersonAsk(
+            {"request_id": str(uuid.uuid4()), "context": context},
+            manifest.spec(model_id),
+            AnsweringMechanism.TOOL_CALL,
+        ),
+        decision_contract(),
+        time.monotonic() + 20.0,
+    )
+    return result, transport
+
+
+def run_person(world: World) -> Witness:
+    result, transport = _ask_person(world, ("resting on a bench, 12 m away",))
+    assert result["status"] == "accepted", result
+    return transport
+
+
 class _lent:
     """The test's connection, lent for one judgement the way a session would be opened."""
 
@@ -523,6 +621,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "caption embedding": (run_caption, "RUNNING CLUB"),
     "vision": (run_vision, "Describe this photograph"),
     "society decision": (run_society, "waits at"),
+    "society person choice": (run_person, "wait here a minute"),
 }
 
 #: The paths whose call site replaces saved names itself, and the modules it replaces them with.
@@ -551,8 +650,21 @@ def _holds(path: str, transport: Witness, admissions: list[tuple[str, ...]]) -> 
     # Positive control: the path's own request carried what it exists to carry.
     own = [body for body, sent_by in zip(bodies, transport.paths, strict=True) if sent_by == path]
     assert any(carried in body for body in own), f"{path}: nothing it carries reached it"
-    sent = [request_parts(request["payload"])[0] for request in transport.requests]
+    sent = [_sent_texts(request["payload"]) for request in transport.requests]
     assert sent == admissions, "a request left that the workspace policy did not admit as sent"
+
+
+def _sent_texts(payload: Mapping[str, Any]) -> tuple[str, ...]:
+    """The texts a request carries, a choice's options and description after its messages', in
+    the order the client shows them to the workspace's rules. A choice's names are fixed values,
+    no caller's text, and are shown to no rule."""
+    texts = request_parts({k: v for k, v in payload.items() if k not in _CHOICE})[0]
+    for tool in payload.get("tools") or ():
+        function = tool["function"]
+        ((argument_name, argument),) = function["parameters"]["properties"].items()
+        assert (function["name"], argument_name) == (CHOICE_FUNCTION, CHOICE_ARGUMENT)
+        texts = (*texts, *argument["enum"], function["description"])
+    return texts
 
 
 @pytest.mark.parametrize("path", sorted(HOSTED_CALL_PATHS))
@@ -576,6 +688,54 @@ def test_the_boundary_alone_holds_where_a_call_site_replaces_nothing(
     run, _ = SCENARIOS[path]
     transport = run(world)
     _holds(path, transport, admissions[-len(transport.requests) :])
+
+
+# -- a choice's own text passes the boundary too ------------------------------------------------
+
+
+def test_an_option_carrying_a_saved_name_is_refused_and_nothing_is_sent(world):
+    """An option rides in the request's function, where the workspace's rules could not replace
+    a name in it; shown to them as a text, one they would change refuses the whole ask."""
+    result, transport = _ask_person(world, (f"resting by {PLACE.lower()}, 12 m away",))
+    assert (result["status"], result["reason"]) == ("unavailable", "request_refused")
+    assert transport.requests == []
+    # The positive control: the same ask with an option that names nothing is sent and answered.
+    answered, sent = _ask_person(world, ("resting on a bench, 12 m away",))
+    assert answered["status"] == "accepted" and len(sent.requests) == 1
+
+
+def test_a_choice_whose_description_carries_a_saved_name_is_refused(world):
+    """A choice a caller builds is judged like the rest of the request, its description too."""
+    manifest, model_id = _chosen_manifest()
+    client, transport = _person_client(world, manifest, model_id)
+    forged = ChoiceRequest(
+        description=f"Choose what {PERSON} does next.", options=("wait here a minute",)
+    )
+    with pytest.raises(HostedRequestRefused, match="the description of the choice"):
+        client.choose(
+            Role.SOCIETY_DECISION,
+            model_id,
+            [{"role": "user", "content": "What next?"}],
+            forged,
+            mechanism=AnsweringMechanism.TOOL_CALL,
+            prompt_version="v1",
+            timeout=5.0,
+        )
+    assert transport.requests == []
+
+
+def test_a_choice_s_function_and_argument_are_fixed_names_no_caller_writes():
+    """No text of a caller's rides in the function's name or its argument's, where no rule could
+    replace it: a choice is asked by the fixed names or not built at all."""
+    with pytest.raises(TypeError):
+        ChoiceRequest(name="maria_estrada", description="Choose.", options=("wait",))  # type: ignore[call-arg]
+    built = ChoiceRequest(description="Choose.", options=("wait here a minute", "rest"))
+    function = built.tool()["function"]
+    assert (function["name"], list(function["parameters"]["properties"])) == (
+        CHOICE_FUNCTION,
+        [CHOICE_ARGUMENT],
+    )
+    assert built.tool_choice() == {"type": "function", "function": {"name": CHOICE_FUNCTION}}
 
 
 # -- the right check at the boundary, reached past the call site's own ---------------------------

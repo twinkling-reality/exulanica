@@ -4,7 +4,8 @@ Status: **BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL**.
 
 The default `exulanica-society/v1` retains seeded synthetic motion. Opt-in
 `exulanica-society/v2` adds reachable goals, routes, reviewed visit/rest actions and reactions to
-versioned authored inputs. Opt-in `exulanica-society/v3` adds a bounded synthetic cast with
+versioned authored inputs, and lets a model its world's owner chose decide for a person at the
+routine's own choice points. Opt-in `exulanica-society/v3` adds a bounded synthetic cast with
 local observations, communicated beliefs and explicitly requested, validated model proposals.
 `exulanica-society/v4`, the living society, adds catalogued routines, occupancy and a
 population sized to its place; the browser creates live societies in the owned district with it,
@@ -28,6 +29,7 @@ residents, infer demographic facts or demonstrate general social intelligence.
 - [Server integration and HTTP](#server-integration-and-http)
 - [V3 bounded observations and communication](#v3-bounded-observations-and-communication)
 - [Explicit model proposals and exact replay](#explicit-model-proposals-and-exact-replay)
+- [A person run by a model their world's owner chose](#a-person-run-by-a-model-their-worlds-owner-chose)
 - [Validation](#validation)
 - [Persisted playback controls and bounded host progression](#persisted-playback-controls-and-bounded-host-progression)
 - [Typed user-directed actions](#typed-user-directed-actions)
@@ -39,13 +41,15 @@ residents, infer demographic facts or demonstrate general social intelligence.
 
 ## Connection to the world
 
-The society is the product's core: the people in a world are its agents, and the explicit model
-proposal path below is how an open model proposes what one of them does. Inhabitants interact with
-permitted places and authored objects through declared affordances. What a person brings into and
-changes in their world changes what its people do. Inhabitants never impersonate remembered people.
-The Companion explains what a person is doing and why from their recorded goal and action, the
-places they use and the events that explain them, cited as simulation and kept apart from personal
-evidence ([Companion questions](companion-question.md#questions-about-a-worlds-people)).
+The society is the product's core: the people in a world are its agents, and the two model paths
+below are how an open model decides what one of them does: a person a world's owner chose a model
+for, in a purposeful society, and the explicit proposal path of the social society. Inhabitants
+interact with permitted places and authored objects through declared affordances. What a person
+brings into and changes in their world changes what its people do. Inhabitants never impersonate
+remembered people. The Companion explains what a person is doing and why from their recorded goal
+and action, the places they use and the events that explain them, cited as simulation and kept apart
+from personal evidence ([Companion
+questions](companion-question.md#questions-about-a-worlds-people)).
 
 The pure engine and PostgreSQL lifecycle have synthetic fixture coverage. The connected
 personal-world demonstration additionally needs the server composition/rights adapter, accepted
@@ -116,7 +120,7 @@ An engine the table does not state is refused by name wherever it is looked up.
 | Engine | Inputs | Playback | Directed actions | Model decisions | Sent away | Saved world | Population |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `exulanica-society/v1` | no | no | no | no | no | no | 100 to 512 |
-| `exulanica-society/v2` | yes | yes | yes | no | yes | yes | 1 to 512 |
+| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | 1 to 512 |
 | `exulanica-society/v3` | yes | yes | yes | yes | no | yes | 1 to 512 |
 | `exulanica-society/v4` | yes | yes | no | no | no | no | 1 to 65,536 |
 
@@ -778,7 +782,9 @@ The Companion answers from the same recorded goal/action/event references, label
 `simulation` and is never evidence of a personal visit, and simulated visits are never evidence of
 real visits. Historical answer clauses still require personal evidence: a simulated fact is a clause
 of type `simulation`, never `historical`. It answers for the purposeful profile and refuses another
-by name. Authored
+by name. A `decision_applied` event records what a decision receipt did and is never one of its
+lines: the person's own events say what they did, a goal their model chose by the reason
+`chosen_by_their_model`. Authored
 composition and live visual acceptance are separate integration responsibilities, not capabilities
 inferred from a fixture.
 
@@ -886,6 +892,124 @@ and consumption bindings commit atomically. Replay uses the exact stored receipt
 that transition, checks context/decision hashes and dispositions, regenerates state/events, and
 verifies the final digest. A provider change cannot retroactively change replay.
 
+## A person run by a model their world's owner chose
+
+A purposeful society (`exulanica-society/v2`) with no choice recorded is the routine it always
+was: nothing is asked or reserved, and its replay reads no decision row. From the moment its
+world's owner chooses a model for one of its people, or for a group, that person's decisions at
+the routine's own choice points come from that model, validated, whenever the host asks it, and
+from the routine whenever it does not. Stored v2 histories have no decision rows and replay
+unchanged.
+
+**Choosing.** `POST /world/versions/{version_id}/society/models` records one choice,
+`{idempotency_key, people: [subject_id, ...], model: {provider, model_id} | null}`, where null is
+their own routine. It requires `world.write` and `model.invoke`, which in a browser only the
+workspace's owner holds. Choices are appended in order to `world_society_model_choice`
+(migration 0110), each naming who made it, and are never changed; a person's model is the latest
+choice naming them. A choice names people of this society and a model the manifest offers the
+`society_decision` role and the decision contract can ask, or it is refused by name
+(`CHOICE_REFUSALS` in `exulanica/world/society_model_choice_repository.py`): 422 for what the body
+names, 409 for a society whose engine takes no choice or a key reused for another choice. A
+choice naming one person twice is refused (`person_named_twice`), and an exact retry of a key is
+answered with the choice it recorded before anything else is checked, so it still returns after
+its model stops being offered. At most `model_people_maximum` people are run by models at once.
+`GET` at the same path, with `world.read`, returns the offered models in plain words with whether
+this process can ask each; whether this host asks models for the world at all, and why not
+(`host_refusal`); each person's choice, with why its model is not asked here when it is not
+(`refusal`), and their latest decision; and per model the decisions asked, accepted and applied,
+why the rest were not acted on, latency and cost, over the society's latest 2,000 decisions.
+
+**The contract.** `assets/catalogs/society/society-decision-action.v1.json` and
+`society-decision-policy.v1.json` state the actions and bounds, read by
+`exulanica/world/society_decision_contract.py`. A person is at a choice point where the routine
+itself chooses for them: when they have no goal, or their action has completed. A person blocked
+on the way to a goal keeps it, as the routine keeps it for them, and is not asked. Their options
+are each enabled place they
+can reach with room for them, the nearest `options_maximum` less one, labelled by what it is and
+how far ("resting on a bench, 5 m away"), and waiting a minute, in an order shuffled by the
+society's seed, the person and the minute. The model reads a fixed instruction and that person's
+situation: tiredness, what they just did and their options, and nothing of anybody else. It
+answers through one function, `act`, forced by name, whose one argument, `action`, is an enum of
+exactly those labels, or through a strict JSON schema of the same enum. The function's name, its
+argument's and its description are fixed product values, no caller's text; the mechanism is the highest
+ranked one the manifest names as verified for the model by a recorded probe. An answer that is
+not an offered label is asked once more, saying so; after `answer_attempts_maximum` answers the
+routine decides that turn.
+
+**The host.** Before each minute of a playing purposeful society in a workspace its environment
+lists, the playback worker's claim runs the host's decision phase
+(`exulanica/api/society_person_decisions.py`). It first closes, with the reason
+`unanswered_in_its_minute`, any request an earlier host reserved in the last few minutes and never
+answered, one that stopped between the two; that request's minute has already run with the routine
+deciding. An older one stays as it is: nothing replays or waits on a request without a receipt. What
+the host cannot ask, it decides before reserving anything, and it writes nothing for it: a process
+with no model client, or whose budget or share (below) leaves too little for the smallest ask of any
+offered model (`HOST_REFUSALS`), and a person whose chosen model is no longer offered, is served by
+another provider than the choice names, is served by a provider this process refuses, or needs more
+for one ask than the budget or the share has left (`MODEL_REFUSALS`). The models route says which,
+for the host and for each choice, and the page says the person follows their own routine until the
+host can ask it, and why. Once a minute, before it reserves anything and with no lock held, the
+host has the workspace's rules judge the function's fixed description and every label anybody it
+may ask could be offered, in one pass for each chosen model. A description the rules would change,
+as a saved name one of whose parts is a word of it would, asks nobody of that model and writes
+nothing; the models route names it for each such choice (`question_changed_by_rules`). Each other
+chosen person at a choice point is offered the places the rules send as they are, leaving out any
+whose words they would change, a place a saved name happens to match; a person left no place, or
+fewer than two options, is not asked and nothing is written. It reserves a request (`exulanica.society-decision-request/v2`), commits and closes its connection,
+asks the models concurrently, at most `concurrent_calls_maximum` at once, and records each receipt
+(`exulanica.society-decision/v2`) in its own transaction; then that claim advances one minute, so no
+later choice point of a person a model runs passes unasked. Every ask of the minute ends by one
+time: the contract's `decision_deadline_ms` after the phase begins, and never later than the lease
+leaves the minute to commit in. A phase with no time left asks nobody, and an ask that could only
+start after that time records `no_time_to_ask`. Nothing is asked for a person once the world's last
+hour holds `decisions_per_world_hour_maximum` asked decisions or `spend_per_world_hour_microusd` of
+their cost, counted from its receipts with an unknown cost at its bound and each ask already
+admitted that minute at its bound; each such receipt names the bound (`DECISION_REASONS`). A person
+whose situation is larger than `context_bytes_maximum` is not asked, and nothing is reserved for
+them. The page never asks a model, and a manual step takes only receipts already recorded.
+
+**Spend.** Two bounds hold whoever plays the world. The hourly bounds above hold each world. The
+process's model budget (`EXULANICA_BUDGET_USD`, `EXULANICA_BUDGET_MAX_CALLS`) is a ceiling for the
+life of the process that every model call it makes shares, the Companion, photograph ingestion,
+vision and caption search among them. People's decisions may use all of it but the contract's
+`process_reserve_percent`, which they leave for that other work, so a world played for hours never
+leaves the Companion or ingestion refused. The budget holds each admitted call's reservation until
+its usage is recorded, so calls admitted at once never cross a ceiling together. The host decides on
+what the process has spent, whoever spent it, never on what calls under way hold: once what is left,
+beside the part kept for other work, fits no ask, it asks nobody, and the models route and, where a
+playback host plays workspaces its environment lists, `/readyz` say so (`process_share_spent`, or `process_budget_spent` when the
+whole budget does not fit). Spending only grows while the process runs, so either holds until it
+restarts. A person whose own model needs more for one ask than is left is not asked either, while a
+cheaper model may still be asked for others, and the models route says so for their choice. An ask's
+need is its bound: every answer the contract allows, each with the largest situation a request may
+carry. A call under way can still leave one ask no room for its reservation, which that ask's
+receipt names. The recorded choice is what authorizes this spending: a caller who may play the world
+(`world.write`) starts it by playing, without holding `model.invoke`, and never beyond these bounds.
+
+**Sending everyone away.** `POST .../society/presence` waits while a model decides: it is refused
+with `a_request_is_waiting` while a person's request exists at the current minute or a receipt is
+unconsumed, as it is while a direct request waits, and the next minute consumes it. A receipt for
+somebody no longer here, one closed after its minute for a person sent away since, is consumed by
+their id alone and moves nobody.
+
+**The minute.** An accepted receipt is checked again against the minute. Asked over another state
+or input it is `stale`; a person's own direct request that minute supersedes it
+(`person_asked_directly`), as a second receipt for somebody already decided does
+(`subject_already_decided`). When the chosen place can no longer be reached or used, or another
+choice or request was promised it first this minute, the receipt is `rejected` with that reason.
+Otherwise it is `applied`, as a goal policy: a chosen place is the planner's goal with the reason
+`chosen_by_their_model`, and a chosen wait keeps the person where they are for the minute, which
+the planner records as blocked with the reason `validated_model_wait`. A receipt that is not
+accepted leaves the turn to the routine and keeps its status. Every consumed receipt
+appends one `decision_applied` event after the minute's other events, naming its `request_id`,
+`decision_seq`, `decision_sha256`, disposition and reason, the model as `{provider, model_id}` and
+the chosen label; `GET /world/versions/{version_id}/society/decisions/{request_id}` reads the
+request and its receipt, which names the calls, tokens and cost.
+
+**Replay.** Replay applies each transition's bound receipts exactly as they were recorded and
+calls no model, so the receipts, not the provider, determine the history. A model or provider
+that changes or is withdrawn later changes nothing already recorded.
+
 ## Validation
 
 Dedicated society tests distinguish pure policy fixtures from PostgreSQL scratch-schema evidence.
@@ -935,7 +1059,10 @@ environment lists workspaces (`EXULANICA_SOCIETY_CONTROL_WORKSPACES`, a JSON arr
 ids) or opts into fresh discovery of active account-owned workspaces through the isolated account
 role (`EXULANICA_SOCIETY_CONTROL_WORKER`); `docs/deployment.md` lists the settings and their
 refusals. Account-wide discovery is off by default and refuses startup without configured
-accounts and the reviewed current-input runtime. There are no model calls in the worker.
+accounts and the reviewed current-input runtime. The worker asks a model only in the decision
+phase before a minute of a purposeful society whose owner chose one for someone, and only for a
+workspace its environment lists
+([A person run by a model their world's owner chose](#a-person-run-by-a-model-their-worlds-owner-chose)).
 
 The authenticated base route is `/world/versions/{version_id}/society/control`:
 
@@ -1261,7 +1388,7 @@ from its recorded motion and speed. Summaries are templates naming the role or "
 **Persistence.** Migration 0075 admits v4 in the engine-version check, allows v4 populations of
 1 to 65,536 while keeping 100 to 512 for earlier profiles, and extends the versioned event order
 index and the input and event binding triggers. V4 uses the existing input, event and transition
-tables, playback controls and replay. Typed user actions and model decisions remain v2/v3 and v3
+tables, playback controls and replay. Typed user actions and model decisions remain v2 and v3
 features; v4 refuses them.
 
 **Rendering.** A saved world's inhabitants are drawn by the same crowd, hung from the authored

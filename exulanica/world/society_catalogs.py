@@ -21,6 +21,12 @@ five needs and whose versions living states record by digest. An input a saved w
 records the purposeful routine it was composed under (``PURPOSEFUL_ROUTINE_VERSIONS``), and an
 input that records none is read under ``UNRECORDED_ROUTINE_VERSIONS``, the rules the society was
 first released with, so no stored input changes meaning.
+
+The contract a model answers under when it runs a person in a world is read from the same
+directory, :func:`load_decision_catalogs`: ``society-decision-action``, what such a person may be
+asked to do and how each option reads, and ``society-decision-policy``, the bounds on asking.
+A decision request records the versions it was asked under, and a new contract is a new version
+published beside the old one.
 """
 
 from __future__ import annotations
@@ -48,6 +54,10 @@ if TYPE_CHECKING:
     from exulanica.world.object_catalog import WorldObjectCatalog
 
 __all__ = [
+    "DECISION_ACTION_CATALOG",
+    "DECISION_ACTION_KINDS",
+    "DECISION_CONTRACT_VERSIONS",
+    "DECISION_POLICY_CATALOG",
     "PURPOSEFUL_CATALOG",
     "PURPOSEFUL_ROUTINE_VERSIONS",
     "ROUTINE_DIRECTORY",
@@ -61,6 +71,7 @@ __all__ = [
     "RoutineModel",
     "UseClass",
     "check_object_kinds",
+    "load_decision_catalogs",
     "load_purposeful_routine",
     "load_routine_model",
     "purposeful_routine",
@@ -87,6 +98,13 @@ PURPOSEFUL_ROUTINE_VERSIONS: Final = {PURPOSEFUL_CATALOG: 2}
 #: The purposeful routine an input that records none is read under: every input composed before
 #: inputs recorded a routine, and every district input, keeps the rules it was recorded with.
 UNRECORDED_ROUTINE_VERSIONS: Final = {PURPOSEFUL_CATALOG: 1}
+#: The contract a model answers under when it runs a person: what it may be asked to do, and the
+#: bounds on asking. A new decision request records these versions.
+DECISION_ACTION_CATALOG: Final = "society-decision-action"
+DECISION_POLICY_CATALOG: Final = "society-decision-policy"
+DECISION_CONTRACT_VERSIONS: Final = {DECISION_ACTION_CATALOG: 1, DECISION_POLICY_CATALOG: 1}
+#: What an action asks of the engine: to go to one place for its activity, or to wait a minute.
+DECISION_ACTION_KINDS: Final = ("target", "wait")
 #: Where a purposeful activity happens: at a place an object states, at an open spot of the
 #: ground, or at two open spots beside each other, one for each of two people.
 PURPOSEFUL_SETTINGS: Final = ("object", "open", "pair")
@@ -293,6 +311,20 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         )
         for version in (1, 2)
     },
+    (DECISION_ACTION_CATALOG, 1): CatalogSchema(
+        DECISION_ACTION_CATALOG,
+        1,
+        (
+            ("kind", _choice(DECISION_ACTION_KINDS)),
+            ("words", text_field),
+            ("reason", text_field),
+        ),
+    ),
+    (DECISION_POLICY_CATALOG, 1): CatalogSchema(
+        DECISION_POLICY_CATALOG,
+        1,
+        (("value", integer_field(0, 10**9)), ("reason", text_field)),
+    ),
 }
 
 
@@ -634,6 +666,37 @@ def load_purposeful_routine(
         )
     return PurposefulRoutine(
         activities=activities, versions=chosen, sha256=catalog_digest(catalogs)
+    )
+
+
+def load_decision_catalogs(
+    directory: Path = ROUTINE_DIRECTORY, versions: Mapping[str, int] | None = None
+) -> tuple[dict[str, dict[str, FieldValue]], dict[str, dict[str, FieldValue]], dict[str, int], str]:
+    """Read one version of each decision contract catalog: actions, policy, versions and digest.
+
+    ``versions`` names the version of each; left out, it is the contract a new decision request
+    records. What the values mean is checked by :mod:`exulanica.world.society_decision_contract`.
+    """
+    chosen = dict(DECISION_CONTRACT_VERSIONS if versions is None else versions)
+    if set(chosen) != set(DECISION_CONTRACT_VERSIONS):
+        raise CatalogError(
+            f"a decision contract reads exactly {sorted(DECISION_CONTRACT_VERSIONS)}"
+        )
+    for catalog_id, version in sorted(chosen.items()):
+        if (catalog_id, version) not in SCHEMAS:
+            raise CatalogError(f"{catalog_id} v{version} has no schema")
+    _claimed(directory)
+    catalogs = {
+        catalog_id: load_catalog(
+            directory.joinpath(f"{catalog_id}.v{version}.json"), SCHEMAS[(catalog_id, version)]
+        )
+        for catalog_id, version in sorted(chosen.items())
+    }
+    return (
+        _values(catalogs[DECISION_ACTION_CATALOG]),
+        _values(catalogs[DECISION_POLICY_CATALOG]),
+        chosen,
+        catalog_digest([catalogs[key] for key in sorted(catalogs)]),
     )
 
 

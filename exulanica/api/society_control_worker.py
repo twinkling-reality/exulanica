@@ -1,9 +1,15 @@
-"""Explicitly hosted playback, bounded and fair across current authorised workspaces."""
+"""Explicitly hosted playback, bounded and fair across current authorised workspaces.
+
+Before a claimed minute, a host that asks models (``before_minute``) asks the model each chosen
+person's world owner picked, with no connection held; a world that runs people by models then
+advances one minute per claim, so no person's choice point is passed without being asked.
+"""
 
 from __future__ import annotations
 
 import logging
 import threading
+import time
 import uuid
 from collections.abc import Callable, Iterable
 
@@ -15,6 +21,8 @@ from exulanica.selection.validation import Session
 from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import (
     DEFAULT_BASE_TICK_INTERVAL_MS,
+    LEASE_SECONDS,
+    ControlClaim,
     LeaseLost,
     validate_settings,
 )
@@ -67,9 +75,13 @@ class SocietyControlWorker:
         workspaces: Iterable[uuid.UUID],
         workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
         base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS,
+        before_minute: Callable[[ControlClaim, float], bool] | None = None,
     ) -> None:
         validate_settings("paused", 1, base_tick_interval_ms)
         self.database, self.runtime = database, runtime
+        #: Asks the chosen models before a claimed minute, given the claim and the monotonic time
+        #: its lease runs out; says whether the world runs people by models.
+        self._before_minute = before_minute
         self._configured_workspaces = frozenset(workspaces)
         self._workspace_source = workspace_source
         self._workspace_lock = threading.Lock()
@@ -156,10 +168,22 @@ class SocietyControlWorker:
             )
         if claim is None:
             return None
+        lease_ends = time.monotonic() + LEASE_SECONDS
+        one_minute = False
+        if self._before_minute is not None:
+            try:
+                one_minute = self._before_minute(claim, lease_ends)
+            except Exception:
+                # The routine decides this minute; never the exception's text, which may carry
+                # request bytes or a credential.
+                _LOG.error("Society model decisions failed before a minute; the routine decides")
+                one_minute = True
         # Committed lease survives process death. No connection is retained between phases.
         try:
             with self.database.session(workspace) as connection:
-                return self._repository(connection, workspace, claim.world_id).execute(claim)
+                return self._repository(connection, workspace, claim.world_id).execute(
+                    claim, max_ticks=1 if one_minute else None
+                )
         except LeaseLost:
             return {"status": "lease_lost"}
 

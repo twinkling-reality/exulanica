@@ -74,29 +74,45 @@ def test_a_new_prompt_version_misses_the_cache(manifest, transport):
     assert transport.call_count == 2
 
 
+def _key(payload, spec, *, pipeline_version=1, role=Role.VISION, prompt_version="v1"):
+    return cache_key(
+        payload,
+        provider=spec.provider,
+        model_id=spec.model_id,
+        pipeline_version=pipeline_version,
+        role=role,
+        prompt_version=prompt_version,
+    )
+
+
 def test_a_new_pipeline_version_misses_the_cache(manifest, transport):
     """Replacing a model identifier must invalidate every answer the old model produced."""
-    key_a = cache_key({"messages": []}, pipeline_version=1, role=Role.VISION, prompt_version="v1")
-    key_b = cache_key({"messages": []}, pipeline_version=2, role=Role.VISION, prompt_version="v1")
+    spec = manifest[Role.VISION].primary
+    key_a = _key({"messages": []}, spec, pipeline_version=1)
+    key_b = _key({"messages": []}, spec, pipeline_version=2)
     assert key_a.digest != key_b.digest
 
 
-def test_a_different_role_misses_the_cache():
+def test_a_different_role_misses_the_cache(manifest):
     payload = {"messages": [{"role": "user", "content": "same text"}]}
-    a = cache_key(payload, pipeline_version=1, role=Role.VISION, prompt_version="v1")
-    b = cache_key(payload, pipeline_version=1, role=Role.REASONING_CHEAP, prompt_version="v1")
+    spec = manifest[Role.VISION].primary
+    a = _key(payload, spec, role=Role.VISION)
+    b = _key(payload, spec, role=Role.REASONING_CHEAP)
     assert a.digest != b.digest
 
 
-def test_the_model_id_is_not_in_the_key(manifest):
-    """A fallback swap during a deprecation must still hit the cache.
-
-    Otherwise a withdrawal turns into a full re-bill on top of a quality regression.
-    """
+def test_the_key_names_the_model_and_the_payload_digest_leaves_it_to_the_key(manifest):
+    """The chain writes each attempt's ``model`` into the payload, so the digest leaves it out, and
+    the key names the model itself: a fallback's answer is never the primary's entry."""
     base = {"messages": [{"role": "user", "content": "hello"}], "max_tokens": 2048}
-    primary = manifest[Role.REASONING_CHEAP].primary.model_id
-    fallback = manifest[Role.REASONING_CHEAP].fallback.model_id
-    assert request_digest({**base, "model": primary}) == request_digest({**base, "model": fallback})
+    binding = manifest[Role.REASONING_CHEAP]
+    primary, fallback = binding.primary, binding.fallback
+    assert request_digest({**base, "model": primary.model_id}) == request_digest(
+        {**base, "model": fallback.model_id}
+    )
+    assert _key(base, primary).digest != _key(base, fallback).digest
+    assert primary.model_id in str(_key(base, primary))
+    assert primary.provider in str(_key(base, primary))
 
 
 def test_the_request_digest_encoding_is_injective():

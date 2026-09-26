@@ -1,14 +1,25 @@
 {
-  "manifest_version": "1",
+  "manifest_version": "2",
   "pipeline_version": 3,
-  "base_url": "https://api.tokenfactory.nebius.com/v1",
-  "catalog_url": "https://tokenfactory.nebius.com/api/public/models_info",
-  "api_key_env": "NEBIUS_API_KEY",
-  "catalog_retrieved_at": "2026-08-27",
-  "note": "The only place in this codebase where a model identifier appears. Every price, context window and use_cases list below was read from flavors[].model_id in the catalog named by catalog_url on catalog_retrieved_at. Bumping any identifier here MUST bump pipeline_version, because pipeline_version is an input to the response cache key and a stale cached answer from a replaced model is a correctness bug, not a saving.",
+  "note": "The only place in this codebase where a model identifier appears. Every price, context window and use_cases list below was read from flavors[].model_id in the catalog of the model's provider on that provider's catalog_retrieved_at. Bumping any identifier here MUST bump pipeline_version, because stored caption vectors and evaluation records are keyed by it. The response cache key names the provider and the model as well, so a cached answer is never served for another model.",
+
+  "providers_note": "Where hosted requests go, as data. A provider states its endpoint, the one environment variable its credential is read from, and the catalog its models are checked against, read by catalog_format. Every model names its provider and no code names one. The origin a provider's requests reach is derived from base_url in the egress allowlist's own spelling, never stated a second time, and a provider whose origin the deployment's allowlist does not declare is refused by name.",
+  "providers": {
+    "nebius_token_factory": {
+      "base_url": "https://api.tokenfactory.nebius.com/v1",
+      "api_key_env": "NEBIUS_API_KEY",
+      "catalog_url": "https://tokenfactory.nebius.com/api/public/models_info",
+      "catalog_format": "model_flavors",
+      "catalog_retrieved_at": "2026-08-27",
+      "description": "Nebius Token Factory, which serves open models behind one OpenAI-compatible API."
+    }
+  },
 
   "models": {
     "nvidia/Nemotron-3_5-Lightning": {
+      "provider": "nebius_token_factory",
+      "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
+      "answering": {"json_schema": "docs/evaluation/2026-09-25-society-person-models-probe.json", "tool_call": "docs/evaluation/2026-09-25-society-person-models-probe.json"},
       "input_usd_per_mtok": 0.06,
       "output_usd_per_mtok": 0.24,
       "context_window_tokens": 1048576,
@@ -23,6 +34,9 @@
       "note": "Runtime-verified 2026-08-27: HTTP 200, echoed model field matches. Spends roughly 150 to 215 reasoning tokens on every call and there is no way to switch that off, which is where min_max_tokens comes from."
     },
     "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+      "provider": "nebius_token_factory",
+      "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
+      "answering": {"json_schema": "docs/evaluation/2026-09-25-society-person-models-probe.json", "tool_call": "docs/evaluation/2026-09-25-society-person-models-probe.json"},
       "input_usd_per_mtok": 0.06,
       "output_usd_per_mtok": 0.24,
       "context_window_tokens": 262144,
@@ -37,6 +51,8 @@
       "note": "Primary for reasoning_cheap. The callable identifier includes both vendor prefixes exactly as listed. The configured context window is smaller than the Lightning fallback window."
     },
     "nvidia/nemotron-3-super-120b-a12b": {
+      "provider": "nebius_token_factory",
+      "description": "Nemotron 3 Super 120B, an open reasoning model from NVIDIA.",
       "input_usd_per_mtok": 0.3,
       "output_usd_per_mtok": 0.9,
       "context_window_tokens": 262144,
@@ -51,6 +67,8 @@
       "note": "Configured as the reasoning_mid primary and reasoning_hard fallback. No production caller selects reasoning_mid. The callable identifier uses lowercase letters as listed."
     },
     "nvidia/Nemotron-3-Ultra-550b-a55b": {
+      "provider": "nebius_token_factory",
+      "description": "Nemotron 3 Ultra 550B, an open reasoning model from NVIDIA.",
       "input_usd_per_mtok": 1.0,
       "output_usd_per_mtok": 3.0,
       "context_window_tokens": 1048576,
@@ -65,6 +83,8 @@
       "note": "Configured as the reasoning_hard primary, with no production caller. Availability and task-specific quality must be evaluated before adoption; configuration alone does not establish either."
     },
     "MiniMaxAI/MiniMax-M3": {
+      "provider": "nebius_token_factory",
+      "description": "MiniMax M3, an open model from MiniMax that reads text and images.",
       "input_usd_per_mtok": 0.3,
       "output_usd_per_mtok": 1.2,
       "context_window_tokens": 1048576,
@@ -79,6 +99,8 @@
       "note": "Runtime-verified 2026-08-27 to accept an image_url content part and describe the image correctly, despite catalog_type reading text2text. use_cases is authoritative, type is not. Measured 277 prompt tokens at 256px and 772 at 768px."
     },
     "openbmb/MiniCPM-V-4_5": {
+      "provider": "nebius_token_factory",
+      "description": "MiniCPM-V 4.5, an open model from OpenBMB that reads images.",
       "input_usd_per_mtok": 0.658,
       "output_usd_per_mtok": 1.11,
       "context_window_tokens": 32000,
@@ -93,6 +115,9 @@
       "note": "Vision fallback. Both the type field and the use_cases list agree it takes images, so it is the safe side of the type-versus-use_cases disagreement. A 32K context is the reason it is not the primary."
     },
     "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+      "provider": "nebius_token_factory",
+      "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+      "answering": {"json_schema": "docs/evaluation/2026-09-25-society-person-models-probe.json", "tool_call": "docs/evaluation/2026-09-25-society-person-models-probe.json"},
       "input_usd_per_mtok": 0.2,
       "output_usd_per_mtok": 0.6,
       "context_window_tokens": 262144,
@@ -107,6 +132,9 @@
       "note": "Primary for structured_extraction, used for request classification, query planning, appearance drafts and environment-operation drafts. Structured output is validated by the client and the calling feature."
     },
     "deepseek-ai/DeepSeek-V4-Flash-0731": {
+      "provider": "nebius_token_factory",
+      "description": "DeepSeek V4 Flash, an open reasoning model from DeepSeek.",
+      "answering": {"json_schema": "docs/evaluation/2026-09-25-society-person-models-probe.json", "tool_call": "docs/evaluation/2026-09-25-society-person-models-probe.json"},
       "input_usd_per_mtok": 0.14,
       "output_usd_per_mtok": 0.28,
       "context_window_tokens": 1048576,
@@ -121,6 +149,8 @@
       "note": "The dated identifier, not the undated one. The undated deepseek-ai/DeepSeek-V4-Flash is scheduled for removal from Serverless on 2026-08-31 and must not be referenced."
     },
     "Qwen/Qwen3-Embedding-8B": {
+      "provider": "nebius_token_factory",
+      "description": "Qwen3 Embedding 8B, an open model from the Qwen team that turns text into vectors for search.",
       "input_usd_per_mtok": 0.01,
       "output_usd_per_mtok": 0.0,
       "context_window_tokens": 40960,
@@ -200,6 +230,14 @@
   "timeout_rule": {
     "headroom_factor": 2,
     "round_up_to_seconds": 5
+  },
+
+  "chosen_roles_note": "A chosen role has no model of its own here. The world names one, for a person or a group, among the models whose declared answering fits the caller's contract, and with no choice nothing is asked. A model answers a chosen role only by a mechanism its answering map names, each mechanism naming the record whose probe verified it; a model whose map names none is offered to no chosen role. Its calls have no fallback, because a choice names one model, and no timeout of their own: the caller bounds each call by its contract.",
+  "chosen_roles": {
+    "society_decision": {
+      "required_use_cases": ["text"],
+      "rationale": "A person in a world choosing what to do next, asked through the society's decision contract (assets/catalogs/society/society-decision-policy.v1.json and society-decision-action.v1.json). The world's owner chooses the model; with no choice the built-in planner decides and no model is asked."
+    }
   },
 
   "roles": {

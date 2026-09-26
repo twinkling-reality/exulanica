@@ -24,6 +24,7 @@ from decimal import Decimal
 from typing import Any
 
 from exulanica.models.budget import BudgetGuard
+from exulanica.models.choice import ChoiceRequest
 from exulanica.models.errors import (
     ModelError,
     SchemaViolationError,
@@ -44,6 +45,42 @@ from exulanica.models.usage import CallUsage
 __all__ = ["checked_payload", "embedding_from_body", "result_from_body"]
 
 
+def _record_attempt(
+    budget: BudgetGuard,
+    *,
+    role: Role,
+    spec: ModelSpec,
+    body: Any,
+    cache_hit: bool,
+    used_fallback: bool,
+    latency_s: float,
+    usd_bound: Decimal | None,
+) -> CallUsage:
+    """Record a call that came back, before anything in its body is read or believed.
+
+    A body or a ``usage`` that is not an object reports nothing, so the call is charged its
+    reservation (``usd_bound``) as a call of unknown cost, and the reservation is given back.
+    """
+    reported = body.get("usage") if isinstance(body, Mapping) else None
+    usage = CallUsage.from_response(
+        role=role,
+        spec=spec,
+        usage=reported if isinstance(reported, Mapping) else None,
+        cache_hit=cache_hit,
+        used_fallback=used_fallback,
+        latency_s=latency_s,
+        usd_bound=usd_bound,
+    )
+    return budget.record(usage, released=usd_bound)
+
+
+def _is_vector_row(row: Any) -> bool:
+    vector = row.get("embedding") if isinstance(row, Mapping) else None
+    return isinstance(vector, list) and all(
+        isinstance(x, (int, float)) and not isinstance(x, bool) for x in vector
+    )
+
+
 def result_from_body(
     *,
     role: Role,
@@ -58,20 +95,30 @@ def result_from_body(
     tried: tuple[str, ...],
     response_format: Mapping[str, Any] | None = None,
     usd_bound: Decimal | None = None,
+    choice_request: ChoiceRequest | None = None,
 ) -> ChatResult:
+    """A completed call's result, once its reply is whole and, where one was asked for, checked.
+
+    ``choice_request`` is the choice a request asked for by its function: the reply's one tool
+    call is read, and its payload is the option it chose, or the reply is refused.
+    """
     # Recorded before anything about the reply is believed, a reply with no choices included: the
     # request reached the provider and came back, so it may be billed, and the ledger, the budget
     # and a request's own record must each see it.
-    usage = CallUsage.from_response(
+    usage = _record_attempt(
+        budget,
         role=role,
         spec=spec,
-        usage=body.get("usage"),
+        body=body,
         cache_hit=cache_hit,
         used_fallback=used_fallback,
         latency_s=latency_s,
         usd_bound=usd_bound,
     )
-    budget.record(usage)
+    if not isinstance(body, Mapping):
+        raise TransportError(
+            f"{spec.model_id} returned a body that is not an object", retryable=False
+        )
 
     choices = body.get("choices") or []
     if not choices:
@@ -107,15 +154,21 @@ def result_from_body(
             "preamble, so there is no answer in this response. Raise max_tokens and retry."
         )
 
-    payload = (
-        None
-        if response_format is None
-        else checked_payload(split.answer, response_format, spec.model_id)
-    )
+    if choice_request is not None:
+        payload: dict[str, Any] | None = {
+            choice_request.argument: choice_request.answer_from_tool_call(message)
+        }
+    else:
+        payload = (
+            None
+            if response_format is None
+            else checked_payload(split.answer, response_format, spec.model_id)
+        )
 
     return ChatResult(
         role=role,
         model_id=spec.model_id,
+        provider=spec.provider,
         served_model_id=str(body.get("model") or spec.model_id),
         answer=split.answer,
         reasoning=split.reasoning,
@@ -189,18 +242,25 @@ def embedding_from_body(
     tried: tuple[str, ...] = (),
     usd_bound: Decimal | None = None,
 ) -> EmbeddingResult:
-    rows = body.get("data") or []
-    vectors = tuple(tuple(float(x) for x in row.get("embedding") or ()) for row in rows)
-    usage = CallUsage.from_response(
+    # Recorded before a vector is read, as a chat reply is: a malformed row is the provider's
+    # answer to a request it may bill.
+    usage = _record_attempt(
+        budget,
         role=role,
         spec=spec,
-        usage=body.get("usage"),
+        body=body,
         cache_hit=cache_hit,
         used_fallback=used_fallback,
         latency_s=latency_s,
         usd_bound=usd_bound,
     )
-    budget.record(usage)
+    rows = body.get("data") if isinstance(body, Mapping) else None
+    if not isinstance(rows, list) or not all(_is_vector_row(row) for row in rows):
+        raise TransportError(
+            f"{spec.model_id} returned embeddings that are not a list of number vectors",
+            retryable=False,
+        )
+    vectors = tuple(tuple(float(x) for x in row["embedding"]) for row in rows)
     dimensions = len(vectors[0]) if vectors else 0
     expected = spec.embedding_dimensions
     if expected is not None and vectors and dimensions != expected:

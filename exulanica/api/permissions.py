@@ -33,11 +33,19 @@ the day the vocabulary grew. The members are derived from the surface that exist
 distinguished from writes, and the consequential writes are isolated so each has to be granted by
 name: intake, deletion and withdrawal, person consent, admission, world write and operations.
 Two members are not a surface of their own. ``model.invoke`` sits beside a read on every route
-that may call a model, because those routes spend money and reach the network. ``tiles.materialise``
-meters a route against :mod:`exulanica.api.quotas` by being declared on it, and declaring it is the
-only way a route is metered. Three routes hold it: the two ``/tiles`` reads, which serve bytes an
-offline bake already made, and ``POST /world-generation/worlds``, which is the first route whose
-cost scales with what the caller asked for and therefore the first that charges MORE than one tile.
+that may call a model, because those routes spend money and reach the network, and beside a write
+on the two society routes that commit a world to a model: a decision the society endpoint asks a
+model for (``POST .../society/decisions``), and the choice of the model that decides for a person
+(``POST .../society/models``). That recorded choice is the authorization for the spend it
+causes. The host's playback asks the chosen model for a listed workspace whoever plays the world,
+so a token holding ``world.write`` without ``model.invoke`` may start spending by playing a world
+whose owner chose a model (``PUT .../society/control``), always within the decision contract's
+bounds per world and hour and the share of the process's budget it keeps for other work.
+``tiles.materialise`` meters a route against :mod:`exulanica.api.quotas` by being declared on it,
+and declaring it is the only way a route is metered. Three routes hold it: the two ``/tiles``
+reads, which serve bytes an offline bake already made, and ``POST /world-generation/worlds``,
+which is the first route whose cost scales with what the caller asked for and therefore the first
+that charges MORE than one tile.
 
 **Who holds what.** A bearer token holds exactly the permissions its grant in
 ``EXULANICA_API_TOKENS`` names. A browser session holds :data:`ACCOUNT_OWNER_PERMISSIONS`, because
@@ -369,11 +377,13 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
     "POST /selection/environment",
 )
 
-#: A world write whose decision provider is a model: the endpoint reaches it through
-#: exulanica.api.society_decision_runtime.request_decision, and records what it proposed.
+#: World writes that commit the world to a model: the decisions endpoint reaches one through
+#: exulanica.api.society_decision_runtime.request_decision and records what it proposed, and a
+#: choice of the model that runs a world's people commits the world's host to asking it.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
     "POST /world/versions/{version_id}/society/decisions",
+    "POST /world/versions/{version_id}/society/models",
 )
 
 #: The only way new photographs arrive.
@@ -491,6 +501,7 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/society/events",
     "GET /world/versions/{version_id}/society/experiments/{experiment_id}",
     "GET /world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}",
+    "GET /world/versions/{version_id}/society/models",
     "GET /world/versions/{version_id}/society/replay",
     "GET /worlds",
 )

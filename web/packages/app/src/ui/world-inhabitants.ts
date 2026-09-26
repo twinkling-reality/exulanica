@@ -135,7 +135,8 @@ export function placeRows(objects: readonly InhabitedObject[], places: SocietyPl
 const PRESENCE_WORDS: Readonly<Record<string, string>> = {
   nobody_to_send_away: 'Nobody is here to send away.',
   already_here: 'They are already here.',
-  a_request_is_waiting: 'Someone was just asked to go somewhere. Advance one minute first, then ask again.',
+  a_request_is_waiting: 'Someone was just asked to go somewhere, or a model\'s decision for someone waits for '
+    + 'the next simulated minute. Advance one minute first, then ask again.',
   nowhere_to_arrive: 'They cannot come back yet: there is nowhere in this world they could reach. Put something '
     + `they can rest on or visit near where you arrive, then ask again. ${say('inhabitants.whereToPlace')}`,
   stale_society_state: 'This world changed while you were deciding. Look again, then ask again.',

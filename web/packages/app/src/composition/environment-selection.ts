@@ -34,6 +34,8 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { createLiveSociety, type LiveSociety, type LiveSocietyView } from './live-society.js';
+import { mountSocietyModels, type MountedSocietyModels } from './society-models-mount.js';
+import type { SocietyModelsClient } from '../society-models-api.js';
 import { unreadMinutes } from './society-unread-minutes.js';
 import { SocietyDistrictClient, type SocietyDistrictPlacement, type SocietyDistrictView } from '../society-district-api.js';
 import {
@@ -121,6 +123,7 @@ export interface EnvironmentSelectionDependencies {
   readonly worldClient?: WorldObjectsClient;
   readonly societyClient?: SocietyClient;
   readonly societyControlClient?: SocietyControlClient;
+  readonly societyModelsClient?: SocietyModelsClient;
   readonly societyDistrictClient?: SocietyDistrictClient;
   readonly onDistrictPlacementChange?: () => void;
   /** Ask the Companion about the simulated person selected in the inspector. */
@@ -360,6 +363,8 @@ export function mountEnvironmentSelection(
   let savedWorld: { readonly worldId: string; readonly versionId: string; readonly regionId: string } | null = null;
   /** One directed-action control per usable place, kept across re-renders of the same person. */
   const savedWorldActions = new Map<string, SocietyDirectedActionControl>();
+  /** Who decides for a saved world's people, beside them in People nearby. */
+  let societyModels: MountedSocietyModels | null = null;
   let savedWorldActionClient: SocietyClient | null = null;
   const inhabitantsPanel = buildWorldInhabitants({
     onBringIn: () => void bringInInhabitants(),
@@ -583,6 +588,7 @@ export function mountEnvironmentSelection(
         ...(citedWords?.inhabitantId === id ? [['Cited by the Companion', citedWords.text] as const] : []),
         ...(words !== null ? [
           ['Recorded explanation', inhabitant.explanation?.summary ?? 'Unavailable'],
+          ...(societyModels?.personDetails(id) ?? []),
           ...(resting ? [['Drawn as', restDrawn] as const] : []),
         ] as const : []),
         ['Plane / origin', 'Simulation · synthetic'],
@@ -1543,9 +1549,15 @@ export function mountEnvironmentSelection(
       }
     }
     for (const control of savedWorldActions.values()) control.reflect();
+    void societyModels?.refresh(society?.currentTick ?? null, savedWorldPeople());
     reflectNearby();
     reflectPlayback();
     atlas?.invalidate();
+  }
+
+  /** A saved world's people, as People nearby names them. */
+  function savedWorldPeople(): readonly { readonly id: string; readonly name: string }[] {
+    return (society?.state.inhabitants ?? []).map((person) => ({ id: person.id, name: inhabitantLabel(person) }));
   }
 
   /**
@@ -1646,6 +1658,13 @@ export function mountEnvironmentSelection(
     workspace.setAvailability(true);
     const heading = workspace.nearby.firstElementChild;
     if (heading) heading.after(inhabitantsPanel.root); else workspace.nearby.prepend(inhabitantsPanel.root);
+    societyModels = mountSocietyModels({
+      credentials: deps.credentials, world: savedWorld,
+      ...(deps.societyModelsClient ? { client: deps.societyModelsClient } : {}),
+      // A read that changes who decides for the inspected person says so in the open inspector.
+      onRead: () => { if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false); },
+    });
+    inhabitantsPanel.root.after(societyModels.root);
     const atlas = deps.state.atlas?.binding;
     if (atlas?.authoredSociety == null) {
       inhabitantsPanel.unavailable('This world is not drawn here, so nobody can be shown in it.');
@@ -1681,6 +1700,7 @@ export function mountEnvironmentSelection(
     if ((phase as string) === 'disposed') return;
     renderInhabitantsPanel();
     reflectNearby();
+    void societyModels.refresh(society?.currentTick ?? null, savedWorldPeople(), true);
     atlas.invalidate();
   }
 
@@ -1879,6 +1899,7 @@ export function mountEnvironmentSelection(
       stopControlPoll();
       if (!deps.env.preview) clearDistrict();
       liveSociety?.dispose();
+      societyModels?.dispose();
       if (liveSociety || recording) crowd()?.clearSociety();
       savedWorldActions.clear();
       recording = null;

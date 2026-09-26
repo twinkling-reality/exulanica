@@ -57,9 +57,10 @@ def test_every_engine_in_the_table_is_implemented_and_every_implementation_is_li
 
 def test_each_capability_is_claimed_only_by_engines_that_implement_it():
     # A capability in the table is a promise the code keeps: directed actions are v2 and v3's
-    # goal-policy seam, model decisions are v3's social policy, experiments run the living engine.
+    # goal-policy seam, model decisions are v2's person decisions over that same seam and v3's
+    # social policy, experiments run the living engine.
     assert ACTION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
-    assert DECISION_ENGINES == (SOCIAL_PROFILE,)
+    assert DECISION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
     assert EXPERIMENT_ENGINES == (LIVING_PROFILE,)
     assert SAVED_WORLD_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
     # Sending people away and bringing them back is the purposeful engine's own transition.

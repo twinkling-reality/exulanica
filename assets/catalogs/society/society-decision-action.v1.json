@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-decision-action",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "go",
+      "kind": "target",
+      "words": "{activity}, {metres} m away",
+      "reason": "Going somewhere to do what is done there: one option for each place the person can reach that has room for them this minute, named by what the world's routine says people do at it and how far the walk is, so options are told apart by what they are and never by where they sit in a list. The engine applies it only if the place is still enabled, unchanged, reachable and free when the minute runs.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "wait",
+      "kind": "wait",
+      "words": "wait here a minute",
+      "reason": "Staying where they are for one simulated minute, after which they choose again. It is offered only beside at least one place to go: a person with nowhere to go is left to the routine, and no model is asked.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    }
+  ]
+}

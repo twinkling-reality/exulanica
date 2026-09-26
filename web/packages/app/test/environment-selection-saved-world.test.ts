@@ -9,6 +9,7 @@ import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import { parseSociety, parseSocietyActionRecord, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
+import { parseSocietyModels } from '../src/society-models-api.js';
 
 /*
  * A person's own saved world: inhabitants are drawn over its authored region, they exist only
@@ -70,6 +71,21 @@ const control = (tick: number) => parseSocietyControl({
   play_ineligible_reason: null, play_eligible: true,
 }, 'version');
 
+const MODEL = { provider: 'nebius_token_factory', model_id: 'nvidia/nemotron' };
+/** Who decides for the saved world's people: Person 0 by a model, whose last choice they acted on. */
+const models = () => parseSocietyModels({
+  profile: 'exulanica.society-models/v1', society_id: 'society', engine: 'exulanica-society/v2',
+  takes_model_choices: true, host_refusal: null,
+  contract: { versions: {}, sha256: 'c'.repeat(64), model_people_maximum: 8 },
+  models: [{ ...MODEL, description: 'Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.',
+    provider_description: 'Nebius Token Factory.', mechanism: 'tool_call',
+    usd_per_mtok: { input: '0.06', output: '0.24' }, refusal: null }],
+  choices: [{ subject_id: 'person-0', model: MODEL, choice_seq: 1, chosen_by: 'actor', recorded_at: '2026-09-25T10:00:00Z', refusal: null }],
+  latest: [{ ...MODEL, subject_id: 'person-0', decision_seq: 1, base_tick: 0, consumed_tick: 1, status: 'accepted',
+    reason: 'validated_choice', disposition: 'applied', disposition_reason: 'validated_choice', chose: 'rest, 4 m away' }],
+  by_model: [], decisions_read: { counted: 1, maximum: 2000 },
+});
+
 function mount() {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   let held: SocietySnapshot | null = null;
@@ -109,6 +125,7 @@ function mount() {
   // the society derives for a marker.
   const assets = [{ ...plate('unused', 0, 0).asset, placeable: true, use: { affordance: 'rest', places: null } }];
   const worldClient = { connect: vi.fn(async () => ({ assets, version })), assets: vi.fn(() => assets) };
+  const modelsClient = { read: vi.fn(async () => models()), choose: vi.fn(async () => undefined) };
   const canvas = document.createElement('canvas');
   const mounted = mountEnvironmentSelection({
     env: { canvas, preview: false } as unknown as AppEnvironment,
@@ -121,10 +138,11 @@ function mount() {
     credentials: { baseUrl: 'https://example.test', token: 'token' },
     showStatus: vi.fn(), admissionId: null,
     worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
+    societyModelsClient: modelsClient as never,
   });
   document.body.append(mounted.root);
   const panel = () => mounted.root.querySelector<HTMLElement>('section.world-inhabitants')!;
-  return { mounted, crowd, controls, societyClient, controlClient, worldClient, panel, canvas };
+  return { mounted, crowd, controls, societyClient, controlClient, worldClient, modelsClient, panel, canvas };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -223,5 +241,55 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     const seated = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(seated).toContainEqual(['Drawn as', 'Sitting on the seat at the place.']);
     mounted.dispose();
+  });
+
+  it('who decides for them is chosen beside them, and the inspector says what their model chose', async () => {
+    const { mounted, controls, modelsClient, panel } = mount();
+    await mounted.begin();
+    // Nobody lives here yet, so there is nobody to choose for and nothing is read.
+    const section = mounted.root.querySelector<HTMLElement>('section.society-models')!;
+    expect(section.hidden).toBe(true);
+    expect(modelsClient.read).not.toHaveBeenCalled();
+    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring in inhabitants')!.click();
+    for (let i = 0; i < 6; i += 1) await settle();
+    expect(modelsClient.read).toHaveBeenCalledWith('version');
+    expect(section.hidden).toBe(false);
+    // Beside the people, after the inhabitants panel, in People nearby.
+    expect(panel().nextElementSibling).toBe(section);
+    const rows = [...section.querySelectorAll<HTMLElement>('label[data-subject-id]')];
+    expect(rows[0]!.textContent).toBe(' Person 0 · Nemotron 3 Nano 30B, which you chose.');
+    expect(rows[1]!.textContent).toBe(' Person 1 · Their own routine.');
+    // A group: two people ticked, one model, sent for this saved world's version.
+    for (const row of rows.slice(1, 3)) {
+      const box = row.querySelector('input')!;
+      box.checked = true;
+      box.dispatchEvent(new Event('change'));
+    }
+    section.querySelector('select')!.value = `${MODEL.provider} ${MODEL.model_id}`;
+    [...section.querySelectorAll('button')].find((b) => b.textContent === 'Use for the chosen people')!.click();
+    for (let i = 0; i < 4; i += 1) await settle();
+    expect(modelsClient.choose).toHaveBeenCalledWith(
+      'version', ['person-1', 'person-2'], { provider: MODEL.provider, modelId: MODEL.model_id },
+    );
+    expect(section.textContent).toContain('2 people are now decided by the model you chose');
+    // The inspector says who decides for this person and what their model last chose.
+    controls.onInteract?.();
+    for (let i = 0; i < 2; i += 1) await settle();
+    const inspector = mounted.root.querySelector<HTMLElement>('.living-world-inspector')!;
+    const details = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
+    expect(details).toContainEqual(['Decided by', 'Nemotron 3 Nano 30B, which you chose.']);
+    expect(details).toContainEqual(['Latest decision', 'At simulated minute 1, Nemotron 3 Nano 30B chose “rest, 4 m away”, and they did it.']);
+    // A minute advanced is read once more, and the same minute drawn again is not.
+    const reads = modelsClient.read.mock.calls.length;
+    const advance = () => [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Advance one minute')!;
+    advance().click();
+    for (let i = 0; i < 6; i += 1) await settle();
+    expect(panel().querySelector('.world-inhabitants-summary')?.textContent).toMatch(/Simulated minute 1\./);
+    expect(modelsClient.read).toHaveBeenCalledTimes(reads + 1);
+    advance().click();
+    for (let i = 0; i < 6; i += 1) await settle();
+    expect(modelsClient.read).toHaveBeenCalledTimes(reads + 1);
+    mounted.dispose();
+    expect(mounted.root.querySelector('section.society-models')).toBeNull();
   });
 });

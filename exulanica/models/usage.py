@@ -95,6 +95,8 @@ class CallUsage:
 
     role: Role
     model_id: str
+    #: The key of the provider the attempt was sent to, as the manifest names it.
+    provider: str
     prompt_tokens: int
     completion_tokens: int
     reasoning_tokens: int
@@ -142,6 +144,7 @@ class CallUsage:
         return cls(
             role=role,
             model_id=spec.model_id,
+            provider=spec.provider,
             prompt_tokens=0,
             completion_tokens=0,
             reasoning_tokens=0,
@@ -174,9 +177,12 @@ class CallUsage:
         count alone. The token fields still read zero for an omitted count, for accounting;
         :class:`exulanica.selection.calls.ModelCall` reads the raw body when absence matters.
         A cache hit issued no request, so it is charged nothing whatever its stored report says.
+        A ``usage`` or its details that is not an object is absent, never a reason to raise
+        before the call is recorded.
         """
-        usage = usage or {}
-        details = usage.get("completion_tokens_details") or {}
+        usage = usage if isinstance(usage, Mapping) else {}
+        details = usage.get("completion_tokens_details")
+        details = details if isinstance(details, Mapping) else {}
         prompt_tokens = _as_int(usage.get("prompt_tokens"))
         completion_tokens = _as_int(usage.get("completion_tokens"))
         cost = spec.cost_usd(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
@@ -199,6 +205,7 @@ class CallUsage:
         return cls(
             role=role,
             model_id=spec.model_id,
+            provider=spec.provider,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             reasoning_tokens=_as_int(details.get("reasoning_tokens")),

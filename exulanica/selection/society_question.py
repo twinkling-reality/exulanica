@@ -68,6 +68,7 @@ from exulanica.selection.plan import SocietyAspect, SocietyScope, SocietySelecto
 from exulanica.selection.prompts import _SOCIETY_COMPOSER_SYSTEM, PROMPT_VERSION
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
 from exulanica.world.society_engines import INPUT_ENGINES
+from exulanica.world.society_model_decisions import DECISION_EVENT_KIND
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
@@ -528,6 +529,10 @@ def _authorized_events(
     events are ordered as ``SocietyRepository.events`` orders them. An event whose input a
     withdrawal no longer authorizes is left out, and only it; a stored input that does not verify
     raises, as the repository does.
+
+    An event recording what a decision receipt did (:data:`DECISION_EVENT_KIND`) is never read
+    here, so none takes a line: the words catalog has none for it, and the person's own events say
+    what they did, a goal their model chose by the reason ``chosen_by_their_model``.
     """
     if latest is None and not event_ids:
         return []
@@ -540,11 +545,13 @@ def _authorized_events(
         "select e.event_id,e.tick,e.event_kind,e.subject_id,e.document "
         "from world_society_event e join world_society s "
         "on s.workspace_id=e.workspace_id and s.society_id=e.society_id "
-        "where e.workspace_id=%s and s.world_id=%s and e.society_id=%s " + chosen,
+        "where e.workspace_id=%s and s.world_id=%s and e.society_id=%s and e.event_kind<>%s "
+        + chosen,
         (
             workspace_id,
             world_id,
             snapshot["society_id"],
+            DECISION_EVENT_KIND,
             latest if latest is not None else list(event_ids),
         ),
     ).fetchall()

@@ -11,9 +11,10 @@ and no stronger.
 one, checks every URL against it before the client is called, and mounts a transport inside that
 client which checks every request again at the last point before a connection is opened, so a
 redirect hop is held to the same rule as the first request.
-:class:`exulanica.models.client.ModelClient` checks the manifest's ``base_url`` against it at
-construction, so a deployment whose allowlist does not name its own model endpoint fails at
-startup rather than at the first question.
+:class:`exulanica.models.client.ModelClient` checks each provider's origin against it at
+construction, so a deployment whose allowlist does not name the endpoint of a provider serving a
+role the manifest binds fails at startup rather than at the first question, and any other
+provider it does not name is refused by name at each call.
 
 **No default.** An absent or malformed allowlist raises, for the reason
 :func:`exulanica.api.authorisation.load_token_directory` raises: a default allowlist would be a
@@ -69,6 +70,7 @@ __all__ = [
     "EgressError",
     "EgressRefused",
     "Origin",
+    "declared_origin",
     "load_egress_allowlist",
     "parse_egress_allowlist",
 ]
@@ -312,6 +314,29 @@ def parse_egress_allowlist(entries: Iterable[object]) -> EgressAllowlist:
             raise EgressConfigurationError(f"{EGRESS_ALLOWLIST_ENV}: {origin} is declared twice")
         origins.add(origin)
     return EgressAllowlist(frozenset(origins))
+
+
+def declared_origin(url: str) -> str:
+    """The origin this allowlist would have to declare for ``url``, in its one spelling.
+
+    Parsed by :func:`parse_egress_allowlist`, so anything the list would refuse to declare, an
+    address, userinfo, plain http to a remote host, is refused here too, and a default port is
+    written the way :class:`Origin` writes it. The model manifest derives each provider's origin
+    with this rather than stating it beside the provider's URL a second time.
+    """
+    if not isinstance(url, str) or not url:
+        raise ValueError("a destination must be a URL or an origin")
+    parts = urllib.parse.urlsplit(url)
+    if not parts.scheme or not parts.netloc:
+        raise ValueError(f"{url!r} names no origin")
+    try:
+        allowlist = parse_egress_allowlist([f"{parts.scheme}://{parts.netloc}"])
+    except EgressError as exc:
+        raise ValueError(
+            f"{url!r} names no origin the egress allowlist could declare: {exc}"
+        ) from exc
+    (origin,) = allowlist.origins
+    return str(origin)
 
 
 def load_egress_allowlist(environ: Mapping[str, str] | None = None) -> EgressAllowlist:

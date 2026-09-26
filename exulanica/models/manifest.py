@@ -16,11 +16,25 @@ Four consequences follow, and all four are enforced here rather than by conventi
     catalog; it declares ``null`` and the client raises rather than substituting a model from a
     different vector space, which would silently poison every stored vector.
 *   ``pipeline_version`` lives in the manifest. Changing an identifier is required to bump it,
-    which invalidates every cached response produced by the model being replaced. A cache that
-    outlived the model that filled it would be a correctness bug wearing a cost saving's coat.
+    which invalidates every stored caption vector and evaluation provenance keyed by the model
+    being replaced. The response cache key names the provider and the model besides, so a
+    cached answer is never served for another model.
 *   Prices are read with ``json.loads(parse_float=Decimal)`` and stay ``Decimal`` all the way to
     the reported total. Money never becomes a float here: a float dollar amount accumulated over
     a corpus is a number nobody can reconcile against an invoice.
+
+**Providers are data.** A provider states where its requests go, the one environment variable
+its credential is read from and the catalog its models are checked against; every model names
+its provider, and no code names one. The origin a provider's requests reach is derived from its
+``base_url`` by :func:`exulanica.models.egress.declared_origin`, the egress allowlist's own
+spelling, so it is never stated a second time, and a URL the allowlist could not declare is
+refused here. A role's chain stays on one provider, because a hand-over names one destination.
+
+**A chosen role has no model here.** The world names one, for a person or a group, among the
+models the manifest offers the role: a model is offered when its ``answering`` map names at least
+one mechanism by which it was verified to answer a choice, each naming the record of the probe
+that verified it, and its catalog use cases hold the role's. A model with no verified mechanism
+is offered to no chosen role.
 
 **Casing is load bearing.** The catalog's human-readable ``name`` field differs from the callable
 ``model_id``, inconsistently across the reasoning line: one identifier doubles its vendor prefix,
@@ -33,7 +47,8 @@ silent 404-class failure.
 primary, and one ``timeout_rule`` saying how the first follows from the second. The parser derives
 each timeout from its basis and refuses a manifest that states a different one, so a timeout can
 not drift from the measurement it claims, and a changed primary cannot keep the old primary's
-basis. The client reads the timeout from here; no second constant exists in code.
+basis. The client reads the timeout from here; no second constant exists in code. A chosen role
+states none: its caller bounds each call by its own contract.
 
 **Region strings are informational.** Token Factory reports its public endpoints as Region
 "Global" and warns the processing location can change without notice, so only the global base URL
@@ -43,8 +58,9 @@ is ever used and nothing in this codebase branches on a region.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
 from functools import lru_cache
@@ -52,13 +68,17 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final
 
+from exulanica.models.egress import declared_origin
 from exulanica.models.errors import ManifestError
 
 __all__ = [
     "MANIFEST_PATH",
-    "PROVIDER",
+    "AnsweringMechanism",
+    "CatalogFormat",
+    "ChosenRoleBinding",
     "Manifest",
     "ModelSpec",
+    "Provider",
     "Role",
     "RoleBinding",
     "TimeoutRule",
@@ -69,9 +89,13 @@ __all__ = [
 
 MANIFEST_PATH: Final = Path(__file__).with_name("models.manifest.json")
 
-#: Recorded on every ledger row and every ``model_ref``. One provider today, named explicitly so
-#: a second one later is an added value rather than an ambiguous blank.
-PROVIDER: Final = "nebius_token_factory"
+#: A provider key, the same shape a model identity's provider takes (``exulanica.models.handoff``).
+_PROVIDER_KEY: Final = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+#: The variables a provider's credential may be read from: an API key's, and never one of this
+#: application's own settings, so a manifest entry cannot send a database URL as a bearer token.
+_KEY_VARIABLE: Final = re.compile(r"^(?!EXULANICA_)[A-Z][A-Z0-9_]{0,55}_API_KEY$")
+#: Where a verified mechanism's evidence lives: a record under ``docs/evaluation``.
+_RECORD_PATH: Final = re.compile(r"^docs/evaluation/[A-Za-z0-9._/-]+\.json$")
 
 
 class Role(StrEnum):
@@ -83,6 +107,57 @@ class Role(StrEnum):
     VISION = "vision"
     STRUCTURED_EXTRACTION = "structured_extraction"
     EMBEDDING = "embedding"
+    #: A person in a world choosing what to do next; the world chooses the model.
+    SOCIETY_DECISION = "society_decision"
+
+
+class CatalogFormat(StrEnum):
+    """How a provider's machine-readable catalog is read, by the shape of its document."""
+
+    #: A JSON array of models, each with ``flavors[]`` naming ``model_id``, ``use_cases`` and
+    #: prices per million tokens.
+    MODEL_FLAVORS = "model_flavors"
+
+
+class AnsweringMechanism(StrEnum):
+    """How a model is asked for one choice among labelled options, when it was verified to answer.
+
+    Each is a request the client builds itself. A manifest names a mechanism for a model only with
+    the record of the probe that verified it; the client never asks a model by a mechanism its
+    entry does not name.
+    """
+
+    #: One OpenAI-format function whose single argument is an enum of the options, forced by name.
+    TOOL_CALL = "tool_call"
+    #: ``response_format`` ``json_schema`` strict, whose single property is that enum.
+    JSON_SCHEMA = "json_schema"
+
+
+@dataclass(frozen=True, slots=True)
+class Provider:
+    """Where one provider's requests go, the variable its credential is read from, its catalog.
+
+    ``origin`` and ``catalog_origin`` are derived in the egress allowlist's own spelling, the
+    exact entries a deployment must declare, and never stated beside the URLs a second time.
+    """
+
+    provider_id: str
+    base_url: str
+    api_key_env: str
+    catalog_url: str
+    catalog_format: CatalogFormat
+    catalog_retrieved_at: str
+    description: str
+
+    @property
+    def origin(self) -> str:
+        """The origin every request to this provider reaches."""
+        return declared_origin(self.base_url)
+
+    @property
+    def catalog_origin(self) -> str:
+        """The origin the preflight reaches for this provider's catalog."""
+        return declared_origin(self.catalog_url)
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +173,10 @@ class ModelSpec:
     """
 
     model_id: str
+    #: The key of the provider serving this identifier, in the manifest's ``providers``.
+    provider: str
+    #: One plain sentence naming the model for a person choosing among models.
+    description: str
     input_usd_per_mtok: Decimal
     output_usd_per_mtok: Decimal
     context_window_tokens: int
@@ -111,6 +190,12 @@ class ModelSpec:
     region_informational: str
     embedding_dimensions: int | None = None
     note: str = ""
+    #: Each mechanism this model was verified to answer a choice by, with the record of the probe
+    #: that verified it. Empty for a model offered to no chosen role. Left out of the hash, which
+    #: every other field supports: a mapping cannot be hashed.
+    answering: Mapping[AnsweringMechanism, str] = field(
+        default_factory=lambda: MappingProxyType({}), hash=False
+    )
 
     def cost_usd(self, *, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Billable cost of one call, exactly.
@@ -137,7 +222,12 @@ class ModelSpec:
         serverless endpoints, and a field invented here would be a fact the ledger cannot
         support.
         """
-        return {"provider": PROVIDER, "model_id": self.model_id, "endpoint": endpoint}
+        return {"provider": self.provider, "model_id": self.model_id, "endpoint": endpoint}
+
+    @property
+    def is_chat(self) -> bool:
+        """Whether a chat request can be sent to it: a chat model declares a max_tokens floor."""
+        return self.min_max_tokens is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +264,11 @@ class RoleBinding:
     timeout_basis: Mapping[str, Any]
 
     @property
+    def provider(self) -> str:
+        """The key of the one provider serving the whole chain."""
+        return self.primary.provider
+
+    @property
     def chain(self) -> tuple[ModelSpec, ...]:
         """Primary first, then fallback. The order the client tries them in."""
         return (self.primary,) if self.fallback is None else (self.primary, self.fallback)
@@ -206,23 +301,51 @@ class RoleBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class ChosenRoleBinding:
+    """A role whose model a world chooses, and what a model must declare to be offered it."""
+
+    role: Role
+    required_use_cases: tuple[str, ...]
+    rationale: str
+
+    def offers(self, spec: ModelSpec) -> bool:
+        """Whether ``spec`` may be chosen for this role: a chat model, verified to answer a
+        choice by at least one mechanism, whose catalog use cases hold the role's."""
+        return (
+            spec.is_chat
+            and bool(spec.answering)
+            and all(use_case in spec.catalog_use_cases for use_case in self.required_use_cases)
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Manifest:
     """The parsed manifest. Immutable, and the only source of identifiers in the process."""
 
     manifest_version: str
     pipeline_version: int
-    base_url: str
-    catalog_url: str
-    api_key_env: str
-    catalog_retrieved_at: str
+    providers: Mapping[str, Provider]
     models: Mapping[str, ModelSpec]
     roles: Mapping[Role, RoleBinding]
     timeout_rule: TimeoutRule
+    chosen_roles: Mapping[Role, ChosenRoleBinding]
 
     def __getitem__(self, role: Role | str) -> RoleBinding:
         try:
-            return self.roles[Role(role)]
-        except (KeyError, ValueError) as exc:
+            resolved = Role(role)
+        except ValueError as exc:
+            known = ", ".join(sorted(r.value for r in Role))
+            raise ManifestError(
+                f"no binding for role {role!r}; the manifest binds {known}"
+            ) from exc
+        if resolved in self.chosen_roles:
+            raise ManifestError(
+                f"role {resolved} is chosen by the world, so the manifest binds no model to it; "
+                "ask for the model a world chose with offered()"
+            )
+        try:
+            return self.roles[resolved]
+        except KeyError as exc:
             known = ", ".join(sorted(r.value for r in Role))
             raise ManifestError(
                 f"no binding for role {role!r}; the manifest binds {known}"
@@ -234,28 +357,164 @@ class Manifest:
         except KeyError as exc:
             raise ManifestError(f"{model_id!r} is not declared in the manifest") from exc
 
+    def provider(self, provider_id: str) -> Provider:
+        """The provider with this key, or a refusal naming what was asked for."""
+        try:
+            return self.providers[provider_id]
+        except KeyError as exc:
+            raise ManifestError(f"no provider {provider_id!r} is declared in the manifest") from exc
+
+    def chosen(self, role: Role | str) -> ChosenRoleBinding:
+        """The chosen role's binding, or a refusal: a manifest-bound role is not chosen."""
+        try:
+            return self.chosen_roles[Role(role)]
+        except (KeyError, ValueError) as exc:
+            known = ", ".join(sorted(r.value for r in self.chosen_roles))
+            raise ManifestError(
+                f"role {role!r} is not chosen by a world; the chosen roles are {known}"
+            ) from exc
+
+    def offered_models(self, role: Role | str) -> tuple[ModelSpec, ...]:
+        """Every model a world may choose for a chosen role, in identifier order."""
+        binding = self.chosen(role)
+        return tuple(spec for _, spec in sorted(self.models.items()) if binding.offers(spec))
+
+    def offered(self, role: Role | str, model_id: str) -> ModelSpec:
+        """The model a world chose for a chosen role, or a refusal naming why it is not offered."""
+        binding = self.chosen(role)
+        spec = self.spec(model_id)
+        if not binding.offers(spec):
+            raise ManifestError(
+                f"{model_id!r} is not offered to {binding.role}: a chosen role takes a chat model "
+                "verified to answer a choice by at least one mechanism whose catalog use cases "
+                f"hold {sorted(binding.required_use_cases)}"
+            )
+        return spec
+
     @property
     def model_ids(self) -> frozenset[str]:
         """Every identifier the manifest declares, whether or not a role reaches it."""
         return frozenset(self.models)
 
+    def bound_origins(self) -> frozenset[str]:
+        """The origin of every provider serving a role the manifest binds to a model.
+
+        What a deployment that serves those roles must declare in its egress allowlist, in the
+        allowlist's own spelling: the one derivation a launcher or a rehearsal asks for, never a
+        second reading of the manifest's JSON.
+        """
+        return frozenset(self.provider(b.provider).origin for b in self.roles.values())
+
     def referenced_model_ids(self) -> frozenset[str]:
-        """Identifiers reachable through a role. This is what the preflight checks.
+        """Identifiers reachable through a role, bound or chosen. This is what the preflight checks.
 
         Fallbacks are included. A fallback that has itself been removed is a failover that fails,
-        which is worse than no failover because it is only discovered under load.
+        which is worse than no failover because it is only discovered under load. So is every
+        model offered to a chosen role, since a world may have chosen it.
         """
         reachable: set[str] = set()
         for binding in self.roles.values():
             reachable.update(spec.model_id for spec in binding.chain)
+        for role in self.chosen_roles:
+            reachable.update(spec.model_id for spec in self.offered_models(role))
         return frozenset(reachable)
 
 
-def _spec_from(model_id: str, raw: Mapping[str, Any]) -> ModelSpec:
+def _need(raw: Mapping[str, Any], key: str, where: str) -> Any:
+    if key not in raw:
+        raise ManifestError(f"{where}: manifest entry is missing {key!r}")
+    return raw[key]
+
+
+def _text(raw: Mapping[str, Any], key: str, where: str) -> str:
+    value = _need(raw, key, where)
+    if not isinstance(value, str) or not value.strip():
+        raise ManifestError(f"{where}: {key} must be a non-empty string")
+    return value
+
+
+def _key_variable(raw: Mapping[str, Any], where: str) -> str:
+    name = _text(raw, "api_key_env", where)
+    if not _KEY_VARIABLE.fullmatch(name):
+        raise ManifestError(
+            f"{where}: api_key_env {name!r} is not a provider's API key variable "
+            "(NAME_API_KEY, never an EXULANICA_ setting)"
+        )
+    return name
+
+
+def _provider_from(provider_id: str, raw: Any) -> Provider:
+    where = f"provider {provider_id}"
+    if not isinstance(provider_id, str) or not _PROVIDER_KEY.fullmatch(provider_id):
+        raise ManifestError(f"{provider_id!r} is not a provider key")
+    if not isinstance(raw, Mapping):
+        raise ManifestError(f"{where} must be an object")
+    fields = {
+        "base_url",
+        "api_key_env",
+        "catalog_url",
+        "catalog_format",
+        "catalog_retrieved_at",
+        "description",
+    }
+    if set(raw) != fields:
+        raise ManifestError(f"{where} states exactly {sorted(fields)}, got {sorted(raw)}")
+    try:
+        catalog_format = CatalogFormat(raw["catalog_format"])
+    except ValueError as exc:
+        known = ", ".join(sorted(f.value for f in CatalogFormat))
+        raise ManifestError(
+            f"{where}: catalog_format {raw['catalog_format']!r} is not one this code reads "
+            f"({known})"
+        ) from exc
+    provider = Provider(
+        provider_id=provider_id,
+        base_url=_text(raw, "base_url", where).rstrip("/"),
+        api_key_env=_key_variable(raw, where),
+        catalog_url=_text(raw, "catalog_url", where),
+        catalog_format=catalog_format,
+        catalog_retrieved_at=_text(raw, "catalog_retrieved_at", where),
+        description=_text(raw, "description", where),
+    )
+    for name, url in (("base_url", provider.base_url), ("catalog_url", provider.catalog_url)):
+        try:
+            declared_origin(url)
+        except ValueError as exc:
+            raise ManifestError(
+                f"{where}: {name} names no origin an allowlist declares: {exc}"
+            ) from exc
+    return provider
+
+
+def _answering(model_id: str, raw: Any) -> Mapping[AnsweringMechanism, str]:
+    if raw is None:
+        return MappingProxyType({})
+    if not isinstance(raw, Mapping):
+        raise ManifestError(f"{model_id}: answering maps a mechanism to its probe's record")
+    answering: dict[AnsweringMechanism, str] = {}
+    for mechanism, record in raw.items():
+        try:
+            key = AnsweringMechanism(mechanism)
+        except ValueError as exc:
+            known = ", ".join(sorted(m.value for m in AnsweringMechanism))
+            raise ManifestError(
+                f"{model_id}: answering names {mechanism!r}, which is not a mechanism the client "
+                f"asks by ({known})"
+            ) from exc
+        if not isinstance(record, str) or not _RECORD_PATH.fullmatch(record):
+            raise ManifestError(
+                f"{model_id}: answering.{mechanism} names the probe record that verified it, a "
+                f"docs/evaluation JSON path, not {record!r}"
+            )
+        answering[key] = record
+    return MappingProxyType(answering)
+
+
+def _spec_from(
+    model_id: str, raw: Mapping[str, Any], providers: Mapping[str, Provider]
+) -> ModelSpec:
     def need(key: str) -> Any:
-        if key not in raw:
-            raise ManifestError(f"{model_id}: manifest entry is missing {key!r}")
-        return raw[key]
+        return _need(raw, key, model_id)
 
     def as_decimal(key: str) -> Decimal:
         value = need(key)
@@ -269,8 +528,13 @@ def _spec_from(model_id: str, raw: Mapping[str, Any]) -> ModelSpec:
         value = need(key)
         return None if value is None else int(value)
 
+    provider = _text(raw, "provider", model_id)
+    if provider not in providers:
+        raise ManifestError(f"{model_id}: provider {provider!r} is not declared in providers")
     return ModelSpec(
         model_id=model_id,
+        provider=provider,
+        description=_text(raw, "description", model_id),
         input_usd_per_mtok=as_decimal("input_usd_per_mtok"),
         output_usd_per_mtok=as_decimal("output_usd_per_mtok"),
         context_window_tokens=int(need("context_window_tokens")),
@@ -286,6 +550,7 @@ def _spec_from(model_id: str, raw: Mapping[str, Any]) -> ModelSpec:
             None if raw.get("embedding_dimensions") is None else int(raw["embedding_dimensions"])
         ),
         note=str(raw.get("note", "")),
+        answering=_answering(model_id, raw.get("answering")),
     )
 
 
@@ -343,27 +608,49 @@ def _role_timeout(
     return stated, MappingProxyType(dict(basis))
 
 
+def _chosen_role(role: Role, raw: Any) -> ChosenRoleBinding:
+    if not isinstance(raw, Mapping):
+        raise ManifestError(f"chosen role {role} must be an object")
+    fields = {"required_use_cases", "rationale"}
+    if set(raw) != fields:
+        raise ManifestError(
+            f"chosen role {role} states exactly {sorted(fields)}: no primary, fallback or "
+            "timeout, because the world chooses its model and the caller bounds its calls"
+        )
+    use_cases = raw["required_use_cases"]
+    if not isinstance(use_cases, list) or not all(isinstance(u, str) and u for u in use_cases):
+        raise ManifestError(f"chosen role {role}: required_use_cases is a list of use cases")
+    return ChosenRoleBinding(
+        role=role,
+        required_use_cases=tuple(use_cases),
+        rationale=_text(raw, "rationale", f"chosen role {role}"),
+    )
+
+
 def parse_manifest(document: Mapping[str, Any]) -> Manifest:
     """Validate a manifest document and freeze it. Raises ``ManifestError`` on anything wrong."""
-    for key in (
-        "models",
-        "roles",
-        "pipeline_version",
-        "base_url",
-        "catalog_url",
-        "api_key_env",
-        "timeout_rule",
-    ):
+    for key in ("providers", "models", "roles", "chosen_roles", "pipeline_version", "timeout_rule"):
         if key not in document:
             raise ManifestError(f"manifest is missing top-level key {key!r}")
 
+    raw_providers: Mapping[str, Any] = document["providers"]
+    if not isinstance(raw_providers, Mapping) or not raw_providers:
+        raise ManifestError("manifest declares no provider")
+    providers = {key: _provider_from(key, raw) for key, raw in raw_providers.items()}
     raw_models: Mapping[str, Any] = document["models"]
     raw_roles: Mapping[str, Any] = document["roles"]
+    raw_chosen: Mapping[str, Any] = document["chosen_roles"]
     rule = _timeout_rule(document["timeout_rule"])
-    specs = {model_id: _spec_from(model_id, raw) for model_id, raw in raw_models.items()}
+    specs = {model_id: _spec_from(model_id, raw, providers) for model_id, raw in raw_models.items()}
 
     _reject_unknown_roles(raw_roles)
-    missing = {role.value for role in Role} - set(raw_roles)
+    _reject_unknown_roles(raw_chosen)
+    both = sorted(set(raw_roles) & set(raw_chosen))
+    if both:
+        raise ManifestError(
+            "a role is bound to a model or chosen by a world, never both: " + ", ".join(both)
+        )
+    missing = {role.value for role in Role} - set(raw_roles) - set(raw_chosen)
     if missing:
         raise ManifestError(
             "manifest does not bind every role. Missing: " + ", ".join(sorted(missing))
@@ -383,6 +670,12 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
                 f"role {role}: the fallback is the same identifier as the primary, which is not a "
                 "fallback. Declare null if this role genuinely has none."
             )
+        if fallback_id is not None and specs[fallback_id].provider != specs[primary_id].provider:
+            raise ManifestError(
+                f"role {role}: the primary is served by {specs[primary_id].provider} and the "
+                f"fallback by {specs[fallback_id].provider}. A role's chain stays on one provider, "
+                "because a hand-over names one destination."
+            )
         timeout_seconds, timeout_basis = _role_timeout(role, raw, specs[primary_id], rule)
         bindings[role] = RoleBinding(
             role=role,
@@ -393,17 +686,16 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
             timeout_seconds=timeout_seconds,
             timeout_basis=timeout_basis,
         )
+    chosen = {Role(name): _chosen_role(Role(name), raw) for name, raw in raw_chosen.items()}
 
     return Manifest(
         manifest_version=str(document.get("manifest_version", "0")),
         pipeline_version=int(document["pipeline_version"]),
-        base_url=str(document["base_url"]).rstrip("/"),
-        catalog_url=str(document["catalog_url"]),
-        api_key_env=str(document["api_key_env"]),
-        catalog_retrieved_at=str(document.get("catalog_retrieved_at", "")),
+        providers=MappingProxyType(providers),
         models=specs,
         roles=bindings,
         timeout_rule=rule,
+        chosen_roles=MappingProxyType(chosen),
     )
 
 
