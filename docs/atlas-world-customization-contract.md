@@ -2,9 +2,9 @@
 
 Status: **DECISION** and **IMPLEMENTED** for global appearance customization. PostgreSQL appearance
 transactions, the HTTP lifecycle, exact frontend recipe handshake, generated controls, transient
-preview, apply/discard/refine/rollback review, provenance/history, and authenticated source-media
-loading exist. The upstream conversational authoring service, regional renderer preview, complete
-multi-style library, and structural topology editor do not.
+preview, apply/discard/refine/rollback review, provenance/history, authenticated source-media
+loading, and Companion proposals drafted from a person's sentence exist. The regional renderer
+preview, complete multi-style library, and structural topology editor do not.
 
 ## 1. Protected topology
 
@@ -191,7 +191,9 @@ active style's generated parameter controls; a different validated style may exp
 manifest. It does not expose the incomplete Survey fixture as a product choice. Input changes are
 live, isolated previews in both the renderer and backend. The person must choose **Apply world design** to persist them, and may use
 **Undo preview** or leave Options to restore the saved style. The visible editor names what is
-protected and truthfully states that an upstream conversational proposal service is not connected.
+protected and states that Companion designs arrive there as bounded profile values from an
+upstream proposal service, and that Exulanica does not generate recipes or run model output in the
+browser.
 The renderer binding exposes the same Companion-origin preview/apply/discard methods; the separately
 owned Companion behavior is unchanged while its surrounding interface consumes the active world's
 derived semantic roles.
@@ -252,16 +254,56 @@ hydrate the renderer from backend values. Unknown or mismatched data fails close
 
 Settings input creates a transient local renderer preview and an isolated backend preview. Apply
 uses the preview's exact style and topology bases. If another writer wins, Atlas reads the new
-current state, creates a refinement-linked preview on that base, and requires review and Apply
-again; it never silently overwrites the competing version. Rollback has the same conflict rule and
-appends a new immutable revision on success.
+current state, creates a refinement-linked preview of the Settings draft on that base, and requires
+review and Apply again; it never silently overwrites the competing version. Rollback has the same
+conflict rule and appends a new immutable revision on success. A proposal from another origin
+follows the stricter rule below.
 
 `web/packages/app/src/world-style-proposals.ts` is the typed conversational handoff. It accepts only
 an already-structured upstream proposal with profile values and provenance. The browser does not
 call a model or translate conversation text. Companion proposals require an origin reference,
 reference IDs, model ID, and prompt version, and refinements retain `refinesProposalId`. The same
-Options review applies or discards them. A production proposal service is still required to supply
-those records.
+Options review applies or discards them. The Companion supplies those records:
+`POST /selection/appearance` (`exulanica/api/routes/selection.py`) drafts one from a person's
+sentence on the server, and `web/packages/app/src/composition/companion.ts` hands it to the inbox.
+
+A proposal from another origin than Settings is applied only against the version it was made for,
+whether Atlas found it open when the world opened or staged it on the page. Its candidate is the
+whole design as drafted, every control included, so it is never made again on a newer version: that
+would save the old design over each control another writer changed. When another writer wins, Atlas
+refuses the proposal in words and takes it off the panel, so none of its values stay on the
+controls. While this page can still change the world, the panel then shows the saved version, and
+moving one control proposes only that change on it. When the world's live appearance is no longer
+the one this page shows, as after a writer this page had not heard of, the panel stays on the
+version it shows and every change is refused before any request until the saved version is restored,
+as for any saved world whose appearance another writer replaced
+(`WorldStyleClient.requiresReconciliation`). The words then say what to do next, in one sentence
+whatever found the move (`web/packages/app/src/world-style-refusals.ts`): restore the saved version
+in Version history, which replaces the change made elsewhere, and reload if asked. A refusal that
+arrives while Customize is closed, as when the Companion drafted the proposal, keeps its words there
+until Customize is next opened. Atlas reads the world's versions again after such a refusal, so
+Version history lists the other writer's version beside the saved one. After a writer that left the
+saved world alone, such as an agent writing through the API, the restore goes through, and so does
+the next change, with no reload. After another page that advanced the saved world, the restore is
+refused (`stale_saved_world_entry`) with "Reload before trying again", and after the reload the
+saved world is live and the next change goes through. A restore that another change overtook in
+between is refused as stale, and Atlas shows the latest version and asks for the restore target
+again. A reload first would not do: after a writer that left the saved world alone it reopens the
+same saved version, which Version history then marks current and cannot restore.
+One Atlas already knows is that old is refused without a request and stays open on the backend until
+its lifetime closes it; until then a page that opens the world again shows it as made for an earlier
+version, and refuses it again on Apply. Otherwise Apply is refused by the backend: its own base
+check closes the preview as stale, and the saved world's checks, which answer first, leave it open
+for its lifetime to close. When another page advanced the saved world's resume point, the backend
+answers `stale_saved_world_entry` and Atlas asks for a reload, after which it finds the proposal
+made for an earlier version and refuses it as above. The draft names no base version, so a proposal
+whose preview meets a newer version than the page has read is refused rather than made on it: a tab
+whose copy of the world is behind refuses its first proposal and asks for the restore above before
+the next. A preview nobody decides within the backend's lifetime for one expires; Apply is refused
+by name (`preview_expired`) and Atlas says the change waited too long, with no number, because the
+lifetime is the backend's. `web/packages/app/src/world-style-api.ts` and
+`web/packages/app/src/composition/appearance.ts` hold these rules, and
+`web/packages/app/test/companion-proposals.test.ts` holds them against a scripted authority.
 
 Regional records remain backend-authoritative and are parsed without reinterpretation, but the
 current renderer has only a reviewed global profile preview. The UI therefore refuses to display a

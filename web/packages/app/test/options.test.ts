@@ -251,6 +251,36 @@ describe('Options', () => {
     expect(view.root.textContent).not.toContain('No durable change was made.');
   });
 
+  it('puts the world controls back on the applied design without reporting a discard', () => {
+    const onWorldDiscard = vi.fn();
+    const view = buildOptions({
+      preferences: DEFAULT_PREFERENCES,
+      onChange: vi.fn(),
+      onPreview: vi.fn(),
+      onWorldDiscard,
+      onClose: vi.fn(),
+      onShowControls: vi.fn(),
+    });
+    document.body.append(view.root);
+    const vitality = view.root.querySelector<HTMLInputElement>('[aria-label="Color vitality"]')!;
+    vitality.value = '0.4';
+    vitality.dispatchEvent(new Event('input'));
+    view.reportWorldLifecycle('failed', 'The proposal was refused.');
+    // What a refusal cannot use: the applied design did not move, so the draft is kept.
+    view.setPreferences(DEFAULT_PREFERENCES);
+    expect(view.preferences().worldStyleParameters['vitality']).toBe(0.4);
+
+    view.discardWorldDraft();
+
+    const applied = DEFAULT_PREFERENCES.worldStyleParameters['vitality'];
+    expect(view.preferences().worldStyleParameters['vitality']).toBe(applied);
+    expect(vitality.value).toBe(String(applied));
+    expect(view.root.dataset['worldDirty']).toBe('false');
+    // Nobody is told: the caller has already closed what the draft previewed.
+    expect(onWorldDiscard).not.toHaveBeenCalled();
+    expect(view.root.textContent).toContain('The proposal was refused.');
+  });
+
   it('keeps Tab inside the modal without taking Escape', () => {
     const view = buildOptions({
       preferences: DEFAULT_PREFERENCES,

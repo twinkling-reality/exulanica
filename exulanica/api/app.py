@@ -138,6 +138,7 @@ from exulanica.models.errors import (
 from exulanica.models.policy import HostedRequestRefused, NoHostedRequestPolicy
 from exulanica.selection.validation import RejectionCode, SelectionRejected
 from exulanica.world import (
+    ExpiredPreview,
     InvalidInteractionData,
     InvalidInteractionPreviewState,
     InvalidPreviewState,
@@ -518,6 +519,10 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     @app.exception_handler(InvalidPreviewState)
     async def _preview_state(_request: Request, exc: InvalidPreviewState) -> JSONResponse:
         return _problem(409, "invalid_preview_state", str(exc))
+
+    @app.exception_handler(ExpiredPreview)
+    async def _expired_preview(_request: Request, exc: ExpiredPreview) -> JSONResponse:
+        return _problem(409, "preview_expired", str(exc))
 
     @app.exception_handler(WorldNotConfigured)
     async def _world_not_configured(_request: Request, exc: WorldNotConfigured) -> JSONResponse:

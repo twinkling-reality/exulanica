@@ -6,10 +6,12 @@ import {
 } from '@exulanica/presentation';
 import { ApiError } from '@exulanica/graph-client';
 import {
+  StaleProposalError,
   WorldStyleClient,
   WorldStyleContractError,
   validateLocalReference,
 } from '../src/world-style-api.js';
+import { RESTORE_BEFORE_CHANGING } from '../src/world-style-refusals.js';
 
 /** The world these clients are opened for. */
 const TEST_WORLD = 'world:personal:test';
@@ -483,6 +485,205 @@ describe('world style API boundary', () => {
   });
 });
 
+
+/** A Companion proposal as the inbox hands it to the client. */
+const COMPANION_PROPOSAL = {
+  origin: 'companion' as const,
+  originReference: 'companion-utterance:0f2c',
+  profile: { profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.3 } },
+  referenceIds: ['evidence-span-1'],
+  modelId: 'reviewed-personalizer-v1',
+  promptVersion: 'world-style-proposal-v1',
+};
+
+describe('a proposal from another origin than Settings', () => {
+  /** The world as the first read finds it, then as another writer has left it. */
+  const movedOn = () => {
+    let currentReads = 0;
+    return () => {
+      currentReads += 1;
+      return json(currentReads === 1 ? state() : state('v1', 1, 0.55));
+    };
+  };
+
+  it('is never made again after a competing writer: Apply says stale and the client lets it go', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const current = movedOn();
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) return current();
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        return json(preview(`preview-${bodies.length}`, String(body['proposalId'])), 201);
+      }
+      if (url.pathname.endsWith('/apply')) {
+        return json({ code: 'stale_style_version', detail: 'another writer won' }, 409);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => 'proposal-companion',
+    });
+    await client.connect();
+    await client.previewUpstream(COMPANION_PROPOSAL);
+
+    const result = await client.applyActive();
+
+    // The live appearance is no longer the one this page shows (v0), and the result says so.
+    expect(result).toMatchObject({
+      kind: 'stale', state: { current: { versionId: 'v1' } }, reconciliationRequired: true,
+    });
+    // Its candidate is the whole design as drafted against v0: made again on v1, a second Apply
+    // would save it over every control the other writer changed.
+    expect(bodies).toHaveLength(1);
+    expect(client.activePreview()).toBeNull();
+    expect(client.state()?.current.versionId).toBe('v1');
+    // Every change after it is refused before any request until the saved version is restored.
+    expect(client.requiresReconciliation()).toBe(true);
+    await expect(client.previewUpstream({
+      ...COMPANION_PROPOSAL, originReference: 'companion-utterance:77aa',
+    })).rejects.toMatchObject({ code: 'saved_style_reconciliation_required' });
+    expect(bodies).toHaveLength(1);
+  });
+
+  it('keeps a version it wrote while its history was being read', async () => {
+    let versionReads = 0;
+    const late: { answer?: () => void } = {};
+    const fetch = connectedFetch((url) => {
+      if (url.pathname.endsWith('/world/styles/versions')) {
+        versionReads += 1;
+        if (versionReads === 1) return undefined;
+        // Asked before the restore below and answered after it, with the history as it was asked.
+        return new Promise<Response>((resolve) => {
+          late.answer = () => resolve(json([version('v0', 0), version('v1', 1, 0.55)]));
+        });
+      }
+      if (url.pathname.endsWith('/world/styles/rollback')) return json(version('v2', 2));
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD, baseUrl: 'https://exulanica.test/api', token: 't', fetch,
+    });
+    await client.connect();
+    const read = client.refreshVersions();
+    await vi.waitFor(() => expect(late.answer).toBeDefined());
+    expect((await client.rollback('v0')).kind).toBe('applied');
+    late.answer?.();
+
+    await read;
+
+    expect(client.versions().map((listed) => listed.versionId)).toEqual(['v0', 'v1', 'v2']);
+  });
+
+  it('is let go before the world is read again, so a failed read leaves nothing held', async () => {
+    let currentReads = 0;
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) {
+        currentReads += 1;
+        return currentReads === 1 ? json(state()) : json({ code: 'internal_error', detail: 'no' }, 500);
+      }
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return json(preview('preview-1', String(body['proposalId'])), 201);
+      }
+      if (url.pathname.endsWith('/apply')) {
+        return json({ code: 'stale_style_version', detail: 'another writer won' }, 409);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => 'proposal-companion',
+    });
+    await client.connect();
+    await client.previewUpstream(COMPANION_PROPOSAL);
+
+    await expect(client.applyActive()).rejects.toMatchObject({ code: 'internal_error' });
+
+    expect(currentReads).toBe(2);
+    expect(client.activePreview()).toBeNull();
+  });
+
+  it('is refused, not made on the newer version, when its preview meets a stale base', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const current = movedOn();
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) return current();
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        // The first is made; by the second, another writer has moved the world on.
+        return bodies.length === 1
+          ? json(preview('preview-1', String(body['proposalId'])), 201)
+          : json({ code: 'stale_style_version', detail: 'another writer won' }, 409);
+      }
+      return undefined;
+    });
+    const ids = ['proposal-first', 'proposal-second'];
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => ids.shift()!,
+    });
+    await client.connect();
+    const first = await client.previewUpstream(COMPANION_PROPOSAL);
+
+    const refused = client.previewUpstream({
+      ...COMPANION_PROPOSAL, originReference: 'companion-utterance:77aa',
+    });
+    await expect(refused).rejects.toBeInstanceOf(StaleProposalError);
+    await expect(refused).rejects.toMatchObject({ code: 'stale_proposal', reconciliationRequired: true });
+    await expect(refused).rejects.toThrow(RESTORE_BEFORE_CHANGING);
+
+    // The draft names no base, so this client cannot tell a draft of v0 from one of v1.
+    expect(bodies).toHaveLength(2);
+    // A refused request leaves the previous one staged. The live appearance moved from the one
+    // this page shows, so the next is refused before any request until the saved version is
+    // restored.
+    expect(client.activePreview()).toBe(first);
+    expect(client.state()?.current.versionId).toBe('v1');
+    await expect(client.previewUpstream({
+      ...COMPANION_PROPOSAL, originReference: 'companion-utterance:3c3c',
+    })).rejects.toMatchObject({ code: 'saved_style_reconciliation_required' });
+    expect(bodies).toHaveLength(2);
+  });
+
+  it('is let go when the authority says it expired, from either origin, and nothing is made again', async () => {
+    for (const origin of ['settings', 'companion'] as const) {
+      const bodies: Record<string, unknown>[] = [];
+      const fetch = connectedFetch((url, init) => {
+        if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+          const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+          bodies.push(body);
+          return json(preview('preview-1', String(body['proposalId'])), 201);
+        }
+        if (url.pathname.endsWith('/apply')) {
+          return json({ code: 'preview_expired', detail: 'world preview preview-1 expired' }, 409);
+        }
+        return undefined;
+      });
+      const client = new WorldStyleClient({
+        worldId: TEST_WORLD,
+        baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => `proposal-${origin}`,
+      });
+      await client.connect();
+      if (origin === 'settings') {
+        await client.previewSettings({
+          profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.4 },
+        });
+      } else {
+        await client.previewUpstream(COMPANION_PROPOSAL);
+      }
+
+      const result = await client.applyActive();
+
+      // The world did not move, so this page may change it again at once.
+      expect(result, origin).toMatchObject({ kind: 'expired', reconciliationRequired: false });
+      expect(bodies, origin).toHaveLength(1);
+      expect(client.activePreview(), origin).toBeNull();
+    }
+  });
+});
 
 describe('reviewed historical recipe bindings', () => {
   const historicalVersion = () => {

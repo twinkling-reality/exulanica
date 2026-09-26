@@ -21,6 +21,7 @@ from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.errors import (
+    ExpiredPreview,
     InvalidatedSourceVersion,
     InvalidPreviewState,
     InvalidStyleData,
@@ -82,8 +83,27 @@ _UNREADABLE_PREVIEW: Final = (InvalidPreviewState, InvalidStyleData, UnknownWorl
 #: A declared bound, not a measurement: the page takes up one, the newest made against the current
 #: version or else the newest, so eight lets that one be found behind a few made against earlier
 #: versions while holding every world opening to eight proposal reads, however many previews tabs
-#: and the Companion have left open over time.
+#: and the Companion have left open over time. Only previews a page may take up count towards it
+#: (see ``open_previews``), so no number of newer Settings drafts hides a staged proposal.
 OPEN_PREVIEWS_READ: Final = 8
+
+#: How long an open preview waits for a person's decision before the world closes it as expired.
+#: A declared product bound, not a measurement: a proposal staged before a weekend away is still
+#: there to decide, and a world's open previews, which every opening of it reads, stay few however
+#: many tabs and proposals have left them. The age does not protect later changes: a preview made
+#: for an earlier version is refused by its base (``_check_concurrency``) whatever its age.
+OPEN_PREVIEW_LIFETIME: Final = dt.timedelta(days=7)
+
+#: A preview past ``OPEN_PREVIEW_LIFETIME``, over a preview row named ``v``, with the lifetime as
+#: its one parameter. The one predicate the reads, the closing in ``preview`` and ``apply`` use,
+#: so a read never calls waiting a preview that Apply would refuse.
+_PAST_LIFETIME: Final = "v.created_at <= now() - %s::interval"
+
+#: The previews a page may take up when it opens a world: a proposal from another origin than the
+#: panel's own Settings, over the whole world. A Settings preview is a live tab's draft, and no page
+#: shows a regional one as a change (docs/atlas-world-customization-contract.md, section 7).
+_TAKEN_UP_ORIGIN_EXCLUDED: Final = ProposalOrigin.SETTINGS.value
+_TAKEN_UP_SCOPE: Final = "global"
 
 
 class WorldStyleRepository:
@@ -287,10 +307,20 @@ class WorldStyleRepository:
         return tuple(self._row_to_version(row) for row in rows)
 
     def proposal(self, proposal_id: uuid.UUID) -> StyleProposalRecord:
+        """One proposal and where its lifecycle stands.
+
+        A proposal whose preview outlived ``OPEN_PREVIEW_LIFETIME`` reads as ``expired`` before
+        any write has closed it, by the predicate Apply refuses it by: this read runs on a
+        connection that cannot write, and must never call waiting what Apply would refuse.
+        """
         row = self.connection.execute(
-            "select * from world_style_proposal where workspace_id=%s and world_id=%s "
-            "and proposal_id=%s",
-            (self.workspace_id, self.world_id, proposal_id),
+            "select p.*,(p.status='previewed' and v.status='open' and "
+            + _PAST_LIFETIME
+            + ") as past_lifetime from world_style_proposal p left join world_style_preview v "
+            "on v.workspace_id=p.workspace_id and v.world_id=p.world_id "
+            "and v.proposal_id=p.proposal_id "
+            "where p.workspace_id=%s and p.world_id=%s and p.proposal_id=%s",
+            (OPEN_PREVIEW_LIFETIME, self.workspace_id, self.world_id, proposal_id),
         ).fetchone()
         if row is None:
             raise UnknownWorldResource("no such world style proposal")
@@ -310,28 +340,42 @@ class WorldStyleRepository:
             proposal=proposal,
             recipe_binding=row["recipe_binding"],
             capability_mapping=row["capability_mapping"],
-            status=row["status"],
+            status="expired" if row["past_lifetime"] else row["status"],
             validation_issues=tuple(row["validation_issues"]),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
 
     def open_previews(self) -> OpenStylePreviews:
-        """The newest ``OPEN_PREVIEWS_READ`` of this world's previews nobody has applied or
-        discarded, newest first, and how many of those it could not read.
+        """The newest ``OPEN_PREVIEWS_READ`` of this world's open previews a page may take up,
+        newest first, and how many of those it could not read.
 
-        What a page reads back when it opens, so a preview it staged before a reload or a world
+        What a page reads back when it opens, so a proposal it staged before a reload or a world
         switch is still the person's to apply or discard: the server holds a preview until a
-        decision closes it, and a page's memory does not. Best effort by design: a row this code
-        cannot read, such as a preview made before the reviewed recipe-binding contract (0023), is
-        counted and skipped rather than refused, because what it serves is a convenience on
-        opening a world and must never stand in the way of the opening.
+        decision closes it or it outlives ``OPEN_PREVIEW_LIFETIME``, and a page's memory does not.
+        Only a proposal from another origin than Settings, over the whole world and younger than
+        the lifetime, is read, and the filter runs before the limit: origin and scope are on the
+        proposal, so the statement joins it rather than reading rows it would throw away. Best
+        effort by design: a row this code cannot read, such as a preview made before the reviewed
+        recipe-binding contract (0023), is counted and skipped rather than refused, because what it
+        serves is a convenience on opening a world and must never stand in the way of the opening.
         """
         rows = self.connection.execute(
-            "select preview_id,proposal_id,candidate,created_at from world_style_preview "
-            "where workspace_id=%s and world_id=%s and status='open' "
-            "order by created_at desc, preview_id desc limit %s",
-            (self.workspace_id, self.world_id, OPEN_PREVIEWS_READ),
+            "select v.preview_id,v.proposal_id,v.candidate,v.created_at "
+            "from world_style_preview v join world_style_proposal p "
+            "on p.workspace_id=v.workspace_id and p.world_id=v.world_id "
+            "and p.proposal_id=v.proposal_id "
+            "where v.workspace_id=%s and v.world_id=%s and v.status='open' "
+            "and p.origin<>%s and p.scope_kind=%s and not (" + _PAST_LIFETIME + ") "
+            "order by v.created_at desc, v.preview_id desc limit %s",
+            (
+                self.workspace_id,
+                self.world_id,
+                _TAKEN_UP_ORIGIN_EXCLUDED,
+                _TAKEN_UP_SCOPE,
+                OPEN_PREVIEW_LIFETIME,
+                OPEN_PREVIEWS_READ,
+            ),
         ).fetchall()
         readable: list[tuple[StylePreview, StyleProposalRecord]] = []
         unreadable = 0
@@ -361,6 +405,9 @@ class WorldStyleRepository:
             state = self._state(for_update=True)
             if state is None:
                 raise WorldNotConfigured("no protected world topology is registered")
+            # Where a world's open previews grow, so where they are bounded: under the lock that
+            # every Apply and new preview of this world takes first.
+            self._close_expired()
             current = self._filter_version_regions(
                 self._version_by_id(state["current_style_version_id"]),
                 state["current_topology_digest"],
@@ -446,31 +493,40 @@ class WorldStyleRepository:
                 before_write()
             state = self._require_state(for_update=True)
             preview = self._preview_row(preview_id, for_update=True)
+            expired = ExpiredPreview(f"world preview {preview_id} expired without a decision")
+            if preview["status"] == "expired":
+                raise expired
             if preview["status"] != "open":
                 raise InvalidPreviewState(
                     f"world preview {preview_id} is {preview['status']}, not open"
                 )
             provenance = _provenance_from_row(preview)
-            try:
-                self._check_concurrency(base_style_version_id, base_topology_digest)
-                if (
-                    preview["base_style_version_id"] != base_style_version_id
-                    or preview["base_topology_digest"] != base_topology_digest
-                ):
-                    self._check_concurrency(
-                        preview["base_style_version_id"],
-                        preview["base_topology_digest"],
-                    )
-            except (
-                InvalidStyleData,
-                ProtectedTopologyConflict,
-                StaleStyleVersion,
-                UnknownWorldResource,
-            ) as exc:
-                failure = exc
-            if failure is not None:
-                self._close_stale(preview, provenance, failure)
+            # Refused by its age before its base: past its lifetime, a preview is expired whatever
+            # the world did since, and says so by name, closed or not.
+            if preview["past_lifetime"]:
+                self._close_expired(preview_id=preview_id)
+                failure = expired
             else:
+                try:
+                    self._check_concurrency(base_style_version_id, base_topology_digest)
+                    if (
+                        preview["base_style_version_id"] != base_style_version_id
+                        or preview["base_topology_digest"] != base_topology_digest
+                    ):
+                        self._check_concurrency(
+                            preview["base_style_version_id"],
+                            preview["base_topology_digest"],
+                        )
+                except (
+                    InvalidStyleData,
+                    ProtectedTopologyConflict,
+                    StaleStyleVersion,
+                    UnknownWorldResource,
+                ) as exc:
+                    failure = exc
+                if failure is not None:
+                    self._close_stale(preview, provenance, failure)
+            if failure is None:
                 proposed_reference = StyleReference(
                     preview["profile_id"], preview["profile_version"], preview["parameters"]
                 )
@@ -567,12 +623,17 @@ class WorldStyleRepository:
     def discard(self, preview_id: uuid.UUID, *, discarded_by: uuid.UUID) -> None:
         with self.connection.transaction():
             preview = self._preview_row(preview_id, for_update=True)
-            if preview["status"] == "discarded":
+            if preview["status"] in ("discarded", "expired"):
                 return
             if preview["status"] != "open":
                 raise InvalidPreviewState(
                     f"world preview {preview_id} is {preview['status']}, not open"
                 )
+            # Past its lifetime a preview had already expired, and the proposal read already said
+            # so: it closes as expired, not as a person's discard.
+            if preview["past_lifetime"]:
+                self._close_expired(preview_id=preview_id)
+                return
             provenance = _provenance_from_row(preview)
             self.connection.execute(
                 "update world_style_preview set status='discarded',closed_at=now() "
@@ -806,11 +867,12 @@ class WorldStyleRepository:
     def _preview_row(self, preview_id: uuid.UUID, *, for_update: bool) -> Mapping[str, Any]:
         row = self.connection.execute(
             "select p.*,v.preview_id,v.candidate,v.status as preview_status,v.created_at as "
-            "preview_created_at from world_style_preview v join world_style_proposal p "
+            "preview_created_at," + _PAST_LIFETIME + " as past_lifetime "
+            "from world_style_preview v join world_style_proposal p "
             "on p.workspace_id=v.workspace_id and p.world_id=v.world_id "
             "and p.proposal_id=v.proposal_id where v.workspace_id=%s and v.world_id=%s "
             "and v.preview_id=%s" + (" for update of v" if for_update else ""),
-            (self.workspace_id, self.world_id, preview_id),
+            (OPEN_PREVIEW_LIFETIME, self.workspace_id, self.world_id, preview_id),
         ).fetchone()
         if row is None:
             raise UnknownWorldResource("no such world preview")
@@ -1003,6 +1065,43 @@ class WorldStyleRepository:
             proposal_id=preview["proposal_id"],
             preview_id=preview["preview_id"],
             details={"error": _error_code(failure), "detail": str(failure)},
+        )
+
+    def _close_expired(self, *, preview_id: uuid.UUID | None = None) -> None:
+        """Close this world's open previews past ``OPEN_PREVIEW_LIFETIME`` as expired.
+
+        Each closes with its proposal and one ``preview_expired`` event carrying the proposal's
+        own provenance, as every other lifecycle event does. ``preview`` and ``apply`` call it
+        holding the world's state row; ``discard`` calls it for its one preview (``preview_id``)
+        holding only that preview's row. Either way each closing takes the preview's row lock and
+        re-reads that it is still open, so no preview is closed, or recorded, twice.
+        """
+        one = "" if preview_id is None else " and v.preview_id=%s"
+        self.connection.execute(
+            "with expired as (update world_style_preview v set status='expired',closed_at=now() "
+            "where v.workspace_id=%s and v.world_id=%s and v.status='open' and "
+            + _PAST_LIFETIME
+            + one
+            + " returning v.proposal_id,v.preview_id), "
+            "closed as (update world_style_proposal p set status='expired',updated_at=now() "
+            "from expired e where p.workspace_id=%s and p.world_id=%s "
+            "and p.proposal_id=e.proposal_id "
+            "returning p.proposal_id,p.origin,p.actor,p.origin_reference) "
+            "insert into world_style_audit_event (workspace_id,world_id,event_type,origin,actor,"
+            "origin_reference,proposal_id,preview_id,details) "
+            "select %s,%s,'preview_expired',c.origin,c.actor,c.origin_reference,c.proposal_id,"
+            "e.preview_id,%s from expired e join closed c on c.proposal_id=e.proposal_id",
+            (
+                self.workspace_id,
+                self.world_id,
+                OPEN_PREVIEW_LIFETIME,
+                *(() if preview_id is None else (preview_id,)),
+                self.workspace_id,
+                self.world_id,
+                self.workspace_id,
+                self.world_id,
+                Jsonb({"lifetime_seconds": int(OPEN_PREVIEW_LIFETIME.total_seconds())}),
+            ),
         )
 
     def _check_concurrency(

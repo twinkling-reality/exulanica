@@ -80,6 +80,14 @@ export interface OptionsView {
   showSection(section: AtlasInstrumentSection): void;
   preferences(): AtlasPreferences;
   setPreferences(value: AtlasPreferences): void;
+  /**
+   * Put the world controls back on the applied design, telling nobody.
+   *
+   * For a caller that has already closed, or never held, what the draft previewed, such as a
+   * proposal the authority refused. `setPreferences` keeps a draft when the applied design does
+   * not move, and Undo reports a discard; neither is right for a draft that is already gone.
+   */
+  discardWorldDraft(): void;
   setVisible(visible: boolean): void;
   reportPersistence(state: 'idle' | 'saving' | 'saved' | 'failed'): void;
   setWorldAuthority(value: WorldStyleAuthorityPresentation): void;
@@ -285,6 +293,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
   let applied = callbacks.preferences;
   let current = callbacks.preferences;
   let worldBusy = false;
+  let shown = false;
   let render = (): void => {};
   const worldDirty = (): boolean => !sameWorldStyle(current, applied);
   const discardWorldPreview = (): void => {
@@ -632,8 +641,21 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
         : applied;
       render();
     },
+    discardWorldDraft() {
+      if (!worldDirty()) return;
+      current = normalisePreferences({
+        ...current,
+        worldArtProfile: applied.worldArtProfile,
+        worldArtProfileVersion: applied.worldArtProfileVersion,
+        worldStyleParameters: applied.worldStyleParameters,
+      });
+      render();
+    },
     setVisible(visible) {
-      if (!visible) hideWorldPreview();
+      // The shell reports every surface's visibility on each change. Only closing the panel throws
+      // its draft away, so a refusal that arrived while it was hidden keeps its words until seen.
+      if (!visible && shown) hideWorldPreview();
+      shown = visible;
       modalFocus.setVisible(visible);
     },
     reportPersistence(state) {

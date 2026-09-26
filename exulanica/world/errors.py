@@ -14,6 +14,7 @@ __all__ = [
     "EnvironmentBindingDrift",
     "EnvironmentCompositionDenied",
     "EnvironmentSourceWithdrawn",
+    "ExpiredPreview",
     "InvalidEnvironmentData",
     "InvalidEnvironmentState",
     "InvalidInteractionData",
@@ -71,6 +72,10 @@ class UnknownWorldResource(WorldStyleError):
 
 class InvalidPreviewState(WorldStyleError):
     """A preview is known but is not open and applicable."""
+
+
+class ExpiredPreview(InvalidPreviewState):
+    """A preview nobody decided within ``OPEN_PREVIEW_LIFETIME``; it is closed and never applied."""
 
 
 class WorldNotConfigured(WorldStyleError):

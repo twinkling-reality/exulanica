@@ -15,6 +15,7 @@ import type { AppEnvironment, SessionState } from '../src/composition/session-st
 import { DEFAULT_PREFERENCES } from '../src/preferences.js';
 import { say } from '../src/ui/copy.js';
 import { WorldStyleClient, validateLocalReference } from '../src/world-style-api.js';
+import { RESTORE_BEFORE_CHANGING } from '../src/world-style-refusals.js';
 import {
   WorldStyleProposalOutcomes,
   worldStyleProposalInbox,
@@ -287,6 +288,9 @@ interface Harness {
   readonly client: WorldStyleClient;
   readonly gets: string[];
   readonly open: unknown[];
+  /** Move the world to another version behind this page's back, as another tab applying. */
+  readonly setCurrent: (next: ReturnType<typeof version>) => void;
+  readonly restored: Record<string, unknown>[];
 }
 
 async function harness(over: {
@@ -308,6 +312,14 @@ async function harness(over: {
   shared?: unknown[];
   /** Every apply is answered as made against a version that is no longer current. */
   applyStale?: boolean;
+  /** Every apply is answered as a preview that outlived the authority's lifetime for one. */
+  applyExpired?: boolean;
+  /** A status the n-th read of the current version answers with instead of the version, 1-based. */
+  currentStatus?: (read: number) => number | undefined;
+  /** Every restore meets a saved world another page advanced, as the authority answers it. */
+  restoreEntryMoved?: boolean;
+  /** The version the world holds when the page opens, for a page opened after another change. */
+  start?: ReturnType<typeof version>;
 } = {}): Promise<Harness> {
   const bodies: Record<string, unknown>[] = [];
   const applied: string[] = [];
@@ -315,14 +327,35 @@ async function harness(over: {
   const gets: string[] = [];
   /** The world's open previews, oldest first, as the authority holds them: shared by every tab. */
   const open: unknown[] = over.shared ?? [...(over.open ?? [])].reverse();
+  /** The version the authority holds as current. Previews and applies on another base are stale. */
+  let current = over.start ?? version('v0', 0);
+  /** The world's history as the authority serves it, oldest first. */
+  const known: ReturnType<typeof version>[] = [version('v0', 0)];
+  const remember = (next: ReturnType<typeof version>): void => {
+    const at = known.findIndex((item) => item.version_id === next.version_id);
+    if (at >= 0) known.splice(at, 1);
+    known.push(next);
+  };
+  if (over.start !== undefined) remember(over.start);
+  let currentReads = 0;
+  /** The restores (rollbacks) the page asked for. */
+  const restored: Record<string, unknown>[] = [];
+  const stale = () => json({ code: 'stale_style_version', detail: 'the world changed' }, 409);
+  const close = (id: string): void => {
+    const at = open.findIndex((row) => (row as { preview: { preview_id: string } }).preview.preview_id === id);
+    if (at >= 0) open.splice(at, 1);
+  };
   const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
     const url = new URL(String(input));
     if ((init.method ?? 'GET') === 'GET') gets.push(`${url.pathname}${url.search}`);
     if (url.pathname.endsWith('/world/styles/catalog')) return json(catalog());
     if (url.pathname.endsWith('/world/styles/current')) {
-      return json({ current_topology_digest: 'topology-a', current: version('v0', 0) });
+      currentReads += 1;
+      const status = over.currentStatus?.(currentReads);
+      if (status !== undefined) return json({ code: 'internal_error', detail: 'the read failed' }, status);
+      return json({ current_topology_digest: 'topology-a', current });
     }
-    if (url.pathname.endsWith('/world/styles/versions')) return json([version('v0', 0)]);
+    if (url.pathname.endsWith('/world/styles/versions')) return json(known);
     if (url.pathname.endsWith('/world/styles/previews') && (init.method ?? 'GET') === 'GET') {
       if (over.openStatus !== undefined) return json({ code: 'invalid_preview_state', detail: 'no' }, over.openStatus);
       return json({ previews: [...open].reverse(), unreadable: over.unreadable ?? 0 });
@@ -336,6 +369,7 @@ async function harness(over: {
       if (over.previewStatus !== undefined) {
         return json(over.previewBody ?? { code: 'invalid_style_data', detail: 'no' }, over.previewStatus);
       }
+      if (body['baseStyleVersionId'] !== current.version_id) return stale();
       const previewId = `preview-${bodies.length}`;
       open.push(openFromBody(previewId, body));
       return json(
@@ -366,22 +400,44 @@ async function harness(over: {
     }
     if (url.pathname.endsWith('/apply')) {
       applied.push(url.pathname);
-      if (over.applyStale === true) {
-        return json({ code: 'stale_style_version', detail: 'the world changed' }, 409);
-      }
       const id = decodeURIComponent(url.pathname.split('/').at(-2) ?? '');
-      const at = open.findIndex((row) => (row as { preview: { preview_id: string } }).preview.preview_id === id);
-      if (at >= 0) open.splice(at, 1);
-      return json(version('v1', 1, 0.8));
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      // Refused by its age, then by its own base check, as the authority checks them, it closes the
+      // preview in the same transaction. This page holds no saved world entry, so no entry check
+      // answers first.
+      if (over.applyExpired === true) {
+        close(id);
+        return json({ code: 'preview_expired', detail: `world preview ${id} expired` }, 409);
+      }
+      if (over.applyStale === true || body['baseStyleVersionId'] !== current.version_id) {
+        close(id);
+        return stale();
+      }
+      close(id);
+      current = version('v1', 1, 0.8);
+      remember(current);
+      return json(current);
+    }
+    if (url.pathname.endsWith('/world/styles/rollback') && init.method === 'POST') {
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      restored.push(body);
+      if (over.restoreEntryMoved === true) {
+        return json({ code: 'stale_saved_world_entry', detail: 'the resume point moved' }, 409);
+      }
+      if (body['baseStyleVersionId'] !== current.version_id) return stale();
+      // Every version this page knows carries the saved design, so the restored one does too.
+      current = version(`restored-${restored.length}`, current.revision + 1, 0.46, {
+        rollback_target_version_id: body['targetVersionId'],
+      });
+      remember(current);
+      return json(current);
     }
     if (url.pathname.includes('/world/styles/previews/') && init.method === 'DELETE') {
       deleted.push(url.pathname);
       if (over.deleteStatus !== undefined) {
         return json({ code: 'internal_error', detail: 'the discard failed' }, over.deleteStatus);
       }
-      const id = decodeURIComponent(url.pathname.split('/').at(-1) ?? '');
-      const at = open.findIndex((row) => (row as { preview: { preview_id: string } }).preview.preview_id === id);
-      if (at >= 0) open.splice(at, 1);
+      close(decodeURIComponent(url.pathname.split('/').at(-1) ?? ''));
       return new Response(null, { status: 204 });
     }
 
@@ -439,7 +495,13 @@ async function harness(over: {
   // to nobody. It is also what a person would be looking at.
   document.body.replaceChildren(mounted.options.root);
   cleanups.push(stop, () => mounted.dispose());
-  return { bodies, applied, deleted, mounted, outcomes, stop, client, gets, open };
+  return {
+    bodies, applied, deleted, mounted, outcomes, stop, client, gets, open, restored,
+    setCurrent: (next) => {
+      current = next;
+      remember(next);
+    },
+  };
 }
 
 const COMPANION = {
@@ -775,6 +837,8 @@ describe('a staged Companion proposal until the person decides', () => {
 
   it('still throws away the panel\'s own draft when the panel is hidden', async () => {
     const { bodies, deleted, mounted } = await harness();
+    // A person moves a control on the open panel.
+    mounted.options.setVisible(true);
     const vitality = mounted.options.root.querySelector<HTMLInputElement>(
       '[aria-label="Color vitality"]',
     )!;
@@ -801,6 +865,13 @@ const SECOND = {
   ...COMPANION,
   originReference: 'companion-utterance:77aa',
   profile: { ...PROFILE, parameters: { ...PARAMETERS, vitality: 0.5 } },
+};
+
+/** A third, asked after a refusal. */
+const THIRD = {
+  ...COMPANION,
+  originReference: 'companion-utterance:3c3c',
+  profile: { ...PROFILE, parameters: { ...PARAMETERS, glass: 0.5 } },
 };
 
 /** One open preview as GET /world/styles/previews answers, with the proposal it was made from. */
@@ -1006,8 +1077,8 @@ describe('a staged proposal the page finds when it opens', () => {
     }]);
   });
 
-  it('never applies one the authority finds stale, and closes what the recovery re-made', async () => {
-    const { mounted, deleted, applied, outcomes } = await harness({
+  it('never applies one the authority finds stale, and makes nothing again', async () => {
+    const { mounted, deleted, applied, bodies, outcomes } = await harness({
       applyStale: true,
       open: [openPreview({ id: 'looks-current' })],
     });
@@ -1017,8 +1088,10 @@ describe('a staged proposal the page finds when it opens', () => {
     await settle();
 
     expect(applied).toEqual(['/api/world/styles/previews/preview-looks-current/apply']);
-    // The recovery's own preview, made from the old design, is closed rather than offered.
-    expect(deleted).toHaveLength(1);
+    // Nothing is made again from the old design, and nothing is left to close: the authority
+    // closed the preview in the transaction that refused it.
+    expect(bodies).toEqual([]);
+    expect(deleted).toEqual([]);
     expect(outcomes.at(-1)).toMatchObject({
       originReference: 'companion-utterance:looks-current', kind: 'refused', earlier: true,
     });
@@ -1128,6 +1201,381 @@ describe('a staged proposal the page finds when it opens', () => {
     first.mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
     await settle();
     expect(first.applied).toHaveLength(1);
+  });
+});
+
+describe('a staged proposal the world moved past, or that waited too long', () => {
+  beforeEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
+    document.body.replaceChildren();
+  });
+
+  const lifecycle = (): string | undefined =>
+    document.querySelector<HTMLElement>('.world-style-lifecycle')?.dataset['state'];
+  const lifecycleText = (): string =>
+    document.querySelector('.world-style-lifecycle')?.textContent ?? '';
+  const reviewShown = (mounted: Harness['mounted']): boolean =>
+    !mounted.options.root.querySelector<HTMLElement>('.world-style-proposal-review')!.hidden;
+  const applyButton = (mounted: Harness['mounted']): HTMLButtonElement =>
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!;
+  /** The saved design this page opened on, which is also the panel's applied design. */
+  const SAVED = DEFAULT_PREFERENCES.worldStyleParameters;
+  /** Another tab applies its own change: vitality moved, everything else as it was. */
+  const elsewhere = () => version('v1', 1, 0.46, {
+    global_style: {
+      profile_id: PROFILE.profileId,
+      profile_version: PROFILE.profileVersion,
+      parameters: { ...PARAMETERS, vitality: 0.3 },
+    },
+  });
+  /** Move one control by hand, as a person would, and read the settings preview it posts. */
+  const nudge = async (
+    h: Harness,
+    label: string,
+    value: string,
+  ): Promise<Record<string, unknown>> => {
+    const settings = (): number => h.bodies.filter((body) => body['origin'] === 'settings').length;
+    const before = settings();
+    const input = h.mounted.options.root.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => expect(settings()).toBe(before + 1), { timeout: 2000 });
+    await settle();
+    return (h.bodies.at(-1)!['profile'] as { parameters: Record<string, unknown> }).parameters;
+  };
+
+  const HISTORY = 'select[aria-label="World design history"]';
+  /** The versions Version history lists, as their ids. */
+  const historyOptions = (h: Harness): string[] =>
+    [...h.mounted.options.root.querySelectorAll<HTMLOptionElement>(`${HISTORY} option`)]
+      .map((option) => option.value);
+  /** What the refusal says to do: choose the saved version in Version history and restore it. */
+  const restoreSaved = (h: Harness, saved: string): void => {
+    const history = h.mounted.options.root.querySelector<HTMLSelectElement>(HISTORY)!;
+    history.value = saved;
+    history.dispatchEvent(new Event('change', { bubbles: true }));
+    const restore = [...h.mounted.options.root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Restore selected version')!;
+    expect(restore.disabled).toBe(false);
+    restore.click();
+  };
+  /** Move one control and wait until the authority has answered its Settings preview. */
+  const changeGoesThrough = async (h: Harness): Promise<void> => {
+    const vitality = h.mounted.options.root.querySelector<HTMLInputElement>(
+      '[aria-label="Color vitality"]',
+    )!;
+    const before = h.bodies.filter((body) => body['origin'] === 'settings').length;
+    vitality.value = vitality.value === '0.3' ? '0.4' : '0.3';
+    vitality.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(h.bodies.filter((body) => body['origin'] === 'settings').length).toBe(before + 1);
+    }, { timeout: 2000 });
+    await settle();
+    expect(lifecycle()).toBe('ready');
+  };
+
+  it('refuses one staged on this page once another writer changed the world, and makes nothing again', async () => {
+    const h = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    h.setCurrent(elsewhere());
+
+    applyButton(h.mounted).click();
+    await settle();
+
+    expect(h.applied).toHaveLength(1);
+    // Not made again against the newer version, and nothing left to discard: the authority
+    // closed it in the transaction that refused it.
+    expect(h.bodies).toHaveLength(1);
+    expect(h.deleted).toEqual([]);
+    expect(lifecycle()).toBe('failed');
+    expect(lifecycleText()).toContain('earlier version of your world');
+    // Apply found the live appearance moved from the one this page shows: every change is held
+    // back until the saved version is restored, which the words say, and not "ask again".
+    expect(lifecycleText()).toContain(RESTORE_BEFORE_CHANGING);
+    expect(lifecycleText()).not.toContain('Ask again');
+    expect(h.outcomes.map((outcome) => outcome.kind)).toEqual(['previewed', 'refused']);
+    // Version history lists the writer's version beside the saved one: what a restore replaces.
+    await vi.waitFor(() => expect(historyOptions(h)).toEqual(['v0', 'v1']), { timeout: 2000 });
+    expect(lifecycleText()).toContain(RESTORE_BEFORE_CHANGING);
+    expect(h.outcomes.at(-1)?.detail).toContain(RESTORE_BEFORE_CHANGING);
+    expect(h.client.activePreview()).toBeNull();
+    expect(h.client.requiresReconciliation()).toBe(true);
+    expect(reviewShown(h.mounted)).toBe(false);
+    // The panel stays on the version it shows: none of the proposal's values, and not the other
+    // writer's change, which this page cannot build on.
+    expect(h.mounted.options.preferences().worldStyleParameters).toEqual(SAVED);
+    expect(applyButton(h.mounted).disabled).toBe(true);
+  });
+
+  it('then refuses a moved control and a new proposal until the saved version is restored, as it says', async () => {
+    const h = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    h.setCurrent(elsewhere());
+    applyButton(h.mounted).click();
+    await settle();
+    expect(h.bodies).toHaveLength(1);
+
+    const vitality = h.mounted.options.root.querySelector<HTMLInputElement>(
+      '[aria-label="Color vitality"]',
+    )!;
+    vitality.value = '0.3';
+    vitality.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => expect(lifecycleText()).toContain('Restore this saved appearance'), {
+      timeout: 2000,
+    });
+    await settle();
+    expect(h.bodies).toHaveLength(1);
+
+    worldStyleProposalInbox.submit(THIRD);
+    await settle();
+    expect(h.bodies).toHaveLength(1);
+    expect(h.outcomes.at(-1)).toMatchObject({ originReference: THIRD.originReference, kind: 'refused' });
+    expect(h.outcomes.at(-1)?.detail).toContain('Restore this saved appearance');
+
+    // What the words said, after a writer that left the saved world alone: restore the saved
+    // version from Version history, which replaces the change, and the next change goes through
+    // with no reload.
+    const refusal = h.outcomes.find((outcome) => outcome.kind === 'refused')?.detail ?? '';
+    expect(refusal).toMatch(/restore your saved version in Version history/);
+    await vi.waitFor(() => expect(historyOptions(h)).toEqual(['v0', 'v1']), { timeout: 2000 });
+    restoreSaved(h, 'v0');
+    await vi.waitFor(() => expect(lifecycle()).toBe('saved'), { timeout: 2000 });
+    expect(h.restored).toMatchObject([{ targetVersionId: 'v0', baseStyleVersionId: 'v1' }]);
+    expect(h.client.requiresReconciliation()).toBe(false);
+    await changeGoesThrough(h);
+  });
+
+  it('after a preview found the move, the restore it names works with no reload', async () => {
+    const h = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    h.setCurrent(elsewhere());
+    worldStyleProposalInbox.submit(SECOND);
+    await settle();
+    expect(h.outcomes.at(-1)).toMatchObject({ originReference: SECOND.originReference, kind: 'refused' });
+    expect(h.outcomes.at(-1)?.detail).toContain(RESTORE_BEFORE_CHANGING);
+    expect(lifecycleText()).toMatch(/restore your saved version in Version history/);
+    await vi.waitFor(() => expect(historyOptions(h)).toEqual(['v0', 'v1']), { timeout: 2000 });
+
+    restoreSaved(h, 'v0');
+    await vi.waitFor(() => expect(lifecycle()).toBe('saved'), { timeout: 2000 });
+
+    expect(h.restored).toMatchObject([{ targetVersionId: 'v0', baseStyleVersionId: 'v1' }]);
+    await changeGoesThrough(h);
+  });
+
+  it('after another page advanced the saved world, the restore asks for a reload, after which a change goes through', async () => {
+    const h = await harness({ restoreEntryMoved: true });
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    h.setCurrent(elsewhere());
+    worldStyleProposalInbox.submit(SECOND);
+    await settle();
+    expect(h.outcomes.at(-1)?.detail).toContain(RESTORE_BEFORE_CHANGING);
+    expect(lifecycleText()).toMatch(
+      /restore your saved version in Version history, .* and reload if it asks you to\./,
+    );
+    await vi.waitFor(() => expect(historyOptions(h)).toEqual(['v0', 'v1']), { timeout: 2000 });
+
+    restoreSaved(h, 'v0');
+    await vi.waitFor(() => expect(lifecycle()).toBe('failed'), { timeout: 2000 });
+
+    // "... and reload if it asks you to": it does.
+    expect(lifecycleText()).toContain('Reload before trying again');
+    expect(h.restored).toHaveLength(1);
+    // The reloaded page opens the saved world as another page left it, live, and a change goes
+    // through.
+    const reloaded = await harness({ start: elsewhere() });
+    expect(reloaded.client.requiresReconciliation()).toBe(false);
+    await changeGoesThrough(reloaded);
+  });
+
+  it('keeps the words of a refusal that arrived while Customize was hidden until it is shown', async () => {
+    const h = await harness();
+    // The person opens the Companion, so the shell hides Customize.
+    h.mounted.options.setVisible(true);
+    h.mounted.options.setVisible(false);
+    await settle();
+    h.setCurrent(elsewhere());
+    worldStyleProposalInbox.submit(SECOND);
+    await settle();
+    expect(lifecycleText()).toContain(RESTORE_BEFORE_CHANGING);
+
+    // The Companion closes: the shell reports Customize hidden again, twice, as reflectShell does,
+    // and then the person opens Customize.
+    h.mounted.options.setVisible(false);
+    h.mounted.options.setVisible(false);
+    await settle();
+    h.mounted.options.setVisible(true);
+
+    expect(lifecycle()).toBe('failed');
+    expect(lifecycleText()).toContain(RESTORE_BEFORE_CHANGING);
+  });
+
+  it('takes a refused proposal off the panel even when the world cannot be read after it', async () => {
+    // The second read of the current version is the one after the refusal; it fails.
+    const h = await harness({ currentStatus: (read) => (read === 2 ? 500 : undefined) });
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    h.setCurrent(elsewhere());
+
+    applyButton(h.mounted).click();
+    await settle();
+
+    expect(h.applied).toHaveLength(1);
+    expect(lifecycle()).toBe('failed');
+    expect(h.outcomes.map((outcome) => outcome.kind)).toEqual(['previewed', 'refused']);
+    expect(h.client.activePreview()).toBeNull();
+    expect(reviewShown(h.mounted)).toBe(false);
+    expect(h.mounted.options.preferences().worldStyleParameters).toEqual(SAVED);
+
+    // A moved control proposes the person's change on the design they see, never the proposal's
+    // values, whatever becomes of that Settings draft afterwards.
+    const vitality = h.mounted.options.root.querySelector<HTMLInputElement>(
+      '[aria-label="Color vitality"]',
+    )!;
+    vitality.value = '0.3';
+    vitality.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(h.bodies.some((body) => body['origin'] === 'settings')).toBe(true);
+    }, { timeout: 2000 });
+    await settle();
+    const settings = h.bodies.filter((body) => body['origin'] === 'settings');
+    for (const body of settings) {
+      const parameters = (body['profile'] as { parameters: Record<string, unknown> }).parameters;
+      expect(parameters).toEqual({ ...SAVED, vitality: 0.3 });
+    }
+  });
+
+  it('refuses a proposal whose preview meets a newer version, and then the one staged before it', async () => {
+    const h = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    h.setCurrent(elsewhere());
+
+    worldStyleProposalInbox.submit(SECOND);
+    await settle();
+
+    // One POST each: the second met the newer version and was not made again on it.
+    expect(h.bodies).toHaveLength(2);
+    expect(h.deleted).toEqual([]);
+    expect(h.outcomes.map((o) => [o.originReference, o.kind])).toEqual([
+      ['companion-utterance:0f2c', 'previewed'],
+      ['companion-utterance:77aa', 'refused'],
+    ]);
+    expect(h.outcomes.at(-1)?.detail).toContain('changed elsewhere');
+    expect(h.outcomes.at(-1)?.detail).toContain(RESTORE_BEFORE_CHANGING);
+    expect(lifecycle()).toBe('failed');
+
+    // Asking again before a reload is refused before any request.
+    worldStyleProposalInbox.submit(THIRD);
+    await settle();
+    expect(h.bodies).toHaveLength(2);
+    expect(h.outcomes.at(-1)).toMatchObject({ originReference: THIRD.originReference, kind: 'refused' });
+    expect(h.outcomes.at(-1)?.detail).toContain('Restore this saved appearance');
+
+    // The first is still staged, and this page now knows it was made for an earlier version.
+    applyButton(h.mounted).click();
+    await settle();
+    expect(h.applied).toEqual([]);
+    expect(h.outcomes.at(-1)).toMatchObject({
+      originReference: 'companion-utterance:0f2c', kind: 'refused',
+    });
+    // Known from the refused preview's read, which cannot tell what moved the world.
+    expect(h.outcomes.at(-1)?.detail).toContain(RESTORE_BEFORE_CHANGING);
+    expect(h.mounted.options.preferences().worldStyleParameters).toEqual(SAVED);
+  });
+
+  it('after refusing one found on opening, a moved control proposes only its own change', async () => {
+    const h = await harness({ open: [openPreview({ id: 'stale', base: 'v-earlier', softness: 0.8 })] });
+    await settle();
+    expect(h.mounted.options.preferences().worldStyleParameters['horizon-softness']).toBe(0.8);
+
+    applyButton(h.mounted).click();
+    await settle();
+    expect(h.applied).toEqual([]);
+    expect(lifecycle()).toBe('failed');
+    // The controls show the applied design again, none of the refused values.
+    expect(h.mounted.options.preferences().worldStyleParameters).toEqual(SAVED);
+    expect(reviewShown(h.mounted)).toBe(false);
+
+    const posted = await nudge(h, 'Color vitality', '0.3');
+    expect(posted).toEqual({ ...SAVED, vitality: 0.3 });
+  });
+
+  it('refuses one that waited too long in words, offers nothing again, and a moved control proposes only its own change', async () => {
+    const h = await harness({ applyExpired: true });
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+
+    applyButton(h.mounted).click();
+    await settle();
+
+    expect(h.applied).toHaveLength(1);
+    expect(h.bodies).toHaveLength(1);
+    expect(h.deleted).toEqual([]);
+    expect(lifecycle()).toBe('failed');
+    expect(lifecycleText()).toContain('waited too long');
+    expect(h.outcomes.map((outcome) => outcome.kind)).toEqual(['previewed', 'refused']);
+    expect(h.outcomes.at(-1)?.detail).toContain('waited too long');
+    expect(h.client.activePreview()).toBeNull();
+    expect(reviewShown(h.mounted)).toBe(false);
+    expect(h.mounted.options.preferences().worldStyleParameters).toEqual(SAVED);
+    expect(applyButton(h.mounted).disabled).toBe(true);
+
+    const posted = await nudge(h, 'Color vitality', '0.3');
+    expect(posted).toEqual({ ...SAVED, vitality: 0.3 });
+  });
+
+  it('says to restore when one that waited too long is refused after the world moved', async () => {
+    const h = await harness({ applyExpired: true });
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    h.setCurrent(elsewhere());
+
+    applyButton(h.mounted).click();
+    await settle();
+
+    expect(lifecycle()).toBe('failed');
+    expect(lifecycleText()).toContain('waited too long');
+    expect(lifecycleText()).toContain(RESTORE_BEFORE_CHANGING);
+    expect(h.outcomes.at(-1)?.detail).toContain(RESTORE_BEFORE_CHANGING);
+    expect(h.mounted.options.preferences().worldStyleParameters).toEqual(SAVED);
+    await vi.waitFor(() => expect(historyOptions(h)).toEqual(['v0', 'v1']), { timeout: 2000 });
+  });
+
+  it('says a settings preview that waited too long was not saved, and keeps the person\'s draft', async () => {
+    const h = await harness({ applyExpired: true });
+    const posted = await nudge(h, 'Color vitality', '0.3');
+    expect(posted['vitality']).toBe(0.3);
+
+    applyButton(h.mounted).click();
+    await settle();
+
+    expect(lifecycle()).toBe('failed');
+    expect(lifecycleText()).toContain('waited too long');
+    // A settings draft is the person's own: it stays, and nobody is told about a proposal.
+    expect(h.mounted.options.preferences().worldStyleParameters['vitality']).toBe(0.3);
+    expect(h.outcomes).toEqual([]);
+    expect(applyButton(h.mounted).disabled).toBe(false);
+  });
+
+  it('says to restore when a settings preview that waited too long meets a moved world, and lists what moved it', async () => {
+    const h = await harness({ applyExpired: true });
+    await nudge(h, 'Color vitality', '0.3');
+    h.setCurrent(elsewhere());
+
+    applyButton(h.mounted).click();
+    await settle();
+
+    expect(lifecycle()).toBe('failed');
+    expect(lifecycleText()).toContain('waited too long');
+    expect(lifecycleText()).toContain(RESTORE_BEFORE_CHANGING);
+    expect(lifecycleText()).not.toContain('Apply again');
+    expect(h.mounted.options.preferences().worldStyleParameters['vitality']).toBe(0.3);
+    await vi.waitFor(() => expect(historyOptions(h)).toEqual(['v0', 'v1']), { timeout: 2000 });
   });
 });
 

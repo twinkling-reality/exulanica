@@ -421,7 +421,10 @@ def preview(body: PreviewBody, repository: WriteWorld, session: CurrentSession) 
 @router.get(
     "/styles/previews",
     response_model=OpenPreviewsView,
-    summary="This world's open appearance previews, newest first, each with its proposal.",
+    summary=(
+        "The open appearance previews a page may take up when it opens this world, newest "
+        "first, each with its proposal."
+    ),
 )
 def open_previews(repository: ReadWorld) -> OpenPreviewsView:
     found = repository.open_previews()

@@ -37,6 +37,7 @@ import {
   worldStyleProposalOutcomes,
   type WorldStyleProposalOutcomeKind,
 } from '../world-style-proposals.js';
+import { RESTORE_BEFORE_CHANGING } from '../world-style-refusals.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 
 export interface AppearanceDependencies {
@@ -65,6 +66,49 @@ export interface MountedAppearance {
   readonly settings: ReturnType<typeof buildControlsGuide>;
   applyPreferences(next: AtlasPreferences): void;
   dispose(): void;
+}
+
+/**
+ * What a refusal says: why, then what the person can do next. While this page can still change
+ * the world the next step is `retry`. Once the live appearance moved from the one this page shows
+ * (`WorldStyleClient.requiresReconciliation`), every change is held back until the saved version
+ * is restored, and the next step is to restore it (`RESTORE_BEFORE_CHANGING`).
+ */
+interface Refusal {
+  readonly why: string;
+  readonly retry: string;
+}
+
+/** Why a proposal made for an earlier version of the world was refused, found open or made here. */
+const REFUSED_FOR_AN_EARLIER_VERSION: Refusal = {
+  why: 'This change was proposed for an earlier version of your world, so applying it would undo '
+    + 'what changed since. It was not applied.',
+  retry: 'Ask again for it.',
+};
+
+/** What the panel says about such a proposal before anybody presses Apply. */
+const SHOWN_FOR_AN_EARLIER_VERSION =
+  'This change was proposed for an earlier version of your world, so it cannot be applied. Ask '
+  + 'again for it, or throw it away.';
+
+/**
+ * Why the authority refused a proposal that nobody decided within the lifetime it gives one.
+ * No number: the lifetime is the server's (`OPEN_PREVIEW_LIFETIME`), and a copy here would drift.
+ */
+const REFUSED_AS_EXPIRED: Refusal = {
+  why: 'This change waited too long to be confirmed and has expired, so it was not applied.',
+  retry: 'Ask for it again, or make the change yourself.',
+};
+
+/** The same for the panel's own draft, which stays: Apply makes a fresh preview of it. */
+const SETTINGS_EXPIRED: Refusal = {
+  why: 'This preview waited too long to be confirmed and has expired, so nothing was saved.',
+  retry: 'Apply again to save these settings.',
+};
+
+/** A refusal's words: why, then `behind` when the live appearance moved, else its retry. */
+function refusalWords(refusal: Refusal, behind: string | null): string {
+  return `${refusal.why} ${behind ?? refusal.retry}`;
 }
 
 export function mountAppearance(deps: AppearanceDependencies): MountedAppearance {
@@ -183,9 +227,9 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
    * Say what became of a proposal that came from somewhere other than this panel.
    *
    * Read off the ACTIVE PREVIEW rather than from a variable held here, because the client is
-   * what knows which proposal is current: a stale base makes it discard and refine silently, and
-   * a local copy would name the attempt before that one. Settings changes report nothing, which
-   * is not an omission: nobody is waiting to hear what happened to a slider they moved.
+   * what knows which proposal is current: another proposal replaces it, a refusal leaves the one
+   * before it staged, and a local copy would name the wrong one. Settings changes report nothing,
+   * which is not an omission: nobody is waiting to hear what happened to a slider they moved.
    */
   const reportProposalOutcome = (
     active: ActiveWorldStylePreview | null,
@@ -202,12 +246,15 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     });
   };
 
-  /** A preview found open on opening whose base is not the version the world holds now. */
+  /**
+   * A preview from another origin whose base is not the version the world holds now, as far as
+   * this page knows: one found open on opening, or one staged here that another writer overtook.
+   */
   const madeForAnEarlierVersion = (
     active: ActiveWorldStylePreview,
     client: WorldStyleClient,
   ): boolean => {
-    if (!earlierReferences.has(active.request.originReference ?? '')) return false;
+    if (active.request.origin === 'settings') return false;
     const current = client.state();
     return current !== null && (
       active.baseStyleVersionId !== current.current.versionId
@@ -215,10 +262,68 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     );
   };
 
-  const refuseEarlier = (active: ActiveWorldStylePreview): void => {
-    const detail =
-      'This change was proposed for an earlier version of your world, so applying it would undo '
-      + 'what changed since. It was not applied. Ask again for it.';
+  /** Throw away the local renderer preview, leaving the world drawn as `restored`. */
+  const dropLocalWorldPreview = (restored: AtlasPreferences): void => {
+    if (state.settingsStylePreviewId !== null && state.atlas !== null) {
+      state.atlas.binding.discardArtProfilePreview(state.settingsStylePreviewId);
+      state.settingsStylePreviewId = null;
+    }
+    applyDocumentWorldStyle(env.previewArtProfile ?? worldArtProfile(
+      restored.worldArtProfile,
+      restored.worldArtProfileVersion,
+      restored.worldStyleParameters,
+    ));
+  };
+
+  /**
+   * Take a proposal the client no longer holds off the panel: its values, its local renderer
+   * preview and its review. Left on the controls, its values would be saved as the person's own
+   * Settings change by the first slider they moved.
+   */
+  const clearProposal = (client: WorldStyleClient): void => {
+    stagedCandidate = null;
+    dropLocalWorldPreview(state.preferences);
+    optionsView.discardWorldDraft();
+    syncWorldStyleConnection(state, client);
+    presentWorldStyleAuthority(
+      optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
+    );
+  };
+
+  /**
+   * List the version another writer made beside the saved one after a refusal that found it, so the
+   * person sees what restoring the saved version replaces. The client reads its history when it
+   * connects and after its own writes only, so without this read the writer's version is missing
+   * until a reload. One read of the world's history; a failed read leaves the list as it was, and
+   * one that answers after the page opened another world presents nothing.
+   */
+  const showVersionsAfterRefusal = (client: WorldStyleClient): void => {
+    void client.refreshVersions().then(() => {
+      if (state.worldStyles !== client) return;
+      syncWorldStyleConnection(state, client);
+      presentWorldStyleAuthority(
+        optionsView, state.worldStyleConnection, state.worldStyleFailure, client.activePreview(),
+      );
+    }).catch(() => undefined);
+  };
+
+  /**
+   * Refuse a proposal from another origin in words, and take it off the panel.
+   *
+   * The panel then shows the version this page shows as saved, which is the one it applied last.
+   * While that is the live version, moving one control proposes only that change on it. When the
+   * live appearance moved from it, the panel stays on it, because the client holds every change
+   * back until the saved version is restored, and `behind` says what to do next instead of retry.
+   */
+  const refuseProposal = (
+    active: ActiveWorldStylePreview,
+    client: WorldStyleClient,
+    refusal: Refusal,
+    behind: string | null,
+  ): void => {
+    clearProposal(client);
+    if (behind !== null) showVersionsAfterRefusal(client);
+    const detail = refusalWords(refusal, behind);
     optionsView.reportWorldLifecycle('failed', detail);
     reportProposalOutcome(active, 'refused', detail);
   };
@@ -299,15 +404,7 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         serverPreviewTimer = null;
       }
       previewSequence += 1;
-      if (state.settingsStylePreviewId !== null && state.atlas !== null) {
-        state.atlas.binding.discardArtProfilePreview(state.settingsStylePreviewId);
-        state.settingsStylePreviewId = null;
-      }
-      applyDocumentWorldStyle(env.previewArtProfile ?? worldArtProfile(
-        restored.worldArtProfile,
-        restored.worldArtProfileVersion,
-        restored.worldStyleParameters,
-      ));
+      dropLocalWorldPreview(restored);
       const client = state.worldStyles;
       if (client !== null) {
         // Read BEFORE the discard, because `discardActive` clears it. A proposal thrown away
@@ -344,11 +441,28 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
        * **A proposal made for an earlier version of the world is not applied.** Its candidate is
        * the whole design as it was at its base, so applying it, or re-making it against the
        * current version, would silently undo every change made since (a rollback, another
-       * device's change). A proposal found open when the page opened is the one that can be that
-       * old; it is refused in words, and asking again drafts one for the world as it is.
+       * device's change). One this page already knows is that old, found open when the page
+       * opened or overtaken by a change this page has heard of, is refused here without a
+       * request, and this page stops holding it; it stays open on the authority, as opening a
+       * world leaves it, until its lifetime closes it. One this page does not know is that old is
+       * refused by the authority on Apply, below, by the same words. While the live appearance is
+       * still the one this page shows, asking again drafts one for the world as it is. Once it is
+       * not, every change is held back until the saved version is restored from Version history
+       * over the change made elsewhere. After a writer that left the saved world alone the restore
+       * goes through, and so does the next change, with no reload. After another page that
+       * advanced the saved world the restore is refused with "Reload before trying again", and
+       * after the reload the saved world is live and the next change goes through. A restore that
+       * another change overtook in between is refused as stale, and the page shows the latest
+       * version and asks for the restore target again (`onWorldRollback`).
        */
       if (existing !== null && madeForAnEarlierVersion(existing, client)) {
-        refuseEarlier(existing);
+        client.release();
+        refuseProposal(
+          existing,
+          client,
+          REFUSED_FOR_AN_EARLIER_VERSION,
+          client.requiresReconciliation() ? RESTORE_BEFORE_CHANGING : null,
+        );
         return false;
       }
       /*
@@ -386,31 +500,48 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       try {
         const result = await client.applyActive();
         syncWorldStyleConnection(state, client);
-        if (result.kind === 'stale-recovered' && earlierReferences.has(
-          result.preview.request.originReference ?? '',
-        )) {
-          // Found open on this page's opening and stale at the authority: the recovery re-made
-          // its old whole design, which is exactly what must not be applied. Closed, and said.
-          await client.discardActive();
-          syncWorldStyleConnection(state, client);
+        if (result.kind === 'stale') {
+          // Overtaken by another writer this page had not heard of. The client stopped holding it
+          // and made nothing again (`WorldStyleClient.applyActive`).
+          refuseProposal(
+            active,
+            client,
+            REFUSED_FOR_AN_EARLIER_VERSION,
+            result.reconciliationRequired ? RESTORE_BEFORE_CHANGING : null,
+          );
+          return false;
+        }
+        if (result.kind === 'expired') {
+          if (active.request.origin !== 'settings') {
+            refuseProposal(
+              active,
+              client,
+              REFUSED_AS_EXPIRED,
+              result.reconciliationRequired ? RESTORE_BEFORE_CHANGING : null,
+            );
+            return false;
+          }
+          // The person's own draft stays on the panel, and Apply makes a fresh preview of it,
+          // unless the live appearance moved from the one this page shows.
           presentWorldStyleAuthority(
             optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
           );
-          refuseEarlier(result.preview);
+          optionsView.reportWorldLifecycle(
+            'failed',
+            refusalWords(
+              SETTINGS_EXPIRED, result.reconciliationRequired ? RESTORE_BEFORE_CHANGING : null,
+            ),
+          );
+          if (result.reconciliationRequired) showVersionsAfterRefusal(client);
           return false;
         }
         if (result.kind === 'stale-recovered') {
+          // The panel's own Settings draft, made again on the version another writer saved, for
+          // the person to review before Apply. Nobody is waiting to hear about a slider.
           presentWorldStyleAuthority(
             optionsView, state.worldStyleConnection, state.worldStyleFailure, result.preview,
           );
           optionsView.reportWorldLifecycle('stale');
-          // Still open, not refused: the client has already made a refinement carrying the same
-          // origin reference, and it is that one a person now confirms.
-          reportProposalOutcome(
-            result.preview,
-            'previewed',
-            'The saved world changed elsewhere, so the proposal was made again against it.',
-          );
           return false;
         }
         presentWorldStyleAuthority(
@@ -425,6 +556,11 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         return true;
       } catch (error) {
         const detail = describeWorldStyleFailure(error);
+        // A proposal the client let go of, refused and then not followed by a read of the world,
+        // leaves the panel too; one it still holds stays staged for another try.
+        if (active.request.origin !== 'settings' && client.activePreview() !== active) {
+          clearProposal(client);
+        }
         optionsView.reportWorldLifecycle('failed', detail);
         reportProposalOutcome(active, 'refused', detail);
         return false;
@@ -542,20 +678,12 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     presentWorldStyleAuthority(
       optionsView, state.worldStyleConnection, state.worldStyleFailure, active,
     );
-    // A preview made against an earlier version than the one the world now holds is shown as
-    // stale: Apply then makes it again against the current version for the person to review.
-    const current = state.worldStyleConnection?.state.current.versionId;
-    const stale = active.recoveredFromStale
-      || (current !== undefined && active.baseStyleVersionId !== current);
-    // One found on opening and made for an earlier version is never applied (`refuseEarlier`),
-    // so it does not promise the fresh preview a stale one made on this page would get.
+    // One made for an earlier version than the world holds now is shown as stale, and never
+    // applied (`refuseProposal`), so it does not promise the fresh preview a Settings draft gets.
     const earlier = madeForAnEarlierVersion(active, client);
     optionsView.reportWorldLifecycle(
-      stale ? 'stale' : 'ready',
-      earlier
-        ? 'This change was proposed for an earlier version of your world, so it cannot be '
-          + 'applied. Ask again for it, or throw it away.'
-        : undefined,
+      earlier ? 'stale' : 'ready',
+      earlier ? SHOWN_FOR_AN_EARLIER_VERSION : undefined,
     );
     if (announce) reportProposalOutcome(active, 'previewed', 'Waiting to be confirmed in Customize.');
   }
@@ -604,6 +732,13 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         kind: 'refused',
         detail,
       });
+      // The refused preview's read found the world moved: list what the restore would replace.
+      if (
+        error instanceof WorldStyleContractError && error.code === 'stale_proposal'
+        && client.requiresReconciliation()
+      ) {
+        showVersionsAfterRefusal(client);
+      }
     }
   });
   /*

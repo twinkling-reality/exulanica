@@ -7327,7 +7327,7 @@
     "tags": [
      "world"
     ],
-    "summary": "This world's open appearance previews, newest first, each with its proposal.",
+    "summary": "The open appearance previews a page may take up when it opens this world, newest first, each with its proposal.",
     "operationId": "open_previews_world_styles_previews_get",
     "parameters": [
      {

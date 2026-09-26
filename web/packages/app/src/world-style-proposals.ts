@@ -39,12 +39,10 @@ export const worldStyleProposalInbox = new WorldStyleProposalInbox();
  * companion.ts` owns what is remembered. Neither may import the other, and a shared module they
  * both already depend on is where the seam belongs.
  *
- * **Keyed by origin reference rather than proposal id, deliberately.** A stale base makes the
- * world style client discard its proposal and create a REFINEMENT with a new id, silently and
- * correctly, so a listener keyed on the id it first saw would stop hearing about its own
- * proposal exactly when a second person changed the world underneath it. The origin reference is
- * minted per utterance and survives that recovery, because it describes what was asked rather
- * than which attempt is current.
+ * **Keyed by origin reference rather than proposal id, deliberately.** An id names one attempt,
+ * and the client can make another attempt for the same request (a Settings draft is made again
+ * on a newer version), so a listener keyed on an id could lose its request; the origin reference
+ * is minted per utterance and names what was asked.
  */
 export type WorldStyleProposalOutcomeKind =
   /** The authority validated it and there is now something to confirm. */

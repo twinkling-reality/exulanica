@@ -6,8 +6,9 @@ authority is implemented separately in [spatial-world-authority.md](spatial-worl
 This document is the persistence and HTTP half of
 [ADR-0007](adr/0007-world-composition-and-customization.md) and the
 [Atlas world customization contract](atlas-world-customization-contract.md). The implementation is
-`exulanica/world/`, migrations `0017_adaptive_world_styles.sql` and
-`0023_frontend_world_recipe_contract.sql`, and the `/world` API routes.
+`exulanica/world/`, migrations `0017_adaptive_world_styles.sql`,
+`0023_frontend_world_recipe_contract.sql` and `0111_an_open_style_preview_expires.sql`, and the
+`/world` API routes.
 
 ## Boundary
 
@@ -85,21 +86,35 @@ base_topology_digest   == current_topology_digest
 Preview validates a proposal and writes an isolated candidate; it never moves the pointer. Apply
 inserts the global version and all regional overrides, moves the pointer, closes the preview, and
 writes the audit event in one transaction. Discard closes only the preview/proposal. A preview
-stays open until one of the two closes it, whatever happens to the page that made it, and
-`GET /world/styles/previews` reads back the newest eight of the world's open previews
-(`OPEN_PREVIEWS_READ` in `exulanica/world/repository.py`, which states why eight), counting in
-`unreadable` and leaving out any it cannot read, such as one made before the reviewed
-recipe-binding contract. When a page opens a world, the browser's client takes up the newest open
-preview from another origin, such as a Companion proposal, made against the current version, or
-else the newest, which Customize shows as stale; so a staged proposal is still in Customize after a
-reload, after the person opens another world and comes back, and in a second tab. A proposal found
-open this way that was made against an earlier version is never applied, and never made again
-against the current one, because its candidate is the whole design as it was and applying it would
-undo every change made since: the page refuses it in words and the person asks again. One the page cannot show, such as a design of
+stays open, whatever happens to the page that made it, until one of the two closes it, a new
+proposal replaces it, or it outlives `OPEN_PREVIEW_LIFETIME` (seven days, in
+`exulanica/world/repository.py`, which states the reason). The next preview of that world closes
+every one past its lifetime as `expired`, each with a `preview_expired` audit event, under the
+state-row lock every Apply and preview of the world takes first; Apply refuses one past its
+lifetime as `409 preview_expired`, closing it if nothing has yet; a discard of one closes it as
+`expired` rather than as a person's discard; and `GET /world/styles/proposals/{id}` reports its
+proposal `expired` before any write closes it, by the same predicate. `GET /world/styles/previews` reads back the newest eight open previews a page may
+take up (`OPEN_PREVIEWS_READ`, which states why eight): proposals from another origin than
+Settings, over the whole world, within their lifetime. That filter runs in the query before the
+limit, so Settings drafts that reloaded pages left open never hide a staged proposal. The read
+counts in `unreadable`, and leaves out, any row it cannot read, such as one made before the
+reviewed recipe-binding contract. When a page opens a world, the browser's client takes up the
+newest of them made against the current version, or else the newest, which Customize shows as
+stale; so a staged proposal is still in Customize after a reload, after the person opens another
+world and comes back, and in a second tab. A proposal from another origin than Settings, found open
+this way or staged on the page, is applied only against the version it was made for and is never
+made again against a newer one, because its candidate is the whole design as it was and applying it
+would undo every change made since; the page refuses it in words (see the
+[customization contract](atlas-world-customization-contract.md#7-frontend-integration-boundary)).
+Apply's own base check closes such a preview as stale in the transaction that refuses it. An Apply
+bound to a saved world's resume point meets that world's checks first:
+`409 stale_saved_world_entry` when another page advanced the resume point, and
+`409 stale_style_version` when the saved appearance is no longer the live one. Those refuse without
+closing the preview, which its lifetime then closes. One the page cannot show, such as a design of
 another profile, is left open and the page says so in words the Companion keeps. Opening a world
-closes nothing, because a page cannot tell a preview an earlier page left from one a live tab
-holds: a preview closes only when a person applies or discards it or a new proposal replaces it. The read-back is best effort, and
-a failed read or a row the client cannot parse leaves the world opening as it would with none
+closes nothing, because a page cannot tell a preview an earlier page left from one a live tab holds.
+The read-back is best effort, and a failed read or a row the client cannot parse leaves the world
+opening as it would with none
 (`web/packages/app/src/world-style-api.ts`). A new preview is made before the one it replaces is
 discarded, so an authority that refuses the new one leaves the previous one staged, and a discard
 that fails leaves the new one staged and the old one open, which the page says. Rollback
@@ -116,8 +131,8 @@ retain the supplied origin, token-derived actor, origin reference, and rejection
 and `companion` proposals require an origin reference; `user` proposals may omit one. The HTTP body
 has no actor field: the actor comes from the bearer token. Companion proposals additionally require
 model ID, prompt version, and at least one opaque reference ID. `GET /world/styles/proposals/{id}`
-exposes acceptance/rejection/discard/stale status, refinement lineage, and the exact inert recipe
-binding without storing raw conversation or private reference media.
+exposes acceptance/rejection/discard/stale/expired status, refinement lineage, and the exact inert
+recipe binding without storing raw conversation or private reference media.
 
 ## Source media
 
@@ -215,7 +230,7 @@ All routes require a bearer token.
 | `GET` | `/world/styles/current` | Current version plus the independently current topology digest |
 | `GET` | `/world/styles/versions` | Immutable resolved history with warnings/provenance |
 | `GET` | `/world/styles/proposals/{id}` | Proposal status, provenance, refinement, and recipe binding |
-| `GET` | `/world/styles/previews` | The world's open previews, newest first, each with its proposal, and how many it could not read |
+| `GET` | `/world/styles/previews` | The open previews a page may take up (from another origin than Settings, over the whole world, within their lifetime), newest first, each with its proposal, and how many it could not read |
 | `POST` | `/world/styles/previews` | Validate and create an isolated preview |
 | `POST` | `/world/styles/previews/{id}/apply` | Compare both bases and atomically apply |
 | `DELETE` | `/world/styles/previews/{id}` | Atomically discard without changing current style |
@@ -232,6 +247,7 @@ The domain problem codes are intentionally distinct:
 | `409` | `protected_topology_conflict` | Recompose/review against the conflicting topology; never force appearance over it |
 | `424` | `unavailable_asset` | Render the recorded honest fallback/state or restore authorised bytes |
 | `409` | `invalid_preview_state` | Do not reapply a closed preview |
+| `409` | `preview_expired` | Nobody decided the preview within its lifetime and it is closed; propose the change again |
 | `404` | `unknown_reference` | Treat absent and cross-workspace IDs identically, including an unknown style write base |
 
 ## Verification
@@ -246,4 +262,6 @@ historical write bases on the write path, and latent COMPOSE tokens.
 `tests/test_world_api.py` holds the route shapes, problem codes (unknown
 write-base style is `404 unknown_reference`; a historical style that exists but
 is not current is `409 stale_style_version`), actor derivation, and
-cross-workspace source behavior.
+cross-workspace source behavior. `tests/test_world_style_open_previews.py` holds the read-back
+filter, the preview lifetime, its closing and `409 preview_expired`, with writes as the runtime role
+and reads as a role that can only select.

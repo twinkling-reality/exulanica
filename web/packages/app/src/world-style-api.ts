@@ -23,6 +23,7 @@ import {
   type WorldStyleRegistryDocument,
 } from '@exulanica/presentation';
 import { worldPath } from './world-scope.js';
+import { RESTORE_BEFORE_CHANGING } from './world-style-refusals.js';
 
 export type WorldStyleOrigin = 'user' | 'settings' | 'companion';
 export type WorldStyleScope =
@@ -156,7 +157,25 @@ export interface SavedStyleEntryBinding {
 
 export type WorldStyleApplyResult =
   | { readonly kind: 'applied'; readonly version: WorldStyleVersionRecord }
-  | { readonly kind: 'stale-recovered'; readonly preview: ActiveWorldStylePreview };
+  /** A Settings preview another writer overtook, made again on the new version for review. */
+  | { readonly kind: 'stale-recovered'; readonly preview: ActiveWorldStylePreview }
+  /**
+   * A preview from another origin that another writer overtook, which the client stops holding
+   * and never makes again: see `applyActive`. `reconciliationRequired` is
+   * `requiresReconciliation()` after the read that followed.
+   */
+  | {
+      readonly kind: 'stale';
+      readonly state: WorldStyleState;
+      readonly reconciliationRequired: boolean;
+    }
+  /** A preview the authority closed because it outlived its lifetime without a decision. */
+  | {
+      readonly kind: 'expired';
+      readonly state: WorldStyleState;
+      readonly reconciliationRequired: boolean;
+    };
+
 
 export type WorldStyleRollbackResult =
   | { readonly kind: 'applied'; readonly version: WorldStyleVersionRecord }
@@ -166,6 +185,21 @@ export class WorldStyleContractError extends Error {
   constructor(readonly code: string, message: string) {
     super(message);
     this.name = 'WorldStyleContractError';
+  }
+}
+
+/**
+ * A proposal from another origin refused because the world had moved on when its preview was
+ * made (see `#replacePreview`), with `requiresReconciliation()` after the read that followed.
+ */
+export class StaleProposalError extends WorldStyleContractError {
+  constructor(readonly reconciliationRequired: boolean) {
+    super(
+      'stale_proposal',
+      'Your world changed elsewhere, so this change was not proposed: it might undo that change. '
+        + (reconciliationRequired ? RESTORE_BEFORE_CHANGING : 'Ask again for it.'),
+    );
+    this.name = 'StaleProposalError';
   }
 }
 
@@ -230,6 +264,20 @@ export class WorldStyleClient {
 
   activePreview(): ActiveWorldStylePreview | null {
     return this.#active;
+  }
+
+  /**
+   * Whether the world's live appearance is no longer the one this page shows, so every change is
+   * refused (`#replacePreview`) until the saved version is restored from Version history over the
+   * change made elsewhere (`rollback`). After a writer that left the saved world alone the restore
+   * goes through, and so does the next change, with no reload. After another page that advanced
+   * the saved world the restore is refused with "Reload before trying again", and after the reload
+   * the saved world is live and the next change goes through. A restore that another change
+   * overtook in between is refused as stale, and the page shows the latest version and asks for
+   * the restore target again (`RESTORE_BEFORE_CHANGING`).
+   */
+  requiresReconciliation(): boolean {
+    return this.#requiresReconciliation;
   }
 
   async connect(selectedVersionId?: string): Promise<WorldStyleConnection> {
@@ -348,9 +396,14 @@ export class WorldStyleClient {
   }
 
   async refreshVersions(): Promise<readonly WorldStyleVersionRecord[]> {
-    this.#versions = parseVersions(
+    const before = this.#versions;
+    const read = parseVersions(
       await this.#transport.getJson<unknown>(this.#path('/world/styles/versions')),
     );
+    // A version this client wrote while the read was in flight may be newer than the read.
+    this.#versions = this.#versions
+      .filter((version) => !before.includes(version))
+      .reduce((versions, version) => appendVersion(versions, version), read);
     return this.#versions;
   }
 
@@ -457,7 +510,33 @@ export class WorldStyleClient {
           'This saved world changed elsewhere. The appearance was not saved. Reload before trying again.',
         );
       }
+      if (error instanceof ApiError && error.code === 'preview_expired') {
+        // Closed by the authority as it refused it: nothing is left to hold or to discard.
+        if (this.#active === active) this.#active = null;
+        const state = await this.refresh();
+        return Object.freeze({
+          kind: 'expired', state, reconciliationRequired: this.#requiresReconciliation,
+        });
+      }
       if (!(error instanceof ApiError) || error.code !== 'stale_style_version') throw error;
+      /*
+       * **A proposal from another origin is never made again on a newer version.** Its candidate
+       * is the whole design as drafted against its base, every control included, so a preview of
+       * it on the new version would save that old design over each control the other writer
+       * changed. Nothing is posted and nothing is discarded: the authority closed it as stale when
+       * its own base check refused it, and when the saved world's check that its style is live
+       * refused first, the preview stays open until its lifetime closes it, and a page that finds
+       * it shows it made for an earlier version. It is let go BEFORE the read that follows, so a
+       * read that fails leaves nothing holding it. Only the panel's own Settings draft is made
+       * again, because that draft is what the person is looking at and reviews before Apply.
+       */
+      if (active.request.origin !== 'settings') {
+        if (this.#active === active) this.#active = null;
+        const state = await this.refresh();
+        return Object.freeze({
+          kind: 'stale', state, reconciliationRequired: this.#requiresReconciliation,
+        });
+      }
       await this.refresh();
       const recovered = await this.#createPreview({
         ...active.request,
@@ -525,6 +604,19 @@ export class WorldStyleClient {
       if (!(error instanceof ApiError) || error.code !== 'stale_style_version') throw error;
       const rejectedProposalId = this.#lastProposalId;
       await this.refresh();
+      /*
+       * The rule `applyActive` holds, one step earlier. A proposal's draft reads the current
+       * version when its model call starts and names no base, so this client cannot tell one drawn
+       * on the version it has just learned of from one drawn before another writer's change, and
+       * the second, made on the new version, would undo that change on Apply. It is refused and
+       * the previous preview stays staged. The read above finds the live appearance moved from
+       * the one this page shows, so every change after it is refused until the saved version is
+       * restored (`requiresReconciliation`), which the refusal's words say, with the reload that a
+       * restore after another page's change asks for (`RESTORE_BEFORE_CHANGING`).
+       */
+      if (request.origin !== 'settings') {
+        throw new StaleProposalError(this.#requiresReconciliation);
+      }
       active = await this.#createPreview({
         ...request,
         refinesProposalId: rejectedProposalId,

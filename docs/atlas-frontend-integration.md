@@ -27,11 +27,14 @@ backend preview after a short input debounce. Undo, leaving Options, or replacin
 the backend preview without moving the current pointer. Apply posts the exact preview bases and
 updates the UI only after the server returns a new immutable version.
 
-If preview creation is stale, the client reads current state and creates a new proposal linked to
-the rejected proposal through `refinesProposalId`. If Apply becomes stale, that recovered preview
-is shown but is not silently applied; the person reviews and applies again. Rollback similarly
-refreshes on a conflict and requires the target to be chosen again. Successful rollback creates a
-new revision and leaves the target untouched.
+For a Settings draft, if preview creation is stale, the client reads current state and creates a
+new proposal linked to the rejected proposal through `refinesProposalId`; if Apply becomes stale,
+that recovered preview is shown but is not silently applied, and the person reviews and applies
+again. A proposal from another origin, such as the Companion's, is never made again: it is refused
+in words (see the
+[customization contract](atlas-world-customization-contract.md#7-frontend-integration-boundary)).
+Rollback similarly refreshes on a conflict and requires the target to be chosen again. Successful
+rollback creates a new revision and leaves the target untouched.
 
 Options shows current revision and ID, actor/origin/origin reference, model and prompt provenance,
 warnings, proposal refinement/reference information, and immutable history. Loading, unavailable,
