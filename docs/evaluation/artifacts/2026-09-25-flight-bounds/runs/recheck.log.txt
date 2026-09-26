@@ -1,0 +1,2 @@
+PYTHONPATH=$SNAP PYTHONDONTWRITEBYTECODE=1 $PY -B  --out   326.32s user 0.38s system 99% cpu 5:27.01 total
+exit 0

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import heapq
 import math
 import uuid
 from copy import deepcopy
@@ -10,6 +9,10 @@ from itertools import pairwise
 from typing import Any, Final
 
 from exulanica.grammar.errors import CatalogError
+from exulanica.movement.registry import WALKING
+from exulanica.movement.steps import step_of
+from exulanica.movement.walking import WALKING_MODULE
+from exulanica.movement.walking import routes_from as _paths
 from exulanica.world.society import (
     SOCIETY_NAMESPACE,
     SOCIETY_POPULATION,
@@ -42,9 +45,10 @@ from exulanica.world.society_legacy import initial_society
 
 PURPOSEFUL_PROFILE = "exulanica-society/v2"
 INPUT_PROFILE = "exulanica.society-input/v1"
-#: The travel budget a new society records in its state, 60 m per one-minute tick: at most a
-#: metre each simulated second. A stored society walks at the budget its own state records.
-MOVEMENT_BUDGET_MM = 60_000
+#: The travel budget a new society records in its state: the walking module's declared figure,
+#: with its reason (exulanica/movement/movement-modules.v1.json). A stored society walks at the
+#: budget its own state records.
+MOVEMENT_BUDGET_MM = WALKING_MODULE.value("new_society_budget_mm_per_tick")
 #: What people do, how long each stay lasts and how it varies, what it relieves and how often it
 #: is chosen are the purposeful routine's (``exulanica.world.society_catalogs``), not figures here.
 #: The routine an input records selects them, so a stored history replays under exactly the figures
@@ -130,7 +134,8 @@ REASON_CODES: Final = frozenset(
         "unsupported_active_behaviour",
     }
 )
-CLEARANCE_MM = 450
+#: How far a walker's centre keeps from anything that blocks walking: the walking module's.
+CLEARANCE_MM = WALKING_MODULE.value("clearance_mm")
 #: The fewest inhabitants a society over a district starts with. The database no longer holds a
 #: v2 or v3 population to this, because a row cannot tell a district from a saved world's own
 #: ground; the initializer, which every creation and every replay passes through, does.
@@ -577,21 +582,6 @@ def _graph(document: dict[str, Any]) -> tuple[dict, dict, dict]:
     for values in adjacent.values():
         values.sort(key=lambda pair: pair[0])
     return nodes, adjacent, edges
-
-
-def _paths(start: str, adjacent: dict) -> dict[str, tuple[int, tuple[str, ...]]]:
-    queue = [(0, (start,), start)]
-    best = {start: (0, (start,))}
-    while queue:
-        distance, path, node = heapq.heappop(queue)
-        if best[node] != (distance, path):
-            continue
-        for neighbor, edge in adjacent[node]:
-            candidate = (distance + edge["length_mm"], (*path, neighbor))
-            if neighbor not in best or candidate < best[neighbor]:
-                best[neighbor] = candidate
-                heapq.heappush(queue, (*candidate, neighbor))
-    return best
 
 
 def _spawn_nodes(document: dict[str, Any]) -> tuple[dict[str, Any], list[str], bool]:
@@ -1161,7 +1151,11 @@ def advance_purposeful_society(
     # The budget is the one the state recorded at creation, so a society walks at the speed it
     # was created with however the module constant for new societies moves.
     budget_per_tick = state["movement_budget_mm_per_tick"]
-    _require(_integer(budget_per_tick, 1, 10**9), "invalid movement budget")
+    _require(
+        WALKING_MODULE.admits("budget_mm_per_tick", budget_per_tick), "invalid movement budget"
+    )
+    # Everybody walks by the walking module's step, looked up through the movement dispatcher.
+    walk = step_of(WALKING)
     result = deepcopy(state)
     tick = state["tick"] + 1
     result["tick"] = tick
@@ -1663,40 +1657,15 @@ def advance_purposeful_society(
                 emit(person, "action_completed", "reviewed_duration_elapsed", outcome, doc)
             continue
         route = person["route"]
-        budget = budget_per_tick
-        while route["edge_index"] < len(route["node_ids"]) - 1 and budget > 0:
-            index = route["edge_index"]
-            a, b = route["node_ids"][index : index + 2]
-            edge = edges[frozenset((a, b))]
-            progress = route["edge_progress_mm"]
-            step = min(budget, edge["length_mm"] - progress)
-            progress += step
-            budget -= step
-            start, end = nodes[a]["position_mm"], nodes[b]["position_mm"]
-            point = [
-                x + (y - x) * progress // edge["length_mm"] for x, y in zip(start, end, strict=True)
-            ]
+        for leg in walk(route, nodes, edges, budget_per_tick):
+            point = leg.point
             person["position_mm"] = point
             if point != person["motion_path_mm"][-1]:
                 person["motion_path_mm"].append(point)
-            if progress == edge["length_mm"]:
-                route["edge_index"] += 1
-                route["edge_progress_mm"] = 0
-                person["location"] = {"node_id": b, "edge": None}
+            if leg.arrived:
+                person["location"] = {"node_id": leg.to_node, "edge": None}
             else:
-                route["edge_progress_mm"] = progress
-                person["location"] = {
-                    "node_id": None,
-                    "edge": {
-                        "edge_id": edge["edge_id"],
-                        "from_node_id": a,
-                        "to_node_id": b,
-                        "from_position_mm": list(start),
-                        "to_position_mm": list(end),
-                        "length_mm": edge["length_mm"],
-                        "progress_mm": progress,
-                    },
-                }
+                person["location"] = {"node_id": None, "edge": leg.edge_location()}
         arrived = route["edge_index"] == len(route["node_ids"]) - 1
         goal_kind = person["goal"]["kind"]
         if arrived and target is None and stand is not None and goal_kind == stand.key:

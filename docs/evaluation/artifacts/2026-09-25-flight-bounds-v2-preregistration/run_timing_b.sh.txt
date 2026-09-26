@@ -1,0 +1,58 @@
+#!/bin/bash
+# Lane V2 (movement), second flight bounds registration: the timing runs, in their stated order,
+# each through the idle gate. Run it inside quiet-slot then gpu-slot, so it holds both slots once:
+#
+#   quiet-slot gpu-slot bash run_timing_b.sh STATE_JSON APP_URL OUT_DIR
+#
+# 1. request cost: composing the air, a cold window before an episode's end and at its start, and a
+#    window resumed from the one before, for eight trees and the cluttered world (24 flyers each);
+# 2. the square with its flight refused, then with it (3 flyers);
+# 3. seven more trees through the page's own routes (24 flyers);
+# 4. the square and the trees with the flight refused, then with it;
+# 5. what one cold worst-case window does to health requests beside it, on the same server.
+# A run the gate refuses, or one the harness discards for a busy machine, is tried again, at most
+# three times; every attempt is a line in the gate's ledger. A run refused three times stops the
+# driver, so the slots are not held while the machine stays busy.
+set -u
+here="$(cd "$(dirname "$0")" && pwd)"
+worktree="$(cd "$here/../../.." && pwd)"
+state="$1"
+app="$2"
+out="$3"
+mkdir -p "$out"
+ledger="$out/gates.jsonl"
+
+gated() {
+  local name="$1"
+  shift
+  local attempt=1
+  local code=0
+  while [ "$attempt" -le 3 ]; do
+    python3 "$here/gate.py" --ledger "$ledger" -- "$@" > "$out/$name.attempt-$attempt.log" 2>&1
+    code=$?
+    echo "$(date +%H:%M:%S) $name attempt $attempt exit $code"
+    [ "$code" -ne 75 ] && return "$code"
+    attempt=$((attempt + 1))
+  done
+  echo "$(date +%H:%M:%S) stopping: $name was refused three times"
+  exit 75
+}
+
+cd "$worktree" || exit 2
+gated request-cost uv run python scripts/measure_flight_bounds.py --request-cost --repeats 5 \
+  --out "$out/request-cost.json"
+node "$here/measure_flight_frames.mjs" --state "$state" --setup square > "$out/setup-square.json" 2> "$out/setup-square.log"
+echo "$(date +%H:%M:%S) setup square exit $?"
+for arm in blocked flight; do
+  gated "frames-square-$arm" node "$here/measure_flight_frames.mjs" --state "$state" --app "$app" \
+    --arm "$arm" --seconds 60 --out "$out/frames-square-$arm.json"
+done
+node "$here/measure_flight_frames.mjs" --state "$state" --setup trees > "$out/setup-trees.json" 2> "$out/setup-trees.log"
+echo "$(date +%H:%M:%S) setup trees exit $?"
+for arm in blocked flight; do
+  gated "frames-trees-$arm" node "$here/measure_flight_frames.mjs" --state "$state" --app "$app" \
+    --arm "$arm" --seconds 60 --out "$out/frames-trees-$arm.json"
+done
+gated request-blocking python3 "$here/measure_request_blocking.py" --state "$state" \
+  --setup "$out/setup-trees.json" --out "$out/request-blocking.json"
+echo "$(date +%H:%M:%S) done"

@@ -1,0 +1,123 @@
+{
+  "modules": [
+    {
+      "agents": {
+        "catalog": "flight-kind",
+        "kinds": null,
+        "reason": "Every kind the flight kind catalog states flies by this module; a kind names the module it uses and states a value for each parameter below that a kind supplies."
+      },
+      "clock": {
+        "kind": "page",
+        "reason": "Nothing is stored: a flight is derived from a world version and its episode, and a page plays it from step 0 on its own clock, so two pages opened at different times show the same flight from its beginning. A clock shared between viewers needs recorded flyer choices, which arrive with a model deciding for a flyer.",
+        "step_ms": 100
+      },
+      "module": "exulanica-movement/flight/v1",
+      "output": {
+        "profile": "exulanica.flight-window/v1",
+        "reason": "Per flyer and step: position in millimetres, velocity in millimetres a second, the signed turning acceleration, the state and whether it flaps. A renderer draws bank, pitch and flap from these and runs no steering of its own."
+      },
+      "parameters": [
+        {"maximum": 5000, "minimum": 500, "name": "approach_height_mm", "reason": "How far above its perch a flyer turns from flying to a vertical landing, and where a take-off ends: at least one grid cell, so the column it descends is checked cell by cell, and at most 5 m.", "unit": "mm", "value": null},
+        {"maximum": 20000, "minimum": 50, "name": "body_span_mm", "reason": "A kind's wingspan. A perch bears a kind no wider than the span it declares, and the air is grown by half the widest kind's span around every part, so a flyer whose point keeps to free cells keeps its whole body out of every object. From a 5 cm insect to a 20 m winged creature, which the grown air leaves little room to fly in.", "unit": "mm", "value": null},
+        {"maximum": 12000, "minimum": 12000, "name": "ceiling_mm", "reason": "The declared top of every flight volume above its ground: a saved world states no sky, so the module declares one. Twice the tallest kind the world object catalog places (the lamp post, 6,000 mm), so a flyer can pass over everything a person puts down.", "unit": "mm", "value": 12000},
+        {"maximum": 500, "minimum": 500, "name": "cell_mm", "reason": "The side of an occupancy cell. Half a metre is coarse enough that a 24 m square by 12 m volume is 55,296 cells, and fine enough that a lamp post's 150 mm pole blocks one column of cells rather than a 2 m block.", "unit": "mm", "value": 500},
+        {"maximum": 10000, "minimum": 100, "name": "climb_rate_mm_s", "reason": "The fastest a kind climbs while flying.", "unit": "mm/s", "value": null},
+        {"maximum": 1000, "minimum": 1000, "name": "containment_margin_mm", "reason": "How far inside the volume's sides and altitude band a flyer's predicted position must stay before containment steers it back: two cells, so steering turns a flyer well before the guard would have to stop it.", "unit": "mm", "value": 1000},
+        {"maximum": 20000, "minimum": 500, "name": "cruise_speed_mm_s", "reason": "The speed a kind flies at when nothing slows it.", "unit": "mm/s", "value": null},
+        {"maximum": 10000, "minimum": 100, "name": "descent_rate_mm_s", "reason": "The fastest a kind descends while flying.", "unit": "mm/s", "value": null},
+        {"maximum": 3000, "minimum": 3000, "name": "episode_steps", "reason": "Five simulated minutes a flight episode. Every flyer starts an episode perching at its home perch and ends it there, so a request computes at most one episode from its start, whatever step it asks for.", "unit": "step", "value": 3000},
+        {"maximum": 2000, "minimum": 50, "name": "flap_cycle_ms", "reason": "How long one wingbeat takes in the renderer; presentation only, never read by the step.", "unit": "ms", "value": null},
+        {"maximum": 20000, "minimum": 0, "name": "glide_speed_mm_s", "reason": "A kind flying level at or above this speed glides; below it, or climbing, it flaps.", "unit": "mm/s", "value": null},
+        {"maximum": 600, "minimum": 600, "name": "homing_steps", "reason": "The last simulated minute of an episode, in which every flyer goes home and lands: at a small bird's cruise speed a minute crosses the volume's 34 m diagonal ten times over, so a flyer not home by the end is a finding, not a schedule.", "unit": "step", "value": 600},
+        {"maximum": 5000, "minimum": 100, "name": "landing_rate_mm_s", "reason": "How fast a kind descends its perch's column to land.", "unit": "mm/s", "value": null},
+        {"maximum": 1000, "minimum": 1000, "name": "lookahead_ms", "reason": "How far ahead obstacle avoidance and containment look: one second of the flyer's own velocity.", "unit": "ms", "value": 1000},
+        {"maximum": 50000, "minimum": 100, "name": "max_accel_mm_s2", "reason": "The most steering can change a kind's velocity in a second.", "unit": "mm/s2", "value": null},
+        {"maximum": 11999, "minimum": 1000, "name": "max_altitude_mm", "reason": "The top of the band a kind flies in, above the ground and below the ceiling.", "unit": "mm", "value": null},
+        {"maximum": 1571, "minimum": 0, "name": "max_bank_mrad", "reason": "The steepest bank the renderer draws a kind at; presentation only.", "unit": "mrad", "value": null},
+        {"maximum": 262144, "minimum": 262144, "name": "max_cells", "reason": "The most cells a flight's grid may have: building the grid and searching a route home grow with it. 262,144 cells cover a 52 m square ground to the ceiling; a wider ground is refused by name (flight_world_too_large) rather than served slowly.", "unit": "cell", "value": 262144},
+        {"maximum": 24, "minimum": 24, "name": "max_flyers", "reason": "The most flyers one world's volume holds: the largest number whose frame time was measured within one 60 Hz frame on a release build (docs/evaluation/2026-09-25-flight-bounds-v2.json). A world whose objects would host more is refused by name, never trimmed.", "unit": "flyer", "value": 24},
+        {"maximum": 864000, "minimum": 864000, "name": "max_from_step", "reason": "A day of page time: a page open longer is refused by name rather than served a step nobody asked to be shown.", "unit": "step", "value": 864000},
+        {"maximum": 2048, "minimum": 2048, "name": "max_parts", "reason": "The most object parts a flight's air is built from: every part is placed and marked in the grid when a flight is composed. A world whose objects have more is refused by name (flight_world_too_large).", "unit": "part", "value": 2048},
+        {"maximum": 20000, "minimum": 500, "name": "max_speed_mm_s", "reason": "The fastest a kind flies. At 100 ms steps a move then covers at most 2,000 mm, four cells, all of which the guard checks.", "unit": "mm/s", "value": null},
+        {"maximum": 600, "minimum": 600, "name": "max_steps_per_request", "reason": "One simulated minute a request: a page asks for the next minute while it plays the current one.", "unit": "step", "value": 600},
+        {"maximum": 12566, "minimum": 100, "name": "max_turn_rate_mrad_s", "reason": "The fastest a kind turns, bounded as turning acceleration: never more than its speed times this rate.", "unit": "mrad/s", "value": null},
+        {"maximum": 11000, "minimum": 0, "name": "min_altitude_mm", "reason": "The bottom of the band a kind flies in, above the ground; only landing and taking off go lower, inside a perch's own column.", "unit": "mm", "value": null},
+        {"maximum": 600, "minimum": 1, "name": "perch_seconds_maximum", "reason": "The longest a kind stays on a perch before choosing again.", "unit": "s", "value": null},
+        {"maximum": 600, "minimum": 1, "name": "perch_seconds_minimum", "reason": "The shortest a kind stays on a perch before choosing again.", "unit": "s", "value": null},
+        {"maximum": 600, "minimum": 1, "name": "roam_seconds_maximum", "reason": "The longest a kind wanders before choosing a perch.", "unit": "s", "value": null},
+        {"maximum": 600, "minimum": 1, "name": "roam_seconds_minimum", "reason": "The shortest a kind wanders before choosing a perch.", "unit": "s", "value": null},
+        {"maximum": 1000, "minimum": 0, "name": "roam_weight_milli", "reason": "Of a kind's choices when a perch ends, the share, in thousandths, that wander for a while before choosing a perch.", "unit": "milli", "value": null},
+        {"maximum": 2000, "minimum": 2000, "name": "slowing_radius_mm", "reason": "Within this distance of where it is heading a flyer slows in proportion, so it arrives at its perch's approach point at rest.", "unit": "mm", "value": 2000},
+        {"maximum": 5000, "minimum": 100, "name": "takeoff_rate_mm_s", "reason": "How fast a kind climbs its perch's column to take off.", "unit": "mm/s", "value": null},
+        {"maximum": 2000, "minimum": 2000, "name": "wander_distance_mm", "reason": "How far ahead of a wandering flyer the circle its wander target moves on is centred.", "unit": "mm", "value": 2000},
+        {"maximum": 250, "minimum": 250, "name": "wander_jitter_mm", "reason": "How far a wander target may move on its circle in one step, drawn from the seed.", "unit": "mm", "value": 250},
+        {"maximum": 1000, "minimum": 1000, "name": "wander_radius_mm", "reason": "The radius of the circle a wander target moves on.", "unit": "mm", "value": 1000}
+      ],
+      "reason": "Flight over a world's own geometry: Reynolds steering (seek, arrive, wander, obstacle avoidance, containment) over an integer point mass, a coarse occupancy grid built from the placed objects' catalog parts, an altitude band inside the volume, and take-off, flying, landing and perching as states. A bird, a dragon and a plane are kinds of the flight kind catalog, never code.",
+      "refusal": null,
+      "space": {
+        "kind": "air-volume",
+        "profiles": ["exulanica.air-volume/v1"],
+        "reason": "A saved world's ground area, read where its ground states one and declared where it states none, as the society declares its walking area, from the ground to the declared ceiling."
+      },
+      "status": "built"
+    },
+    {
+      "agents": {
+        "catalog": "vehicle-class",
+        "kinds": null,
+        "reason": "The traffic simulation's vehicle classes (assets/catalogs/traffic/vehicle-class.v1.json), each bounded by that catalog's own integer fields and their cited sources."
+      },
+      "clock": {
+        "kind": "host",
+        "reason": "The traffic step advances one simulated second a call, where the society advances a minute; a host that runs both must state how the two clocks meet before either is connected.",
+        "step_ms": 1000
+      },
+      "module": "exulanica-movement/roads/v1",
+      "output": {
+        "profile": "exulanica.traffic-presentation-frame/v1",
+        "reason": "The traffic presentation frame: each vehicle's axles, recorded path, dimensions, body family and colour."
+      },
+      "parameters": [],
+      "reason": "Road movement exists as exulanica/traffic, a complete deterministic simulation that nothing in the application calls. A world needs lane connections, parking spaces and signals, which nothing writes, a host that owns the fleet, trips and receipts, the society's crossing feed and a vehicle renderer before vehicles appear in it.",
+      "refusal": "roads_not_connected",
+      "space": {
+        "kind": "road-graph",
+        "profiles": ["exulanica.traffic-network/v2"],
+        "reason": "A compiled road network: lanes, directional connections, conflict zones, crossings and parking, from road records no world holds."
+      },
+      "status": "not_connected"
+    },
+    {
+      "agents": {
+        "catalog": "society-engines",
+        "kinds": ["exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4"],
+        "reason": "The inhabitants of every society engine that routes its people over a graph. Version 1 keeps its frozen seeded motion, which has no routes, and is not moved by any module."
+      },
+      "clock": {
+        "kind": "society",
+        "reason": "One tick is one simulated minute of the society's persisted history, advanced by a person's request or the host's playback.",
+        "step_ms": 60000
+      },
+      "module": "exulanica-movement/walking/v1",
+      "output": {
+        "profile": "exulanica.motion-path/v1",
+        "reason": "Every inhabitant's motion_path_mm: each segment traversed in the tick, start and end included, or one stationary point. A renderer interpolates along it, never across its corners."
+      },
+      "parameters": [
+        {"maximum": 1000000000, "minimum": 1, "name": "budget_mm_per_tick", "reason": "The travel one tick may spend along a route: a society's recorded movement budget or a living inhabitant's walk speed. At most a thousand kilometres a tick, a guard on a stored figure far past any walk.", "unit": "mm/tick", "value": null},
+        {"maximum": 450, "minimum": 450, "name": "clearance_mm", "reason": "How far a walker's centre keeps from anything that blocks walking: the lattice is inset by it and a node or edge nearer an obstacle is removed.", "unit": "mm", "value": 450},
+        {"maximum": 60000, "minimum": 60000, "name": "new_society_budget_mm_per_tick", "reason": "The movement budget a new purposeful society records in its state: 60 m a one-minute tick, at most a metre each simulated second. A stored society walks at the budget its own state records, never this figure.", "unit": "mm/tick", "value": 60000}
+      ],
+      "reason": "Walking over a graph of integer-millimetre nodes and edges: shortest routes by integer edge length with lexicographic node-path ties, and a budgeted traversal that interpolates each point with integer floor division.",
+      "refusal": null,
+      "space": {
+        "kind": "ground-lattice",
+        "profiles": ["authored-ground-lattice/v1", "bounded-sidewalk-graph/v1", "exulanica.society-place/v1", "exulanica.society-place/v2"],
+        "reason": "The route graph a society's input or a living society's place states: a district's sidewalk graph, a saved world's declared lattice or a living place's walking graph."
+      },
+      "status": "built"
+    }
+  ],
+  "profile": "exulanica.movement-modules/v1"
+}

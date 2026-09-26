@@ -29,6 +29,7 @@ from exulanica.world.asset_kinds import ASSET_KINDS, PLACEABLE_KINDS, AssetKind
 from exulanica.world.assets import reviewed_assets
 from exulanica.world.composition_preview import BLOCKED_REASONS
 from exulanica.world.errors import AssetNotPlaceable
+from exulanica.world.flight_kinds import flight_assets
 
 import test_world_objects_api as helpers
 from test_reviewed_asset_import import imported_fixture
@@ -44,6 +45,8 @@ import prepare_character_people as people  # noqa: E402
 MARKERS = {asset.asset_key for asset in reviewed_assets()}
 CATALOG = json.loads((ROOT / "assets/characters/catalog.json").read_text())
 CONTAINERS = {asset["assetKey"]: asset for asset in people.iter_assets(CATALOG)}
+#: The flying kinds' bodies and wings, components migration 0114 publishes.
+FLYERS = {asset.asset_key: asset for asset in flight_assets()}
 #: A body the character catalog publishes, read from it rather than named by its revision.
 BODY = CONTAINERS[CATALOG["families"][0]["bases"][0]["asset"]["assetKey"]]
 
@@ -111,6 +114,7 @@ def test_the_listing_a_client_chooses_an_object_from_names_no_character_containe
     assert listed.status_code == 200, listed.text
     keys = {row["asset_key"] for row in listed.json()}
     assert not keys & set(CONTAINERS), sorted(keys & set(CONTAINERS))[:5]
+    assert not keys & set(FLYERS), sorted(keys & set(FLYERS))
     assert keys == MARKERS
     assert {row["placeable"] for row in listed.json()} == {True}
 
@@ -135,7 +139,12 @@ def test_every_published_asset_carries_the_kind_its_catalog_declares(
         row = stored[key]
         assert (row["content_sha256"], row["kind"]) == (container["contentSha256"], "component")
         assert objects_api.get(f"/world/assets/{key}").json()["placeable"] is False
-    assert set(stored) == MARKERS | set(CONTAINERS)
+    # Every body and wing the flight kind catalog generates is a component too.
+    for key, asset in FLYERS.items():
+        row = stored[key]
+        assert (row["content_sha256"], row["kind"]) == (asset.content_sha256, "component")
+        assert objects_api.get(f"/world/assets/{key}").json()["placeable"] is False
+    assert set(stored) == MARKERS | set(CONTAINERS) | set(FLYERS)
 
 
 def test_the_schema_admits_exactly_the_registered_kinds(repository):

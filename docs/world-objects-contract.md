@@ -347,7 +347,7 @@ why none exists; a reviewed CC0 mesh is global, carries no evidence and makes no
 source world.
 
 The generated objects are the kinds of the
-[world object catalog](../assets/catalogs/world-objects/world-object.v2.json), in its order: the
+[world object catalog](../assets/catalogs/world-objects/world-object.v3.json), in its order: the
 three grey markers `cc0.marker-cube`, `cc0.marker-pillar` and `cc0.marker-plate`, generated exactly
 as 0042 pinned them and drawn matte, and the furniture 0105 pins, `cc0.bench`, `cc0.cafe-table`,
 `cc0.planter-tree`, `cc0.lamp-post`, `cc0.market-stall` and `cc0.seating-planter`, generated from
@@ -372,7 +372,27 @@ its affordance's entry for every kind, as a saved world's next society input rec
 [`world_version_document.py`](../exulanica/api/world_version_document.py)). `activity` is `null` for
 a kind nobody uses, such as the lamp post, and for an asset the catalog does not state.
 
-`seed_reviewed_assets(store)` writes the GLB and licence bytes into the content-addressed store.
+### Perches and hosted flyers
+
+Version 3 of the catalog is version 2 with two fields on each kind, kept out of `use`, which is what
+people do with a kind: `perches`, where a flyer stands on it, and `hosts`, the flyers that live on
+it. A perch states a point in the kind's part frame, the widest flyer it bears and a declared reason.
+Its height is derived rather than stated: the upper surface of the highest part over the point, the
+level top of a box or the curved top of an ellipsoid, rounded up to the millimetre. A perch over any
+other part, over nothing, or closer to another perch than half their spans is refused. The planter
+tree declares five perches on its crown, its top at 5,650 mm and four points 700 mm out along its
+axes at 5,499 mm, each bearing a flyer up to 600 mm across, and hosts three small birds; the lamp
+post declares one perch on its lamp head, 1,275 mm out from the post beyond the arm, at 5,800 mm.
+`hosts` names kinds of the flight kind catalog, and a host must declare perches enough for every
+flyer it hosts, of all its kinds together: its perches are one pool, which its widest kinds draw
+from first (`check_hosts` in [`flight_kinds.py`](../exulanica/world/flight_kinds.py)). Every recipe, size, material and use is
+version 2's, so the meshes, the pins of 0042 and 0105 and every registry row are unchanged
+(`tests/test_world_object_perches.py`). The society never reads a perch or a host, and `GET
+/world/assets` serves neither; flight reads both
+([movement modules contract](movement-modules-contract.md#flight)).
+
+`seed_reviewed_assets(store)` writes the GLB and licence bytes into the content-addressed store,
+with the flying kinds' bodies and wings that migration 0114 pins as components.
 The registry row is the reviewed decision; the store holds the bytes; the two are separate because
 a migration cannot write to an object store and should not pretend to.
 

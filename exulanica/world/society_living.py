@@ -35,6 +35,9 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica.movement.registry import WALKING
+from exulanica.movement.steps import step_of
+from exulanica.movement.walking import routes_from
 from exulanica.world import society_catalogs
 from exulanica.world.society import (
     SOCIETY_NAMESPACE,
@@ -62,7 +65,6 @@ from exulanica.world.society_place import (
     place_from_society_input,
     validate_place,
 )
-from exulanica.world.society_planner import _paths
 
 __all__ = [
     "LIVING_PROFILE",
@@ -144,7 +146,7 @@ class LivingPlace:
 
     def paths(self, start: str) -> dict[str, tuple[int, tuple[str, ...]]]:
         if start not in self._paths:
-            self._paths[start] = _paths(start, self.adjacent)
+            self._paths[start] = routes_from(start, self.adjacent)
         return self._paths[start]
 
     @property
@@ -1158,56 +1160,28 @@ def _walk(person: dict, place: LivingPlace, routine: RoutineModel) -> list[dict]
         _step_to(person, list(node))
     elif loc["indoors"]:
         person["location"] = {**loc, "destination_id": None, "indoors": False}
-    while route["edge_index"] < len(route["node_ids"]) - 1 and budget > 0:
-        index = route["edge_index"]
-        a, b = route["node_ids"][index : index + 2]
-        edge = place.edges[frozenset((a, b))]
-        progress = route["edge_progress_mm"]
-        if progress == 0 and edge["edge_id"] in place.crossings:
-            crossing = place.crossings[edge["edge_id"]]
+    # The edges themselves are walked by the walking module's step; a crossing is entered where
+    # a leg starts at its edge's near node.
+    for leg in step_of(WALKING)(route, place.nodes, place.edges, budget):
+        if leg.entered and leg.edge["edge_id"] in place.crossings:
+            crossing = place.crossings[leg.edge["edge_id"]]
             crossings.append(
                 {
                     "crossing_id": crossing["crossing_id"],
                     "arrival_second": walked * TICK_SECONDS // speed,
-                    "duration_seconds": -(-edge["length_mm"] * TICK_SECONDS // speed),
+                    "duration_seconds": -(-leg.edge["length_mm"] * TICK_SECONDS // speed),
                 }
             )
-        step = min(budget, edge["length_mm"] - progress)
-        progress += step
-        budget -= step
-        walked += step
-        start, end = place.nodes[a]["position_mm"], place.nodes[b]["position_mm"]
-        _step_to(
-            person,
-            [x + (y - x) * progress // edge["length_mm"] for x, y in zip(start, end, strict=True)],
-        )
-        if progress == edge["length_mm"]:
-            route["edge_index"] += 1
-            route["edge_progress_mm"] = 0
-            person["location"] = {
-                "node_id": b,
-                "edge": None,
-                "spot_id": None,
-                "destination_id": None,
-                "indoors": False,
-            }
-        else:
-            route["edge_progress_mm"] = progress
-            person["location"] = {
-                "node_id": None,
-                "edge": {
-                    "edge_id": edge["edge_id"],
-                    "from_node_id": a,
-                    "to_node_id": b,
-                    "from_position_mm": list(start),
-                    "to_position_mm": list(end),
-                    "length_mm": edge["length_mm"],
-                    "progress_mm": progress,
-                },
-                "spot_id": None,
-                "destination_id": None,
-                "indoors": False,
-            }
+        budget -= leg.step_mm
+        walked += leg.step_mm
+        _step_to(person, leg.point)
+        person["location"] = {
+            "node_id": leg.to_node if leg.arrived else None,
+            "edge": None if leg.arrived else leg.edge_location(),
+            "spot_id": None,
+            "destination_id": None,
+            "indoors": False,
+        }
     if route["edge_index"] == len(route["node_ids"]) - 1:
         goal = person["goal"]
         if goal["spot_id"] is None:

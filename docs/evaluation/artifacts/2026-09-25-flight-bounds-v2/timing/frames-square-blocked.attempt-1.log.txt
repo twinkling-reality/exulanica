@@ -1,0 +1,2 @@
+{"arm":"blocked","frames":3600,"work_p95_us":700,"interval_p95_us":16700,"idle":{"samples":33,"mean_tenths":814,"min":74}}
+gate: exit 0 pre idle 84

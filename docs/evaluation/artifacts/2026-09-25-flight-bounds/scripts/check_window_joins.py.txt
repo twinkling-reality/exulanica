@@ -1,0 +1,122 @@
+"""Check the segments that join one served window to the next: a check added after the judged run.
+
+    uv run python .exulanica/lane-movement/evidence/check_window_joins.py --seeds judged --minutes 30 --out FILE
+
+The pre-registered script checks each 600-step window on its own, so the move from a window's last
+step to the next window's first step is never a segment it looks at. A page interpolates across
+that move like any other. Inside an episode that is 4 of the 2,999 moves a flyer makes; at an
+episode's end the next step is the genesis, where every flyer is placed at home, and there is no
+move to check. This builds, for every such join, a two-step window from the last step of one
+window and the first of the next and hands it to the same, unchanged checker
+(exulanica.movement.flight_checks.check_window). Its windows are the same windows, from the same
+worlds and seeds, as the pre-registered script's.
+
+Not pre-registered: it was written after the judged run, to cover what that run's script did not.
+
+A positive control runs first in every world: the first join of the first seed, copied with its
+second step moved, flying, to the centre of a solid cell no perch column owns. The checker must
+name that join entered_solid_cell, or the script stops before any join is counted.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.movement.flight import FLIGHT_MODULE, flight_window  # noqa: E402
+from exulanica.movement.flight_checks import check_window  # noqa: E402
+from scripts.measure_flight_bounds import WORLDS, compose, seeded, seeds  # noqa: E402
+
+WINDOW = FLIGHT_MODULE.value("max_steps_per_request")
+EPISODE = FLIGHT_MODULE.value("episode_steps")
+STEPS_PER_MINUTE = 60_000 // FLIGHT_MODULE.step_ms
+
+
+def join(before: dict, after: dict) -> dict:
+    """The last step of ``before`` and the first of ``after``, as one two-step window."""
+    by_id = {row["flyer_id"]: row for row in after["flyers"]}
+    rows = []
+    for row in before["flyers"]:
+        other = by_id[row["flyer_id"]]
+        rows.append(
+            {
+                "flyer_id": row["flyer_id"],
+                "position_mm": row["position_mm"][-3:] + other["position_mm"][:3],
+                "state": [row["state"][-1], other["state"][0]],
+                "held": [0, 0],
+            }
+        )
+    assert before["states"] == after["states"]
+    return {
+        **before,
+        "from_step": before["from_step"] + before["steps"] - 1,
+        "steps": 2,
+        "flyers": rows,
+        "late_home": [],
+    }
+
+
+def _control(flight, join_window: dict) -> list[str]:
+    """Plant a flying step at the centre of a solid cell no column owns; return the rules named."""
+    owned = {cell for perch in flight.perches for column in perch.columns.values() for cell in column.own_cells}
+    nx, ny, nz = flight.volume.shape
+    cell = next(
+        (ix, iy, iz)
+        for iy in range(ny)
+        for ix in range(nx)
+        for iz in range(nz)
+        if flight.occupancy.is_solid((ix, iy, iz)) and (ix, iy, iz) not in owned
+    )
+    low, high = flight.volume.cell_bounds(cell)
+    centre = [(a + b) // 2 for a, b in zip(low, high, strict=True)]
+    planted = {**join_window, "flyers": [dict(row) for row in join_window["flyers"]]}
+    first = planted["flyers"][0]
+    first["position_mm"] = first["position_mm"][:3] + centre
+    first["state"] = [first["state"][0], join_window["states"].index("flying")]
+    return sorted({v["rule"] for v in check_window(flight, planted).violations})
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seeds", choices=("judged", "development"), required=True)
+    parser.add_argument("--minutes", type=int, required=True)
+    parser.add_argument("--out", required=True)
+    arguments = parser.parse_args()
+    steps = arguments.minutes * STEPS_PER_MINUTE
+    out = {"profile": "exulanica.flight-bounds/v1/window-joins", "seeds": arguments.seeds,
+           "minutes": arguments.minutes, "window_steps": WINDOW, "worlds": {}}
+    for name in WORLDS:
+        base = compose(name)
+        runs = []
+        control = None
+        for seed in seeds(arguments.seeds):
+            flight = seeded(base, seed)
+            joins = segments = 0
+            violations = []
+            before = None
+            for start in range(0, steps, WINDOW):
+                window = flight_window(flight, start, WINDOW)
+                if before is not None and start % EPISODE != 0:
+                    joined = join(before, window)
+                    if control is None:
+                        control = _control(flight, joined)
+                        if "entered_solid_cell" not in control:
+                            raise SystemExit(f"{name}: the planted join was not named: {control}")
+                    check = check_window(flight, joined)
+                    joins += 1
+                    segments += check.segments
+                    violations.extend(check.violations)
+                before = window
+            runs.append({"seed": seed, "joins": joins, "segments": segments,
+                         "violation_count": len(violations), "violations": violations[:20]})
+        out["worlds"][name] = {"flyers": len(base.flyers), "control_rules_named": control, "runs": runs}
+    Path(arguments.out).write_bytes(canonical_json(out))
+
+
+if __name__ == "__main__":
+    main()

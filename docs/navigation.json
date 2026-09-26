@@ -86,6 +86,7 @@
       "purpose": "Follow generation, canonical simulation and derived rendering separately.",
       "documents": [
         {"path": "synthetic-society-contract.md", "role": "contract", "owns": "Synthetic identity, state, actions, composition and replay"},
+        {"path": "movement-modules-contract.md", "role": "contract", "owns": "Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads"},
         {"path": "society-experiments.md", "role": "contract", "owns": "Experiment definitions, attempts, interventions and results"},
         {"path": "character-representation-contract.md", "role": "contract", "owns": "Character appearance, rigging, subject bindings and movement"},
         {"path": "grammar-package.md", "role": "contract", "owns": "Generation vocabulary, seeds, stages and validation"},

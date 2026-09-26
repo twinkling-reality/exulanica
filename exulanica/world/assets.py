@@ -345,10 +345,13 @@ def seed_reviewed_assets(store: ContentAddressedStore) -> tuple[ReviewedAsset, .
 
     Idempotent, because the store is content-addressed: a second call re-hashes the same bytes and
     writes nothing. Returns the catalog so a caller can assert the digests it just made available
-    against the ones the migration pinned.
+    against the ones the migration pinned. The flying kinds' bodies and wings, the components
+    migration 0114 pins (:func:`exulanica.world.flight_kinds.flight_assets`), are written too.
     """
+    from exulanica.world.flight_kinds import flight_assets
+
     catalog = reviewed_assets()
-    for asset in catalog:
+    for asset in (*catalog, *flight_assets()):
         store.put_bytes(asset.payload)
         store.put_bytes(asset.licence_bytes)
     return catalog

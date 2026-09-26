@@ -74,6 +74,8 @@ Implementation:
   `exulanica/world/society_place.py`, the generated-city place `exulanica/world/society_city_place.py`
   and run measurements `exulanica/world/society_metrics.py`;
 - purposeful policy and input validation: `exulanica/world/society_planner.py`;
+- how people walk, for every engine but v1: the walking movement module,
+  `exulanica/movement/walking.py` ([movement modules contract](movement-modules-contract.md#walking));
 - the authored-object projection shared by every composition:
   `exulanica/world/society_composition.py`, and the saved-world projection over a world's own
   declared ground: `exulanica/world/society_authored_ground.py`;
@@ -174,11 +176,14 @@ are distributed deterministically among declared nodes in components containing 
 
 ## Goals, routes and actions
 
-Each tick is one simulated minute. The travel budget is the one the state records at creation,
-`movement_budget_mm_per_tick`, which is 60,000 mm (`MOVEMENT_BUDGET_MM`), at most one metre per
-simulated second; an advance reads the state's figure, never the module's, so a stored society
-walks at the budget it was created with. Shortest routes minimize integer edge length with
-lexicographic node-path ties (in every profile).
+Each tick is one simulated minute. People walk by the walking movement module
+([movement modules contract](movement-modules-contract.md#walking)): shortest routes minimize
+integer edge length with lexicographic node-path ties, and a walk spends its budget along its route
+edge by edge, each point interpolated with integer floor division, in every profile. The travel
+budget is the one the state records at creation, `movement_budget_mm_per_tick`, the walking
+module's declared 60,000 mm for a new society (`MOVEMENT_BUDGET_MM`), at most one metre per
+simulated second; an advance reads the state's figure, never the module's, so a stored society walks
+at the budget it was created with.
 What people do, how long each stay lasts and how it varies, what it relieves and how often it is
 chosen are the purposeful routine's: versioned data in
 `assets/catalogs/society/society-purposeful-activity.v<N>.json`, read by
@@ -1375,7 +1380,8 @@ every inhabitant preferred the one visit target forever: no two stationary peopl
 position, and an outdoor inhabitant moves again within a bounded number of minutes.
 
 **Motion.** Each inhabitant walks at its own seeded speed of 66 to 84 m per simulated minute
-along shortest graph routes, from spot to access node, along edges and onto its target spot. An
+along shortest graph routes, from spot to access node, along edges and onto its target spot; the
+edges are walked by the walking movement module, as the purposeful society's are. An
 indoor activity places the person at the premises' access node with `indoors: true`. Positions
 are always on the graph or on a spot, so v4 needs no position bound. `motion_path_mm` records
 every point passed in the minute. Weather and resources are recorded as unavailable with a reason.
@@ -1660,7 +1666,9 @@ lines this line does not reach, 125, 137, 151, 155, 158, 159 and 167, are still 
 
 ## Traffic boundary
 
-Cars likewise remain outside the pedestrian implementation. A future traffic producer must supply
+Cars likewise remain outside the pedestrian implementation. Road movement is stated as the movement
+module `exulanica-movement/roads/v1`, not connected and refused by name as `roads_not_connected`
+([movement modules contract](movement-modules-contract.md#roads)). A traffic producer must supply
 a separate versioned road input contract: stable road/lane/junction and movement IDs, directional
 lane connectivity, permitted turns and vehicle classes, lane geometry and clearance envelopes in
 the agreed coordinate frame, speed limits, right-of-way/signal rules and their effective ordering,

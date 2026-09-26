@@ -1,0 +1,113 @@
+"""Judge the first flight bounds registration again: its judged seeds, its unchanged flight, a
+corrected checker.
+
+    python recheck_first_registration.py --out FILE      (run from a snapshot of the tree)
+
+The first registration's run passed a rule it never tested. Its script checked each 600-step window
+on its own, and the flight reported a flyer late home only in a window that crossed an episode's
+end, which no 600-step window from step 0 does; the checker also skipped the move into an episode,
+where a late flyer is put back home, and allowed a flyer landing on a perch every solid cell above
+the perch. This runs the same worlds and judged seeds through the same flight code, window by
+window as the page reads them, and judges them with the corrected checker
+(exulanica.movement.flight_checks.check_windows): every join between windows checked, the move into
+each episode checked as an ordinary move, every flyer looked for at home at every episode's last
+step, and a perch's own cells derived from its object's parts. The world's parts are taken from the
+composer as it builds the grid, so they are the parts the flight flew among.
+
+Each world's windows are digested as the first run digested them, and compared with its record: the
+windows judged here are the windows it served. Not pre-registered: it was written after root found
+the defect, to give the first registration its true result.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import sys
+import time
+from collections import Counter
+from datetime import UTC, datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path.cwd()))
+
+import exulanica.world.flight_input as composer  # noqa: E402
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.movement.flight import FLIGHT_MODULE, flight_window  # noqa: E402
+from exulanica.movement.flight_checks import check_windows  # noqa: E402
+from scripts.measure_flight_bounds import WORLDS, compose, seeded, seeds  # noqa: E402
+
+WINDOW = FLIGHT_MODULE.value("max_steps_per_request")
+STEPS_PER_MINUTE = 60_000 // FLIGHT_MODULE.step_ms
+_captured: dict[str, tuple] = {}
+_build = composer.build_occupancy
+
+
+def _capturing(volume, solids):
+    _captured["solids"] = tuple(solids)
+    return _build(volume, solids)
+
+
+composer.build_occupancy = _capturing
+
+
+def _digest(value) -> str:
+    return hashlib.sha256(canonical_json(value)).hexdigest()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--minutes", type=int, default=30)
+    arguments = parser.parse_args()
+    steps = arguments.minutes * STEPS_PER_MINUTE
+    started = datetime.now(UTC).isoformat(timespec="seconds")
+    out = {
+        "profile": "exulanica.flight-bounds/v1/recheck",
+        "seeds": {"kind": "judged", "values": seeds("judged")},
+        "minutes": arguments.minutes,
+        "window_steps": WINDOW,
+        "started_at": started,
+        "worlds": {},
+    }
+    for name in WORLDS:
+        base = compose(name)
+        solids = _captured.pop("solids")
+        runs = []
+        for seed in seeds("judged"):
+            flight = seeded(base, seed)
+            began = time.process_time()
+            windows = [flight_window(flight, start, WINDOW) for start in range(0, steps, WINDOW)]
+            check = check_windows(flight, windows, solids=solids, clearance_mm=0)
+            rules = Counter(violation["rule"] for violation in check.violations)
+            runs.append(
+                {
+                    "seed": seed,
+                    "input_sha256": flight.sha256,
+                    "windows_sha256": _digest([_digest(window) for window in windows]),
+                    "segments": check.segments,
+                    "episode_ends": check.episode_ends,
+                    "late_home": check.late_home,
+                    "violations_by_rule": dict(sorted(rules.items())),
+                    "violations": [
+                        violation
+                        for rule in sorted(rules)
+                        for violation in [v for v in check.violations if v["rule"] == rule][:5]
+                    ],
+                    "guard_interventions": check.guard_holds,
+                    "state_samples": dict(sorted(check.states.items())),
+                    "process_seconds_milli": round((time.process_time() - began) * 1000),
+                }
+            )
+        out["worlds"][name] = {
+            "flyers": len(base.flyers),
+            "solids": len(solids),
+            "occupancy_sha256": base.occupancy.sha256,
+            "runs": runs,
+        }
+    out["finished_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+    Path(arguments.out).write_bytes(canonical_json(out))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,655 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifact_notes": {
+      "runs/first-run.json": "the first run's output, with its own checker",
+      "runs/first-run.log.txt": "the first run's time and exit",
+      "runs/recheck-snapshot-movement.sha256.txt": "the movement package's files in the tree the corrected check ran from, before the corrected checker was copied in",
+      "runs/recheck.json": "the corrected check's output",
+      "runs/recheck.log.txt": "the corrected check's time and exit",
+      "runs/window-joins-first-checker.json": "the joins between windows, checked after the first run by its own checker, which skipped the joins into an episode",
+      "scripts/check_window_joins.py.txt": "the check of the joins between windows run after the first run with its own checker",
+      "scripts/flight_checks.py.txt": "the corrected checker as the re-check ran it: exulanica/movement/flight_checks.py",
+      "scripts/recheck_first_registration.py.txt": "the corrected check of the first registration's judged seeds, as it ran",
+      "scripts/run_timing.sh.txt": "the driver that ran the timing runs in order",
+      "scripts/tree_identity.py.txt": "the script that listed the tree",
+      "scripts/write_record_a.py.txt": "this record's writer",
+      "timing/frames-square-blocked.json": "the square blocked arm",
+      "timing/frames-square-flight.json": "the square flight arm",
+      "timing/frames-trees-blocked.json": "the trees blocked arm",
+      "timing/frames-trees-flight.json": "the trees flight arm",
+      "timing/gates.jsonl": "the idle gate's ledger",
+      "timing/idle-20260925T223757-72892.jsonl": "idle samples during one run",
+      "timing/idle-20260925T223812-73036.jsonl": "idle samples during one run",
+      "timing/idle-20260925T223933-74270.jsonl": "idle samples during one run",
+      "timing/idle-20260925T224050-75476.jsonl": "idle samples during one run",
+      "timing/idle-20260925T224207-77474.jsonl": "idle samples during one run",
+      "timing/idle-20260925T224431-79695.jsonl": "idle samples during one run",
+      "timing/request-cost-repeat.json": "a request cost run's output",
+      "timing/request-cost.json": "a request cost run's output",
+      "timing/setup-square.json": "the square world the harness set up",
+      "timing/setup-trees.json": "the trees world the harness set up"
+    },
+    "bound_artifacts": {
+      "runs/first-run.json": {
+        "byte_size": 18699,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/runs/first-run.json",
+        "sha256": "03b8d0ce3f25610f877e8ed9d3cf07d676a0d8971a927b5ca31f267eeda63023"
+      },
+      "runs/first-run.log.txt": {
+        "byte_size": 135,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/runs/first-run.log.txt",
+        "sha256": "fcef00b2d3fce35f70cc98a9889a30b64ef786fb389428e74aad72cca45462b5"
+      },
+      "runs/recheck-snapshot-movement.sha256.txt": {
+        "byte_size": 767,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/runs/recheck-snapshot-movement.sha256.txt",
+        "sha256": "21b2736a6563b652d8f0604f9561a693ba120184de1e410593e4a0d12b4aeb1c"
+      },
+      "runs/recheck.json": {
+        "byte_size": 67120,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/runs/recheck.json",
+        "sha256": "244daa877399eccbeceea08a7b5ca121e749d8cd4f508f41d990cc9d3f7507be"
+      },
+      "runs/recheck.log.txt": {
+        "byte_size": 114,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/runs/recheck.log.txt",
+        "sha256": "74bf53eb913fc69d22fd65b2cd2d84f32d0a8741d6c470f4a8e9f671e245ff44"
+      },
+      "runs/window-joins-first-checker.json": {
+        "byte_size": 5414,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/runs/window-joins-first-checker.json",
+        "sha256": "13f5bf5c2bca3bf675d56c94091cbf80f9a3caa9d50739ae47eefccdd266ab72"
+      },
+      "scripts/check_window_joins.py.txt": {
+        "byte_size": 5530,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/scripts/check_window_joins.py.txt",
+        "sha256": "809b21a7476ca8584b9f36440bbedec9e95c2354b60945fa8d0eae9b1a79b05e"
+      },
+      "scripts/flight_checks.py.txt": {
+        "byte_size": 17413,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/scripts/flight_checks.py.txt",
+        "sha256": "c27aba1e8e648fe46bd5ecc88f6c3bdfc4000bad673c9a1eeb0beb13012a58a0"
+      },
+      "scripts/recheck_first_registration.py.txt": {
+        "byte_size": 4776,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/scripts/recheck_first_registration.py.txt",
+        "sha256": "e8206d95ebaa4efc67970e6c3b6db366b182e9d4255d33448e7f6b38a87c040f"
+      },
+      "scripts/run_timing.sh.txt": {
+        "byte_size": 2429,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/scripts/run_timing.sh.txt",
+        "sha256": "84d9633807e0a1a9225c350b563d11e8d5b63f804c707fe56f90802126efd4ab"
+      },
+      "scripts/tree_identity.py.txt": {
+        "byte_size": 1437,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/scripts/tree_identity.py.txt",
+        "sha256": "37078e9f7e321405d0a5557845cc68fcc47cc3f0b2943156f58b595391e153ee"
+      },
+      "scripts/write_record_a.py.txt": {
+        "byte_size": 25380,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/scripts/write_record_a.py.txt",
+        "sha256": "0d41bc78dc3400937139e40719d32512d2299fb151d800624d0bbc01c00878c7"
+      },
+      "timing/frames-square-blocked.json": {
+        "byte_size": 1231,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/frames-square-blocked.json",
+        "sha256": "5b9d251ab38463e468b91bda90f9feefec3d4dcbcf0c7138b0b5eb6541b69e4e"
+      },
+      "timing/frames-square-flight.json": {
+        "byte_size": 1221,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/frames-square-flight.json",
+        "sha256": "ac1d6c158d04361e5915523ae80c002f3d1eb098b705afc3b7e8f17ac328f588"
+      },
+      "timing/frames-trees-blocked.json": {
+        "byte_size": 1230,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/frames-trees-blocked.json",
+        "sha256": "4a3456d8f25295f86baf79f27ce0c9d2f631e8dcf55e2ce4eeb725dd47d4dca5"
+      },
+      "timing/frames-trees-flight.json": {
+        "byte_size": 1231,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/frames-trees-flight.json",
+        "sha256": "93645352888409c5c855d4b3430dd2d9dbf23a3dec7f3ef25ea840ef35a6f6f8"
+      },
+      "timing/gates.jsonl": {
+        "byte_size": 2398,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/gates.jsonl",
+        "sha256": "3307a67754ab39bb8098cd7e6eb309c574a9f41697d4d453d352062ea3572475"
+      },
+      "timing/idle-20260925T223757-72892.jsonl": {
+        "byte_size": 76,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/idle-20260925T223757-72892.jsonl",
+        "sha256": "df61341b3eee943d408f9a3e7b05093a9f3014d3c17e0bdf94a1a77f43b5ace2"
+      },
+      "timing/idle-20260925T223812-73036.jsonl": {
+        "byte_size": 1297,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/idle-20260925T223812-73036.jsonl",
+        "sha256": "e148a5010b0d616ff57babf0bc30f04b60dcc997fc90f2a79e4c3d77f1e3ee8c"
+      },
+      "timing/idle-20260925T223933-74270.jsonl": {
+        "byte_size": 1225,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/idle-20260925T223933-74270.jsonl",
+        "sha256": "3c26460ecf9f002a42456072198878c7cb30c899a11d2ab4eb1ae532e5acff66"
+      },
+      "timing/idle-20260925T224050-75476.jsonl": {
+        "byte_size": 1227,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/idle-20260925T224050-75476.jsonl",
+        "sha256": "422fd9b737bf2304cd6bf67bb9cb5670b5666e68352e5da796cfba49f5b06195"
+      },
+      "timing/idle-20260925T224207-77474.jsonl": {
+        "byte_size": 1226,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/idle-20260925T224207-77474.jsonl",
+        "sha256": "7d0e9f2a1a84486050bcc6a588d988eb888e986e090f81cda3663d3fb148f27f"
+      },
+      "timing/idle-20260925T224431-79695.jsonl": {
+        "byte_size": 75,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/idle-20260925T224431-79695.jsonl",
+        "sha256": "c6ed16d53218092f72da417e0bb3c10c1abe5d5ce2e722ccd77ab2ff9a58bc1e"
+      },
+      "timing/request-cost-repeat.json": {
+        "byte_size": 655,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/request-cost-repeat.json",
+        "sha256": "94bb51fbb1a5fd016924468f2d8064d3e383d3d7cc5f99d564badeb8ef3befb2"
+      },
+      "timing/request-cost.json": {
+        "byte_size": 655,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/request-cost.json",
+        "sha256": "0650c1c39089dfb0172127ebc40df91e201c7827d9928e536187de7ee9e6f8a5"
+      },
+      "timing/setup-square.json": {
+        "byte_size": 238,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/setup-square.json",
+        "sha256": "c56c96f60c149e0b3088b8404494dfaefe4d0737dd9421912e97e6d4fee486a7"
+      },
+      "timing/setup-trees.json": {
+        "byte_size": 240,
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds/timing/setup-trees.json",
+        "sha256": "2c75c95fac88a4fa7b72ca8725a3f098c99fa44c918f80ef3c449d107a28821c"
+      }
+    },
+    "checker_defects": [
+      "The flight named a flyer late home only in a window that crossed an episode's end: every window was 600 steps from step 0 and an episode is 3,000, so no window crossed one and the late list was always empty, and the rule every-flyer-home was never tested.",
+      "The checker skipped the move into an episode's first step, where the flight puts a late flyer back home, so a jump home of up to 15 m through a crown was never a move it checked; and it checked each window alone, so no move between two windows was checked either.",
+      "The checker let a flyer landing on, perching at or taking off from a perch pass every solid cell the flight's column called the perch's own, and the column called every solid cell above a perch its own, whichever object filled it."
+    ],
+    "execution": {
+      "browser": "Chrome/153.0.8010.54 headless, its own profile per arm",
+      "machine": "Apple M5 Max, 18 cores, 64 GB, macOS 26.7",
+      "python": "CPython 3.11.6",
+      "timing": "inside quiet-slot then gpu-slot, each run behind the idle gate: at least 70 percent idle over 10 s before it, discarded below 50 percent mean idle during it"
+    },
+    "first_run": {
+      "finished_at": "2026-09-26T01:25:05+00:00",
+      "started_at": "2026-09-26T01:10:48+00:00",
+      "times_from": "its start from the process table while it ran, its length from the wall time its own run printed; the old script stamped neither",
+      "verdict_then": "PASSED",
+      "wall_seconds": 857
+    },
+    "found": {
+      "crowded_crowns": {
+        "bodies_meeting_a_part": 296813,
+        "episode_ends": 864,
+        "first_run_said": {
+          "late_home": 0,
+          "violations": 0
+        },
+        "late_home_the_flight_named": 0,
+        "not_home_at_an_episode_end": 141,
+        "registered_violations_by_rule": {
+          "entered_solid_cell": 111,
+          "moved_too_far": 100
+        },
+        "replay_mismatches_in_the_first_run": 0,
+        "seeds": 12,
+        "segments_checked": 2591856,
+        "windows_equal_to_the_first_run": 12
+      },
+      "eight_trees": {
+        "bodies_meeting_a_part": 0,
+        "episode_ends": 1728,
+        "first_run_said": {
+          "late_home": 0,
+          "violations": 0
+        },
+        "late_home_the_flight_named": 0,
+        "not_home_at_an_episode_end": 0,
+        "registered_violations_by_rule": {},
+        "replay_mismatches_in_the_first_run": 0,
+        "seeds": 12,
+        "segments_checked": 5183712,
+        "windows_equal_to_the_first_run": 12
+      },
+      "small_square": {
+        "bodies_meeting_a_part": 0,
+        "episode_ends": 216,
+        "first_run_said": {
+          "late_home": 0,
+          "violations": 0
+        },
+        "late_home_the_flight_named": 0,
+        "not_home_at_an_episode_end": 0,
+        "registered_violations_by_rule": {},
+        "replay_mismatches_in_the_first_run": 0,
+        "seeds": 12,
+        "segments_checked": 647964,
+        "windows_equal_to_the_first_run": 12
+      }
+    },
+    "judged": [
+      {
+        "id": "no-violation",
+        "measured": {
+          "crowded_crowns": {
+            "entered_solid_cell": 111,
+            "moved_too_far": 100
+          },
+          "eight_trees": {},
+          "small_square": {}
+        },
+        "outcome": "failed",
+        "rule": "In every world and every judged seed the independent checker finds no violation: no flying position outside the volume or the kind's band, no landing, take-off or perch off its perch's column, no step longer than the kind's top speed allows, no segment with a point in a solid cell the flyer may not use, no perch holding two flyers, and every episode's first step with every flyer perching at home."
+      },
+      {
+        "id": "every-flyer-home",
+        "measured": {
+          "crowded_crowns": [
+            141,
+            864
+          ],
+          "eight_trees": [
+            0,
+            1728
+          ],
+          "small_square": [
+            0,
+            216
+          ]
+        },
+        "outcome": "failed",
+        "rule": "No flyer is anywhere but perching at home when an episode ends, in any world or seed."
+      },
+      {
+        "id": "exact-replay",
+        "measured": {
+          "crowded_crowns": 0,
+          "eight_trees": 0,
+          "small_square": 0
+        },
+        "outcome": "passed",
+        "rule": "Every window computed twice has one digest, in every world and seed."
+      },
+      {
+        "id": "twenty-four-flyers-in-a-frame",
+        "measured": {
+          "budget_us": 16667,
+          "flyers": 24,
+          "work_p95_us": 1400
+        },
+        "outcome": "passed",
+        "rule": "With the 24 flyers of the square and seven more trees drawn, main-thread work per frame at the 95th percentile stays under one 60 Hz frame (16,667 us) on the release build. If it does not, max_flyers is lowered to the largest population measured that does, and the record says so."
+      }
+    ],
+    "limits": [
+      "Request cost timed the flight module's flight_window alone, cold, from an episode's genesis: a request's database reads, composing the air and answering are not in it. The first request cost run started with a one-minute load of 8.6, just after a full suite; quiet-slot asks for a repeat above 8, and the repeat started at 18.1, a burst the idle gate did not see; both are given, and their medians differ by at most 2 percent.",
+      "Only the cold path was judged. A page reads windows in order, each resumed from the one before, which computes 600 steps; that path was not timed here.",
+      "performance.now() resolves to 100 microseconds in these pages, so every frame figure is a multiple of 100.",
+      "No arm moves the camera, so at any moment some of the 24 birds are out of view.",
+      "One machine and one browser.",
+      "The corrected check also found every move that brought a point flyer's body within half its span of a part (bodies_meeting_a_part): the first registration's rules are about points, so that count judges nothing here, and it is why the air is grown now."
+    ],
+    "max_flyers": {
+      "declared": 24,
+      "largest_population_measured_within_a_frame": 24
+    },
+    "preregistration": {
+      "path": "docs/evaluation/2026-09-25-flight-bounds-preregistration.json",
+      "record_sha256": "b00450a98df1671c81f2bb29e70d3189ca31b252a8a8ec7d0e5a993693808d09"
+    },
+    "profile": "exulanica.flight-bounds/v1",
+    "question": "Does the flight module keep every flyer inside its volume and its kind's band and out of every solid cell it may not use, bring every flyer home by the end of each episode, replay exactly, and draw 3 and 24 flyers within one 60 Hz frame of main-thread work on the release build?",
+    "recheck_run": {
+      "finished_at": "2026-09-26T03:37:44+00:00",
+      "started_at": "2026-09-26T03:32:17+00:00"
+    },
+    "release_build": {
+      "index_html_sha256": "16904e16ac6d60b9712ff1edfaaa4ae3b442f638ac5340b6af8396e651dad555",
+      "served_index_is_the_build": true,
+      "vite": "vite/6.4.3 darwin-arm64 node-v24.15.0"
+    },
+    "reported": {
+      "frame-time": {
+        "square-blocked": {
+          "browser": "Chrome/153.0.8010.54",
+          "finished_at": "2026-09-26T02:39:22.788Z",
+          "flyers_served": 0,
+          "frames": 3600,
+          "frames_over_one_60hz_frame": 0,
+          "idle_before_percent": 85,
+          "idle_during_mean_tenths_percent": 809,
+          "interval_p95_us": 16700,
+          "load_1min_before_milli": 7503,
+          "ran": 1,
+          "started_at": "2026-09-26T02:38:16.727Z",
+          "work_max_us": 1100,
+          "work_p50_us": 100,
+          "work_p95_us": 500,
+          "work_p99_us": 700
+        },
+        "square-flight": {
+          "browser": "Chrome/153.0.8010.54",
+          "finished_at": "2026-09-26T02:40:39.775Z",
+          "flyers_served": 3,
+          "frames": 3600,
+          "frames_over_one_60hz_frame": 0,
+          "idle_before_percent": 78,
+          "idle_during_mean_tenths_percent": 733,
+          "interval_p95_us": 16700,
+          "load_1min_before_milli": 5845,
+          "ran": 2,
+          "started_at": "2026-09-26T02:39:33.812Z",
+          "work_max_us": 1200,
+          "work_p50_us": 400,
+          "work_p95_us": 600,
+          "work_p99_us": 900
+        },
+        "trees-blocked": {
+          "browser": "Chrome/153.0.8010.54",
+          "finished_at": "2026-09-26T02:41:57.101Z",
+          "flyers_served": 0,
+          "frames": 3600,
+          "frames_over_one_60hz_frame": 0,
+          "idle_before_percent": 75,
+          "idle_during_mean_tenths_percent": 692,
+          "interval_p95_us": 16700,
+          "load_1min_before_milli": 6695,
+          "ran": 3,
+          "started_at": "2026-09-26T02:40:51.147Z",
+          "work_max_us": 1300,
+          "work_p50_us": 100,
+          "work_p95_us": 600,
+          "work_p99_us": 900
+        },
+        "trees-flight": {
+          "browser": "Chrome/153.0.8010.54",
+          "finished_at": "2026-09-26T02:43:14.071Z",
+          "flyers_served": 24,
+          "frames": 3600,
+          "frames_over_one_60hz_frame": 0,
+          "idle_before_percent": 83,
+          "idle_during_mean_tenths_percent": 831,
+          "interval_p95_us": 16800,
+          "load_1min_before_milli": 5417,
+          "ran": 4,
+          "started_at": "2026-09-26T02:42:08.148Z",
+          "work_max_us": 2000,
+          "work_p50_us": 700,
+          "work_p95_us": 1400,
+          "work_p99_us": 1600
+        }
+      },
+      "guard-interventions": {
+        "crowded_crowns": 46271,
+        "eight_trees": 2,
+        "small_square": 21
+      },
+      "request-cost": [
+        {
+          "arms": [
+            {
+              "flyers": 3,
+              "from_step": 864000,
+              "median_us": 8014,
+              "process_us": [
+                8106,
+                8027,
+                8012,
+                8014,
+                7992
+              ],
+              "world": "small_square"
+            },
+            {
+              "flyers": 3,
+              "from_step": 863999,
+              "median_us": 49548,
+              "process_us": [
+                49949,
+                49946,
+                49506,
+                49533,
+                49548
+              ],
+              "world": "small_square"
+            },
+            {
+              "flyers": 24,
+              "from_step": 864000,
+              "median_us": 87250,
+              "process_us": [
+                87764,
+                87191,
+                87365,
+                87250,
+                87146
+              ],
+              "world": "eight_trees"
+            },
+            {
+              "flyers": 24,
+              "from_step": 863999,
+              "median_us": 502208,
+              "process_us": [
+                502181,
+                502208,
+                502644,
+                504028,
+                502037
+              ],
+              "world": "eight_trees"
+            }
+          ],
+          "at": "2026-09-25T22:38:02-0400",
+          "idle_before_percent": 84,
+          "load_1min_before_milli": 8611,
+          "run": "request-cost.json"
+        },
+        {
+          "arms": [
+            {
+              "flyers": 3,
+              "from_step": 864000,
+              "median_us": 8018,
+              "process_us": [
+                8184,
+                7989,
+                7969,
+                8018,
+                8039
+              ],
+              "world": "small_square"
+            },
+            {
+              "flyers": 3,
+              "from_step": 863999,
+              "median_us": 49865,
+              "process_us": [
+                49759,
+                49865,
+                49788,
+                50094,
+                50041
+              ],
+              "world": "small_square"
+            },
+            {
+              "flyers": 24,
+              "from_step": 864000,
+              "median_us": 88283,
+              "process_us": [
+                88655,
+                88186,
+                88283,
+                88194,
+                88888
+              ],
+              "world": "eight_trees"
+            },
+            {
+              "flyers": 24,
+              "from_step": 863999,
+              "median_us": 506843,
+              "process_us": [
+                505828,
+                508724,
+                516046,
+                506843,
+                502669
+              ],
+              "world": "eight_trees"
+            }
+          ],
+          "at": "2026-09-25T22:44:37-0400",
+          "idle_before_percent": 80,
+          "load_1min_before_milli": 18091,
+          "run": "request-cost-repeat.json"
+        }
+      ]
+    },
+    "scripts": {
+      "gate.py.txt": {
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/gate.py.txt",
+        "sha256": "9bac3b50d4fd7fcb8939d9d5e83238144cff1dfebb9b6027d4f49fd7da961d65"
+      },
+      "measure_flight_bounds.py.txt": {
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/measure_flight_bounds.py.txt",
+        "sha256": "8f856cea865b8c4b5575941b07912b797ba3bd8c9a0d926c6c0476f04eb2c23f"
+      },
+      "measure_flight_frames.mjs.txt": {
+        "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/measure_flight_frames.mjs.txt",
+        "sha256": "4456d283eefcf2bd4b77702ac9a43d7f0d425a2956645ceb3e9aaf7a3733dbbc"
+      }
+    },
+    "tree": {
+      "head": "ac5f64b60811a8c98147a244aed8293ab4a05ab7",
+      "launch_tracked_diff_sha256": "abb504820771e04af6bf23d27c2d91f8f7dcc58432afd733dfef166469ea5c53",
+      "package_b4e020bf": {
+        "delta_patch_sha256": "b4e020bfb66a8458709d5bdc9175c26c17f27bf8f7b26555d2a91430891365f9",
+        "files_changed_after_the_runs": {
+          "created": [
+            "docs/evaluation/2026-09-25-flight-bounds.json",
+            "tests/test_flight_bounds_record.py"
+          ],
+          "note": "Between the first run and the package: the tracked files are those whose change leaves the tracked diff without docs equal to the one launched and pre-registered once left out; the untracked ones differ from their digests taken during the run. None of them is code the flight runs.",
+          "tracked": [
+            "docs/navigation.json",
+            "docs/product-direction.md",
+            "docs/synthetic-society-contract.md",
+            "docs/world-objects-contract.md",
+            "tests/test_world_object_seats.py",
+            "tests/test_world_objects_postgres.py"
+          ],
+          "untracked": [
+            "docs/movement-modules-contract.md",
+            "tests/flight_support.py",
+            "tests/test_flight.py",
+            "tests/test_movement_modules.py"
+          ]
+        }
+      },
+      "recheck": "The corrected check ran from a copy of this lane's tree taken before any flight fix: every file the first run's record named by digest was the same, and the checker, exulanica/movement/flight_checks.py, was the corrected one bound here.",
+      "tracked_diff_without_docs_sha256": "abb504820771e04af6bf23d27c2d91f8f7dcc58432afd733dfef166469ea5c53",
+      "untracked_during_the_first_run": {
+        "assets/catalogs/movement/flight-kind.v1.json": "33f029aaaa7529f32e7bf955db70831d4cf1251c2c7e1d01ff74b941f3c84dd5",
+        "assets/catalogs/world-objects/world-object.v3.json": "9ca81b1c4efef47517c0c3ea0224049e530467246341230870dd9f8acd5c54a7",
+        "docs/evaluation/2026-09-25-flight-bounds-preregistration.json": "4dece12222ea36ad46a81c13d1598405b1cbaf0c7d593428bb95189f69b372fe",
+        "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/gate.py.txt": "9bac3b50d4fd7fcb8939d9d5e83238144cff1dfebb9b6027d4f49fd7da961d65",
+        "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/measure_flight_bounds.py.txt": "8f856cea865b8c4b5575941b07912b797ba3bd8c9a0d926c6c0476f04eb2c23f",
+        "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/measure_flight_frames.mjs.txt": "4456d283eefcf2bd4b77702ac9a43d7f0d425a2956645ceb3e9aaf7a3733dbbc",
+        "docs/movement-modules-contract.md": "498f44b6dc12509f7772a4cf573ca23efe8cad93efa9d28d8bc4ffe73da4dde2",
+        "exulanica/api/routes/world_flight.py": "f7c996bccc5fba7f5b6da2f48da814b496befaa039ff3821872e53230f78095e",
+        "exulanica/migrations/0114_a_tree_s_birds_are_reviewed_components.sql": "aead7d3aae3130de55bbb29ec7e88e12bf25caafe22f38b19aa49bd725d56ada",
+        "exulanica/movement/__init__.py": "85f1423c0fdfbef8e6daf79a526a321edd7646d1d80e7546efbfa3906d3655aa",
+        "exulanica/movement/air.py": "3d8d1b9ff22b966ba1e5f4b249a68036eeb73ff84ed1d744995f9c82b1da0c7a",
+        "exulanica/movement/fixed.py": "5961e6943c80fa1862f2d32b8921298e010755493cc5187aac87483bed1b48a0",
+        "exulanica/movement/flight.py": "f4526edf5866dd6a35c5e1ad428f74947bf76ebcdbf13237262625a2c7d3d181",
+        "exulanica/movement/flight_checks.py": "07028042d716bc3ba9f25a2361ca2f9d94a985bcc2eb1fb26e205e66c039b67e",
+        "exulanica/movement/movement-modules.v1.json": "fb1e0087db5038546ac6edfa8fe5b8ae9c9582f090bdea6fff12d1309601f74b",
+        "exulanica/movement/registry.py": "b2b2b4edc339708e371818f2347676d8d0c14879ca5c8ac437d6b4a2abe74fc3",
+        "exulanica/movement/steps.py": "999567dc6b16c5b1609eda3bb4b413b1c136e4822be29e7b533f86108200239f",
+        "exulanica/movement/walking.py": "259fffb894e0a383421c04d0463d1d5262dc76aa0355376d783962708e74e541",
+        "exulanica/world/flight_input.py": "ae8ed4b081286366e0551ec421d09af5a0469c59be33f0937f09cc5d6feb6947",
+        "exulanica/world/flight_kinds.py": "f92081a5476108d75c31ba3026e8c173483c5b46c565e81275fcdc66f3fba0d9",
+        "scripts/measure_flight_bounds.py": "8f856cea865b8c4b5575941b07912b797ba3bd8c9a0d926c6c0476f04eb2c23f",
+        "tests/flight_support.py": "482840de45d177da40a35931b500ea61dbfe294ec56ad69daa8757a92dd61755",
+        "tests/migration_reservations/0110.txt": "8f3cf87be45cc2b69106b3c6156334fd18ad737c69349bc91fdf756c90d6a8b3",
+        "tests/migration_reservations/0111.txt": "9eec6d5550f649b9986ab4de0ee7556290c9cf7d51944829643480b5e0b3e22b",
+        "tests/migration_reservations/0112.txt": "203546a033e8216665c6d18386418bb831db2a0e49b33404e2efb93f7bed7f12",
+        "tests/migration_reservations/0113.txt": "203546a033e8216665c6d18386418bb831db2a0e49b33404e2efb93f7bed7f12",
+        "tests/test_flight.py": "405c064314cced8a55edfc91237c500e29f32a40226d886fccf979c96ea788aa",
+        "tests/test_flight_kinds.py": "7571fe948bf49323865b79b73a60bad1086e86afc6022e07860e8d2c24018f07",
+        "tests/test_movement_layering.py": "654624b56d8faeaff2b649d533b3ca89fbd6ead520ea1aacdff8c91ab8847222",
+        "tests/test_movement_modules.py": "f7989d1f9149d3f18e4544d5b78e5871a96d5516030239f3dd8b3b86bf854576",
+        "tests/test_world_flight_api.py": "1e60b0bced56855bee65c907e8b251042879d0ede849bc8248f6d4f11a971ea4",
+        "tests/test_world_object_perches.py": "298aaa2c9153aa77daecba2740560e2a3e8640410d996cfa90f3109ea717954d",
+        "web/packages/app/src/composition/saved-world-flight.ts": "e9b485fedc8d524836f8c461f6ba871ee788aa6d524c3f95287ce14dee765c6c",
+        "web/packages/app/src/flight-api.ts": "06eeddbb18ca602fdd04c31db604859c7822302bab85577ad3b0a07f056a355e",
+        "web/packages/app/test/environment-selection-flight.test.ts": "cbd967b20352dc243b4f5b0d2e02f4301296fb4574b8e8ef938af0f31db3b638",
+        "web/packages/app/test/flight-api.test.ts": "57049e5e0b64999e5cae04bc96a733425944bbeaea2818455bc1315a8fa92b36",
+        "web/packages/app/test/saved-world-flight.test.ts": "0ed1e058dbda76982598396acd1431858d11d7cd6ecceda92056f4d1f9174312",
+        "web/packages/atlas-react/src/playcanvas/flight/flock.ts": "c4fdc535179e6b83c2d1fb5391bd40b8519f3eadc0ec3a998ad665624f39b8f5",
+        "web/packages/atlas-react/src/playcanvas/flight/types.ts": "abd66a0558bfd977014ded207d0f83dee354447297763fd8cdcc4b40283febbd",
+        "web/packages/atlas-react/test/flight-flock.test.ts": "9c5ddcb306afdabac5de9024dcb7db8575607ca88cbd5504b226dde506e44753"
+      }
+    },
+    "verdict": "FAILED: no-violation, every-flyer-home. Among the crowded crowns 141 of 864 flyer episodes ended with the flyer not home, and the flight put each back home at the next episode's first step in one move, through crowns. The first run reported PASSED because its checker never tested either (checker_defects). The small square and the eight trees were clean, every window replayed exactly, and 24 flyers were drawn within one 60 Hz frame.",
+    "worlds": {
+      "crowded_crowns": {
+        "flyers": 12,
+        "occupancy_sha256": "c316b6a0bfb149c5afc0b7cf1f8225f0bb648be9545a68dc9278861b68bc3e73",
+        "perches": 40,
+        "solid_cells": 7428,
+        "unplaced": [
+          {
+            "count": 3,
+            "kind": "small_bird",
+            "object_id": "tree-0",
+            "reason": "home_perch_unusable"
+          },
+          {
+            "count": 3,
+            "kind": "small_bird",
+            "object_id": "tree-1",
+            "reason": "home_perch_unusable"
+          },
+          {
+            "count": 3,
+            "kind": "small_bird",
+            "object_id": "tree-2",
+            "reason": "home_perch_unusable"
+          },
+          {
+            "count": 3,
+            "kind": "small_bird",
+            "object_id": "tree-3",
+            "reason": "home_perch_unusable"
+          }
+        ]
+      },
+      "eight_trees": {
+        "flyers": 24,
+        "occupancy_sha256": "be6660627a9459226b6c97c39fb4035d98d0dee1f4ade438585acf681916d86c",
+        "perches": 40,
+        "solid_cells": 5100,
+        "unplaced": []
+      },
+      "small_square": {
+        "flyers": 3,
+        "occupancy_sha256": "75ae5b70d2b5ce4be4c0f6d0bfa67279b6a92735f70e1d9c4829570e7cea7729",
+        "perches": 7,
+        "solid_cells": 734,
+        "unplaced": []
+      }
+    }
+  },
+  "record_sha256": "d32c8e0f785a936968002333b883644ecb62eab5b4cda34c93c2cd5e66e5d382"
+}

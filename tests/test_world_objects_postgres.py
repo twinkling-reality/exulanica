@@ -37,6 +37,7 @@ from exulanica.world import (
     reviewed_assets,
     seed_reviewed_assets,
 )
+from exulanica.world.flight_kinds import flight_assets
 
 from conftest import scratch_role_database, write_photo
 from pg_harness import open_scratch_connection
@@ -984,12 +985,14 @@ def test_the_reviewed_catalogs_match_what_the_code_generates(world, tmp_path):
     objects, _, _ = world
     store = LocalContentAddressedStore(tmp_path / "blobs")
     catalog = {a.asset_key: a for a in objects.reviewed_assets(store)}
-    assert set(catalog) == {asset.asset_key for asset in reviewed_assets()}
+    # The flying kinds' bodies and wings are registry rows too (0114), seeded beside the objects.
+    generated = (*reviewed_assets(), *flight_assets())
+    assert set(catalog) == {asset.asset_key for asset in generated}
     # Nothing has been seeded into the store yet, so nothing may claim to be available.
     assert {a.availability for a in catalog.values()} == {"unavailable_asset"}
 
-    seeded = seed_reviewed_assets(store)
-    for asset in seeded:
+    assert seed_reviewed_assets(store) == reviewed_assets()
+    for asset in generated:
         assert catalog[asset.asset_key].content_sha256 == asset.content_sha256
         assert catalog[asset.asset_key].byte_size == asset.byte_size
         assert catalog[asset.asset_key].licence_sha256 == asset.licence_sha256

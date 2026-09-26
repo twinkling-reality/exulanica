@@ -104,7 +104,8 @@ def test_a_person_standing_at_a_place_faces_across_its_side_toward_the_kind():
 def test_version_2_is_version_1_with_seats_the_same_meshes_and_society_rows():
     """If this fails, seats moved a mesh or a registry row, and 0105 or a society digest with it."""
     earlier = load_world_object_catalog(version=1)
-    current = world_object_catalog()
+    # Version 3 is this one with perches and hosts; tests/test_world_object_perches.py holds that.
+    current = load_world_object_catalog(version=2)
     assert current.version == 2
     assert [kind.key for kind in earlier.kinds] == [kind.key for kind in current.kinds]
     for old, new in zip(earlier.kinds, current.kinds, strict=True):

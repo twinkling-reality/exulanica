@@ -377,6 +377,11 @@ layers = [
   # pipeline. Pure: the offline package verifier resolves consent through it with no database.
   "consent",
   "world | identity",
+  # Movement modules: walking, flight and the stated but unconnected roads, one engine module per
+  # kind of movement. The society engines in `world` walk by it and the world composes a flight's
+  # input and passes it down, so it sits directly under `world`; the forbidden contract below keeps
+  # it pure, so its integer steps replay the same on any machine with no database or store.
+  "movement",
   "epistemics",
   # Erasure sits under everything that writes, because everything that writes may have to ask
   # for it: `exulanica.ingest` writes the tombstone that fills the queue, and there is one
@@ -606,6 +611,36 @@ forbidden_modules = [
   "exulanica.api",
   "numpy",
   "torch",
+]
+
+[[tool.importlinter.contracts]]
+# A movement module is a pure, replayable step over plain data: a route graph, an air volume. It
+# cannot open the database or the store, name an evidence address, reach the pipeline, a person,
+# the selector, reconstruction or the capture verdict, import the world that composes its input or
+# the traffic simulation beside it, call a model, or load the numeric stack. Its decisions are
+# integers and seeded draws, and a module that cannot import any of the above cannot quietly make
+# them anything else. `exulanica.canonical` stays importable: a digest is not a citation.
+name = "Movement modules are pure: no database, store, evidence, pipeline, world, traffic or model"
+type = "forbidden"
+source_modules = ["exulanica.movement"]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.db",
+  "exulanica.store",
+  "exulanica.evidence",
+  "exulanica.ingest",
+  "exulanica.migrations",
+  "exulanica.identity",
+  "exulanica.selection",
+  "exulanica.reconstruction",
+  "exulanica.capture",
+  "exulanica.world",
+  "exulanica.traffic",
+  "exulanica.models",
+  "exulanica.api",
+  "numpy",
+  "torch",
+  "exulanica.env",
 ]
 
 [[tool.importlinter.contracts]]

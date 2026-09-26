@@ -1,0 +1,5 @@
+quiet-slot: waiting for the machine-wide slot at 02:00:08 from <worktree>/.exulanica/lane-movement/evidence
+quiet-slot: slot taken at 02:00:08; load 5.37 5.74 6.79
+{"runs": [[507944, 221847], [521424, 145851], [483681, 151469], [520284, 181643], [513434, 162371]]}
+gate: exit 0 pre idle 77
+quiet-slot: finished at 02:00:28 with exit 0; load 6.10 5.88 6.82

@@ -1,0 +1,34 @@
+"""Print the worktree's identity as JSON: HEAD, the tracked diff's digest and every untracked file's.
+
+    python3 tree_identity.py [--exclude PREFIX]...
+
+The launcher's diff_head_sha256 covers tracked files only; a new file is untracked until it is
+added, so the untracked files are listed by path and digest too. Paths are relative to the root.
+"""
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+excluded = [sys.argv[i + 1] for i, a in enumerate(sys.argv) if a == "--exclude"]
+
+
+def git(*args):
+    return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, check=True).stdout
+
+
+diff = git("diff", "HEAD", "--binary")
+untracked = sorted(p for p in git("ls-files", "--others", "--exclude-standard").decode().splitlines()
+                   if not any(p.startswith(prefix) for prefix in excluded))
+files = [{"path": p, "sha256": hashlib.sha256((ROOT / p).read_bytes()).hexdigest()} for p in untracked]
+listing = "".join(f"{f['sha256']}  {f['path']}\n" for f in files).encode()
+print(json.dumps({
+    "head": git("rev-parse", "HEAD").decode().strip(),
+    "diff_head_sha256": hashlib.sha256(diff).hexdigest(),
+    "diff_head_bytes": len(diff),
+    "changed_tracked_paths": len(git("diff", "HEAD", "--name-only").decode().splitlines()),
+    "untracked_listing_sha256": hashlib.sha256(listing).hexdigest(),
+    "untracked": files,
+}, indent=1))

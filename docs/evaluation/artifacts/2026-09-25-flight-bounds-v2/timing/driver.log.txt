@@ -1,0 +1,15 @@
+quiet-slot: waiting for the machine-wide slot at 01:54:00 from <worktree>/.exulanica/lane-movement/evidence
+quiet-slot: slot taken at 01:54:00; load 8.27 8.40 8.02
+gpu-slot: waiting for the machine-wide GPU slot at 01:54:00 from <worktree>/.exulanica/lane-movement/evidence
+gpu-slot: slot taken at 01:54:00; load 8.27 8.40 8.02
+01:54:20 request-cost attempt 1 exit 0
+01:54:20 setup square exit 0
+01:55:37 frames-square-blocked attempt 1 exit 0
+01:56:54 frames-square-flight attempt 1 exit 0
+01:56:54 setup trees exit 0
+01:58:11 frames-trees-blocked attempt 1 exit 0
+01:59:27 frames-trees-flight attempt 1 exit 0
+01:59:40 request-blocking attempt 1 exit 1
+01:59:40 done
+gpu-slot: finished at 01:59:40 with exit 0; load 5.56 5.82 6.85
+quiet-slot: finished at 01:59:40 with exit 0; load 5.56 5.82 6.85

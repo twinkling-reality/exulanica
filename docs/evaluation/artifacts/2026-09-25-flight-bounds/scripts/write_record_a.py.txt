@@ -1,0 +1,562 @@
+"""Write the first flight bounds registration's result: its run, and the check that corrects it.
+
+    uv run python .exulanica/lane-movement/evidence/write_record_a.py --runs DIR --recheck DIR \
+        --snapshot DIR --package DIR --state STATE_JSON [--into SCRATCH_DIR]
+
+The first registration's run reported PASSED on a rule its checker never tested. This record keeps
+that run's own output beside a corrected check of the same windows, and gives the registration the
+verdict the corrected check finds. It binds each file it names by digest and copies it beside
+itself; a log becomes .log.txt, a script .txt. The pre-registered scripts are not copied again: the
+record names the pre-registration's copies and checks that the scripts which ran are those copies.
+
+Refuses to write if any bound text holds a home path, a temporary directory or an em dash, and
+computes every outcome from the files, never typing one.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import itertools
+import json
+import re
+import subprocess
+import sys
+from collections import Counter
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.evaluation.visual_gate import digest_bound  # noqa: E402
+
+NAME = "2026-09-25-flight-bounds"
+RECORD = ROOT / "docs" / "evaluation" / f"{NAME}.json"
+ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / NAME
+PREREGISTRATION = ROOT / "docs" / "evaluation" / f"{NAME}-preregistration.json"
+HERE = Path(__file__).resolve().parent
+FRAME_BUDGET_US = 16_667
+WORLDS = ("small_square", "eight_trees", "crowded_crowns")
+#: The rules of the first registration's no-violation rule, as the checker names them.
+NO_VIOLATION_RULES = (
+    "out_of_bounds",
+    "off_column",
+    "perched_off_point",
+    "perch_held_twice",
+    "moved_too_far",
+    "entered_solid_cell",
+    "genesis_not_home",
+)
+PREREGISTERED = {
+    "measure_flight_bounds.py.txt": "scripts/measure_flight_bounds.py",
+    "measure_flight_frames.mjs.txt": "measure_flight_frames.mjs",
+    "gate.py.txt": "gate.py",
+}
+LATER_SCRIPTS = {
+    "recheck_first_registration.py.txt": (
+        HERE / "recheck_first_registration.py",
+        "the corrected check of the first registration's judged seeds, as it ran",
+    ),
+    "check_window_joins.py.txt": (
+        HERE / "check_window_joins.py",
+        "the check of the joins between windows run after the first run with its own checker",
+    ),
+    "run_timing.sh.txt": (HERE / "run_timing.sh", "the driver that ran the timing runs in order"),
+    "tree_identity.py.txt": (HERE / "tree_identity.py", "the script that listed the tree"),
+    "write_record_a.py.txt": (Path(__file__).resolve(), "this record's writer"),
+}
+CHECKER_DEFECTS = (
+    "The flight named a flyer late home only in a window that crossed an episode's end: every "
+    "window was 600 steps from step 0 and an episode is 3,000, so no window crossed one and the "
+    "late list was always empty, and the rule every-flyer-home was never tested.",
+    "The checker skipped the move into an episode's first step, where the flight puts a late "
+    "flyer back home, so a jump home of up to 15 m through a crown was never a move it checked; "
+    "and it checked each window alone, so no move between two windows was checked either.",
+    "The checker let a flyer landing on, perching at or taking off from a perch pass every solid "
+    "cell the flight's column called the perch's own, and the column called every solid cell "
+    "above a perch its own, whichever object filled it.",
+)
+
+
+def _forbidden() -> tuple[str, ...]:
+    """Text no bound file may hold, each fragment built here so this file's own copy holds none."""
+    home = Path.home()
+    slash = "/"
+    return (
+        str(home),
+        home.name,
+        slash + "Users" + slash,
+        slash + "private" + slash,
+        slash + "var" + slash + "folders",
+        "Bearer" + " ",
+        "api" + "-token",
+        chr(0x2014),
+    )
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _redacted(text: str) -> str:
+    """Checkout locations to named placeholders, then the home directory to ``~``."""
+    common = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    main_checkout = (ROOT / common).resolve().parent
+    text = text.replace(str(ROOT), "<worktree>").replace(str(main_checkout), "<main checkout>")
+    return text.replace(str(Path.home()), "~")
+
+
+def _load(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+class Binder:
+    """Copies a file beside the record, refusing forbidden text, and remembers its digest."""
+
+    def __init__(self, artifacts: Path) -> None:
+        self.artifacts = artifacts
+        self.bound: dict[str, dict[str, Any]] = {}
+        self.notes: dict[str, str] = {}
+
+    def bind(self, name: str, data: bytes, note: str, *, text: bool = True) -> str:
+        if text:
+            decoded = data.decode("utf-8")
+            found = [fragment for fragment in _forbidden() if fragment in decoded]
+            if found:
+                raise SystemExit(f"{name} holds text no record may bind ({len(found)} kind(s))")
+        target = self.artifacts / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        path = f"docs/evaluation/artifacts/{NAME}/{name}"
+        self.bound[name] = {"path": path, "byte_size": len(data), "sha256": _sha(data)}
+        self.notes[name] = note
+        return path
+
+
+def _sections(patch: bytes) -> list[tuple[str, bytes]]:
+    """A binary git patch split into its files' sections, in order, each with its path."""
+    starts = [match.start() for match in re.finditer(rb"^diff --git a/", patch, re.MULTILINE)]
+    sections = []
+    for start, end in zip(starts, [*starts[1:], len(patch)], strict=True):
+        header = patch[start : patch.index(b"\n", start)].decode()
+        sections.append((header.split(" b/", 1)[1], patch[start:end]))
+    return sections
+
+
+def _left_out(patch: bytes, new_paths: set[str], digest: str) -> list[str]:
+    """The fewest tracked files outside docs whose sections, left out with docs, give ``digest``."""
+    tracked = [(path, body) for path, body in _sections(patch) if path not in new_paths]
+    candidates = [path for path, _body in tracked if not path.startswith("docs/")]
+    for size in range(len(candidates) + 1):
+        for left in itertools.combinations(candidates, size):
+            kept = b"".join(
+                body for path, body in tracked if not path.startswith("docs/") and path not in left
+            )
+            if _sha(kept) == digest:
+                return sorted(left)
+    raise SystemExit("no set of files left out gives the launched diff")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    for name in ("runs", "recheck", "snapshot", "package", "state"):
+        parser.add_argument(f"--{name}", required=True)
+    parser.add_argument(
+        "--first-run-started",
+        required=True,
+        help="when the first run started, read from the process table while it ran",
+    )
+    parser.add_argument("--into")
+    arguments = parser.parse_args()
+    runs = Path(arguments.runs).resolve()
+    timing = runs / "timing"
+    recheck_dir = Path(arguments.recheck).resolve()
+    snapshot = Path(arguments.snapshot).resolve()
+    package = Path(arguments.package).resolve()
+    state = _load(Path(arguments.state))
+    record_path, artifacts = RECORD, ARTIFACTS
+    if arguments.into:
+        record_path = Path(arguments.into).resolve() / RECORD.name
+        artifacts = Path(arguments.into).resolve() / "artifacts" / NAME
+    if record_path.exists() or artifacts.exists():
+        raise SystemExit(f"{record_path.name} or its artifacts exist; remove the old ones first")
+
+    started = datetime.fromisoformat(arguments.first_run_started)
+    minutes, seconds = re.search(
+        r"(\d+):(\d+\.\d+) total", (runs / "judged-bounds.log").read_text()
+    ).groups()
+    wall = round(int(minutes) * 60 + float(seconds))
+    envelope = _load(PREREGISTRATION)
+    pre = envelope["record"]
+    assert envelope["record_sha256"] == _sha(canonical_json(pre)), "the pre-registration moved"
+    copies = {Path(f["path"]).name: f for f in pre["artifacts"]["files"]}
+    scripts = {
+        name: {"path": copies[name]["path"], "sha256": copies[name]["sha256"]}
+        for name in PREREGISTERED
+    }
+    # The first run ran the pre-registered measuring script as bound; so did the timing harness.
+    snapshot_script = (snapshot / "scripts" / "measure_flight_bounds.py").read_bytes()
+    assert _sha(snapshot_script) == copies["measure_flight_bounds.py.txt"]["sha256"]
+    for name in ("measure_flight_frames.mjs.txt", "gate.py.txt"):
+        assert _sha((HERE / PREREGISTERED[name]).read_bytes()) == copies[name]["sha256"], name
+
+    artifacts.mkdir(parents=True)
+    binder = Binder(artifacts)
+    for name, (source, what) in LATER_SCRIPTS.items():
+        text = source.read_text(encoding="utf-8")
+        redacted = _redacted(text)
+        if redacted != text:
+            what += "; its checkout locations are written as <worktree>, <main checkout> and ~"
+        binder.bind(f"scripts/{name}", redacted.encode(), what)
+    checker = (snapshot / "exulanica" / "movement" / "flight_checks.py").read_bytes()
+    binder.bind(
+        "scripts/flight_checks.py.txt",
+        checker,
+        "the corrected checker as the re-check ran it: exulanica/movement/flight_checks.py",
+    )
+
+    # ---- the first run, with its own checker --------------------------------------------------
+    first_bytes = (runs / "judged-bounds.json").read_bytes()
+    first = json.loads(first_bytes)
+    assert first["seeds"]["values"] == pre["seeds"]["judged"]
+    binder.bind("runs/first-run.json", first_bytes, "the first run's output, with its own checker")
+    binder.bind(
+        "runs/first-run.log.txt",
+        _redacted((runs / "judged-bounds.log").read_text()).encode(),
+        "the first run's time and exit",
+    )
+    joins_bytes = (runs / "judged-joins.json").read_bytes()
+    binder.bind(
+        "runs/window-joins-first-checker.json",
+        joins_bytes,
+        "the joins between windows, checked after the first run by its own checker, which skipped "
+        "the joins into an episode",
+    )
+
+    # ---- the corrected check ------------------------------------------------------------------
+    recheck_bytes = (recheck_dir / "recheck.json").read_bytes()
+    recheck = json.loads(recheck_bytes)
+    assert recheck["seeds"]["values"] == pre["seeds"]["judged"]
+    assert recheck["minutes"] == first["minutes"] == pre["run"]["minutes_per_seed"]
+    binder.bind("runs/recheck.json", recheck_bytes, "the corrected check's output")
+    binder.bind(
+        "runs/recheck.log.txt",
+        _redacted((recheck_dir / "recheck.log").read_text()).encode(),
+        "the corrected check's time and exit",
+    )
+    binder.bind(
+        "runs/recheck-snapshot-movement.sha256.txt",
+        (snapshot / "movement-sources.sha256").read_bytes(),
+        "the movement package's files in the tree the corrected check ran from, before the "
+        "corrected checker was copied in",
+    )
+
+    worlds: dict[str, Any] = {}
+    found: dict[str, Any] = {}
+    no_violation = every_home = exact = True
+    for name in WORLDS:
+        first_world = first["worlds"][name]
+        world = recheck["worlds"][name]
+        assert (
+            world["occupancy_sha256"]
+            == first_world["occupancy_sha256"]
+            == (pre["worlds"][name]["occupancy_sha256"])
+        )
+        rules: Counter[str] = Counter()
+        late = ends = equal = mismatched = 0
+        for run, first_run in zip(world["runs"], first_world["runs"], strict=True):
+            assert run["seed"] == first_run["seed"]
+            rules.update(run["violations_by_rule"])
+            late += run["late_home"]
+            ends += run["episode_ends"]
+            equal += run["windows_sha256"] == first_run["windows_sha256"]
+            mismatched += first_run["replay_mismatches"]
+        registered = {rule: rules[rule] for rule in NO_VIOLATION_RULES if rules[rule]}
+        no_violation &= not registered
+        every_home &= late == 0
+        exact &= mismatched == 0 and equal == len(world["runs"])
+        worlds[name] = {
+            "flyers": first_world["flyers"],
+            "perches": first_world["perches"],
+            "unplaced": first_world["unplaced"],
+            "solid_cells": first_world["solid_cells"],
+            "occupancy_sha256": first_world["occupancy_sha256"],
+        }
+        found[name] = {
+            "seeds": len(world["runs"]),
+            "segments_checked": sum(run["segments"] for run in world["runs"]),
+            "registered_violations_by_rule": registered,
+            "episode_ends": ends,
+            "not_home_at_an_episode_end": late,
+            "late_home_the_flight_named": late - rules["late_home_misreported"],
+            "bodies_meeting_a_part": rules["body_meets_solid"],
+            "windows_equal_to_the_first_run": equal,
+            "replay_mismatches_in_the_first_run": mismatched,
+            "first_run_said": {
+                "violations": sum(run["violation_count"] for run in first_world["runs"]),
+                "late_home": sum(run["late_home"] for run in first_world["runs"]),
+            },
+        }
+
+    # ---- request cost and frames, measured on the first registration's tree ------------------
+    ledger = [json.loads(line) for line in (timing / "gates.jsonl").read_text().splitlines()]
+    costs = [row for row in ledger if "--request-cost" in row["command"]]
+    request_cost = []
+    for name, row in zip(("request-cost.json", "request-cost-repeat.json"), costs, strict=True):
+        cost_bytes = (timing / name).read_bytes()
+        binder.bind(f"timing/{name}", cost_bytes, "a request cost run's output")
+        request_cost.append(
+            {
+                "run": name,
+                "at": row["at"],
+                "idle_before_percent": row["pre"][-1],
+                "load_1min_before_milli": round(row["load_before"][0] * 1000),
+                "arms": [
+                    {
+                        key: arm[key]
+                        for key in ("world", "flyers", "from_step", "median_us", "process_us")
+                    }
+                    for arm in json.loads(cost_bytes)["arms"]
+                ],
+            }
+        )
+    frame_runs = [row for row in ledger if "measure_flight_frames" in row["command"]]
+    arms: dict[str, Any] = {}
+    for world, setup_name in (("square", "setup-square.json"), ("trees", "setup-trees.json")):
+        setup_bytes = (timing / setup_name).read_bytes()
+        setup = json.loads(setup_bytes)
+        binder.bind(f"timing/{setup_name}", setup_bytes, f"the {world} world the harness set up")
+        for arm in ("blocked", "flight"):
+            frames_bytes = (timing / f"frames-{world}-{arm}.json").read_bytes()
+            frames = json.loads(frames_bytes)
+            binder.bind(f"timing/frames-{world}-{arm}.json", frames_bytes, f"the {world} {arm} arm")
+            order = len(arms)
+            gate = frame_runs[order]
+            work = frames["frames"]["work"]
+            arms[f"{world}-{arm}"] = {
+                "ran": order + 1,
+                "started_at": frames["started_at"],
+                "finished_at": frames["finished_at"],
+                "flyers_served": 0 if arm == "blocked" else setup["flyers"],
+                "frames": frames["frames"]["count"],
+                "work_p50_us": work["p50_us"],
+                "work_p95_us": work["p95_us"],
+                "work_p99_us": work["p99_us"],
+                "work_max_us": work["max_us"],
+                "frames_over_one_60hz_frame": work["over_one_frame"],
+                "interval_p95_us": frames["frames"]["interval"]["p95_us"],
+                "idle_before_percent": gate["pre"][-1],
+                "idle_during_mean_tenths_percent": frames["idle_during"]["mean_tenths"],
+                "load_1min_before_milli": round(gate["load_before"][0] * 1000),
+                "browser": frames["browser"]["product"],
+            }
+    binder.bind(
+        "timing/gates.jsonl",
+        _redacted((timing / "gates.jsonl").read_text()).encode(),
+        "the idle gate's ledger",
+    )
+    for idle_file in sorted(timing.glob("idle-*.jsonl")):
+        binder.bind(
+            f"timing/{idle_file.name}", idle_file.read_bytes(), "idle samples during one run"
+        )
+    loads = [f"{run['load_1min_before_milli'] / 1000:.1f}" for run in request_cost]
+    first_medians = [arm["median_us"] for arm in request_cost[0]["arms"]]
+    again_medians = [arm["median_us"] for arm in request_cost[1]["arms"]]
+    spread = max(
+        -(-abs(a - b) * 100 // min(a, b)) for a, b in zip(first_medians, again_medians, strict=True)
+    )
+    trees = arms["trees-flight"]
+    within_a_frame = trees["work_p95_us"] < FRAME_BUDGET_US and trees["flyers_served"] == 24
+
+    # ---- the tree ---------------------------------------------------------------------------
+    during = _load(runs / "tree-during-runs.json")
+    postimage = {}
+    for line in (package / "postimage.sha256").read_text().splitlines():
+        digest, path = line.split("  ", 1)
+        postimage[path] = digest
+    new_paths = set((package / "new-paths.txt").read_text().split())
+    untracked_then = {row["path"]: row["sha256"] for row in during["untracked"]}
+    delta = (package / "delta.patch").read_bytes()
+    tracked_after = sorted(
+        {
+            path
+            for path, _body in _sections(delta)
+            if path not in new_paths and path.startswith("docs/")
+        }
+        | set(_left_out(delta, new_paths, pre["tree"]["diff_head_sha256"]))
+    )
+    untracked_after = sorted(
+        path
+        for path in new_paths
+        if path in untracked_then and untracked_then[path] != postimage.get(path)
+    )
+    created_after = sorted(
+        path
+        for path in new_paths
+        if path not in untracked_then and not path.startswith(f"docs/evaluation/artifacts/{NAME}/")
+    )
+    tree = {
+        "head": during["head"],
+        "tracked_diff_without_docs_sha256": pre["tree"]["diff_head_sha256"],
+        "launch_tracked_diff_sha256": state["tree"]["diff_head_sha256"],
+        "untracked_during_the_first_run": untracked_then,
+        "package_b4e020bf": {
+            "delta_patch_sha256": _sha(delta),
+            "files_changed_after_the_runs": {
+                "tracked": tracked_after,
+                "untracked": untracked_after,
+                "created": created_after,
+                "note": (
+                    "Between the first run and the package: the tracked files are those whose "
+                    "change leaves the tracked diff without docs equal to the one launched and "
+                    "pre-registered once left out; the untracked ones differ from their digests "
+                    "taken during the run. None of them is code the flight runs."
+                ),
+            },
+        },
+        "recheck": (
+            "The corrected check ran from a copy of this lane's tree taken before any flight fix: "
+            "every file the first run's record named by digest was the same, and the checker, "
+            "exulanica/movement/flight_checks.py, was the corrected one bound here."
+        ),
+    }
+
+    judged = []
+    outcomes = {
+        "no-violation": (
+            no_violation,
+            {name: found[name]["registered_violations_by_rule"] for name in WORLDS},
+        ),
+        "every-flyer-home": (
+            every_home,
+            {
+                name: [found[name]["not_home_at_an_episode_end"], found[name]["episode_ends"]]
+                for name in WORLDS
+            },
+        ),
+        "exact-replay": (
+            exact,
+            {name: found[name]["replay_mismatches_in_the_first_run"] for name in WORLDS},
+        ),
+        "twenty-four-flyers-in-a-frame": (
+            within_a_frame,
+            {
+                "flyers": trees["flyers_served"],
+                "work_p95_us": trees["work_p95_us"],
+                "budget_us": FRAME_BUDGET_US,
+            },
+        ),
+    }
+    for rule in pre["judged"]:
+        passed, measured = outcomes[rule["id"]]
+        judged.append(
+            {
+                "id": rule["id"],
+                "rule": rule["rule"],
+                "outcome": "passed" if passed else "failed",
+                "measured": measured,
+            }
+        )
+    failed = [row["id"] for row in judged if row["outcome"] == "failed"]
+    crowded = found["crowded_crowns"]
+    record = {
+        "profile": "exulanica.flight-bounds/v1",
+        "question": pre["question"],
+        "preregistration": {
+            "path": f"docs/evaluation/{PREREGISTRATION.name}",
+            "record_sha256": envelope["record_sha256"],
+        },
+        "verdict": (
+            ("FAILED: " + ", ".join(failed) + ". " if failed else "PASSED. ")
+            + f"Among the crowded crowns {crowded['not_home_at_an_episode_end']} of "
+            f"{crowded['episode_ends']} flyer episodes ended with the flyer not home, and the "
+            "flight put each back home at the next episode's first step in one move, through "
+            "crowns. The first run reported PASSED because its checker never tested either "
+            "(checker_defects). The small square and the eight trees were clean, every window "
+            "replayed exactly, and 24 flyers were drawn within one 60 Hz frame."
+        ),
+        "judged": judged,
+        "checker_defects": list(CHECKER_DEFECTS),
+        "found": found,
+        "first_run": {
+            "started_at": started.isoformat(timespec="seconds"),
+            "finished_at": (started + timedelta(seconds=wall)).isoformat(timespec="seconds"),
+            "wall_seconds": wall,
+            "times_from": (
+                "its start from the process table while it ran, its length from the wall time "
+                "its own run printed; the old script stamped neither"
+            ),
+            "verdict_then": "PASSED",
+        },
+        "recheck_run": {"started_at": recheck["started_at"], "finished_at": recheck["finished_at"]},
+        "reported": {
+            "guard-interventions": {
+                name: sum(run["guard_interventions"] for run in first["worlds"][name]["runs"])
+                for name in WORLDS
+            },
+            "request-cost": request_cost,
+            "frame-time": arms,
+        },
+        "worlds": worlds,
+        "max_flyers": {
+            "declared": 24,
+            "largest_population_measured_within_a_frame": 24 if within_a_frame else None,
+        },
+        "scripts": scripts,
+        "tree": tree,
+        "release_build": {
+            "index_html_sha256": state["app"]["build"]["index_html_sha256"],
+            "vite": state["app"]["build"]["vite"],
+            "served_index_is_the_build": state["app"]["served_index_is_the_build"],
+        },
+        "execution": {
+            "machine": "Apple M5 Max, 18 cores, 64 GB, macOS 26.7",
+            "python": "CPython 3.11.6",
+            "browser": trees["browser"] + " headless, its own profile per arm",
+            "timing": (
+                "inside quiet-slot then gpu-slot, each run behind the idle gate: at least 70 "
+                "percent idle over 10 s before it, discarded below 50 percent mean idle during it"
+            ),
+        },
+        "limits": [
+            "Request cost timed the flight module's flight_window alone, cold, from an episode's "
+            "genesis: a request's database reads, composing the air and answering are not in it. "
+            f"The first request cost run started with a one-minute load of {loads[0]}, just after "
+            f"a full suite; quiet-slot asks for a repeat above 8, and the repeat started at "
+            f"{loads[1]}, a burst the idle gate did not see; both are given, and their medians "
+            f"differ by at most {spread} percent.",
+            "Only the cold path was judged. A page reads windows in order, each resumed from the "
+            "one before, which computes 600 steps; that path was not timed here.",
+            "performance.now() resolves to 100 microseconds in these pages, so every frame figure "
+            "is a multiple of 100.",
+            "No arm moves the camera, so at any moment some of the 24 birds are out of view.",
+            "One machine and one browser.",
+            "The corrected check also found every move that brought a point flyer's body within "
+            "half its span of a part (bodies_meeting_a_part): the first registration's rules are "
+            "about points, so that count judges nothing here, and it is why the air is grown now.",
+        ],
+        "bound_artifacts": binder.bound,
+        "artifact_notes": binder.notes,
+    }
+    record_path.write_text(json.dumps(digest_bound(record), indent=2, sort_keys=True) + "\n")
+    print(
+        json.dumps(
+            {
+                "record": record_path.name,
+                "verdict": record["verdict"][:90],
+                "files": len(binder.bound),
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

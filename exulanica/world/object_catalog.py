@@ -55,6 +55,16 @@ is: the simulation's person stands at the place. A person at a place with no sea
 place's side, toward the kind (:attr:`ObjectUse.facing`). Version 1 is the same kinds without seats,
 kept because the reviewed rows migration 0105 pinned were generated from it.
 
+**Perches and hosts** (version 3). A kind may state perches, each a point in the part frame
+where a flyer stands, the widest flyer it bears, and a ``declared/<key>`` that says why; its height
+is not stated but derived: the upper surface of the highest part over the point, the level top of
+a box or the curved top of an ellipsoid, rounded up to the millimetre, or the perch is refused. Two
+perches of one kind stand at least half their spans apart. A kind may also host flyers: a kind of
+the flight kind catalog and how many live on it (``exulanica.world.flight_kinds`` holds each named
+kind to that catalog and to the perches it can use). Neither is part of ``use``, which is what
+people do with a kind, and the society never reads either. Version 3 is version 2 with these two
+fields, and every recipe, size and use is unchanged, so every reviewed row stays what it was.
+
 Pure: no connection, no store and no network. The catalog is read once per process.
 """
 
@@ -100,15 +110,20 @@ __all__ = [
     "SEATED_ACTIVITY",
     "SIDES",
     "CatalogPart",
+    "HostedFlyers",
     "MarkerRecipe",
     "ObjectUse",
     "PartsRecipe",
+    "Perch",
     "PlaceRow",
     "RowSeat",
     "Seat",
     "WorldObjectCatalog",
     "WorldObjectKind",
+    "check_dressing",
     "load_world_object_catalog",
+    "read_declared",
+    "read_parts_recipe",
     "world_object_catalog",
 ]
 
@@ -118,9 +133,13 @@ CATALOG_DIRECTORY: Final = (
 CATALOG_ID: Final = "world-object"
 #: The version a running host reads. A new version is published beside this one and never edits
 #: it, because the reviewed rows a migration pinned name the meshes this version's recipes make.
-CATALOG_VERSION: Final = 2
+CATALOG_VERSION: Final = 3
 #: The first version whose rows may state a seat.
 _SEATS_FROM_VERSION: Final = 2
+#: The first version whose kinds state perches and the flyers they host.
+_PERCHES_FROM_VERSION: Final = 3
+#: The part shapes a perch may stand on: a box's level top, or an ellipsoid's curved top.
+_PERCH_SHAPES: Final = ("box", "ellipsoid")
 MARKER_PROFILE: Final = "marker-v1"
 PARTS_PROFILE: Final = "parts-v1"
 #: The use of a kind inhabitants do nothing with: it is an obstacle, or nothing at all.
@@ -232,6 +251,25 @@ class Seat:
 
 
 @dataclass(frozen=True, slots=True)
+class Perch:
+    """Where a flyer stands on a kind: ``[x, y, z]`` in the part frame, ``z`` derived as the upper
+    surface of the part under the point; the widest flyer it bears; and why."""
+
+    position_mm: tuple[int, int, int]
+    span_mm: int
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
+class HostedFlyers:
+    """Flyers that live on a kind: a kind of the flight kind catalog, how many, and why."""
+
+    kind: str
+    count: int
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
 class ObjectUse:
     """What inhabitants do with a kind, and where it stands in their way.
 
@@ -274,6 +312,10 @@ class WorldObjectKind:
     declared: Mapping[str, str]
     reason: str
     licence: Licence
+    #: Where flyers stand on it, from version 3; none before.
+    perches: tuple[Perch, ...] = ()
+    #: The flyers that live on it, from version 3; none before.
+    hosts: tuple[HostedFlyers, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -448,6 +490,48 @@ def _read_use(where: str, value: object, version: int) -> _StatedUse:
     )
 
 
+def _read_perches(where: str, value: object) -> tuple[tuple[int, int, int, str], ...]:
+    """Each perch as stated: its plan point, the span it bears and its source."""
+    if not isinstance(value, list):
+        raise CatalogError(f"{where} is a list of perches, each a point, a span and a source")
+    perches = []
+    for index, item in enumerate(value):
+        at = f"{where}[{index}]"
+        row = _object(at, item, ("x_mm", "y_mm", "span_mm", "source"))
+        perches.append(
+            (
+                _int(f"{at}.x_mm", row["x_mm"], -_MAX_SIZE_MM, _MAX_SIZE_MM),
+                _int(f"{at}.y_mm", row["y_mm"], -_MAX_SIZE_MM, _MAX_SIZE_MM),
+                _int(f"{at}.span_mm", row["span_mm"], 1, _MAX_SIZE_MM),
+                _citation(f"{at}.source", row["source"]),
+            )
+        )
+    return tuple(perches)
+
+
+def _read_hosts(where: str, value: object) -> tuple[HostedFlyers, ...]:
+    """The flyers a kind hosts: each a flight kind key, a count and a source, a kind once."""
+    if not isinstance(value, list):
+        raise CatalogError(f"{where} is a list of hosted flyers, each a kind, a count and a source")
+    hosts = []
+    for index, item in enumerate(value):
+        at = f"{where}[{index}]"
+        row = _object(at, item, ("kind", "count", "source"))
+        kind = row["kind"]
+        if type(kind) is not str or _DECLARED_KEY.fullmatch(kind) is None:
+            raise CatalogError(f"{at}.kind is a flight kind key, got {kind!r}")
+        hosts.append(
+            HostedFlyers(
+                kind,
+                _int(f"{at}.count", row["count"], 1, _MAX_SIZE_MM),
+                _citation(f"{at}.source", row["source"]),
+            )
+        )
+    if len({host.kind for host in hosts}) != len(hosts):
+        raise CatalogError(f"{where} names one flight kind twice")
+    return tuple(hosts)
+
+
 def _read_declared(where: str, value: object) -> Mapping[str, str]:
     if not isinstance(value, dict):
         raise CatalogError(f"{where} maps a declared key to the sentence that states it")
@@ -484,6 +568,11 @@ def _schema(version: int) -> CatalogSchema:
             ("dimensions_mm", _nested(_read_dimensions)),
             ("materials", _nested(_read_materials)),
             ("use", _nested(lambda where, value: _read_use(where, value, version))),
+            *(
+                (("perches", _nested(_read_perches)), ("hosts", _nested(_read_hosts)))
+                if version >= _PERCHES_FROM_VERSION
+                else ()
+            ),
             ("declared", _nested(_read_declared)),
             ("reason", text_field),
         ),
@@ -491,7 +580,7 @@ def _schema(version: int) -> CatalogSchema:
 
 
 _SCHEMAS: Final[Mapping[int, CatalogSchema]] = MappingProxyType(
-    {version: _schema(version) for version in (1, 2)}
+    {version: _schema(version) for version in (1, 2, 3)}
 )
 
 
@@ -542,6 +631,8 @@ def _check_citations(kind: WorldObjectKind, furniture: Mapping[str, tuple[FormPa
     )
     rows = kind.use.rows or ()
     sources += [(row.seat.source, None) for row in rows if row.seat is not None]
+    sources += [(perch.source, None) for perch in kind.perches]
+    sources += [(host.source, None) for host in kind.hosts]
     for source, form in sources:
         match = _CITATION.fullmatch(source)
         assert match is not None
@@ -573,13 +664,23 @@ def _check_materials(
         if kind.materials:
             raise CatalogError(f"{where} is a marker, drawn matte by the renderer, so it has none")
         return
-    roles = {part.form.surface_role for part in kind.recipe.parts}
-    if roles != set(kind.materials):
+    _check_dressing(where, kind.recipe, kind.materials, texture_sets, resolutions)
+
+
+def _check_dressing(
+    where: str,
+    recipe: PartsRecipe,
+    materials: Mapping[str, str],
+    texture_sets: Mapping[str, TextureSet],
+    resolutions: Mapping[str, int],
+) -> None:
+    roles = {part.form.surface_role for part in recipe.parts}
+    if roles != set(materials):
         raise CatalogError(
             f"{where}: its parts take the roles {sorted(roles)} and it dresses "
-            f"{sorted(kind.materials)}; every role a part takes is dressed, and only those"
+            f"{sorted(materials)}; every role a part takes is dressed, and only those"
         )
-    for role, set_id in sorted(kind.materials.items()):
+    for role, set_id in sorted(materials.items()):
         texture = texture_sets.get(set_id)
         if texture is None:
             raise CatalogError(f"{where} dresses {role} with {set_id}, which is not published")
@@ -590,7 +691,7 @@ def _check_materials(
                 f"{role} admits {admitted}"
             )
         side = resolutions.get(set_id)
-        texels = kind.recipe.texels
+        texels = recipe.texels
         factor, remainder = divmod(side, texels) if side is not None else (0, 1)
         if side is None or remainder or factor & (factor - 1):
             raise CatalogError(
@@ -708,6 +809,85 @@ def _seat_height(where: str, recipe: Recipe, point: Place) -> int:
             "level top of a box"
         )
     return top.offset_z_mm + top.size_z_mm
+
+
+def _surface_over(form: FormPart, x: int, y: int) -> int | None:
+    """The height of a part's upper surface over a plan point, rounded up, or None off it.
+
+    A box's is its level top. An ellipsoid's is its curved top: with the sizes ``A``, ``B`` and
+    ``C`` and the point's doubled offsets ``dx`` and ``dy`` from its centre, the top stands
+    ``C/2 * sqrt(1 - dx^2/A^2 - dy^2/B^2)`` above the centre, computed with integer square roots.
+    Any other shape has no surface a perch is derived on here.
+    """
+    dx, dy = 2 * (x - form.offset_x_mm), 2 * (y - form.offset_y_mm)
+    if form.shape == "box":
+        if abs(dx) <= form.size_x_mm and abs(dy) <= form.size_y_mm:
+            return form.offset_z_mm + form.size_z_mm
+        return None
+    if form.shape != "ellipsoid":
+        return None
+    a2, b2 = form.size_x_mm**2, form.size_y_mm**2
+    inside = a2 * b2 - dx * dx * b2 - dy * dy * a2
+    if inside < 0:
+        return None
+    ratio_numerator, ratio_denominator = form.size_z_mm**2 * inside, a2 * b2
+    root = math.isqrt(ratio_numerator // ratio_denominator)
+    if root * root * ratio_denominator != ratio_numerator:
+        root += 1
+    return -(-(2 * form.offset_z_mm + form.size_z_mm + root) // 2)
+
+
+def _perches(
+    where: str, recipe: Recipe, stated: Sequence[tuple[int, int, int, str]]
+) -> tuple[Perch, ...]:
+    """Each stated perch with its height derived from the highest part over it.
+
+    The highest part is the one whose top over the point is highest, a box's or an ellipsoid's
+    surface there, or any other part's top where its plan bounds hold the point; on a tie, a box or
+    an ellipsoid. It must be a box or an ellipsoid, or the perch is refused.
+    """
+    if stated and not isinstance(recipe, PartsRecipe):
+        raise CatalogError(f"{where}: a marker has no parts to perch on")
+    perches = []
+    for index, (x, y, span, source) in enumerate(stated):
+        at = f"{where} perch {index}"
+        assert isinstance(recipe, PartsRecipe)
+        over = []
+        for part in recipe.parts:
+            form = part.form
+            if form.shape in _PERCH_SHAPES:
+                height = _surface_over(form, x, y)
+                if height is not None:
+                    over.append((height, True))
+            elif _plan_covers(form, x, y):
+                over.append((form.offset_z_mm + form.size_z_mm, False))
+        if not over:
+            raise CatalogError(f"{at}: no part lies under the perch at {[x, y]}")
+        height, perchable = max(over)
+        if not perchable:
+            raise CatalogError(
+                f"{at}: the part under the perch at {[x, y]} is not a box or an ellipsoid, and a "
+                "perch stands on the level top of a box or the curved top of an ellipsoid"
+            )
+        perches.append(Perch((x, y, height), span, source))
+    for index, perch in enumerate(perches):
+        for other in perches[:index]:
+            gap = (perch.span_mm + other.span_mm) // 2
+            px, py, _ = perch.position_mm
+            ox, oy, _ = other.position_mm
+            if (px - ox) ** 2 + (py - oy) ** 2 < gap * gap:
+                raise CatalogError(
+                    f"{where} perches at {[ox, oy]} and {[px, py]} stand closer than half their "
+                    f"spans, {gap} mm"
+                )
+    return tuple(perches)
+
+
+def _plan_covers(form: FormPart, x: int, y: int) -> bool:
+    """Whether a part's plan bounds hold a point: a prism or anything else a perch cannot use."""
+    return 2 * abs(x - form.offset_x_mm) <= form.size_x_mm and (
+        2 * abs(y - form.offset_y_mm) <= form.size_y_mm
+    )
 
 
 def _row_seats(
@@ -830,6 +1010,11 @@ def _kind(catalog: Catalog, index: int, version: int) -> WorldObjectKind:
         return json.loads(str(values[name]))
 
     recipe = _read_recipe(f"{where}.recipe", nested("recipe"))
+    flight = version >= _PERCHES_FROM_VERSION
+    perches = _perches(
+        where, recipe, _read_perches(f"{where}.perches", nested("perches")) if flight else ()
+    )
+    hosts = _read_hosts(f"{where}.hosts", nested("hosts")) if flight else ()
     return WorldObjectKind(
         key=entry.key,
         asset_key=str(values["asset_key"]),
@@ -842,6 +1027,8 @@ def _kind(catalog: Catalog, index: int, version: int) -> WorldObjectKind:
         declared=_read_declared(f"{where}.declared", nested("declared")),
         reason=str(values["reason"]),
         licence=entry.licence,
+        perches=perches,
+        hosts=hosts,
     )
 
 
@@ -878,6 +1065,26 @@ def load_world_object_catalog(
     for kind in kinds:
         _check_kind(kind, texture_sets=published, resolutions=resolutions, furniture=furniture)
     return WorldObjectCatalog(version, kinds, catalog_digest([catalog]))
+
+
+def read_parts_recipe(where: str, value: object) -> PartsRecipe:
+    """A ``parts-v1`` recipe read and checked as a kind's is, for another catalog that draws
+    parts (:mod:`exulanica.world.flight_kinds`)."""
+    recipe = _read_recipe(where, value)
+    if not isinstance(recipe, PartsRecipe):
+        raise CatalogError(f"{where} is a {PARTS_PROFILE} recipe")
+    return recipe
+
+
+def read_declared(where: str, value: object) -> Mapping[str, str]:
+    """A ``declared`` map read as a kind's is: lowercase keys, each a sentence."""
+    return _read_declared(where, value)
+
+
+def check_dressing(where: str, recipe: PartsRecipe, materials: Mapping[str, str]) -> None:
+    """Every role a recipe's parts take dressed by a published set that role admits, embedded at
+    the set's own side over a power of two, as a kind's are."""
+    _check_dressing(where, recipe, materials, read_texture_manifest(), _square_sides())
 
 
 @functools.cache

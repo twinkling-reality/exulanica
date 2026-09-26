@@ -1,0 +1,304 @@
+// Lane V2 (movement): the frame cost of drawing a saved world's flight, on the release build.
+//
+//   node measure_flight_frames.mjs --state RUN_DIR/state.json --setup square|trees
+//   node measure_flight_frames.mjs --state RUN_DIR/state.json --app http://localhost:PORT/ \
+//        --arm flight|blocked --seconds 60 --out FILE [--screenshot FILE]
+//
+// Setup goes through the routes the page itself calls, binding the saved world's entry so the
+// page opens it without asking to reconcile: the starter world (POST /world-entries/starter), the
+// small square before the arrival point (arrangements/apply, facing the centre), and for `trees`
+// seven more planter trees (compositions/apply), which with the square's tree host 24 small birds.
+//
+// One arm is one new headless Chrome (its own profile under the run directory) opening the release
+// build served by `vite preview`, typing the slot's token into the access form as a person does.
+// `blocked` answers every flight request with a named refusal before it leaves the browser (CDP
+// Fetch), so the page draws the same world with no flyers; `flight` lets the page read its flight.
+// Once the page has fetched the flight (and, in the flight arm, both bird parts) and five seconds
+// have passed, frames are measured for the stated seconds from an instrument installed before any
+// page script runs: every requestAnimationFrame callback is wrapped, recording its timestamp, how
+// late it started after that timestamp and how long it ran (the main-thread work of the frame,
+// which the rAF interval alone hides). Nothing moves the camera: the person stands where a
+// starter world puts them, facing the square.
+//
+// The token is read from the launcher's token file and typed into the page; it is never printed or
+// written. Every location comes from the arguments or the launcher's state file.
+
+import { spawn } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { loadavg } from 'node:os';
+import { join, resolve } from 'node:path';
+
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const STARTED = Date.now() / 1000;
+const SETTLE_MS = 5_000;
+const FACING_THE_CENTRE = 3141593;
+const TREE_COUNT = 7;
+
+function argument(name, fallback) {
+  const at = process.argv.indexOf(`--${name}`);
+  return at > 0 ? process.argv[at + 1] : fallback;
+}
+const state = JSON.parse(readFileSync(resolve(argument('state')), 'utf8'));
+const token = readFileSync(state.token_file, 'utf8').trim();
+const apiBase = `http://127.0.0.1:${state.ports.api}`;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function api(method, path, body) {
+  const response = await fetch(`${apiBase}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const text = await response.text();
+  let parsed = text;
+  try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+  if (response.status >= 300) throw new Error(`${method} ${path.split('?')[0]} answered ${response.status}: ${text.slice(0, 300)}`);
+  return parsed;
+}
+
+// ------------------------------------------------------------------------------------------------
+// The world, through the routes the page calls
+// ------------------------------------------------------------------------------------------------
+async function starter() {
+  const listed = await api('GET', '/world-entries');
+  return listed.find((e) => e.source_kind === 'authored') ?? api('POST', '/world-entries/starter', { title: 'Birds over the square' });
+}
+const savedEntry = (e) => ({ entry_id: e.entry_id, base_revision: e.revision,
+  authored_state_sha256: e.current_authored_state_sha256, authored_edit_seq: e.current_authored_edit_seq });
+
+async function setup(kind) {
+  let entry = await starter();
+  const scope = `world_id=${encodeURIComponent(entry.world_id)}`;
+  const versionPath = `/world/versions/${entry.authored_version_id}`;
+  const fresh = async () => (await api('GET', '/world-entries')).find((e) => e.entry_id === entry.entry_id);
+  let version = await api('GET', `${versionPath}?${scope}`);
+  const live = () => version.objects.filter((o) => !o.removed);
+  if (live().length === 0) {
+    entry = await fresh();
+    await api('POST', `${versionPath}/arrangements/apply?${scope}`, {
+      base_state_sha256: version.state_sha256, arrangement_key: 'small_square', arrangement_version: 1,
+      viewer: { x_mm: 0, z_mm: 4000, yaw_microradians: FACING_THE_CENTRE }, origin_role: 'fictional',
+      saved_entry: savedEntry(entry),
+    });
+    version = await api('GET', `${versionPath}?${scope}`);
+  }
+  if (kind === 'trees') {
+    // Seven more trees beside and beyond the square, at least 4 m from each other and from the
+    // square's tree, so no crown, grown by a bird's half span, reaches another tree's perch
+    // columns: with the square's own tree, eight trees and 24 birds. The flight bounds script's
+    // cluttered world plants them at the same spots.
+    const spots = [[-9000, -9500], [-4000, -10500], [4000, -10500], [9000, -9500], [-9500, 1000], [9500, 1000], [0, -10500]];
+    for (const [index, [x, z]] of spots.slice(0, TREE_COUNT).entries()) {
+      const id = `flight-tree-${index}`;
+      if (version.objects.some((o) => o.object_id === id && !o.removed)) continue;
+      entry = await fresh();
+      await api('POST', `${versionPath}/compositions/apply?${scope}`, {
+        source: { kind: 'reviewed_asset', asset_key: 'cc0.planter-tree' },
+        placement: { subject_id: id, region_id: 'region:starter',
+          transform: { x_mm: x, y_mm: 0, z_mm: z, yaw_microradians: FACING_THE_CENTRE, scale_milli: 1000 },
+          origin_role: 'fictional', behaviour: null },
+        base_state_sha256: version.state_sha256,
+        saved_entry: savedEntry(entry),
+      });
+      version = await api('GET', `${versionPath}?${scope}`);
+    }
+  }
+  const flight = await api('GET', `${versionPath}/flight?${scope}&from_step=0&steps=1`);
+  return { world_id: entry.world_id, version_id: entry.authored_version_id, objects: live().length,
+    flyers: flight.flyers.length, unplaced: flight.unplaced, input_sha256: flight.input_sha256 };
+}
+
+if (argument('setup')) {
+  console.log(JSON.stringify(await setup(argument('setup'))));
+  process.exit(0);
+}
+
+// ------------------------------------------------------------------------------------------------
+// One arm on the release build
+// ------------------------------------------------------------------------------------------------
+const out = resolve(argument('out'));
+const arm = argument('arm');
+const seconds = Number(argument('seconds', '60'));
+const appUrl = argument('app');
+const screenshot = argument('screenshot');
+if (arm !== 'flight' && arm !== 'blocked') throw new Error('--arm is flight or blocked');
+
+const profile = mkdtempSync(join(state.run_dir, 'chrome-profile-flight-'));
+const chrome = spawn(CHROME, [
+  '--headless=new', `--remote-debugging-port=${state.ports.browser}`, `--user-data-dir=${profile}`,
+  '--window-size=1440,900', '--no-first-run', '--no-default-browser-check',
+  '--disable-extensions', '--disable-background-networking', '--disable-sync',
+  '--password-store=basic', '--use-mock-keychain', 'about:blank',
+], { stdio: 'ignore', detached: true });
+function finish(code) {
+  try { process.kill(-chrome.pid, 'SIGTERM'); } catch { /* gone */ }
+  setTimeout(() => { try { rmSync(profile, { recursive: true, force: true }); } catch { /* kept */ } process.exit(code); }, 500);
+}
+
+async function debuggerTarget() {
+  for (let i = 0; i < 60; i += 1) {
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${state.ports.browser}/json/list`)).json();
+      const page = list.find((t) => t.type === 'page');
+      if (page) return page.webSocketDebuggerUrl;
+    } catch { /* not up yet */ }
+    await sleep(250);
+  }
+  throw new Error('headless Chrome did not expose a page target');
+}
+
+class Cdp {
+  constructor(url) {
+    this.socket = new WebSocket(url);
+    this.next = 1;
+    this.pending = new Map();
+    this.handlers = new Map();
+    this.socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.id && this.pending.has(message.id)) {
+        const { ok, reject } = this.pending.get(message.id);
+        this.pending.delete(message.id);
+        if (message.error) reject(new Error(`${message.error.message} ${message.error.data ?? ''}`));
+        else ok(message.result);
+      } else if (message.method && this.handlers.has(message.method)) {
+        this.handlers.get(message.method)(message.params);
+      }
+    };
+  }
+  open() { return new Promise((ok, fail) => { this.socket.onopen = ok; this.socket.onerror = fail; }); }
+  on(method, handler) { this.handlers.set(method, handler); }
+  send(method, params = {}, timeoutMs = 120_000) {
+    const id = this.next++;
+    this.socket.send(JSON.stringify({ id, method, params }));
+    return new Promise((ok, reject) => {
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`${method} timed out`)); }, timeoutMs);
+      this.pending.set(id, {
+        ok: (value) => { clearTimeout(timer); ok(value); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+      });
+    });
+  }
+}
+
+const cdp = new Cdp(await debuggerTarget());
+await cdp.open();
+await cdp.send('Page.enable');
+await cdp.send('Runtime.enable');
+await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+
+async function evaluate(expression) {
+  const result = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true });
+  if (result.exceptionDetails) throw new Error(`evaluate failed: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`);
+  return result.result.value;
+}
+async function waitFor(expression, timeoutMs, what) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    try { last = await evaluate(expression); if (last) return last; } catch (error) { last = error.message; }
+    await sleep(100);
+  }
+  throw new Error(`timed out after ${timeoutMs} ms waiting for ${what} (last: ${JSON.stringify(last)})`);
+}
+
+// Every animation frame callback, wrapped: when its frame was stamped, how late it started, how
+// long it ran. Frames are kept only while `window.__frames.on` is true.
+await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  window.__frames = { on: false, rows: [], errors: [] };
+  // The default buffer holds 250 entries, and a page opening a world fetches more than that.
+  performance.setResourceTimingBufferSize(100000);
+  addEventListener('error', (e) => window.__frames.errors.push(String(e.message).slice(0, 300)));
+  const request = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = (callback) => request((stamp) => {
+    const start = performance.now();
+    try { callback(stamp); } finally {
+      if (window.__frames.on) window.__frames.rows.push([stamp, start - stamp, performance.now() - start]);
+    }
+  });
+` });
+
+let refused = 0;
+if (arm === 'blocked') {
+  await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*/flight?*', requestStage: 'Request' }] });
+  cdp.on('Fetch.requestPaused', (params) => {
+    refused += 1;
+    const body = Buffer.from(JSON.stringify({ code: 'flight_unavailable', detail: 'refused by the measurement' })).toString('base64');
+    void cdp.send('Fetch.fulfillRequest', { requestId: params.requestId, responseCode: 409,
+      responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body });
+  });
+}
+
+const record = { arm, app: appUrl, seconds, tree: state.tree, run_id: state.run_id,
+  api_imported_exulanica_from_worktree: String(state.api_imported_exulanica_from ?? '').endsWith('/exulanica/__init__.py'),
+  load_before: loadavg(), started_at: new Date().toISOString() };
+const version = await cdp.send('Browser.getVersion');
+record.browser = { product: version.product, revision: version.revision };
+
+await cdp.send('Page.navigate', { url: appUrl });
+await waitFor(`document.readyState !== 'loading' && !!document.querySelector('form.credential-gate input[type=password]')`, 30_000, 'the access form');
+await evaluate(`(() => { document.querySelector('form.credential-gate input[type=password]').focus(); return true; })()`);
+await cdp.send('Input.insertText', { text: token });
+const at = await waitFor(`(() => { const b = document.querySelector('button.credential-submit'); if (!b || b.disabled) return null;
+  const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10_000, 'the submit button');
+for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+  await cdp.send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
+}
+// The page opens the saved world; it reads the flight once the world is drawn.
+const reads = `performance.getEntriesByType('resource').map((e) => new URL(e.name).pathname)`;
+await waitFor(`!!document.querySelector('canvas') && ${arm === 'blocked' ? 'true' : `${reads}.some((p) => p.endsWith('/flight'))`}`,
+  90_000, 'the world and its flight');
+if (arm === 'flight') {
+  await waitFor(`${reads}.filter((p) => p.includes('/world/assets/cc0.small-bird-')).length >= 2`, 60_000, 'both bird parts');
+} else {
+  for (let i = 0; i < 600 && refused === 0; i += 1) await sleep(100);
+  if (refused === 0) throw new Error('the page never asked for its flight, so blocking it measures nothing');
+}
+await sleep(SETTLE_MS);
+record.flight_requests_refused = refused;
+await evaluate(`(() => { window.__frames.rows = []; window.__frames.on = true; return true; })()`);
+await sleep(seconds * 1000);
+const rows = await evaluate(`(() => { window.__frames.on = false; return window.__frames.rows; })()`);
+record.page_errors = await evaluate('window.__frames.errors');
+if (screenshot) {
+  const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
+  writeFileSync(resolve(screenshot), Buffer.from(shot.data, 'base64'));
+  record.screenshot = true;
+}
+
+function quantile(values, q) {
+  const ordered = [...values].sort((a, b) => a - b);
+  return ordered.length ? ordered[Math.min(ordered.length - 1, Math.max(0, Math.ceil(q * ordered.length) - 1))] : null;
+}
+const us = (ms) => (ms === null ? null : Math.round(ms * 1000));
+const intervals = rows.slice(1).map((row, i) => row[0] - rows[i][0]);
+const work = rows.map((row) => row[2]);
+const lag = rows.map((row) => row[1]);
+const FRAME_MS = 1000 / 60;
+record.frames = {
+  count: rows.length,
+  interval: { p50_us: us(quantile(intervals, 0.5)), p95_us: us(quantile(intervals, 0.95)) },
+  work: { p50_us: us(quantile(work, 0.5)), p95_us: us(quantile(work, 0.95)), p99_us: us(quantile(work, 0.99)),
+    max_us: us(quantile(work, 1)), over_one_frame: work.filter((w) => w > FRAME_MS).length },
+  lag: { p50_us: us(quantile(lag, 0.5)), p95_us: us(quantile(lag, 0.95)) },
+};
+
+function idleDuring() {
+  const file = process.env.LANE_IDLE_SAMPLES;
+  if (!file) return null;
+  const values = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    .filter((v) => v.t >= STARTED).map((v) => v.idle);
+  return { samples: values.length, mean_tenths: values.length ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) : null,
+    min: values.length ? Math.min(...values) : null };
+}
+record.idle_during = idleDuring();
+record.load_after = loadavg();
+record.finished_at = new Date().toISOString();
+writeFileSync(out, JSON.stringify(record, null, 1));
+console.log(JSON.stringify({ arm, frames: record.frames.count, work_p95_us: record.frames.work.p95_us,
+  interval_p95_us: record.frames.interval.p95_us, idle: record.idle_during }));
+if (record.idle_during && record.idle_during.mean_tenths !== null && record.idle_during.mean_tenths < 500) {
+  console.log('discarded: mean idle below 50 percent during the run');
+  finish(75);
+} else {
+  finish(0);
+}

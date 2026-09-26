@@ -1,0 +1,2 @@
+uv run python scripts/measure_flight_bounds.py --seeds judged-2 --minutes 30   842.44s user 2.77s system 99% cpu 14:08.86 total
+exit 0

@@ -1,0 +1,2 @@
+{"arm":"flight","frames":3601,"work_p95_us":700,"interval_p95_us":16700,"idle":{"samples":32,"mean_tenths":827,"min":74}}
+gate: exit 0 pre idle 88

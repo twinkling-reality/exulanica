@@ -1,5 +1,8 @@
 import * as pc from 'playcanvas';
+import { FlightFlock } from '../flight/flock.js';
+import type { FlightKindLook, FlightWindow } from '../flight/types.js';
 import type { NativeCharacterFrame } from '../native-character-runtime.js';
+import { createObjectContainerAsset } from '../scene-objects.js';
 import { SocietyCrowd, type CrowdCounts, type CrowdSeatingMiss } from './crowd.js';
 import type { SeatingLayout } from './seating.js';
 import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
@@ -15,6 +18,10 @@ import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
  *
  * Nothing occludes a pick here. A saved world's ground has no buildings, and its placed objects are
  * not solid to this ray; the nearest drawn inhabitant along it is the one selected.
+ *
+ * The flyers its objects host are drawn here too (`../flight/flock.ts`), from the windows of the
+ * saved world's flight handed to `setFlight`, in the same frame; the flock is made with the first
+ * window, so a world with no flight draws nothing more than it did.
  */
 export class AuthoredRegionSociety {
   readonly root: pc.Entity;
@@ -22,6 +29,8 @@ export class AuthoredRegionSociety {
   private readonly ray = new pc.Ray();
   private readonly box = new pc.BoundingBox();
   private readonly hitPoint = new pc.Vec3();
+  private flock: FlightFlock | null = null;
+  private readonly flightAssets: { app: pc.AppBase; asset: pc.Asset }[] = [];
   private destroyed = false;
 
   constructor(device: pc.GraphicsDevice, regionRoot: pc.Entity) {
@@ -75,6 +84,74 @@ export class AuthoredRegionSociety {
   /** Interpolate display only; authoritative endpoints remain the society snapshots. */
   tickSociety(nowMs: number): void {
     this.crowd.update(nowMs);
+    this.flock?.update(nowMs);
+  }
+
+  /** Present one served window of the saved world's flight; the first starts its page clock. */
+  setFlight(window: FlightWindow, nowMs: number): void {
+    if (this.destroyed) return;
+    (this.flock ??= new FlightFlock(this.root)).setWindow(window, nowMs);
+  }
+
+  /**
+   * Draw a flying kind from its reviewed body and wing, given as verified container bytes; its
+   * flyers appear from the next frame.
+   */
+  async setFlightKind(
+    app: pc.AppBase,
+    look: FlightKindLook,
+    body: { readonly assetKey: string; readonly bytes: ArrayBuffer },
+    wing: { readonly assetKey: string; readonly bytes: ArrayBuffer },
+  ): Promise<void> {
+    const assets = await Promise.all([
+      createObjectContainerAsset(app, body.assetKey, body.bytes),
+      createObjectContainerAsset(app, wing.assetKey, wing.bytes),
+    ]);
+    for (const asset of assets) this.flightAssets.push({ app, asset });
+    if (this.destroyed) {
+      this.releaseFlightAssets();
+      return;
+    }
+    const [bodyAsset, wingAsset] = assets;
+    (this.flock ??= new FlightFlock(this.root)).setKind(look, {
+      body: () => (bodyAsset!.resource as pc.ContainerResource).instantiateRenderEntity({}),
+      wing: () => (wingAsset!.resource as pc.ContainerResource).instantiateRenderEntity({}),
+    });
+  }
+
+  hasFlightKind(key: string): boolean {
+    return this.flock?.hasKind(key) ?? false;
+  }
+
+  /** The step the next window of this flight starts at, or null before the first window. */
+  get flightNextStep(): number | null {
+    return this.flock?.nextStep ?? null;
+  }
+
+  /** The flight's page clock, as a fractional step, or null before the first window. */
+  flightStepAt(nowMs: number): number | null {
+    return this.flock?.stepAt(nowMs) ?? null;
+  }
+
+  /** Frames drawn past the last served step, each holding it (`FlightFlock.starved`). */
+  get flightStarvedFrames(): number {
+    return this.flock?.starved ?? 0;
+  }
+
+  get drawnFlyerIds(): readonly string[] {
+    return this.flock?.drawnFlyerIds ?? [];
+  }
+
+  /** Release every flyer and window of the flight; kinds stay loaded for the next one. */
+  clearFlight(): void {
+    this.flock?.clear();
+  }
+
+  private releaseFlightAssets(): void {
+    for (const { app, asset } of this.flightAssets.splice(0)) {
+      asset.unload();
+      app.assets.remove(asset);
+    }
   }
 
   /** Re-choose who is near, from the observer's world position. */
@@ -88,7 +165,7 @@ export class AuthoredRegionSociety {
   }
 
   get societyAnimating(): boolean {
-    return this.crowd.animating;
+    return this.crowd.animating || (this.flock?.animating ?? false);
   }
 
   get drawnInhabitantCount(): number {
@@ -157,6 +234,9 @@ export class AuthoredRegionSociety {
     if (this.destroyed) return;
     this.destroyed = true;
     this.crowd.destroy();
+    this.flock?.destroy();
+    this.flock = null;
+    this.releaseFlightAssets();
     this.root.destroy();
   }
 }

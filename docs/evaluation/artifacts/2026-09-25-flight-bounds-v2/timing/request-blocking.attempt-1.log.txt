@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "<worktree>/.exulanica/lane-movement/evidence/measure_request_blocking.py", line 105, in <module>
+    main()
+    ~~~~^^
+  File "<worktree>/.exulanica/lane-movement/evidence/measure_request_blocking.py", line 90, in main
+    "health_alone": _summary(alone),
+                    ~~~~~~~~^^^^^^^
+  File "<worktree>/.exulanica/lane-movement/evidence/measure_request_blocking.py", line 45, in _summary
+    "p50_us": _quantile(values, 0.5),
+              ~~~~~~~~~^^^^^^^^^^^^^
+  File "<worktree>/.exulanica/lane-movement/evidence/measure_request_blocking.py", line 39, in _quantile
+    return ordered[min(len(ordered) - 1, max(0, -(-len(ordered) * q // 1) - 1))] if ordered else None
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: list indices must be integers or slices, not float
+gate: exit 1 pre idle 75

@@ -1,0 +1,496 @@
+"""Write the second flight bounds registration's result: the fixed flight on held-out seeds.
+
+    uv run python .exulanica/lane-movement/evidence/write_record_b.py --runs DIR \
+        --state STATE_JSON [--picture NAME=FILE=WHAT]... [--into SCRATCH_DIR]
+
+DIR holds the judged run, the timing runs, the tree taken at the registration and the pictures. The
+record binds each file it names by digest and copies it beside itself; a log becomes .log.txt, a
+script .txt. The pre-registered scripts are not copied again: the record names the
+pre-registration's copies and checks that the scripts which ran are those copies. The one departure,
+the request blocking measurement run from a copy with one line changed, is found from the gate's
+ledger and the two scripts. Every outcome is computed from the files; the files changed after the
+registration are found by digest, never typed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.evaluation.visual_gate import digest_bound  # noqa: E402
+from exulanica.movement.flight import FLIGHT_MODULE  # noqa: E402
+
+NAME = "2026-09-25-flight-bounds-v2"
+RECORD = ROOT / "docs" / "evaluation" / f"{NAME}.json"
+ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / NAME
+PREREGISTRATION = ROOT / "docs" / "evaluation" / f"{NAME}-preregistration.json"
+HERE = Path(__file__).resolve().parent
+FRAME_BUDGET_US = 16_667
+WORLDS = ("small_square", "eight_trees", "crowded_crowns", "cluttered")
+#: The rules every-flyer-home judges; every other rule the checker names is no-violation's.
+HOME_RULES = ("not_home_at_episode_end", "late_home_misreported")
+PREREGISTERED = {
+    "measure_flight_bounds.py.txt": ROOT / "scripts" / "measure_flight_bounds.py",
+    "measure_flight_frames.mjs.txt": HERE / "measure_flight_frames.mjs",
+    "gate.py.txt": HERE / "gate.py",
+    "run_timing_b.sh.txt": HERE / "run_timing_b.sh",
+    "measure_request_blocking.py.txt": HERE / "measure_request_blocking.py",
+}
+LATER_SCRIPTS = {
+    "capture_flight.mjs.txt": (HERE / "capture_flight.mjs", "the script that took the pictures"),
+    "measure_request_blocking_fixed.py.txt": (
+        HERE / "measure_request_blocking_fixed.py",
+        "the request blocking measurement as it ran: the pre-registered copy with one line changed",
+    ),
+    "write_record_b.py.txt": (Path(__file__).resolve(), "this record's writer"),
+}
+
+
+def _forbidden() -> tuple[str, ...]:
+    """Text no bound file may hold, each fragment built here so this file's own copy holds none."""
+    home = Path.home()
+    slash = "/"
+    return (
+        str(home),
+        home.name,
+        slash + "Users" + slash,
+        slash + "private" + slash,
+        slash + "var" + slash + "folders",
+        "Bearer" + " ",
+        "api" + "-token",
+        chr(0x2014),
+    )
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _redacted(text: str) -> str:
+    """Checkout locations to named placeholders, then the home directory to ``~``."""
+    common = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    main_checkout = (ROOT / common).resolve().parent
+    text = text.replace(str(ROOT), "<worktree>").replace(str(main_checkout), "<main checkout>")
+    return text.replace(str(Path.home()), "~")
+
+
+def _load(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+class Binder:
+    """Copies a file beside the record, refusing forbidden text, and remembers its digest."""
+
+    def __init__(self, artifacts: Path) -> None:
+        self.artifacts = artifacts
+        self.bound: dict[str, dict[str, Any]] = {}
+        self.notes: dict[str, str] = {}
+
+    def bind(self, name: str, data: bytes, note: str, *, text: bool = True) -> str:
+        if text:
+            decoded = data.decode("utf-8")
+            found = [fragment for fragment in _forbidden() if fragment in decoded]
+            if found:
+                raise SystemExit(f"{name} holds text no record may bind ({len(found)} kind(s))")
+        target = self.artifacts / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        path = f"docs/evaluation/artifacts/{NAME}/{name}"
+        self.bound[name] = {"path": path, "byte_size": len(data), "sha256": _sha(data)}
+        self.notes[name] = note
+        return path
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--runs", required=True)
+    parser.add_argument("--state", required=True)
+    parser.add_argument("--picture", action="append", default=[], help="NAME=FILE=WHAT")
+    parser.add_argument("--into")
+    arguments = parser.parse_args()
+    runs = Path(arguments.runs).resolve()
+    timing = runs / "timing"
+    state = _load(Path(arguments.state))
+    record_path, artifacts = RECORD, ARTIFACTS
+    if arguments.into:
+        record_path = Path(arguments.into).resolve() / RECORD.name
+        artifacts = Path(arguments.into).resolve() / "artifacts" / NAME
+    if record_path.exists() or artifacts.exists():
+        raise SystemExit(f"{record_path.name} or its artifacts exist; a record is written once")
+
+    envelope = _load(PREREGISTRATION)
+    pre = envelope["record"]
+    assert envelope["record_sha256"] == _sha(canonical_json(pre)), "the pre-registration moved"
+    copies = {Path(f["path"]).name: f for f in pre["artifacts"]["files"]}
+    scripts: dict[str, Any] = {}
+    for name, source in PREREGISTERED.items():
+        data = source.read_bytes()
+        bound = (ROOT / copies[name]["path"]).read_bytes()
+        if data != bound or _sha(data) != copies[name]["sha256"]:
+            raise SystemExit(f"{source.name} is not the pre-registered copy")
+        scripts[name] = {"path": copies[name]["path"], "sha256": copies[name]["sha256"]}
+
+    artifacts.mkdir(parents=True)
+    binder = Binder(artifacts)
+    for name, (source, what) in LATER_SCRIPTS.items():
+        text = source.read_text(encoding="utf-8")
+        redacted = _redacted(text)
+        if redacted != text:
+            what += "; its checkout locations are written as <worktree>, <main checkout> and ~"
+        binder.bind(f"scripts/{name}", redacted.encode(), what)
+
+    # ---- the judged run ---------------------------------------------------------------------
+    run_bytes = (runs / "judged-bounds.json").read_bytes()
+    run = json.loads(run_bytes)
+    assert run["seeds"]["values"] == pre["seeds"]["judged"] and run["seeds"]["kind"] == "judged-2"
+    assert run["minutes"] == pre["run"]["minutes_per_seed"]
+    assert pre["written_at"] < run["started_at"], "the run started before its registration"
+    binder.bind("runs/judged-bounds.json", run_bytes, "the judged run's output")
+    binder.bind(
+        "runs/judged-bounds.log.txt",
+        _redacted((runs / "judged-bounds.log").read_text()).encode(),
+        "the judged run's time and exit",
+    )
+    found: dict[str, Any] = {}
+    worlds: dict[str, Any] = {}
+    no_violation = every_home = exact = True
+    for name in WORLDS:
+        world = run["worlds"][name]
+        registered = pre["worlds"][name]
+        assert world["occupancy_sha256"] == registered["occupancy_sha256"], name
+        rules: Counter[str] = Counter()
+        late = named = ends = mismatched = holds = 0
+        for row in world["runs"]:
+            rules.update(row["violations_by_rule"])
+            late += row["late_home"]
+            named += row["late_home_reported"]
+            ends += row["episode_ends"]
+            mismatched += row["replay_mismatches"]
+            holds += row["guard_interventions"]
+        violations = {rule: count for rule, count in rules.items() if rule not in HOME_RULES}
+        no_violation &= not violations
+        every_home &= late == 0 and not rules["late_home_misreported"]
+        exact &= mismatched == 0
+        worlds[name] = {
+            key: world[key]
+            for key in (
+                "flyers",
+                "perches",
+                "unplaced",
+                "solids",
+                "clearance_mm",
+                "solid_cells",
+                "occupancy_sha256",
+            )
+        }
+        found[name] = {
+            "seeds": len(world["runs"]),
+            "segments_checked": sum(row["segments"] for row in world["runs"]),
+            "violations_by_rule": dict(sorted(violations.items())),
+            "episode_ends": ends,
+            "not_home_at_an_episode_end": late,
+            "late_home_the_windows_named": named,
+            "late_home_misreported": rules["late_home_misreported"],
+            "replay_mismatches": mismatched,
+            "guard_interventions": holds,
+            "started_at": world["started_at"],
+            "finished_at": world["finished_at"],
+        }
+
+    # ---- timing -------------------------------------------------------------------------------
+    ledger = [json.loads(line) for line in (timing / "gates.jsonl").read_text().splitlines()]
+    passed = [row for row in ledger if row.get("exit") == 0]
+    cost_gate = next(row for row in passed if "--request-cost" in row["command"])
+    cost_bytes = (timing / "request-cost.json").read_bytes()
+    cost = json.loads(cost_bytes)
+    binder.bind("timing/request-cost.json", cost_bytes, "the request cost run's output")
+    request_cost = {
+        "started_at": cost["started_at"],
+        "finished_at": cost["finished_at"],
+        "idle_before_percent": cost_gate["pre"][-1],
+        "load_1min_before_milli": round(cost_gate["load_before"][0] * 1000),
+        "arms": [
+            {key: arm[key] for key in ("world", "flyers", "arm", "median_us", "process_us")}
+            for arm in cost["arms"]
+        ],
+    }
+    blocking_gate = next(
+        row for row in passed if "measure_request_blocking_fixed.py" in row["command"]
+    )
+    [registered_attempt] = [
+        row for row in ledger if row["command"].split()[1:2] == ["measure_request_blocking.py"]
+    ]
+    assert registered_attempt["exit"] != 0, "the pre-registered blocking script ran"
+    registered_lines = (
+        (ROOT / scripts["measure_request_blocking.py.txt"]["path"]).read_text().splitlines()
+    )
+    ran_lines = (HERE / "measure_request_blocking_fixed.py").read_text().splitlines()
+    assert len(registered_lines) == len(ran_lines)
+    [(changed_line, registered_text, ran_text)] = [
+        (number, registered, ran)
+        for number, (registered, ran) in enumerate(zip(registered_lines, ran_lines), start=1)
+        if registered != ran
+    ]
+    blocking_bytes = (timing / "request-blocking.json").read_bytes()
+    blocking = json.loads(blocking_bytes)
+    binder.bind("timing/request-blocking.json", blocking_bytes, "the request blocking run's output")
+    request_blocking = {
+        "idle_before_percent": blocking_gate["pre"][-1],
+        "load_1min_before_milli": round(blocking_gate["load_before"][0] * 1000),
+        "flyers": blocking["flyers"],
+        "runs": blocking["runs"],
+    }
+    frame_gates = [row for row in passed if "measure_flight_frames" in row["command"]]
+    arms: dict[str, Any] = {}
+    for world, setup_name in (("square", "setup-square.json"), ("trees", "setup-trees.json")):
+        setup_bytes = (timing / setup_name).read_bytes()
+        setup = json.loads(setup_bytes)
+        binder.bind(f"timing/{setup_name}", setup_bytes, f"the {world} world the harness set up")
+        for arm in ("blocked", "flight"):
+            frames_bytes = (timing / f"frames-{world}-{arm}.json").read_bytes()
+            frames = json.loads(frames_bytes)
+            binder.bind(f"timing/frames-{world}-{arm}.json", frames_bytes, f"the {world} {arm} arm")
+            gate = frame_gates[len(arms)]
+            work = frames["frames"]["work"]
+            arms[f"{world}-{arm}"] = {
+                "ran": len(arms) + 1,
+                "started_at": frames["started_at"],
+                "finished_at": frames["finished_at"],
+                "flyers_served": 0 if arm == "blocked" else setup["flyers"],
+                "frames": frames["frames"]["count"],
+                "work_p50_us": work["p50_us"],
+                "work_p95_us": work["p95_us"],
+                "work_p99_us": work["p99_us"],
+                "work_max_us": work["max_us"],
+                "frames_over_one_60hz_frame": work["over_one_frame"],
+                "interval_p95_us": frames["frames"]["interval"]["p95_us"],
+                "idle_before_percent": gate["pre"][-1],
+                "idle_during_mean_tenths_percent": frames["idle_during"]["mean_tenths"],
+                "load_1min_before_milli": round(gate["load_before"][0] * 1000),
+                "page_errors": len(frames["page_errors"]),
+                "browser": frames["browser"]["product"],
+            }
+    binder.bind(
+        "timing/gates.jsonl",
+        _redacted((timing / "gates.jsonl").read_text()).encode(),
+        "the idle gate's ledger",
+    )
+    for idle_file in sorted(timing.glob("idle-*.jsonl")):
+        binder.bind(
+            f"timing/{idle_file.name}", idle_file.read_bytes(), "idle samples during one run"
+        )
+    log_notes = {
+        "request-blocking.attempt-1": (
+            "the pre-registered request blocking script's console: the TypeError it stopped at"
+        ),
+        "request-blocking-fixed": "the console of the one-line fixed copy's run",
+    }
+    for log in sorted(timing.glob("*.log")):
+        if log.stat().st_size:
+            binder.bind(
+                f"timing/{log.stem}.log.txt",
+                _redacted(log.read_text()).encode(),
+                log_notes.get(log.stem, "a timing run's console"),
+            )
+    binder.bind(
+        "timing/driver.log.txt",
+        _redacted((runs / "timing-driver.log").read_text()).encode(),
+        "the slots taken and each run's exit",
+    )
+    trees = arms["trees-flight"]
+    within_a_frame = trees["work_p95_us"] < FRAME_BUDGET_US and trees["flyers_served"] == 24
+
+    pictures = {}
+    for entry in arguments.picture:
+        name, file, what = entry.split("=", 2)
+        pictures[name] = binder.bind(f"pictures/{name}", Path(file).read_bytes(), what, text=False)
+
+    # ---- the tree ---------------------------------------------------------------------------
+    at_registration = _load(runs / "tree-at-registration.json")
+    assert at_registration["tracked_diff_equals_the_registration"]
+    assert at_registration["untracked_equal_the_registration"]
+    then = at_registration["files"]
+    listed = (
+        subprocess.run(
+            ["git", "-C", str(ROOT), "diff", "HEAD", "--name-only"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+        + subprocess.run(
+            ["git", "-C", str(ROOT), "ls-files", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+    )
+    now = {
+        path: _sha((ROOT / path).read_bytes())
+        for path in sorted(set(listed))
+        if (ROOT / path).is_file()
+    }
+    outside = (f"docs/evaluation/artifacts/{NAME}/", f"docs/evaluation/{NAME}.json")
+    changed = sorted(path for path in then if path in now and now[path] != then[path])
+    created = sorted(path for path in now if path not in then and not path.startswith(outside))
+    removed = sorted(path for path in then if path not in now)
+    tree = {
+        "registration": pre["tree"],
+        "files_changed_after_the_registration": {
+            "changed": changed,
+            "created": created,
+            "removed": removed,
+        },
+        "release_build_launched": {
+            "run_id": state["run_id"],
+            "diff_head_sha256": state["tree"]["diff_head_sha256"],
+        },
+    }
+
+    outcomes = {
+        "no-violation": (
+            no_violation,
+            {name: found[name]["violations_by_rule"] for name in WORLDS},
+        ),
+        "every-flyer-home": (
+            every_home,
+            {
+                name: [
+                    found[name]["not_home_at_an_episode_end"],
+                    found[name]["episode_ends"],
+                    found[name]["late_home_misreported"],
+                ]
+                for name in WORLDS
+            },
+        ),
+        "exact-replay": (exact, {name: found[name]["replay_mismatches"] for name in WORLDS}),
+        "twenty-four-flyers-in-a-frame": (
+            within_a_frame,
+            {
+                "flyers": trees["flyers_served"],
+                "work_p95_us": trees["work_p95_us"],
+                "budget_us": FRAME_BUDGET_US,
+            },
+        ),
+    }
+    judged = []
+    for rule in pre["judged"]:
+        ok, measured = outcomes[rule["id"]]
+        judged.append(
+            {
+                "id": rule["id"],
+                "rule": rule["rule"],
+                "outcome": "passed" if ok else "failed",
+                "measured": measured,
+            }
+        )
+    failed = [row["id"] for row in judged if row["outcome"] == "failed"]
+    departures = [
+        {
+            "what": "request-blocking",
+            "registered_script": scripts["measure_request_blocking.py.txt"]["path"],
+            "ran": binder.bound["scripts/measure_request_blocking_fixed.py.txt"]["path"],
+            "registered_run": {
+                "exit": registered_attempt["exit"],
+                "at": registered_attempt["at"],
+                "console": binder.bound["timing/request-blocking.attempt-1.log.txt"]["path"],
+            },
+            "fixed_run": {"exit": blocking_gate["exit"], "at": blocking_gate["at"]},
+            "changed_line": {
+                "line": changed_line,
+                "registered": registered_text.strip(),
+                "ran": ran_text.strip(),
+            },
+            "why": (
+                "The pre-registered measurement stopped at its first quantile, a float used as a "
+                "list index, and wrote nothing. One line was changed in a copy; the pre-registered "
+                "copy is unchanged. The copy ran once, by hand after the driver finished rather "
+                "than by the driver: inside quiet-slot without gpu-slot, behind the same idle gate, "
+                "against the same release server and the same world. Request blocking is reported, "
+                "not judged, so no outcome rests on it."
+            ),
+        }
+    ]
+    record = {
+        "profile": "exulanica.flight-bounds/v2",
+        "question": pre["question"],
+        "preregistration": {
+            "path": f"docs/evaluation/{PREREGISTRATION.name}",
+            "record_sha256": envelope["record_sha256"],
+        },
+        "answers": pre["answers"],
+        "verdict": (
+            "FAILED: " + ", ".join(failed) + "." if failed else "PASSED. Every judged rule held."
+        )
+        + f" Over {len(run['seeds']['values'])} held-out seeds and {run['minutes']} simulated minutes in each of {len(WORLDS)} worlds.",
+        "judged": judged,
+        "found": found,
+        "judged_run": {"started_at": run["started_at"], "finished_at": run["finished_at"]},
+        "departures": departures,
+        "reported": {
+            "request-cost": request_cost,
+            "request-blocking": request_blocking,
+            "frame-time": arms,
+        },
+        "worlds": worlds,
+        "max_flyers": {
+            "declared": FLIGHT_MODULE.value("max_flyers"),
+            "largest_population_measured_within_a_frame": 24 if within_a_frame else None,
+        },
+        "scripts": scripts,
+        "tree": tree,
+        "release_build": {
+            "index_html_sha256": state["app"]["build"]["index_html_sha256"],
+            "vite": state["app"]["build"]["vite"],
+            "served_index_is_the_build": state["app"]["served_index_is_the_build"],
+        },
+        "execution": {
+            "machine": "Apple M5 Max, 18 cores, 64 GB, macOS 26.7",
+            "python": (
+                "CPython 3.11.6 for the bounds and request cost runs; the request blocking client "
+                "ran under CPython 3.14.6"
+            ),
+            "browser": trees["browser"] + " headless, its own profile per arm",
+            "timing": "the request cost and frame runs inside quiet-slot then gpu-slot, the request blocking run inside quiet-slot, each behind the idle gate: at least 70 percent idle over 10 s before it, discarded below 50 percent mean idle during it",
+        },
+        "limits": [
+            "Request cost is process time of the flight module's parts alone: composing the air, a cold window, a resumed window; a request's database reads and its answer are not in it.",
+            "Only cold windows were judged: the judged run computed every window from its episode's first step, as flight_window does. A page reads windows in order, each resumed from the one before; tests hold a resumed window equal to the cold one, and the request cost times the resumed path, but no judged rule was checked on windows read that way.",
+            "Request blocking was measured on the release server over its loopback, in the world the trees arms drew: health answers beside one cold window from the step before an episode ends, the window's time taken over the whole request.",
+            "performance.now() resolves to 100 microseconds in these pages, so every frame figure is a multiple of 100.",
+            "No arm moves the camera, so at any moment some of the 24 birds are out of view.",
+            "One machine and one browser.",
+            "How the birds look was judged by eye in still pictures.",
+        ],
+        "bound_artifacts": binder.bound,
+        "artifact_notes": binder.notes,
+        "pictures": pictures,
+    }
+    record_path.write_text(json.dumps(digest_bound(record), indent=2, sort_keys=True) + "\n")
+    print(
+        json.dumps(
+            {
+                "record": record_path.name,
+                "verdict": record["verdict"][:90],
+                "files": len(binder.bound),
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

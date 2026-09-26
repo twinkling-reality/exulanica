@@ -79,6 +79,7 @@ import type { AppEnvironment, SessionState } from './session-state.js';
 import { seatingLayout } from './seating-layout.js';
 import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
+import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 
 /** Where the development preview's real-engine society recording is served. */
 const SOCIETY_RECORDING_URL = '/preview-api/society/recording';
@@ -125,6 +126,13 @@ export interface EnvironmentSelectionDependencies {
   readonly societyControlClient?: SocietyControlClient;
   readonly societyModelsClient?: SocietyModelsClient;
   readonly societyDistrictClient?: SocietyDistrictClient;
+  /** The open saved world's flight, read ahead of the page's clock; none when omitted. */
+  readonly flight?: (world: {
+    readonly worldId: string;
+    readonly versionId: string;
+    readonly regionId: string;
+    readonly onStatus: (status: SavedWorldFlightStatus) => void;
+  }) => SavedWorldFlight;
   readonly onDistrictPlacementChange?: () => void;
   /** Ask the Companion about the simulated person selected in the inspector. */
   readonly onAskAboutInhabitant?: (question: string, asked: SocietyQuestion) => void;
@@ -313,6 +321,10 @@ export function mountEnvironmentSelection(
   const environmentClient = deps.environmentClient ?? new EnvironmentSelectionClient(deps.credentials);
   const worldClient = deps.worldClient ?? new WorldObjectsClient(deps.credentials);
   let liveSociety: LiveSociety | null = null;
+  // The flyers a saved world's objects host, read from its flight while the world is open.
+  let savedFlight: SavedWorldFlight | null = null;
+  /** Why the saved world's flight stopped, as the inhabitants panel says it, or null. */
+  let flightWords: string | null = null;
   const districtAbort = new AbortController();
   const districtClient = deps.societyDistrictClient ?? new SocietyDistrictClient({ ...deps.credentials, signal: districtAbort.signal });
   const controlAbort = new AbortController();
@@ -500,6 +512,24 @@ export function mountEnvironmentSelection(
   function inhabitantLabel(inhabitant: OwnedSocietyState['inhabitants'][number]): string {
     const place = deps.state.atlas?.binding.ownedDistrict?.district.name ?? 'this place';
     return inhabitant.display_name ?? (inhabitant.role ? `A ${inhabitant.role}` : `A person in ${place}`);
+  }
+
+  /**
+   * The saved world's flight: the inhabitants panel says in words why it stopped, and the canvas
+   * states it for tools (flying, retrying or refused, and the code).
+   */
+  function reflectFlight(status: SavedWorldFlightStatus): void {
+    if (flightWords !== status.refusalWords) {
+      flightWords = status.refusalWords;
+      renderInhabitantsPanel();
+    }
+    const canvas = deps.env.canvas;
+    if (!canvas) return;
+    canvas.dataset.flightState = status.state;
+    canvas.dataset.flightFlyers = String(status.flyers);
+    canvas.dataset.flightUnplaced = status.unplaced.map((row) => `${row.objectId}:${row.reason}`).join(' ');
+    canvas.dataset.flightUndrawn = status.undrawnKinds.join('; ');
+    canvas.dataset.flightFailure = status.failure ?? '';
   }
 
   function reflectCrowd(): void {
@@ -1265,7 +1295,7 @@ export function mountEnvironmentSelection(
       .filter((person) => (person.motion_path_mm?.length ?? 0) > 1).length ?? 0;
     inhabitantsPanel.render({
       society: view, objects: savedObjects(), walked, advanceBlocked: advanceBlocked(),
-      playback: { control: societyControl, busy: controlBusy }, moved, noticing,
+      playback: { control: societyControl, busy: controlBusy }, moved, noticing, flight: flightWords,
     });
   }
 
@@ -1465,6 +1495,7 @@ export function mountEnvironmentSelection(
       await readSavedVersion();
       refreshSeatingLayout();
       noticeChangedObject(before);
+      void savedFlight?.restart();
       await liveSociety.afterAuthoredEdit();
       renderInhabitantsPanel();
       return;
@@ -1696,6 +1727,11 @@ export function mountEnvironmentSelection(
     });
     await liveSociety.connect();
     if ((phase as string) === 'disposed') return;
+    savedFlight = deps.flight?.({
+      worldId: entry.worldId, versionId: entry.authoredVersionId, regionId: scene.region.regionId,
+      onStatus: reflectFlight,
+    }) ?? null;
+    void savedFlight?.start();
     await refreshPlayback();
     if ((phase as string) === 'disposed') return;
     renderInhabitantsPanel();
@@ -1900,6 +1936,12 @@ export function mountEnvironmentSelection(
       if (!deps.env.preview) clearDistrict();
       liveSociety?.dispose();
       societyModels?.dispose();
+      savedFlight?.stop();
+      savedFlight = null;
+      flightWords = null;
+      for (const key of ['flightState', 'flightFlyers', 'flightUnplaced', 'flightUndrawn', 'flightFailure']) {
+        if (deps.env.canvas) delete deps.env.canvas.dataset[key];
+      }
       if (liveSociety || recording) crowd()?.clearSociety();
       savedWorldActions.clear();
       recording = null;

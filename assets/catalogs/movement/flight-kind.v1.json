@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "catalog_id": "flight-kind",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "small_bird",
+      "module": "exulanica-movement/flight/v1",
+      "title": "Small bird",
+      "summary": "A small brown bird that lives in a tree, perches on crowns and lamp heads, and wanders over the square between perches.",
+      "parameters": {
+        "approach_height_mm": {"source": "declared/band", "value": 1000},
+        "body_span_mm": {"source": "declared/size", "value": 280},
+        "climb_rate_mm_s": {"source": "declared/vertical", "value": 2000},
+        "cruise_speed_mm_s": {"source": "declared/speeds", "value": 5000},
+        "descent_rate_mm_s": {"source": "declared/vertical", "value": 2500},
+        "flap_cycle_ms": {"source": "declared/presentation", "value": 120},
+        "glide_speed_mm_s": {"source": "declared/speeds", "value": 4500},
+        "landing_rate_mm_s": {"source": "declared/vertical", "value": 1000},
+        "max_accel_mm_s2": {"source": "declared/speeds", "value": 6000},
+        "max_altitude_mm": {"source": "declared/band", "value": 10000},
+        "max_bank_mrad": {"source": "declared/presentation", "value": 785},
+        "max_speed_mm_s": {"source": "declared/speeds", "value": 8000},
+        "max_turn_rate_mrad_s": {"source": "declared/speeds", "value": 3000},
+        "min_altitude_mm": {"source": "declared/band", "value": 3000},
+        "perch_seconds_maximum": {"source": "declared/times", "value": 30},
+        "perch_seconds_minimum": {"source": "declared/times", "value": 8},
+        "roam_seconds_maximum": {"source": "declared/times", "value": 20},
+        "roam_seconds_minimum": {"source": "declared/times", "value": 6},
+        "roam_weight_milli": {"source": "declared/times", "value": 500},
+        "takeoff_rate_mm_s": {"source": "declared/vertical", "value": 1500}
+      },
+      "body": {
+        "profile": "parts-v1",
+        "texels": 64,
+        "texels_source": "declared/texels",
+        "parts": [
+          {"shape": "box", "surface_role": "object_primary", "offset_x_mm": 0, "offset_y_mm": 0, "offset_z_mm": 0, "size_x_mm": 20, "size_y_mm": 12, "size_z_mm": 32, "top_scale_millionths": 1000000, "segments": 4, "rings": 1, "source": "declared/body"},
+          {"shape": "ellipsoid", "surface_role": "object_primary", "offset_x_mm": 0, "offset_y_mm": 0, "offset_z_mm": 30, "size_x_mm": 60, "size_y_mm": 140, "size_z_mm": 60, "top_scale_millionths": 1000000, "segments": 16, "rings": 8, "source": "declared/body"},
+          {"shape": "ellipsoid", "surface_role": "object_primary", "offset_x_mm": 0, "offset_y_mm": 58, "offset_z_mm": 70, "size_x_mm": 46, "size_y_mm": 46, "size_z_mm": 46, "top_scale_millionths": 1000000, "segments": 16, "rings": 8, "source": "declared/body"},
+          {"shape": "box", "surface_role": "object_secondary", "offset_x_mm": 0, "offset_y_mm": 88, "offset_z_mm": 88, "size_x_mm": 10, "size_y_mm": 20, "size_z_mm": 10, "top_scale_millionths": 1000000, "segments": 4, "rings": 1, "source": "declared/body"},
+          {"shape": "box", "surface_role": "object_primary", "offset_x_mm": 0, "offset_y_mm": -88, "offset_z_mm": 58, "size_x_mm": 44, "size_y_mm": 56, "size_z_mm": 8, "top_scale_millionths": 1000000, "segments": 4, "rings": 1, "source": "declared/body"}
+        ]
+      },
+      "wing": {
+        "profile": "parts-v1",
+        "texels": 64,
+        "texels_source": "declared/texels",
+        "parts": [
+          {"shape": "box", "surface_role": "object_primary", "offset_x_mm": 55, "offset_y_mm": 0, "offset_z_mm": 0, "size_x_mm": 110, "size_y_mm": 60, "size_z_mm": 6, "top_scale_millionths": 1000000, "segments": 4, "rings": 1, "source": "declared/wing"}
+        ]
+      },
+      "wing_hinge_mm": {"x_mm": 30, "y_mm": 6, "z_mm": 66, "source": "declared/wing"},
+      "materials": {"object_primary": "cc0.tree-bark", "object_secondary": "cc0.tree-pit-soil"},
+      "declared": {
+        "band": "It flies between 3 m and 10 m above the ground: above the society's 1.9 m walker capsule with a metre to spare, so it never flies through a person, and below the flight module's 12 m ceiling. It turns to land 1 m above a perch, two grid cells, so the column it descends is checked cell by cell.",
+        "body": "A small garden bird authored for this repository, about 200 mm from beak to tail: legs 32 mm high, a body 140 mm long and 60 mm round, a 46 mm head, a short beak and a flat tail. Declared for this catalog; not measured from any bird.",
+        "presentation": "Drawn banking at most 45 degrees into a turn, with a wingbeat of 120 ms while it flaps. The step never reads either; they are how the renderer draws what the step hands it.",
+        "size": "280 mm from wingtip to wingtip, the span its body and two wings draw: the wing hinge 30 mm out from the body's centre and a wing 110 mm long, twice over.",
+        "speeds": "It cruises at 5 m/s, at most 8 m/s, and glides in level flight at 4.5 m/s or faster; it changes speed by at most 6 m/s each second and turns at most 3 radians a second. Declared so a loop over a 24 m square lasts several seconds and a turn reads as a bird's; not measured from any bird.",
+        "texels": "Its maps are embedded at 64 texels a side, an eighth of the 512 texel sets it is dressed in: a bird is a few centimetres on screen at the distances a square is watched from, so its maps stay small.",
+        "times": "It stays on a perch 8 to 30 seconds and wanders 6 to 20 seconds; when a perch ends, half its choices wander before choosing another perch and half fly straight to one. Declared so a square with a few birds always has one in the air.",
+        "vertical": "It climbs at most 2 m/s and descends at most 2.5 m/s while flying, takes off up its perch's column at 1.5 m/s and lands down it at 1 m/s, a second to land from its approach height.",
+        "wing": "One flat wing 110 mm long and 60 mm wide, hinged 30 mm out from the body's centre line at the top of its shoulders; the renderer draws it on both sides, turned half a turn about the vertical for the left."
+      },
+      "reason": "The first flying kind: a small bird that shows flight over a world a person built, taking off from and landing on the perches its objects declare. A larger flyer is another entry with its own figures, never code.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/movement-modules-contract.md"
+      }
+    }
+  ]
+}

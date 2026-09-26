@@ -1,0 +1,138 @@
+// Lane V2 (movement): pictures of a saved world's birds on the release build. Evidence, not timing.
+//
+//   node capture_flight.mjs --state RUN_DIR/state.json --app http://localhost:PORT/ --out DIR \
+//        [--keys ArrowUp:150,KeyS:300] [--frames 8] [--every 5] [--dpr 2] [--crop x,y,w,h]...
+//
+// Opens the release build in a new headless Chrome (its own profile, removed afterwards), types the
+// slot's token into the access form, waits for the flight and both bird parts, holds each named key
+// for its milliseconds in order (the camera moves only while a key is down), then saves a full
+// frame every few seconds and, for each crop, the same region magnified twice. --dpr renders the
+// page at that device pixel ratio, so a small bird is drawn with more pixels rather than enlarged.
+// Every location comes from the arguments or the launcher's state file; the token is typed, never
+// printed or written.
+
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const all = (name) => process.argv.flatMap((value, index) => (process.argv[index - 1] === `--${name}` ? [value] : []));
+const argument = (name, fallback) => all(name)[0] ?? fallback;
+const state = JSON.parse(readFileSync(resolve(argument('state')), 'utf8'));
+const token = readFileSync(state.token_file, 'utf8').trim();
+const out = resolve(argument('out'));
+const frames = Number(argument('frames', '8'));
+const every = Number(argument('every', '5'));
+const dpr = Number(argument('dpr', '1'));
+const keys = (argument('keys', '') || '').split(',').filter(Boolean).map((k) => k.split(':'));
+const crops = all('crop').map((c) => c.split(',').map(Number));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+mkdirSync(out, { recursive: true });
+
+const profile = mkdtempSync(join(state.run_dir, 'chrome-profile-capture-'));
+const chrome = spawn(CHROME, [
+  '--headless=new', `--remote-debugging-port=${state.ports.browser}`, `--user-data-dir=${profile}`,
+  '--window-size=1440,900', '--no-first-run', '--no-default-browser-check', '--disable-extensions',
+  '--disable-background-networking', '--disable-sync', '--password-store=basic', '--use-mock-keychain', 'about:blank',
+], { stdio: 'ignore', detached: true });
+function finish(code) {
+  try { process.kill(-chrome.pid, 'SIGTERM'); } catch { /* gone */ }
+  setTimeout(() => { try { rmSync(profile, { recursive: true, force: true }); } catch { /* kept */ } process.exit(code); }, 500);
+}
+
+let socket;
+let next = 1;
+const pending = new Map();
+async function connect() {
+  for (let i = 0; i < 60; i += 1) {
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${state.ports.browser}/json/list`)).json();
+      const page = list.find((t) => t.type === 'page');
+      if (page) {
+        socket = new WebSocket(page.webSocketDebuggerUrl);
+        socket.onmessage = (event) => {
+          const message = JSON.parse(event.data);
+          const waiter = pending.get(message.id);
+          if (!waiter) return;
+          pending.delete(message.id);
+          if (message.error) waiter.reject(new Error(message.error.message)); else waiter.ok(message.result);
+        };
+        await new Promise((ok, fail) => { socket.onopen = ok; socket.onerror = fail; });
+        return;
+      }
+    } catch { /* not up yet */ }
+    await sleep(250);
+  }
+  throw new Error('headless Chrome did not expose a page target');
+}
+const send = (method, params = {}, timeoutMs = 60_000) => new Promise((ok, reject) => {
+  const id = next++;
+  const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out`)); }, timeoutMs);
+  pending.set(id, { ok: (v) => { clearTimeout(timer); ok(v); }, reject: (e) => { clearTimeout(timer); reject(e); } });
+  socket.send(JSON.stringify({ id, method, params }));
+});
+const step = (what) => console.error(`${new Date().toISOString().slice(11, 19)} ${what}`);
+async function evaluate(expression) {
+  const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true });
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+  return result.result.value;
+}
+async function waitFor(expression, timeoutMs, what) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try { if (await evaluate(expression)) return; } catch { /* not yet */ }
+    await sleep(100);
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+async function shot(name, clip) {
+  // A page that produces no frame never answers a screenshot; say which it is before asking.
+  const framed = await Promise.race([
+    evaluate('new Promise((r) => requestAnimationFrame(() => r(true)))'),
+    sleep(5_000).then(() => false),
+  ]);
+  step(`${name}: ${framed ? 'a frame came' : 'no frame in 5 s'}`);
+  const params = { format: 'png', ...(clip ? { clip: { x: clip[0], y: clip[1], width: clip[2], height: clip[3], scale: 2 } } : {}) };
+  const picture = await send('Page.captureScreenshot', params);
+  writeFileSync(join(out, name), Buffer.from(picture.data, 'base64'));
+}
+
+async function main() {
+  await connect();
+  step('connected');
+  await send('Page.enable');
+  await send('Runtime.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: dpr, mobile: false });
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: 'performance.setResourceTimingBufferSize(100000);' });
+  await send('Page.navigate', { url: argument('app') });
+  await waitFor(`!!document.querySelector('form.credential-gate input[type=password]')`, 30_000, 'the access form');
+  step('access form');
+  await evaluate(`document.querySelector('form.credential-gate input[type=password]').focus()`);
+  await send('Input.insertText', { text: token });
+  await waitFor(`(() => { const b = document.querySelector('button.credential-submit'); return b && !b.disabled; })()`, 10_000, 'submit');
+  await evaluate(`document.querySelector('button.credential-submit').click()`);
+  const reads = `performance.getEntriesByType('resource').map((e) => new URL(e.name).pathname)`;
+  await waitFor(`${reads}.filter((p) => p.includes('/world/assets/cc0.small-bird-')).length >= 2`, 90_000, 'both bird parts');
+  step('bird parts read');
+  await sleep(3_000);
+  await evaluate(`document.querySelector('canvas')?.focus()`);
+  for (const [code, ms] of keys) {
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', code, key: code, windowsVirtualKeyCode: 0 });
+    await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { code: '${code}', key: '${code}' }))`);
+    await sleep(Number(ms));
+    await evaluate(`window.dispatchEvent(new KeyboardEvent('keyup', { code: '${code}', key: '${code}' }))`);
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', code, key: code, windowsVirtualKeyCode: 0 });
+    await sleep(800);
+  }
+  step('keys done');
+  for (let index = 0; index < frames; index += 1) {
+    const label = String(index).padStart(2, '0');
+    await shot(`frame-${label}.png`);
+    for (const [cropIndex, clip] of crops.entries()) await shot(`frame-${label}-crop-${cropIndex}.png`, clip);
+    await sleep(every * 1000);
+  }
+  console.log(JSON.stringify({ saved: frames * (1 + crops.length), out: out.split('/').slice(-2).join('/') }));
+  finish(0);
+}
+
+main().catch((error) => { step(`failed: ${error.message}`); finish(1); });

@@ -10381,6 +10381,96 @@
     }
    }
   },
+  "/world/versions/{version_id}/flight": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The flyers a saved world's objects host, as steps of its flight for a page to draw.",
+    "operationId": "world_flight_world_versions__version_id__flight_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "from_step",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 0,
+       "title": "From Step"
+      }
+     },
+     {
+      "name": "steps",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 600,
+       "title": "Steps"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response World Flight World Versions  Version Id  Flight Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/interactions/catalog": {
    "get": {
     "tags": [

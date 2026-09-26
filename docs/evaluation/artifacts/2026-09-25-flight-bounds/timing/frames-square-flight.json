@@ -1,0 +1,57 @@
+{
+ "arm": "flight",
+ "app": "http://localhost:19232/",
+ "seconds": 60,
+ "tree": {
+  "branch": "lane/0923-movement",
+  "head": "ac5f64b60811a8c98147a244aed8293ab4a05ab7",
+  "diff_head_sha256": "abb504820771e04af6bf23d27c2d91f8f7dcc58432afd733dfef166469ea5c53",
+  "diff_head_bytes": "48707",
+  "status_sha256": "906d3ef107969369b514476a4295d6c07e917fd63f91f14e5979b5d097e0c214",
+  "changed_paths": "49"
+ },
+ "run_id": "20260926T010847Z",
+ "api_imported_exulanica_from_worktree": true,
+ "load_before": [
+  5.64697265625,
+  9.9609375,
+  14.1669921875
+ ],
+ "started_at": "2026-09-26T02:39:33.812Z",
+ "browser": {
+  "product": "Chrome/153.0.8010.54",
+  "revision": "@ab3ecba863fd7852cc9b0fe5736187e19ed52a1c"
+ },
+ "flight_requests_refused": 0,
+ "page_errors": [],
+ "screenshot": true,
+ "frames": {
+  "count": 3600,
+  "interval": {
+   "p50_us": 16700,
+   "p95_us": 16700
+  },
+  "work": {
+   "p50_us": 400,
+   "p95_us": 600,
+   "p99_us": 900,
+   "max_us": 1200,
+   "over_one_frame": 0
+  },
+  "lag": {
+   "p50_us": 1100,
+   "p95_us": 1300
+  }
+ },
+ "idle_during": {
+  "samples": 33,
+  "mean_tenths": 733,
+  "min": 54
+ },
+ "load_after": [
+  6.6953125,
+  9.39794921875,
+  13.642578125
+ ],
+ "finished_at": "2026-09-26T02:40:39.775Z"
+}

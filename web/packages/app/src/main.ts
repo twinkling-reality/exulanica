@@ -84,6 +84,7 @@ import {
   type PersonalWorldControl,
 } from './composition/world-entry.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
+import { createSavedWorldFlight } from './composition/saved-world-flight.js';
 import { mountSocietyExperimentResult } from './composition/society-experiment-result.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
@@ -769,6 +770,11 @@ async function mount(): Promise<void> {
     onDistrictPlacementChange: () => {
       void objects.begin();
     },
+    ...(state.activeWorldEntry === null ? {} : {
+      flight: (world) => createSavedWorldFlight({
+        ...world, credentials: currentCredentials, binding: () => state.atlas?.binding ?? null,
+      }),
+    }),
   });
   state.disposeEnvironmentSelection = () => environmentSelection.dispose();
 

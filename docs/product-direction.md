@@ -63,9 +63,10 @@ A world has three layers, and each is replaceable on its own:
 | Content | What exists: kinds of places, people, vehicles and objects, their sizes, looks and abilities | Versioned catalogs, authored by hand or imported with their origin, validated before admission |
 | Decisions | What each agent does from moment to moment | Models and deterministic planners while the world runs; decisions are stored so a run replays without calling a model |
 
-Walking exists for the people in a world ([society contract](synthetic-society-contract.md)).
-Road movement exists as a module that nothing in the application calls
-([`exulanica/traffic`](../exulanica/traffic)); flight does not exist. Objects, vehicles and
+Walking exists for the people in a world ([society contract](synthetic-society-contract.md)), and
+flight for the small birds a saved world's trees host; both are movement modules chosen by data
+([movement modules contract](movement-modules-contract.md)). Road movement exists as a module that
+nothing in the application calls ([`exulanica/traffic`](../exulanica/traffic)). Objects, vehicles and
 society activities are versioned catalogs under [`assets/catalogs`](../assets/catalogs). The
 people's decisions come from a deterministic planner
 ([`society_planner.py`](../exulanica/world/society_planner.py)); a society engine version with an
@@ -685,8 +686,9 @@ acceptance criterion and measured evidence; none is built until that evidence ex
    one hosted policy boundary.
 3. **Movement modules:** each kind of movement is one engine module driven by catalog data:
    walking, roads and flight. A dragon, a plane and a bird are content that use the flight module,
-   not code written for each. Road movement exists in [`exulanica/traffic`](../exulanica/traffic)
-   with no caller and connects when a world needs vehicles; flight does not exist.
+   not code written for each. Walking and flight are modules of the
+   [movement modules contract](movement-modules-contract.md); road movement exists in
+   [`exulanica/traffic`](../exulanica/traffic) with no caller and connects when a world needs vehicles.
 4. **Measured results per model:** each role's result is computed exactly from world data, with
    what counts as good declared per role as reviewed data. Model comparisons use a pre-registered
    held-out set, as the [model selection](#model-selection-and-compute-priorities) rules require.

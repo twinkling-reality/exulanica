@@ -1,0 +1,143 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifacts": {
+      "directory": "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration",
+      "files": [
+        {
+          "byte_size": 12694,
+          "is": "the script that will measure bounds, solids, homecoming, replay and request cost, as it will run; copy it to a .py name to run it",
+          "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/measure_flight_bounds.py.txt",
+          "sha256": "8f856cea865b8c4b5575941b07912b797ba3bd8c9a0d926c6c0476f04eb2c23f"
+        },
+        {
+          "byte_size": 15948,
+          "is": "the browser harness that will measure frame work on the release build, as it will run",
+          "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/measure_flight_frames.mjs.txt",
+          "sha256": "4456d283eefcf2bd4b77702ac9a43d7f0d425a2956645ceb3e9aaf7a3733dbbc"
+        },
+        {
+          "byte_size": 2889,
+          "is": "the idle gate every timed run passes through",
+          "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds-preregistration/gate.py.txt",
+          "sha256": "9bac3b50d4fd7fcb8939d9d5e83238144cff1dfebb9b6027d4f49fd7da961d65"
+        }
+      ]
+    },
+    "judged": [
+      {
+        "id": "no-violation",
+        "rule": "In every world and every judged seed the independent checker finds no violation: no flying position outside the volume or the kind's band, no landing, take-off or perch off its perch's column, no step longer than the kind's top speed allows, no segment with a point in a solid cell the flyer may not use, no perch holding two flyers, and every episode's first step with every flyer perching at home."
+      },
+      {
+        "id": "every-flyer-home",
+        "rule": "No flyer is anywhere but perching at home when an episode ends, in any world or seed."
+      },
+      {
+        "id": "exact-replay",
+        "rule": "Every window computed twice has one digest, in every world and seed."
+      },
+      {
+        "id": "twenty-four-flyers-in-a-frame",
+        "rule": "With the 24 flyers of the square and seven more trees drawn, main-thread work per frame at the 95th percentile stays under one 60 Hz frame (16,667 us) on the release build. If it does not, max_flyers is lowered to the largest population measured that does, and the record says so."
+      }
+    ],
+    "module": {
+      "episode_steps": 3000,
+      "id": "exulanica-movement/flight/v1",
+      "max_flyers": 24,
+      "step_ms": 100
+    },
+    "profile": "exulanica.flight-bounds/v1/preregistration",
+    "question": "Does the flight module keep every flyer inside its volume and its kind's band and out of every solid cell it may not use, bring every flyer home by the end of each episode, replay exactly, and draw 3 and 24 flyers within one 60 Hz frame of main-thread work on the release build?",
+    "reported": [
+      {
+        "id": "guard-interventions",
+        "what": "Per world, the steps at which steering proposed a move the guard refused, beside the flying steps: how often steering alone would have entered a solid cell or left the band. No target."
+      },
+      {
+        "id": "request-cost",
+        "what": "Process time of one cold 600-step window at the largest step admitted and the step before it, for the small square and eight trees, five repeats each, median, inside quiet-slot with the idle gate."
+      },
+      {
+        "id": "frame-time",
+        "what": "Main-thread work per frame, rAF intervals and callback lag over 60 s, release build on slot 6, each arm in its own headless Chrome, inside quiet-slot then gpu-slot with the idle gate (at least 70 percent idle over 10 s before, a run discarded below 50 percent mean idle during it). Arms: the square with its flight refused (0 flyers), the square (3 flyers), the square and seven more trees with the flight refused (0), and with it (24)."
+      }
+    ],
+    "run": {
+      "command": "uv run python scripts/measure_flight_bounds.py --seeds judged --minutes 30 --out FILE",
+      "minutes_per_seed": 30,
+      "window_steps": 600
+    },
+    "seeds": {
+      "development_rule": "sha256 of exulanica.flight/v1/development/<i>, i from 0 to 11: every test and every run before this record used these, never a judged seed",
+      "judged": [
+        "c95fe2c0b32bc1ea5a6ea8551463bc0f1f91c1ecc890bac15a2388fdc917f528",
+        "e61def83f90e5a329d16706ccd3d58436b3495426286b1fa35a6bba09fa8208d",
+        "6fa1c6b9aa0979c5b4334fb9e59acc06aa9f877fab14aa2d35db3f7a326710a9",
+        "e1284e7db87efb0ffdab808eb24a1cd56ce5821c7082cc856bcd39b11f143791",
+        "e51c8471745e597b7a02af69c03abe1281af430c1deb5094c1758f0dd2ed0be9",
+        "7704ae5b383a686bc2d911000a4029dff9367c9e7e5c3de96af92e5e0aa5109f",
+        "5c880cb5bb92a2db944f420ce8d03f88f436aa9d320a3bd36e30a5f6557e74ac",
+        "120326dbd0e1cbc13b2f59249c570fa0c5c799cbd722dc59aa5428e3934eaa71",
+        "70511eac4e033a739018beba6cbbeb9d31763f240c6ca670a96ded585b18bb53",
+        "d33c3c292b980bb0cdac7940a028d1d31e11176de3fb4d48b49ee1734bc10c5e",
+        "628f59db3ebccc2d12262f0fc4fd00b68d1fc9f8fa1adf4c2f1e61cb530bae0e",
+        "fab803071b4a0e48c27d61b73fe36059b4652ee6e8539eca589c4780842aef9d"
+      ],
+      "judged_rule": "sha256 of exulanica.flight/v1/judged/<i>, i from 0 to 11"
+    },
+    "tree": {
+      "diff_head_bytes": 48707,
+      "diff_head_sha256": "abb504820771e04af6bf23d27c2d91f8f7dcc58432afd733dfef166469ea5c53",
+      "head": "ac5f64b60811a8c98147a244aed8293ab4a05ab7"
+    },
+    "worlds": {
+      "crowded_crowns": {
+        "flyers": 12,
+        "occupancy_sha256": "c316b6a0bfb149c5afc0b7cf1f8225f0bb648be9545a68dc9278861b68bc3e73",
+        "perches": 40,
+        "unplaced": [
+          {
+            "count": 3,
+            "kind": "small_bird",
+            "object_id": "tree-0",
+            "reason": "home_perch_unusable"
+          },
+          {
+            "count": 3,
+            "kind": "small_bird",
+            "object_id": "tree-1",
+            "reason": "home_perch_unusable"
+          },
+          {
+            "count": 3,
+            "kind": "small_bird",
+            "object_id": "tree-2",
+            "reason": "home_perch_unusable"
+          },
+          {
+            "count": 3,
+            "kind": "small_bird",
+            "object_id": "tree-3",
+            "reason": "home_perch_unusable"
+          }
+        ]
+      },
+      "eight_trees": {
+        "flyers": 24,
+        "occupancy_sha256": "be6660627a9459226b6c97c39fb4035d98d0dee1f4ade438585acf681916d86c",
+        "perches": 40,
+        "unplaced": []
+      },
+      "small_square": {
+        "flyers": 3,
+        "occupancy_sha256": "75ae5b70d2b5ce4be4c0f6d0bfa67279b6a92735f70e1d9c4829570e7cea7729",
+        "perches": 7,
+        "unplaced": []
+      }
+    },
+    "written_at": "2026-09-26T01:10:35+00:00"
+  },
+  "record_sha256": "b00450a98df1671c81f2bb29e70d3189ca31b252a8a8ec7d0e5a993693808d09"
+}
