@@ -24,11 +24,14 @@ from decimal import Decimal
 
 import psycopg
 import pytest
+from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
 from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.api.society_person_decisions import world_hour
 from exulanica.api.society_runtime import NOT_ANNOUNCED, SocietyRuntime, _ReadFirst
 from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.env import env_get
+from exulanica.models.manifest import Role, load_manifest
+from exulanica.orchestration.compare import comparison_body
 from exulanica.selection.validation import Session
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world.society import (
@@ -50,6 +53,7 @@ import test_society_social_postgres as social_helpers
 import test_society_stay_requests_api as stays
 import test_world_arrangements as arrangements
 from asset_lock_support import recorded_store_reads
+from comparison_support import SEEDS, seeded_catalogs
 from tests_support_api import EVERY_PERMISSION, scratch_database
 
 pytestmark = pytest.mark.postgres
@@ -177,6 +181,57 @@ def test_replaying_a_history_reads_nothing_under_the_lock(runtime_app, monkeypat
         replayed = client.get(society + "/replay", headers=saved_api.OWNER, params=scope)
     assert replayed.status_code == 200, replayed.text
     assert replayed.json()["replay_verified"] is True
+    assert reads.under_the_lock == []
+    assert _society_read_its_bytes(reads)
+
+
+@CURRENT_GROUND
+def test_a_comparison_run_planned_over_two_inputs_reads_nothing_under_the_lock(
+    runtime_app, monkeypatch, caplog
+):
+    """A comparison's run authorizes every input from the first to the one it froze, in one
+    transaction, whether it is played or replayed. The second input names an asset the first
+    does not, so every input is announced and read first, and none is left unannounced."""
+    world, make_app = runtime_app
+    with TestClient(make_app()) as client:
+        saved_api.place(client, world, "object:cushion", 3_000, 5_000)
+        brought = saved_api.bring_inhabitants(client, world)
+        assert brought.status_code in (200, 201), brought.text
+        saved_api.place(client, world, "object:second", -3_000, 5_000, asset="pillar")
+        services = client.app.state.services
+        manifest = load_manifest()
+        runner = SocietyComparisonRunner(
+            database=services.database,
+            runtime=services.society_runtime,
+            client=None,
+            policy_for=services.person_decision_policy,
+            manifest=manifest,
+            manifest_sha256="a" * 64,
+            workspace_id=world["workspace"],
+            world_id=world["binding"].world_id,
+            actor=world["session"].actor,
+            catalogs=seeded_catalogs(population_maximum=512),
+        )
+        models = [
+            ComparisonArm(spec.provider, spec.model_id)
+            for spec in manifest.offered_models(Role.SOCIETY_DECISION)[:2]
+        ]
+        comparison_id = uuid.uuid4()
+        runner.define(
+            world["binding"].version_id,
+            comparison_id=comparison_id,
+            body=comparison_body(runner, models, SEEDS[:1], control=False),
+        )
+        [run_id, *_] = runner.reserve_all(comparison_id, SEEDS[:1])
+        reads = _reads(world, client, monkeypatch)
+        with (
+            caplog.at_level(logging.ERROR),
+            services.database.session(world["workspace"]) as connection,
+            connection.transaction(),
+        ):
+            plan, _definition = runner._repository(connection).plan(comparison_id, run_id)
+    assert len(plan.inputs) == 2, "the run is planned over both inputs"
+    assert caplog.records == [], [record.getMessage() for record in caplog.records]
     assert reads.under_the_lock == []
     assert _society_read_its_bytes(reads)
 

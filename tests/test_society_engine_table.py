@@ -19,6 +19,7 @@ from exulanica.world import society_engines
 from exulanica.world.society import SOCIETY_ENGINE_VERSION
 from exulanica.world.society_engines import (
     ACTION_ENGINES,
+    COMPARISON_ENGINES,
     DECISION_ENGINES,
     DEFAULT_ENGINE,
     ENGINES,
@@ -62,6 +63,8 @@ def test_each_capability_is_claimed_only_by_engines_that_implement_it():
     assert ACTION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
     assert DECISION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
     assert EXPERIMENT_ENGINES == (LIVING_PROFILE,)
+    # A comparison plays the purposeful engine's genesis and minutes with person decisions.
+    assert COMPARISON_ENGINES == (PURPOSEFUL_PROFILE,)
     assert SAVED_WORLD_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
     # Sending people away and bringing them back is the purposeful engine's own transition.
     assert PRESENCE_ENGINES == (PURPOSEFUL_PROFILE,)

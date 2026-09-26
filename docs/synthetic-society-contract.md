@@ -110,21 +110,22 @@ identity substitution, tick reset or history rewrite occurs.
 
 `exulanica/world/society-engines.v1.json` states which engine profiles exist and, for each,
 whether it consumes authorised inputs, whether the playback worker may play it (and the refusal it
-gives when not), whether it takes directed actions, model decisions or experiments, whether the
-person whose world it lives in may send its people away, whether it can stand on a saved world's
-own ground, which state shape it writes and how many people it may hold, with a reason per row.
+gives when not), whether it takes directed actions, model decisions or experiments, whether a
+comparison of the models that decide for its people may run it, whether the person whose world it
+lives in may send its people away, whether it can stand on a saved world's own ground, which state
+shape it writes and how many people it may hold, with a reason per row.
 `exulanica/world/society_engines.py` reads and checks it, and every list of engines derives from
 it: the runtime's edit hook, the repositories' dispatch and population check, the playback
 control, directed actions, decisions, experiments, the creation route's choices and default, and
 the selection query, which receives the lists as bound array parameters rather than SQL text.
 An engine the table does not state is refused by name wherever it is looked up.
 
-| Engine | Inputs | Playback | Directed actions | Model decisions | Sent away | Saved world | Population |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `exulanica-society/v1` | no | no | no | no | no | no | 100 to 512 |
-| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | 1 to 512 |
-| `exulanica-society/v3` | yes | yes | yes | yes | no | yes | 1 to 512 |
-| `exulanica-society/v4` | yes | yes | no | no | no | no | 1 to 65,536 |
+| Engine | Inputs | Playback | Directed actions | Model decisions | Compared | Sent away | Saved world | Population |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `exulanica-society/v1` | no | no | no | no | no | no | no | 100 to 512 |
+| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | 1 to 512 |
+| `exulanica-society/v3` | yes | yes | yes | yes | no | no | yes | 1 to 512 |
+| `exulanica-society/v4` | yes | yes | no | no | no | no | no | 1 to 65,536 |
 
 The browser reads the same file: `pnpm run society-engines:sync` writes it byte for byte, with the
 union of its profiles, into `web/packages/app/src/society-engines.generated.ts`, which
@@ -1015,6 +1016,13 @@ request and its receipt, which names the calls, tokens and cost.
 **Replay.** Replay applies each transition's bound receipts exactly as they were recorded and
 calls no model, so the receipts, not the provider, determine the history. A model or provider
 that changes or is withdrawn later changes nothing already recorded.
+
+**Comparing models.** The same hour of such a society can be run once per model, beside its routine
+and waiting, from one genesis and one seed, and scored from what the engine recorded; each run is
+asked as this host asks, save where the comparison states otherwise, and replayed from its own
+receipts, and none changes the society it ran over.
+[Comparisons of models](society-experiments.md#comparisons-of-models) states the records, the
+score, the claim and the Compare view.
 
 ## Validation
 

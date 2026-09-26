@@ -20,6 +20,9 @@ describe('the Atlas shell', () => {
     const experiment = updateWorldShell(menu, { type: 'toggle-experiment' });
     expect(experiment.primary).toBe('experiment');
     expect(updateWorldShell(experiment, { type: 'toggle-experiment' })).toEqual(menu);
+    const compare = updateWorldShell(menu, { type: 'toggle-compare' });
+    expect(compare.primary).toBe('compare');
+    expect(updateWorldShell(compare, { type: 'toggle-compare' })).toEqual(menu);
   });
 
   it('allows one primary surface and clears Index detail when switching', () => {

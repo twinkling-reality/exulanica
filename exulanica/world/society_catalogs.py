@@ -27,10 +27,16 @@ directory, :func:`load_decision_catalogs`: ``society-decision-action``, what suc
 asked to do and how each option reads, and ``society-decision-policy``, the bounds on asking.
 A decision request records the versions it was asked under, and a new contract is a new version
 published beside the old one.
+
+How such a person's hour is scored, and the protocol and seeds a comparison of the models that run
+them is made under, are read from the same directory too, :func:`load_comparison_catalogs`:
+``society-person-score``, ``society-comparison-protocol`` and ``society-comparison-seeds``, whose
+entries commit each seed by the SHA-256 of its text and never state the seed.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cache
@@ -54,10 +60,14 @@ if TYPE_CHECKING:
     from exulanica.world.object_catalog import WorldObjectCatalog
 
 __all__ = [
+    "COMPARISON_PROTOCOL_CATALOG",
+    "COMPARISON_SEEDS_CATALOG",
+    "COMPARISON_VERSIONS",
     "DECISION_ACTION_CATALOG",
     "DECISION_ACTION_KINDS",
     "DECISION_CONTRACT_VERSIONS",
     "DECISION_POLICY_CATALOG",
+    "PERSON_SCORE_CATALOG",
     "PURPOSEFUL_CATALOG",
     "PURPOSEFUL_ROUTINE_VERSIONS",
     "ROUTINE_DIRECTORY",
@@ -65,12 +75,14 @@ __all__ = [
     "UNRECORDED_ROUTINE_VERSIONS",
     "Activity",
     "CapacityRule",
+    "ComparisonCatalogs",
     "Need",
     "PurposefulActivity",
     "PurposefulRoutine",
     "RoutineModel",
     "UseClass",
     "check_object_kinds",
+    "load_comparison_catalogs",
     "load_decision_catalogs",
     "load_purposeful_routine",
     "load_routine_model",
@@ -105,6 +117,23 @@ DECISION_POLICY_CATALOG: Final = "society-decision-policy"
 DECISION_CONTRACT_VERSIONS: Final = {DECISION_ACTION_CATALOG: 1, DECISION_POLICY_CATALOG: 1}
 #: What an action asks of the engine: to go to one place for its activity, or to wait a minute.
 DECISION_ACTION_KINDS: Final = ("target", "wait")
+#: How a person's hour is scored, and the protocol and seeds a comparison of models is made under.
+PERSON_SCORE_CATALOG: Final = "society-person-score"
+COMPARISON_PROTOCOL_CATALOG: Final = "society-comparison-protocol"
+COMPARISON_SEEDS_CATALOG: Final = "society-comparison-seeds"
+COMPARISON_VERSIONS: Final = {
+    PERSON_SCORE_CATALOG: 1,
+    COMPARISON_PROTOCOL_CATALOG: 1,
+    COMPARISON_SEEDS_CATALOG: 1,
+}
+#: Whether a score term is weighed or only reported, and what a term reads: a run's minutes, the
+#: events the engine appended, or the host's record of each call, which only a reader outside the
+#: score reads.
+SCORE_PARTS: Final = ("primary", "held_out")
+SCORE_READS: Final = ("states", "events", "calls")
+#: The seeds a comparison may run: development seeds, looked at freely, and held-out seeds, judged.
+SEED_PHASES: Final = ("development", "held_out")
+_SHA256: Final = re.compile(r"[0-9a-f]{64}")
 #: Where a purposeful activity happens: at a place an object states, at an open spot of the
 #: ground, or at two open spots beside each other, one for each of two people.
 PURPOSEFUL_SETTINGS: Final = ("object", "open", "pair")
@@ -205,6 +234,21 @@ def _purposeful_bounds(where: str, values: dict[str, FieldValue]) -> None:
             f"{where}: how often an activity is chosen is its affordance's, so an entry for one "
             "kind states weight 0 and preference 0"
         )
+
+
+def _score_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    if (values["part"] == "primary") == (values["weight_milli"] == 0):
+        raise CatalogError(f"{where}: exactly a primary term carries a weight")
+    if (values["reads"] == "events") != bool(values["dispositions"]):
+        raise CatalogError(f"{where}: exactly a term that reads events names what it counts")
+    if values["part"] == "primary" and values["reads"] == "calls":
+        raise CatalogError(f"{where}: no weighed term reads the host's record of a call")
+
+
+def _sha256_text(where: str, value: object) -> FieldValue:
+    if type(value) is not str or _SHA256.fullmatch(value) is None:
+        raise CatalogError(f"{where} is a SHA-256 in lowercase hexadecimal, got {value!r}")
+    return value
 
 
 def _use_class_bounds(where: str, values: dict[str, FieldValue]) -> None:
@@ -324,6 +368,32 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         DECISION_POLICY_CATALOG,
         1,
         (("value", integer_field(0, 10**9)), ("reason", text_field)),
+    ),
+    (PERSON_SCORE_CATALOG, 1): CatalogSchema(
+        PERSON_SCORE_CATALOG,
+        1,
+        (
+            ("part", _choice(SCORE_PARTS)),
+            ("weight_milli", integer_field(-1000, 1000)),
+            ("reads", _choice(SCORE_READS)),
+            ("dispositions", key_list_field),
+            ("reason", text_field),
+        ),
+        entry_check=_score_bounds,
+    ),
+    (COMPARISON_PROTOCOL_CATALOG, 1): CatalogSchema(
+        COMPARISON_PROTOCOL_CATALOG,
+        1,
+        (("value", integer_field(0, 10**9)), ("reason", text_field)),
+    ),
+    (COMPARISON_SEEDS_CATALOG, 1): CatalogSchema(
+        COMPARISON_SEEDS_CATALOG,
+        1,
+        (
+            ("phase", _choice(SEED_PHASES)),
+            ("seed_digest", _sha256_text),
+            ("reason", text_field),
+        ),
     ),
 }
 
@@ -697,6 +767,45 @@ def load_decision_catalogs(
         _values(catalogs[DECISION_POLICY_CATALOG]),
         chosen,
         catalog_digest([catalogs[key] for key in sorted(catalogs)]),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ComparisonCatalogs:
+    """One version each of the score, the comparison protocol and its seeds, by entry key."""
+
+    score: Mapping[str, Mapping[str, FieldValue]]
+    protocol: Mapping[str, Mapping[str, FieldValue]]
+    seeds: Mapping[str, Mapping[str, FieldValue]]
+    versions: Mapping[str, int]
+    #: One digest over the three catalogs, as a comparison records what it was scored under.
+    sha256: str
+
+
+def load_comparison_catalogs(
+    directory: Path = ROUTINE_DIRECTORY, versions: Mapping[str, int] | None = None
+) -> ComparisonCatalogs:
+    """Read one version of each comparison catalog. What the values mean is checked by
+    :mod:`exulanica.world.society_score` and :mod:`exulanica.world.society_comparison`."""
+    chosen = dict(COMPARISON_VERSIONS if versions is None else versions)
+    if set(chosen) != set(COMPARISON_VERSIONS):
+        raise CatalogError(f"a comparison reads exactly {sorted(COMPARISON_VERSIONS)}")
+    for catalog_id, version in sorted(chosen.items()):
+        if (catalog_id, version) not in SCHEMAS:
+            raise CatalogError(f"{catalog_id} v{version} has no schema")
+    _claimed(directory)
+    catalogs = {
+        catalog_id: load_catalog(
+            directory.joinpath(f"{catalog_id}.v{version}.json"), SCHEMAS[(catalog_id, version)]
+        )
+        for catalog_id, version in sorted(chosen.items())
+    }
+    return ComparisonCatalogs(
+        score=_values(catalogs[PERSON_SCORE_CATALOG]),
+        protocol=_values(catalogs[COMPARISON_PROTOCOL_CATALOG]),
+        seeds=_values(catalogs[COMPARISON_SEEDS_CATALOG]),
+        versions=chosen,
+        sha256=catalog_digest([catalogs[key] for key in sorted(catalogs)]),
     )
 
 

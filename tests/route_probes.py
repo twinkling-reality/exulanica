@@ -710,6 +710,10 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         build.world_object, build.invented_object
     ),
     "/world/versions/{version_id}/society/actions/{request_id}": Owned(build.action_request),
+    "/world/versions/{version_id}/society/comparisons/{comparison_id}": Owned(build.comparison),
+    "/world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}": Owned(
+        build.comparison_run
+    ),
     "/world/versions/{version_id}/society/decisions/{request_id}": Owned(build.decision_request),
     "/world/versions/{version_id}/society/experiments/{experiment_id}": Owned(build.experiment),
     "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}": (

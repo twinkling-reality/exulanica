@@ -12,6 +12,8 @@ export function buildWorldMenu(options: {
   readonly onResume: () => void;
   readonly onWorld: () => void;
   readonly onExperiment?: () => void;
+  /** Opens the comparisons of the models that ran this world's people; absent with no world. */
+  readonly onCompare?: () => void;
   readonly onCommand: (command: AtlasCommand) => void;
 }): WorldMenu {
   const root = el('section', {
@@ -24,7 +26,7 @@ export function buildWorldMenu(options: {
   let activate = (action: () => void): void => action();
 
   const entry = (
-    command: AtlasCommand | 'world' | 'experiment',
+    command: AtlasCommand | 'world' | 'experiment' | 'compare',
     label: string,
     detail: string,
     key: string,
@@ -43,7 +45,9 @@ export function buildWorldMenu(options: {
       ? options.onWorld
       : command === 'experiment'
         ? options.onExperiment!
-        : () => options.onCommand(command)));
+        : command === 'compare'
+          ? options.onCompare!
+          : () => options.onCommand(command)));
     return button;
   };
 
@@ -59,6 +63,9 @@ export function buildWorldMenu(options: {
     entry('map', 'Map', 'Regions and orientation', 'M', 'world-menu-map'),
     ...(options.onExperiment === undefined ? [] : [
       entry('experiment', 'Recorded comparison', 'Read one existing society attempt', '', 'world-menu-experiment'),
+    ]),
+    ...(options.onCompare === undefined ? [] : [
+      entry('compare', 'Compare models', 'Two open models, the same hour', '', 'world-menu-compare'),
     ]),
     entry('companion', 'Companion', 'Call the Unnamed Companion', 'X', 'world-menu-companion'),
     entry('options', 'Customize world', 'Light, material, and atmosphere', 'O', 'world-menu-customize'),

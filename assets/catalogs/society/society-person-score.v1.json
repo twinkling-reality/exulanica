@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-person-score",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "need_relief",
+      "part": "primary",
+      "weight_milli": 1000,
+      "reads": "states",
+      "dispositions": [],
+      "reason": "How much of the need that waiting would leave above the threshold the people were spared, as a share of what their own routine spares them on the same seed. U is the need above the threshold summed over the people's person-minutes, read from every minute's state, and the term is (U of waiting minus U of this run) over (U of waiting minus U of the routine). Waiting scores 0 and the routine 1 by construction; a run can score below 0, worse than waiting, or above 1, better than the routine, and every reader shows the value unclipped. The threshold is the need at which the recorded routine prefers an activity to every other, read from the routine the run's input records, never stated here.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    },
+    {
+      "key": "turns_refused",
+      "part": "primary",
+      "weight_milli": -1000,
+      "reads": "events",
+      "dispositions": [
+        "rejected"
+      ],
+      "reason": "The share of the people's turns whose proposal the engine refused: an answer that was not one of the offered actions after the retry, or a choice that no longer held when its minute ran. Read from the decision_applied events the engine appends, by their disposition, never from the model's answer. At weight one, together with the unanswered share, a run whose every turn the routine took scores what waiting scores, so a model gains nothing from the routine's decisions.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    },
+    {
+      "key": "turns_unanswered",
+      "part": "primary",
+      "weight_milli": -1000,
+      "reads": "events",
+      "dispositions": [
+        "stale",
+        "superseded",
+        "unavailable"
+      ],
+      "reason": "The share of the people's turns the model's answer did not decide: no answer in time, a failed call or no ask at all, a decision asked over a minute that then changed, or a person asked directly by their world's owner in the same minute; the routine or the owner decided each of them. Read from the decision_applied events the engine appends, by their disposition, and weighted as a refusal is, because either way the turn was not the model's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    },
+    {
+      "key": "waiting_share",
+      "part": "held_out",
+      "weight_milli": 0,
+      "reads": "states",
+      "dispositions": [],
+      "reason": "The share of the people's person-minutes spent where they are with nothing under way. Waiting is an allowed action, so this is reported rather than penalised: a model that waits a great deal shows it here and pays for it only through the need it leaves unmet.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    },
+    {
+      "key": "walking_share",
+      "part": "held_out",
+      "weight_milli": 0,
+      "reads": "states",
+      "dispositions": [],
+      "reason": "The share of the people's person-minutes spent walking. No term rewards or penalises walking, since a travel penalty would pay people to stand still; it is reported so a reader can see how a model moves people.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    },
+    {
+      "key": "activities_per_person",
+      "part": "held_out",
+      "weight_milli": 0,
+      "reads": "states",
+      "dispositions": [],
+      "reason": "How many different activities each person was seen doing in the hour, averaged over the people: the variety of what people do, which no term rewards, reported so that a model which sends everybody to one kind of place is visible.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    },
+    {
+      "key": "first_answers_refused",
+      "part": "held_out",
+      "weight_milli": 0,
+      "reads": "calls",
+      "dispositions": [],
+      "reason": "The share of the people's asked turns whose first answer was not one of the offered actions, whether or not the answer asked once more then was. Read from the host's record of each call, never from the model's account of itself, and kept out of the score, which sees only what the engine did.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    },
+    {
+      "key": "cost_per_hour",
+      "part": "held_out",
+      "weight_milli": 0,
+      "reads": "calls",
+      "dispositions": [],
+      "reason": "What the model's calls cost for the simulated hour, as the provider reported it, or at the most a call can cost when the provider reported nothing. A running cost, not a measure of how well people fared.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    },
+    {
+      "key": "latency",
+      "part": "held_out",
+      "weight_milli": 0,
+      "reads": "calls",
+      "dispositions": [],
+      "reason": "How long each asked turn took, the median and the slowest twentieth, measured on the machine that asked. A property of the provider and the network as much as the model, reported so a reader can weigh it, never scored.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica score of a person in a world; see the entry reason"
+      }
+    }
+  ]
+}

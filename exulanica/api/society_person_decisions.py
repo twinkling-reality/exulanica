@@ -375,6 +375,13 @@ def ask_person(
         except (ModelError, PrivacyAdmissionError, NoHostedRequestPolicy) as exc:
             status, reason = "unavailable", _failure_reason(exc)
             break
+        except Exception:
+            # Any other error ends the ask as a failed call, and every attempt it paid for stays in
+            # the record rather than leaving with the exception. Never an exception's text, which
+            # may carry request bytes or a credential.
+            _LOG.error("A person's decision ask failed; the routine decides that turn")
+            status, reason = "unavailable", "model_call_failed"
+            break
         log.record(chosen.call)
         served = chosen.call.served_model_id
         option = next(o for o in context["options"] if o["label"] == chosen.label)

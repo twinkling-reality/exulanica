@@ -137,6 +137,12 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0110 appends a world owner's choices of who decides for its people and refuses
     # every update and delete of one.
     "world_society_model_choice",
+    # Migration 0113 appends a comparison of the models that run a world's people, its runs,
+    # their receipts and outcomes, and refuses every update and delete of each.
+    "society_comparison",
+    "society_comparison_run",
+    "society_comparison_decision",
+    "society_comparison_outcome",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

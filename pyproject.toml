@@ -763,3 +763,25 @@ source_modules = [
   "exulanica.selection.proposal",
 ]
 forbidden_modules = ["exulanica.selection.question"]
+
+[[tool.importlinter.contracts]]
+# A person's score is read from what the engine recorded, never from what a model said of itself.
+#
+# The score of a person in a world and the claim a comparison makes from it are computed from
+# engine states and the dispositions the engine recorded for each receipt. The strongest form of
+# "a model's output cannot reach its own score" is a scorer that cannot import the model client,
+# the asking path or the API that holds the receipts' call records: no refactor inside these two
+# modules can read an answer, a token count or a cost, and no reviewer has to notice. Indirect
+# imports count, so a chain through another module is refused as well; the scorer may import the
+# society catalogs and the planner, which import none of the three.
+name = "A person's score cannot read a model"
+type = "forbidden"
+source_modules = [
+  "exulanica.world.society_comparison_claim",
+  "exulanica.world.society_score",
+]
+forbidden_modules = [
+  "exulanica.api",
+  "exulanica.models",
+  "exulanica.selection",
+]

@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-comparison-seeds",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "development_1",
+      "phase": "development",
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80",
+      "reason": "A development seed: a comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser, and it is never judged. The seed itself is kept outside the repository; this is the SHA-256 of its text, which a runner checks before it runs one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_2",
+      "phase": "development",
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca",
+      "reason": "A development seed: a comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser, and it is never judged. The seed itself is kept outside the repository; this is the SHA-256 of its text, which a runner checks before it runs one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_3",
+      "phase": "development",
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2",
+      "reason": "A development seed: a comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser, and it is never judged. The seed itself is kept outside the repository; this is the SHA-256 of its text, which a runner checks before it runs one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_4",
+      "phase": "development",
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19",
+      "reason": "A development seed: a comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser, and it is never judged. The seed itself is kept outside the repository; this is the SHA-256 of its text, which a runner checks before it runs one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_5",
+      "phase": "development",
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0",
+      "reason": "A development seed: a comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser, and it is never judged. The seed itself is kept outside the repository; this is the SHA-256 of its text, which a runner checks before it runs one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_6",
+      "phase": "development",
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d",
+      "reason": "A development seed: a comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser, and it is never judged. The seed itself is kept outside the repository; this is the SHA-256 of its text, which a runner checks before it runs one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_7",
+      "phase": "development",
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7",
+      "reason": "A development seed: a comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser, and it is never judged. The seed itself is kept outside the repository; this is the SHA-256 of its text, which a runner checks before it runs one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_8",
+      "phase": "development",
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047",
+      "reason": "A development seed: a comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser, and it is never judged. The seed itself is kept outside the repository; this is the SHA-256 of its text, which a runner checks before it runs one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_1",
+      "phase": "held_out",
+      "seed_digest": "441d70ddc98150dc8251cbb5d5d8da0c4a402e3bebcdcd210891821492f5c1b7",
+      "reason": "A held-out seed, committed here by the SHA-256 of its text before any comparison was run on it and kept outside the repository until a pre-registered comparison is judged on it. It is disjoint from the development seeds, and a comparison judged on it is judged once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_2",
+      "phase": "held_out",
+      "seed_digest": "e4a6b29ba0ac55df96c5906e4cfabf9f3f796cf49ba05c754bad32ccd4ce72f4",
+      "reason": "A held-out seed, committed here by the SHA-256 of its text before any comparison was run on it and kept outside the repository until a pre-registered comparison is judged on it. It is disjoint from the development seeds, and a comparison judged on it is judged once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_3",
+      "phase": "held_out",
+      "seed_digest": "da735daa310764a8b3700111fc7c259c4628b18a53b04a1fb58f5809b7b55727",
+      "reason": "A held-out seed, committed here by the SHA-256 of its text before any comparison was run on it and kept outside the repository until a pre-registered comparison is judged on it. It is disjoint from the development seeds, and a comparison judged on it is judged once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_4",
+      "phase": "held_out",
+      "seed_digest": "00fc09b7e6c225dc2bfc0f9cf2a16724c8e15803a9cda40956cc57fea2b99c31",
+      "reason": "A held-out seed, committed here by the SHA-256 of its text before any comparison was run on it and kept outside the repository until a pre-registered comparison is judged on it. It is disjoint from the development seeds, and a comparison judged on it is judged once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_5",
+      "phase": "held_out",
+      "seed_digest": "91f6c5f85a7659ad6cf830843838f4d1ff8c9ab29a231f44d2fb4a98d4d722a0",
+      "reason": "A held-out seed, committed here by the SHA-256 of its text before any comparison was run on it and kept outside the repository until a pre-registered comparison is judged on it. It is disjoint from the development seeds, and a comparison judged on it is judged once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_6",
+      "phase": "held_out",
+      "seed_digest": "8b7a635021d9dc4956309378ea3df8efd68631f8b6e1e14937031498c9d4f3fc",
+      "reason": "A held-out seed, committed here by the SHA-256 of its text before any comparison was run on it and kept outside the repository until a pre-registered comparison is judged on it. It is disjoint from the development seeds, and a comparison judged on it is judged once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_7",
+      "phase": "held_out",
+      "seed_digest": "d21b2a46d776d4ac4c2b12f3321145187962a95afb15208cadb037b86c624a5b",
+      "reason": "A held-out seed, committed here by the SHA-256 of its text before any comparison was run on it and kept outside the repository until a pre-registered comparison is judged on it. It is disjoint from the development seeds, and a comparison judged on it is judged once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_8",
+      "phase": "held_out",
+      "seed_digest": "1205c55e5de395ab5cd7841168ddd2037db4fafc5dfd732a99263070340d0112",
+      "reason": "A held-out seed, committed here by the SHA-256 of its text before any comparison was run on it and kept outside the repository until a pre-registered comparison is judged on it. It is disjoint from the development seeds, and a comparison judged on it is judged once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    }
+  ]
+}

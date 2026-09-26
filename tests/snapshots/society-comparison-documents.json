@@ -1,0 +1,1372 @@
+{
+  "listing": {
+    "comparisons": [
+      {
+        "arms": [
+          {
+            "decider": {
+              "kind": "model",
+              "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+              "name": "Qwen3 235B Instruct",
+              "provider": "nebius_token_factory"
+            },
+            "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+            "key": "model_a",
+            "role": "candidate"
+          },
+          {
+            "decider": {
+              "kind": "model",
+              "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+              "name": "DeepSeek V4 Flash",
+              "provider": "nebius_token_factory"
+            },
+            "description": "DeepSeek V4 Flash, an open reasoning model from DeepSeek.",
+            "key": "model_b",
+            "role": "candidate"
+          },
+          {
+            "decider": {
+              "kind": "routine"
+            },
+            "description": "Their own routine",
+            "key": "routine",
+            "role": "one"
+          },
+          {
+            "decider": {
+              "kind": "wait"
+            },
+            "description": "Waiting where they are",
+            "key": "wait",
+            "role": "zero"
+          }
+        ],
+        "comparison_id": "34bf5db4-3228-4cd0-b890-6f60c694b4ec",
+        "created_at": "2026-09-26T18:46:12.773881+00:00",
+        "phase": "development",
+        "runs": 8,
+        "runs_completed": 8,
+        "runs_expected": 8,
+        "seeds": 2
+      }
+    ],
+    "profile": "exulanica.society-comparisons/v1"
+  },
+  "result": {
+    "arms": [
+      {
+        "decider": {
+          "kind": "model",
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "name": "Qwen3 235B Instruct",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+        "key": "model_a",
+        "role": "candidate"
+      },
+      {
+        "decider": {
+          "kind": "model",
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "name": "DeepSeek V4 Flash",
+          "provider": "nebius_token_factory"
+        },
+        "description": "DeepSeek V4 Flash, an open reasoning model from DeepSeek.",
+        "key": "model_b",
+        "role": "candidate"
+      },
+      {
+        "decider": {
+          "kind": "routine"
+        },
+        "description": "Their own routine",
+        "key": "routine",
+        "role": "one"
+      },
+      {
+        "decider": {
+          "kind": "wait"
+        },
+        "description": "Waiting where they are",
+        "key": "wait",
+        "role": "zero"
+      }
+    ],
+    "comparison_id": "34bf5db4-3228-4cd0-b890-6f60c694b4ec",
+    "control": null,
+    "control_bound": null,
+    "created_at": "2026-09-26T18:46:12.773881+00:00",
+    "differences": [
+      {
+        "first": "model_a",
+        "high": "0.0000",
+        "low": "0.0000",
+        "mean": "0.0000",
+        "rejected": false,
+        "second": "model_b"
+      },
+      {
+        "first": "routine",
+        "high": "-0.1969",
+        "low": "-0.2301",
+        "mean": "-0.2135",
+        "rejected": true,
+        "second": "model_a"
+      },
+      {
+        "first": "routine",
+        "high": "-0.1969",
+        "low": "-0.2301",
+        "mean": "-0.2135",
+        "rejected": true,
+        "second": "model_b"
+      }
+    ],
+    "phase": "development",
+    "population": 8,
+    "preregistration": null,
+    "primary": [
+      "model_a",
+      "model_b"
+    ],
+    "profile": "exulanica.society-comparison-result/v1",
+    "seeds": [
+      {
+        "excluded": null,
+        "name": null,
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 91,
+              "cost_known": true,
+              "cost_usd": "0.01274000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 14
+              }
+            },
+            "failure": null,
+            "not_applied": 21,
+            "run_id": "e22aaa9f-2ce1-5238-b33f-bfc19784a26b",
+            "score": "0.7699",
+            "status": "completed",
+            "turns": 91
+          },
+          "model_b": {
+            "calls": {
+              "asked": 91,
+              "cost_known": true,
+              "cost_usd": "0.00637000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 10
+              }
+            },
+            "failure": null,
+            "not_applied": 21,
+            "run_id": "ed1e175e-eb54-5fd8-803a-e53876662453",
+            "score": "0.7699",
+            "status": "completed",
+            "turns": 91
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "not_applied": 0,
+            "run_id": "12dd2f20-b7e4-5343-bebd-06fc447f2af2",
+            "score": "1.0000",
+            "status": "completed",
+            "turns": 0
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "not_applied": 0,
+            "run_id": "6b493090-4439-5939-bc82-3794040004d0",
+            "score": "0.0000",
+            "status": "completed",
+            "turns": 0
+          }
+        },
+        "seed_digest": "ef10d747dfd582f69c152750b7a36498feefcd01028cc5206b9ac0e7437db150"
+      },
+      {
+        "excluded": null,
+        "name": null,
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 90,
+              "cost_known": true,
+              "cost_usd": "0.01260000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 8
+              }
+            },
+            "failure": null,
+            "not_applied": 18,
+            "run_id": "ae49e483-9c44-5481-88ad-dc6f96a82169",
+            "score": "0.8031",
+            "status": "completed",
+            "turns": 90
+          },
+          "model_b": {
+            "calls": {
+              "asked": 90,
+              "cost_known": true,
+              "cost_usd": "0.00630000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 16
+              }
+            },
+            "failure": null,
+            "not_applied": 18,
+            "run_id": "131403c8-cd83-5748-b7e5-92b4c4848f85",
+            "score": "0.8031",
+            "status": "completed",
+            "turns": 90
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "not_applied": 0,
+            "run_id": "ea20f551-d98d-577f-b39c-42bfd3971558",
+            "score": "1.0000",
+            "status": "completed",
+            "turns": 0
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "not_applied": 0,
+            "run_id": "22145525-fc5b-5ba0-a678-07ab370c5181",
+            "score": "0.0000",
+            "status": "completed",
+            "turns": 0
+          }
+        },
+        "seed_digest": "760c29cbe9611967c28af6c06867dd5112267f21ea4a0be9679dc1a92f27c4ee"
+      }
+    ],
+    "summaries": {
+      "model_a": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0127",
+        "held_out": {
+          "activities_per_person": "3.1875",
+          "first_answers_refused": "0.0000",
+          "waiting_share": "0.0000",
+          "walking_share": "0.2042"
+        },
+        "interval": {
+          "high": "0.8031",
+          "low": "0.7699"
+        },
+        "latency_ms": {
+          "p50": 6,
+          "p95": 12
+        },
+        "mean_score": "0.7865",
+        "not_applied_share": "0.2155"
+      },
+      "model_b": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0063",
+        "held_out": {
+          "activities_per_person": "3.1875",
+          "first_answers_refused": "0.0000",
+          "waiting_share": "0.0000",
+          "walking_share": "0.2042"
+        },
+        "interval": {
+          "high": "0.8031",
+          "low": "0.7699"
+        },
+        "latency_ms": {
+          "p50": 6,
+          "p95": 13
+        },
+        "mean_score": "0.7865",
+        "not_applied_share": "0.2155"
+      },
+      "routine": {
+        "cost_known": true,
+        "cost_usd_per_hour": null,
+        "held_out": {
+          "activities_per_person": "3.8125",
+          "first_answers_refused": null,
+          "waiting_share": "0.0000",
+          "walking_share": "0.1771"
+        },
+        "interval": {
+          "high": "1.0000",
+          "low": "1.0000"
+        },
+        "latency_ms": {
+          "p50": null,
+          "p95": null
+        },
+        "mean_score": "1.0000",
+        "not_applied_share": null
+      },
+      "wait": {
+        "cost_known": true,
+        "cost_usd_per_hour": null,
+        "held_out": {
+          "activities_per_person": "0.0000",
+          "first_answers_refused": null,
+          "waiting_share": "1.0000",
+          "walking_share": "0.0000"
+        },
+        "interval": {
+          "high": "0.0000",
+          "low": "0.0000"
+        },
+        "latency_ms": {
+          "p50": null,
+          "p95": null
+        },
+        "mean_score": "0.0000",
+        "not_applied_share": null
+      }
+    },
+    "verdict": {
+      "code": "not_judged",
+      "higher": null,
+      "reason": "development_seeds"
+    },
+    "window_ticks": 60
+  },
+  "run": {
+    "activities": [
+      {
+        "kind": "rest",
+        "label": "resting"
+      },
+      {
+        "kind": "visit",
+        "label": "visiting"
+      },
+      {
+        "kind": "stand",
+        "label": "standing"
+      },
+      {
+        "kind": "talk",
+        "label": "talking"
+      }
+    ],
+    "arm": "model_a",
+    "decisions": [
+      {
+        "chose": "resting, 8 m away",
+        "cost_usd": "0.00014000",
+        "decision_seq": 1,
+        "disposition": "applied",
+        "disposition_reason": "validated_choice",
+        "latency_ms": 12,
+        "reason": "validated_choice",
+        "status": "accepted",
+        "subject_id": "00187c7e-0724-5022-8449-bb86abf8b9e7",
+        "tick": 1
+      },
+      {
+        "chose": "resting, 14 m away",
+        "cost_usd": "0.00014000",
+        "decision_seq": 2,
+        "disposition": "applied",
+        "disposition_reason": "validated_choice",
+        "latency_ms": 13,
+        "reason": "validated_choice",
+        "status": "accepted",
+        "subject_id": "1653363d-6449-51a9-a0f4-823df7b52ab0",
+        "tick": 1
+      },
+      {
+        "chose": "resting, 10 m away",
+        "cost_usd": "0.00014000",
+        "decision_seq": 3,
+        "disposition": "applied",
+        "disposition_reason": "validated_choice",
+        "latency_ms": 12,
+        "reason": "validated_choice",
+        "status": "accepted",
+        "subject_id": "217c089f-2e6e-57ee-84d0-b6b7ebc5c531",
+        "tick": 1
+      }
+    ],
+    "events": [
+      {
+        "kind": "goal_selected",
+        "reason": "chosen_by_their_model",
+        "subject_id": "00187c7e-0724-5022-8449-bb86abf8b9e7",
+        "summary": "Ari Ash 1 (simulated): goal selected; chosen by their model.",
+        "tick": 1
+      },
+      {
+        "kind": "route_progressed",
+        "reason": "arrived_at_access_node",
+        "subject_id": "00187c7e-0724-5022-8449-bb86abf8b9e7",
+        "summary": "Ari Ash 1 (simulated): action started; arrived at access node.",
+        "tick": 1
+      },
+      {
+        "kind": "goal_selected",
+        "reason": "chosen_by_their_model",
+        "subject_id": "1653363d-6449-51a9-a0f4-823df7b52ab0",
+        "summary": "Bela Ash 2 (simulated): goal selected; chosen by their model.",
+        "tick": 1
+      }
+    ],
+    "minutes": [
+      {
+        "people": [
+          {
+            "action": "idle",
+            "goal": null,
+            "id": "00187c7e-0724-5022-8449-bb86abf8b9e7",
+            "need_milli": 618,
+            "path": [
+              [
+                0,
+                0
+              ]
+            ],
+            "reason": "awaiting_goal",
+            "status": "active",
+            "x": 0,
+            "z": 0
+          },
+          {
+            "action": "idle",
+            "goal": null,
+            "id": "1653363d-6449-51a9-a0f4-823df7b52ab0",
+            "need_milli": 504,
+            "path": [
+              [
+                2000,
+                -8000
+              ]
+            ],
+            "reason": "awaiting_goal",
+            "status": "active",
+            "x": 2000,
+            "z": -8000
+          },
+          {
+            "action": "idle",
+            "goal": null,
+            "id": "217c089f-2e6e-57ee-84d0-b6b7ebc5c531",
+            "need_milli": 581,
+            "path": [
+              [
+                6000,
+                4000
+              ]
+            ],
+            "reason": "awaiting_goal",
+            "status": "active",
+            "x": 6000,
+            "z": 4000
+          },
+          {
+            "action": "idle",
+            "goal": null,
+            "id": "cdeac823-0b8c-56c1-8b80-faee5db33d5d",
+            "need_milli": 771,
+            "path": [
+              [
+                8000,
+                -2000
+              ]
+            ],
+            "reason": "awaiting_goal",
+            "status": "active",
+            "x": 8000,
+            "z": -2000
+          },
+          {
+            "action": "idle",
+            "goal": null,
+            "id": "85df9c38-a5b1-50df-ba15-e83486ddc94f",
+            "need_milli": 512,
+            "path": [
+              [
+                10000,
+                -8000
+              ]
+            ],
+            "reason": "awaiting_goal",
+            "status": "active",
+            "x": 10000,
+            "z": -8000
+          },
+          {
+            "action": "idle",
+            "goal": null,
+            "id": "a98c2fba-00cd-5a82-8224-371b065fd9aa",
+            "need_milli": 660,
+            "path": [
+              [
+                -4000,
+                4000
+              ]
+            ],
+            "reason": "awaiting_goal",
+            "status": "active",
+            "x": -4000,
+            "z": 4000
+          },
+          {
+            "action": "idle",
+            "goal": null,
+            "id": "c565fb9f-85c0-5371-9a3a-ca437ffaabe5",
+            "need_milli": 832,
+            "path": [
+              [
+                -6000,
+                10000
+              ]
+            ],
+            "reason": "awaiting_goal",
+            "status": "active",
+            "x": -6000,
+            "z": 10000
+          },
+          {
+            "action": "idle",
+            "goal": null,
+            "id": "b36600d8-cbac-5621-b9fb-dd67685d4756",
+            "need_milli": 861,
+            "path": [
+              [
+                -8000,
+                -6000
+              ]
+            ],
+            "reason": "awaiting_goal",
+            "status": "active",
+            "x": -8000,
+            "z": -6000
+          }
+        ],
+        "tick": 0
+      },
+      {
+        "people": [
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-0:rest"
+            },
+            "id": "00187c7e-0724-5022-8449-bb86abf8b9e7",
+            "need_milli": 619,
+            "path": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                2000
+              ],
+              [
+                0,
+                4000
+              ],
+              [
+                2000,
+                4000
+              ],
+              [
+                4000,
+                4000
+              ],
+              [
+                3350,
+                4999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 3350,
+            "z": 4999
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-0:rest"
+            },
+            "id": "1653363d-6449-51a9-a0f4-823df7b52ab0",
+            "need_milli": 505,
+            "path": [
+              [
+                2000,
+                -8000
+              ],
+              [
+                2000,
+                -6000
+              ],
+              [
+                2000,
+                -4000
+              ],
+              [
+                2000,
+                -2000
+              ],
+              [
+                2000,
+                0
+              ],
+              [
+                2000,
+                2000
+              ],
+              [
+                2000,
+                4000
+              ],
+              [
+                2000,
+                6000
+              ],
+              [
+                2650,
+                5001
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 2650,
+            "z": 5001
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-2:rest"
+            },
+            "id": "217c089f-2e6e-57ee-84d0-b6b7ebc5c531",
+            "need_milli": 582,
+            "path": [
+              [
+                6000,
+                4000
+              ],
+              [
+                4000,
+                4000
+              ],
+              [
+                2000,
+                4000
+              ],
+              [
+                0,
+                4000
+              ],
+              [
+                0,
+                6000
+              ],
+              [
+                0,
+                8000
+              ],
+              [
+                350,
+                8999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 350,
+            "z": 8999
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-1:rest"
+            },
+            "id": "cdeac823-0b8c-56c1-8b80-faee5db33d5d",
+            "need_milli": 772,
+            "path": [
+              [
+                8000,
+                -2000
+              ],
+              [
+                6000,
+                -2000
+              ],
+              [
+                4000,
+                -2000
+              ],
+              [
+                2000,
+                -2000
+              ],
+              [
+                0,
+                -2000
+              ],
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                2000
+              ],
+              [
+                0,
+                4000
+              ],
+              [
+                0,
+                6000
+              ],
+              [
+                -2000,
+                6000
+              ],
+              [
+                -4000,
+                6000
+              ],
+              [
+                -3350,
+                5001
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": -3350,
+            "z": 5001
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "looking_around",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:pillar:visit"
+            },
+            "id": "85df9c38-a5b1-50df-ba15-e83486ddc94f",
+            "need_milli": 513,
+            "path": [
+              [
+                10000,
+                -8000
+              ],
+              [
+                8000,
+                -8000
+              ],
+              [
+                8000,
+                -6000
+              ],
+              [
+                8000,
+                -4000
+              ],
+              [
+                8000,
+                -2000
+              ],
+              [
+                8000,
+                0
+              ],
+              [
+                8000,
+                2000
+              ],
+              [
+                8000,
+                4000
+              ],
+              [
+                8000,
+                6000
+              ],
+              [
+                8000,
+                8000
+              ],
+              [
+                8000,
+                10000
+              ],
+              [
+                6000,
+                10000
+              ],
+              [
+                5085,
+                9001
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 5085,
+            "z": 9001
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "looking_around",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:pillar:visit"
+            },
+            "id": "a98c2fba-00cd-5a82-8224-371b065fd9aa",
+            "need_milli": 661,
+            "path": [
+              [
+                -4000,
+                4000
+              ],
+              [
+                -2000,
+                4000
+              ],
+              [
+                0,
+                4000
+              ],
+              [
+                0,
+                6000
+              ],
+              [
+                0,
+                8000
+              ],
+              [
+                2000,
+                8000
+              ],
+              [
+                4000,
+                8000
+              ],
+              [
+                6000,
+                8000
+              ],
+              [
+                5999,
+                8085
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 5999,
+            "z": 8085
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:pillar:visit"
+            },
+            "id": "c565fb9f-85c0-5371-9a3a-ca437ffaabe5",
+            "need_milli": 833,
+            "path": [
+              [
+                -6000,
+                10000
+              ],
+              [
+                -4000,
+                10000
+              ],
+              [
+                -2000,
+                10000
+              ],
+              [
+                0,
+                10000
+              ],
+              [
+                2000,
+                10000
+              ],
+              [
+                4000,
+                10000
+              ],
+              [
+                6000,
+                10000
+              ],
+              [
+                6001,
+                9915
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 6001,
+            "z": 9915
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-1:rest"
+            },
+            "id": "b36600d8-cbac-5621-b9fb-dd67685d4756",
+            "need_milli": 862,
+            "path": [
+              [
+                -8000,
+                -6000
+              ],
+              [
+                -6000,
+                -6000
+              ],
+              [
+                -4000,
+                -6000
+              ],
+              [
+                -2000,
+                -6000
+              ],
+              [
+                -2000,
+                -4000
+              ],
+              [
+                -2000,
+                -2000
+              ],
+              [
+                -2000,
+                0
+              ],
+              [
+                -2000,
+                2000
+              ],
+              [
+                -2000,
+                4000
+              ],
+              [
+                -2650,
+                4999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": -2650,
+            "z": 4999
+          }
+        ],
+        "tick": 1
+      },
+      {
+        "people": [
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-0:rest"
+            },
+            "id": "00187c7e-0724-5022-8449-bb86abf8b9e7",
+            "need_milli": 620,
+            "path": [
+              [
+                3350,
+                4999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 3350,
+            "z": 4999
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-0:rest"
+            },
+            "id": "1653363d-6449-51a9-a0f4-823df7b52ab0",
+            "need_milli": 506,
+            "path": [
+              [
+                2650,
+                5001
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 2650,
+            "z": 5001
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-2:rest"
+            },
+            "id": "217c089f-2e6e-57ee-84d0-b6b7ebc5c531",
+            "need_milli": 583,
+            "path": [
+              [
+                350,
+                8999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 350,
+            "z": 8999
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-1:rest"
+            },
+            "id": "cdeac823-0b8c-56c1-8b80-faee5db33d5d",
+            "need_milli": 773,
+            "path": [
+              [
+                -3350,
+                5001
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": -3350,
+            "z": 5001
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "looking_around",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:pillar:visit"
+            },
+            "id": "85df9c38-a5b1-50df-ba15-e83486ddc94f",
+            "need_milli": 514,
+            "path": [
+              [
+                5085,
+                9001
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 5085,
+            "z": 9001
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "looking_around",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:pillar:visit"
+            },
+            "id": "a98c2fba-00cd-5a82-8224-371b065fd9aa",
+            "need_milli": 662,
+            "path": [
+              [
+                5999,
+                8085
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 5999,
+            "z": 8085
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:pillar:visit"
+            },
+            "id": "c565fb9f-85c0-5371-9a3a-ca437ffaabe5",
+            "need_milli": 814,
+            "path": [
+              [
+                6001,
+                9915
+              ]
+            ],
+            "reason": "reviewed_duration_elapsed",
+            "status": "completed",
+            "x": 6001,
+            "z": 9915
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-1:rest"
+            },
+            "id": "b36600d8-cbac-5621-b9fb-dd67685d4756",
+            "need_milli": 863,
+            "path": [
+              [
+                -2650,
+                4999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": -2650,
+            "z": 4999
+          }
+        ],
+        "tick": 2
+      }
+    ],
+    "people": [
+      {
+        "id": "00187c7e-0724-5022-8449-bb86abf8b9e7",
+        "name": "Ari Ash 1"
+      },
+      {
+        "id": "1653363d-6449-51a9-a0f4-823df7b52ab0",
+        "name": "Bela Ash 2"
+      },
+      {
+        "id": "217c089f-2e6e-57ee-84d0-b6b7ebc5c531",
+        "name": "Cleo Ash 3"
+      },
+      {
+        "id": "cdeac823-0b8c-56c1-8b80-faee5db33d5d",
+        "name": "Dara Ash 4"
+      },
+      {
+        "id": "85df9c38-a5b1-50df-ba15-e83486ddc94f",
+        "name": "Emi Ash 5"
+      },
+      {
+        "id": "a98c2fba-00cd-5a82-8224-371b065fd9aa",
+        "name": "Faye Ash 6"
+      },
+      {
+        "id": "c565fb9f-85c0-5371-9a3a-ca437ffaabe5",
+        "name": "Ivo Ash 7"
+      },
+      {
+        "id": "b36600d8-cbac-5621-b9fb-dd67685d4756",
+        "name": "Juno Ash 8"
+      }
+    ],
+    "place": {
+      "edges": [
+        [
+          "ground:+00000000:+00000000",
+          "ground:+00000000:+00002000"
+        ],
+        [
+          "ground:+00000000:+00000000",
+          "ground:+00002000:+00000000"
+        ],
+        [
+          "ground:+00000000:+00002000",
+          "ground:+00000000:+00004000"
+        ],
+        [
+          "ground:+00000000:+00004000",
+          "ground:+00000000:+00006000"
+        ],
+        [
+          "ground:+00000000:+00006000",
+          "ground:+00000000:+00008000"
+        ],
+        [
+          "ground:+00000000:+00008000",
+          "ground:+00000000:+00010000"
+        ],
+        [
+          "ground:+00000000:-00002000",
+          "ground:+00000000:+00000000"
+        ],
+        [
+          "ground:+00000000:-00004000",
+          "ground:+00000000:-00002000"
+        ],
+        [
+          "ground:+00000000:-00006000",
+          "ground:+00000000:-00004000"
+        ],
+        [
+          "ground:+00000000:-00008000",
+          "ground:+00000000:-00006000"
+        ],
+        [
+          "ground:+00000000:-00010000",
+          "ground:+00000000:-00008000"
+        ]
+      ],
+      "nodes": [
+        {
+          "id": "ground:+00000000:+00000000",
+          "x": 0,
+          "z": 0
+        },
+        {
+          "id": "ground:+00000000:+00002000",
+          "x": 0,
+          "z": 2000
+        },
+        {
+          "id": "ground:+00000000:+00004000",
+          "x": 0,
+          "z": 4000
+        },
+        {
+          "id": "ground:+00000000:+00006000",
+          "x": 0,
+          "z": 6000
+        },
+        {
+          "id": "ground:+00000000:+00008000",
+          "x": 0,
+          "z": 8000
+        },
+        {
+          "id": "ground:+00000000:+00010000",
+          "x": 0,
+          "z": 10000
+        },
+        {
+          "id": "ground:+00000000:-00002000",
+          "x": 0,
+          "z": -2000
+        },
+        {
+          "id": "ground:+00000000:-00004000",
+          "x": 0,
+          "z": -4000
+        },
+        {
+          "id": "ground:+00000000:-00006000",
+          "x": 0,
+          "z": -6000
+        },
+        {
+          "id": "ground:+00000000:-00008000",
+          "x": 0,
+          "z": -8000
+        },
+        {
+          "id": "ground:+00000000:-00010000",
+          "x": 0,
+          "z": -10000
+        },
+        {
+          "id": "ground:+00002000:+00000000",
+          "x": 2000,
+          "z": 0
+        }
+      ],
+      "targets": [
+        {
+          "activity": "visit",
+          "affordance": "visit",
+          "label": "visiting",
+          "places": [
+            [
+              6001,
+              9915
+            ],
+            [
+              5085,
+              9001
+            ],
+            [
+              5999,
+              8085
+            ],
+            [
+              6915,
+              8999
+            ]
+          ],
+          "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:pillar:visit",
+          "x": 6000,
+          "z": 10000
+        },
+        {
+          "activity": "rest",
+          "affordance": "rest",
+          "label": "resting",
+          "places": [
+            [
+              3350,
+              4999
+            ],
+            [
+              2650,
+              5001
+            ]
+          ],
+          "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-0:rest",
+          "x": 4000,
+          "z": 4000
+        },
+        {
+          "activity": "rest",
+          "affordance": "rest",
+          "label": "resting",
+          "places": [
+            [
+              -2650,
+              4999
+            ],
+            [
+              -3350,
+              5001
+            ]
+          ],
+          "target_id": "authored:6d390826-eef8-43dd-8817-d2b0e658e017:object:plate-1:rest",
+          "x": -2000,
+          "z": 4000
+        }
+      ]
+    },
+    "profile": "exulanica.society-comparison-run-replay/v1",
+    "replay_verified": true,
+    "run_id": "e22aaa9f-2ce1-5238-b33f-bfc19784a26b",
+    "seed_digest": "ef10d747dfd582f69c152750b7a36498feefcd01028cc5206b9ac0e7437db150",
+    "threshold": 750
+  }
+}

@@ -101,11 +101,12 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     found = discovered()
     assert set(found) == {ENTRY_SHAPE, CITED_SHAPE, GLYPH_SHAPE}, sorted(found)
     # Counted from the tree, so adding a catalog to a family is visible here as a number: eighteen
-    # city catalogs, nine society catalogs (the living society's five, the purposeful routine's two
-    # versions and a person's decision contract's two), the words both the inspector and the
-    # Companion say of a simulated person, the world object catalog's three versions and its
-    # arrangements, and the flight kind catalog.
-    assert len(found[ENTRY_SHAPE]) == 33
+    # city catalogs, twelve society catalogs (the living society's five, the purposeful routine's
+    # two versions, a person's decision contract's two, and a person's score with the protocol and
+    # seeds a comparison of models reads), the words both the inspector and the Companion say of a
+    # simulated person, the world object catalog's three versions and its arrangements, and the
+    # flight kind catalog.
+    assert len(found[ENTRY_SHAPE]) == 36
     assert len(found[CITED_SHAPE]) == 5
     assert len(found[GLYPH_SHAPE]) == 4
     # And the discovery is looking where the catalogs are: the city files are among what it found.

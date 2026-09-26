@@ -144,11 +144,18 @@ def test_released_catalog_versions_never_change_in_place():
 
 
 #: Read from the files as released with the living society (05120886 and 5acc7cdf), with the
-#: purposeful routine the inputs record, and with the decision contract a person's requests record;
-#: a new version adds a line here, and no line ever changes.
+#: purposeful routine the inputs record, with the decision contract a person's requests record, and
+#: with the score, protocol and seeds a comparison of models records; a new version adds a line
+#: here, and no line ever changes.
 RELEASED_CATALOGS = {
     "society-activity.v1.json": "0ac08e1e351bc93adae7e175f0fe07b46b73ccfcfcefc8e2744b540bd39d3a31",
     "society-capacity.v1.json": "dc9a9a2b337524a3856c69d62626179a8b31587d561b76dff101a4d9f0f93e66",
+    "society-comparison-protocol.v1.json": (
+        "353cfd7cf83a72641be76de7a7ba44e61bc5e81ba69a84de5110bfaffd8b8e89"
+    ),
+    "society-comparison-seeds.v1.json": (
+        "7afa7495492e632f39f88caf48637bbac3767d4ce47e2fb874e4e34bad709ff1"
+    ),
     "society-decision-action.v1.json": (
         "900e91eabcdb60a3d373639a096a7ee3be037bfc2e80431ec6e9f37c715c823f"
     ),
@@ -162,6 +169,9 @@ RELEASED_CATALOGS = {
     ),
     "society-purposeful-activity.v2.json": (
         "2898207d7570d9534cdf1884de58dcf0848c6888b234ff295b6baa8e4ccc1b61"
+    ),
+    "society-person-score.v1.json": (
+        "950e712ad96b5f70cd656fb86a0a613f55c56a426142f34a5c89189143df234b"
     ),
     "society-use-class.v1.json": "ba1f7f4971412bf8c612d32ce0144367f237008116d08b78ca19a9b95df9e541",
 }

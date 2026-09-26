@@ -43,6 +43,7 @@ import psycopg
 from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
 from exulanica.api.composer_rights import photograph_text_right
+from exulanica.api.society_comparison_runner import SocietyComparisonRunner
 from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.api.society_person_decisions import (
     PersonDecisionHost,
@@ -263,22 +264,42 @@ class Services:
         """
         if self.society_runtime is None:
             return None
-
-        def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
-            return self.request_policy(
-                workspace_id,
-                lambda: self.readonly_database.session(workspace_id),
-                released_places=no_place_released,
-            )
-
         return PersonDecisionHost(
             database=self.database,
             runtime=self.society_runtime,
             client=self.model_client,
             workspaces=frozenset(self.society_control_workspaces),
-            policy_for=policy_for,
+            policy_for=self.person_decision_policy,
             manifest=load_manifest(),
             manifest_sha256=hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest(),
+        )
+
+    def person_decision_policy(self, workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
+        """The rules a person's decision is asked under, by the host and by a comparison alike:
+        the workspace's own, with no place's name released."""
+        return self.request_policy(
+            workspace_id,
+            lambda: self.readonly_database.session(workspace_id),
+            released_places=no_place_released,
+        )
+
+    def comparison_runner(
+        self, workspace_id: uuid.UUID, world_id: str, actor: uuid.UUID
+    ) -> SocietyComparisonRunner | None:
+        """What defines and runs a comparison of the models that decide for a world's people,
+        in one workspace and world as ``actor``; None where no society runtime is configured."""
+        if self.society_runtime is None:
+            return None
+        return SocietyComparisonRunner(
+            database=self.database,
+            runtime=self.society_runtime,
+            client=self.model_client,
+            policy_for=self.person_decision_policy,
+            manifest=load_manifest(),
+            manifest_sha256=hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest(),
+            workspace_id=workspace_id,
+            world_id=world_id,
+            actor=actor,
         )
 
     def model_host_refusal(self, workspace_id: uuid.UUID) -> str | None:

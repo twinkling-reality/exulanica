@@ -85,6 +85,7 @@ import {
 } from './composition/world-entry.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
 import { createSavedWorldFlight } from './composition/saved-world-flight.js';
+import { mountSocietyComparison } from './composition/society-comparison-mount.js';
 import { mountSocietyExperimentResult } from './composition/society-experiment-result.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
@@ -120,6 +121,7 @@ window.addEventListener('pagehide', () => {
   state.disposeCharacter?.();
   state.disposeObjects?.();
   state.disposeSocietyExperiment?.();
+  state.disposeSocietyComparison?.();
   state.disposeEnvironmentSelection?.();
   state.personalIntake.dispose?.();
   disposeCompanionStage(state);
@@ -429,6 +431,8 @@ async function mount(): Promise<void> {
   state.disposeObjects = null;
   state.disposeSocietyExperiment?.();
   state.disposeSocietyExperiment = null;
+  state.disposeSocietyComparison?.();
+  state.disposeSocietyComparison = null;
   const current = state.snapshot;
   const currentSession = state.session;
   const currentEvidence = state.evidence;
@@ -665,7 +669,8 @@ async function mount(): Promise<void> {
     isSystemSurfaceOpen: () =>
       shellState.primary === 'menu' || shellState.primary === 'options' ||
       shellState.primary === 'controls' || shellState.primary === 'character' ||
-      shellState.primary === 'experiment' || shellState.primary === 'photos',
+      shellState.primary === 'experiment' || shellState.primary === 'compare' ||
+      shellState.primary === 'photos',
     onFirstUseAction: (action) => {
       const { activate } = action;
       if (activate === 'summon-companion') runFirstUseAction();
@@ -967,6 +972,7 @@ async function mount(): Promise<void> {
     },
     ...(state.activeWorldEntry === null ? {} : {
       onExperiment: () => dispatchShell({ type: 'toggle-experiment' }),
+      onCompare: () => dispatchShell({ type: 'toggle-compare' }),
     }),
     onCommand: handleAtlasCommand,
   });
@@ -979,6 +985,15 @@ async function mount(): Promise<void> {
   state.disposeSocietyExperiment = societyExperiment === null
     ? null
     : () => societyExperiment.dispose();
+  const societyComparison = state.activeWorldEntry === null ? null : mountSocietyComparison({
+    getWorldId: () => state.activeWorldEntry?.worldId ?? null,
+    getVersionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
+    credentials: currentCredentials,
+    onClose: () => dispatchShell({ type: 'toggle-compare' }),
+  });
+  state.disposeSocietyComparison = societyComparison === null
+    ? null
+    : () => societyComparison.dispose();
   const character = mountCharacter({ env, state, onClose: () => dispatchShell({ type: 'toggle-character' }) });
   state.disposeCharacter = () => character.dispose();
   const mapPeek = new MapPeek({
@@ -1057,6 +1072,7 @@ async function mount(): Promise<void> {
     environmentSelection.root,
     worldMenu.root,
     ...(societyExperiment === null ? [] : [societyExperiment.root]),
+    ...(societyComparison === null ? [] : [societyComparison.root]),
     mapCaption,
     travelStatus,
     minimap.root,
@@ -1087,10 +1103,12 @@ async function mount(): Promise<void> {
     appearance.settings.setVisible(shellState.primary === 'controls');
     worldMenu.setVisible(shellState.primary === 'menu');
     societyExperiment?.setVisible(shellState.primary === 'experiment');
+    societyComparison?.setVisible(shellState.primary === 'compare');
     worldIdentity?.setPhotosVisible(shellState.primary === 'photos');
     const systemSurfaceOpen = shellState.primary === 'menu' || shellState.primary === 'options' ||
       shellState.primary === 'controls' || shellState.primary === 'character' ||
-      shellState.primary === 'experiment' || shellState.primary === 'photos';
+      shellState.primary === 'experiment' || shellState.primary === 'compare' ||
+      shellState.primary === 'photos';
     const modalBackground = [
       stage,
       worldIndex.root,

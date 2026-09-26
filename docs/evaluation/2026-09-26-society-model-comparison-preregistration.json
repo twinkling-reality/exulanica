@@ -1,0 +1,174 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": [
+      "model_a",
+      "model_b",
+      "model_a_again",
+      "routine",
+      "wait"
+    ],
+    "bound_usd": "0.38",
+    "candidates": [
+      {
+        "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+        "mechanism": "tool_call",
+        "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "provider": "nebius_token_factory"
+      },
+      {
+        "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
+        "mechanism": "tool_call",
+        "model_id": "nvidia/Nemotron-3_5-Lightning",
+        "provider": "nebius_token_factory"
+      }
+    ],
+    "contract": {
+      "catalog_versions": {
+        "society-decision-action": 1,
+        "society-decision-policy": 1
+      },
+      "sha256": "79d662b6566f0a3c367d9509747bd30f3f648c2e75e09159a3bffc8b18c57862"
+    },
+    "control": [
+      "model_a",
+      "model_a_again"
+    ],
+    "decision_rule": "different only when Holm's procedure over the family at the protocol's family error rejects the primary hypothesis and the primary mean's size exceeds the larger end, in size, of the control's interval; otherwise no measured difference",
+    "earlier_measurements": [
+      "An anchors run and a dry run on the eight development seeds, each with a scripted model behind the product's client, checked the harness and measured the anchors the protocol's floor rests on; neither asked a model.",
+      "Two development pairs asked both candidate models on one development seed, against a separate database, for the Compare view's browser evidence. The first stopped its Lightning run by the share of the budget the playback host keeps for other work, which the runner then stopped applying, since a comparison's process does no other work; neither pair is part of this comparison, and no held-out seed was run before this pre-registration."
+    ],
+    "family": [
+      [
+        "model_a",
+        "model_b"
+      ],
+      [
+        "routine",
+        "model_a"
+      ],
+      [
+        "routine",
+        "model_b"
+      ]
+    ],
+    "manifest_sha256": "35d1436a2ec1b7e36f398cf717182e9803fcfd11126bd380342de31b0a5377ba",
+    "max_calls": 8000,
+    "primary": {
+      "measure": "the mean over held-out seeds of model_b's score minus model_a's",
+      "pair": [
+        "model_a",
+        "model_b"
+      ]
+    },
+    "protocol": {
+      "bootstrap_resamples": 10000,
+      "family_alpha_per_mille": 50,
+      "interval_per_mille": 950,
+      "need_relief_floor": 4600,
+      "population_maximum": 8,
+      "runs_at_once": 2,
+      "window_ticks": 60
+    },
+    "question": "**The question.** The small square of a starter world, its eight simulated people brought in, one simulated hour: with Qwen3 235B Instruct deciding for every one of them, and with Nemotron 3.5 Lightning, how much of the need above the routine's rest threshold are they spared, as a share of what their own routine spares them against waiting (the score of ``society-person-score.v1``), and is the difference between the two models larger than the protocol lets a comparison claim? The comparison runs each model, the first model a second time as the control, the routine and waiting on every held-out seed of ``society-comparison-seeds.v1``, through the product's own runner (``SocietyComparisonRunner``), and reads its verdict from the product's own route.",
+    "scoring": {
+      "catalogs": {
+        "sha256": "0b9433fbc2f8eadb37957c8cb8c3692572f476a267a18859c8107dfc3796dcd6",
+        "versions": {
+          "society-comparison-protocol": 1,
+          "society-comparison-seeds": 1,
+          "society-person-score": 1
+        }
+      },
+      "claim_sha256": "7f3ff0152129e64c501acbf4067514d694e4eb5ef644b48b25b319f73cff000a",
+      "scorer_sha256": "561e6242bdb601559215e234a40e29429b9d26967a548e5bfdf166006194c010"
+    },
+    "script": "scripts/measure_society_comparison.py",
+    "script_sha256": "5bf81e90e67a3e1acaf31778030545f1b155776fe1b804e73df6d07694e77e0b",
+    "seeds": {
+      "digests": [
+        "441d70ddc98150dc8251cbb5d5d8da0c4a402e3bebcdcd210891821492f5c1b7",
+        "e4a6b29ba0ac55df96c5906e4cfabf9f3f796cf49ba05c754bad32ccd4ce72f4",
+        "da735daa310764a8b3700111fc7c259c4628b18a53b04a1fb58f5809b7b55727",
+        "00fc09b7e6c225dc2bfc0f9cf2a16724c8e15803a9cda40956cc57fea2b99c31",
+        "91f6c5f85a7659ad6cf830843838f4d1ff8c9ab29a231f44d2fb4a98d4d722a0",
+        "8b7a635021d9dc4956309378ea3df8efd68631f8b6e1e14937031498c9d4f3fc",
+        "d21b2a46d776d4ac4c2b12f3321145187962a95afb15208cadb037b86c624a5b",
+        "1205c55e5de395ab5cd7841168ddd2037db4fafc5dfd732a99263070340d0112"
+      ],
+      "phase": "held_out"
+    },
+    "tree": {
+      "files_sha256": {
+        "assets/catalogs/society/society-comparison-protocol.v1.json": "fce9506cf5c2b943e2bfc1f3b01420c647d51d3b0164490ea3e3bf6da6257f09",
+        "assets/catalogs/society/society-comparison-seeds.v1.json": "35c491a5d5a7c5cb25c811f3045a98f457e0965e0e118967463190404c5e1f7f",
+        "assets/catalogs/society/society-person-score.v1.json": "413ca55d22f8cd7f76be8be36e16e099af55076afa65752b05062ad75d3fd688",
+        "docs/evaluation/artifacts/2026-09-26-society-model-comparison/dry-run.json": "8e576a7dd3adb5a61f0c6dd75721eb7d6cf7ec05a956afa6cbb08ace5a7a062f",
+        "docs/product-direction.md": "bbbbacf9658603cc569e01fc916fc4390bded7473a95a4850faf12325d58e0f0",
+        "docs/society-experiments.md": "53faeee979b561da714589611f2d3e148b66e886e37c38f26b57330700232285",
+        "docs/synthetic-society-contract.md": "b9915aa7fe8440261b0dbc05ffca751c77bc92b82a6a07b4f961e1877096f4f0",
+        "exulanica/api/app.py": "9f8f0be87a03fe6aed38bc79df7ae6bea006c6218d88ca60c629c02384aac251",
+        "exulanica/api/permissions.py": "172a77be79b76636391a0cf0953e6d1dce34f3a6c381c1cc1a03e0c18b4cbc60",
+        "exulanica/api/routes/society_comparisons.py": "930a70b51c5ee167189335490d5a2e562e37d852c4b5d0832be64fe8bd97e9f5",
+        "exulanica/api/services.py": "a29db8fb89408f2886610ea2030ad09bed4aaab5b14f93a7908a218c5df34d23",
+        "exulanica/api/society_comparison_runner.py": "d1eb4b1aba974316aa01075322166ad696eaf43f2a54d4729089ffc5331d4bb0",
+        "exulanica/db/roles.py": "bcf4b9b1488f0779481e1397ef2d21bff4412a4edc9737b93353d9fc52a33ed1",
+        "exulanica/migrations/0113_the_same_hour_run_by_two_models_is_recorded_and_replayed.sql": "dc7a133d15d5553f27af552653e5ede7249115eded5c21968dc051a4f88ea796",
+        "exulanica/orchestration/compare.py": "00afe24029ff9b6c449f522a22640c94677ab348549eb7ea9a3f25b918ef7924",
+        "exulanica/world/society-engines.v1.json": "274ca9749188dfa7e6a1b5f82647272178732d894ad274ba60eb4ea0f67b0687",
+        "exulanica/world/society_catalogs.py": "eb24de9bae92a7227d7b813c03a3d5cfae69f9083ccdf886da8f820f1fbcde4d",
+        "exulanica/world/society_comparison.py": "d81a5cb0330f0db0d1c3001a9a256a57239e720b9c68a16a7564254b433b5202",
+        "exulanica/world/society_comparison_claim.py": "7f3ff0152129e64c501acbf4067514d694e4eb5ef644b48b25b319f73cff000a",
+        "exulanica/world/society_comparison_repository.py": "811ab23aeef615908a680fe11cffecd3060f1178c8d68379bf18d5916d7dba3c",
+        "exulanica/world/society_comparison_result.py": "fa671d3b552a0e1945ff135a6d014466710f25be320f217a142beba7e5018ced",
+        "exulanica/world/society_decision_repository.py": "179bd184652be5ba4c72bde359541faab1593cdb9c4780f76710f39179398b02",
+        "exulanica/world/society_decisions.py": "789c331fae6b4db6cca81684c73ce4b216377f7e8b98af5106125e35a3fe22aa",
+        "exulanica/world/society_engines.py": "7c28d4b4b3055510f9f2eb6092cdb872480b439cf4199adce6a8a723e85f692b",
+        "exulanica/world/society_score.py": "561e6242bdb601559215e234a40e29429b9d26967a548e5bfdf166006194c010",
+        "pyproject.toml": "c0211e0dcdc5bbd4d1061ed02ec4eb2308a1f5d6e5076f34d1ed6fee93c48ec0",
+        "scripts/measure_society_comparison.py": "5bf81e90e67a3e1acaf31778030545f1b155776fe1b804e73df6d07694e77e0b",
+        "tests/comparison_support.py": "72186c475def409fbf82f3565fa1aec9d8068b8d1e2c9ef4b7cc2de439e6a68b",
+        "tests/existence_builders.py": "b8b37d87fb2b8fba9b9d26c4df99ac4094263e7297d207b3e308bcbcdb166775",
+        "tests/migration_reservations/0113.txt": null,
+        "tests/route_probes.py": "83736ad03c7f65739d81a50919fdf2a72600cb94866b6fb8da69222c9bef7b26",
+        "tests/snapshots/api-openapi.json": "a89d01e97def35553b62833b590f0d84bee2c37c5ef81702f9c7b3d7750eb57d",
+        "tests/snapshots/api-routes.json": "c0b2dc674300b81468afef8e2ba2e0255bcf0e34881828b59231e3380fcbb425",
+        "tests/snapshots/society-comparison-documents.json": "8d92ff460b111e6e829ed9584d906ca8c88472240ec43c751edcb41af55ad4da",
+        "tests/test_catalog_provenance.py": "8c63de98f72c78dff1f038545668ce41bf3688e56059d38b77a9076f80646963",
+        "tests/test_society_comparison_claim.py": "ebdea206d981a5659319e667a38ffedc4ef7c5b9d40b981e7213776468d093a8",
+        "tests/test_society_comparison_play.py": "1b731b532044e7a4010a6f7f63fff26893624f6eb85ff3ef4a9880a559c9e10f",
+        "tests/test_society_comparison_postgres.py": "b7465085d0336896807effbd92b26b70415c7f706bd56b6e920aa592354a886f",
+        "tests/test_society_comparison_result.py": "36e2f39751123b11c8c2bb3a61f6c47d47a850920a8644c149a83866237a2a53",
+        "tests/test_society_comparison_runner.py": "451df6afde2b10fcffda9dcf5d09be48862e9bd3eb3871ff49b357474ce74b0d",
+        "tests/test_society_engine_table.py": "3e4fb1b8ea4b6a2b6e8f22b3726483ad54d67b331711b95263c85e006c859bbc",
+        "tests/test_society_score.py": "63fe09df6e552ef722eb69336d7558f92864462acb15a0a539e845cb32222b6e",
+        "tests/test_society_versions_survive_upgrades.py": "42a15024f8f90afbdb1a349fd3125432bd8fb4b164bb53dca70223877819b285",
+        "web/packages/app/src/composition/session-state.ts": "2cb842cbbb4f789bd68e4443f991e5f9bd2f56a2c3e409b72e3942fa576d1f77",
+        "web/packages/app/src/composition/society-comparison-mount.ts": "b19d9d778a85928e8496a3f9cde0315f51640eb47e5d019c0ce19d27663770bf",
+        "web/packages/app/src/main.ts": "07d04608ade0925c436612dbd001feef0b02e56cf5ef36a43889c38c3cd75671",
+        "web/packages/app/src/society-comparison-api.ts": "b3c1f3fed475c96dd729f90fc9733265a78233e87dd53490aa27b0c798c4a0b8",
+        "web/packages/app/src/society-engines.generated.ts": "95a46a1de85390d2671c43a70daebe359ba05515a7a0a8d0c51e4319198792e9",
+        "web/packages/app/src/ui/society-comparison-plan.ts": "132ff5adc3af54d8215b5e658b581b87a7adcfa7a38fcaf5db7bdf9fccf804e5",
+        "web/packages/app/src/ui/society-comparison-strips.ts": "c471973c3484426214e29f4f6582866f64a29b466e64f847c13d20f87f5e1ea8",
+        "web/packages/app/src/ui/society-comparison.css": "ae829f551ba055d7e98a42e2f5546225040ed7aa8349b46e0d481ae632a100f1",
+        "web/packages/app/src/ui/society-comparison.ts": "b6c148a47855e88c283742dd13fbc648262fa0cfde5ad101e703c9981190a085",
+        "web/packages/app/src/ui/society-models.ts": "64c754619a30c103e430705e377614659fbb0ef79da25a71937c8e45e72caeef",
+        "web/packages/app/src/ui/world-menu.ts": "3c3048746874db1dee79015d35bd05a057c93ba4cfd2457170f97d208a59fbb7",
+        "web/packages/app/src/world-shell.ts": "a9e69b18b312f1cda4591999fe747d95fcc8ae892dc62af29f45588815436f21",
+        "web/packages/app/test/society-comparison-api.test.ts": "ac5c284da879a1215c19b65f868292bf629e33b5b0d26ed0c0156e83d0c894cb",
+        "web/packages/app/test/society-comparison-words-parity.test.ts": "7a532aef20ee737ff5ec0f9aff720717dae85eeb022023152c901d48f61ccf10",
+        "web/packages/app/test/society-comparison.test.ts": "4486e49c6480a46ebf7fa6674b6e6a0e42075892940431b4c94b27e8c155ef9b",
+        "web/packages/app/test/world-menu.test.ts": "30ec95d6292d227a220a55d8f1075396b88c31d709059f191ee7ae3638fb00e2",
+        "web/packages/app/test/world-shell.test.ts": "221a6c9c98f6e6a02823a34437d2f8c45c274029854333f8c34eb636e5e8c423"
+      },
+      "head": "c05e3666da0cc00eceb2ca7aef6ccd0d80d10006"
+    },
+    "world": {
+      "society_seed_sha256": "6a15aaaaa82f36da69dcf735291563cbe19a7cbb748e1ae9320a12fde3ef490a",
+      "starter": "the starter world with the small square placed where a person arrives"
+    },
+    "written_before_any_held_out_seed_was_run": true
+  },
+  "record_sha256": "10c306109854a714f42e61bba4363747f8cfd6d784b946bfd89aa27a6d8a3348"
+}

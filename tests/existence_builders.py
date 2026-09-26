@@ -43,8 +43,11 @@ from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepository
 from exulanica.world.assets import reviewed_assets
+from exulanica.world.society_comparison_repository import SocietyComparisonRepository
 from exulanica.world.society_experiments import DEVELOPMENT_SEEDS
+from exulanica.world.society_repository import SocietyRepository
 
+import comparison_support
 from conftest import (
     DEFAULT_PAYLOAD,
     CountingVisionModel,
@@ -53,7 +56,7 @@ from conftest import (
     write_point_map,
 )
 from social_society_fixtures import social_input
-from society_fixtures import SEED
+from society_fixtures import SEED, society_input
 from society_living_fixtures import grid_input
 from test_material_recipes import _small
 from world_support import FIXTURE_WORLD_ID, registered_world
@@ -67,7 +70,9 @@ TOPOLOGY = "existence-topology"
 #: The region every authored thing in the owner's world is placed in.
 REGION = "region-a"
 #: A society profile each builder asks for by name, because what a society can do depends on it:
-#: actions need v2 or v3, model decisions need v3 and experiments need v4.
+#: actions need v2 or v3, model decisions need v3, experiments need v4 and a comparison of
+#: models needs v2.
+PURPOSEFUL = "exulanica-society/v2"
 SOCIAL = "exulanica-society/v3"
 LIVING = "exulanica-society/v4"
 
@@ -640,6 +645,59 @@ def decision_request(owner) -> dict[str, Any]:
         "/world/versions/{version_id}": version_id,
         "/world/versions/{version_id}/society/decisions/{request_id}": key,
     }
+
+
+def _comparison(owner) -> dict[str, Any]:
+    """A development comparison over a version's purposeful society (domain: only the local
+    command defines one, and runs are reserved by its runner)."""
+    if "comparison" not in owner.memo:
+        made = _version_with_society(owner, PURPOSEFUL, society_input)
+        version_id = made["version_id"]
+        comparisons = SocietyComparisonRepository(
+            SocietyRepository(
+                owner.repository.connection,
+                owner.workspace_id,
+                world_id=WORLD,
+                input_authorizer=lambda _document: None,
+            )
+        )
+        # The district society holds more people than a saved world's, so the test catalogs
+        # raise the bound as well as committing the tests' seeds.
+        catalogs = comparison_support.seeded_catalogs(population_maximum=512)
+        comparison_id = uuid.uuid4()
+        comparisons.define(
+            version_id,
+            comparison_id=comparison_id,
+            body=comparison_support.development_body(catalogs),
+            created_by=owner.actor,
+            catalogs=catalogs,
+        )
+        run_id = comparisons.reserve(
+            comparison_id, arm="routine", seed=comparison_support.SEEDS[0], created_by=owner.actor
+        )
+        owner.memo["comparison"] = {
+            "/world/versions/{version_id}": version_id,
+            "/world/versions/{version_id}/society/comparisons/{comparison_id}": comparison_id,
+            "/world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}": (
+                run_id
+            ),
+        }
+    return owner.memo["comparison"]
+
+
+def comparison(owner) -> dict[str, Any]:
+    made = _comparison(owner)
+    return {
+        address: made[address]
+        for address in (
+            "/world/versions/{version_id}",
+            "/world/versions/{version_id}/society/comparisons/{comparison_id}",
+        )
+    }
+
+
+def comparison_run(owner) -> dict[str, Any]:
+    return _comparison(owner)
 
 
 def experiment(owner) -> str:

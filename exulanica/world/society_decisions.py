@@ -12,6 +12,8 @@ asked again.
 from __future__ import annotations
 
 import json
+import uuid
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
@@ -25,7 +27,16 @@ from exulanica.world.society import society_state_sha256
 from exulanica.world.society_decision_contract import (
     CONTEXT_PROFILE as PERSON_CONTEXT_PROFILE,
 )
-from exulanica.world.society_decision_contract import DECISION_REASONS, DecisionOption
+from exulanica.world.society_decision_contract import (
+    DECISION_REASONS,
+    DecisionContract,
+    DecisionOption,
+    choice_options,
+    context_bytes,
+)
+from exulanica.world.society_decision_contract import (
+    decision_context as person_context,
+)
 from exulanica.world.society_planner import input_sha256
 
 REQUEST_PROFILE = "exulanica.society-decision-request/v1"
@@ -179,6 +190,54 @@ class SocietyDecisionProvider:
 def seal(document: dict) -> dict:
     document["document_sha256"] = input_sha256(document)
     return document
+
+
+def person_request(
+    state: dict,
+    document: dict,
+    subject_id: str,
+    *,
+    request_id: uuid.UUID,
+    contract: DecisionContract,
+    seed: str,
+    provider_config: dict,
+    offer: Callable[[Sequence[DecisionOption]], Sequence[DecisionOption]] | None = None,
+) -> tuple[dict | None, str]:
+    """A person's sealed request over the options they have in ``state``, asked over ``document``.
+
+    Pure: the host's reservation and a comparison's run build a request here, and so does a
+    comparison's replay, which rebuilds it to the byte. ``offer`` keeps the options that may be
+    offered, in their order. ``(None, "nothing_to_choose")`` when fewer than two options, or no
+    place, are left, and ``(None, "context_limit_exceeded")`` when the context is larger than the
+    contract's bound; otherwise the request and ``"in_progress"``.
+    """
+    options = choice_options(state, document, subject_id, contract, seed=seed)
+    if offer is not None and options:
+        options = tuple(offer(options))
+    # A request offers two options at least (``validate_decision_request``): with fewer, or with
+    # no place among them, there is nothing to ask.
+    if len(options) < 2 or not any(option.kind == "target" for option in options):
+        return None, "nothing_to_choose"
+    context = person_context(state, document, subject_id, options)
+    if context_bytes(context) > contract.value("context_bytes_maximum"):
+        return None, "context_limit_exceeded"
+    request = seal(
+        {
+            "profile": PERSON_REQUEST_PROFILE,
+            "request_id": str(request_id),
+            "subject_id": subject_id,
+            "branch_id": state["branch_id"],
+            "base_tick": state["tick"],
+            "base_state_sha256": society_state_sha256(state),
+            "input_seq": document["input_seq"],
+            "input_sha256": document["document_sha256"],
+            "context": context,
+            "context_sha256": society_state_sha256(context),
+            "provider_config": provider_config,
+        }
+    )
+    validate_decision_request(request)
+    return request, "in_progress"
 
 
 def _person_request(document: dict) -> None:

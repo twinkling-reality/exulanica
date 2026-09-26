@@ -560,14 +560,26 @@ what accepts it.
 | Honest difference | A control pair with the same model in both arms bounds the difference that run-to-run variation alone produces; a reported difference between models exceeds that bound, or the comparison says it does not. |
 | Independent reading | The runs, their decisions and the models that served them can be read through the authenticated API by a client other than the browser. |
 
-The foundations exist in part: the society's deterministic planner, a society engine version whose
-opt-in model decision slot validates and stores each proposal
-([explicit model proposals](synthetic-society-contract.md#explicit-model-proposals-and-exact-replay)),
-paired runs over one intervention ([society experiments](society-experiments.md)) and hosted roles
-behind one policy boundary ([model and service selection](model-and-service-selection.md)). The
-milestone needs a model chosen per group, mixed-model runs and a side-by-side view in the
-application; none of those exists. The Companion, personal photographs and reconstruction are not
-part of this milestone.
+The foundations exist in part. A saved world's owner chooses the open model that decides for a
+person or a group; each decision is validated at the routine's own choice point, stored with the
+model that served it and replayed without a call
+([a person run by a model](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose)),
+through hosted roles behind one policy boundary
+([model and service selection](model-and-service-selection.md)). A comparison runs the same hour
+of a saved world once per model, beside the routine and waiting, scores each run from what the
+engine recorded, bounds run-to-run variation with the same model run twice, and shows two runs side
+by side in the application ([comparisons of models](society-experiments.md#comparisons-of-models)).
+The first judged comparison, of Qwen3 235B Instruct and Nemotron 3.5 Lightning deciding for the
+small square's eight people over eight held-out seeds, found no measured difference
+([record](evaluation/2026-09-26-society-model-comparison.json)). People fared almost the same on
+need relief under both models, 0.9880 on average in each of Qwen's two runs and 0.9893 under
+Lightning, and almost all of each difference between them came from turns whose answer was not
+applied: Lightning's lead of 0.0367 is 0.0013 of relief and 0.0354 of turns, and the 0.0248
+between Qwen's two runs of the same hours is all turns
+([decomposition](evaluation/2026-09-26-society-model-comparison-decomposition.json)).
+A comparison's arm decides for every person of the world, so a run that swaps one group's model
+while another group keeps its own is not supported. The Companion, personal photographs and
+reconstruction are not part of this milestone.
 
 ### Saved-world foundation
 

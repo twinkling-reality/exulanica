@@ -147,6 +147,7 @@ VERSION_TABLES: Final[Mapping[str, str]] = {
     "world_character_appearance_revision": "the avatar's carried; an inhabitant's stay",
     "world_society": "stays in the previous version; inhabitants who are here refuse",
     "society_experiment_definition": "stays in the previous version with its society",
+    "society_comparison": "stays in the previous version with its society",
     "saved_world_entry": "moved to the new version",
 }
 

@@ -2,8 +2,9 @@
 
 ``society-engines.v1.json`` beside this module is the one statement of which engine profiles
 exist and which capabilities each has: whether it consumes authorised inputs, whether the playback
-worker may play it, whether it takes directed actions, model decisions or experiments, whether it
-can stand on a saved world's own ground, which state shape it writes and how many people it may
+worker may play it, whether it takes directed actions, model decisions or experiments, whether a
+comparison of the models that decide for its people may run it, whether it can stand on a saved
+world's own ground, which state shape it writes and how many people it may
 hold. Everything that used to restate a list of engines derives it from here: the runtime's edit
 hook, the repositories, the routes, the selection query's bound parameters and, through a
 generated module, the browser's parser. Where a copy cannot derive, because a migration's CHECK
@@ -25,6 +26,7 @@ from exulanica.world.society import SocietyError
 
 __all__ = [
     "ACTION_ENGINES",
+    "COMPARISON_ENGINES",
     "DECISION_ENGINES",
     "DEFAULT_ENGINE",
     "ENGINES",
@@ -45,6 +47,7 @@ TABLE_PROFILE: Final = "exulanica.society-engines/v1"
 StateFamily = Literal["legacy", "purposeful", "living"]
 _STATE_FAMILIES: Final = ("legacy", "purposeful", "living")
 _CAPABILITIES: Final = (
+    "comparisons",
     "directed_actions",
     "experiments",
     "model_decisions",
@@ -70,6 +73,8 @@ class SocietyEngine:
     directed_actions: bool
     model_decisions: bool
     experiments: bool
+    #: A comparison may run its people's hour with each of several deciders, models among them.
+    comparisons: bool
     #: The person whose world it lives in may send its people away and bring them back.
     presence: bool
     saved_world: bool
@@ -106,6 +111,7 @@ def _engine(row: Any) -> SocietyEngine:
             (row["directed_actions"] or row["model_decisions"] or row["presence"])
             and not row["takes_inputs"]
         )
+        or (row["comparisons"] and not row["model_decisions"])
     ):
         raise ValueError(f"invalid society engine row {row.get('engine')!r}")
     return SocietyEngine(
@@ -116,6 +122,7 @@ def _engine(row: Any) -> SocietyEngine:
         directed_actions=row["directed_actions"],
         model_decisions=row["model_decisions"],
         experiments=row["experiments"],
+        comparisons=row["comparisons"],
         presence=row["presence"],
         saved_world=row["saved_world"],
         state_family=row["state_family"],
@@ -168,5 +175,6 @@ PLAYABLE_ENGINES: Final = _where("playback")
 ACTION_ENGINES: Final = _where("directed_actions")
 DECISION_ENGINES: Final = _where("model_decisions")
 EXPERIMENT_ENGINES: Final = _where("experiments")
+COMPARISON_ENGINES: Final = _where("comparisons")
 SAVED_WORLD_ENGINES: Final = _where("saved_world")
 PRESENCE_ENGINES: Final = _where("presence")

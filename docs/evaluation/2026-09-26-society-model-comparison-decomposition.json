@@ -1,0 +1,498 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": {
+      "model_a": {
+        "mean_not_applied_share": "0.0368",
+        "mean_relief": "0.9880",
+        "mean_score": "0.9512",
+        "not_applied": 24,
+        "turns": 703
+      },
+      "model_a_again": {
+        "mean_not_applied_share": "0.0120",
+        "mean_relief": "0.9880",
+        "mean_score": "0.9760",
+        "not_applied": 9,
+        "turns": 770
+      },
+      "model_b": {
+        "mean_not_applied_share": "0.0014",
+        "mean_relief": "0.9893",
+        "mean_score": "0.9879",
+        "not_applied": 2,
+        "turns": 1527
+      },
+      "routine": {
+        "mean_not_applied_share": "0.0000",
+        "mean_relief": "1.0000",
+        "mean_score": "1.0000",
+        "not_applied": 0,
+        "turns": 0
+      },
+      "wait": {
+        "mean_not_applied_share": "0.0000",
+        "mean_relief": "0.0000",
+        "mean_score": "0.0000",
+        "not_applied": 0,
+        "turns": 0
+      }
+    },
+    "deadline_ms": 20000,
+    "differences": [
+      {
+        "control": false,
+        "first": "model_a",
+        "from_relief": "0.0013",
+        "from_turns_not_applied": "0.0354",
+        "score": "0.0367",
+        "second": "model_b"
+      },
+      {
+        "control": false,
+        "first": "routine",
+        "from_relief": "-0.0120",
+        "from_turns_not_applied": "-0.0368",
+        "score": "-0.0488",
+        "second": "model_a"
+      },
+      {
+        "control": false,
+        "first": "routine",
+        "from_relief": "-0.0107",
+        "from_turns_not_applied": "-0.0014",
+        "score": "-0.0121",
+        "second": "model_b"
+      },
+      {
+        "control": true,
+        "first": "model_a",
+        "from_relief": "0.0000",
+        "from_turns_not_applied": "0.0248",
+        "score": "0.0248",
+        "second": "model_a_again"
+      }
+    ],
+    "judged_record": "docs/evaluation/2026-09-26-society-model-comparison.json",
+    "judged_record_sha256": "2d74eccac49f89007720d510709dce33eb1f93f62d6ba500426d12c8859b296b",
+    "method": "A run's relief is its recorded score plus its turns not applied over its turns, the score's two turn terms each weighing minus one. Scores are recorded to four places, so each relief is within 0.00005 of the exact value. A difference is split as the mean over seeds of the relief it makes and of the turns not applied it makes, the two summing to the score's difference.",
+    "preregistration_record_sha256": "10c306109854a714f42e61bba4363747f8cfd6d784b946bfd89aa27a6d8a3348",
+    "question": "Where each arm's score in the judged comparison comes from: the need its people were spared, and the share of their turns whose model's answer was not applied.",
+    "reasons": "The judged record keeps how many of a run's turns were not applied, not why: each turn's reason was in the run's receipts, in the private database the measurement made for the run and removed after it. What the record keeps of the asking is each run's answer time at the 50th and 95th percentiles, set beside the deadline here.",
+    "reasons_kept": false,
+    "script": "scripts/decompose_society_comparison.py",
+    "script_as_run": "docs/evaluation/artifacts/2026-09-26-society-model-comparison/decompose_society_comparison-as-run.py.txt",
+    "script_sha256": "729808380fc00c8258b15b6f2a5aa5ffc2d502450496bcc53f33d2097d37dc49",
+    "seeds": [
+      {
+        "name": "held_out_1",
+        "runs": {
+          "model_a": {
+            "answer_ms_p95": 1617,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 2,
+            "not_applied_share": "0.0175",
+            "relief": "0.9427",
+            "score": "0.9252",
+            "turns": 114
+          },
+          "model_a_again": {
+            "answer_ms_p95": 1625,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0082",
+            "relief": "0.9428",
+            "score": "0.9346",
+            "turns": 122
+          },
+          "model_b": {
+            "answer_ms_p95": 6379,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.9824",
+            "score": "0.9824",
+            "turns": 228
+          },
+          "routine": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 0
+          },
+          "wait": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.0000",
+            "score": "0.0000",
+            "turns": 0
+          }
+        },
+        "seed_digest": "441d70ddc98150dc8251cbb5d5d8da0c4a402e3bebcdcd210891821492f5c1b7"
+      },
+      {
+        "name": "held_out_2",
+        "runs": {
+          "model_a": {
+            "answer_ms_p95": 1443,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 2,
+            "not_applied_share": "0.0250",
+            "relief": "0.9860",
+            "score": "0.9610",
+            "turns": 80
+          },
+          "model_a_again": {
+            "answer_ms_p95": 1096,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.9860",
+            "score": "0.9860",
+            "turns": 106
+          },
+          "model_b": {
+            "answer_ms_p95": 7286,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.9619",
+            "score": "0.9619",
+            "turns": 186
+          },
+          "routine": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 0
+          },
+          "wait": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.0000",
+            "score": "0.0000",
+            "turns": 0
+          }
+        },
+        "seed_digest": "e4a6b29ba0ac55df96c5906e4cfabf9f3f796cf49ba05c754bad32ccd4ce72f4"
+      },
+      {
+        "name": "held_out_3",
+        "runs": {
+          "model_a": {
+            "answer_ms_p95": 20008,
+            "answer_ms_p95_reached_the_deadline": true,
+            "not_applied": 11,
+            "not_applied_share": "0.1358",
+            "relief": "1.0230",
+            "score": "0.8872",
+            "turns": 81
+          },
+          "model_a_again": {
+            "answer_ms_p95": 8422,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 2,
+            "not_applied_share": "0.0196",
+            "relief": "1.0230",
+            "score": "1.0034",
+            "turns": 102
+          },
+          "model_b": {
+            "answer_ms_p95": 13910,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.9763",
+            "score": "0.9763",
+            "turns": 172
+          },
+          "routine": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 0
+          },
+          "wait": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.0000",
+            "score": "0.0000",
+            "turns": 0
+          }
+        },
+        "seed_digest": "da735daa310764a8b3700111fc7c259c4628b18a53b04a1fb58f5809b7b55727"
+      },
+      {
+        "name": "held_out_4",
+        "runs": {
+          "model_a": {
+            "answer_ms_p95": 3036,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 2,
+            "not_applied_share": "0.0267",
+            "relief": "0.9483",
+            "score": "0.9216",
+            "turns": 75
+          },
+          "model_a_again": {
+            "answer_ms_p95": 1083,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0109",
+            "relief": "0.9483",
+            "score": "0.9374",
+            "turns": 92
+          },
+          "model_b": {
+            "answer_ms_p95": 12125,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.9662",
+            "score": "0.9662",
+            "turns": 192
+          },
+          "routine": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 0
+          },
+          "wait": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.0000",
+            "score": "0.0000",
+            "turns": 0
+          }
+        },
+        "seed_digest": "00fc09b7e6c225dc2bfc0f9cf2a16724c8e15803a9cda40956cc57fea2b99c31"
+      },
+      {
+        "name": "held_out_5",
+        "runs": {
+          "model_a": {
+            "answer_ms_p95": 1110,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0091",
+            "relief": "1.0366",
+            "score": "1.0275",
+            "turns": 110
+          },
+          "model_a_again": {
+            "answer_ms_p95": 844,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 2,
+            "not_applied_share": "0.0220",
+            "relief": "1.0366",
+            "score": "1.0146",
+            "turns": 91
+          },
+          "model_b": {
+            "answer_ms_p95": 6402,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0057",
+            "relief": "1.0071",
+            "score": "1.0014",
+            "turns": 175
+          },
+          "routine": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 0
+          },
+          "wait": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.0000",
+            "score": "0.0000",
+            "turns": 0
+          }
+        },
+        "seed_digest": "91f6c5f85a7659ad6cf830843838f4d1ff8c9ab29a231f44d2fb4a98d4d722a0"
+      },
+      {
+        "name": "held_out_6",
+        "runs": {
+          "model_a": {
+            "answer_ms_p95": 1004,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 3,
+            "not_applied_share": "0.0455",
+            "relief": "0.9809",
+            "score": "0.9354",
+            "turns": 66
+          },
+          "model_a_again": {
+            "answer_ms_p95": 868,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0116",
+            "relief": "0.9809",
+            "score": "0.9693",
+            "turns": 86
+          },
+          "model_b": {
+            "answer_ms_p95": 4764,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0055",
+            "relief": "1.0286",
+            "score": "1.0231",
+            "turns": 181
+          },
+          "routine": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 0
+          },
+          "wait": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.0000",
+            "score": "0.0000",
+            "turns": 0
+          }
+        },
+        "seed_digest": "8b7a635021d9dc4956309378ea3df8efd68631f8b6e1e14937031498c9d4f3fc"
+      },
+      {
+        "name": "held_out_7",
+        "runs": {
+          "model_a": {
+            "answer_ms_p95": 7180,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 2,
+            "not_applied_share": "0.0241",
+            "relief": "0.9868",
+            "score": "0.9627",
+            "turns": 83
+          },
+          "model_a_again": {
+            "answer_ms_p95": 1771,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0133",
+            "relief": "0.9867",
+            "score": "0.9734",
+            "turns": 75
+          },
+          "model_b": {
+            "answer_ms_p95": 8003,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.9922",
+            "score": "0.9922",
+            "turns": 183
+          },
+          "routine": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 0
+          },
+          "wait": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.0000",
+            "score": "0.0000",
+            "turns": 0
+          }
+        },
+        "seed_digest": "d21b2a46d776d4ac4c2b12f3321145187962a95afb15208cadb037b86c624a5b"
+      },
+      {
+        "name": "held_out_8",
+        "runs": {
+          "model_a": {
+            "answer_ms_p95": 2111,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0106",
+            "relief": "1.0000",
+            "score": "0.9894",
+            "turns": 94
+          },
+          "model_a_again": {
+            "answer_ms_p95": 3085,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 1,
+            "not_applied_share": "0.0104",
+            "relief": "1.0000",
+            "score": "0.9896",
+            "turns": 96
+          },
+          "model_b": {
+            "answer_ms_p95": 12374,
+            "answer_ms_p95_reached_the_deadline": false,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 210
+          },
+          "routine": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "1.0000",
+            "score": "1.0000",
+            "turns": 0
+          },
+          "wait": {
+            "answer_ms_p95": null,
+            "answer_ms_p95_reached_the_deadline": null,
+            "not_applied": 0,
+            "not_applied_share": "0.0000",
+            "relief": "0.0000",
+            "score": "0.0000",
+            "turns": 0
+          }
+        },
+        "seed_digest": "1205c55e5de395ab5cd7841168ddd2037db4fafc5dfd732a99263070340d0112"
+      }
+    ]
+  },
+  "record_sha256": "7fcb0bbb913746292dc6e99d6e6b277f52eaa1209e1e51471c5a66c5a385df05"
+}

@@ -37,6 +37,18 @@ describe('World menu', () => {
       onCommand: vi.fn(),
     });
     expect(menu.root.querySelector('[data-command=experiment]')).toBeNull();
+    expect(menu.root.querySelector('[data-command=compare]')).toBeNull();
+  });
+
+  it('opens the comparisons of the models that ran the open world', () => {
+    const onCompare = vi.fn();
+    const menu = buildWorldMenu({
+      preview: false, onResume: vi.fn(), onWorld: vi.fn(), onCompare, onCommand: vi.fn(),
+    });
+    const entry = menu.root.querySelector<HTMLButtonElement>('[data-command=compare]')!;
+    expect(entry.textContent).toContain('Compare models');
+    entry.click();
+    expect(onCompare).toHaveBeenCalledOnce();
   });
 
   it('is hidden and inert outside the menu state', () => {

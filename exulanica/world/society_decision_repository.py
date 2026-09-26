@@ -24,18 +24,11 @@ from exulanica.world.society import (
     society_state_sha256,
 )
 from exulanica.world.society_controls import MAX_CATCHUP_TICKS
-from exulanica.world.society_decision_contract import (
-    DecisionContract,
-    DecisionOption,
-    choice_options,
-    context_bytes,
-)
-from exulanica.world.society_decision_contract import (
-    decision_context as person_context,
-)
+from exulanica.world.society_decision_contract import DecisionContract, DecisionOption
 from exulanica.world.society_decisions import (
     PERSON_REQUEST_PROFILE,
     REQUEST_PROFILE,
+    person_request,
     receipt_for,
     seal,
     validate_decision_receipt,
@@ -310,34 +303,18 @@ class SocietyDecisionRepository:
             raise StaleSocietyState("subject already has a decision reservation at this tick")
         latest_seq = self.society._chain(row)
         document = self.society._inputs(row, [latest_seq])[latest_seq]
-        options = choice_options(
-            row["state"], document, str(subject_id), contract, seed=row["seed"]
+        request, status = person_request(
+            row["state"],
+            document,
+            str(subject_id),
+            request_id=request_id,
+            contract=contract,
+            seed=row["seed"],
+            provider_config=provider_config,
+            offer=offer,
         )
-        if offer is not None and options:
-            options = tuple(offer(options))
-        # A request offers two options at least (``validate_decision_request``): with fewer, or
-        # with no place among them, there is nothing to ask.
-        if len(options) < 2 or not any(option.kind == "target" for option in options):
-            return {"request": None, "decision": None, "status": "nothing_to_choose"}, False
-        context = person_context(row["state"], document, str(subject_id), options)
-        if context_bytes(context) > contract.value("context_bytes_maximum"):
-            return {"request": None, "decision": None, "status": "context_limit_exceeded"}, False
-        request = seal(
-            {
-                "profile": PERSON_REQUEST_PROFILE,
-                "request_id": str(request_id),
-                "subject_id": str(subject_id),
-                "branch_id": str(version_id),
-                "base_tick": base_tick,
-                "base_state_sha256": base_state_sha256,
-                "input_seq": document["input_seq"],
-                "input_sha256": document["document_sha256"],
-                "context": context,
-                "context_sha256": society_state_sha256(context),
-                "provider_config": provider_config,
-            }
-        )
-        validate_decision_request(request)
+        if request is None:
+            return {"request": None, "decision": None, "status": status}, False
         self.connection.execute(
             "insert into world_society_decision_request("
             "workspace_id,society_id,request_id,subject_id,"

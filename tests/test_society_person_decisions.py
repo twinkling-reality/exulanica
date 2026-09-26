@@ -623,6 +623,39 @@ def test_an_answer_asked_once_more_with_no_time_left_sends_nothing_more_and_says
     validate_decision_receipt(receipt_for(request, 1, result), request)
 
 
+def test_an_ask_that_fails_as_no_model_error_does_keeps_what_its_attempts_cost():
+    """An answer off the offer, paid for, then an error no model error names (a programming or a
+    library error in the transport): the ask ends as a failed call, and the attempt it paid for
+    stays in its record, cost and all, rather than leaving with the exception."""
+    state, document, contract, offered = _minute_with_choices()
+    subject, options = next(iter(offered.items()))
+    manifest, model_id = _offered_manifest()
+    request = _request(state, document, subject, options, model=model_id)
+    transport = FakeTransport(
+        [_tool_reply("fly away", model_id), RuntimeError("the transport broke")]
+    )
+    client = ModelClient(
+        api_key="test-key-not-real",
+        manifest=manifest,
+        transport=transport,
+        budget=BudgetGuard(ceiling_usd=Decimal("1"), max_calls=10),
+        policy=RecordingPolicy(),
+    )
+    result = ask_person(
+        client,
+        PersonAsk(request, manifest.spec(model_id), AnsweringMechanism.TOOL_CALL),
+        contract,
+        time.monotonic() + 20.0,
+    )
+    assert (result["status"], result["reason"]) == ("unavailable", "model_call_failed")
+    assert transport.call_count == 2, "the second answer was asked, and failed"
+    provider = result["provider"]
+    assert [call["outcome"] for call in provider["calls"]] == ["reply_refused"]
+    assert Decimal(provider["cost_usd"]) > 0
+    assert provider["answers_asked"] == 2
+    validate_decision_receipt(receipt_for(request, 1, result), request)
+
+
 def test_a_refusal_is_decided_on_money_spent_never_on_calls_under_way():
     """A call under way, the Companion's say, holds part of the budget until it is recorded. The
     host neither refuses for it nor lets a refusal come and go with it: once spending leaves too

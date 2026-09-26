@@ -82,6 +82,7 @@ export interface SessionState {
   disposeCharacter: (() => void) | null;
   disposeObjects: (() => void) | null;
   disposeSocietyExperiment: (() => void) | null;
+  disposeSocietyComparison: (() => void) | null;
   personalIntake: PersonalIntakeSession;
   credentials: Credentials | null;
   session: Session | null;
@@ -226,6 +227,7 @@ export function createSessionState(): SessionState {
     disposeCharacter: null,
     disposeObjects: null,
     disposeSocietyExperiment: null,
+    disposeSocietyComparison: null,
     personalIntake: createPersonalIntakeSession(),
     credentials: null,
     session: null,

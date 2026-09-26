@@ -5,6 +5,7 @@ export const SOCIETY_ENGINES_V1_JSON = String.raw`{
   "default_engine": "exulanica-society/v1",
   "engines": [
     {
+      "comparisons": false,
       "directed_actions": false,
       "engine": "exulanica-society/v1",
       "experiments": false,
@@ -19,6 +20,7 @@ export const SOCIETY_ENGINES_V1_JSON = String.raw`{
       "takes_inputs": false
     },
     {
+      "comparisons": true,
       "directed_actions": true,
       "engine": "exulanica-society/v2",
       "experiments": false,
@@ -27,12 +29,13 @@ export const SOCIETY_ENGINES_V1_JSON = String.raw`{
       "playback_refusal": null,
       "population": {"maximum": 512, "minimum": 1},
       "presence": true,
-      "reason": "Purposeful goals, routes and the two reviewed activities over authorised inputs, with typed user-directed actions, and the person whose world it lives in can send its people away and bring them back. A person whose world's owner chose a model for them takes, at the planner's own choice point, that model's validated choice from a stored receipt, replayed without a call; with no choice nothing changes. It stands on a district or on a saved world's own ground, where it starts with a handful of people, so its floor is one; a district's floor of 100 is the initializer's.",
+      "reason": "Purposeful goals, routes and the two reviewed activities over authorised inputs, with typed user-directed actions, and the person whose world it lives in can send its people away and bring them back. A person whose world's owner chose a model for them takes, at the planner's own choice point, that model's validated choice from a stored receipt, replayed without a call; with no choice nothing changes. A comparison runs the same hour of it with each of several deciders from the same genesis, beside the society and never changing it. It stands on a district or on a saved world's own ground, where it starts with a handful of people, so its floor is one; a district's floor of 100 is the initializer's.",
       "saved_world": true,
       "state_family": "purposeful",
       "takes_inputs": true
     },
     {
+      "comparisons": false,
       "directed_actions": true,
       "engine": "exulanica-society/v3",
       "experiments": false,
@@ -47,6 +50,7 @@ export const SOCIETY_ENGINES_V1_JSON = String.raw`{
       "takes_inputs": true
     },
     {
+      "comparisons": false,
       "directed_actions": false,
       "engine": "exulanica-society/v4",
       "experiments": true,
