@@ -101,6 +101,7 @@ from exulanica.world.photo_point_maps import (
 )
 from exulanica.world.point_map_source_authority import PointMapSourceAuthority
 from exulanica.world.reviewed_catalog import ReviewedAssetRow, ReviewedCatalog
+from exulanica.world.society import inputs_ahead
 from exulanica.world.society_engines import INPUT_ENGINES
 from exulanica.world.workspace_lock import lock_workspace
 
@@ -1342,16 +1343,20 @@ class WorldObjectRepository:
         nothing from the store, so the byte checks of the additions after it are made here,
         before the first: bytes found are taken as present, and bytes missing are refused from
         what was found, without looking again. A repository with no store looks for nothing and
-        refuses as it always has.
+        refuses as it always has. The assets are also announced to the society, whose input after
+        each addition names every object placed so far, so it reads them before the first
+        addition's lock too (:func:`~exulanica.world.society.inputs_ahead`).
         """
+        wanted = frozenset(digests)
         found = (
             {}
             if self.store is None
-            else {digest: self.store.exists(BlobId.from_hex(digest)) for digest in set(digests)}
+            else {digest: self.store.exists(BlobId.from_hex(digest)) for digest in wanted}
         )
         held, self._bytes_read_first = self._bytes_read_first, MappingProxyType(found)
         try:
-            yield
+            with inputs_ahead(self.connection, assets=wanted):
+                yield
         finally:
             self._bytes_read_first = held
 

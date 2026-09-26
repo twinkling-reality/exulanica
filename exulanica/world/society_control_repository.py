@@ -15,6 +15,7 @@ from exulanica.world.society import (
     StaleSocietyState,
     UnavailableSocietyInput,
     UnknownSociety,
+    inputs_ahead,
     society_state_sha256,
 )
 from exulanica.world.society_controls import (
@@ -90,7 +91,10 @@ class SocietyControlRepository:
         if not engine.playback:
             raise ValueError(engine.playback_refusal)
         repo = self._society(actor)
-        repo.snapshot(society["version_id"])
+        # The minutes this round runs next, in this transaction, authorize every input queued after
+        # the one consumed, and this read takes the asset read lock first: all are announced to it.
+        with inputs_ahead(self.connection, repo.named_inputs(society)):
+            repo.snapshot(society["version_id"])
         latest = repo._pending_inputs(society)[-1]
         if latest["availability"] != "available" or latest["navigation"]["unavailable_reason"]:
             raise UnavailableSocietyInput("society input is unavailable for playback")

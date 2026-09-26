@@ -10,15 +10,17 @@ exact state and input checked again.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Final
 
 from psycopg.types.json import Jsonb
 
 from exulanica.world.society import (
+    SocietyBytesNotRead,
     StaleSocietyState,
     UnavailableSocietyInput,
     UnknownSociety,
+    inputs_ahead,
     society_state_sha256,
 )
 from exulanica.world.society_controls import MAX_CATCHUP_TICKS
@@ -96,13 +98,19 @@ class SocietyDecisionRepository:
 
     def read(self, version_id: uuid.UUID, request_id: uuid.UUID) -> dict:
         row = self._row(version_id)
-        self.society.snapshot(version_id)
         request = self._request(row, request_id)
-        if request is None:
-            raise UnknownSociety("decision request is unavailable")
-        documents, _latest = self._context_inputs(row, request)
-        self._authorize_context(request, documents)
+        documents = {} if request is None else self._context_inputs(row, request)[0]
+        with inputs_ahead(self.connection, documents.values()):
+            self.society.snapshot(version_id)
+            if request is None:
+                raise UnknownSociety("decision request is unavailable")
+            self._authorize_context(request, documents)
         return self._result(row, request)
+
+    def _context_ahead(self, row: dict, request: dict | None) -> Iterable[dict]:
+        """The inputs reading ``request`` back authorizes, announced before the state's are asked,
+        which takes the asset read lock (:func:`~exulanica.world.society.inputs_ahead`)."""
+        return () if request is None else self._context_inputs(row, request)[0].values()
 
     def _context_inputs(self, row: dict, request: dict) -> tuple[dict[int, dict], dict]:
         """The inputs a request's context was asked over, and the latest, never the history
@@ -142,16 +150,17 @@ class SocietyDecisionRepository:
     ) -> tuple[dict, bool]:
         """Caller must commit and close its connection before using the returned context."""
         row = self._row(version_id)
-        self.society.snapshot(version_id)
         existing = self._request(row, request_id)
-        if existing:
-            if (existing["subject_id"], existing["base_tick"], existing["base_state_sha256"]) != (
-                str(subject_id),
-                base_tick,
-                base_state_sha256,
-            ):
-                raise StaleSocietyState("idempotency key already binds a different request")
-            return self.read(version_id, request_id), False
+        with inputs_ahead(self.connection, self._context_ahead(row, existing)):
+            self.society.snapshot(version_id)
+            if existing:
+                if (
+                    existing["subject_id"],
+                    existing["base_tick"],
+                    existing["base_state_sha256"],
+                ) != (str(subject_id), base_tick, base_state_sha256):
+                    raise StaleSocietyState("idempotency key already binds a different request")
+                return self.read(version_id, request_id), False
         if row["current_tick"] != base_tick or row["state_sha256"] != base_state_sha256:
             raise StaleSocietyState("society changed before decision request")
         occupied = self.connection.execute(
@@ -279,16 +288,17 @@ class SocietyDecisionRepository:
         row = self._row(version_id)
         if row["engine_version"] != PURPOSEFUL_PROFILE:
             raise ValueError(f"{row['engine_version']} takes no person decisions")
-        self.society.snapshot(version_id)
         existing = self._request(row, request_id)
-        if existing:
-            if (existing["subject_id"], existing["base_tick"], existing["base_state_sha256"]) != (
-                str(subject_id),
-                base_tick,
-                base_state_sha256,
-            ):
-                raise StaleSocietyState("idempotency key already binds a different request")
-            return self.read(version_id, request_id), False
+        with inputs_ahead(self.connection, self._context_ahead(row, existing)):
+            self.society.snapshot(version_id)
+            if existing:
+                if (
+                    existing["subject_id"],
+                    existing["base_tick"],
+                    existing["base_state_sha256"],
+                ) != (str(subject_id), base_tick, base_state_sha256):
+                    raise StaleSocietyState("idempotency key already binds a different request")
+                return self.read(version_id, request_id), False
         if row["current_tick"] != base_tick or row["state_sha256"] != base_state_sha256:
             raise StaleSocietyState("society changed before decision request")
         occupied = self.connection.execute(
@@ -345,7 +355,24 @@ class SocietyDecisionRepository:
         )
         return {"request": request, "decision": None, "status": "in_progress"}, True
 
-    def finish(self, version_id: uuid.UUID, request_id: uuid.UUID, result: dict) -> dict:
+    def finish(
+        self,
+        version_id: uuid.UUID,
+        request_id: uuid.UUID,
+        result: dict,
+        *,
+        last_try: bool = True,
+    ) -> dict:
+        """Record the answer to a reserved request, checked against the state and inputs now.
+
+        A request whose inputs can no longer be authorized is recorded as
+        ``decision_sources_unavailable``, with no proposal and with the call that was made, if one
+        was. So is one whose finish meets the race between reading its inputs' bytes and the asset
+        read lock on its ``last_try``
+        (``asked_again_after_a_race`` in :mod:`exulanica.world.society`): what the person could
+        see could not be read, and the request is closed rather than left in progress. A try
+        before the last raises the race, to be asked again.
+        """
         row = self._row(version_id)
         request = self._request(row, request_id)
         if request is None:
@@ -355,14 +382,19 @@ class SocietyDecisionRepository:
             return existing
         documents, latest = self._context_inputs(row, request)
         try:
-            self._authorize_context(request, documents)
-            self.society._authorize(latest)
-        except UnavailableSocietyInput:
+            with inputs_ahead(self.connection, [*documents.values(), latest]):
+                self._authorize_context(request, documents)
+                self.society._authorize(latest)
+        except (UnavailableSocietyInput, SocietyBytesNotRead) as refused:
+            if isinstance(refused, SocietyBytesNotRead) and not last_try:
+                raise
+            # The call that was made, and what it cost, stay on the receipt: a world's hourly
+            # bounds count every call a receipt names.
             result = {
                 "status": "unavailable",
                 "reason": "decision_sources_unavailable",
                 "proposal": None,
-                "provider": None,
+                "provider": result["provider"],
             }
         else:
             if (

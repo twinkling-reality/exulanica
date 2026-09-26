@@ -50,7 +50,7 @@ from exulanica.models.policy import HostedRequestPolicy, NoHostedRequestPolicy
 from exulanica.models.usage import CallUsage, usd_string
 from exulanica.selection.calls import CallLog
 from exulanica.selection.validation import Session
-from exulanica.world.society import SocietyBytesNotRead, society_state_sha256
+from exulanica.world.society import asked_again_after_a_race, society_state_sha256
 from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
 from exulanica.world.society_decision_contract import (
     CHOICE_DESCRIPTION,
@@ -295,17 +295,14 @@ def _only(labels: frozenset[str]) -> Callable[[Sequence[DecisionOption]], list[D
 
 
 def _once_more_after_a_race(action: Callable[[], _T]) -> _T:
-    """``action``, a whole transaction, asked once more after a race between reading an input's
-    stored bytes and taking the asset read lock (``SocietyBytesNotRead``).
+    """``action``, a whole transaction, asked again after a race between reading an input's
+    stored bytes and taking the asset read lock (``asked_again_after_a_race``).
 
-    The first try rolled back and holds nothing, and reserving, closing and finishing are each
-    idempotent, so the second reads the bytes first; an answer a model was paid for is not lost.
-    A second race is raised, and the next claim closes what it left open.
+    A try that met it rolled back and holds nothing, and reserving and closing are each
+    idempotent, so the next reads the bytes first. A race on the last try is raised, and the next
+    claim closes what it left open. Recording an answer ends terminally instead (``finish``).
     """
-    try:
-        return action()
-    except SocietyBytesNotRead:
-        return action()
+    return asked_again_after_a_race(lambda _last_try: action())
 
 
 @dataclass(frozen=True, slots=True)
@@ -608,12 +605,16 @@ class PersonDecisionHost:
             for request_id, result in [*refused, *results]:
 
                 def finish(
-                    request_id: uuid.UUID = request_id, result: dict[str, Any] = result
+                    last_try: bool,
+                    request_id: uuid.UUID = request_id,
+                    result: dict[str, Any] = result,
                 ) -> None:
                     with connection.transaction():
-                        decisions.finish(claim.version_id, request_id, result)
+                        decisions.finish(claim.version_id, request_id, result, last_try=last_try)
 
-                _once_more_after_a_race(finish)
+                # An answer a model was paid for is recorded: asked again after a race, and on the
+                # last try recorded as decision_sources_unavailable rather than left open.
+                asked_again_after_a_race(finish)
         return True
 
     @staticmethod

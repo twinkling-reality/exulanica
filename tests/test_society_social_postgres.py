@@ -228,7 +228,8 @@ def test_withdrawal_during_inference_records_unavailable_without_returning_conte
         (uuid.UUID(body["idempotency_key"]),),
     ).fetchone()["document"]
     assert receipt["status"] == "unavailable" and receipt["proposal"] is None
-    assert receipt["provider"] is None
+    # The call that was made stays on the receipt, by its digests: no context is kept.
+    assert receipt["provider"]["messages_sha256"] and "own_beliefs" not in str(receipt["provider"])
     unavailable = edited(changed)
     unavailable.update(availability="unavailable", unavailable_reason="source_withdrawn")
     repo.record_input(version, seal(unavailable))

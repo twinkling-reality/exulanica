@@ -55,7 +55,7 @@ from exulanica.selection.validation import (
     ValidatedPlan,
 )
 from exulanica.store.base import ContentAddressedStore
-from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput
+from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput, inputs_ahead
 from exulanica.world.society_engines import INPUT_ENGINES, LEGACY_ENGINES
 from exulanica.world.society_planner import validate_input_successor, validate_society_input
 
@@ -470,7 +470,7 @@ def _authorized_societies(
         "and s.engine_version=any(%s::text[])",
         (validated.workspace_id, world_id, list(validated.place_ids), list(INPUT_ENGINES)),
     ).fetchall()
-    allowed = []
+    chains = []
     for society in societies:
         inputs = connection.execute(
             "select input_seq,document,document_sha256 from world_society_input "
@@ -479,7 +479,7 @@ def _authorized_societies(
         ).fetchall()
         if not inputs:
             continue
-        previous = None
+        documents = []
         try:
             for sequence, row in enumerate(inputs, start=1):
                 document = row["document"]
@@ -492,15 +492,27 @@ def _authorized_societies(
                     or document["version_id"] != str(society["version_id"])
                 ):
                     raise ValueError("society input binding mismatch")
-                if previous is not None:
-                    validate_input_successor(previous, document)
-                authorize(document)
-                previous = document
-        except (UnavailableSocietyInput, SocietyBytesNotRead, ValueError):
-            # A race between reading the society's stored bytes and taking the asset read lock
-            # leaves it out this time, as an unavailable input does; the next question asks again.
+                if documents:
+                    validate_input_successor(documents[-1], document)
+                documents.append(document)
+        except ValueError:
             continue
-        allowed.append(society["society_id"])
+        chains.append((society, documents))
+    allowed = []
+    # Every checked input of every society is announced before the first is authorized, which
+    # takes the asset read lock, so all their stored bytes are read before it
+    # (docs/asset-read-currency.md). A society whose chain does not check is left out unread.
+    with inputs_ahead(connection, [document for _, documents in chains for document in documents]):
+        for society, documents in chains:
+            try:
+                for document in documents:
+                    authorize(document)
+            except (UnavailableSocietyInput, SocietyBytesNotRead, ValueError):
+                # A race between reading the society's stored bytes and taking the asset read
+                # lock leaves it out this time, as an unavailable input does; the next question
+                # asks again.
+                continue
+            allowed.append(society["society_id"])
     return allowed
 
 

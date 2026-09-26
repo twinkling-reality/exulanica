@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Iterable
+from contextlib import ExitStack
 from typing import Any
 
 import psycopg
@@ -19,6 +20,7 @@ from exulanica.world.society import (
     UnavailableSocietyInput,
     UnknownSociety,
     event_document_sha256,
+    inputs_ahead,
     society_state_sha256,
 )
 from exulanica.world.society_action_repository import SocietyActionRepository
@@ -326,6 +328,33 @@ class SocietyRepository:
         documents = self._inputs(row, range(first, self._chain(row) + 1))
         return [documents[sequence] for sequence in sorted(documents)]
 
+    @staticmethod
+    def _memories(row: dict) -> list[int]:
+        """The inputs a social society's people remember, by sequence: what they observed and
+        what they believe was each learned from one."""
+        if row["engine_version"] != SOCIAL_PROFILE:
+            return []
+        return [
+            memory["input_seq"]
+            for agent in row["state"]["social"]["agents"].values()
+            for memory in [*agent["observations"], *agent["beliefs"].values()]
+        ]
+
+    def named_inputs(self, row: dict) -> tuple[dict, ...]:
+        """Every input a society's state names or its next minute consumes, to announce first.
+
+        The input the state consumed, each queued after it and each its people remember: what a
+        minute, the state read after it and a change of presence authorize, all in one transaction,
+        so each is announced before the first takes the asset read lock
+        (:func:`~exulanica.world.society.inputs_ahead`). A caller that reads the state and then
+        runs minutes in one transaction, as a playback round does, announces these before the read.
+        """
+        if row["engine_version"] not in INPUT_PROFILES:
+            return ()
+        first = row["state"]["input_seq"]
+        documents = self._inputs(row, [*range(first, self._chain(row) + 1), *self._memories(row)])
+        return tuple(documents[sequence] for sequence in sorted(documents))
+
     def _validated_inputs(self, row: dict) -> list[dict]:
         """Every stored input from the first, each checked against the one before it: replay's."""
         rows = self._input_rows(row)
@@ -356,22 +385,15 @@ class SocietyRepository:
             # A historical snapshot is not a current rights grant. Authorizer checks dependencies
             # of the current state plus queued input. Historical replay checks every input below.
             consumed, latest = row["state"]["input_seq"], self._chain(row)
-            memories = (
-                [
-                    memory["input_seq"]
-                    for agent in row["state"]["social"]["agents"].values()
-                    for memory in [*agent["observations"], *agent["beliefs"].values()]
-                ]
-                if row["engine_version"] == SOCIAL_PROFILE
-                else []
-            )
+            memories = self._memories(row)
             documents = self._inputs(row, [consumed, latest, *memories])
             current = documents[consumed]
-            self._authorize(current)
-            if latest != consumed:
-                self._authorize(documents[latest])
-            for sequence in memories:
-                self._authorize(documents[sequence])
+            with inputs_ahead(self.connection, documents.values()):
+                self._authorize(current)
+                if latest != consumed:
+                    self._authorize(documents[latest])
+                for sequence in memories:
+                    self._authorize(documents[sequence])
         snapshot = self._snapshot(row)
         if places and current is not None:
             snapshot["places"] = consumed_places(current)
@@ -451,7 +473,7 @@ class SocietyRepository:
     def advance(
         self, version_id: uuid.UUID, *, base_tick: int, base_state_sha256: str
     ) -> dict[str, Any]:
-        with self.connection.transaction():
+        with self.connection.transaction(), ExitStack() as ahead:
             self._lock()
             row = self._row(version_id, lock=True)
             if row is None:
@@ -460,6 +482,7 @@ class SocietyRepository:
                 raise StaleSocietyState("society changed; reload before advancing")
             if society_state_sha256(row["state"]) != row["state_sha256"]:
                 raise ValueError("stored society state digest mismatch")
+            ahead.enter_context(inputs_ahead(self.connection, self.named_inputs(row)))
             if row["engine_version"] == SOCIETY_ENGINE_VERSION:
                 state, events = advance_society(row["state"], row["seed"])
             elif row["engine_version"] == LIVING_PROFILE:
@@ -626,7 +649,7 @@ class SocietyRepository:
         exact retry of a recorded request returns the society as it is; a request against a state
         that has moved on is stale; one the state cannot honour is refused by name.
         """
-        with self.connection.transaction():
+        with self.connection.transaction(), ExitStack() as ahead:
             self._lock()
             row = self._row(version_id, lock=True)
             if row is None:
@@ -685,6 +708,8 @@ class SocietyRepository:
                 # consumed: like a directed request, the next ordinary minute takes it.
                 raise PresenceRefused("a_request_is_waiting")
             inputs = self._pending_inputs(row)
+            # The state read after this minute names the same inputs: all are read first.
+            ahead.enter_context(inputs_ahead(self.connection, self.named_inputs(row)))
             self._authorize(inputs[-1])
             request = presence_request(
                 row["state"],
@@ -769,8 +794,9 @@ class SocietyRepository:
                 state, expected_events = self._replay_living(row)
             elif row["engine_version"] in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE):
                 documents = self._validated_inputs(row)
-                for document in documents:
-                    self._authorize(document)
+                with inputs_ahead(self.connection, documents):
+                    for document in documents:
+                        self._authorize(document)
                 actions = self._actions(row, documents)
                 initializer = (
                     initial_social_society
@@ -918,8 +944,9 @@ class SocietyRepository:
     def _replay_living(self, row: dict[str, Any]) -> tuple[dict[str, Any], list[SocietyEvent]]:
         """Regenerate a v4 society from genesis over every retained input and transition."""
         documents = self._validated_inputs(row)
-        for document in documents:
-            self._authorize(document)
+        with inputs_ahead(self.connection, documents):
+            for document in documents:
+                self._authorize(document)
         if self.connection.execute(
             "select 1 from world_society_action_request where workspace_id=%s and society_id=%s",
             (self.workspace_id, row["society_id"]),

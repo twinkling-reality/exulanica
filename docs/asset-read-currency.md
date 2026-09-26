@@ -86,17 +86,37 @@ recording why, between that read and the last question, no longer refuse the wri
 what it placed reads `unavailable_bytes`, as it would had the bytes been lost just after the commit.
 The product erases stored bytes only for a committed deletion (`mark_purged` in
 [`deletion/queue.py`](../exulanica/deletion/queue.py)), and a depth estimate's last question reads
-that deletion's rows. Authored edits, branches, the carry that adds photographs to a made world, a
-saved world's society input from an edit, and a read of a society's current state follow the rule
-([`tests/test_store_reads_under_the_asset_lock.py`](../tests/test_store_reads_under_the_asset_lock.py)).
-A saved world's society breaks it where its own transaction took the barrier for an earlier question
-and asks again, reading its objects' bytes under that barrier: in the second and later
-authorizations of one simulated minute; in a playback round after its first question (its readiness
-check, then each minute it advances); in every input after the first when a history is replayed,
-when a decision is read, and when a question's answer reads the society (the selection executor
-authorizes every input in one transaction); in a decision's preparation and its finish, each of
-which authorizes several inputs; when inhabitants are brought in; and for each object after the
-first of a small square. A district society's inputs read theirs under the barrier.
+that deletion's rows. Authored edits, branches, the carry that adds photographs to a made world and
+a society's inputs follow the rule
+([`tests/test_store_reads_under_the_asset_lock.py`](../tests/test_store_reads_under_the_asset_lock.py),
+[`tests/test_society_store_reads_under_the_asset_lock.py`](../tests/test_society_store_reads_under_the_asset_lock.py)).
+A society's input depends on stored bytes: each placed object's reviewed asset and licence, and a
+district's admitted sources and artifacts. Every authorization takes the barrier, and one
+transaction often authorizes several inputs, so the transaction reads the bytes of all of them
+before its first authorization, once, and answers every later one from that read. The repository
+asking announces them first (`inputs_ahead` in
+[`world/society.py`](../exulanica/world/society.py)): the inputs a minute, the state read after it
+and a change of presence name; a replayed history; a decision's context, where it is prepared,
+read or finished; a history of directed requests; every society a question's answer reads, of
+those whose stored inputs check; a society experiment's baseline and treatment; every input queued
+for the minutes a playback round runs after checking its society is ready; and the reviewed assets
+a small square places, whose inputs after each addition name them. The read belongs to its
+transaction, known by its connection and the time the transaction began
+([`society_runtime.py`](../exulanica/api/society_runtime.py)), so a playback round's minutes share
+one, and a district society and a saved world's follow the same rule. A transaction that
+authorizes one input alone, as a read made outside a caller's transaction does, reads only that
+input's bytes. Bringing inhabitants into a saved world reads its first input and takes the barrier
+before it writes the world's place, because that write takes the barrier's shared side (below). An
+input nobody announced is still authorized: its bytes are read under the barrier and the log names
+the defect (`society_input_not_announced`). A reviewed asset row, or a district's admitted source,
+that names other bytes under the barrier than when they were read changed in between, which only a
+direct change to the registry, or a right taking effect in that moment, does (the importer refuses
+to rebind or republish a key). That is the race: a request that meets it is refused as `409 busy`,
+to be asked again; a question's answer leaves that society out; a playback round fails without
+pausing, and the society is claimed again once that claim's lease runs out. Recording a model's
+decision is asked again `RETRIES_AFTER_A_RACE` times, and on its last try the race records the
+decision as `decision_sources_unavailable`, with no proposal and with the call that was made and
+what it cost, so the race leaves no request in progress.
 
 Dependency mutations take the shared side of the global barrier with **try-lock**, retaining it
 through commit. If a reader already owns the exclusive barrier, mutation raises retryable 40001

@@ -14,6 +14,7 @@ from exulanica.world.society import (
     StaleSocietyState,
     UnavailableSocietyInput,
     UnknownSociety,
+    inputs_ahead,
     society_state_sha256,
 )
 from exulanica.world.society_actions import (
@@ -245,12 +246,19 @@ class SocietyActionRepository:
                 "and society_id=%s order by action_seq desc limit %s",
                 (self.workspace_id, society["society_id"], max(1, min(limit, 128))),
             ).fetchall()
-            history = []
+            requests = []
             for row in rows:
                 request = self._request(society["society_id"], row["request_id"])
                 assert request is not None
-                self._authorize(self._input(society["society_id"], request["input_seq"]))
-                history.append(self._envelope(society["society_id"], request))
+                requests.append(request)
+            inputs = [self._input(society["society_id"], r["input_seq"]) for r in requests]
+            history = []
+            # Each request's input is announced before the first is authorized, which takes the
+            # asset read lock, so all their stored bytes are read before it.
+            with inputs_ahead(self.connection, inputs):
+                for request, document in zip(requests, inputs, strict=True):
+                    self._authorize(document)
+                    history.append(self._envelope(society["society_id"], request))
             return tuple(history)
 
     def pending_for_step(

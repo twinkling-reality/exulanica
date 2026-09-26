@@ -15,8 +15,8 @@ the reads it makes happen, before the lock or after the commit.
 
 What reading before the lock gives up is tested too: bytes lost with no row saying why, between
 the read and the last question, no longer refuse a placement, which is written and reads
-``unavailable_bytes``; and rows under the lock naming bytes nobody read refuse the request as a
-race to be asked again, which neither records an input nor pauses playback.
+``unavailable_bytes``; and a reviewed asset row that changed between the read and the lock refuses
+the request as a race to be asked again, which neither records an input nor pauses playback.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import uuid
 
 import pytest
 from exulanica.api.society_control_worker import SocietyControlWorker
-from exulanica.api.society_runtime import SocietyRuntime, _ReadFirst
+from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.deletion.queue import PurgeTarget, mark_purged
 from exulanica.evidence.blob import BlobId
@@ -34,7 +34,12 @@ from exulanica.selection import execute, validate
 from exulanica.world import UnavailableAsset, reviewed_assets
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject, ObjectOrigin, Transform
-from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput
+from exulanica.world.society import (
+    RETRIES_AFTER_A_RACE,
+    SocietyBytesNotRead,
+    UnavailableSocietyInput,
+    announced_inputs,
+)
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_repository import SocietyRepository
 from fastapi.testclient import TestClient
@@ -55,7 +60,7 @@ from personal_world_support import (
     place_object,
     source_media,
 )
-from society_fixtures import SEED, society_input
+from society_fixtures import SEED, edited, seal, society_input
 from test_personal_world_addition import (
     _add_what_the_read_offers,
     _attach,
@@ -446,15 +451,25 @@ def _society_reads(world, client, monkeypatch):
     )
 
 
-def _forgetting_licences(monkeypatch) -> None:
-    """Leave each licence unread before the lock, as if its row named new bytes after the read."""
-    read_first = SocietyRuntime._read_first
+#: A licence digest no reviewed row names, standing for the licence a row named when it was read.
+EARLIER_LICENCE = "0" * 64
 
-    def forgets(self, read, digest, size, *, keep=False):
-        if size is not None or keep:
-            read_first(self, read, digest, size, keep=keep)
 
-    monkeypatch.setattr(SocietyRuntime, "_read_first", forgets)
+def _racing(monkeypatch) -> None:
+    """Record each reviewed row as it was before an administrator changed its licence: the bytes
+    read ahead are that earlier licence's, so the licence the row names under the lock was never
+    read. The race between the read and the lock, made to happen every time."""
+    ahead = SocietyRuntime._read_assets_ahead
+
+    def raced(self, connection, read, named):
+        ahead(self, connection, read, named)
+        for key, row in list(read.rows.items()):
+            if row is not None and row[2] != EARLIER_LICENCE:
+                read.found.pop((row[2], None), None)
+                read.found[(EARLIER_LICENCE, None)] = None
+                read.rows[key] = (row[0], row[1], EARLIER_LICENCE)
+
+    monkeypatch.setattr(SocietyRuntime, "_read_assets_ahead", raced)
 
 
 def _inputs(world) -> list[dict]:
@@ -595,7 +610,7 @@ def test_the_small_square_looks_for_its_objects_bytes_before_the_first_addition(
     assert _asked(reads, "world/object_repository.py:reviewed_bytes_read_first")
 
 
-def test_rows_naming_bytes_nobody_read_before_the_lock_refuse_the_edit_to_be_asked_again(
+def test_a_reviewed_row_changed_after_its_read_refuses_the_edit_to_be_asked_again(
     runtime_app, monkeypatch
 ):
     world, make_app = runtime_app
@@ -606,15 +621,15 @@ def test_rows_naming_bytes_nobody_read_before_the_lock_refuse_the_edit_to_be_ask
         base = client.get(version, headers=saved_api.OWNER, params=scope).json()["state_sha256"]
         reads = _society_reads(world, client, monkeypatch)
         with monkeypatch.context() as patch:
-            _forgetting_licences(patch)
+            _racing(patch)
             refused = saved_api.place_request(
                 client, world, "object:second", -3_000, 5_000, asset="pillar"
             )
         assert refused.status_code == 409, refused.text
         assert refused.json() == {
             "code": "busy",
-            "detail": "a society input names stored bytes that were not read before the asset "
-            "read lock was taken; ask again",
+            "detail": "a reviewed asset changed between reading a society input's stored bytes "
+            "and taking the asset read lock; ask again",
         }
         after = client.get(version, headers=saved_api.OWNER, params=scope).json()["state_sha256"]
         assert after == base, "the edit was not written"
@@ -625,7 +640,7 @@ def test_rows_naming_bytes_nobody_read_before_the_lock_refuse_the_edit_to_be_ask
     assert len(_inputs(world)) == len(inputs) + 1
 
 
-def test_playback_fails_a_round_that_names_unread_bytes_and_the_next_claim_retries(
+def test_playback_fails_a_round_that_meets_the_race_and_the_next_claim_retries(
     runtime_app, monkeypatch
 ):
     """A race fails the round without pausing: the lease is left to expire and is claimed again."""
@@ -661,7 +676,7 @@ def test_playback_fails_a_round_that_names_unread_bytes_and_the_next_claim_retri
             services.database, runtime=services.society_runtime, workspaces=[world["workspace"]]
         )
         with monkeypatch.context() as patch:
-            _forgetting_licences(patch)
+            _racing(patch)
             with pytest.raises(SocietyBytesNotRead):
                 worker.run_once(world["workspace"])
         still = client.get(control_route, headers=saved_api.OWNER, params=scope).json()
@@ -672,27 +687,6 @@ def test_playback_fails_a_round_that_names_unread_bytes_and_the_next_claim_retri
         due(lease_expired=True)
         result = worker.run_once(world["workspace"])
     assert result is not None and result["receipt"]["kind"] == "advanced", result
-
-
-def test_bytes_read_before_the_lock_answer_only_for_what_was_read():
-    """The record read before the lock answers from what it holds and refuses anything else."""
-    record = _ReadFirst(
-        {
-            ("a" * 64, 3): None,
-            ("b" * 64, None): "required exact asset bytes are unavailable",
-            ("c" * 64, None): b"{}",
-        }
-    )
-    assert record.answer("a" * 64, 3) is None
-    assert record.kept("c" * 64) == b"{}"
-    with pytest.raises(UnavailableSocietyInput, match="required exact asset bytes are unavailable"):
-        record.answer("b" * 64, None)
-    # The same digest held to another size was not what was read, nor were bytes not kept.
-    for unread in (lambda: record.answer("a" * 64, 4), lambda: record.kept("a" * 64)):
-        with pytest.raises(SocietyBytesNotRead):
-            unread()
-    # A race is not an unavailable input: nothing that records one, or pauses for one, takes it.
-    assert not issubclass(SocietyBytesNotRead, (UnavailableSocietyInput, ValueError))
 
 
 def test_the_application_answers_the_race_as_a_retry_whatever_route_meets_it(
@@ -706,7 +700,7 @@ def test_the_application_answers_the_race_as_a_retry_whatever_route_meets_it(
         assert SocietyBytesNotRead in client.app.exception_handlers
         reads = _society_reads(world, client, monkeypatch)
         with monkeypatch.context() as patch:
-            _forgetting_licences(patch)
+            _racing(patch)
             raced = client.get(society, headers=saved_api.OWNER, params=scope)
         assert raced.status_code == 409, raced.text
         assert raced.json()["code"] == "busy"
@@ -802,3 +796,157 @@ def test_a_decision_whose_finish_meets_the_race_is_finished_once_more_and_keeps_
     assert len(transport.requests) == 1, "the model was asked once and its answer kept"
     # The same key reads the recorded decision, not a request stuck in progress.
     assert api.post(api.in_world(route + "/decisions"), body).json() == answered.json()
+
+
+def test_a_decision_whose_finish_meets_the_race_every_time_is_recorded_not_left_open(
+    social, client, transport, manifest, monkeypatch
+):
+    """On its last try a finish that meets the race records ``decision_sources_unavailable``:
+    what the person could see could not be read, and the key reads that decision back rather
+    than a request in progress for good."""
+    api, _repo, _version, route, _changed, _rights, body = social
+    api.client.app.state.society_decision_provider = social_helpers.provider_for(
+        client, transport, manifest
+    )
+    finishes = {"now": False, "tries": 0}
+    finish = SocietyDecisionRepository.finish
+    authorize = api.client.app.state.society_input_authorizer
+
+    def counted(self, *args, **kwargs):
+        finishes["now"], finishes["tries"] = True, finishes["tries"] + 1
+        try:
+            return finish(self, *args, **kwargs)
+        finally:
+            finishes["now"] = False
+
+    def racing(connection, session, document):
+        if finishes["now"]:
+            raise SocietyBytesNotRead("a reviewed asset changed between the read and the lock")
+        return authorize(connection, session, document)
+
+    monkeypatch.setattr(SocietyDecisionRepository, "finish", counted)
+    api.client.app.state.society_input_authorizer = racing
+    answered = api.post(api.in_world(route + "/decisions"), body)
+    assert answered.status_code == 424, answered.text
+    assert answered.json()["code"] == "unavailable_society_input"
+    assert finishes["tries"] == RETRIES_AFTER_A_RACE + 1
+    assert len(transport.requests) == 1, "the model was asked once"
+    read = api.get(api.in_world(route + "/decisions/" + body["idempotency_key"]))
+    assert read.status_code == 200, read.text
+    assert read.json()["status"] == "completed"
+    assert (read.json()["decision"]["status"], read.json()["decision"]["reason"]) == (
+        "unavailable",
+        "decision_sources_unavailable",
+    )
+    assert read.json()["decision"]["provider"] is not None, "the call made stays on the receipt"
+
+
+def test_the_selection_executor_announces_every_input_before_authorizing_the_first(memory_place):
+    """Every input of every society the question reads is announced before the first is
+    authorized, so the society reads all their stored bytes before its lock."""
+    memory = memory_place
+    composition._confirm_bridge(memory)
+    world = memory.composed
+    conn = world.worlds.connection
+    version = world.version.version_id
+    society = SocietyRepository(
+        conn,
+        world.worlds.workspace_id,
+        world_id=world.worlds.world_id,
+        input_authorizer=lambda _document: None,
+    )
+    document = society_input(version)
+    society.create(
+        version,
+        place_id=world.source.place_id,
+        region_id="region-a",
+        seed=SEED,
+        actor=memory.actor,
+        profile="exulanica-society/v2",
+        initial_input=document,
+    )
+    society.record_input(version, seal(edited(document)))
+    conn.commit()
+    announced_at_each = []
+
+    def authorizer(_document):
+        announced, _assets = announced_inputs(conn)
+        announced_at_each.append({d["document_sha256"] for d in announced})
+
+    execute(
+        conn,
+        validate(conn, memory.plan(), memory.session),
+        world_id=world.worlds.world_id,
+        store=world.store,
+        society_authorizer=authorizer,
+    )
+    stored = {
+        row["document_sha256"]
+        for row in conn.execute(
+            "select document_sha256 from world_society_input where workspace_id=%s",
+            (world.worlds.workspace_id,),
+        ).fetchall()
+    }
+    conn.commit()
+    assert len(stored) == 2
+    assert announced_at_each == [stored, stored], "both inputs, before the first was authorized"
+
+
+def test_a_society_whose_stored_inputs_do_not_check_is_left_out_unannounced(memory_place):
+    """A stored input that no longer checks leaves its society out of the answer, as before, and
+    is never announced to be read ahead, so it cannot fail reading ahead for another society."""
+    memory = memory_place
+    composition._confirm_bridge(memory)
+    world = memory.composed
+    conn = world.worlds.connection
+    version = world.version.version_id
+    society = SocietyRepository(
+        conn,
+        world.worlds.workspace_id,
+        world_id=world.worlds.world_id,
+        input_authorizer=lambda _document: None,
+    )
+    document = society_input(version)
+    society.create(
+        version,
+        place_id=world.source.place_id,
+        region_id="region-a",
+        seed=SEED,
+        actor=memory.actor,
+        profile="exulanica-society/v2",
+        initial_input=document,
+    )
+    society.record_input(version, seal(edited(document)))
+    conn.commit()
+
+    def run(authorizer):
+        return execute(
+            conn,
+            validate(conn, memory.plan(), memory.session),
+            world_id=world.worlds.world_id,
+            store=world.store,
+            society_authorizer=authorizer,
+        )
+
+    def unavailable(_document):
+        raise UnavailableSocietyInput("the society's source was withdrawn")
+
+    allowed, left_out = run(lambda _document: None), run(unavailable)
+    # The second stored input no longer checks: it names another world than its society's.
+    with conn.transaction():
+        conn.execute("set local session_replication_role = replica")
+        conn.execute(
+            "update world_society_input set document=jsonb_set(document,'{world_id}',%s) "
+            "where workspace_id=%s and input_seq=2",
+            ('"elsewhere"', world.worlds.workspace_id),
+        )
+    announced_at_each = []
+
+    def authorizer(_document):
+        announced_at_each.append(len(announced_inputs(conn)[0]))
+
+    answered = run(authorizer)
+    assert announced_at_each == [], "nothing of a society that does not check is authorized"
+    assert any(item.origin_kind == "simulated" for item in allowed.content), "positive control"
+    assert answered.content == left_out.content
+    assert answered.total_matched == left_out.total_matched < allowed.total_matched

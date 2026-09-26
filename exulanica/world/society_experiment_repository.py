@@ -18,7 +18,7 @@ from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json
 from exulanica.world import society_experiments as experiments
-from exulanica.world.society import UnavailableSocietyInput, society_state_sha256
+from exulanica.world.society import UnavailableSocietyInput, inputs_ahead, society_state_sha256
 from exulanica.world.society_engines import EXPERIMENT_ENGINES, society_engine
 
 __all__ = [
@@ -90,11 +90,14 @@ class SocietyExperimentRepository:
         if self.input_authorizer is None:
             raise UnavailableSocietyInput("current society input authorization is not configured")
         seen: set[str] = set()
-        for document in documents:
-            digest = document["document_sha256"]
-            if digest not in seen:
-                self.input_authorizer(document)
-                seen.add(digest)
+        # Every input is announced before the first is authorized, which takes the asset read
+        # lock, so their stored bytes are all read before it.
+        with inputs_ahead(self.connection, documents):
+            for document in documents:
+                digest = document["document_sha256"]
+                if digest not in seen:
+                    self.input_authorizer(document)
+                    seen.add(digest)
 
     @staticmethod
     def _reservation(attempt: dict[str, Any]) -> dict[str, Any]:

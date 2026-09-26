@@ -55,9 +55,10 @@ def stub():
     runtime = SimpleNamespace(
         _binding=lambda s, v: binding,
         _lock=lambda c, s: calls.append("lock"),
+        _read_district_first=lambda c, s, b: calls.append("read first, then lock assets"),
         _version=lambda c, s, b: SimpleNamespace(source_invalidated=False),
-        _district=lambda c, s, b: ({}, base, None),
-        _blob=lambda sha: interpreted,
+        _district=lambda c, s, b, read: ({}, base, None),
+        _kept=lambda read, sha: interpreted,
     )
     return runtime, Connection(), session, version, base, interpreted, calls, binding
 
@@ -72,7 +73,13 @@ def test_exact_utf8_strings_and_registered_transform_survive_response(stub):
     assert result["registration"] == binding.registration()
     assert result["current_dependencies"] == {"a" * 64: "available", "b" * 64: "available"}
     assert "base_document" not in result and "interpretation_document" not in result
-    assert calls == ["transaction", "set transaction read only", "lock", "commit"]
+    assert calls == [
+        "transaction",
+        "set transaction read only",
+        "lock",
+        "read first, then lock assets",
+        "commit",
+    ]
 
 
 @pytest.mark.parametrize("failure", ["binding", "version", "invalidated", "district", "utf8"])
@@ -100,7 +107,7 @@ def test_boundary_distinguishes_missing_scope_from_unavailable_source(stub, fail
     elif failure == "district":
         runtime._district = unavailable
     else:
-        runtime._blob = lambda *args: b"\xff"
+        runtime._kept = lambda *args: b"\xff"
     with pytest.raises(
         UnknownWorldResource if failure in ("binding", "version") else UnavailableSocietyInput
     ):

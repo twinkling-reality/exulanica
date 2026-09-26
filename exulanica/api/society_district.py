@@ -54,6 +54,9 @@ def society_district_view(
     with connection.transaction():
         connection.execute("set transaction read only")
         runtime._lock(connection, session)
+        # The district's bytes are read and checked before the asset read lock, and only rows
+        # are read under it (docs/asset-read-currency.md).
+        read = runtime._read_district_first(connection, session, binding)
         try:
             version = runtime._version(connection, session, binding)
         except UnavailableSocietyInput as exc:
@@ -63,9 +66,9 @@ def society_district_view(
         if version.source_invalidated:
             raise UnavailableSocietyInput("authored source invalidated")
         # _district checks current operation rights, exact source receipts and all pinned
-        # geometry/frame relationships. _blob verifies the second immutable read against its pin.
-        _, base_bytes, _ = runtime._district(connection, session, binding)
-        interpretation_bytes = runtime._blob(binding.interpretation_artifact_sha256)
+        # geometry/frame relationships, over the bytes read and verified against their pins.
+        _, base_bytes, _ = runtime._district(connection, session, binding, read)
+        interpretation_bytes = runtime._kept(read, binding.interpretation_artifact_sha256)
         try:
             base_json = base_bytes.decode("utf-8")
             interpretation_json = interpretation_bytes.decode("utf-8")

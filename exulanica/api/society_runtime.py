@@ -18,14 +18,19 @@ version whose snapshot is anything else derives nothing.
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import json
+import logging
+import threading
 import uuid
+import weakref
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Final, Literal
 
 import psycopg
+from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
@@ -45,6 +50,7 @@ from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.society import (
     SocietyBytesNotRead,
     UnavailableSocietyInput,
+    announced_inputs,
     society_state_sha256,
 )
 from exulanica.world.society_authored_ground import (
@@ -92,36 +98,45 @@ def saved_world_place_id(version_id: uuid.UUID) -> uuid.UUID:
     return uuid.uuid5(version_id, SAVED_WORLD_PLACE_NAME)
 
 
+_LOG = logging.getLogger(__name__)
+
+#: The name the log gives an input authorized without being announced (``inputs_ahead`` in
+#: :mod:`exulanica.world.society`): a defect in its caller, whose bytes are then read under the
+#: asset read lock, as every input's were before inputs were read ahead.
+NOT_ANNOUNCED: Final = "society_input_not_announced"
+_RACE: Final = (
+    "a reviewed asset changed between reading a society input's stored bytes and taking the "
+    "asset read lock; ask again"
+)
+
+#: A reviewed asset row as a society input's check depends on it: its bytes, their size and its
+#: licence's bytes, or ``None`` where no row names the key.
+ReviewedRow = tuple[str, int, str] | None
+
+
 @dataclass(slots=True)
 class _ReadFirst:
-    """The stored bytes one saved-world input depends on, read before the asset read lock.
+    """The stored bytes one transaction's society inputs depend on, read before the asset read lock.
 
-    Keyed by content digest and the size the check held it to, or ``None`` where it checks the
-    hash alone. A value is the bytes where they are kept (a registry an input recorded), ``None``
-    for bytes checked and let go, or the words of the refusal checking them raised. Nothing reads
-    the store through this: a digest it does not hold is refused by name.
+    ``found`` is keyed by content digest and the size the check held it to, or ``None`` where it
+    checks the hash alone. A value is the bytes where they are kept (a recorded registry, a
+    district's artifacts), ``None`` for bytes checked and let go, or the words of the refusal
+    checking them raised. ``rows`` is each reviewed asset row as it was when its bytes were read,
+    so a row that names other bytes under the lock is known to have changed in between.
+    ``locked`` is whether this transaction's society has taken the lock, after which nothing is
+    read ahead. ``read`` holds what was already read ahead, so it is read once a transaction.
     """
 
     found: dict[tuple[str, int | None], bytes | str | None] = field(default_factory=dict)
+    rows: dict[str, ReviewedRow] = field(default_factory=dict)
+    read: set[tuple[str, str]] = field(default_factory=set)
+    locked: bool = False
 
-    def answer(self, digest: str, size: int | None) -> bytes | None:
-        """What reading the bytes found, raising the refusal reading them raised."""
-        if (digest, size) not in self.found:
-            raise SocietyBytesNotRead(
-                "a society input names stored bytes that were not read before the asset read "
-                "lock was taken; ask again"
-            )
-        found = self.found[(digest, size)]
-        if isinstance(found, str):
-            raise UnavailableSocietyInput(found)
-        return found
 
-    def kept(self, digest: str) -> bytes:
-        """The bytes read and kept under this digest, such as a recorded registry."""
-        found = self.answer(digest, None)
-        if found is None:
-            raise SocietyBytesNotRead("stored bytes were checked before the lock but not kept")
-        return found
+def _reviewed_view(row: Mapping[str, Any] | None) -> ReviewedRow:
+    if row is None:
+        return None
+    return (row["content_sha256"], row["byte_size"], row["licence_sha256"])
 
 
 class RuntimeSourceBinding(BaseModel):
@@ -208,6 +223,13 @@ class SocietyRuntime:
         )
         self._bindings: dict[tuple[uuid.UUID, uuid.UUID], SocietyRuntimeBinding] = {}
         self._authored: dict[tuple[uuid.UUID, uuid.UUID], AuthoredWorldSocietyBinding] = {}
+        # What each open connection's current transaction read before the asset read lock, with
+        # the time that transaction began: one entry per connection (one database session),
+        # replaced when a later transaction begins and gone with the connection.
+        self._transactions: weakref.WeakKeyDictionary[
+            psycopg.Connection, tuple[dt.datetime, _ReadFirst]
+        ] = weakref.WeakKeyDictionary()
+        self._transactions_lock = threading.Lock()
         # Freeze caller-owned dictionaries by serializing once; no mutable registry leaks out. The
         # registry this runtime composes with is kept in the store under its own digest, so an
         # input composed under it keeps authorising after the registry changes.
@@ -282,6 +304,14 @@ class SocietyRuntime:
             self._lock(connection, session)
             binding, _ = self._authored_scope(connection, session, version_id)
             if binding.binding_id.startswith(SAVED_WORLD_BINDING_PREFIX):
+                # Writing a place takes the shared side of the asset read lock (its table's
+                # mutation guard) and holds it until the commit, and a holder of either side reads
+                # nothing from the store. So the creation's first input is read first, then the
+                # lock is taken, and only then is the place written; the input composed next in
+                # this transaction is answered from that read.
+                read = self._transaction_read(connection)
+                self._read_ahead(connection, session, read, composing=binding)
+                self._lock_assets(connection, read)
                 connection.execute(
                     "insert into place(workspace_id,place_id) values(%s,%s) on conflict do nothing",
                     (session.workspace_id, binding.place_id),
@@ -289,32 +319,51 @@ class SocietyRuntime:
             return binding.place_id
 
     @staticmethod
-    def _lock(connection: psycopg.Connection, session: Session, *, assets: bool = True) -> None:
+    def _lock(connection: psycopg.Connection, session: Session) -> None:
+        """The workspace's lock, the first of the two a society takes, in the order authored edits
+        and structural invalidation take them; the asset read lock follows (:meth:`_lock_assets`).
+        """
         connection.row_factory = dict_row
         set_workspace(connection, session.workspace_id)
-        # Same order as authored edits/structural invalidation, then source withdrawal exclusion.
         connection.execute(
             "select pg_advisory_xact_lock(hashtextextended(%s,880024))",
             (str(session.workspace_id),),
         )
-        if assets:
-            SocietyRuntime._lock_assets(connection)
 
     @staticmethod
-    def _lock_assets(connection: psycopg.Connection) -> None:
+    def _lock_assets(connection: psycopg.Connection, read: _ReadFirst) -> None:
         """The asset read lock, after the workspace's, once everything to be read is read."""
         lock_asset_reads_until_commit(
             connection,
             outside="a society's inputs are locked only inside the transaction that records them",
         )
+        read.locked = True
+
+    def _transaction_read(self, connection: psycopg.Connection) -> _ReadFirst:
+        """What this transaction read before the asset read lock; call inside the transaction.
+
+        A transaction is known by its connection and the time it began, which is fixed for the
+        whole transaction, savepoints included: a later transaction on the same connection begins
+        with nothing read, and so does each statement of a connection outside a transaction.
+        """
+        began = connection.execute("select transaction_timestamp() as began").fetchone()["began"]
+        with self._transactions_lock:
+            held = self._transactions.get(connection)
+            if held is not None and held[0] == began:
+                return held[1]
+            read = _ReadFirst()
+            self._transactions[connection] = (began, read)
+            return read
 
     def _version(
         self, connection: psycopg.Connection, session: Session, binding: SocietyRuntimeBinding
     ) -> AlternateVersion:
+        # Rows only: a district reads which placements its version holds, never whether their
+        # bytes are present, and this is read under the asset read lock.
         try:
             version = WorldObjectRepository(
-                connection, session.workspace_id, world_id=binding.world_id, store=self.store
-            ).version(binding.version_id)
+                connection, session.workspace_id, world_id=binding.world_id, store=None
+            ).version(binding.version_id, with_availability=False)
         except UnknownWorldResource as exc:
             raise UnavailableSocietyInput("bound authored version is unavailable") from exc
         if version.source_snapshot_id != binding.source_snapshot_id:
@@ -341,47 +390,74 @@ class SocietyRuntime:
             raise UnavailableSocietyInput("required asset bytes failed integrity validation")
         return data
 
-    def _source_rows(
+    def _admitted_sources(
         self, connection: psycopg.Connection, session: Session, binding: SocietyRuntimeBinding
     ) -> dict[str, dict]:
-        rows = {}
-        for source in binding.sources:
-            row = connection.execute(
-                "select *, environment_resource_allows(%s,'source',admission_id,'display'"
-                ",statement_timestamp()) "
-                "and environment_resource_allows(%s,'source',admission_id,'persist',state"
-                "ment_timestamp()) "
-                "and environment_resource_allows(%s,'source',admission_id,'modify',statem"
-                "ent_timestamp()) "
-                "and environment_resource_allows(%s,'source',admission_id,'compose',state"
-                "ment_timestamp()) as allowed "
-                "from environment_source_admission where workspace_id=%s and admission_id=%s",
-                (session.workspace_id,) * 5 + (source.admission_id,),
-            ).fetchone()
-            if row is None or not row["allowed"] or row["withdrawn_at"] is not None:
-                raise UnavailableSocietyInput("district source is unavailable or operation denied")
-            receipt = canonical_json(row["receipt_record"])
-            if (
-                row["place_id"] != binding.place_id
-                or row["provider_key"] != "nyc-open-data"
-                or row["provider_original_id"] != source.dataset_id
-                or bytes(row["source_sha256"]).hex() != source.source_sha256
-                or bytes(row["receipt_sha256"]).hex() != source.receipt_sha256
-                or hashlib.sha256(receipt).hexdigest() != source.receipt_sha256
-                or bytes(row["receipt_canonical"]) != receipt
-                or any(row["operation_rights"].get(op) is not True for op in _OPERATIONS)
-            ):
-                raise UnavailableSocietyInput("district source binding drift")
-            self._blob(source.source_sha256, row["byte_size"])
-            rows[source.dataset_id] = row
-        return rows
+        """The district's admitted source rows, each current and bound exactly as registered."""
+        return {
+            source.dataset_id: self._admitted_source(connection, session, binding, source)
+            for source in binding.sources
+        }
+
+    @staticmethod
+    def _source_key(source: RuntimeSourceBinding) -> str:
+        """Where the record read ahead keeps an admitted source's row, beside reviewed assets'."""
+        return f"source:{source.admission_id}"
+
+    def _admitted_source(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        binding: SocietyRuntimeBinding,
+        source: RuntimeSourceBinding,
+    ) -> dict:
+        """One admitted source's row, current and bound exactly as registered, or its refusal."""
+        row = connection.execute(
+            "select *, environment_resource_allows(%s,'source',admission_id,'display'"
+            ",statement_timestamp()) "
+            "and environment_resource_allows(%s,'source',admission_id,'persist',state"
+            "ment_timestamp()) "
+            "and environment_resource_allows(%s,'source',admission_id,'modify',statem"
+            "ent_timestamp()) "
+            "and environment_resource_allows(%s,'source',admission_id,'compose',state"
+            "ment_timestamp()) as allowed "
+            "from environment_source_admission where workspace_id=%s and admission_id=%s",
+            (session.workspace_id,) * 5 + (source.admission_id,),
+        ).fetchone()
+        if row is None or not row["allowed"] or row["withdrawn_at"] is not None:
+            raise UnavailableSocietyInput("district source is unavailable or operation denied")
+        receipt = canonical_json(row["receipt_record"])
+        if (
+            row["place_id"] != binding.place_id
+            or row["provider_key"] != "nyc-open-data"
+            or row["provider_original_id"] != source.dataset_id
+            or bytes(row["source_sha256"]).hex() != source.source_sha256
+            or bytes(row["receipt_sha256"]).hex() != source.receipt_sha256
+            or hashlib.sha256(receipt).hexdigest() != source.receipt_sha256
+            or bytes(row["receipt_canonical"]) != receipt
+            or any(row["operation_rights"].get(op) is not True for op in _OPERATIONS)
+        ):
+            raise UnavailableSocietyInput("district source binding drift")
+        return row
 
     def _district(
-        self, connection: psycopg.Connection, session: Session, binding: SocietyRuntimeBinding
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        binding: SocietyRuntimeBinding,
+        read: _ReadFirst,
     ) -> tuple[dict, bytes, DistrictGeometry]:
-        rows = self._source_rows(connection, session, binding)
-        base_bytes = self._blob(binding.base_artifact_sha256)
-        data = self._blob(binding.interpretation_artifact_sha256)
+        rows = self._admitted_sources(connection, session, binding)
+        for source in binding.sources:
+            size = rows[source.dataset_id]["byte_size"]
+            self._answer(
+                read,
+                source.source_sha256,
+                size,
+                reviewed=(self._source_key(source), (source.source_sha256, size, "")),
+            )
+        base_bytes = self._kept(read, binding.base_artifact_sha256)
+        data = self._kept(read, binding.interpretation_artifact_sha256)
         try:
             interpreted = validate_interpretation(data, base_bytes)
         except (ValueError, TypeError, KeyError) as exc:
@@ -407,16 +483,12 @@ class SocietyRuntime:
             DistrictGeometry(json.loads(base_bytes)),
         )
 
-    def _registry(self, digest: str, read: _ReadFirst | None) -> dict[str, Any]:
-        """The affordance registry with this digest: the current one, or one kept in the store.
-
-        ``read`` holds a kept registry a saved world's input read before the asset read lock; a
-        district's input, which reads it here, passes ``None``.
-        """
+    def _registry(self, digest: str, read: _ReadFirst) -> dict[str, Any]:
+        """The affordance registry with this digest: the current one, or one kept in the store."""
         if digest == self._registry_sha256:
             return json.loads(self._registry_bytes)
         try:
-            data = self._blob(digest) if read is None else read.kept(digest)
+            data = self._kept(read, digest)
         except UnavailableSocietyInput as exc:
             raise UnavailableSocietyInput(
                 "the affordance registry this input was composed under is not held here"
@@ -432,9 +504,7 @@ class SocietyRuntime:
             ) from exc
         return registry
 
-    def _recorded_registry(
-        self, document: dict, read: _ReadFirst | None
-    ) -> tuple[str, dict[str, Any]]:
+    def _recorded_registry(self, document: dict, read: _ReadFirst) -> tuple[str, dict[str, Any]]:
         """The registry a stored input was composed under, as the input itself names it."""
         refs = [
             ref
@@ -459,12 +529,12 @@ class SocietyRuntime:
         key: str,
         digest: str,
         registry: Mapping[str, dict[str, Any]],
-        read: _ReadFirst | None,
+        read: _ReadFirst,
     ) -> None:
         """Whether a placed asset is still the reviewed one, its bytes and licence whole.
 
-        ``read`` answers for the bytes a saved world's input read before the asset read lock, so
-        only rows are read here; a district's input, which reads them here, passes ``None``.
+        Asked under the asset read lock: the rows are read here and the bytes are answered from
+        what the transaction read before it.
         """
         assignment = registry.get(digest)
         if assignment is None or assignment["asset_key"] != key:
@@ -472,18 +542,56 @@ class SocietyRuntime:
         row = self._reviewed_row(connection, key)
         if row is None or row["content_sha256"] != digest or row["licence_id"] != "CC0-1.0":
             raise UnavailableSocietyInput("reviewed authored asset binding drift")
-        if read is None:
-            self._blob(digest, row["byte_size"])
-            self._blob(row["licence_sha256"])
-            return
-        read.answer(digest, row["byte_size"])
-        read.answer(row["licence_sha256"], None)
+        reviewed = (key, _reviewed_view(row))
+        self._answer(read, digest, row["byte_size"], reviewed=reviewed)
+        self._answer(read, row["licence_sha256"], None, reviewed=reviewed)
+
+    # -- reading before the asset read lock -------------------------------------------------------
+
+    def _answer(
+        self,
+        read: _ReadFirst,
+        digest: str,
+        size: int | None,
+        *,
+        keep: bool = False,
+        reviewed: tuple[str, ReviewedRow] | None = None,
+    ) -> bytes | None:
+        """What reading these bytes before the lock found, raising the refusal it raised.
+
+        ``reviewed`` names the reviewed asset row that named them, as it reads under the lock. A
+        row that changed since the bytes were read is the race, refused to be asked again. Bytes
+        nothing read ahead belong to an input its caller did not announce: that defect is logged
+        by name and the bytes are read now, under the lock, as every input's were before inputs
+        were read ahead, so the person is still answered.
+        """
+        held = read.found.get((digest, size))
+        if (digest, size) not in read.found or (keep and held is None):
+            if reviewed is not None:
+                key, row = reviewed
+                if key in read.rows and read.rows[key] != row:
+                    raise SocietyBytesNotRead(_RACE)
+            if read.locked:
+                _LOG.error(
+                    "%s: stored bytes %s are read under the asset read lock", NOT_ANNOUNCED, digest
+                )
+            self._read_first(read, digest, size, keep=keep)
+        found = read.found[(digest, size)]
+        if isinstance(found, str):
+            raise UnavailableSocietyInput(found)
+        return found
+
+    def _kept(self, read: _ReadFirst, digest: str) -> bytes:
+        """Bytes read and kept whole, such as a recorded registry or a district's artifacts."""
+        data = self._answer(read, digest, None, keep=True)
+        assert data is not None, "kept bytes are answered as bytes"
+        return data
 
     def _read_first(
         self, read: _ReadFirst, digest: str, size: int | None, *, keep: bool = False
     ) -> None:
-        """Read one stored object into ``read`` now, which is only ever before the lock."""
-        if (digest, size) in read.found:
+        """Read one stored object into ``read`` now; ``keep`` holds its bytes for later use."""
+        if (digest, size) in read.found and not (keep and read.found[(digest, size)] is None):
             return
         try:
             data = self._blob(digest, size)
@@ -492,38 +600,34 @@ class SocietyRuntime:
         else:
             read.found[(digest, size)] = data if keep else None
 
-    def _read_assets_first(
+    def _read_assets_ahead(
         self,
         connection: psycopg.Connection,
         read: _ReadFirst,
         named: Iterable[tuple[str, str]],
     ) -> None:
-        """Read the bytes and licence of each (asset key, digest) an input names.
+        """Read the bytes and licence of each (asset key, digest), with the row that names them.
 
         Only where the reviewed row names that digest: any other pair is refused by its rows under
         the lock before its bytes are asked for, exactly as :meth:`_asset` refuses it.
         """
         for key, digest in named:
+            if ("asset:" + key, digest) in read.read:
+                continue
+            read.read.add(("asset:" + key, digest))
             row = self._reviewed_row(connection, key)
+            read.rows.setdefault(key, _reviewed_view(row))
             if row is None or row["content_sha256"] != digest:
                 continue
             self._read_first(read, digest, row["byte_size"])
             self._read_first(read, row["licence_sha256"], None)
 
-    def _read_objects_first(
-        self,
-        connection: psycopg.Connection,
-        session: Session,
-        binding: AuthoredWorldSocietyBinding,
-        read: _ReadFirst,
+    def _read_version_ahead(
+        self, connection: psycopg.Connection, read: _ReadFirst, version: AlternateVersion
     ) -> None:
-        """Read what composing the bound version's input asks of the store: each live object's."""
-        try:
-            version = self._authored_version(connection, session, binding)
-        except UnavailableSocietyInput:
-            return  # Refused the same way, from rows, under the lock.
+        """Read what composing ``version``'s input asks of the store: each live object's."""
         registry = json.loads(self._registry_bytes)
-        self._read_assets_first(
+        self._read_assets_ahead(
             connection,
             read,
             (
@@ -533,24 +637,125 @@ class SocietyRuntime:
             ),
         )
 
-    def _read_input_first(
+    def _read_district_ahead(
         self,
         connection: psycopg.Connection,
         session: Session,
-        binding: AuthoredWorldSocietyBinding,
-        document: dict,
+        binding: SocietyRuntimeBinding,
+        read: _ReadFirst,
+    ) -> None:
+        """Read a district's admitted sources and its two artifacts, before the lock.
+
+        Each source is asked alone. One whose rows refuse it is not read, and is recorded as
+        refused: its rows refuse it again under the lock, and rows that admit it there changed in
+        between, which is the race rather than a caller's defect.
+        """
+        if read.locked or ("district", binding.binding_id) in read.read:
+            return
+        read.read.add(("district", binding.binding_id))
+        for source in binding.sources:
+            try:
+                row = self._admitted_source(connection, session, binding, source)
+            except UnavailableSocietyInput:
+                read.rows.setdefault(self._source_key(source), None)
+                continue
+            read.rows.setdefault(
+                self._source_key(source), (source.source_sha256, row["byte_size"], "")
+            )
+            self._read_first(read, source.source_sha256, row["byte_size"])
+        self._read_first(read, binding.base_artifact_sha256, None, keep=True)
+        self._read_first(read, binding.interpretation_artifact_sha256, None, keep=True)
+
+    def _read_district_first(
+        self, connection: psycopg.Connection, session: Session, binding: SocietyRuntimeBinding
     ) -> _ReadFirst:
-        """Read what authorizing ``document`` asks of the store, before the asset read lock.
+        """This transaction's record, with a district's bytes read, and then the asset read lock.
+
+        For a read of the district itself (``exulanica/api/society_district.py``); call it after
+        :meth:`_lock`, inside the transaction.
+        """
+        read = self._transaction_read(connection)
+        self._read_district_ahead(connection, session, binding, read)
+        self._lock_assets(connection, read)
+        return read
+
+    def _read_composition_ahead(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        binding: SocietyRuntimeBinding | AuthoredWorldSocietyBinding,
+        read: _ReadFirst,
+    ) -> None:
+        """Read what composing the bound version's next input asks of the store."""
+        if ("composition", binding.binding_id) in read.read:
+            return
+        read.read.add(("composition", binding.binding_id))
+        try:
+            if isinstance(binding, SocietyRuntimeBinding):
+                version = self._version(connection, session, binding)
+                self._read_district_ahead(connection, session, binding, read)
+            else:
+                version = self._authored_version(connection, session, binding)
+        except UnavailableSocietyInput:
+            return  # Refused the same way, from rows, under the lock.
+        self._read_version_ahead(connection, read, version)
+
+    def _read_input_ahead(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        read: _ReadFirst,
+        document: dict,
+        binding: SocietyRuntimeBinding | AuthoredWorldSocietyBinding | None = None,
+    ) -> None:
+        """Read what authorizing one input asks of the store, before the asset read lock.
 
         The version's objects where the input is not stored yet (it is composed again and
-        compared), the assets it names where it is available, and a registry it recorded that
-        this runtime does not hold.
+        compared), a district's sources and artifacts where it reads them, the assets it names
+        where it is available, and a registry it recorded that this runtime does not hold. An input
+        whose scope its rows refuse reads nothing: it is refused from those rows under the lock,
+        and so does a malformed one, which its own authorization refuses: reading ahead for other
+        inputs never fails because one announced beside them is malformed.
         """
-        read = _ReadFirst()
-        if self._stored_authored_input(connection, session, binding, document["input_seq"]) is None:
-            self._read_objects_first(connection, session, binding, read)
-        if document["availability"] != "unavailable":
-            self._read_assets_first(
+        try:
+            self._read_one_input_ahead(connection, session, read, document, binding)
+        except (
+            UnavailableSocietyInput,
+            InvalidStructuralData,
+            AttributeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
+            return
+
+    def _read_one_input_ahead(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        read: _ReadFirst,
+        document: dict,
+        binding: SocietyRuntimeBinding | AuthoredWorldSocietyBinding | None,
+    ) -> None:
+        marker = ("input", document["document_sha256"])
+        if marker in read.read:
+            return
+        read.read.add(marker)
+        if binding is None:
+            version_id = uuid.UUID(document["version_id"])
+            binding = (
+                self._authored_scope(connection, session, version_id)[0]
+                if is_authored_ground(document["profile"])
+                else self._binding(session, version_id)
+            )
+        stored = self._stored_input(connection, session, binding, document["input_seq"])
+        available = document["availability"] != "unavailable"
+        if stored is None:
+            self._read_composition_ahead(connection, session, binding, read)
+        elif available and isinstance(binding, SocietyRuntimeBinding):
+            self._read_district_ahead(connection, session, binding, read)
+        if available:
+            self._read_assets_ahead(
                 connection,
                 read,
                 (
@@ -566,7 +771,51 @@ class SocietyRuntime:
         ]
         if len(registries) == 1 and registries[0] != self._registry_sha256:
             self._read_first(read, registries[0], None, keep=True)
-        return read
+
+    def _read_ahead(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        read: _ReadFirst,
+        *documents: dict,
+        composing: SocietyRuntimeBinding | AuthoredWorldSocietyBinding | None = None,
+        announced: bool = True,
+        binding: SocietyRuntimeBinding | AuthoredWorldSocietyBinding | None = None,
+    ) -> None:
+        """Read, before this transaction's asset read lock, everything its inputs ask of the store.
+
+        ``documents`` are the inputs this call authorizes, of the version ``binding`` binds where
+        the caller has resolved it, and ``composing`` the binding whose next input it composes.
+        With ``announced``, every input and reviewed asset announced for this connection
+        (:func:`~exulanica.world.society.inputs_ahead`) is read too, so later authorizations in the
+        same transaction, made once the lock is held, are answered from what was read here; a
+        transaction that authorizes one input alone reads only its own. Once the lock is held
+        nothing more is read ahead.
+        """
+        if read.locked:
+            return
+        if composing is not None:
+            self._read_composition_ahead(connection, session, composing, read)
+        for document in documents:
+            self._read_input_ahead(connection, session, read, document, binding)
+        if not announced:
+            return
+        announced_documents, assets = announced_inputs(connection)
+        for document in announced_documents:
+            self._read_input_ahead(connection, session, read, document)
+        if assets:
+            self._read_assets_ahead(
+                connection,
+                read,
+                (
+                    (row["asset_key"], row["content_sha256"])
+                    for row in connection.execute(
+                        "select asset_key,content_sha256 from world_reviewed_asset "
+                        "where content_sha256=any(%s) order by asset_key",
+                        (sorted(assets),),
+                    ).fetchall()
+                ),
+            )
 
     def _refs(self, binding: SocietyRuntimeBinding) -> list[dict[str, str]]:
         refs = [
@@ -669,20 +918,22 @@ class SocietyRuntime:
         binding: SocietyRuntimeBinding,
         version: AlternateVersion,
         seq: int,
+        read: _ReadFirst,
     ) -> dict:
+        """Compose a district's input under the asset read lock, from rows and ``read``."""
         if version.source_invalidated:
             return self._unavailable(binding, version, seq, "authored_source_invalidated")
         registry = json.loads(self._registry_bytes)
         refs = self._refs(binding)
         try:
-            interpreted, base_bytes, geometry = self._district(connection, session, binding)
+            interpreted, base_bytes, geometry = self._district(connection, session, binding, read)
             for obj in version.objects:
                 if obj.removed:
                     continue
                 assignment = registry.get(obj.asset_sha256)
                 if assignment is None:
                     raise UnavailableSocietyInput("reviewed affordance assignment is unavailable")
-                self._asset(connection, assignment["asset_key"], obj.asset_sha256, registry, None)
+                self._asset(connection, assignment["asset_key"], obj.asset_sha256, registry, read)
                 refs.append(
                     {
                         "kind": "reviewed_asset",
@@ -725,24 +976,25 @@ class SocietyRuntime:
             raise UnavailableSocietyInput("requested place/region has no configured binding")
         with connection.transaction():
             self._lock(connection, session)
+            read = self._transaction_read(connection)
+            self._read_ahead(connection, session, read, composing=binding)
+            self._lock_assets(connection, read)
             version = self._version(connection, session, binding)
-            return self._compose(connection, session, binding, version, 1)
+            return self._compose(connection, session, binding, version, 1, read)
 
     def authorize(self, connection: psycopg.Connection, session: Session, document: dict) -> None:
-        """Authorize an exact persisted historical input or exact fresh server recomposition."""
-        self._authorize(connection, session, document, None)
+        """Authorize an exact persisted historical input or exact fresh server recomposition.
 
-    def _authorize(
-        self,
-        connection: psycopg.Connection,
-        session: Session,
-        document: dict,
-        read: _ReadFirst | None,
-    ) -> None:
-        """:meth:`authorize`, given what a saved world's edit read before its asset read lock."""
+        Every stored byte the input depends on, and those of every input announced for this
+        connection, is read before this transaction's asset read lock, once a transaction; under
+        the lock only rows are read (``docs/asset-read-currency.md``).
+        """
         validate_society_input(document)
+        # A transaction of this call's own authorizes this input alone, so only its own bytes are
+        # read; what is announced is read by the first authorization of a caller's transaction.
+        alone = connection.info.transaction_status == TransactionStatus.IDLE
         if is_authored_ground(document["profile"]):
-            self._authored_authorize(connection, session, document, read)
+            self._authored_authorize(connection, session, document, alone=alone)
             return
         binding = self._binding(session, uuid.UUID(document["version_id"]))
         if (
@@ -755,22 +1007,13 @@ class SocietyRuntime:
             raise UnavailableSocietyInput("society input scope or frame binding drift")
         with connection.transaction():
             self._lock(connection, session)
+            read = self._transaction_read(connection)
+            self._read_ahead(
+                connection, session, read, document, announced=not alone, binding=binding
+            )
+            self._lock_assets(connection, read)
             version = self._version(connection, session, binding)
-            stored = connection.execute(
-                "select i.document,i.document_sha256 from world_society_input i join "
-                "world_society s "
-                "on s.workspace_id=i.workspace_id and s.society_id=i.society_id "
-                "where i.workspace_id=%s and s.world_id=%s and s.version_id=%s and s.place_id=%s "
-                "and s.region_id=%s and i.input_seq=%s",
-                (
-                    session.workspace_id,
-                    binding.world_id,
-                    binding.version_id,
-                    binding.place_id,
-                    binding.region_id,
-                    document["input_seq"],
-                ),
-            ).fetchone()
+            stored = self._stored_input(connection, session, binding, document["input_seq"])
             if stored is None:
                 next_seq = connection.execute(
                     "select coalesce(max(i.input_seq),0)+1 as seq from world_society s "
@@ -782,7 +1025,7 @@ class SocietyRuntime:
                 if document["input_seq"] != next_seq:
                     raise UnavailableSocietyInput("unpersisted input sequence is not current")
                 expected = self._compose(
-                    connection, session, binding, version, document["input_seq"]
+                    connection, session, binding, version, document["input_seq"], read
                 )
                 if document != expected:
                     raise UnavailableSocietyInput(
@@ -796,7 +1039,7 @@ class SocietyRuntime:
             actual = {(r["kind"], r["identity"], r["sha256"]) for r in document["dependency_refs"]}
             # A stored input is held to the registry it recorded, never to whichever registry this
             # runtime holds now; a fresh one was compared byte for byte with a current composition.
-            registry_sha256, registry = self._recorded_registry(document, None)
+            registry_sha256, registry = self._recorded_registry(document, read)
             required = {
                 (r["kind"], r["identity"], r["sha256"])
                 for r in self._refs(binding)
@@ -820,11 +1063,12 @@ class SocietyRuntime:
                 return
             if version.source_invalidated:
                 raise UnavailableSocietyInput("authored source invalidated")
-            # Even a correctly persisted historic input needs current rights and byte availability.
-            self._district(connection, session, binding)
+            # Even a correctly persisted historic input needs current rights and byte availability,
+            # read before the lock and answered here from rows.
+            self._district(connection, session, binding, read)
             for ref in document["dependency_refs"]:
                 if ref["kind"] == "reviewed_asset":
-                    self._asset(connection, ref["identity"], ref["sha256"], registry, None)
+                    self._asset(connection, ref["identity"], ref["sha256"], registry, read)
 
     def authored_edit(
         self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
@@ -834,6 +1078,8 @@ class SocietyRuntime:
             self._authored_world_edit(connection, session, version_id)
             return
         with connection.transaction():
+            # The asset read lock is taken only once this version holds a society that takes
+            # inputs and everything its next input reads from the store has been read.
             self._lock(connection, session)
             row = connection.execute(
                 "select society_id,world_id,place_id,region_id,engine_version from world_society "
@@ -858,8 +1104,11 @@ class SocietyRuntime:
             ).fetchone()["seq"]
             if last is None:
                 raise UnavailableSocietyInput("society input history is unavailable")
+            read = self._transaction_read(connection)
+            self._read_ahead(connection, session, read, composing=binding)
+            self._lock_assets(connection, read)
             version = self._version(connection, session, binding)
-            document = self._compose(connection, session, binding, version, last + 1)
+            document = self._compose(connection, session, binding, version, last + 1, read)
             SocietyRepository(
                 connection,
                 session.workspace_id,
@@ -996,22 +1245,22 @@ class SocietyRuntime:
         region_id: str,
     ) -> dict:
         with connection.transaction():
-            self._lock(connection, session, assets=False)
+            self._lock(connection, session)
             binding, ground = self._authored_scope(connection, session, version_id)
             requested = binding.place_id if place_id is None else place_id
             if requested != binding.place_id or region_id != binding.region_id:
                 raise UnavailableSocietyInput("requested place/region has no configured binding")
-            read = _ReadFirst()
-            self._read_objects_first(connection, session, binding, read)
-            self._lock_assets(connection)
+            read = self._transaction_read(connection)
+            self._read_ahead(connection, session, read, composing=binding)
+            self._lock_assets(connection, read)
             version = self._authored_version(connection, session, binding)
             return self._authored_compose(connection, binding, ground, version, 1, read)
 
-    def _stored_authored_input(
+    def _stored_input(
         self,
         connection: psycopg.Connection,
         session: Session,
-        binding: AuthoredWorldSocietyBinding,
+        binding: SocietyRuntimeBinding | AuthoredWorldSocietyBinding,
         input_seq: int,
     ) -> dict[str, Any] | None:
         """The input the bound society recorded at ``input_seq``, or ``None`` when it has none."""
@@ -1032,26 +1281,24 @@ class SocietyRuntime:
         ).fetchone()
 
     def _authored_authorize(
-        self,
-        connection: psycopg.Connection,
-        session: Session,
-        document: dict,
-        read: _ReadFirst | None,
+        self, connection: psycopg.Connection, session: Session, document: dict, *, alone: bool
     ) -> None:
         """Authorize a saved world's input, reading the store only before the asset read lock.
 
-        ``read`` is what the edit recording this input read before it took the lock; without it,
-        what authorizing asks of the store is read here, before this call's own lock. A caller
-        that already holds the lock reads under it all the same.
+        What authorizing asks of the store is read once a transaction, before its first lock, for
+        this input and, unless the transaction is this call's ``alone``, every input announced for
+        the connection; later authorizations in the transaction are answered from that.
         """
         with connection.transaction():
-            self._lock(connection, session, assets=False)
+            self._lock(connection, session)
             binding, ground = self._authored_scope(
                 connection, session, uuid.UUID(document["version_id"])
             )
-            if read is None:
-                read = self._read_input_first(connection, session, binding, document)
-            self._lock_assets(connection)
+            read = self._transaction_read(connection)
+            self._read_ahead(
+                connection, session, read, document, announced=not alone, binding=binding
+            )
+            self._lock_assets(connection, read)
             if document["world_id"] != binding.world_id:
                 raise UnavailableSocietyInput("society input scope binding drift")
             if (
@@ -1062,9 +1309,7 @@ class SocietyRuntime:
             ):
                 raise UnavailableSocietyInput("authored ground or frame binding drift")
             version = self._authored_version(connection, session, binding)
-            stored = self._stored_authored_input(
-                connection, session, binding, document["input_seq"]
-            )
+            stored = self._stored_input(connection, session, binding, document["input_seq"])
             if stored is None:
                 next_seq = connection.execute(
                     "select coalesce(max(i.input_seq),0)+1 as seq from world_society s "
@@ -1126,7 +1371,7 @@ class SocietyRuntime:
             # it is taken only once this version is known to hold a society that reads assets and
             # everything its input names from the store has been read, in the same order as
             # always: workspace first, then assets. Under it only rows are read.
-            self._lock(connection, session, assets=False)
+            self._lock(connection, session)
             row = connection.execute(
                 "select society_id,world_id,place_id,region_id,engine_version from world_society "
                 "where workspace_id=%s and version_id=%s",
@@ -1159,19 +1404,14 @@ class SocietyRuntime:
             ).fetchone()["seq"]
             if last is None:
                 raise UnavailableSocietyInput("society input history is unavailable")
-            read = _ReadFirst()
-            self._read_objects_first(connection, session, binding, read)
-            lock_asset_reads_until_commit(
-                connection,
-                outside=(
-                    "an accepted edit reaches a society only inside the transaction that records it"
-                ),
-            )
+            read = self._transaction_read(connection)
+            self._read_ahead(connection, session, read, composing=binding)
+            self._lock_assets(connection, read)
             version = self._authored_version(connection, session, binding)
             document = self._authored_compose(connection, binding, ground, version, last + 1, read)
             SocietyRepository(
                 connection,
                 session.workspace_id,
                 world_id=binding.world_id,
-                input_authorizer=lambda doc: self._authorize(connection, session, doc, read),
+                input_authorizer=lambda doc: self.authorize(connection, session, doc),
             ).record_input(version_id, document)
