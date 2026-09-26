@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**102 documents** in the public catalog.
+**103 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -118,6 +118,7 @@ Follow generation, canonical simulation and derived rendering separately.
 | Document | Role | Owns |
 | --- | --- | --- |
 | [Synthetic society contract](synthetic-society-contract.md) | contract | Synthetic identity, state, actions, composition and replay |
+| [Movement modules contract](movement-modules-contract.md) | contract | Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads |
 | [Society experiments](society-experiments.md) | contract | Experiment definitions, attempts, interventions and results |
 | [Character representation and movement](character-representation-contract.md) | contract | Character appearance, rigging, subject bindings and movement |
 | [The generator system: `exulanica.grammar`](grammar-package.md) | contract | Generation vocabulary, seeds, stages and validation |
