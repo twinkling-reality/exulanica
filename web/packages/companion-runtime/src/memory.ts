@@ -281,6 +281,64 @@ export interface PersistedCitation {
   readonly ordinal: number;
 }
 
+/**
+ * What kind of answer a remembered row is, which decides the line it is drawn under
+ * (`provenanceSentence` in the app's `ui/companion-speech.ts`): who wrote the sentence, which is
+ * not always a model.
+ *
+ * `discarded` is the case worth naming. `architecture-overview.md` 5.3 makes the deterministic
+ * answer "a first-class output, not an error page": when the composer fails validation twice its
+ * output is thrown away and the answer is rendered from the query result. That answer is correct
+ * and cited, and it was not written by the model whose name the call list carries, so a line that
+ * named the model anyway would be attributing a sentence to something that did not write it.
+ *
+ * Here because the remembered row keeps its kind (migration 0112) and this package states that
+ * row's shape; the app's `Composed` is this type. `AnswerComposed` in
+ * `exulanica/world/companion_memory.py` states the same set, and
+ * `companion-remembered-provenance.test.ts` holds the two equal through the route's schema.
+ */
+export const COMPOSED_KINDS = [
+  'model',
+  'discarded',
+  'search',
+  /** A model was asked and could not turn the question into a search. Nothing was looked at. */
+  'unreadable',
+  /**
+   * A model DREW A CHANGE to the world, and nothing has been applied.
+   *
+   * Not `model`. "Answered by" is a sentence about an answer, and this is a proposal: no
+   * question was asked, no evidence was read, and the thing on the screen is waiting for a
+   * decision rather than reporting one.
+   */
+  'proposed',
+  /**
+   * A model read a request to change the world and the reviewed design could not express it.
+   *
+   * Not `discarded`. That one says "what it wrote was not supported by the evidence", and there
+   * was no evidence and no search: what happened is that the catalogue has no such control.
+   */
+  'refused',
+  /**
+   * A model was asked to draw a change and gave back no reply the server could read.
+   *
+   * Not `refused`: that one states a limit of the reviewed design, and nothing here says the
+   * design could not make the change.
+   */
+  'undrafted',
+  /**
+   * A model drew a change and it was never shown: the world style authority refused it, or no
+   * surface was there to show it. Not `proposed`, whose line says the change waits to be applied.
+   */
+  'unshown',
+  'none',
+  /** What became of a proposed change: a person or the world decided it, and no model did. */
+  'outcome',
+  /** The person's own correction of an earlier answer, which only the corrections route keeps. */
+  'corrected',
+] as const;
+
+export type AnswerComposed = (typeof COMPOSED_KINDS)[number];
+
 export interface PersistedAnswer {
   readonly answerId: string;
   readonly askedAtMs: number;
@@ -309,6 +367,19 @@ export interface PersistedAnswer {
    * the answer is drawn, so a rename, a deletion or a withdrawn consent carries through.
    */
   readonly names: Readonly<Record<string, string>>;
+  /**
+   * What kind of answer it was, which decides the line it is drawn under. Null on an answer kept
+   * before the kind was kept (migration 0112): the app derives its kind from the fields above.
+   */
+  readonly composed: AnswerComposed | null;
+  /** Whether the model that answered was its role's fallback. False on a row kept before 0112. */
+  readonly usedFallback: boolean;
+  /**
+   * How many of the answer's requests returned no answer, and whether the cost of any of them is
+   * unknown. Zero and false on a row kept before 0112, which did not keep them.
+   */
+  readonly unansweredAttempts: number;
+  readonly unansweredCostUnknown: boolean;
 }
 
 export interface PersistedEscape {

@@ -138,6 +138,10 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "answer_text": "on 2026-02-01",
             "prompt_version": "selection-3",
             "latency_ms": 1,
+            "composed": "none",
+            "used_fallback": False,
+            "unanswered_attempts": 0,
+            "unanswered_cost_unknown": False,
         }
     },
     "POST /companion/memory/answers/{answer_id}/corrections": {

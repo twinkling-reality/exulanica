@@ -15,7 +15,11 @@
 import type { CompanionSession, PersistedMemory, Turn } from '@exulanica/companion-runtime';
 import { companionAppearanceConfiguration } from '@exulanica/presentation';
 
-import { MemoryUnavailable, rememberedAsAnswer } from '../companion-memory-api.js';
+import {
+  MemoryUnavailable,
+  PROPOSAL_OUTCOME_PROMPT,
+  rememberedAsAnswer,
+} from '../companion-memory-api.js';
 
 import { createCompanionController, type CompanionController } from '../companion.js';
 import type { CompanionAnswer, CompanionProposal, SimulationCitation } from '../companion-ask-api.js';
@@ -23,6 +27,7 @@ import type { SocietyNames } from '../companion-simulated.js';
 import { companionNames } from '../companion-names.js';
 import type { EvidenceCache } from '../evidence.js';
 import { say } from '../ui/copy.js';
+import type { UpstreamWorldStyleProposal } from '../world-style-api.js';
 import {
   worldStyleProposalInbox,
   worldStyleProposalOutcomes,
@@ -221,6 +226,10 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
    * and because a proposal IS an answer to what was typed: a model wrote the sentence, the
    * provenance line says which model wrote it, and `onAnswerShown` keeps it, so a proposal is
    * recorded through the write-back that already exists rather than through a second one.
+   *
+   * The sentence each proposal was asked for, by origin reference, held only once the authority
+   * has shown it or the wait for its answer ran out (`authorityAnswer`): what becomes of it after
+   * that is kept under this sentence.
    */
   const proposalUtterances = new Map<string, string>();
 
@@ -240,8 +249,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     if (outcome.proposal === null) return refusalAnswer(outcome);
 
     const originReference = `${COMPANION_REFERENCE}${crypto.randomUUID()}`;
-    proposalUtterances.set(originReference, utterance);
-    const reached = worldStyleProposalInbox.submit({
+    const heard = await authorityAnswer(originReference, utterance, {
       origin: 'companion',
       originReference,
       scope: { kind: 'global' },
@@ -254,15 +262,81 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
       modelId: outcome.proposal.modelId,
       promptVersion: outcome.proposal.promptVersion,
     });
-    // No Atlas integration was mounted to receive it, which is a real state on the empty-world
-    // path. Said out loud rather than left as a sentence describing a change nobody can find.
-    if (!reached) {
-      proposalUtterances.delete(originReference);
-      return spokenAnswer(
-      outcome, [outcome.proposal.spoken, say('proposal.unavailable')], 'proposed',
-    );
+    switch (heard.by) {
+      case 'authority':
+        return heard.outcome.kind === 'previewed'
+          ? spokenAnswer(outcome, [outcome.proposal.spoken, say('proposal.staged')], 'proposed')
+          : spokenAnswer(
+            outcome, [say('proposal.outcome.refused'), heard.outcome.detail], 'unshown',
+          );
+      // No Atlas integration was mounted to receive it, which is a real state on the empty-world
+      // path, or the one that received it finished without saying what became of it. Said out
+      // loud rather than left as a sentence describing a change nobody can find.
+      case 'nobody':
+        return spokenAnswer(outcome, [say('proposal.unavailable')], 'unshown');
+      // The authority has not answered within the bound. The proposal may still arrive in
+      // Customize, so the sentence that describes it stays, and what became of it is kept later.
+      case 'deadline':
+        return spokenAnswer(
+          outcome, [outcome.proposal.spoken, say('proposal.unconfirmed')], 'proposed',
+        );
     }
-    return spokenAnswer(outcome, [outcome.proposal.spoken, say('proposal.staged')], 'proposed');
+  }
+
+  /*
+   * What the world style authority made of a proposal, heard before the Companion says anything.
+   *
+   * The appearance surface reports 'previewed' or 'refused' for every proposal it receives before
+   * its listener settles (`composition/appearance.ts`), so this listens for the first of the two
+   * for this origin reference while the proposal is handed over. Whichever comes first ends the
+   * wait: that report, every listener finishing without one, or `PROPOSAL_ANSWER_WAIT_MS`. The
+   * encounter's working state covers the wait, because `askQuestion` has not returned.
+   *
+   * Its own subscription rather than the mount's, so a remount while the authority is deciding
+   * cannot leave the wait without a listener. The mount's listener keeps no row for the first
+   * answer: it has no sentence for the reference until this hands one over, which it does on
+   * 'previewed' and at the deadline, and only then, so a later decision is kept as its own row
+   * and a refused proposal is kept once, as the answer that says so.
+   */
+  async function authorityAnswer(
+    originReference: string,
+    utterance: string,
+    proposal: UpstreamWorldStyleProposal,
+  ): Promise<AuthorityAnswer> {
+    const first: { outcome: WorldStyleProposalOutcome | null; heard: () => void } = {
+      outcome: null,
+      heard: () => undefined,
+    };
+    const reported = new Promise<'reported'>((resolve) => {
+      first.heard = () => resolve('reported');
+    });
+    const stopListening = worldStyleProposalOutcomes.subscribe((outcome) => {
+      if (first.outcome !== null || outcome.originReference !== originReference) return;
+      if (outcome.kind !== 'previewed' && outcome.kind !== 'refused') return;
+      first.outcome = outcome;
+      if (outcome.kind === 'previewed') proposalUtterances.set(originReference, utterance);
+      first.heard();
+    });
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const waited = new Promise<'deadline'>((resolve) => {
+      deadline = setTimeout(() => resolve('deadline'), PROPOSAL_ANSWER_WAIT_MS);
+    });
+    try {
+      const ended = await Promise.race([
+        reported,
+        worldStyleProposalInbox.submit(proposal),
+        waited,
+      ]);
+      if (first.outcome !== null) return { by: 'authority', outcome: first.outcome };
+      if (ended === 'deadline') {
+        proposalUtterances.set(originReference, utterance);
+        return { by: 'deadline' };
+      }
+      return { by: 'nobody' };
+    } finally {
+      clearTimeout(deadline);
+      stopListening();
+    }
   }
 
   /*
@@ -291,7 +365,8 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
         ? say('proposal.earlier')
         : undefined);
     if (utterance === undefined) return;
-    // 'previewed' is the state the proposal was already recorded in. Keeping it again would
+    // 'previewed' is the state the proposal was already recorded in, by the answer that said it
+    // was waiting in Customize, or that said it might still arrive there. Keeping it again would
     // write one row per stale-base recovery for a proposal nobody has decided about yet.
     if (outcome.kind === 'previewed') return;
     /*
@@ -508,6 +583,30 @@ const FINAL_OUTCOMES: ReadonlySet<string> = new Set(['accepted', 'discarded']);
 const COMPANION_REFERENCE = 'companion-utterance:';
 
 /**
+ * How long the Companion waits for the world style authority to say whether it can show a
+ * proposal, before it says that it could not confirm the change.
+ *
+ * Measured, because neither side declares a bound: the preview route takes the world's style row
+ * with no lock or statement timeout, and the world style client's requests carry no deadline.
+ * What the wait covers is the client replacing the open preview, a POST to
+ * `/world/styles/previews` and a DELETE of the preview it replaces. Over 1000 such pairs on a
+ * development API and database (2026-09-26, at c05e3666, 79 percent idle), the slowest took
+ * 30.4 ms and the 99th percentile 21.8 ms. Five seconds is more than 150 times the slowest, so
+ * the wait ends only when something has stopped the answer (a held lock, a server that is gone),
+ * never when it is merely slow.
+ */
+export const PROPOSAL_ANSWER_WAIT_MS = 5_000;
+
+/**
+ * What ended the wait for the authority: its first answer, every listener finishing without one
+ * (or none being there), or the bound.
+ */
+type AuthorityAnswer =
+  | { readonly by: 'authority'; readonly outcome: WorldStyleProposalOutcome }
+  | { readonly by: 'nobody' }
+  | { readonly by: 'deadline' };
+
+/**
  * A proposal, an outcome, or a refusal, shaped as the answer the encounter renders.
  *
  * **Every field below is what actually happened, and three of them are deliberately empty.**
@@ -529,7 +628,7 @@ const COMPANION_REFERENCE = 'companion-utterance:';
 function spokenAnswer(
   outcome: CompanionProposal,
   sentences: readonly string[],
-  composed: 'proposed' | 'refused' | 'undrafted',
+  composed: 'proposed' | 'refused' | 'undrafted' | 'unshown',
 ): CompanionAnswer {
   const calls = outcome.calls;
   const received = calls.filter((call) => call.outcome === 'completed');
@@ -603,7 +702,7 @@ function outcomeAnswer(utterance: string, outcome: WorldStyleProposalOutcome): C
     // No model decided this. A person did, or the authority refused it, and a provenance line
     // naming a model over either would be naming the wrong author.
     provenance: {
-      composed: 'none',
+      composed: 'outcome',
       servedModel: null,
       plannedBy: null,
       latencyMs: 0,
@@ -611,7 +710,7 @@ function outcomeAnswer(utterance: string, outcome: WorldStyleProposalOutcome): C
     },
     // The write-back requires one and the server bounds it to 64 characters. This says which
     // path recorded the row, which is the question somebody reading the table will have.
-    promptVersion: 'proposal-outcome',
+    promptVersion: PROPOSAL_OUTCOME_PROMPT,
     calls: [],
   };
 }

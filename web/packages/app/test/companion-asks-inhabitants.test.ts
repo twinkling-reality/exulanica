@@ -124,6 +124,10 @@ describe('asking about the people in a world', () => {
       correctionNote: null,
       citations: [],
       names: {},
+      composed: 'none',
+      usedFallback: false,
+      unansweredAttempts: 0,
+      unansweredCostUnknown: false,
     });
     expect(restored.clauses.map((clause) => clause.type)).toEqual(['meta']);
   });
@@ -153,6 +157,10 @@ describe('asking about the people in a world', () => {
       correctionNote: null,
       citations: [],
       names: {},
+      composed: 'none',
+      usedFallback: false,
+      unansweredAttempts: 0,
+      unansweredCostUnknown: false,
     });
     const speech = buildCompanionSpeech({ speakerName: 'Companion', names: companionNames(() => null), society: () => SOCIETY });
     speech.renderAnswer(restored);

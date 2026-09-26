@@ -12,45 +12,11 @@ import type {
   ModelDecisionSummary,
   ModelRef,
   PersonDecision,
-  SocietyModel,
   SocietyModels,
 } from '../society-models-api.js';
+import { DECISION_WORDS } from '../society-inhabitant-words.js';
 import { el, replace } from './dom.js';
 import './society-models.css';
-
-/**
- * Why a person's model was or was not followed, by the reason code the receipt or the minute
- * records: exactly `DECISION_REASONS` in `society_decision_contract.py`, held to it by
- * society-models-words-parity.test.ts.
- */
-export const DECISION_WORDS: Readonly<Record<string, string>> = {
-  validated_choice: 'it chose one of the things they could do',
-  answer_not_offered: 'it did not answer with one of the things they could do',
-  model_timed_out: 'it did not answer in time',
-  model_call_failed: 'asking it failed',
-  model_unavailable: 'it is not available right now',
-  request_refused: 'this world\'s rules would not let the question be sent',
-  provider_not_admitted: 'this server may not reach the service that runs it',
-  provider_credential_absent: 'this server has no key for the service that runs it',
-  model_no_longer_offered: 'it is no longer offered for decisions',
-  world_hour_decisions_spent: 'this world has asked models as often as it may this hour',
-  world_hour_spend_spent: 'this world has spent what it may on models this hour',
-  process_budget_spent: 'this server\'s model budget had too little left for it',
-  process_share_spent: 'this server\'s model budget, less the part kept for its other work, had too little left for it',
-  no_time_to_ask: 'there was no time left to ask it before the minute',
-  unanswered_in_its_minute: 'this server stopped before it heard the answer',
-  decision_context_changed: 'the world changed before they could act on it',
-  decision_sources_unavailable: 'what they could see could not be read',
-  provider_configuration_changed: 'this server changed which model it asks',
-  person_asked_directly: 'you asked them to go somewhere yourself',
-  subject_already_decided: 'something else already decided for them this minute',
-  action_in_progress: 'they were already busy',
-  input_unavailable: 'this world could not be walked right now',
-  target_disabled_or_removed: 'the place it chose is gone',
-  current_position_invalidated: 'the ground where they stood changed',
-  known_target_unreachable: 'they could no longer reach the place it chose',
-  place_taken_this_minute: 'someone else took that place first',
-};
 
 /**
  * Why this host asks no model for this world's people, by `HOST_REFUSALS` in
@@ -106,14 +72,6 @@ export function hostWords(refusal: string | null): string {
     : `${sentence(why)}, so everyone here follows their own routine for now.`;
 }
 
-/** A model's name: its description up to the first comma, or its identifier without one. */
-export function modelName(models: readonly SocietyModel[], ref: ModelRef): string {
-  const model = models.find((held) => held.provider === ref.provider && held.modelId === ref.modelId);
-  if (model === undefined) return ref.modelId;
-  const comma = model.description.indexOf(',');
-  return comma > 0 ? model.description.slice(0, comma) : model.description;
-}
-
 /**
  * Who decides for a person now, in words: the model chosen for them while this host asks it, and
  * otherwise their own routine, for now and why, whenever their model is not asked here.
@@ -121,7 +79,7 @@ export function modelName(models: readonly SocietyModel[], ref: ModelRef): strin
 export function choiceWords(view: SocietyModels, subjectId: string): string {
   const choice = view.choices.find((held) => held.subjectId === subjectId);
   if (choice === undefined || choice.model === null) return 'Their own routine.';
-  const name = modelName(view.models, choice.model);
+  const { name } = choice.model;
   const why = hostReason(view.hostRefusal) ?? (choice.refusal === null
     ? null
     : MODEL_REFUSAL_WORDS[choice.refusal] ?? `the model you chose is not asked here (${choice.refusal})`);
@@ -148,11 +106,11 @@ export function recordedWords(view: SocietyModels | null, people: readonly strin
 /** A person's latest decision and what came of it, in words, or null before their first. */
 export function decisionWordsFor(view: SocietyModels, subjectId: string): string | null {
   const decision = view.latest.find((held) => held.subjectId === subjectId);
-  return decision === undefined ? null : latestDecisionWords(view.models, decision);
+  return decision === undefined ? null : latestDecisionWords(decision);
 }
 
-export function latestDecisionWords(models: readonly SocietyModel[], decision: PersonDecision): string {
-  const name = modelName(models, decision);
+export function latestDecisionWords(decision: PersonDecision): string {
+  const { name } = decision;
   // The routine decided in the decision's own minute when the model was not followed, however
   // late its receipt was closed; a followed decision is told by the minute that took it up.
   const minute = `At simulated minute ${decision.status !== 'accepted' || decision.consumedTick === null
@@ -175,8 +133,8 @@ export function latestDecisionWords(models: readonly SocietyModel[], decision: P
  * under why, as the server counts it: the receipt's reason when the model was not followed, or
  * what the minute found when it was followed and could not be acted on.
  */
-export function summaryWords(models: readonly SocietyModel[], summary: ModelDecisionSummary): string {
-  const name = modelName(models, summary);
+export function summaryWords(summary: ModelDecisionSummary): string {
+  const { name } = summary;
   const decisions = summary.decisions === 1 ? 'one decision' : `${summary.decisions} decisions`;
   const pending = summary.byDisposition['pending'] ?? 0;
   const notActed = summary.decisions - summary.applied - pending;
@@ -268,8 +226,8 @@ export function buildSocietyModels(handlers: {
         ...view.models.map((entry) => el('option', {
           value: optionValue(entry),
           text: entry.refusal === null
-            ? modelName(view.models, entry)
-            : `${modelName(view.models, entry)} (not asked here: ${decisionWords(entry.refusal)})`,
+            ? entry.name
+            : `${entry.name} (not asked here: ${decisionWords(entry.refusal)})`,
           title: `${entry.description} ${entry.providerDescription}`,
         })),
       ]);
@@ -304,7 +262,7 @@ export function buildSocietyModels(handlers: {
       : [];
     replace(summaries, [
       ...view.byModel.map((summary) => {
-        const item = el('li', { text: summaryWords(view.models, summary) });
+        const item = el('li', { text: summaryWords(summary) });
         item.dataset['modelId'] = summary.modelId;
         return item;
       }),

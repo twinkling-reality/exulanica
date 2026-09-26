@@ -624,7 +624,11 @@ disinterest.
 
 Free text input is always available. It is parsed into the same update proposal draft that a choice
 would produce and goes through the identical confirmation flow. **No path writes to the graph without
-a proposal.**
+a proposal.** Words the parser finds no change in are asked as a question instead, and so are words
+it can only keep as a note while one of the Companion's questions is open, unless they answer it (a
+reply to "How do you know them?", or one opening with a yes or a no to a question that asks for
+one): the parser keeps whatever follows a first comma as a note, so that draft is cancelled
+unwritten and the words are asked (`answersOpenQuestion` in `web/packages/app/src/companion.ts`).
 
 ### 4.4 How options evolve rather than being a form
 

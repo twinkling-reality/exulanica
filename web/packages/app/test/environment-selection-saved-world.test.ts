@@ -71,13 +71,14 @@ const control = (tick: number) => parseSocietyControl({
   play_ineligible_reason: null, play_eligible: true,
 }, 'version');
 
-const MODEL = { provider: 'nebius_token_factory', model_id: 'nvidia/nemotron' };
+const MODEL = { provider: 'nebius_token_factory', model_id: 'nvidia/nemotron', name: 'Nemotron 3 Nano 30B' };
 /** Who decides for the saved world's people: Person 0 by a model, whose last choice they acted on. */
 const models = () => parseSocietyModels({
   profile: 'exulanica.society-models/v1', society_id: 'society', engine: 'exulanica-society/v2',
   takes_model_choices: true, host_refusal: null,
   contract: { versions: {}, sha256: 'c'.repeat(64), model_people_maximum: 8 },
-  models: [{ ...MODEL, description: 'Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.',
+  models: [{ ...MODEL,
+    description: 'Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.',
     provider_description: 'Nebius Token Factory.', mechanism: 'tool_call',
     usd_per_mtok: { input: '0.06', output: '0.24' }, refusal: null }],
   choices: [{ subject_id: 'person-0', model: MODEL, choice_seq: 1, chosen_by: 'actor', recorded_at: '2026-09-25T10:00:00Z', refusal: null }],

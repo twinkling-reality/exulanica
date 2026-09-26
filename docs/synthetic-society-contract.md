@@ -789,9 +789,10 @@ real visits. Historical answer clauses still require personal evidence: a simula
 of type `simulation`, never `historical`. It answers for the purposeful profile and refuses another
 by name. A `decision_applied` event records what a decision receipt did and is never one of its
 lines: the person's own events say what they did, a goal their model chose by the reason
-`chosen_by_their_model`. Authored
-composition and live visual acceptance are separate integration responsibilities, not capabilities
-inferred from a fixture.
+`chosen_by_their_model`, and that goal's line names the model from the one `decision_applied` event
+of its minute and person that applied a choice, or names none when there is not exactly one.
+Authored composition and live visual acceptance are separate integration responsibilities, not
+capabilities inferred from a fixture.
 
 ## V3 bounded observations and communication
 

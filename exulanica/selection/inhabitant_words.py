@@ -48,6 +48,9 @@ _KINDS: Final = (
     "outcome",
     "event_reason",
     "line",
+    # Why a person's model was or was not followed. The page's People panel reads them; the
+    # server holds them to ``DECISION_REASONS`` (tests/test_companion_decision_model.py).
+    "decision_reason",
 )
 
 

@@ -735,11 +735,200 @@
       "reason": "Authored: how one recorded event reads as a line the Companion cites; {minute} is the simulated minute, {subject} the person, {outcome} and {reason} the words above, {partner} whom they met."
     },
     {
+      "key": "line.chosen_model",
+      "kind": "line",
+      "code": "chosen_model",
+      "words": "{line} That model was {model}.",
+      "reason": "Authored: the sentence after the line of the minute whose goal a person's model chose, naming that model; {line} is that line and {model} the model's name as the People panel shows it (Manifest.model_name in exulanica/models/manifest.py)."
+    },
+    {
       "key": "line.outcome_unknown",
       "kind": "line",
       "code": "outcome_unknown",
       "words": "had something recorded that has no words here ({code})",
       "reason": "Authored: how one recorded event reads as a line the Companion cites; {minute} is the simulated minute, {subject} the person, {outcome} and {reason} the words above, {partner} whom they met."
+    },
+    {
+      "key": "decision_reason.validated_choice",
+      "kind": "decision_reason",
+      "code": "validated_choice",
+      "words": "it chose one of the things they could do",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.answer_not_offered",
+      "kind": "decision_reason",
+      "code": "answer_not_offered",
+      "words": "it did not answer with one of the things they could do",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.model_timed_out",
+      "kind": "decision_reason",
+      "code": "model_timed_out",
+      "words": "it did not answer in time",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.model_call_failed",
+      "kind": "decision_reason",
+      "code": "model_call_failed",
+      "words": "asking it failed",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.model_unavailable",
+      "kind": "decision_reason",
+      "code": "model_unavailable",
+      "words": "it is not available right now",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.request_refused",
+      "kind": "decision_reason",
+      "code": "request_refused",
+      "words": "this world's rules would not let the question be sent",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.provider_not_admitted",
+      "kind": "decision_reason",
+      "code": "provider_not_admitted",
+      "words": "this server may not reach the service that runs it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.provider_credential_absent",
+      "kind": "decision_reason",
+      "code": "provider_credential_absent",
+      "words": "this server has no key for the service that runs it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.model_no_longer_offered",
+      "kind": "decision_reason",
+      "code": "model_no_longer_offered",
+      "words": "it is no longer offered for decisions",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.world_hour_decisions_spent",
+      "kind": "decision_reason",
+      "code": "world_hour_decisions_spent",
+      "words": "this world has asked models as often as it may this hour",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.world_hour_spend_spent",
+      "kind": "decision_reason",
+      "code": "world_hour_spend_spent",
+      "words": "this world has spent what it may on models this hour",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.process_budget_spent",
+      "kind": "decision_reason",
+      "code": "process_budget_spent",
+      "words": "this server's model budget had too little left for it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.process_share_spent",
+      "kind": "decision_reason",
+      "code": "process_share_spent",
+      "words": "this server's model budget, less the part kept for its other work, had too little left for it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.no_time_to_ask",
+      "kind": "decision_reason",
+      "code": "no_time_to_ask",
+      "words": "there was no time left to ask it before the minute",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.unanswered_in_its_minute",
+      "kind": "decision_reason",
+      "code": "unanswered_in_its_minute",
+      "words": "this server stopped before it heard the answer",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.decision_context_changed",
+      "kind": "decision_reason",
+      "code": "decision_context_changed",
+      "words": "the world changed before they could act on it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.decision_sources_unavailable",
+      "kind": "decision_reason",
+      "code": "decision_sources_unavailable",
+      "words": "what they could see could not be read",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.provider_configuration_changed",
+      "kind": "decision_reason",
+      "code": "provider_configuration_changed",
+      "words": "this server changed which model it asks",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.person_asked_directly",
+      "kind": "decision_reason",
+      "code": "person_asked_directly",
+      "words": "you asked them to go somewhere yourself",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.subject_already_decided",
+      "kind": "decision_reason",
+      "code": "subject_already_decided",
+      "words": "something else already decided for them this minute",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.action_in_progress",
+      "kind": "decision_reason",
+      "code": "action_in_progress",
+      "words": "they were already busy",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.input_unavailable",
+      "kind": "decision_reason",
+      "code": "input_unavailable",
+      "words": "this world could not be walked right now",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.target_disabled_or_removed",
+      "kind": "decision_reason",
+      "code": "target_disabled_or_removed",
+      "words": "the place it chose is gone",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.current_position_invalidated",
+      "kind": "decision_reason",
+      "code": "current_position_invalidated",
+      "words": "the ground where they stood changed",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.known_target_unreachable",
+      "kind": "decision_reason",
+      "code": "known_target_unreachable",
+      "words": "they could no longer reach the place it chose",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.place_taken_this_minute",
+      "kind": "decision_reason",
+      "code": "place_taken_this_minute",
+      "words": "someone else took that place first",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
     }
   ]
 }

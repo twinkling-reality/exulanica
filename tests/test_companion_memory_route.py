@@ -24,6 +24,10 @@ _ANSWER = {
     "latency_ms": 40208,
     "served_model": "nvidia/Nemotron-3_5-Lightning",
     "planned_by": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "composed": "model",
+    "used_fallback": False,
+    "unanswered_attempts": 0,
+    "unanswered_cost_unknown": False,
 }
 
 

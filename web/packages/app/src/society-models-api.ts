@@ -18,8 +18,17 @@ export interface ModelRef {
   readonly modelId: string;
 }
 
+/**
+ * A model a read mentions, with the name a person reads for it, as the server names it
+ * (`Manifest.model_name` in `exulanica/models/manifest.py`) wherever the read mentions a model. The
+ * Companion names a model by the same rule, so one model is never called two things.
+ */
+export interface NamedModelRef extends ModelRef {
+  readonly name: string;
+}
+
 /** A model the server may ask for a person's decisions, and whether this process can ask it. */
-export interface SocietyModel extends ModelRef {
+export interface SocietyModel extends NamedModelRef {
   readonly description: string;
   readonly providerDescription: string;
   readonly mechanism: AnsweringMechanism;
@@ -30,14 +39,14 @@ export interface SocietyModel extends ModelRef {
 /** A person's current choice: a model, or null for their own routine. */
 export interface PersonModelChoice {
   readonly subjectId: string;
-  readonly model: ModelRef | null;
+  readonly model: NamedModelRef | null;
   readonly choiceSeq: number;
   /** Why their model is not asked here while this host asks others, by code, or null. */
   readonly refusal: string | null;
 }
 
 /** A person's latest decision, and what the minute that consumed it did with it. */
-export interface PersonDecision extends ModelRef {
+export interface PersonDecision extends NamedModelRef {
   readonly subjectId: string;
   readonly decisionSeq: number;
   readonly baseTick: number;
@@ -54,7 +63,7 @@ export interface PersonDecision extends ModelRef {
 }
 
 /** What one model's decisions came to: the numbers a comparison of models reads. */
-export interface ModelDecisionSummary extends ModelRef {
+export interface ModelDecisionSummary extends NamedModelRef {
   readonly decisions: number;
   readonly asked: number;
   readonly accepted: number;
@@ -95,9 +104,9 @@ const count = (value: unknown): number => (Number.isSafeInteger(value) && (value
 const maybe = <T>(value: unknown, read: (held: unknown) => T): T | null => (value === null ? null : read(value));
 const flag = (value: unknown): boolean => (typeof value === 'boolean' ? value : invalid());
 
-function modelRef(value: unknown): ModelRef {
+function modelRef(value: unknown): NamedModelRef {
   const held = object(value);
-  return { provider: text(held['provider']), modelId: text(held['model_id']) };
+  return { provider: text(held['provider']), modelId: text(held['model_id']), name: text(held['name']) };
 }
 
 function mechanism(value: unknown): AnsweringMechanism {

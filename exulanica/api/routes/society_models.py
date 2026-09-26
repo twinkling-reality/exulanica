@@ -191,6 +191,7 @@ def society_models(
             {
                 "provider": spec.provider,
                 "model_id": spec.model_id,
+                "name": manifest.model_name(spec.model_id),
                 "description": spec.description,
                 "provider_description": manifest.provider(spec.provider).description,
                 "mechanism": mechanism.value,
@@ -217,10 +218,16 @@ def society_models(
         "models": models,
         # Each choice with why its model is not asked here, when it is not: the page says the
         # routine decides for now, and why, rather than naming a model nobody asks.
+        # Every model the read mentions carries the name Manifest.model_name gives it, the one the
+        # Companion uses too, so a model no longer offered is not called by its identifier here and
+        # by its name there.
         "choices": [
             {
                 "subject_id": subject,
                 **choice,
+                "model": None
+                if choice["model"] is None
+                else {**choice["model"], "name": manifest.model_name(choice["model"]["model_id"])},
                 "refusal": None if choice["model"] is None else refusal(choice["model"]),
             }
             for subject, choice in sorted(choices.items())
@@ -242,9 +249,13 @@ def society_models(
                     "chose",
                 )
             }
+            | {"name": manifest.model_name(decision["model_id"])}
             for _, decision in sorted(latest.items())
         ],
-        "by_model": _by_model(decisions),
+        "by_model": [
+            {**summary, "name": manifest.model_name(summary["model_id"])}
+            for summary in _by_model(decisions)
+        ],
         "decisions_read": {"counted": len(decisions), "maximum": DECISIONS_READ},
     }
 

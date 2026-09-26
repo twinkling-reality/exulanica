@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompanionSession, SelectionOutcome, Turn } from '@exulanica/companion-runtime';
 
 import type { CompanionAnswer, CompanionProposal } from '../src/companion-ask-api.js';
-import { mountCompanion } from '../src/composition/companion.js';
+import { mountCompanion, PROPOSAL_ANSWER_WAIT_MS } from '../src/composition/companion.js';
 import type { SessionState } from '../src/composition/session-state.js';
 import { DEFAULT_PREFERENCES } from '../src/preferences.js';
 import type { ConfirmPanel } from '../src/ui/confirm.js';
@@ -140,19 +140,52 @@ interface Harness {
   readonly received: unknown[];
 }
 
+/**
+ * How the stand-in for the appearance surface answers a proposal it receives.
+ *
+ * The real one (`composition/appearance.ts`) reports 'previewed' or 'refused' on the outcome
+ * channel before its inbox listener settles, and `companion-proposals.test.ts` drives it through
+ * a scripted authority. `'never answers'` holds its listener open, as a request with no deadline
+ * would; `'says nothing'` settles without a report, as a listener that is not the appearance
+ * surface may.
+ */
+type Authority =
+  | 'previews'
+  | { readonly refuses: string }
+  | 'never answers'
+  | 'says nothing'
+  | { readonly previewsWhen: Promise<void> };
+
+const REFUSAL_DETAIL = 'The world changed before this could be shown. Restore it first.';
+
+async function answerAs(authority: Authority, proposal: unknown): Promise<void> {
+  const originReference = (proposal as { readonly originReference: string }).originReference;
+  if (authority === 'never answers') return new Promise(() => undefined);
+  if (authority === 'says nothing') return;
+  if (typeof authority === 'object' && 'refuses' in authority) {
+    worldStyleProposalOutcomes.report({ originReference, kind: 'refused', detail: authority.refuses });
+    return;
+  }
+  if (typeof authority === 'object') await authority.previewsWhen;
+  worldStyleProposalOutcomes.report({
+    originReference, kind: 'previewed', detail: 'Waiting to be confirmed in Customize.',
+  });
+}
+
 const cleanups: (() => void)[] = [];
 
 function harness(
   outcomes: readonly CompanionProposal[],
-  over: { rememberFails?: boolean; noInbox?: boolean } = {},
+  over: { rememberFails?: boolean; noInbox?: boolean; authority?: Authority } = {},
 ): Harness {
   const asked: string[] = [];
   const proposed: string[] = [];
   const remembered: CompanionAnswer[] = [];
   const received: unknown[] = [];
   if (over.noInbox !== true) {
-    cleanups.push(worldStyleProposalInbox.subscribe((proposal) => {
+    cleanups.push(worldStyleProposalInbox.subscribe(async (proposal) => {
       received.push(proposal);
+      await answerAs(over.authority ?? 'previews', proposal);
     }));
   }
   const stageParent = document.createElement('div');
@@ -291,7 +324,7 @@ describe('a sentence that turns out to be a request to change the world', () => 
     expect(remembered[1]?.text).toContain('Applied as revision 1.');
     // No model decided this. A person did, and a provenance line naming one would name the
     // wrong author.
-    expect(remembered[1]?.provenance).toMatchObject({ composed: 'none', servedModel: null });
+    expect(remembered[1]?.provenance).toMatchObject({ composed: 'outcome', servedModel: null });
     expect(remembered[1]?.promptVersion).toBe('proposal-outcome');
   });
 
@@ -463,6 +496,126 @@ describe('a sentence that turns out to be a request to change the world', () => 
   });
 });
 
+describe('a proposal the Companion speaks about only after the world style authority answers', () => {
+  beforeEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
+    document.body.replaceChildren();
+    withoutPointerLock();
+  });
+
+  it('says nothing about Customize while the authority is still deciding', async () => {
+    let show: () => void = () => undefined;
+    const previewsWhen = new Promise<void>((resolve) => { show = resolve; });
+    const { mounted, remembered } = harness([PROPOSAL], { authority: { previewsWhen } });
+    mounted.summon();
+
+    mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+
+    // Still working: nothing is on the screen or in memory about a change the world has not
+    // accepted yet.
+    expect(mounted.controller.answer()).toBeNull();
+    expect(mounted.panel.root.textContent ?? '').not.toContain('Nothing has changed yet');
+    expect(remembered).toEqual([]);
+
+    show();
+    await settle();
+
+    expect(mounted.panel.root.textContent ?? '').toContain(say('proposal.staged'));
+    expect(remembered).toHaveLength(1);
+  });
+
+  it('says one refusal in words and keeps one row when the authority refuses it', async () => {
+    const { mounted, remembered, received } = harness([PROPOSAL], {
+      authority: { refuses: REFUSAL_DETAIL },
+    });
+    mounted.summon();
+
+    mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+
+    const spoken = mounted.panel.root.textContent ?? '';
+    expect(received).toHaveLength(1);
+    expect(spoken).not.toContain('Open Customize');
+    expect(spoken).not.toContain('Nothing has changed yet');
+    expect(spoken).toContain(say('proposal.outcome.refused'));
+    expect(spoken).toContain(REFUSAL_DETAIL);
+    // Named for the change it drew, and said to have been shown nowhere.
+    expect(mounted.controller.answer()?.provenance).toMatchObject({
+      composed: 'unshown', servedModel: DRAFTER,
+    });
+    expect(spoken).toContain(`${DRAFTER} drew this change in 3.5 s. It was never shown`);
+    // One row: the refusal is the answer, never a second answer beside one that said otherwise.
+    expect(remembered).toHaveLength(1);
+    expect(remembered[0]?.text).toContain(REFUSAL_DETAIL);
+  });
+
+  it('keeps no sentence for a refused proposal, so nothing later is kept under it', async () => {
+    const { mounted, remembered, received } = harness([PROPOSAL], {
+      authority: { refuses: REFUSAL_DETAIL },
+    });
+    mounted.summon();
+    mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+
+    worldStyleProposalOutcomes.report({
+      originReference: (received[0] as { readonly originReference: string }).originReference,
+      kind: 'refused',
+      detail: 'said again',
+    });
+    await settle();
+
+    expect(remembered).toHaveLength(1);
+  });
+
+  it('says it could not confirm the change once the wait runs out, and keeps what comes later', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    cleanups.push(() => vi.useRealTimers());
+    const { mounted, remembered, received } = harness([PROPOSAL], { authority: 'never answers' });
+    mounted.summon();
+
+    mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+    await vi.advanceTimersByTimeAsync(PROPOSAL_ANSWER_WAIT_MS - 1);
+    expect(mounted.controller.answer()).toBeNull();
+    await vi.advanceTimersByTimeAsync(1);
+    await settle();
+
+    const spoken = mounted.panel.root.textContent ?? '';
+    expect(spoken).toContain(PROPOSAL.proposal!.spoken);
+    expect(spoken).toContain(say('proposal.unconfirmed'));
+    expect(spoken).not.toContain('Open Customize');
+    // It may still arrive, so its line still says nothing is applied until it is.
+    expect(mounted.controller.answer()?.provenance.composed).toBe('proposed');
+    expect(remembered).toHaveLength(1);
+
+    // What the authority says afterwards is kept under the same sentence, as its own row.
+    worldStyleProposalOutcomes.report({
+      originReference: (received[0] as { readonly originReference: string }).originReference,
+      kind: 'refused',
+      detail: REFUSAL_DETAIL,
+    });
+    await settle();
+    expect(remembered).toHaveLength(2);
+    expect(remembered[1]?.question).toBe(PROPOSAL.utterance);
+    expect(remembered[1]?.text).toContain(say('proposal.outcome.refused'));
+  });
+
+  it('says it could not be put in front of anybody when the surface finishes without a word', async () => {
+    const { mounted, remembered } = harness([PROPOSAL], { authority: 'says nothing' });
+    mounted.summon();
+
+    mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+
+    const spoken = mounted.panel.root.textContent ?? '';
+    expect(spoken).toContain(say('proposal.unavailable'));
+    expect(spoken).not.toContain('Nothing is applied until you apply it.');
+    expect(mounted.controller.answer()?.provenance.composed).toBe('unshown');
+    expect(remembered).toHaveLength(1);
+  });
+});
+
 describe('a request the reviewed design cannot express', () => {
   beforeEach(() => {
     while (cleanups.length > 0) cleanups.pop()?.();
@@ -514,14 +667,19 @@ describe('a request the reviewed design cannot express', () => {
   });
 
   it('says so when there is no surface to put a proposal in front of anybody', async () => {
-    const { mounted, received } = harness([PROPOSAL], { noInbox: true });
+    const { mounted, received, remembered } = harness([PROPOSAL], { noInbox: true });
     mounted.summon();
 
     mounted.controller.say(PROPOSAL.utterance);
     await settle();
 
     expect(received).toEqual([]);
-    expect(mounted.panel.root.textContent ?? '').toContain(say('proposal.unavailable'));
+    const spoken = mounted.panel.root.textContent ?? '';
+    expect(spoken).toContain(say('proposal.unavailable'));
+    // Not the line of a change waiting to be applied: nothing is waiting anywhere.
+    expect(spoken).not.toContain('Nothing is applied until you apply it.');
+    expect(mounted.controller.answer()?.provenance.composed).toBe('unshown');
+    expect(remembered).toHaveLength(1);
   });
 });
 

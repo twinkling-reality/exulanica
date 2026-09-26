@@ -53,7 +53,13 @@ exact response shapes and refusal codes live in the route models and API schema 
 parsed into the same update proposal draft that a choice would produce and goes through the
 IDENTICAL confirmation flow", and that "No path writes to the graph without a proposal". That is
 still true of every utterance the parser can turn into a change. The question branch is what
-happens when it cannot, and the guarantee is structural rather than promised:
+happens when it cannot, or when all it makes of the words is a note: the parser keeps whatever
+follows a first comma as a note, so a draft of notes alone, typed while one of the Companion's own
+questions is open, is cancelled unwritten and asked as a question, unless the words answer that
+question: a reply to "How do you know them?", which a person answers in their own words, or one
+that opens with a yes or a no to a question that asks for one (`answersOpenQuestion` in
+[the controller](../web/packages/app/src/companion.ts)). The guarantee is structural rather than
+promised:
 
 * `companion-ask-api.ts` returns a `CompanionAnswer`. Nothing in the workspace turns one into a
   `ProposalDraft`, and `companion.ts` reaches `onAwaitingConfirmation` only from a
@@ -216,9 +222,11 @@ each placeholder and the entity it stood for, as ids and never as a name, append
 entity's own class and refused for an entity already deleted, and a correction keeps the map of the
 answer it replaces. `GET /companion/memory/recent` serves the map with each answer, and the browser
 draws a remembered answer through the same resolver as a fresh one, so every case in the table
-above holds for it. An appearance proposal's words carry the same map: `propose_appearance` returns
-the request's record with the proposal or the refusal (`AppearanceOutcome.names` in
-`exulanica/selection/proposal.py`), `POST /selection/appearance` serves it as `names`, and the page
+above holds for it, and under the provenance line it was first drawn under
+([Conversation memory](#conversation-memory)). An appearance proposal's words carry the same map:
+`propose_appearance` returns the request's record with the proposal or the refusal
+(`AppearanceOutcome.names` in `exulanica/selection/proposal.py`), `POST /selection/appearance`
+serves it as `names`, and the page
 draws the spoken change and a `not_in_catalogue` detail through the same resolver and writes the map
 back with the proposal, so a reload shows the same names. `tests/test_appearance_proposal_names.py`
 holds the map and the absence of a person's saved name from every request on that path, with no
@@ -381,7 +389,11 @@ recorded, with no model call. The page and the server choose among those words b
 cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). What happened
 over the whole world is chosen by the reasoning role from at most 24 event lines rebuilt from each
 event's recorded outcome, reason and minute in the same words, never from a stored summary, a
-position, a seed or a digest. The composer writes nothing: it returns which lines answer the
+position, a seed or a digest. The line of a minute whose goal a person's model chose names that
+model, by the name the People panel shows (`Manifest.model_name` in
+[the model manifest](../exulanica/models/manifest.py)), from the one `decision_applied` event of
+that minute and person that applied a choice, read under the same authorization; it names none when
+there is not exactly one. The composer writes nothing: it returns which lines answer the
 question, at most nine, and at most one of the fixed framings the words catalog lists, and the
 answer is each chosen line in its own words, cited to it, in the order they were recorded. The
 answer leads with the simulated minutes of the lines it shows, because the simulation counts minutes
@@ -502,6 +514,21 @@ answer. An answer with unresolved cited sources is not stored by dropping the un
 Deleting an answer withdraws its correction lineage as well, so a correction cannot keep the
 removed text visible through its quotation.
 
+A retained answer keeps what kind of answer it was, which decides the provenance line drawn under
+it: a model's answer, the search's, a change a model drew, a refused or never-shown change, what
+became of a proposal, a correction, and the other kinds `AnswerComposed` in the
+[memory repository](../exulanica/world/companion_memory.py) lists. It also keeps whether the model
+that answered was a fallback and how many of its requests returned no answer, with whether any of
+their costs is unknown
+([migration 0112](../exulanica/migrations/0112_a_remembered_answer_keeps_what_kind_of_answer_it_was.sql)).
+`POST /companion/memory/answers` requires all four and refuses a kind it does not know; a
+correction is recorded as `corrected` by its own route and by no other. The browser draws a
+remembered answer under the line of its kind with the same sentence about unanswered requests, so
+after a reload it reads as it did when it was first drawn, and a proposed change is never redrawn
+as an answer. An answer retained before the kind was kept takes its kind from what its row holds
+(its origin, its prompt version and, for a drafter's reply, the reviewed sentence a refusal opens
+with) and claims no fallback and no unanswered request, which those rows did not keep.
+
 The browser [memory client](../web/packages/app/src/companion-memory-api.ts) loads retained state.
 `memoryFromPersisted` in the [Companion runtime](../web/packages/companion-runtime/src/memory.ts)
 replays supported escapes through the same cooldown logic as a live session. Per-session suppression
@@ -514,7 +541,16 @@ autonomous activity, complete lifelong shared context or model training.
 ## Appearance proposals
 
 `POST /selection/appearance` returns a supported appearance proposal or refusal. It does not apply
-the proposal. The [proposal implementation](../exulanica/selection/proposal.py) classifies the request,
+the proposal. The Companion speaks about a proposal only once the world style authority has
+answered the preview the proposal asks for (`POST /world/styles/previews`): one the authority shows
+is described as waiting in Customize; one it refuses is a single answer saying so in reviewed words
+with the authority's own detail, and one no surface is there to show is a single answer saying that
+it could not be put in front of the person, each under a provenance line saying the change was never
+shown. When the authority has not answered within
+`PROPOSAL_ANSWER_WAIT_MS` ([the Companion's composition](../web/packages/app/src/composition/companion.ts),
+5 s, a bound measured against a preview's own requests), the Companion says it could not confirm
+the change, which may still appear in Customize, and what becomes of it is kept as its own
+record. The [proposal implementation](../exulanica/selection/proposal.py) classifies the request,
 drafts from the reviewed style registry and validates the result. A question about evidence and a
 request to change appearance have distinct inputs and responsibilities.
 

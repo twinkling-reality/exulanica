@@ -20,10 +20,18 @@ export class WorldStyleProposalInbox {
     return () => this.#listeners.delete(listener);
   }
 
-  /** True only when an Atlas integration was present to receive the proposal. */
-  submit(proposal: UpstreamWorldStyleProposal): boolean {
+  /**
+   * Hand a proposal to every listener. True only when an Atlas integration was present to receive
+   * it.
+   *
+   * Settled once every listener has finished with it, not at once: the appearance surface reports
+   * what the authority made of a proposal before its own promise settles, and the Companion speaks
+   * about a proposal only after that report. A listener that fails is its own failure and never
+   * the submitter's, so the promise does not reject.
+   */
+  async submit(proposal: UpstreamWorldStyleProposal): Promise<boolean> {
     if (this.#listeners.size === 0) return false;
-    for (const listener of this.#listeners) void listener(proposal);
+    await Promise.allSettled([...this.#listeners].map(async (listener) => listener(proposal)));
     return true;
   }
 }

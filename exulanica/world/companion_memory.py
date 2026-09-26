@@ -39,6 +39,7 @@ from exulanica.errors import ExulanicaError, TombstonedError
 __all__ = [
     "NO_NAMES",
     "AnswerCitation",
+    "AnswerComposed",
     "AnswerOrigin",
     "CompanionAnswer",
     "CompanionEscape",
@@ -98,6 +99,38 @@ class AnswerOrigin(StrEnum):
     CORRECTION = "correction"
 
 
+class AnswerComposed(StrEnum):
+    """What kind of answer a row is, which decides the line it is drawn under.
+
+    The page's ``COMPOSED_KINDS`` (web/packages/companion-runtime/src/memory.ts) states the same
+    set, and migration 0112's ``companion_answer_composed_known`` holds the column to it; both
+    copies are held equal to this one by tests. A correction is ``CORRECTED`` and nothing else is.
+    """
+
+    #: A model wrote the answer.
+    MODEL = "model"
+    #: A model answered and what it wrote was not supported, so the search's own answer stands.
+    DISCARDED = "discarded"
+    #: A model read the question and the search itself answered.
+    SEARCH = "search"
+    #: A model could not turn the question into a search.
+    UNREADABLE = "unreadable"
+    #: A model drew a change to the world, waiting to be applied.
+    PROPOSED = "proposed"
+    #: The reviewed design has no way to make the change asked for.
+    REFUSED = "refused"
+    #: A model was asked to draw a change and no reply could be read.
+    UNDRAFTED = "undrafted"
+    #: A model drew a change that was never shown.
+    UNSHOWN = "unshown"
+    #: No model was asked, and the search answered.
+    NONE = "none"
+    #: What became of a proposed change: a person or the world decided it, not a model.
+    OUTCOME = "outcome"
+    #: The person's own correction of an earlier answer.
+    CORRECTED = "corrected"
+
+
 class EscapeKind(StrEnum):
     """The four escapes of interaction-model.md 4.3, spelled as the runtime spells them."""
 
@@ -144,6 +177,14 @@ class CompanionAnswer:
     #: only: the browser draws each name from the account holder's library when the answer is
     #: drawn, so a rename, a deletion or a withdrawn consent carries through.
     names: Mapping[str, uuid.UUID]
+    #: What kind of answer it was. None only on a row kept before migration 0112.
+    composed: AnswerComposed | None
+    #: Whether the model that answered was its role's fallback.
+    used_fallback: bool
+    #: How many of the answer's requests returned no answer, and whether any of their costs is
+    #: unknown: the attempts line drawn under the answer.
+    unanswered_attempts: int
+    unanswered_cost_unknown: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +211,12 @@ class RecordedAnswer:
     prompt_version: str
     latency_ms: int
     citations: tuple[AnswerCitation, ...]
+    #: What kind of answer it was, as the page drew it. Never ``CORRECTED``: only
+    #: :meth:`CompanionMemoryRepository.correct` records a correction.
+    composed: AnswerComposed
+    used_fallback: bool
+    unanswered_attempts: int
+    unanswered_cost_unknown: bool
     #: The answer's own ``names``, as the answer route served it: placeholder to entity id.
     names: Mapping[str, uuid.UUID] = field(default_factory=lambda: NO_NAMES)
 
@@ -342,8 +389,9 @@ class CompanionMemoryRepository:
             row = self.connection.execute(
                 "insert into companion_answer "
                 "(workspace_id,actor_id,question,answer_text,abstained,deterministic,repaired,"
-                "served_model,planned_by,prompt_version,latency_ms,origin) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'asked') returning *",
+                "served_model,planned_by,prompt_version,latency_ms,origin,composed,"
+                "used_fallback,unanswered_attempts,unanswered_cost_unknown) "
+                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'asked',%s,%s,%s,%s) returning *",
                 (
                     self.workspace_id,
                     self.actor_id,
@@ -356,6 +404,10 @@ class CompanionMemoryRepository:
                     recorded.planned_by,
                     recorded.prompt_version,
                     recorded.latency_ms,
+                    recorded.composed.value,
+                    recorded.used_fallback,
+                    recorded.unanswered_attempts,
+                    recorded.unanswered_cost_unknown,
                 ),
             ).fetchone()
             assert row is not None
@@ -433,8 +485,10 @@ class CompanionMemoryRepository:
                 "insert into companion_answer "
                 "(workspace_id,actor_id,question,answer_text,abstained,deterministic,repaired,"
                 "served_model,planned_by,prompt_version,latency_ms,origin,supersedes,"
-                "correction_note) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'correction',%s,%s) returning *",
+                "correction_note,composed,used_fallback,unanswered_attempts,"
+                "unanswered_cost_unknown) "
+                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'correction',%s,%s,%s,false,0,false) "
+                "returning *",
                 (
                     self.workspace_id,
                     self.actor_id,
@@ -455,6 +509,9 @@ class CompanionMemoryRepository:
                     0,
                     answer_id,
                     correction_note,
+                    # The person's own words, drawn under the line that says so. No request of
+                    # theirs went unanswered and no fallback wrote anything.
+                    AnswerComposed.CORRECTED.value,
                 ),
             ).fetchone()
             assert row is not None
@@ -557,6 +614,16 @@ class CompanionMemoryRepository:
             raise InvalidCompanionMemory("latency is a whole number of milliseconds, not negative")
         if not recorded.prompt_version.strip() or len(recorded.prompt_version) > 64:
             raise InvalidCompanionMemory("a recorded answer names the prompt version that made it")
+        if recorded.composed is AnswerComposed.CORRECTED:
+            raise InvalidCompanionMemory(
+                "a correction is recorded by correcting an answer, not as an answer of its own"
+            )
+        if recorded.unanswered_attempts < 0:
+            raise InvalidCompanionMemory("unanswered attempts are counted, never negative")
+        if recorded.unanswered_cost_unknown and recorded.unanswered_attempts == 0:
+            raise InvalidCompanionMemory(
+                "an unknown cost belongs to a request that returned no answer, and none did"
+            )
         ordinals = [citation.ordinal for citation in recorded.citations]
         if len(set(ordinals)) != len(ordinals):
             raise InvalidCompanionMemory("two citations claim the same reading position")
@@ -628,6 +695,10 @@ def _row_to_answer(
         MemoryStatus(row["status"]),
         citations,
         names,
+        None if row["composed"] is None else AnswerComposed(row["composed"]),
+        row["used_fallback"],
+        row["unanswered_attempts"],
+        row["unanswered_cost_unknown"],
     )
 
 

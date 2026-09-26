@@ -17,6 +17,7 @@ from exulanica.db.session import set_workspace
 from exulanica.errors import TombstonedError
 from exulanica.world.companion_memory import (
     AnswerCitation,
+    AnswerComposed,
     AnswerOrigin,
     CompanionMemoryRepository,
     EscapeKind,
@@ -45,6 +46,10 @@ def _answer(**over) -> RecordedAnswer:
         "prompt_version": "selection-3",
         "latency_ms": 40208,
         "citations": (),
+        "composed": AnswerComposed.MODEL,
+        "used_fallback": False,
+        "unanswered_attempts": 0,
+        "unanswered_cost_unknown": False,
     }
     fields.update(over)
     return RecordedAnswer(**fields)

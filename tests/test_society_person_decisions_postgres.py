@@ -664,7 +664,9 @@ def test_only_a_caller_who_may_ask_models_changes_whose_model_runs_a_person(app,
     assert chosen.json()["chosen_by"] == str(world["session"].actor)
     after = client.get(society + "/models", headers=callers["reader"][0], params=scope).json()
     assert after["takes_model_choices"] is True
-    assert [(c["subject_id"], c["model"]) for c in after["choices"]] == [(p, model) for p in people]
+    # Each choice's model carries the name the People panel and the Companion both use.
+    named = {**model, "name": load_manifest().model_name(model_id)}
+    assert [(c["subject_id"], c["model"]) for c in after["choices"]] == [(p, named) for p in people]
     offered = {entry["model_id"]: entry for entry in after["models"]}
     assert offered[model_id]["mechanism"] == "tool_call"
     # This process has no model client, so it says so for the host and for every provider.

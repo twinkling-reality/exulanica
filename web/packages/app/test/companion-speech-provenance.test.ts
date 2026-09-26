@@ -40,3 +40,25 @@ describe('the provenance line under a proposal or a refusal', () => {
     expect(line).not.toContain('classifier-model');
   });
 });
+
+describe('the provenance line under a change that was never shown, an outcome and a correction', () => {
+  it('credits a change that was never shown to the model that drew it, and says it was not shown', () => {
+    const line = provenanceSentence({
+      ...refusal,
+      composed: 'unshown',
+      servedModel: 'drafting-model',
+      plannedBy: 'classifier-model',
+    });
+    expect(line).toBe('drafting-model drew this change in 1.2 s. It was never shown, so nothing changed.');
+    expect(line).not.toContain('Nothing is applied until you apply it');
+  });
+
+  it('names no model over what became of a proposal, and no search either', () => {
+    expect(provenanceSentence({ ...refusal, composed: 'outcome' })).toBe('No model was asked.');
+  });
+
+  it('says a correction is the person\'s own words, whatever model the row names', () => {
+    const line = provenanceSentence({ ...refusal, composed: 'corrected', servedModel: 'some-model' });
+    expect(line).toBe('You wrote this, correcting an earlier answer.');
+  });
+});

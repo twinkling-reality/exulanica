@@ -15,6 +15,7 @@ import type { SessionState } from '../src/composition/session-state.js';
 import { DEFAULT_PREFERENCES } from '../src/preferences.js';
 import type { ConfirmPanel } from '../src/ui/confirm.js';
 import { fill, say } from '../src/ui/copy.js';
+import { worldStyleProposalInbox, worldStyleProposalOutcomes } from '../src/world-style-proposals.js';
 
 /**
  * An appearance proposal reads with names, as an answer does.
@@ -109,6 +110,15 @@ const cleanups: (() => void)[] = [];
 
 function drawn(outcome: CompanionProposal, snapshot: GraphSnapshot | null) {
   const remembered: CompanionAnswer[] = [];
+  // A surface that shows every proposal, as the appearance surface does when the world style
+  // authority accepts one: the Companion speaks a proposal's own words only then.
+  cleanups.push(worldStyleProposalInbox.subscribe((proposal) => {
+    worldStyleProposalOutcomes.report({
+      originReference: proposal.originReference ?? '',
+      kind: 'previewed',
+      detail: 'Waiting to be confirmed in Customize.',
+    });
+  }));
   const stageParent = document.createElement('div');
   document.body.append(stageParent);
   const state = { preferences: DEFAULT_PREFERENCES, snapshot } as unknown as SessionState;

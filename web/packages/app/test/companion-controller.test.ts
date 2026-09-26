@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from 'vitest';
-import type {
-  CompanionSession,
-  ConfirmationSummary,
-  SelectionOutcome,
-  Turn,
+import {
+  draftFromParse,
+  parseUtterance,
+  type CompanionSession,
+  type ConfirmationSummary,
+  type SelectionOutcome,
+  type Turn,
 } from '@exulanica/companion-runtime';
 
 import { AskUnavailable, type CompanionAnswer } from '../src/companion-ask-api.js';
@@ -457,5 +459,174 @@ describe('an answer restored from durable memory', () => {
     // The second citation is one the packet could not locate. It stops at null rather than
     // falling through to the turn's evidence, which is a different photograph.
     expect(controller.evidenceAt(1)).toBeNull();
+  });
+});
+
+/**
+ * A question typed while one of the Companion's own questions is open.
+ *
+ * The parser keeps everything after a first comma as a note when it finds no name and no relation
+ * in the words, so a question with a comma in it was staged as a note to record, behind a
+ * confirmation, instead of being asked. A draft of notes alone is asked, except on the question a
+ * person answers in their own words, how they know someone.
+ */
+describe('a question typed while the Companion\'s own question is open', () => {
+  const QUESTION =
+    'Make the light warmer where Maria Estrada stands outside Mireland Hall, and say who stands there and where.';
+
+  const openTurn = (utteranceKey: string): Turn => ({
+    ...ACKNOWLEDGE,
+    turnId: `turn-${utteranceKey}`,
+    intent: 'enrich_relation',
+    subjectEntityId: 'entity-1',
+    utteranceKey,
+  }) as unknown as Turn;
+
+  /** A session whose open turn is `turn`, staging `ops` from any free text, and recording cancels. */
+  function staging(turn: Turn, ops: readonly string[]) {
+    const cancelled: string[] = [];
+    const session = {
+      advance: () => turn,
+      say: (text: string) => ({
+        kind: 'awaiting_confirmation',
+        proposal: {
+          proposalId: 'proposal-1',
+          turnId: turn.turnId,
+          origin: 'user_utterance',
+          rawUtterance: text,
+          operations: ops.map((op) => ({
+            op, tier: 1, affectedAnchorIds: [], affectedIslandIds: [], payload: {},
+          })),
+          provenanceSummary: 'provenance.userUtterance',
+          maxTier: 1,
+          reversible: true,
+          expiresAtStateVersion: 2,
+        },
+        confirmation: {} as ConfirmationSummary,
+      }) as unknown as SelectionOutcome,
+      cancel: (proposalId: string) => { cancelled.push(proposalId); },
+    } as unknown as CompanionSession;
+    return { session, cancelled };
+  }
+
+  it('is a draft of notes alone to the parser, which is why it was staged', () => {
+    const parsed = parseUtterance(QUESTION);
+    expect([parsed.name, parsed.relation]).toEqual([null, null]);
+    const draft = draftFromParse(parsed, {
+      ids: (kind) => `${kind}-1`,
+      subjectEntityId: 'entity-1',
+      anchorIds: [],
+      islandIds: [],
+      captureEvidence: [],
+    });
+    expect(draft?.operations.map((operation) => operation.op)).toEqual(['note']);
+  });
+
+  it('is asked, and the note it would have been is cancelled unwritten', async () => {
+    const { session, cancelled } = staging(openTurn('utterance.nameScope'), ['note']);
+    const askQuestion = vi.fn(async () => ANSWER);
+    const staged = vi.fn();
+    const controller = createCompanionController({
+      companion: session,
+      onAwaitingConfirmation: staged,
+      askQuestion,
+    });
+    controller.summon(0);
+
+    controller.say(QUESTION);
+    await vi.waitFor(() => expect(askQuestion).toHaveBeenCalledWith(QUESTION));
+
+    expect(cancelled).toEqual(['proposal-1']);
+    expect(staged).not.toHaveBeenCalled();
+  });
+
+  it('keeps a reply to how the person knows someone as the note it is', () => {
+    const { session, cancelled } = staging(openTurn('utterance.relation'), ['note']);
+    const askQuestion = vi.fn(async () => ANSWER);
+    const staged = vi.fn();
+    const controller = createCompanionController({
+      companion: session,
+      onAwaitingConfirmation: staged,
+      askQuestion,
+    });
+    controller.summon(0);
+
+    controller.say('we met at work, years ago');
+
+    expect(staged).toHaveBeenCalledWith('proposal-1', expect.anything(), 'we met at work, years ago');
+    expect(cancelled).toEqual([]);
+    expect(askQuestion).not.toHaveBeenCalled();
+  });
+
+  it('keeps an answer to a yes or no question, whose yes or no the parser does not keep', () => {
+    // "No, that's her daughter": no capitalized name after "that's", and "daughter" is not a
+    // relation word the parser knows, so the draft is the words after the comma, as a note.
+    const parsed = parseUtterance("No, that's her daughter");
+    expect([parsed.name, parsed.relation, parsed.residual]).toEqual([null, null, "that's her daughter"]);
+    for (const [key, words] of [
+      ['utterance.resolveIdentity', "No, that's her daughter"],
+      ['utterance.confirmContinuity', 'Yes, the same woman, years later'],
+    ] as const) {
+      const { session, cancelled } = staging(openTurn(key), ['note']);
+      const askQuestion = vi.fn(async () => ANSWER);
+      const staged = vi.fn();
+      const controller = createCompanionController({
+        companion: session,
+        onAwaitingConfirmation: staged,
+        askQuestion,
+      });
+      controller.summon(0);
+
+      controller.say(words);
+
+      expect(staged, key).toHaveBeenCalledWith('proposal-1', expect.anything(), words);
+      expect(cancelled, key).toEqual([]);
+      expect(askQuestion, key).not.toHaveBeenCalled();
+    }
+  });
+
+  it('asks a question typed at a yes or no question, which opens with neither', async () => {
+    const { session, cancelled } = staging(openTurn('utterance.resolveIdentity'), ['note']);
+    const askQuestion = vi.fn(async () => ANSWER);
+    const controller = createCompanionController({
+      companion: session,
+      onAwaitingConfirmation: () => expect.unreachable('a question is not staged'),
+      askQuestion,
+    });
+    controller.summon(0);
+
+    controller.say(QUESTION);
+    await vi.waitFor(() => expect(askQuestion).toHaveBeenCalledWith(QUESTION));
+    expect(cancelled).toEqual(['proposal-1']);
+  });
+
+  it('stages a reply that names or relates somebody, whatever notes come with it', () => {
+    const { session, cancelled } = staging(openTurn('utterance.nameScope'), ['name', 'note']);
+    const askQuestion = vi.fn(async () => ANSWER);
+    const staged = vi.fn();
+    const controller = createCompanionController({
+      companion: session,
+      onAwaitingConfirmation: staged,
+      askQuestion,
+    });
+    controller.summon(0);
+
+    controller.say('Call her Maria, from the harbour');
+
+    expect(staged).toHaveBeenCalledTimes(1);
+    expect(cancelled).toEqual([]);
+    expect(askQuestion).not.toHaveBeenCalled();
+  });
+
+  it('stages it as before where no answer path was injected', () => {
+    const { session, cancelled } = staging(openTurn('utterance.nameScope'), ['note']);
+    const staged = vi.fn();
+    const controller = createCompanionController({ companion: session, onAwaitingConfirmation: staged });
+    controller.summon(0);
+
+    controller.say(QUESTION);
+
+    expect(staged).toHaveBeenCalledTimes(1);
+    expect(cancelled).toEqual([]);
   });
 });

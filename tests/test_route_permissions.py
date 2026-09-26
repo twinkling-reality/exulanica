@@ -627,6 +627,10 @@ def test_a_permission_refusal_on_an_id_is_not_an_existence_oracle(floor):
         "answer_text": "then",
         "prompt_version": "selection-3",
         "latency_ms": 1,
+        "composed": "none",
+        "used_fallback": False,
+        "unanswered_attempts": 0,
+        "unanswered_cost_unknown": False,
     }
     mine = floor.request("owner", "POST", "/companion/memory/answers", json=body)
     assert mine.status_code == 201, mine.text
@@ -661,7 +665,16 @@ def test_a_missing_write_on_a_collection_is_a_403_that_names_the_permission(floo
     assert response.status_code == 403
     assert response.json()["code"] == "not_authorised"
     assert "intake.write" in response.json()["detail"]
-    body = {"question": "q", "answer_text": "a", "prompt_version": "selection-3", "latency_ms": 1}
+    body = {
+        "question": "q",
+        "answer_text": "a",
+        "prompt_version": "selection-3",
+        "latency_ms": 1,
+        "composed": "none",
+        "used_fallback": False,
+        "unanswered_attempts": 0,
+        "unanswered_cost_unknown": False,
+    }
     refused = floor.request("reader", "POST", "/companion/memory/answers", json=body)
     assert (refused.status_code, refused.json()["code"]) == (403, "not_authorised")
     # The same body with the grant is accepted, so the 403 above is the grant and not the body.
@@ -729,7 +742,16 @@ def test_a_browser_session_holds_the_owner_grant_and_is_resolved_once(floor):
     assert floor.client.get("/operations/derivative-jobs", headers=cookie).status_code == 200
     # Resolved by the floor, reused by current_session: one account lookup, not two.
     assert floor.accounts.calls == before + 1
-    body = {"question": "q", "answer_text": "a", "prompt_version": "selection-3", "latency_ms": 1}
+    body = {
+        "question": "q",
+        "answer_text": "a",
+        "prompt_version": "selection-3",
+        "latency_ms": 1,
+        "composed": "none",
+        "used_fallback": False,
+        "unanswered_attempts": 0,
+        "unanswered_cost_unknown": False,
+    }
     made = floor.client.post("/companion/memory/answers", headers=cookie, json=body)
     assert made.status_code == 201, made.text
     gone = floor.client.delete(

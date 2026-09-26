@@ -5,14 +5,19 @@ import {
   WORLD_STYLE_RECIPES,
   worldStyleRecipe,
 } from '@exulanica/presentation';
+import type { CompanionSession, Turn } from '@exulanica/companion-runtime';
 import {
   CompanionProposalClient,
   PROPOSAL_OUTCOMES,
   REFUSAL_CODES,
+  type CompanionAnswer,
+  type CompanionProposal,
 } from '../src/companion-ask-api.js';
 import { mountAppearance } from '../src/composition/appearance.js';
+import { mountCompanion, type MountedCompanion } from '../src/composition/companion.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import { DEFAULT_PREFERENCES } from '../src/preferences.js';
+import type { ConfirmPanel } from '../src/ui/confirm.js';
 import { say } from '../src/ui/copy.js';
 import { WorldStyleClient, validateLocalReference } from '../src/world-style-api.js';
 import { RESTORE_BEFORE_CHANGING } from '../src/world-style-refusals.js';
@@ -517,7 +522,7 @@ const COMPANION = {
 /**
  * Wait for the inbox listener to finish, rather than for a fixed number of microtasks.
  *
- * `submit` fires its listeners with `void listener(proposal)` and does not await them, and the
+ * `submit` settles only after its listeners, but most tests here do not await it, and the
  * listener makes a real request through the transport. A fixed flush left the panel showing
  * "Validating the upstream proposal" and every assertion after it measuring a half-finished
  * turn.
@@ -551,7 +556,7 @@ describe('a Companion proposal through the appearance surface', () => {
   it('reaches the authority as a companion-origin preview carrying its full provenance', async () => {
     const { bodies } = await harness();
 
-    expect(worldStyleProposalInbox.submit(COMPANION)).toBe(true);
+    await expect(worldStyleProposalInbox.submit(COMPANION)).resolves.toBe(true);
     await settle();
 
     expect(bodies).toHaveLength(1);
@@ -737,6 +742,123 @@ describe('a Companion proposal through the appearance surface', () => {
 });
 
 // -- a staged proposal waits for the person ----------------------------------------------------
+
+/** A request the Companion drew a change for, as the proposal route's client hands it over. */
+const DRAWN: CompanionProposal = {
+  utterance: 'could the horizon be softer in here',
+  classification: 'appearance',
+  proposal: {
+    ...PROFILE,
+    parameters: { ...PARAMETERS, 'horizon-softness': 0.8 },
+    modules: ['aeroheart-optics-v1'],
+    changed: ['horizon-softness'],
+    referenceIds: ['00000000-0000-0000-0000-000000000001'],
+    modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+    promptVersion: 'proposal-1',
+    spoken: 'The horizon will sit softer, so the far edge reads as distance.',
+  },
+  refusal: null,
+  promptVersion: 'proposal-1',
+  calls: [],
+};
+
+/** A turn with nothing to attach a change to, so free text is asked or proposed. */
+const ACKNOWLEDGE = {
+  turnId: 'turn-ack',
+  intent: 'acknowledge',
+  subjectEntityId: null,
+  subjectAnchorId: null,
+  utteranceKey: 'utterance.acknowledge',
+  utterance: null,
+  evidence: [],
+  choiceSet: null,
+  freeTextAllowed: true,
+  escapes: [],
+  stateVersion: 1,
+} as unknown as Turn;
+
+/**
+ * The Companion over the appearance surface `harness` mounts, drawing `DRAWN` for any sentence.
+ * Mounted after `harness`, which replaces the document's children.
+ */
+function companionOver(): { mounted: MountedCompanion; remembered: CompanionAnswer[] } {
+  Object.defineProperty(document, 'pointerLockElement', { value: null, configurable: true });
+  (document as unknown as { exitPointerLock: () => void }).exitPointerLock = () => undefined;
+  const remembered: CompanionAnswer[] = [];
+  const mounted = mountCompanion({
+    state: { preferences: DEFAULT_PREFERENCES } as unknown as SessionState,
+    engine: {
+      advance: () => ACKNOWLEDGE,
+      say: () => ({ kind: 'refused', reasonKey: 'refused.couldNotParse' }),
+      adoptPersistedMemory: () => undefined,
+      lastAnswer: null,
+    } as unknown as CompanionSession,
+    evidence: { open: vi.fn() } as never,
+    ask: async () => {
+      throw new Error('a request to change the world is not asked as a question');
+    },
+    proposeAppearance: async () => DRAWN,
+    rememberAnswer: async (answer) => {
+      remembered.push(answer);
+    },
+    confirm: () => ({ show: vi.fn(), hide: vi.fn(), reportFailure: vi.fn() }) as unknown as
+      ConfirmPanel,
+    reflectShell: vi.fn(),
+    onAnswered: vi.fn(),
+    isSystemSurfaceOpen: () => false,
+  });
+  cleanups.push(() => mounted.dispose());
+  return { mounted, remembered };
+}
+
+describe('what the Companion says of a proposal, once the authority has answered it', () => {
+  beforeEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.();
+    document.body.replaceChildren();
+  });
+
+  it('says one refusal, keeps one row and never says Open Customize when it is refused', async () => {
+    const { bodies, outcomes } = await harness({ refuse: () => true });
+    const { mounted, remembered } = companionOver();
+    mounted.summon();
+
+    mounted.controller.say(DRAWN.utterance);
+    await vi.waitFor(() => expect(mounted.controller.answer()).not.toBeNull());
+    await settle();
+
+    expect(bodies).toHaveLength(1);
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['refused']);
+    const spoken = mounted.panel.root.textContent ?? '';
+    expect(spoken).toContain(say('proposal.outcome.refused'));
+    // The surface's own words for the refusal, as it reported them, under the reviewed sentence.
+    expect(outcomes[0]?.detail).not.toBe('');
+    expect(spoken).toContain(outcomes[0]?.detail);
+    expect(spoken).not.toContain('Open Customize');
+    expect(spoken).not.toContain(DRAWN.proposal!.spoken);
+    expect(mounted.controller.answer()?.provenance.composed).toBe('unshown');
+    expect(remembered).toHaveLength(1);
+  });
+
+  it('says the change waits in Customize once the authority has shown it there', async () => {
+    const { outcomes, mounted: surface } = await harness();
+    const { mounted, remembered } = companionOver();
+    mounted.summon();
+
+    mounted.controller.say(DRAWN.utterance);
+    await vi.waitFor(() => expect(mounted.controller.answer()).not.toBeNull());
+    await settle();
+
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed']);
+    expect(
+      surface.options.root.querySelector<HTMLElement>('.world-style-proposal-review')?.hidden,
+    ).toBe(false);
+    const spoken = mounted.panel.root.textContent ?? '';
+    expect(spoken).toContain(DRAWN.proposal!.spoken);
+    expect(spoken).toContain(say('proposal.staged'));
+    expect(mounted.controller.answer()?.provenance.composed).toBe('proposed');
+    expect(remembered).toHaveLength(1);
+  });
+});
 
 describe('a staged Companion proposal until the person decides', () => {
   beforeEach(() => {

@@ -11,7 +11,7 @@
 import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v1.json?raw';
 
 /** The entry kinds the catalog holds; a kind outside these is refused when the page loads. */
-const KINDS = ['reason', 'phrase', 'doing', 'outcome', 'event_reason', 'line'] as const;
+const KINDS = ['reason', 'phrase', 'doing', 'outcome', 'event_reason', 'line', 'decision_reason'] as const;
 type Kind = (typeof KINDS)[number];
 
 interface CatalogEntry {
@@ -54,6 +54,13 @@ const fill = (template: string, values: Readonly<Record<string, string | number>
  * `REASON_CODES` in `society_planner.py` states, held to it by society-words-parity.test.ts.
  */
 export const REASON_WORDS: Readonly<Record<string, string>> = TABLES.reason;
+
+/**
+ * Why a person's model was or was not followed, by the reason code the receipt or the minute
+ * records: exactly `DECISION_REASONS` in `society_decision_contract.py`, held to it by
+ * society-models-words-parity.test.ts.
+ */
+export const DECISION_WORDS: Readonly<Record<string, string>> = TABLES.decision_reason;
 
 /** Why, for any code a state or an event records, or the named sentence for one with no words. */
 export function reasonWords(code: string): string {

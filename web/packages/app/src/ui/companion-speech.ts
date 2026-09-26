@@ -1,9 +1,11 @@
 import type { Turn } from '@exulanica/companion-runtime';
-import type {
-  AnswerProvenance,
-  AskUnavailable,
-  CompanionAnswer,
-  ModelCall,
+import {
+  unansweredOf,
+  type AnswerProvenance,
+  type AskUnavailable,
+  type CompanionAnswer,
+  type ModelCall,
+  type UnansweredAttempts,
 } from '../companion-ask-api.js';
 import { contentRowFields } from '../companion-content.js';
 import type { CompanionNames } from '../companion-names.js';
@@ -64,50 +66,68 @@ function duration(latencyMs: number): string {
  */
 export function provenanceSentence(provenance: AnswerProvenance): string {
   const spent = duration(provenance.latencyMs);
-  if (provenance.composed === 'none') return say('provenance.none');
+  switch (provenance.composed) {
+    case 'none':
+      return say('provenance.none');
 
-  if (provenance.composed === 'unreadable') {
-    // Named when a planner call was recorded, unnamed when both attempts raised before any
-    // result reached the recorder. Either way it does not mention a search, because there
-    // wasn't one.
-    return provenance.plannedBy === null
-      ? say('provenance.unreadable')
-      : fill('provenance.unreadableNamed', { model: provenance.plannedBy, duration: spent });
+    case 'unreadable':
+      // Named when a planner call was recorded, unnamed when both attempts raised before any
+      // result reached the recorder. Either way it does not mention a search, because there
+      // wasn't one.
+      return provenance.plannedBy === null
+        ? say('provenance.unreadable')
+        : fill('provenance.unreadableNamed', { model: provenance.plannedBy, duration: spent });
+
+    case 'search':
+      // A model read the question and none wrote the answer. Falling through to
+      // `provenance.none` here, which is what this function used to do whenever no composing
+      // model was named, printed "No model was asked" over every abstention the interface
+      // produced, because the browser sends no plan and the planner therefore always runs.
+      return provenance.plannedBy === null
+        ? say('provenance.none')
+        : fill('provenance.search', { model: provenance.plannedBy, duration: spent });
+
+    case 'undrafted':
+      return say('provenance.undrafted');
+
+    case 'proposed':
+    case 'refused':
+    case 'unshown': {
+      // Each names the model that read the request, and none mentions evidence or a search,
+      // because a proposal is not an answer and nothing was looked at to make one. A refusal can
+      // come after the classifier read the request and before any model drew anything, so it
+      // names the classifier; a proposal, shown or not, is only ever credited to the model that
+      // drew it.
+      const model =
+        provenance.servedModel ?? (provenance.composed === 'refused' ? provenance.plannedBy : null);
+      return model === null
+        ? say('provenance.proposalNone')
+        : fill(`provenance.${provenance.composed}`, { model, duration: spent });
+    }
+
+    case 'discarded':
+      return provenance.servedModel === null
+        ? fill('provenance.discardedUnnamed', { duration: spent })
+        : fill('provenance.discarded', { model: provenance.servedModel, duration: spent });
+
+    // What became of a proposal: a person or the world decided it, and no model did. There was
+    // no search either, so the line says only that.
+    case 'outcome':
+      return say('provenance.proposalNone');
+
+    // The person's own words. Naming a model over them would credit it with their sentence.
+    case 'corrected':
+      return say('provenance.corrected');
+
+    case 'model': {
+      if (provenance.servedModel === null) return say('provenance.none');
+      const values = { model: provenance.servedModel, duration: spent };
+      return fill(
+        provenance.usedFallback ? 'provenance.modelOnFallback' : 'provenance.model',
+        values,
+      );
+    }
   }
-
-  if (provenance.composed === 'search') {
-    // A model read the question and none wrote the answer. Falling through to
-    // `provenance.none` here, which is what this function used to do whenever no composing
-    // model was named, printed "No model was asked" over every abstention the interface
-    // produced, because the browser sends no plan and the planner therefore always runs.
-    return provenance.plannedBy === null
-      ? say('provenance.none')
-      : fill('provenance.search', { model: provenance.plannedBy, duration: spent });
-  }
-
-  if (provenance.composed === 'undrafted') return say('provenance.undrafted');
-
-  if (provenance.composed === 'proposed' || provenance.composed === 'refused') {
-    // Both name the model that read the request, and neither mentions evidence or a search,
-    // because a proposal is not an answer and nothing was looked at to make one. A refusal can
-    // come after the classifier read the request and before any model drew anything, so it
-    // names the classifier; a proposal is only ever credited to the model that drew it.
-    const model =
-      provenance.servedModel ?? (provenance.composed === 'refused' ? provenance.plannedBy : null);
-    return model === null
-      ? say('provenance.proposalNone')
-      : fill(`provenance.${provenance.composed}`, { model, duration: spent });
-  }
-
-  if (provenance.composed === 'discarded') {
-    return provenance.servedModel === null
-      ? fill('provenance.discardedUnnamed', { duration: spent })
-      : fill('provenance.discarded', { model: provenance.servedModel, duration: spent });
-  }
-
-  if (provenance.servedModel === null) return say('provenance.none');
-  const values = { model: provenance.servedModel, duration: spent };
-  return fill(provenance.usedFallback ? 'provenance.modelOnFallback' : 'provenance.model', values);
 }
 
 /**
@@ -117,13 +137,27 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
  * have to guess that the twelve seconds included a model that timed out first. Whether their cost
  * is known comes from the record, never from the failure's own words.
  */
-export function unansweredSentence(calls: readonly ModelCall[]): string {
-  const unanswered = calls.filter((call) => call.outcome !== 'completed');
-  if (unanswered.length === 0) return '';
-  const count = fill('provenance.unanswered', { count: String(unanswered.length) });
-  return unanswered.some((call) => call.costBasis === 'unknown')
-    ? `${count} ${say('provenance.costUnknown')}`
-    : count;
+export function unansweredSentence(unanswered: UnansweredAttempts): string {
+  if (unanswered.attempts === 0) return '';
+  const count = fill('provenance.unanswered', { count: String(unanswered.attempts) });
+  return unanswered.costUnknown ? `${count} ${say('provenance.costUnknown')}` : count;
+}
+
+/**
+ * The paragraph drawn under an answer: who wrote it, and what its unanswered requests came to.
+ *
+ * One function for a fresh answer and a remembered one, and what it reads is what each keeps: a
+ * fresh answer's calls say what went unanswered, and a remembered one, which executed nothing,
+ * carries the count that was kept with it. So the paragraph is drawn again exactly as it was
+ * first drawn.
+ */
+export function provenanceParagraph(answer: CompanionAnswer): string {
+  return [
+    provenanceSentence(answer.provenance),
+    unansweredSentence(answer.unanswered ?? unansweredOf(answer.calls)),
+  ]
+    .filter((sentence) => sentence !== '')
+    .join(' ');
 }
 
 /**
@@ -314,9 +348,7 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
 
     content.push(el('p', {
       class: 'companion-provenance',
-      text: [provenanceSentence(answer.provenance), unansweredSentence(answer.calls)]
-        .filter((sentence) => sentence !== '')
-        .join(' '),
+      text: provenanceParagraph(answer),
     }));
 
     root.dataset['mode'] = 'answer';

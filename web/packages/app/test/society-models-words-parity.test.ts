@@ -2,7 +2,8 @@
 // of words is held here to the Python source that states the codes.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { CHOICE_REFUSAL_WORDS, DECISION_WORDS, HOST_REFUSAL_WORDS, MODEL_REFUSAL_WORDS } from '../src/ui/society-models.js';
+import { DECISION_WORDS } from '../src/society-inhabitant-words.js';
+import { CHOICE_REFUSAL_WORDS, HOST_REFUSAL_WORDS, MODEL_REFUSAL_WORDS } from '../src/ui/society-models.js';
 
 const REPOSITORY = new URL('../../../../', import.meta.url);
 const python = (path: string): string => readFileSync(new URL(path, REPOSITORY), 'utf8');

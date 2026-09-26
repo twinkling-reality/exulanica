@@ -179,6 +179,11 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     'Nothing has changed yet. Open Customize to look at it, then Apply it or throw it away.',
   'proposal.unavailable':
     'That change could not be put in front of you, so nothing was proposed and nothing changed.',
+  // The authority did not say in time whether it can show the change. It may still arrive, so
+  // the sentence describing it stays above this one.
+  'proposal.unconfirmed':
+    'Customize has not confirmed that it can show this change. It may still appear there, and '
+    + 'nothing changes unless you apply it.',
 
   // A request to change how the world looks that produced no proposal. Seven different facts,
   // and none of them is silence: somebody asked for something and the reply has to say what
@@ -292,6 +297,9 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   // and nothing was looked at, and the second sentence is the one a person needs.
   'provenance.proposed':
     '{model} drew this change in {duration}. Nothing is applied until you apply it.',
+  // A model drew a change that was never shown: refused by the world, or with nowhere to show it.
+  'provenance.unshown':
+    '{model} drew this change in {duration}. It was never shown, so nothing changed.',
   // A model read the request and the reviewed design has no way to make that change. Saying
   // anything about evidence here would be false, because none was read.
   'provenance.refused':
@@ -299,6 +307,8 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'provenance.none': 'No model was asked. This is what the search found.',
   // A proposal or a refusal with no model to name. There was no search, so none is mentioned.
   'provenance.proposalNone': 'No model was asked.',
+  // A correction: the person's own words about an answer that was wrong.
+  'provenance.corrected': 'You wrote this, correcting an earlier answer.',
   // A model was asked to draw the change and no reply it gave could be read. Unnamed, because no
   // draft call returned a result to name, and not the design-limit sentence above.
   'provenance.undrafted':

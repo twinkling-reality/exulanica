@@ -12300,6 +12300,22 @@
       "minimum": 0.0,
       "title": "Latency Ms"
      },
+     "composed": {
+      "$ref": "#/components/schemas/AnswerComposed"
+     },
+     "used_fallback": {
+      "type": "boolean",
+      "title": "Used Fallback"
+     },
+     "unanswered_attempts": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Unanswered Attempts"
+     },
+     "unanswered_cost_unknown": {
+      "type": "boolean",
+      "title": "Unanswered Cost Unknown"
+     },
      "citations": {
       "items": {
        "$ref": "#/components/schemas/CitationBody"
@@ -12328,7 +12344,11 @@
      "question",
      "answer_text",
      "prompt_version",
-     "latency_ms"
+     "latency_ms",
+     "composed",
+     "used_fallback",
+     "unanswered_attempts",
+     "unanswered_cost_unknown"
     ],
     "title": "AnswerBody",
     "description": "An answer that has already rendered, handed back so a reload can show it again.\n\nEvery model field is what the response said, never what the manifest says.\n`companion-question.md` 4: a record derived from configuration reports a fallback wrongly and\nsilently, and this is the record."
@@ -12370,6 +12390,24 @@
      "type"
     ],
     "title": "AnswerClause"
+   },
+   "AnswerComposed": {
+    "type": "string",
+    "enum": [
+     "model",
+     "discarded",
+     "search",
+     "unreadable",
+     "proposed",
+     "refused",
+     "undrafted",
+     "unshown",
+     "none",
+     "outcome",
+     "corrected"
+    ],
+    "title": "AnswerComposed",
+    "description": "What kind of answer a row is, which decides the line it is drawn under.\n\nThe page's ``COMPOSED_KINDS`` (web/packages/companion-runtime/src/memory.ts) states the same\nset, and migration 0112's ``companion_answer_composed_known`` holds the column to it; both\ncopies are held equal to this one by tests. A correction is ``CORRECTED`` and nothing else is."
    },
    "AnswerOrigin": {
     "type": "string",
@@ -25293,6 +25331,28 @@
       },
       "type": "object",
       "title": "Names"
+     },
+     "composed": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AnswerComposed"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "used_fallback": {
+      "type": "boolean",
+      "title": "Used Fallback"
+     },
+     "unanswered_attempts": {
+      "type": "integer",
+      "title": "Unanswered Attempts"
+     },
+     "unanswered_cost_unknown": {
+      "type": "boolean",
+      "title": "Unanswered Cost Unknown"
      }
     },
     "additionalProperties": false,
@@ -25313,7 +25373,11 @@
      "supersedes",
      "correction_note",
      "citations",
-     "names"
+     "names",
+     "composed",
+     "used_fallback",
+     "unanswered_attempts",
+     "unanswered_cost_unknown"
     ],
     "title": "AnswerView"
    },

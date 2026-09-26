@@ -22,16 +22,16 @@ const read = (overrides: Record<string, unknown> = {}) => ({
   takes_model_choices: true, host_refusal: null,
   contract: { versions: {}, sha256: 'c'.repeat(64), model_people_maximum: 8 },
   models: [{
-    provider: 'nebius_token_factory', model_id: MODEL,
+    provider: 'nebius_token_factory', model_id: MODEL, name: 'Nemotron 3 Nano 30B',
     description: 'Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.',
     provider_description: 'Nebius Token Factory, which serves open models.',
     mechanism: 'tool_call', usd_per_mtok: { input: '0.06', output: '0.24' }, refusal: null,
   }],
-  choices: [{ subject_id: 'ada', model: { provider: 'nebius_token_factory', model_id: MODEL }, choice_seq: 1,
+  choices: [{ subject_id: 'ada', model: { provider: 'nebius_token_factory', model_id: MODEL, name: 'Nemotron 3 Nano 30B' }, choice_seq: 1,
     chosen_by: 'owner', recorded_at: '2026-09-25T10:00:00Z', refusal: null }],
   latest: [{ subject_id: 'ada', decision_seq: 3, base_tick: 6, consumed_tick: 7, provider: 'nebius_token_factory',
-    model_id: MODEL, status: 'accepted', reason: 'validated_choice', disposition: 'applied', disposition_reason: 'validated_choice', chose: 'rest, 4 m away' }],
-  by_model: [{ provider: 'nebius_token_factory', model_id: MODEL, decisions: 5, asked: 5, accepted: 4, applied: 3,
+    model_id: MODEL, name: 'Nemotron 3 Nano 30B', status: 'accepted', reason: 'validated_choice', disposition: 'applied', disposition_reason: 'validated_choice', chose: 'rest, 4 m away' }],
+  by_model: [{ provider: 'nebius_token_factory', model_id: MODEL, name: 'Nemotron 3 Nano 30B', decisions: 5, asked: 5, accepted: 4, applied: 3,
     by_reason: { validated_choice: 4, model_timed_out: 1 },
     by_disposition: { applied: 3, rejected: 1, unavailable: 1 },
     not_acted_on: { model_timed_out: 1, place_taken_this_minute: 1 },
@@ -41,6 +41,16 @@ const read = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('reading who decides', () => {
+  it('calls a model by the name the server gives it, even one this host no longer offers', () => {
+    // The Companion names a model by the same rule (`Manifest.model_name`), so the two never
+    // disagree: a choice and a decision by a withdrawn model are not called by its identifier.
+    const view = parseSocietyModels(read({ models: [] }));
+    expect(choiceWords(view, 'ada')).toBe('Nemotron 3 Nano 30B, which you chose.');
+    expect(latestDecisionWords(view.latest[0]!)).toContain('Nemotron 3 Nano 30B chose');
+    expect(summaryWords(view.byModel[0]!)).toMatch(/^Nemotron 3 Nano 30B: /);
+    expect(() => parseSocietyModels(read({ latest: [{ ...read().latest[0], name: undefined }] }))).toThrow();
+  });
+
   it('reads the route exactly, and refuses a read that is not one', () => {
     const view = parseSocietyModels(read());
     expect(view.models[0]).toMatchObject({ modelId: MODEL, mechanism: 'tool_call', refusal: null });
@@ -53,25 +63,25 @@ describe('reading who decides', () => {
     const view = parseSocietyModels(read());
     expect(choiceWords(view, 'ada')).toBe('Nemotron 3 Nano 30B, which you chose.');
     expect(choiceWords(view, 'grace')).toBe('Their own routine.');
-    expect(latestDecisionWords(view.models, view.latest[0]!))
+    expect(latestDecisionWords(view.latest[0]!))
       .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and they did it.');
-    expect(latestDecisionWords(view.models, { ...view.latest[0]!, disposition: 'rejected', dispositionReason: 'place_taken_this_minute' }))
+    expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'rejected', dispositionReason: 'place_taken_this_minute' }))
       .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but someone else took that place first, so their routine decided.');
-    expect(latestDecisionWords(view.models, { ...view.latest[0]!, status: 'unavailable', reason: 'model_timed_out', disposition: 'unavailable', chose: null }))
+    expect(latestDecisionWords({ ...view.latest[0]!, status: 'unavailable', reason: 'model_timed_out', disposition: 'unavailable', chose: null }))
       .toBe('At simulated minute 7, their routine decided: Nemotron 3 Nano 30B was not followed because it did not answer in time.');
     // A request closed after its minute is told by the minute the routine decided, not the later
     // minute that took up its receipt.
-    expect(latestDecisionWords(view.models, { ...view.latest[0]!, baseTick: 6, consumedTick: 9, status: 'unavailable',
+    expect(latestDecisionWords({ ...view.latest[0]!, baseTick: 6, consumedTick: 9, status: 'unavailable',
       reason: 'unanswered_in_its_minute', disposition: 'unavailable', dispositionReason: null, chose: null }))
       .toBe('At simulated minute 7, their routine decided: Nemotron 3 Nano 30B was not followed because this server '
         + 'stopped before it heard the answer.');
     // A person's own request, or another decision, came first: neither is their routine.
-    expect(latestDecisionWords(view.models, { ...view.latest[0]!, disposition: 'superseded', dispositionReason: 'person_asked_directly' }))
+    expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'superseded', dispositionReason: 'person_asked_directly' }))
       .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but you asked them to go somewhere yourself, and that came first.');
-    expect(latestDecisionWords(view.models, { ...view.latest[0]!, disposition: 'superseded', dispositionReason: 'subject_already_decided' }))
+    expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'superseded', dispositionReason: 'subject_already_decided' }))
       .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but something else already decided for them this minute, and that came first.');
     // Every decision not acted on is counted once, under why.
-    expect(summaryWords(view.models, view.byModel[0]!)).toBe(
+    expect(summaryWords(view.byModel[0]!)).toBe(
       'Nemotron 3 Nano 30B: 5 decisions, 3 acted on, 2 not acted on (1 because it did not answer in time; '
       + '1 because someone else took that place first). Half its answers came within 1.2 s, 95 in 100 within 2.9 s. '
       + 'Cost $0.000420.',

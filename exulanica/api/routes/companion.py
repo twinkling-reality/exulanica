@@ -36,6 +36,7 @@ from exulanica.world.companion_memory import (
     DEFAULT_RECENT_LIMIT,
     MAX_RECENT_LIMIT,
     AnswerCitation,
+    AnswerComposed,
     AnswerOrigin,
     CompanionAnswer,
     CompanionEscape,
@@ -110,6 +111,16 @@ class AnswerBody(BaseModel):
     planned_by: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     prompt_version: Annotated[str, Field(min_length=1, max_length=64)]
     latency_ms: Annotated[int, Field(ge=0)]
+    #: What kind of answer the page drew, which decides the line it is drawn under again. Required,
+    #: because a kind this route guessed would redraw a proposal as an answer; never ``corrected``,
+    #: which only the corrections route records.
+    composed: AnswerComposed
+    #: Whether the model that answered was its role's fallback, as the answer's calls said.
+    used_fallback: bool
+    #: How many of the answer's requests returned no answer, and whether any of their costs is
+    #: unknown, as the answer's calls said.
+    unanswered_attempts: Annotated[int, Field(ge=0)]
+    unanswered_cost_unknown: bool
     citations: Annotated[list[CitationBody], Field(max_length=_MAX_CITATIONS)] = Field(
         default_factory=list
     )
@@ -175,6 +186,12 @@ class AnswerView(BaseModel):
     #: Each placeholder the answer text carries and the entity it stood for. The browser draws each
     #: name from the account holder's library when the answer is drawn, never from here.
     names: dict[str, uuid.UUID]
+    #: What kind of answer it was. Null only on an answer kept before the kind was kept, whose kind
+    #: the browser derives from the fields above.
+    composed: AnswerComposed | None
+    used_fallback: bool
+    unanswered_attempts: int
+    unanswered_cost_unknown: bool
 
 
 class EscapeView(BaseModel):
@@ -248,6 +265,10 @@ def record_answer(body: AnswerBody, repository: WriteMemory) -> AnswerView | JSO
                 planned_by=body.planned_by,
                 prompt_version=body.prompt_version,
                 latency_ms=body.latency_ms,
+                composed=body.composed,
+                used_fallback=body.used_fallback,
+                unanswered_attempts=body.unanswered_attempts,
+                unanswered_cost_unknown=body.unanswered_cost_unknown,
                 citations=tuple(
                     AnswerCitation(
                         span_id=citation.span_id,
@@ -357,6 +378,10 @@ def _answer_view(answer: CompanionAnswer) -> AnswerView:
             for citation in answer.citations
         ],
         names=dict(answer.names),
+        composed=answer.composed,
+        used_fallback=answer.used_fallback,
+        unanswered_attempts=answer.unanswered_attempts,
+        unanswered_cost_unknown=answer.unanswered_cost_unknown,
     )
 
 

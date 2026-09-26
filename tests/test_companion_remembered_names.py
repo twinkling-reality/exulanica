@@ -22,6 +22,7 @@ from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.errors import TombstonedError
 from exulanica.identity import IdentityRepository, name_occurrence
 from exulanica.world.companion_memory import (
+    AnswerComposed,
     CompanionMemoryRepository,
     InvalidCompanionMemory,
     RecordedAnswer,
@@ -47,6 +48,10 @@ def _answer(**over) -> RecordedAnswer:
         "prompt_version": "selection-7",
         "latency_ms": 1200,
         "citations": (),
+        "composed": AnswerComposed.MODEL,
+        "used_fallback": False,
+        "unanswered_attempts": 0,
+        "unanswered_cost_unknown": False,
     }
     fields.update(over)
     return RecordedAnswer(**fields)
@@ -213,6 +218,10 @@ _BODY = {
     "answer_text": "[person A] is in this photograph.",
     "prompt_version": "selection-7",
     "latency_ms": 900,
+    "composed": "none",
+    "used_fallback": False,
+    "unanswered_attempts": 0,
+    "unanswered_cost_unknown": False,
 }
 
 

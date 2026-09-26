@@ -81,8 +81,9 @@ PROMPT_VERSION: Final = "society-person-choice/v1"
 #: (``chosen_by_their_model``), never the one a person's own request gives.
 CHOSEN_BY_MODEL: Final = "model"
 #: Every reason a person's decision receipt, or the minute that consumed it, records, by code. The
-#: page has words for exactly these (``DECISION_WORDS`` in
-#: web/packages/app/src/ui/society-models.ts, held to this set by a parity test).
+#: words catalog has words for exactly these (its ``decision_reason`` entries, which the page reads
+#: as ``DECISION_WORDS``), held to this set by tests/test_companion_decision_model.py and
+#: society-models-words-parity.test.ts.
 DECISION_REASONS: Final = frozenset(
     {
         # The model answered with one of the options, and it held when the minute ran.

@@ -2,10 +2,11 @@ import {
   findOption,
   type CompanionSession,
   type ConfirmationSummary,
+  type DraftOp,
   type SelectionOutcome,
   type Turn,
 } from '@exulanica/companion-runtime';
-import type { EvidenceHandle, GraphSnapshot } from '@exulanica/graph-client';
+import type { EvidenceHandle, GraphSnapshot, UpdateProposal } from '@exulanica/graph-client';
 import { AskUnavailable, type CompanionAnswer } from './companion-ask-api.js';
 import type { CompanionEncounter } from './ui/companion-encounter.js';
 import { say } from './ui/copy.js';
@@ -29,7 +30,9 @@ import { say } from './ui/copy.js';
  * draft; when the parser finds no change in the words, `companion-runtime` refuses, and until now
  * that refusal was the end of it. But "when were these taken" is not a malformed answer, it is a
  * question, and `POST /selection/ask` has always been able to answer it. So a refusal that means
- * THE WORDS DESCRIBE NO CHANGE is routed to the answer path instead.
+ * THE WORDS DESCRIBE NO CHANGE is routed to the answer path instead, and so is a staged draft of
+ * notes alone whose words do not answer the open question (`NOTE`, `answersOpenQuestion`): it is
+ * cancelled, which writes nothing, and asked.
  *
  * That branch cannot write and the shape of it is why: `askQuestion` returns a
  * `CompanionAnswer`, nothing here or downstream turns one into a `ProposalDraft`, and
@@ -59,6 +62,59 @@ const QUESTION_REFUSALS: ReadonlySet<string> = new Set([
   'refused.couldNotParse',
   'refused.noSubject',
 ]);
+
+/**
+ * What the parser makes of words it found no name and no relation in: everything after the first
+ * comma, kept as a note (`draftFromParse` in `companion-runtime/src/parse.ts`).
+ *
+ * So any sentence with a comma is staged, and a question typed while a turn is open ("Make the
+ * light warmer where she stands, and say who stands there") became a note to record, behind a
+ * confirmation, instead of being asked. A draft of notes alone is therefore read as a question,
+ * the way a refusal that means "these words describe no change" is: the draft is cancelled, which
+ * writes nothing, and the words are asked.
+ */
+const NOTE: DraftOp = 'note';
+
+/**
+ * The open turns whose question a person answers in their own words, where a draft of notes alone
+ * is the answer and is kept as one.
+ *
+ * "How do you know them?" is one: "we met at work, years ago" carries no relation word the parser
+ * knows, and it is exactly the context a note exists to keep. Every other open turn asks for a
+ * name, a scope or a decision, which a note does not give.
+ */
+const ANSWERED_IN_NOTES: ReadonlySet<string> = new Set(['utterance.relation']);
+
+/**
+ * The open turns whose question a yes or a no answers, and how such an answer opens.
+ *
+ * The parser reads a name, a relation word and whatever follows a first comma, and keeps no yes or
+ * no, so "No, that's her daughter" typed at "Is this the same person as the one in the earlier
+ * photograph?" is a draft of notes alone. It answers the open question all the same, so it is
+ * staged as the note it is, for the person to confirm, rather than asked.
+ */
+const ANSWERED_YES_OR_NO: ReadonlySet<string> = new Set([
+  'utterance.resolveIdentity',
+  'utterance.confirmContinuity',
+]);
+const OPENS_WITH_YES_OR_NO = /^\s*(?:yes|yeah|yep|no|nope|not)\b/iu;
+
+/** Whether words typed on the open turn answer its own question, so the note they make is kept. */
+function answersOpenQuestion(text: string, turn: Turn | null): boolean {
+  const key = turn?.utteranceKey ?? '';
+  return (
+    ANSWERED_IN_NOTES.has(key)
+    || (ANSWERED_YES_OR_NO.has(key) && OPENS_WITH_YES_OR_NO.test(text))
+  );
+}
+
+/** A staged proposal of notes alone, which records no name, relation or decision. */
+function onlyNotes(proposal: UpdateProposal): boolean {
+  return (
+    proposal.operations.length > 0
+    && proposal.operations.every((operation) => operation.op === NOTE)
+  );
+}
 
 export interface CompanionControllerOptions {
   readonly companion: CompanionSession;
@@ -212,6 +268,17 @@ export function createCompanionController(
       QUESTION_REFUSALS.has(outcome.reasonKey) &&
       options.askQuestion !== undefined
     ) {
+      void ask(text);
+      return;
+    }
+    if (
+      outcome.kind === 'awaiting_confirmation' &&
+      onlyNotes(outcome.proposal) &&
+      !answersOpenQuestion(text, turn) &&
+      options.askQuestion !== undefined
+    ) {
+      // Nothing was written: a staged proposal is only held until it is confirmed.
+      companion.cancel(outcome.proposal.proposalId);
       void ask(text);
       return;
     }

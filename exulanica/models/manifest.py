@@ -357,6 +357,21 @@ class Manifest:
         except KeyError as exc:
             raise ManifestError(f"{model_id!r} is not declared in the manifest") from exc
 
+    def model_name(self, model_id: str) -> str:
+        """The name a person reads for a model: its description up to its first comma, or its
+        identifier when this manifest does not declare it.
+
+        The one rule. ``GET /world/versions/{version_id}/society/models`` serves it as each
+        offered model's ``name``, which the People panel shows, and the Companion names the model
+        behind a person's decision by it (``exulanica/selection/society_question.py``), so one
+        model is never called two things.
+        """
+        spec = self.models.get(model_id)
+        if spec is None:
+            return model_id
+        comma = spec.description.find(",")
+        return spec.description[:comma] if comma > 0 else spec.description
+
     def provider(self, provider_id: str) -> Provider:
         """The provider with this key, or a refusal naming what was asked for."""
         try:

@@ -41,7 +41,15 @@ import type {
   PersistedEscape,
   PersistedMemory,
 } from '@exulanica/companion-runtime';
-import type { CompanionAnswer } from './companion-ask-api.js';
+import {
+  REFUSAL_CODES,
+  isComposed,
+  unansweredOf,
+  type CompanionAnswer,
+  type Composed,
+  type UnansweredAttempts,
+} from './companion-ask-api.js';
+import { say } from './ui/copy.js';
 
 /**
  * An ordinary indexed read, and the deadline says so.
@@ -127,6 +135,11 @@ interface WireAnswer {
   readonly citations: readonly WireCitation[];
   /** Each placeholder the answer carries and the entity it stood for. Ids only. */
   readonly names?: Readonly<Record<string, string>>;
+  /** Null on an answer kept before the kind was kept. */
+  readonly composed: string | null;
+  readonly used_fallback: boolean;
+  readonly unanswered_attempts: number;
+  readonly unanswered_cost_unknown: boolean;
 }
 
 interface WireEscape {
@@ -171,6 +184,15 @@ export interface AnswerToRemember {
    * sent, because they are read from the library when the answer is drawn.
    */
   readonly names: Readonly<Record<string, string>>;
+  /**
+   * What kind of answer was drawn, and the two facts its line states beside it: whether the model
+   * that answered was a fallback, and the requests that returned no answer. Kept so a reload draws
+   * the same line (`provenanceParagraph` in `ui/companion-speech.ts`).
+   */
+  readonly composed: Composed;
+  readonly usedFallback: boolean;
+  readonly unansweredAttempts: number;
+  readonly unansweredCostUnknown: boolean;
 }
 
 /** One escape, as `CompanionSession` recorded it against the turn it was taken on. */
@@ -258,6 +280,22 @@ function namesOf(wire: WireAnswer): Readonly<Record<string, string>> {
   return Object.freeze(names);
 }
 
+/**
+ * The kind of answer a row says it is, refused when it is not one this page draws.
+ *
+ * A closed set, as the escape kind is (`escapeOf`), and for the same reason: `provenanceSentence`
+ * switches over it with no default, and a kind drawn under a line guessed for it would say
+ * something false about who wrote the answer. Null is the row kept before the kind was kept, which
+ * `rememberedAsAnswer` derives.
+ */
+function composedOf(kind: string | null | undefined): Composed | null {
+  if (kind === null || kind === undefined) return null;
+  if (!isComposed(kind)) {
+    throw new MemoryUnavailable('unreadable', `The server described an answer's kind as ${kind}.`);
+  }
+  return kind;
+}
+
 function answerOf(wire: WireAnswer): PersistedAnswer {
   const abstained = wire.abstained;
   return Object.freeze({
@@ -280,6 +318,10 @@ function answerOf(wire: WireAnswer): PersistedAnswer {
     correctionNote: wire.correction_note,
     citations: Object.freeze((wire.citations ?? []).map(citationOf)),
     names: namesOf(wire),
+    composed: composedOf(wire.composed),
+    usedFallback: wire.used_fallback === true,
+    unansweredAttempts: wire.unanswered_attempts ?? 0,
+    unansweredCostUnknown: wire.unanswered_cost_unknown === true,
   });
 }
 
@@ -377,6 +419,10 @@ export class CompanionMemoryClient {
       planned_by: answer.plannedBy,
       prompt_version: answer.promptVersion,
       latency_ms: Math.round(answer.latencyMs),
+      composed: answer.composed,
+      used_fallback: answer.usedFallback,
+      unanswered_attempts: answer.unansweredAttempts,
+      unanswered_cost_unknown: answer.unansweredCostUnknown,
       citations: answer.citations.map((citation) => ({
         span_id: citation.spanId,
         capture_id: citation.captureId,
@@ -480,7 +526,19 @@ export function answerToRemember(answer: CompanionAnswer): AnswerToRemember {
     latencyMs: answer.provenance.latencyMs,
     citations,
     names: answer.names ?? {},
+    composed: answer.provenance.composed,
+    usedFallback: answer.provenance.usedFallback,
+    // What the line under it said, from the calls it executed, or from what a remembered answer
+    // kept: the same reading `provenanceParagraph` draws from.
+    ...attemptsOf(answer.unanswered ?? unansweredOf(answer.calls)),
   };
+}
+
+function attemptsOf(unanswered: UnansweredAttempts): {
+  readonly unansweredAttempts: number;
+  readonly unansweredCostUnknown: boolean;
+} {
+  return { unansweredAttempts: unanswered.attempts, unansweredCostUnknown: unanswered.costUnknown };
 }
 
 /**
@@ -533,21 +591,71 @@ export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer
     content: { rows: [], placeConfirmed: false, totalMatched: 0 },
     ...(Object.keys(remembered.names).length === 0 ? {} : { names: remembered.names }),
     provenance: {
-      // A correction has no composing model, and a restored one must not borrow the model that
-      // wrote the sentence it replaced. `servedModel` null is what the provenance line reads as
-      // "no model wrote this", which is true of a correction and is the honest thing to show.
-      composed: remembered.servedModel === null ? 'none' : 'model',
+      // The kind it was drawn as, so it is drawn under the same line: a proposal is never redrawn
+      // as an answer, nor a correction under a model's name.
+      composed: remembered.composed ?? keptBeforeItsKind(remembered),
       servedModel: remembered.servedModel,
       plannedBy: remembered.plannedBy,
       latencyMs: remembered.latencyMs,
-      // Not stored, because it is a property of the request rather than of the answer, and a
-      // restored answer made no request. False is the honest default: it claims nothing.
-      usedFallback: false,
+      usedFallback: remembered.usedFallback,
     },
     promptVersion: remembered.promptVersion,
     // Empty, and this is the one that must not be faked. `calls` is the record of what was
     // executed, and a restored answer executed nothing. An invented entry here would put a
-    // latency and a token count into the execution block for a call that never happened.
+    // latency and a token count into the execution block for a call that never happened. What
+    // its unanswered requests came to is what was kept with it instead.
     calls: [],
+    unanswered: {
+      attempts: remembered.unansweredAttempts,
+      costUnknown: remembered.unansweredCostUnknown,
+    },
   };
+}
+
+/**
+ * The prompt version an outcome row is kept under (`outcomeAnswer` in `composition/companion.ts`).
+ * An outcome is decided by a person or the world, never a model, so no model prompt names it.
+ */
+export const PROPOSAL_OUTCOME_PROMPT = 'proposal-outcome';
+
+/**
+ * The prompt versions the appearance drafter records, `PROMPT_VERSION` in
+ * `exulanica/selection/proposal.py` (`proposal-3` and the versions before it), held to that source
+ * by `companion-remembered-provenance.test.ts`.
+ */
+const DRAFTER_PROMPT = /^proposal-\d+$/;
+
+/**
+ * The kind of an answer kept before the kind was kept (migration 0112), from what its row holds.
+ *
+ * Those rows keep who wrote the sentence and how it was asked, and each kind leaves its own trace
+ * there: a correction its origin, what became of a proposal its prompt version, a drafter's reply
+ * its prompt version and the reviewed sentence a refusal opens with, and a question the rules
+ * `provenanceOf` in `companion-ask-api.ts` drew it by. What those rows did not keep is read as
+ * nothing: no fallback model, and no request that went unanswered.
+ */
+function keptBeforeItsKind(remembered: PersistedAnswer): Composed {
+  if (remembered.origin === 'correction') return 'corrected';
+  if (remembered.promptVersion === PROPOSAL_OUTCOME_PROMPT) return 'outcome';
+  if (DRAFTER_PROMPT.test(remembered.promptVersion)) {
+    const opens = (key: string): boolean => remembered.answerText.startsWith(say(key));
+    if (opens('proposal.refused.not_drafted')) return 'undrafted';
+    if (REFUSAL_CODES.some((code) => opens(`proposal.refused.${code}`))) return 'refused';
+    // A refusal whose sentence has since been reworded opens with neither: the drafter's name is
+    // on a proposal, and a refusal before any draft names none.
+    return remembered.servedModel === null ? 'refused' : 'proposed';
+  }
+  if (remembered.abstained === 'UNANSWERABLE_NOT_UNDERSTOOD') return 'unreadable';
+  // No model was asked, which a fresh answer says by having no calls (`provenanceOf`), and which is
+  // checked before `deterministic` as it is there: a content plan answered from its rows and a city
+  // selection with no place bridge are deterministic and asked nobody.
+  if (
+    remembered.servedModel === null && remembered.plannedBy === null && remembered.latencyMs === 0
+  ) {
+    return 'none';
+  }
+  if (remembered.deterministic) return 'discarded';
+  if (remembered.servedModel !== null) return 'model';
+  if (remembered.plannedBy !== null) return 'search';
+  return 'none';
 }

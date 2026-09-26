@@ -216,6 +216,10 @@ describe('a restored answer keeps what was stored and invents nothing', () => {
     correctionNote: null,
     citations: [{ spanId: 'span-a', captureId: 'capture-a', ordinal: 0 }],
     names: {},
+    composed: 'model' as const,
+    usedFallback: false,
+    unansweredAttempts: 0,
+    unansweredCostUnknown: false,
   };
 
   it('carries the sentence, the model and the citations, and claims no executed calls', () => {
@@ -237,10 +241,10 @@ describe('a restored answer keeps what was stored and invents nothing', () => {
       supersedes: 'answer-0',
       servedModel: null,
       answerText: 'No, the spring ones.',
+      composed: 'corrected',
     });
     expect(correction.provenance.servedModel).toBeNull();
-    // The provenance line reads this as "no model wrote this", which is exactly true of a
-    // sentence the person typed themselves.
-    expect(correction.provenance.composed).toBe('none');
+    // The line says the person wrote it, which is exactly true of a sentence they typed.
+    expect(correction.provenance.composed).toBe('corrected');
   });
 });

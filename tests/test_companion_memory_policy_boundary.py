@@ -32,7 +32,11 @@ from pathlib import Path
 
 import pytest
 from exulanica.db.session import set_workspace
-from exulanica.world.companion_memory import CompanionMemoryRepository, RecordedAnswer
+from exulanica.world.companion_memory import (
+    AnswerComposed,
+    CompanionMemoryRepository,
+    RecordedAnswer,
+)
 from exulanica.world.errors import InvalidInteractionData
 from exulanica.world.interaction import InteractionProposal
 from exulanica.world.interaction_repository import (
@@ -133,6 +137,10 @@ def test_a_stored_question_is_still_refused_as_durable_policy_input(repository):
             prompt_version="selection-3",
             latency_ms=10094,
             citations=(),
+            composed=AnswerComposed.MODEL,
+            used_fallback=False,
+            unanswered_attempts=0,
+            unanswered_cost_unknown=False,
         )
     )
 

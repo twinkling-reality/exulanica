@@ -55,6 +55,7 @@ export { ESCAPE_ORDER, escapeDraft, escapeOption, escapeOptions } from './escape
 
 export type {
   AbstentionCode,
+  AnswerComposed,
   AnswerOrigin,
   CompanionMemory,
   EscapeRecord,
@@ -67,6 +68,7 @@ export type {
   TranscriptEntry,
 } from './memory.js';
 export {
+  COMPOSED_KINDS,
   DAY_MS,
   EMPTY_MEMORY,
   EMPTY_PERSISTED_MEMORY,

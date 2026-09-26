@@ -68,6 +68,10 @@ function answer(over: Partial<PersistedAnswer> = {}): PersistedAnswer {
     correctionNote: null,
     citations: [],
     names: {},
+    composed: 'model',
+    usedFallback: false,
+    unansweredAttempts: 0,
+    unansweredCostUnknown: false,
     ...over,
   };
 }
@@ -219,6 +223,7 @@ describe('the answers that still stand', () => {
       supersedes: 'answer-1',
       servedModel: null,
       correctionNote: 'Wrong roll.',
+      composed: 'corrected',
     });
     const standing = standingAnswers(persisted({ answers: [original, correction] }));
     expect(standing.map((a) => a.answerId)).toEqual(['answer-2']);

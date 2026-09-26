@@ -32,6 +32,7 @@
  */
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
+import { COMPOSED_KINDS, type AnswerComposed } from '@exulanica/companion-runtime';
 import type { EvidenceHandle } from '@exulanica/graph-client';
 import { parseContentSurface, type CompanionContentSurface } from './companion-content.js';
 import { worldPath } from './world-scope.js';
@@ -136,44 +137,39 @@ export interface Execution {
 }
 
 /**
- * Who wrote the sentence on the screen, which is not always a model.
+ * Who wrote the sentence on the screen, which is not always a model: the kinds of answer, each of
+ * which is drawn under its own line (`provenanceSentence` in `ui/companion-speech.ts`).
  *
- * `discarded` is the case worth naming. `architecture-overview.md` 5.3 makes the deterministic
- * answer "a first-class output, not an error page": when the composer fails validation twice its
- * output is thrown away and the answer is rendered from the query result. That answer is correct
- * and cited, and it was not written by the model whose name the call list carries, so a
- * provenance line that named the model anyway would be attributing a sentence to something that
- * did not write it.
+ * The kinds are one list, `COMPOSED_KINDS` in `@exulanica/companion-runtime`, because a
+ * remembered answer keeps its kind (`companion_answer.composed`, migration 0112) and the runtime
+ * package states the remembered row's shape; each kind is described there.
  */
-export type Composed =
-  | 'model'
-  | 'discarded'
-  | 'search'
-  /** A model was asked and could not turn the question into a search. Nothing was looked at. */
-  | 'unreadable'
-  /**
-   * A model DREW A CHANGE to the world, and nothing has been applied.
-   *
-   * Not `model`. "Answered by" is a sentence about an answer, and this is a proposal: no
-   * question was asked, no evidence was read, and the thing on the screen is waiting for a
-   * decision rather than reporting one.
-   */
-  | 'proposed'
-  /**
-   * A model read a request to change the world and the reviewed design could not express it.
-   *
-   * Not `discarded`. That one says "what it wrote was not supported by the evidence", and there
-   * was no evidence and no search: what happened is that the catalogue has no such control.
-   */
-  | 'refused'
-  /**
-   * A model was asked to draw a change and gave back no reply the server could read.
-   *
-   * Not `refused`: that one states a limit of the reviewed design, and nothing here says the
-   * design could not make the change.
-   */
-  | 'undrafted'
-  | 'none';
+
+export type Composed = AnswerComposed;
+export { COMPOSED_KINDS };
+
+/** Whether a stored kind is one this page draws, which is how a remembered one is read. */
+export function isComposed(kind: string): kind is Composed {
+  return (COMPOSED_KINDS as readonly string[]).includes(kind);
+}
+
+/**
+ * What an answer's requests that returned no result come to: how many, and whether the cost of
+ * any of them is unknown. The line under the answer says both, because each may have been billed.
+ */
+export interface UnansweredAttempts {
+  readonly attempts: number;
+  readonly costUnknown: boolean;
+}
+
+/** The attempts that returned no result, from the record of what a request executed. */
+export function unansweredOf(calls: readonly ModelCall[]): UnansweredAttempts {
+  const unanswered = calls.filter((call) => call.outcome !== 'completed');
+  return {
+    attempts: unanswered.length,
+    costUnknown: unanswered.some((call) => call.costBasis === 'unknown'),
+  };
+}
 
 export interface AnswerProvenance {
   readonly composed: Composed;
@@ -251,6 +247,12 @@ export interface CompanionAnswer {
   readonly provenance: AnswerProvenance;
   readonly promptVersion: string;
   readonly calls: readonly ModelCall[];
+  /**
+   * What the requests that returned no result come to, where `calls` cannot say it: a remembered
+   * answer executed nothing, so its calls are empty and the count is what was kept with it. Absent
+   * on a fresh answer, whose calls say it (`unansweredOf`).
+   */
+  readonly unanswered?: UnansweredAttempts;
 }
 
 export type AskFailure =

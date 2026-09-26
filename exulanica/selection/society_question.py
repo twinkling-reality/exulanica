@@ -48,7 +48,7 @@ from exulanica.epistemics.saved_names import (
 from exulanica.errors import ExulanicaError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError, StructuredOutputError, TruncatedResponseError
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import Manifest, Role, load_manifest
 from exulanica.selection.answer import (
     MAX_CLAUSES,
     Abstention,
@@ -110,6 +110,15 @@ _TOKEN_ALPHABET: Final = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 _TOKEN_TEXT: Final = re.compile(
     rf"(?<![{_TOKEN_ALPHABET}])[{_TOKEN_ALPHABET}]{{{TOKEN_LENGTH}}}(?![{_TOKEN_ALPHABET}])"
 )
+
+#: The reason the planner records on a goal a person's model chose for them
+#: (``REASON_CODES`` in ``exulanica/world/society_planner.py``). The line of that minute names the
+#: model when the minute's one applied decision event for that person names it
+#: (``_deciding_models``).
+_CHOSEN_BY_THEIR_MODEL: Final = "chosen_by_their_model"
+#: What a decision event says a consumed receipt did when the minute acted on the model's choice
+#: (``_DISPOSITIONS`` in ``exulanica/world/society_model_decisions.py``).
+_APPLIED: Final = "applied"
 
 #: The outcomes and event kinds that record two people talking. Their lines say that they talked
 #: and with whom, and nothing more.
@@ -289,7 +298,9 @@ class SocietyEvidenceItem:
     event_id: uuid.UUID | None
     #: The simulated minute the state or event is from.
     tick: int
-    #: The line as the composer is sent it: placeholders and catalog words only.
+    #: The line as the composer is sent it: placeholders and catalog words, and the name of the
+    #: model a person's owner chose when the line says that model picked their goal
+    #: (``Manifest.model_name``: a manifest description, never anything a person wrote).
     line: str
 
     @property
@@ -420,6 +431,9 @@ class SocietyScene:
     typed_label: bool = False
     #: The question with every inhabitant's name written as a placeholder or taken out.
     question: str = ""
+    #: The name of the model a person's owner chose, by the minute and the person whose goal it
+    #: picked, for each such goal whose model one decision event of that minute names.
+    deciding_models: Mapping[tuple[int, str], str] = field(default_factory=dict)
 
 
 class _AuthorizedOnce:
@@ -494,12 +508,22 @@ def read_scene(
         older = _authorized_events(
             connection, workspace_id, world_id, snapshot, repository, once, event_ids=wanted
         )
+        chosen_at = sorted(
+            {
+                (int(event["tick"]), str(event["subject_id"]))
+                for event in (*events, *older)
+                if (event.get("document") or {}).get("reason") == _CHOSEN_BY_THEIR_MODEL
+            }
+        )
+        decisions = _authorized_events(
+            connection, workspace_id, world_id, snapshot, repository, once, decisions_at=chosen_at
+        )
     except (UnavailableSocietyInput, ValueError):
         # Authorization not configured, or a stored input that does not verify: the society
         # cannot be read. A withdrawn input only leaves out its own events.
         return SocietyRefusal.UNAVAILABLE
     places = snapshot.get("places") or {}
-    return build_scene(
+    scene = build_scene(
         snapshot,
         targets=places.get("targets", []),
         events=events,
@@ -508,6 +532,36 @@ def read_scene(
         question=question,
         saved=saved,
     )
+    if decisions:
+        scene.deciding_models = _deciding_models(decisions, load_manifest())
+    return scene
+
+
+def _deciding_models(
+    decisions: Iterable[Mapping[str, Any]], manifest: Manifest
+) -> dict[tuple[int, str], str]:
+    """The model to name for each minute and person, from that minute's decision events for them.
+
+    A goal a person's model chose is recorded in the minute whose one applied receipt set it: the
+    planner reads a model's goal policy only in the minute it is given
+    (``advance_purposeful_society``), and one person takes at most one applied receipt a minute
+    (``subject_already_decided``). So the model is named only when exactly one decision event of
+    that minute and person applied a choice, and that event names the model; none, or several,
+    leave the name out rather than guess. The name is :meth:`Manifest.model_name`'s, as the People
+    panel shows it.
+    """
+    applied: dict[tuple[int, str], list[Mapping[str, Any]]] = {}
+    for event in decisions:
+        document = event["document"]
+        if document.get("disposition") == _APPLIED:
+            key = (int(event["tick"]), str(event["subject_id"]))
+            applied.setdefault(key, []).append(document)
+    named: dict[tuple[int, str], str] = {}
+    for key, documents in applied.items():
+        model = documents[0].get("model") if len(documents) == 1 else None
+        if isinstance(model, Mapping) and isinstance(model.get("model_id"), str):
+            named[key] = manifest.model_name(model["model_id"])
+    return named
 
 
 def _authorized_events(
@@ -520,9 +574,11 @@ def _authorized_events(
     *,
     latest: int | None = None,
     event_ids: Sequence[str] = (),
+    decisions_at: Sequence[tuple[int, str]] = (),
 ) -> list[Mapping[str, Any]]:
     """This world's society's ``latest`` events, newest first, or the named ones however long ago,
-    each only while the input it was recorded under is still authorized.
+    or the decision events recorded at ``decisions_at``'s minutes for its people, each only while
+    the input it was recorded under is still authorized.
 
     The inputs are read, held to their rows and to this society's version, by the repository's own
     reader (``SocietyRepository._inputs``, whose ``_validate_scope`` binds them), and the latest
@@ -531,29 +587,40 @@ def _authorized_events(
     raises, as the repository does.
 
     An event recording what a decision receipt did (:data:`DECISION_EVENT_KIND`) is never read
-    here, so none takes a line: the words catalog has none for it, and the person's own events say
-    what they did, a goal their model chose by the reason ``chosen_by_their_model``.
+    with the latest events or by id, so none takes a line: the words catalog has none for it, and
+    the person's own events say what they did, a goal their model chose by the reason
+    ``chosen_by_their_model``. ``decisions_at`` reads those events alone, for the model that line
+    names, under the same withdrawal rule.
     """
-    if latest is None and not event_ids:
+    chosen: str
+    values: tuple[Any, ...]
+    if latest is not None:
+        chosen = (
+            "and e.event_kind<>%s "
+            "order by e.tick desc,(e.document->>'order')::integer nulls last,e.event_id limit %s"
+        )
+        values = (DECISION_EVENT_KIND, latest)
+    elif event_ids:
+        chosen = "and e.event_kind<>%s and e.event_id=any(%s::uuid[])"
+        values = (DECISION_EVENT_KIND, list(event_ids))
+    elif decisions_at:
+        chosen = (
+            "and e.event_kind=%s and (e.tick,e.subject_id) in "
+            "(select * from unnest(%s::bigint[],%s::uuid[])) order by e.tick,e.event_id"
+        )
+        values = (
+            DECISION_EVENT_KIND,
+            [tick for tick, _ in decisions_at],
+            [subject for _, subject in decisions_at],
+        )
+    else:
         return []
-    chosen = (
-        "order by e.tick desc,(e.document->>'order')::integer nulls last,e.event_id limit %s"
-        if latest is not None
-        else "and e.event_id=any(%s::uuid[])"
-    )
     rows = connection.execute(
         "select e.event_id,e.tick,e.event_kind,e.subject_id,e.document "
         "from world_society_event e join world_society s "
         "on s.workspace_id=e.workspace_id and s.society_id=e.society_id "
-        "where e.workspace_id=%s and s.world_id=%s and e.society_id=%s and e.event_kind<>%s "
-        + chosen,
-        (
-            workspace_id,
-            world_id,
-            snapshot["society_id"],
-            DECISION_EVENT_KIND,
-            latest if latest is not None else list(event_ids),
-        ),
+        "where e.workspace_id=%s and s.world_id=%s and e.society_id=%s " + chosen,
+        (workspace_id, world_id, snapshot["society_id"], *values),
     ).fetchall()
     if snapshot["profile"] not in INPUT_ENGINES:
         return [dict(row) for row in rows]
@@ -784,6 +851,13 @@ class _Builder:
             outcome=outcome_words,
             reason=self.catalog.reason(str(document.get("reason") or "")),
         )
+        deciding = (
+            self.scene.deciding_models.get((tick, subject))
+            if document.get("reason") == _CHOSEN_BY_THEIR_MODEL
+            else None
+        )
+        if deciding is not None:
+            line = self.catalog.words("line", "chosen_model").format(line=line, model=deciding)
         goal = document.get("goal") if isinstance(document.get("goal"), Mapping) else None
         partner = goal.get("partner_id") if goal is not None else None
         talk = event.get("event_kind") == _TALK_KIND or outcome in _TALK_OUTCOMES
