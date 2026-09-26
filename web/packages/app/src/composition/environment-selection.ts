@@ -61,6 +61,9 @@ import {
 import { buildWorldWorkspace } from '../ui/world-workspace.js';
 import { aboutWorld, aboutWorldLayers } from '../world-about.js';
 import '../ui/living-world-inspector.css';
+import type { CompanionSocietyContext, SimulationCitation, SocietyQuestion } from '../companion-ask-api.js';
+import { drawSimulated, type SimulatedReferences, type SocietyNames } from '../companion-simulated.js';
+import { phrase } from '../society-inhabitant-words.js';
 import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
 import {
   OBJECT_ROLE_LABELS,
@@ -120,6 +123,8 @@ export interface EnvironmentSelectionDependencies {
   readonly societyControlClient?: SocietyControlClient;
   readonly societyDistrictClient?: SocietyDistrictClient;
   readonly onDistrictPlacementChange?: () => void;
+  /** Ask the Companion about the simulated person selected in the inspector. */
+  readonly onAskAboutInhabitant?: (question: string, asked: SocietyQuestion) => void;
   readonly createOverlay?: (
     features: readonly NYCLocalFeature[],
   ) => {
@@ -140,6 +145,18 @@ export interface MountedEnvironmentSelection {
   setWelcomeVisible(visible: boolean): void;
   afterAuthoredEdit(versionId: string): Promise<void>;
   districtPlacement(): SocietyDistrictPlacement | null;
+  /**
+   * The saved world's society, by its version, and the inhabitant selected in it, for a question
+   * to the Companion; null where this world shows no society of its own.
+   */
+  societyContext(): CompanionSocietyContext | null;
+  /** Each simulated person's name and each usable place's label, as the inspector draws them. */
+  societyNames(): SocietyNames | null;
+  /**
+   * Select the person a simulation citation names, and show the cited words beside them, each
+   * placeholder drawn as `references`, the answer's own maps, say.
+   */
+  showSimulation(cited: SimulationCitation, references: SimulatedReferences): void;
 }
 
 const instanceId = (feature: NYCLocalFeature): string =>
@@ -426,6 +443,7 @@ export function mountEnvironmentSelection(
     workspace.inspect();
     if (!keepInhabitant) selectedInhabitant = null;
     inspectedInhabitant = null;
+    citedWords = null;
     directedAction = null;
     chosen = null;
     deps.onSelect?.(null);
@@ -465,6 +483,7 @@ export function mountEnvironmentSelection(
     inspector.clear();
     inspectedInhabitant = null;
     directedAction = null;
+    citedWords = null;
   }
 
   /** The crowd this world draws: the owned district's, or a saved world's over its own region. */
@@ -508,12 +527,17 @@ export function mountEnvironmentSelection(
     reflectCrowd();
   }
 
-  function inspectInhabitant(id: string, reveal = true): void {
+  /** The words a Companion citation opened this person with, kept while they stay selected. */
+  let citedWords: { readonly inhabitantId: string; readonly text: string } | null = null;
+
+  function inspectInhabitant(id: string, reveal = true): boolean {
     crowd()?.revealInhabitant(id);deps.state.atlas?.binding.invalidate();
     const state = society?.state ?? previewState;
     const inhabitant = state?.inhabitants.find(held => held.id === id);
-    if (!inhabitant || !state) return;
+    if (!inhabitant || !state) return false;
     if (reveal) workspace.inspect();
+    // A citation's words belong to the person it opened; selecting anybody else forgets them.
+    if (citedWords?.inhabitantId !== id) citedWords = null;
     selectedInhabitant = id;
     inspectedInhabitant = id;
     directedAction = null;
@@ -523,7 +547,7 @@ export function mountEnvironmentSelection(
     place.disabled = true; modify.disabled = true; remove.disabled = true;
     invalidateProposal('Select an authored object before editing.');
     selected.textContent = 'Selected synthetic inhabitant';
-    if (state.profile === 'exulanica-society/v4') { inspectLivingInhabitant(inhabitant, state); return; }
+    if (state.profile === 'exulanica-society/v4') { inspectLivingInhabitant(inhabitant, state); return true; }
     const v2 = state.profile === 'exulanica-society/v2';
     const goal = inhabitant.goal && 'kind' in inhabitant.goal ? inhabitant.goal : null;
     const representation = crowd()?.inhabitantRepresentation(id);
@@ -551,11 +575,12 @@ export function mountEnvironmentSelection(
       title: words?.who ?? inhabitant.display_name ?? `Synthetic ${inhabitant.role ?? 'inhabitant'}`,
       description: words?.what ?? 'A fictional inhabitant of this world. This is not a remembered person.',
       activity: words !== null
-        ? `${words.doing} ${words.why}`
+        ? `${words.doing} ${words.why}${citedWords?.inhabitantId === id ? ` ${citedWords.text}` : ''}`
         : v2
           ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ` Drawn ${onSeat ? 'sitting on the seat at' : 'sitting on the ground in front of'} the place.` : ''}`
           : 'No persisted goal or action is available in this preview or legacy society.',
       details: [
+        ...(citedWords?.inhabitantId === id ? [['Cited by the Companion', citedWords.text] as const] : []),
         ...(words !== null ? [
           ['Recorded explanation', inhabitant.explanation?.summary ?? 'Unavailable'],
           ...(resting ? [['Drawn as', restDrawn] as const] : []),
@@ -580,7 +605,36 @@ export function mountEnvironmentSelection(
         ['Unavailable dependencies', v2 ? 'Personal evidence and model explanation not established by this view.' : 'Routes, goals, event history and authenticated persistence unavailable.'],
       ],
     });
-    if (savedWorld !== null && v2) addSavedWorldActions();
+    if (savedWorld !== null && v2) {
+      addAskActions();
+      addSavedWorldActions();
+    }
+    return true;
+  }
+
+  /** On a selected inhabitant of a saved world: ask the Companion who they are, what and why. */
+  function addAskActions(): void {
+    const ask = deps.onAskAboutInhabitant;
+    if (ask === undefined) return;
+    for (const [code, aspect] of [['ask_who', 'who'], ['ask_doing', 'doing'], ['ask_why', 'why']] as const) {
+      const question = phrase(code);
+      const button = el('button', { type: 'button', class: 'world-inhabitants-ask', text: question });
+      button.addEventListener('click', () => ask(question, { scope: 'selected', aspect }));
+      inspector.addAction(button);
+    }
+  }
+
+  function societyNames(): SocietyNames | null {
+    if (savedWorld === null || society === null) return null;
+    const spots = new Map<string, string>();
+    for (const row of society.places === null ? [] : placeRows(savedObjects() ?? [], society.places)) {
+      if (row.status.kind === 'usable') spots.set(row.status.targetId, row.label);
+    }
+    return {
+      versionId: society.versionId,
+      people: new Map(society.state.inhabitants.map((person) => [person.id, inhabitantLabel(person)])),
+      spots,
+    };
   }
 
   /**
@@ -827,6 +881,7 @@ export function mountEnvironmentSelection(
     selectedInhabitant = null;
     inspectedInhabitant = null;
     directedAction = null;
+    citedWords = null;
     if (representationAvailability(feature.providerFeatureId) === 'unavailable') {
       representation.refresh();
       return;
@@ -1783,6 +1838,32 @@ export function mountEnvironmentSelection(
     setWelcomeVisible: (visible) => workspace.setWelcomeVisible(visible),
     afterAuthoredEdit,
     districtPlacement: () => districtView?.placement ?? null,
+    societyContext: () => {
+      if (savedWorld === null || society === null) return null;
+      const chosen = selectedInhabitant;
+      const inhabitantId = chosen !== null && society.state.inhabitants.some((person) => person.id === chosen)
+        ? chosen
+        : null;
+      return { versionId: society.versionId, inhabitantId };
+    },
+    societyNames,
+    showSimulation: (cited, references) => {
+      const names = societyNames();
+      const line = drawSimulated([{ kind: 'text', text: cited.line }], references, names)
+        .map((piece) => piece.text)
+        .join('');
+      citedWords = {
+        inhabitantId: cited.inhabitantId,
+        // An event's line says its own minute; a person's state is said with the minute it is from.
+        text: cited.eventId === null
+          ? phrase('citation_shown', { minute: cited.tick, line })
+          : phrase('citation_shown_event', { line }),
+      };
+      if (names?.versionId !== cited.versionId || !inspectInhabitant(cited.inhabitantId)) {
+        citedWords = null;
+        deps.showStatus(phrase('citation_gone'), 'failure');
+      }
+    },
     dispose: () => {
       workspace.dispose();
       representation.dispose();

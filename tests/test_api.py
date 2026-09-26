@@ -668,6 +668,11 @@ def test_the_execution_block_is_additive_and_changes_nothing_above_it(deployment
         # Added with the rule that no saved name reaches a hosted model: the placeholder each
         # answer may carry and the entity it stands for, so the client restores the name.
         "names",
+        # Added with answers about a world's simulated people: their citations, and the
+        # inhabitant and place placeholders the client draws from the society it shows.
+        "simulation",
+        "inhabitants",
+        "spots",
     }
     assert body["names"] == {}, "this question names nothing, so there is nothing to restore"
     assert body["deterministic"] is True
@@ -840,6 +845,7 @@ def test_a_model_invented_entity_id_abstains_instead_of_reporting_a_missing_one(
             "place": None,
             "capture": None,
             "content": None,
+            "society": None,
             "epistemic": "confirmed",
             "semantic_query": None,
             "limit": 10,

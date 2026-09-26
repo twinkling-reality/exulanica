@@ -1,6 +1,6 @@
 """What ``answer_question`` returns on every one of its exits, held whole to a golden document.
 
-``answer_question`` has twelve ways to return an :class:`AnsweredQuestion` and three to raise, and
+``answer_question`` has eighteen ways to return an :class:`AnsweredQuestion` and three to raise, and
 the answer path's split keeps it where it is because tests replace its module globals. Each exit
 is driven here through the product's own code over a workspace with a person and a place saved on
 a photograph's sign, and what it returns is reduced to a document: the answer, the plan, what the
@@ -31,10 +31,12 @@ from typing import Any
 import pytest
 from exulanica.api.composer_rights import composer_rights_check
 from exulanica.epistemics.assertions import AssertionWriter
+from exulanica.epistemics.saved_names import SavedName
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.transport import HttpResponse
 from exulanica.selection import packet as packet_module
 from exulanica.selection import question as question_module
+from exulanica.selection import society_question as society_module
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.plan import (
     ContentScope,
@@ -44,11 +46,16 @@ from exulanica.selection.plan import (
     Intent,
     PlaceSelector,
     SelectionPlan,
+    SocietyAspect,
+    SocietyScope,
+    SocietySelector,
 )
 from exulanica.selection.question import AnsweredQuestion, answer_question
+from exulanica.selection.society_question import SocietyRefusal, build_scene
 
 from model_fakes import chat_body
 from test_companion_saved_names import PERSON, PLACE, _client, named
+from test_society_question import EVENTS, SNAPSHOT, STATE, TARGETS
 
 pytestmark = pytest.mark.postgres
 
@@ -102,6 +109,8 @@ class Context:
         before_compose: Callable | None = None,
         client: Any = "scripted",
         question: str = QUESTION,
+        society: uuid.UUID | None = None,
+        selected: uuid.UUID | None = None,
     ) -> AnsweredQuestion:
         chosen = _client(self.repository, replies)[0] if client == "scripted" else client
         return answer_question(
@@ -114,9 +123,13 @@ class Context:
             store=self.store,
             # Every exit reads captures or memories, which belong to the workspace and not to a
             # world, so no world's authored or simulated content is asked for.
-            world_id=None,
+            # A society exit names a world; its society is the small square's recorded run,
+            # read through the replaced ``read_scene`` (``_square``).
+            world_id=None if society is None else "world:exits",
             before_compose=before_compose
             or composer_rights_check(self.connection, self.repository.workspace_id),
+            society_version_id=society,
+            selected_inhabitant_id=selected,
         )
 
 
@@ -148,6 +161,77 @@ def _changed_during_composition(context: Context) -> AnsweredQuestion:
 
     context.monkeypatch.setattr(question_module, "compose_answer", compose_then_retract)
     return context.ask([_answer(_META)], plan=_captures("running club"))
+
+
+def _square(context: Context, *, also_saved=(), refusal=None) -> None:
+    """The society the page shows: the small square's recorded run, read as ``read_scene`` reads
+    one, with any name ``also_saved`` saved beside the workspace's own."""
+
+    def read(connection, workspace_id, world_id, society, *, authorize, question, saved):
+        if refusal is not None:
+            return refusal
+        return build_scene(
+            SNAPSHOT,
+            targets=TARGETS,
+            events=EVENTS,
+            explaining=EVENTS,
+            selected=society.inhabitant_id,
+            question=question,
+            saved=(*saved, *also_saved),
+        )
+
+    context.monkeypatch.setattr(question_module, "read_scene", read)
+
+
+def _explained_person() -> uuid.UUID:
+    return uuid.UUID(next(p["id"] for p in STATE["inhabitants"] if p["explanation"]["event_ids"]))
+
+
+def _colliding(context: Context) -> AnsweredQuestion:
+    person = STATE["inhabitants"][0]
+    first = person["display_name"].split()[0]
+    _square(context, also_saved=(SavedName(uuid.UUID(int=77), "person", f"{first} Cohen"),))
+    return context.ask(
+        [],
+        question=f"Why is {first} there?",
+        society=SNAPSHOT["version_id"],
+        selected=uuid.UUID(person["id"]),
+    )
+
+
+def _shared_name(context: Context) -> AnsweredQuestion:
+    first = STATE["inhabitants"][0]["display_name"].split()[0]
+    _square(context, also_saved=(SavedName(uuid.UUID(int=78), "person", f"{first} Cohen"),))
+    return context.ask(
+        [],
+        plan=_captures("harbour"),
+        question=f"Show me photos of {first}",
+        society=SNAPSHOT["version_id"],
+    )
+
+
+def _typed_label(context: Context) -> AnsweredQuestion:
+    _square(context)
+    return context.ask([], question="Why is [inhabitant B] there?", society=SNAPSHOT["version_id"])
+
+
+def _people_unreadable(context: Context) -> AnsweredQuestion:
+    _square(context, refusal=SocietyRefusal.UNAVAILABLE)
+    return context.ask([], plan=_captures("ferris wheel"), society=SNAPSHOT["version_id"])
+
+
+def _about_a_person(context: Context) -> AnsweredQuestion:
+    _square(context)
+    return context.ask(
+        [],
+        plan=SelectionPlan(
+            intent=Intent.SOCIETY,
+            society=SocietySelector(scope=SocietyScope.SELECTED, aspect=SocietyAspect.WHY),
+        ),
+        client=None,
+        society=SNAPSHOT["version_id"],
+        selected=_explained_person(),
+    )
 
 
 #: Each exit, and how to reach it. A value that raises is the exit's document.
@@ -195,6 +279,21 @@ EXITS: dict[str, Callable[[Context], AnsweredQuestion]] = {
         client=None,
     ),
     "the packet was empty": lambda c: c.ask([], plan=_captures("zebra crossing")),
+    "a name is both a saved person's and the selected inhabitant's": _colliding,
+    "a name is a saved person's and an unselected inhabitant's": _shared_name,
+    "a question carries a typed inhabitant label": _typed_label,
+    "the world's people could not be read": _people_unreadable,
+    "a society question answered from the society": _about_a_person,
+    # A question about the world's simulated people asked where the page shows none: refused by
+    # name, with no model asked and nothing searched.
+    "a society question with no society in view": lambda c: c.ask(
+        [],
+        plan=SelectionPlan(
+            intent=Intent.SOCIETY,
+            society=SocietySelector(scope=SocietyScope.WORLD, aspect=SocietyAspect.RECENT),
+        ),
+        client=None,
+    ),
     "the packet held guesses": lambda c: c.ask(
         [], plan=_captures("running club", epistemic=EpistemicScope.INCLUDE_PROPOSALS)
     ),
@@ -275,6 +374,15 @@ def document(outcome: AnsweredQuestion) -> dict[str, Any]:
                 ],
                 "values": [[value.key, value.text] for value in packet.values],
             },
+            "society_packet": None
+            if outcome.society_packet is None
+            else {
+                "items": [
+                    [item.result_kind, item.tick, item.line]
+                    for item in outcome.society_packet.items
+                ],
+                "inhabitants": [label for label, _ in outcome.society_packet.inhabitants],
+            },
             "content_packet": None
             if content is None
             else {
@@ -305,6 +413,7 @@ def document(outcome: AnsweredQuestion) -> dict[str, Any]:
 def context(named, monkeypatch) -> Context:
     counter = itertools.count(1)
     monkeypatch.setattr(packet_module, "_token", lambda taken: f"TOKEN{next(counter):05d}")
+    monkeypatch.setattr(society_module, "_token", lambda taken: f"TOKEN{next(counter):05d}")
     repository, store, session, entities = named
     return Context(repository, store, session, entities, monkeypatch)
 
@@ -333,7 +442,7 @@ def test_each_exit_returns_the_document_it_always_has(context, exit_name):
 
 
 def test_every_exit_is_a_different_document():
-    """The control: fifteen ways to leave the function, fifteen things said."""
+    """The control: twenty-one ways to leave the function, twenty-one things said."""
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
     assert sorted(golden) == sorted(EXITS)
     documents = [json.dumps(golden[name], sort_keys=True) for name in sorted(golden)]

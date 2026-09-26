@@ -9,6 +9,7 @@ world. [Product direction](product-direction.md) owns its broader role and conti
 
 - [Request path](#request-path)
 - [Answer and source boundaries](#answer-and-source-boundaries)
+- [Questions about a world's people](#questions-about-a-worlds-people)
 - [Execution provenance](#execution-provenance)
 - [Conversation memory](#conversation-memory)
 - [Appearance proposals](#appearance-proposals)
@@ -22,7 +23,7 @@ evidence packets and appearance proposals, and the
 environment panel's typed edits. The [question implementation](../exulanica/selection/question.py)
 sequences the path: the [planner](../exulanica/selection/planner.py) proposes a Selection from the
 question, and the question implementation validates and executes it, builds a bounded packet,
-composes and validates the answer, with the supported repair path. Both system prompts and the
+composes and validates the answer, with the supported repair path. The system prompts and the
 version they are recorded under are in [prompts](../exulanica/selection/prompts.py). The path
 records per-question model execution with [calls](../exulanica/selection/calls.py) rather than
 inferring execution from the manifest.
@@ -347,6 +348,96 @@ carries no record, so the boundary assigns its placeholders per request, in the 
 names: in embedding text `[place A]` is a different place in each caption and in each query, and a
 query about one withheld place shares that token with every caption that holds any saved place.
 That leaks nothing, and what it costs vector retrieval is measured under Evidence and limits.
+
+## Questions about a world's people
+
+A question may carry the society the page shows, as `society_context`: the world version whose
+society it is, and the inhabitant selected in the inspector. The server resolves both in the named
+world. One the world does not hold, or a person not in it, is answered as a question asked with no
+society, alike in every case (`tests/test_companion_asks_inhabitants_api.py`). A society that cannot
+be read under current authorization is left out: the question reaches the planner in the person's
+own words, as any question does, and the answer says first, in a clause of its own, that the people
+were left out; a question about the people themselves is refused as `society_unavailable`. An event
+recorded under an input a withdrawal no longer authorizes is left out alone, among the latest events
+as among those that explain a person's state: the rest of the society still answers, without that
+citation. `POST /selection/plan` reads no society and refuses a `society_context` by name
+(`society_context_not_planned`).
+
+A question about the world's simulated people is a Selection of intent `society`, with a `scope`
+(`selected` or `world`) and an `aspect` (`who`, `doing`, `why`, `recent`, `talk_content` or
+`unrecorded`) ([plan](../exulanica/selection/plan.py)). The planner proposes one from words, told
+only that simulated people are in view and which one is selected, by placeholder. The inspector's
+Ask buttons supply one, which needs no model. It is answered from the society's current state and
+its latest recorded events, read under the same current authorization the inspector's reads take,
+each input authorized once per question however many of those reads it is behind ([society
+question](../exulanica/selection/society_question.py)), and a society Selection that reaches `POST
+/selection` or `POST /selection/packet` is refused as `malformed_plan`, because it is never
+searched.
+
+Who someone is, what they are doing and why are the inspector's own words, from one data file both
+read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-words.v1.json)), cited
+to the society's state and to the event that explains it, read by its id however long ago it was
+recorded, with no model call. The page and the server choose among those words by one rule, held by
+cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). What happened
+over the whole world is chosen by the reasoning role from at most 24 event lines rebuilt from each
+event's recorded outcome, reason and minute in the same words, never from a stored summary, a
+position, a seed or a digest. The composer writes nothing: it returns which lines answer the
+question, at most nine, and at most one of the fixed framings the words catalog lists, and the
+answer is each chosen line in its own words, cited to it, in the order they were recorded. The
+answer leads with the simulated minutes of the lines it shows, because the simulation counts minutes
+and has no time of day. A choice that names a line not in the list, or more lines than nine, is
+asked for once more, and the latest lines are given in fixed words when it is refused twice. They
+are also given when no choice comes: the answer says first whether the composer did not answer in
+time, did not answer, or made a choice there was no time to ask again for, and whether one line or
+several follow; a call that timed out is not repeated. A refused choice is asked for again only
+while one attempt's bound still fits in the answer's wait budget, 75 seconds from the question's
+start (`ANSWER_WAIT_BUDGET_SECONDS`): the first attempt is never skipped and may take the role's
+whole 60 seconds, so a shorter budget would not bound the wait and would only stop every repair.
+After the composer's wait the society is checked again from its row alone, so a withdrawal made
+while it chooses applies from the next question. Every simulated fact is a clause of type
+`simulation`, which must cite and is never a statement about the person's past; an answer about
+simulated people carries no `historical` clause. Every citation is returned in `simulation`, with
+truth class `simulation` and `personal_visit_evidence` false, and every answer closes by saying the
+people are simulated. The page labels each citation Simulation, and opening one selects the person
+in the inspector with the cited words and the minute they are from.
+
+No inhabitant's name is in a hosted request or in an answer. A question is read once, longest words
+first, over saved names and inhabitants' names together, as saved names are read for every hosted
+request: a saved person called Emi Tanaka is that person however an inhabitant called Emi is named,
+and an inhabitant's full name, Ari Ash, is that inhabitant however a saved Ash Ketchum is named.
+Only a form that names exactly one inhabitant, or the selected one, is written `[inhabitant A]`. A
+form several share, with none of them selected, stays the person's own word, and a question about
+one of them named that way is refused as `select_a_person`; a single word every inhabitant's name
+shares, such as a surname they all have, names nobody, so "the ash cloud" stays a cloud. A typed
+`[inhabitant A]` names nobody, because its letter belongs to the answer it came from, and is refused
+as `typed_inhabitant_label`, asking for the name or a selection. A place they use is `[spot A]`;
+`inhabitants` and `spots` say which each stands for, and the page draws the name from the society it
+shows, marked simulated, and the place by the person's own object there
+(`web/packages/app/src/companion-simulated.ts`). Synthetic names come from a small table, so the
+same words can read as a saved name and as an inhabitant's. With the inhabitant who has them
+selected, such a question is refused as `synthetic_name_collision` before it is planned, naming both
+ways to ask: the saved person by full name, or the selected one without the name. With nobody
+selected who has them, the words are the saved person's, as they are with no people on screen, and
+an answer about the library says first, in a clause of its own, that someone in the world shares the
+name, and that it is about the person saved or, for a place or any other name, that it reads the
+words as the name saved. An answer about the world's people says nothing of it, because it is not
+about anybody saved. No refusal or note carries a bracketed label, which the page would draw as a
+person. The society composer's call site replaces every saved name, a place's included, and its
+client adds a policy that releases no place's name (`society_answer_model` in
+`exulanica/api/routes/selection.py`), so a place-name right granted for answers about photographs is
+no use of it (`tests/test_society_composer_place_names.py`).
+
+Talking has no content. An event line says who talked with whom and nothing more, and a question
+about what anybody said is refused as `UNANSWERABLE_NOT_IN_MODALITY`. Every sentence of an answer
+about the world's people is the inspector's words, a recorded line's own words, or the code's, so
+nothing the simulation did not record, what anybody said above all, can reach an answer, whichever
+lines the composer chooses. The notes an answer leads with are the code's and cost it no clause.
+
+What it does not do: it answers for the purposeful profile the words catalog names, and refuses any
+other society by name (`society_profile_has_no_words`); it does not name the model behind an
+inhabitant's decision; and an answer about the world's people is not kept in the Companion's memory,
+which holds photograph citations and saved names only. A remembered answer that cites nothing is
+drawn as a statement about the search, never as the person's past.
 
 ## Execution provenance
 

@@ -37,11 +37,14 @@ from exulanica.selection.packet import EvidencePacket
 
 __all__ = [
     "MAX_CLAUSES",
+    "MAX_CLAUSE_CHARACTERS",
+    "MAX_NOTES",
     "Abstention",
     "Answer",
     "AnswerClause",
     "AnswerRejected",
     "ClauseType",
+    "ComposedAnswer",
     "abstain",
     "abstain_from_a_guess",
     "abstain_without_a_selection",
@@ -50,6 +53,12 @@ __all__ = [
 ]
 
 MAX_CLAUSES: Final = 12
+#: Clauses code writes before an answer, outside the composer's limit and never merged into one
+#: of its clauses: that the world's people were left out, and that someone in the world shares a
+#: name the question uses (``exulanica/selection/question.py``).
+MAX_NOTES: Final = 2
+#: The longest a clause's text may be, as :class:`AnswerClause` declares it.
+MAX_CLAUSE_CHARACTERS: Final = 600
 
 #: Any run of digits. Deliberately crude: "2019", "3", "1st" and "10:00" all match, and every
 #: one of them is a number a model could have invented. A cleverer pattern would be a place for
@@ -64,6 +73,11 @@ class ClauseType(StrEnum):
     HISTORICAL = "historical"
     #: A hedge, a possibility, an explicitly unconfirmed reading. May cite and need not.
     UNCERTAIN = "uncertain"
+    #: A statement of what a world's simulation recorded: an invented person's state or a recorded
+    #: event. Must cite simulation evidence. It is never a statement about the user's past, so a
+    #: photograph answer may not carry one, and an answer about simulated people
+    #: (:mod:`exulanica.selection.society_question`) is written only in these and ``meta``.
+    SIMULATION = "simulation"
     #: A statement about the system rather than the world: what was searched, what was found,
     #: what is missing. Carries no citation, and is still subject to the digit rule. A search is
     #: not a photograph, so a citation here would put a photograph under a sentence about the whole
@@ -119,7 +133,7 @@ class Abstention(StrEnum):
 class AnswerClause(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    text: Annotated[str, Field(min_length=1, max_length=600)]
+    text: Annotated[str, Field(min_length=1, max_length=MAX_CLAUSE_CHARACTERS)]
     type: ClauseType
     citations: Annotated[list[str], Field(max_length=8)] = Field(
         default_factory=list,
@@ -132,9 +146,17 @@ class AnswerClause(BaseModel):
 
 
 class Answer(BaseModel):
-    """What the composer returns. Never a string."""
+    """An answer as it is given: at most :data:`MAX_CLAUSES` clauses a composer or the fixed
+    words wrote, and up to :data:`MAX_NOTES` more that code writes before them. Never a string."""
 
     model_config = ConfigDict(extra="forbid")
+
+    clauses: Annotated[list[AnswerClause], Field(min_length=1, max_length=MAX_CLAUSES + MAX_NOTES)]
+
+
+class ComposedAnswer(Answer):
+    """What a composer is asked for and may return: at most :data:`MAX_CLAUSES` clauses. The
+    notes code writes are never the model's to write, and never count against it."""
 
     clauses: Annotated[list[AnswerClause], Field(min_length=1, max_length=MAX_CLAUSES)]
 
@@ -156,6 +178,9 @@ def validate_answer(answer: Answer, packet: EvidencePacket) -> Answer:
     a question a validator can answer; they ask whether it is *supported*, which is.
     """
     reasons: list[str] = []
+    #: A photograph packet, or a society packet whose lines a simulation recorded; the repair
+    #: message names the clause type that fits the packet it was asked about.
+    photographs = isinstance(packet, EvidencePacket)
     for ordinal, clause in enumerate(answer.clauses):
         where = f"clause {ordinal}"
 
@@ -165,13 +190,32 @@ def validate_answer(answer: Answer, packet: EvidencePacket) -> Answer:
                 # a reference to something that does not exist.
                 reasons.append(f"{where} cites {token!r}, which is not in the packet")
 
+        if clause.type is ClauseType.SIMULATION and photographs:
+            reasons.append(
+                f"{where} is 'simulation', and a photograph answer states nothing a simulation "
+                "recorded: make it 'historical' or 'uncertain' and cite a photograph"
+            )
+
+        if clause.type is ClauseType.SIMULATION and not clause.citations:
+            reasons.append(
+                f"{where} states what the simulation recorded with no citation. Cite the line "
+                "that records it, or say it in a 'meta' clause about what was looked at."
+            )
+
         if clause.type is ClauseType.HISTORICAL and not clause.citations:
             reasons.append(
                 f"{where} is a historical claim with no citation. Every statement about the "
                 "user's past resolves to the original source or it is not made."
             )
 
-        if clause.type is ClauseType.META and clause.citations:
+        if clause.type is ClauseType.META and clause.citations and not photographs:
+            cited = ", ".join(repr(token) for token in clause.citations)
+            reasons.append(
+                f"{where} is 'meta', a statement about what was looked at, and cites {cited}. "
+                "A 'meta' clause carries no citation: if a recorded line supports what it says, "
+                "make it 'simulation' and cite it there; otherwise remove the citation."
+            )
+        elif clause.type is ClauseType.META and clause.citations:
             cited = ", ".join(repr(token) for token in clause.citations)
             reasons.append(
                 f"{where} is 'meta', a statement about the search, and cites {cited}. A 'meta' "

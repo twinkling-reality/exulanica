@@ -51,7 +51,11 @@ const ASK_TIMEOUT_MS = 395_000;
 /** Locating the cited photographs is a second question; it must not hold the answer hostage. */
 const PACKET_TIMEOUT_MS = 20_000;
 
-export type ClauseType = 'historical' | 'uncertain' | 'meta';
+/**
+ * What a clause claims. `simulation` is what a world's simulation recorded, never the person's past:
+ * `ClauseType` in `exulanica/selection/answer.py`.
+ */
+export type ClauseType = 'historical' | 'uncertain' | 'meta' | 'simulation';
 
 /**
  * The three abstention codes, carried through rather than collapsed.
@@ -182,6 +186,29 @@ export interface AnswerProvenance {
   readonly usedFallback: boolean;
 }
 
+/**
+ * One simulation citation an answer about the world's people makes: a person's state, or one
+ * recorded event. Its truth class is always simulation, never a memory and never a real visit.
+ */
+export interface SimulationCitation {
+  readonly token: string;
+  readonly resultKind: 'synthetic_inhabitant' | 'simulation_event';
+  readonly versionId: string;
+  readonly inhabitantId: string;
+  /** Null for a person's state; the event's id for an event. */
+  readonly eventId: string | null;
+  /** The simulated minute the state or event is from. */
+  readonly tick: number;
+  /** The server's line in fixed words, with `[inhabitant A]` and `[spot A]` placeholders. */
+  readonly line: string;
+}
+
+/** A simulated person an answer names as `[inhabitant A]`, drawn from the society the page shows. */
+export interface InhabitantReference {
+  readonly versionId: string;
+  readonly inhabitantId: string;
+}
+
 export interface CompanionAnswer {
   readonly question: string;
   readonly clauses: readonly AnswerClause[];
@@ -209,6 +236,18 @@ export interface CompanionAnswer {
    * account holder's own library, never from this answer. Absent when the answer names nothing.
    */
   readonly names?: Readonly<Record<string, string>>;
+  /** What an answer about the world's people cites, once each, in first-mention order. */
+  readonly simulation?: readonly SimulationCitation[];
+  /** Each `[inhabitant A]` the clauses may carry. No name: the page draws it from its society. */
+  readonly inhabitants?: Readonly<Record<string, InhabitantReference>>;
+  /** Each `[spot A]` the clauses may carry, and the society target it stands for. */
+  readonly spots?: Readonly<Record<string, string>>;
+  /**
+   * An answer about the world's simulated people. It is not kept in the Companion's memory, which
+   * stores photograph citations and entity names only: kept, it would come back without its
+   * simulation citations and its people.
+   */
+  readonly aboutSociety?: boolean;
   readonly provenance: AnswerProvenance;
   readonly promptVersion: string;
   readonly calls: readonly ModelCall[];
@@ -283,6 +322,20 @@ interface WireAnswer {
   readonly execution: WireExecution;
   /** Each placeholder the answer may carry, `[place A]`, and the entity it stands for. */
   readonly names?: Readonly<Record<string, string>>;
+  readonly simulation?: Readonly<Record<string, WireSimulation>>;
+  readonly inhabitants?: Readonly<Record<string, { readonly version_id: string; readonly inhabitant_id: string }>>;
+  readonly spots?: Readonly<Record<string, string>>;
+}
+
+interface WireSimulation {
+  readonly truth_class: string;
+  readonly result_kind: string;
+  readonly version_id: string;
+  readonly inhabitant_id: string;
+  readonly event_id: string | null;
+  readonly tick: number;
+  readonly line: string;
+  readonly personal_visit_evidence: boolean;
 }
 
 interface WirePacketItem {
@@ -304,7 +357,7 @@ interface LocatedEvidence {
   readonly capturedAt: string | null;
 }
 
-const CLAUSE_TYPES: readonly string[] = ['historical', 'uncertain', 'meta'];
+const CLAUSE_TYPES: readonly string[] = ['historical', 'uncertain', 'meta', 'simulation'];
 const ABSTENTIONS: readonly string[] = [
   'UNANSWERABLE_NOT_CAPTURED',
   'UNANSWERABLE_AMBIGUOUS',
@@ -330,6 +383,45 @@ export interface CompanionAskOptions extends TransportOptions {
 export interface CompanionCityContext {
   readonly admissionId: string;
   readonly featureId: string;
+}
+
+/**
+ * The society the page shows, by its world version, and the inhabitant selected in it. The server
+ * resolves both in the open world; the browser names nothing on its own authority.
+ */
+export interface CompanionSocietyContext {
+  readonly versionId: string;
+  readonly inhabitantId: string | null;
+}
+
+/** A question about the world's people the page already knows the shape of: no planner is asked. */
+export interface SocietyQuestion {
+  readonly scope: 'selected' | 'world';
+  readonly aspect: 'who' | 'doing' | 'why' | 'recent';
+}
+
+/**
+ * What an answer about the world's people cites, once each in first-mention order. Only a citation
+ * the server marked simulation, and never a personal visit, is kept: anything else is not one.
+ */
+function simulationOf(clauses: readonly AnswerClause[], body: WireAnswer): SimulationCitation[] {
+  const cited: SimulationCitation[] = [];
+  for (const token of clauses.flatMap((clause) => clause.citations)) {
+    const wire = body.simulation?.[token];
+    if (wire === undefined || cited.some((held) => held.token === token)) continue;
+    if (wire.truth_class !== 'simulation' || wire.personal_visit_evidence !== false) continue;
+    const resultKind = wire.result_kind === 'simulation_event' ? 'simulation_event' : 'synthetic_inhabitant';
+    cited.push({
+      token,
+      resultKind,
+      versionId: wire.version_id,
+      inhabitantId: wire.inhabitant_id,
+      eventId: wire.event_id,
+      tick: wire.tick,
+      line: wire.line,
+    });
+  }
+  return cited;
 }
 
 /** The place placeholder's own prefix, as `exulanica/selection/saved_names.py` writes it. */
@@ -440,7 +532,12 @@ export class CompanionAskClient {
    * that opens nothing, so those entries carry a null handle and the surface renders them as
    * unavailable rather than pretending.
    */
-  async ask(question: string, cityContext: CompanionCityContext | null = null): Promise<CompanionAnswer> {
+  async ask(
+    question: string,
+    cityContext: CompanionCityContext | null = null,
+    society: CompanionSocietyContext | null = null,
+    societyQuestion: SocietyQuestion | null = null,
+  ): Promise<CompanionAnswer> {
     let body: WireAnswer;
     try {
       const asked = {
@@ -451,6 +548,10 @@ export class CompanionAskClient {
             feature_id: cityContext.featureId,
           },
         }),
+        ...(society === null ? {} : {
+          society_context: { version_id: society.versionId, inhabitant_id: society.inhabitantId },
+        }),
+        ...(societyQuestion === null ? {} : { plan: { intent: 'society', society: societyQuestion } }),
       };
       body = await this.#transport(ASK_TIMEOUT_MS).postJson<WireAnswer>(
         this.#inWorld('/selection/ask'),
@@ -473,7 +574,7 @@ export class CompanionAskClient {
     // Asked only when a clause actually cited something. An answer that cited nothing has no
     // photograph to locate, and asking the packet route what it points at would be a query
     // whose answer is already known.
-    const cited = clauses.some((clause) => clause.citations.length > 0);
+    const cited = clauses.some((clause) => clause.citations.some((token) => token in body.citations));
     const spans = cited ? await this.#spansByUri(body.plan) : new Map<string, LocatedEvidence>();
 
     /*
@@ -519,6 +620,13 @@ export class CompanionAskClient {
     const abstained = body.abstained;
     const places = placesOf(body, content);
     const names = namesOf(body);
+    const simulation = simulationOf(clauses, body);
+    const inhabitants = Object.fromEntries(
+      Object.entries(body.inhabitants ?? {}).map(([label, held]) => [
+        label,
+        { versionId: held.version_id, inhabitantId: held.inhabitant_id },
+      ]),
+    );
     return {
       question,
       clauses,
@@ -530,6 +638,10 @@ export class CompanionAskClient {
       content,
       ...(places.length === 0 ? {} : { places }),
       ...(Object.keys(names).length === 0 ? {} : { names }),
+      ...(simulation.length === 0 ? {} : { simulation }),
+      ...(Object.keys(inhabitants).length === 0 ? {} : { inhabitants }),
+      ...(Object.keys(body.spots ?? {}).length === 0 ? {} : { spots: { ...body.spots } }),
+      ...(planIntent === 'society' || simulation.length > 0 ? { aboutSociety: true } : {}),
       provenance: provenanceOf(
         calls,
         body.deterministic === true,

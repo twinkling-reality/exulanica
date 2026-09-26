@@ -221,7 +221,14 @@ export default defineConfig({
   plugins: [societyRecordingPlugin(resolve(APP_ROOT, '../../..')), previewApi],
   server: {
     // The workspace, plus the committed character containers the development preview fetches.
-    fs: { allow: [searchForWorkspaceRoot(APP_ROOT), resolve(APP_ROOT, '../../../assets/characters')] },
+    // The words the inspector and the Companion share are read from the repository's catalog.
+    fs: {
+      allow: [
+        searchForWorkspaceRoot(APP_ROOT),
+        resolve(APP_ROOT, '../../../assets/characters'),
+        resolve(APP_ROOT, '../../../assets/catalogs/society-words'),
+      ],
+    },
     proxy: {
       '/__character': { target: process.env['EXULANICA_CHARACTER_BUILDER_URL'] ?? 'http://127.0.0.1:5196', rewrite: path => path.replace(/^\/__character/, '') },
       '/api': {

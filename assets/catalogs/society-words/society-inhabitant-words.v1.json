@@ -1,0 +1,738 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-inhabitant-words",
+  "catalog_version": 1,
+  "profiles": [
+    "exulanica-society/v2"
+  ],
+  "entries": [
+    {
+      "key": "reason.restore_need",
+      "kind": "reason",
+      "code": "restore_need",
+      "words": "they need a rest, and it is the nearest place to rest they have not just used",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.visit_place",
+      "kind": "reason",
+      "code": "visit_place",
+      "words": "they are rested enough to look around, and it is the nearest place to visit they have not just used",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.needs_a_rest",
+      "kind": "reason",
+      "code": "needs_a_rest",
+      "words": "they need a rest, and this place had room",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.sitting_a_while",
+      "kind": "reason",
+      "code": "sitting_a_while",
+      "words": "they chose to sit a while",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.looking_around",
+      "kind": "reason",
+      "code": "looking_around",
+      "words": "they are rested enough to look around, and chose this place",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.stopping_a_while",
+      "kind": "reason",
+      "code": "stopping_a_while",
+      "words": "they chose to stop and stand a while",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.stopped_to_talk",
+      "kind": "reason",
+      "code": "stopped_to_talk",
+      "words": "they met someone and stopped to talk",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.remembered_target_selected",
+      "kind": "reason",
+      "code": "remembered_target_selected",
+      "words": "you asked them to go there",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.called_away",
+      "kind": "reason",
+      "code": "called_away",
+      "words": "you asked them to go somewhere else",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.making_room",
+      "kind": "reason",
+      "code": "making_room",
+      "words": "they have finished there, and someone else may need the place",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.awaiting_goal",
+      "kind": "reason",
+      "code": "awaiting_goal",
+      "words": "they have only just arrived",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.following_reachable_route",
+      "kind": "reason",
+      "code": "following_reachable_route",
+      "words": "it is on their way",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.arrived_at_access_node",
+      "kind": "reason",
+      "code": "arrived_at_access_node",
+      "words": "they have arrived",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.standing_a_while",
+      "kind": "reason",
+      "code": "standing_a_while",
+      "words": "they stopped to stand a while",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.talking",
+      "kind": "reason",
+      "code": "talking",
+      "words": "they met and stopped to talk",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.waiting_for_partner",
+      "kind": "reason",
+      "code": "waiting_for_partner",
+      "words": "the person they are meeting is still on the way",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.partner_left",
+      "kind": "reason",
+      "code": "partner_left",
+      "words": "the person they were talking with left",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.reviewed_duration_elapsed",
+      "kind": "reason",
+      "code": "reviewed_duration_elapsed",
+      "words": "they have been at it as long as they meant to",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.made_room",
+      "kind": "reason",
+      "code": "made_room",
+      "words": "they stepped out of the way",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.place_moved",
+      "kind": "reason",
+      "code": "place_moved",
+      "words": "the place they stood at moved",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.standing_node_removed",
+      "kind": "reason",
+      "code": "standing_node_removed",
+      "words": "the ground they stood on changed",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.current_position_invalidated",
+      "kind": "reason",
+      "code": "current_position_invalidated",
+      "words": "the ground where they stand changed",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.target_disabled_or_removed",
+      "kind": "reason",
+      "code": "target_disabled_or_removed",
+      "words": "the place they were heading for is gone",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.authored_affordance_unreachable",
+      "kind": "reason",
+      "code": "authored_affordance_unreachable",
+      "words": "the place they were heading for can no longer be reached",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.authored_object_moves",
+      "kind": "reason",
+      "code": "authored_object_moves",
+      "words": "the thing they were heading for moves, and nobody uses it while it does",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.authored_object_off_ground",
+      "kind": "reason",
+      "code": "authored_object_off_ground",
+      "words": "the thing they were heading for is not resting on the ground",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.unsupported_active_behaviour",
+      "kind": "reason",
+      "code": "unsupported_active_behaviour",
+      "words": "the thing they were heading for moves in a way they cannot follow",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.target_changed",
+      "kind": "reason",
+      "code": "target_changed",
+      "words": "the place they were heading for changed",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.route_invalidated",
+      "kind": "reason",
+      "code": "route_invalidated",
+      "words": "their way there changed",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_reachable_affordance",
+      "kind": "reason",
+      "code": "no_reachable_affordance",
+      "words": "there is nowhere they can reach to go",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_enabled_affordance",
+      "kind": "reason",
+      "code": "no_enabled_affordance",
+      "words": "there is nowhere to go yet",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_known_reachable_affordance",
+      "kind": "reason",
+      "code": "no_known_reachable_affordance",
+      "words": "nowhere they know of can be reached",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_room_at_destination",
+      "kind": "reason",
+      "code": "no_room_at_destination",
+      "words": "every place they could use is taken",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_room_to_wait",
+      "kind": "reason",
+      "code": "no_room_to_wait",
+      "words": "there is no free spot to wait in",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.action_precondition_failed",
+      "kind": "reason",
+      "code": "action_precondition_failed",
+      "words": "they are not where it happens",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.validated_model_wait",
+      "kind": "reason",
+      "code": "validated_model_wait",
+      "words": "they chose to wait",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.input_unavailable",
+      "kind": "reason",
+      "code": "input_unavailable",
+      "words": "this world cannot be walked right now",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "phrase.who_unnamed",
+      "kind": "phrase",
+      "code": "who_unnamed",
+      "words": "Someone",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.what",
+      "kind": "phrase",
+      "code": "what",
+      "words": "A simulated {role}, invented for this world: not anyone you know, and nothing they do is a memory.",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.role_unknown",
+      "kind": "phrase",
+      "code": "role_unknown",
+      "words": "inhabitant",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.place_gone",
+      "kind": "phrase",
+      "code": "place_gone",
+      "words": "a place that is no longer there",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.place_none",
+      "kind": "phrase",
+      "code": "place_none",
+      "words": "a free spot nearby",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.partner_unknown",
+      "kind": "phrase",
+      "code": "partner_unknown",
+      "words": "someone nearby",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.still_one",
+      "kind": "phrase",
+      "code": "still_one",
+      "words": ", one more simulated minute",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.still_many",
+      "kind": "phrase",
+      "code": "still_many",
+      "words": ", {count} more simulated minutes",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.because",
+      "kind": "phrase",
+      "code": "because",
+      "words": "Because {reason}.",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.reason_unknown",
+      "kind": "phrase",
+      "code": "reason_unknown",
+      "words": "of a reason this page has no words for ({code})",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.inhabitant_unresolved",
+      "kind": "phrase",
+      "code": "inhabitant_unresolved",
+      "words": "a simulated person this page is not showing",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.citation_list",
+      "kind": "phrase",
+      "code": "citation_list",
+      "words": "Simulation this answer cites",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.citation_chip",
+      "kind": "phrase",
+      "code": "citation_chip",
+      "words": "Simulation, minute {minute}",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.citation_shown",
+      "kind": "phrase",
+      "code": "citation_shown",
+      "words": "From the simulation, minute {minute}: {line}",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.citation_shown_event",
+      "kind": "phrase",
+      "code": "citation_shown_event",
+      "words": "From the simulation: {line}",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.ask_who",
+      "kind": "phrase",
+      "code": "ask_who",
+      "words": "Who is this?",
+      "reason": "Authored: a question a person asks the Companion from the inspector about the simulated person selected there, or what the page says when a citation's person has left the world."
+    },
+    {
+      "key": "phrase.ask_doing",
+      "kind": "phrase",
+      "code": "ask_doing",
+      "words": "What are they doing?",
+      "reason": "Authored: a question a person asks the Companion from the inspector about the simulated person selected there, or what the page says when a citation's person has left the world."
+    },
+    {
+      "key": "phrase.ask_why",
+      "kind": "phrase",
+      "code": "ask_why",
+      "words": "Why are they there?",
+      "reason": "Authored: a question a person asks the Companion from the inspector about the simulated person selected there, or what the page says when a citation's person has left the world."
+    },
+    {
+      "key": "phrase.citation_gone",
+      "kind": "phrase",
+      "code": "citation_gone",
+      "words": "The simulated person that citation names is not in this world now.",
+      "reason": "Authored: a question a person asks the Companion from the inspector about the simulated person selected there, or what the page says when a citation's person has left the world."
+    },
+    {
+      "key": "phrase.framing_recorded",
+      "kind": "phrase",
+      "code": "framing_recorded",
+      "words": "Here is what the simulation recorded.",
+      "reason": "Authored: a sentence the society composer may choose to put before the event lines it chose to answer a question about what happened; the composer chooses it and never writes it."
+    },
+    {
+      "key": "phrase.framing_talk",
+      "kind": "phrase",
+      "code": "framing_talk",
+      "words": "The simulation records who talked with whom, and never what they said.",
+      "reason": "Authored: a sentence the society composer may choose to put before the event lines it chose to answer a question about what happened; the composer chooses it and never writes it."
+    },
+    {
+      "key": "doing.nothing_recorded",
+      "kind": "doing",
+      "code": "nothing_recorded",
+      "words": "Nothing is recorded about what they are doing.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.waiting",
+      "kind": "doing",
+      "code": "waiting",
+      "words": "Waiting.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_stand",
+      "kind": "doing",
+      "code": "walking_to_stand",
+      "words": "Walking to a spot to stand a while.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_talk",
+      "kind": "doing",
+      "code": "walking_to_talk",
+      "words": "Walking over to talk with {partner}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_free_spot",
+      "kind": "doing",
+      "code": "walking_to_free_spot",
+      "words": "Walking to a free spot nearby.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_rest",
+      "kind": "doing",
+      "code": "walking_to_rest",
+      "words": "Walking to {place} to rest.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_visit",
+      "kind": "doing",
+      "code": "walking_to_visit",
+      "words": "Walking to {place} to visit.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.resting",
+      "kind": "doing",
+      "code": "resting",
+      "words": "Resting at {place}{still}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.visiting",
+      "kind": "doing",
+      "code": "visiting",
+      "words": "Visiting {place}{still}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.finished_resting",
+      "kind": "doing",
+      "code": "finished_resting",
+      "words": "Just finished resting at {place}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.finished_visiting",
+      "kind": "doing",
+      "code": "finished_visiting",
+      "words": "Just finished visiting {place}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.standing",
+      "kind": "doing",
+      "code": "standing",
+      "words": "Standing a while{still}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.finished_standing",
+      "kind": "doing",
+      "code": "finished_standing",
+      "words": "Just finished standing a while.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.talking",
+      "kind": "doing",
+      "code": "talking",
+      "words": "Talking with {partner}{still}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.finished_talking",
+      "kind": "doing",
+      "code": "finished_talking",
+      "words": "Just finished talking with {partner}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.waiting_to_talk",
+      "kind": "doing",
+      "code": "waiting_to_talk",
+      "words": "Waiting for {partner}, to talk.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.standing_aside",
+      "kind": "doing",
+      "code": "standing_aside",
+      "words": "Standing aside.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.deciding",
+      "kind": "doing",
+      "code": "deciding",
+      "words": "Standing, deciding where to go.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "outcome.goal_selected",
+      "kind": "outcome",
+      "code": "goal_selected",
+      "words": "chose where to go next",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.moved",
+      "kind": "outcome",
+      "code": "moved",
+      "words": "walked on",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_started",
+      "kind": "outcome",
+      "code": "action_started",
+      "words": "began what they came to do",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.talk_started",
+      "kind": "outcome",
+      "code": "talk_started",
+      "words": "began talking",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.talk_ended",
+      "kind": "outcome",
+      "code": "talk_ended",
+      "words": "stopped talking",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.waiting",
+      "kind": "outcome",
+      "code": "waiting",
+      "words": "waited",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.stepped_aside",
+      "kind": "outcome",
+      "code": "stepped_aside",
+      "words": "stepped aside",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.plan_invalidated",
+      "kind": "outcome",
+      "code": "plan_invalidated",
+      "words": "had to change plans",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.stay_ended",
+      "kind": "outcome",
+      "code": "stay_ended",
+      "words": "ended their stay",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.unable_to_act",
+      "kind": "outcome",
+      "code": "unable_to_act",
+      "words": "could not do anything",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.rest_completed",
+      "kind": "outcome",
+      "code": "rest_completed",
+      "words": "finished resting",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.visit_completed",
+      "kind": "outcome",
+      "code": "visit_completed",
+      "words": "finished visiting",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.stand_completed",
+      "kind": "outcome",
+      "code": "stand_completed",
+      "words": "finished standing a while",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.talk_completed",
+      "kind": "outcome",
+      "code": "talk_completed",
+      "words": "finished talking",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.move_completed",
+      "kind": "outcome",
+      "code": "move_completed",
+      "words": "finished walking",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.idle_completed",
+      "kind": "outcome",
+      "code": "idle_completed",
+      "words": "finished waiting",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.departed",
+      "kind": "outcome",
+      "code": "departed",
+      "words": "left",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.arrived",
+      "kind": "outcome",
+      "code": "arrived",
+      "words": "arrived",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_applied",
+      "kind": "outcome",
+      "code": "action_request_applied",
+      "words": "took up your request",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_stale",
+      "kind": "outcome",
+      "code": "action_request_stale",
+      "words": "did not take up your request, which came after the world had moved on",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_unavailable",
+      "kind": "outcome",
+      "code": "action_request_unavailable",
+      "words": "could not take up your request",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_rejected",
+      "kind": "outcome",
+      "code": "action_request_rejected",
+      "words": "had your request refused",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_superseded",
+      "kind": "outcome",
+      "code": "action_request_superseded",
+      "words": "had your request replaced by a later one",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "event_reason.sent_away",
+      "kind": "event_reason",
+      "code": "sent_away",
+      "words": "the world's owner sent everyone away",
+      "reason": "Authored: why a recorded event happened when the event records a reason that is not a choice the planner makes, such as the world's owner sending everyone away."
+    },
+    {
+      "key": "event_reason.brought_back",
+      "kind": "event_reason",
+      "code": "brought_back",
+      "words": "the world's owner brought everyone back",
+      "reason": "Authored: why a recorded event happened when the event records a reason that is not a choice the planner makes, such as the world's owner sending everyone away."
+    },
+    {
+      "key": "line.event",
+      "kind": "line",
+      "code": "event",
+      "words": "Simulated minute {minute}: {subject} {outcome}, because {reason}.",
+      "reason": "Authored: how one recorded event reads as a line the Companion cites; {minute} is the simulated minute, {subject} the person, {outcome} and {reason} the words above, {partner} whom they met."
+    },
+    {
+      "key": "line.with_partner",
+      "kind": "line",
+      "code": "with_partner",
+      "words": "{line} They were with {partner}.",
+      "reason": "Authored: how one recorded event reads as a line the Companion cites; {minute} is the simulated minute, {subject} the person, {outcome} and {reason} the words above, {partner} whom they met."
+    },
+    {
+      "key": "line.outcome_unknown",
+      "kind": "line",
+      "code": "outcome_unknown",
+      "words": "had something recorded that has no words here ({code})",
+      "reason": "Authored: how one recorded event reads as a line the Companion cites; {minute} is the simulated minute, {subject} the person, {outcome} and {reason} the words above, {partner} whom they met."
+    }
+  ]
+}

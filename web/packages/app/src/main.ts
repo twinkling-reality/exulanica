@@ -646,7 +646,11 @@ async function mount(): Promise<void> {
     onOpen: () => { environmentSelection.closePanels(); objects.close(); character.reach(); },
     engine: currentCompanion,
     evidence: currentEvidence,
-    ask: (question) => companionAsk.ask(question, companionCityContext),
+    // A question is asked with the world's own society when it shows one, so a question about the
+    // people in it is answered from its simulation.
+    ask: (question) => companionAsk.ask(question, companionCityContext, environmentSelection.societyContext()),
+    society: () => environmentSelection.societyNames(),
+    openSimulation: (cited, answer) => environmentSelection.showSimulation(cited, answer),
     ...(companionPropose === null
       ? {}
       : { proposeAppearance: (utterance: string) => companionPropose.propose(utterance) }),
@@ -756,6 +760,10 @@ async function mount(): Promise<void> {
     showStatus: (message, kind) => showTravelStatus(message, kind),
     ...(env.preview ? { admissionId: PREVIEW_NYC_OPEN_DATA_ADMISSION_ID } : {}),
     onSelect: (context) => { companionCityContext = context; },
+    onAskAboutInhabitant: (question, asked) => companion.askAbout(
+      question,
+      () => companionAsk.ask(question, companionCityContext, environmentSelection.societyContext(), asked),
+    ),
     onPanelOpen: () => { companion.dismiss(); objects.close(); character.reach(); },
     onObjects: () => objects.toggle(),
     onDistrictPlacementChange: () => {

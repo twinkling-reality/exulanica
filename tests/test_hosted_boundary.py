@@ -40,12 +40,13 @@ from typing import Any
 import pytest
 from exulanica.api.authorisation import TokenDirectory
 from exulanica.api.composer_rights import composer_rights_check
+from exulanica.api.routes.selection import society_answer_model
 from exulanica.api.services import Services
 from exulanica.db.migrate import provision_workspace
 from exulanica.db.session import Database
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
 from exulanica.epistemics.hosted_requests import WorkspaceRequestPolicy, no_place_released
-from exulanica.epistemics.saved_names import Redacted
+from exulanica.epistemics.saved_names import Redacted, saved_names
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.vision import NebiusVisionModel
@@ -54,13 +55,21 @@ from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.policy import HostedRequestRefused, request_parts
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
+from exulanica.selection.calls import CallLog
 from exulanica.selection.environment_proposal import (
     EnvironmentOperation,
     propose_environment_operation,
 )
-from exulanica.selection.plan import Intent, SelectionPlan
+from exulanica.selection.plan import (
+    Intent,
+    SelectionPlan,
+    SocietyAspect,
+    SocietyScope,
+    SocietySelector,
+)
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import answer_question
+from exulanica.selection.society_question import answer_about_society, build_scene
 from exulanica.world.society_decisions import SocietyDecisionProvider
 
 from conftest import ingest_observed, write_photo
@@ -77,6 +86,7 @@ from test_companion_saved_names import (
     named,
 )
 from test_selection_proposal import WORLD, _seed_world, current_reference, draft
+from test_society_question import EVENTS, SNAPSHOT, TARGETS
 from test_vision_contract import VALID as OBSERVATION
 
 pytestmark = pytest.mark.postgres
@@ -92,6 +102,7 @@ _CLIENT = _PACKAGE / "models" / "client.py"
 HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "planner": ("exulanica.selection.planner", "propose_plan"),
     "composer": ("exulanica.selection.question", "compose_answer"),
+    "society composer": ("exulanica.selection.society_question", "compose_society_answer"),
     "request classifier": ("exulanica.selection.proposal", "classify_request"),
     "appearance drafter": ("exulanica.selection.proposal", "draft_appearance"),
     "environment drafter": (
@@ -375,6 +386,36 @@ def run_supplied_plan(world: World) -> Witness:
     return transport
 
 
+def run_society_question(world: World, *, client_for=None) -> Witness:
+    """What happened among a world's people, asked in a question naming both saved names, through
+    the client the route builds for it (``society_answer_model``), or ``client_for``'s."""
+    saved = saved_names(world.connection, world.repository.workspace_id)
+    transport = Witness([_answer_reply()])
+    services = dataclasses.replace(world.services, model_client=_process_client(transport))
+    client = (client_for or society_answer_model)(
+        services, world.connection, world.repository.workspace_id
+    )
+    assert client is not None
+    scene = build_scene(
+        SNAPSHOT,
+        targets=TARGETS,
+        events=EVENTS,
+        selected=None,
+        question=f"What happened while {PERSON} waited outside {PLACE}?",
+        saved=saved,
+    )
+    answer_about_society(
+        scene,
+        SocietySelector(scope=SocietyScope.WORLD, aspect=SocietyAspect.RECENT),
+        client=client,
+        saved=saved,
+        log=CallLog(),
+        max_tokens=4096,
+        attempts=1,
+    )
+    return transport
+
+
 def run_appearance(world: World) -> Witness:
     """``POST /selection/appearance`` with an utterance naming both: classifier, then drafter."""
     _seed_world(world.repository, world.tmp_path, world.photo_dir)
@@ -474,6 +515,7 @@ class _lent:
 SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "planner": (run_ask, "running club shirt"),
     "composer": (run_ask, "RUNNING CLUB"),
+    "society composer": (run_society_question, "Simulated minute"),
     "query embedding": (run_supplied_plan, "running club"),
     "request classifier": (run_appearance, "make the horizon softer"),
     "appearance drafter": (run_appearance, "THE REVIEWED CATALOGUE"),

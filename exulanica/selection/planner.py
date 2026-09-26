@@ -140,6 +140,7 @@ def propose_plan(
     names: RequestNames,
     now: dt.datetime | None = None,
     log: CallLog | None = None,
+    society: str | None = None,
 ) -> SelectionPlan:
     """Turn a question into a proposed Selection. Does not apply it.
 
@@ -149,6 +150,10 @@ def propose_plan(
 
     ``log`` collects what the calls actually cost and which model served them. It is optional
     because ``POST /selection/plan`` has nowhere to put the answer and asks for none.
+
+    ``society`` is a line saying simulated people are in view, and which one is selected, by
+    placeholder only (:func:`~exulanica.selection.society_question.planner_line`); without it the
+    planner is not told of any.
     """
     # ``names`` is the request's record of every name the account holder has saved, and is
     # required, so no caller can plan without it. The question is sent with each name no right
@@ -179,7 +184,11 @@ def propose_plan(
         {"role": "system", "content": _PLANNER_SYSTEM},
         {
             "role": "user",
-            "content": (f"Today is {stamp}.\n\nCatalogue:\n{catalogue_text}\n\nQuestion: {asked}"),
+            "content": (
+                f"Today is {stamp}.\n\nCatalogue:\n{catalogue_text}\n\n"
+                + (f"World: {society}\n\n" if society else "")
+                + f"Question: {asked}"
+            ),
         },
     ]
     # **One repair, then refuse**, which is the composer's shape with a different floor under it.

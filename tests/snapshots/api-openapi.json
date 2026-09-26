@@ -11977,7 +11977,7 @@
        "$ref": "#/components/schemas/AnswerClause"
       },
       "type": "array",
-      "maxItems": 12,
+      "maxItems": 14,
       "minItems": 1,
       "title": "Clauses"
      }
@@ -11988,7 +11988,7 @@
      "clauses"
     ],
     "title": "Answer",
-    "description": "What the composer returns. Never a string."
+    "description": "An answer as it is given: at most :data:`MAX_CLAUSES` clauses a composer or the fixed\nwords wrote, and up to :data:`MAX_NOTES` more that code writes before them. Never a string."
    },
    "AnswerBody": {
     "properties": {
@@ -13890,6 +13890,7 @@
     "enum": [
      "historical",
      "uncertain",
+     "simulation",
      "meta"
     ],
     "title": "ClauseType",
@@ -16830,6 +16831,28 @@
     "title": "HostPlayback",
     "description": "Whether this host advances this world on its own, and how often it would."
    },
+   "InhabitantReferenceView": {
+    "properties": {
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "inhabitant_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Inhabitant Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version_id",
+     "inhabitant_id"
+    ],
+    "title": "InhabitantReferenceView",
+    "description": "A simulated person an answer names by placeholder."
+   },
    "IntakeAccepted": {
     "properties": {
      "batch_id": {
@@ -16910,7 +16933,8 @@
     "enum": [
      "captures",
      "entities",
-     "content"
+     "content",
+     "society"
     ],
     "title": "Intent",
     "description": "What the caller wants back. Fixed, and each one has a fixed ordering.\n\nBoth intents run the same constraint resolution over the same tables. They differ only in\nwhat they project, which is why \"the Companion asked a question\" and \"the user clicked a\ndate range\" cannot diverge: there is one resolver."
@@ -19819,6 +19843,16 @@
       "anyOf": [
        {
         "$ref": "#/components/schemas/CityContextRequest"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "society_context": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SocietyContextRequest"
        },
        {
         "type": "null"
@@ -22850,6 +22884,16 @@
        }
       ]
      },
+     "society": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SocietySelector"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "epistemic": {
       "$ref": "#/components/schemas/EpistemicScope",
       "default": "confirmed"
@@ -22979,6 +23023,72 @@
     ],
     "title": "SetObjectBehaviourBody"
    },
+   "SimulationCitationView": {
+    "properties": {
+     "truth_class": {
+      "type": "string",
+      "const": "simulation",
+      "title": "Truth Class"
+     },
+     "result_kind": {
+      "type": "string",
+      "enum": [
+       "synthetic_inhabitant",
+       "simulation_event"
+      ],
+      "title": "Result Kind"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "inhabitant_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Inhabitant Id"
+     },
+     "event_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Id"
+     },
+     "tick": {
+      "type": "integer",
+      "title": "Tick"
+     },
+     "line": {
+      "type": "string",
+      "title": "Line"
+     },
+     "personal_visit_evidence": {
+      "type": "boolean",
+      "const": false,
+      "title": "Personal Visit Evidence"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "truth_class",
+     "result_kind",
+     "version_id",
+     "inhabitant_id",
+     "event_id",
+     "tick",
+     "line",
+     "personal_visit_evidence"
+    ],
+    "title": "SimulationCitationView",
+    "description": "One simulation citation: the society's state for one person, or one recorded event."
+   },
    "SocietyActionBody": {
     "properties": {
      "idempotency_key": {
@@ -23023,6 +23133,47 @@
      "intent"
     ],
     "title": "SocietyActionBody"
+   },
+   "SocietyAspect": {
+    "type": "string",
+    "enum": [
+     "who",
+     "doing",
+     "why",
+     "recent",
+     "talk_content",
+     "unrecorded"
+    ],
+    "title": "SocietyAspect",
+    "description": "What a question about a world's people asks.\n\nThe last two are what the simulation does not record, named so the planner can say so and the\nanswer can refuse by name rather than answer something else."
+   },
+   "SocietyContextRequest": {
+    "properties": {
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "inhabitant_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Inhabitant Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version_id"
+    ],
+    "title": "SocietyContextRequest",
+    "description": "The world's society the page shows, by its version, and the inhabitant selected in it.\n\nResolved by the server in the world the question is asked in. One this world does not hold, or\na person not in it, is answered as a question asked with no society, alike in every case. The\npage sends it whenever it shows simulated people, so a question about them in general has a\nsociety to be answered from."
    },
    "SocietyDistrictView": {
     "properties": {
@@ -23084,6 +23235,33 @@
      "interpretation_json"
     ],
     "title": "SocietyDistrictView"
+   },
+   "SocietyScope": {
+    "type": "string",
+    "enum": [
+     "selected",
+     "world"
+    ],
+    "title": "SocietyScope",
+    "description": "Whom a question about a world's people is about."
+   },
+   "SocietySelector": {
+    "properties": {
+     "scope": {
+      "$ref": "#/components/schemas/SocietyScope"
+     },
+     "aspect": {
+      "$ref": "#/components/schemas/SocietyAspect"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "scope",
+     "aspect"
+    ],
+    "title": "SocietySelector",
+    "description": "Whom a question about the world's simulated people is about, and what it asks."
    },
    "SourceAdmission": {
     "properties": {
@@ -24902,6 +25080,27 @@
       },
       "type": "object",
       "title": "Names"
+     },
+     "simulation": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/SimulationCitationView"
+      },
+      "type": "object",
+      "title": "Simulation"
+     },
+     "inhabitants": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/InhabitantReferenceView"
+      },
+      "type": "object",
+      "title": "Inhabitants"
+     },
+     "spots": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Spots"
      }
     },
     "additionalProperties": false,

@@ -6,7 +6,8 @@ import type {
   ModelCall,
 } from '../companion-ask-api.js';
 import { contentRowFields } from '../companion-content.js';
-import type { CompanionNames, SpokenPiece } from '../companion-names.js';
+import type { CompanionNames } from '../companion-names.js';
+import { drawSimulated, type DrawnPiece, type SocietyNames } from '../companion-simulated.js';
 import { el, replace } from './dom.js';
 import { fill, say } from './copy.js';
 
@@ -14,6 +15,8 @@ export interface CompanionSpeechOptions {
   readonly speakerName: string;
   /** Turns each placeholder the Companion's words carry back into the account holder's name. */
   readonly names: CompanionNames;
+  /** The society this page shows, for each simulated person and place an answer names. */
+  readonly society?: () => SocietyNames | null;
 }
 
 export interface CompanionSpeech {
@@ -194,9 +197,21 @@ function renderContentSurface(answer: CompanionAnswer): Node[] {
  * Spoken text as nodes: a name the account holder saved, or the words said in its place, is its
  * own element, so a surface and a test can tell a restored name from the sentence around it.
  */
-function spoken(pieces: readonly SpokenPiece[]): (Node | string)[] {
+function spoken(pieces: readonly DrawnPiece[]): (Node | string)[] {
   return pieces.map((piece) => {
     if (piece.kind === 'text') return piece.text;
+    // A simulated person or place: drawn as simulated, never as somebody from the library.
+    if (piece.kind === 'simulated') {
+      return el('span', {
+        class: 'companion-name companion-simulated',
+        'data-placeholder': piece.placeholder,
+        'data-simulated': piece.subject,
+        'data-subject-id': piece.id ?? undefined,
+        'data-unresolved': piece.drawn ? undefined : 'not_shown',
+        title: piece.subject === 'inhabitant' ? 'Simulated person, invented for this world' : undefined,
+        text: piece.text,
+      });
+    }
     return el('span', {
       class: 'companion-name',
       'data-placeholder': piece.placeholder,
@@ -272,7 +287,11 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       const paragraph = el(
         'p',
         { class: 'companion-utterance' },
-        spoken(options.names.restore(clause.text, answer.names)),
+        spoken(drawSimulated(
+          options.names.restore(clause.text, answer.names),
+          answer,
+          options.society?.() ?? null,
+        )),
       );
       paragraph.dataset['clause'] = clause.type;
       content.push(paragraph);

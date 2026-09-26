@@ -1,0 +1,569 @@
+{
+  "about": "Cases both readers of society-inhabitant-words.v1.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places and people are written by these maps.",
+  "places": {
+    "target:bench": "Bench 2",
+    "target:pillar": "Pillar"
+  },
+  "people": {
+    "p-b": "Bela Ash 2"
+  },
+  "cases": [
+    {
+      "case": "nothing recorded",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "goal": null
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Nothing is recorded about what they are doing.",
+        "why": ""
+      }
+    },
+    {
+      "case": "unnamed with no role, deciding",
+      "person": {
+        "display_name": null,
+        "role": null,
+        "goal": null,
+        "action": {
+          "kind": "idle",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "awaiting_goal"
+        }
+      },
+      "expected": {
+        "who": "Someone",
+        "what": "A simulated inhabitant, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing, deciding where to go.",
+        "why": "Because they have only just arrived."
+      }
+    },
+    {
+      "case": "blocked says the action's reason",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "idle",
+          "status": "blocked",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "no_room_at_destination"
+        },
+        "goal": {
+          "kind": "rest",
+          "reason": "restore_need",
+          "target_id": "target:bench"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Waiting.",
+        "why": "Because every place they could use is taken."
+      }
+    },
+    {
+      "case": "walking to stand",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "stand",
+          "reason": "stopping_a_while",
+          "target_id": null
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking to a spot to stand a while.",
+        "why": "Because they chose to stop and stand a while."
+      }
+    },
+    {
+      "case": "walking over to talk",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "talk",
+          "reason": "stopped_to_talk",
+          "target_id": null,
+          "partner_id": "p-b"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking over to talk with Bela Ash 2.",
+        "why": "Because they met someone and stopped to talk."
+      }
+    },
+    {
+      "case": "walking over to talk with someone gone",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "talk",
+          "reason": "stopped_to_talk",
+          "target_id": null,
+          "partner_id": "p-gone"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking over to talk with someone nearby.",
+        "why": "Because they met someone and stopped to talk."
+      }
+    },
+    {
+      "case": "walking to a free spot to make room",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": "target:bench",
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "make_room",
+          "reason": "making_room",
+          "target_id": null
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking to a free spot nearby.",
+        "why": "Because they have finished there, and someone else may need the place."
+      }
+    },
+    {
+      "case": "walking with no target",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "visit",
+          "reason": "visit_place",
+          "target_id": null
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking to a free spot nearby.",
+        "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
+      }
+    },
+    {
+      "case": "walking to rest",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": "target:bench",
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "rest",
+          "reason": "restore_need",
+          "target_id": "target:bench"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking to Bench 2 to rest.",
+        "why": "Because they need a rest, and it is the nearest place to rest they have not just used."
+      }
+    },
+    {
+      "case": "walking to visit",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": "target:pillar",
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "visit",
+          "reason": "visit_place",
+          "target_id": "target:pillar"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking to Pillar to visit.",
+        "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
+      }
+    },
+    {
+      "case": "walking to a place that is gone",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "move",
+          "status": "active",
+          "target_id": "target:gone",
+          "remaining_ticks": 0,
+          "reason": "following_reachable_route"
+        },
+        "goal": {
+          "kind": "visit",
+          "reason": "looking_around",
+          "target_id": "target:gone"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Walking to a place that is no longer there to visit.",
+        "why": "Because they are rested enough to look around, and chose this place."
+      }
+    },
+    {
+      "case": "resting, one more minute",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "rest",
+          "status": "active",
+          "target_id": "target:bench",
+          "remaining_ticks": 1,
+          "reason": "needs_a_rest"
+        },
+        "goal": {
+          "kind": "rest",
+          "reason": "sitting_a_while",
+          "target_id": "target:bench"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Resting at Bench 2, one more simulated minute.",
+        "why": "Because they chose to sit a while."
+      }
+    },
+    {
+      "case": "visiting, several more minutes",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "visit",
+          "status": "active",
+          "target_id": "target:pillar",
+          "remaining_ticks": 4,
+          "reason": "looking_around"
+        },
+        "goal": {
+          "kind": "visit",
+          "reason": "looking_around",
+          "target_id": "target:pillar"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Visiting Pillar, 4 more simulated minutes.",
+        "why": "Because they are rested enough to look around, and chose this place."
+      }
+    },
+    {
+      "case": "finished resting",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "rest",
+          "status": "completed",
+          "target_id": "target:bench",
+          "remaining_ticks": 0,
+          "reason": "reviewed_duration_elapsed"
+        },
+        "goal": {
+          "kind": "rest",
+          "reason": "restore_need",
+          "target_id": "target:bench"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Just finished resting at Bench 2.",
+        "why": "Because they need a rest, and it is the nearest place to rest they have not just used."
+      }
+    },
+    {
+      "case": "finished visiting",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "visit",
+          "status": "completed",
+          "target_id": "target:pillar",
+          "remaining_ticks": 0,
+          "reason": "reviewed_duration_elapsed"
+        },
+        "goal": {
+          "kind": "visit",
+          "reason": "visit_place",
+          "target_id": "target:pillar"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Just finished visiting Pillar.",
+        "why": "Because they are rested enough to look around, and it is the nearest place to visit they have not just used."
+      }
+    },
+    {
+      "case": "standing a while",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "stand",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 2,
+          "reason": "standing_a_while"
+        },
+        "goal": {
+          "kind": "stand",
+          "reason": "stopping_a_while",
+          "target_id": null
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing a while, 2 more simulated minutes.",
+        "why": "Because they stopped to stand a while."
+      }
+    },
+    {
+      "case": "finished standing",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "stand",
+          "status": "completed",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "reviewed_duration_elapsed"
+        },
+        "goal": {
+          "kind": "stand",
+          "reason": "stopping_a_while",
+          "target_id": null
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Just finished standing a while.",
+        "why": "Because they have been at it as long as they meant to."
+      }
+    },
+    {
+      "case": "talking",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "talk",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 3,
+          "reason": "talking"
+        },
+        "goal": {
+          "kind": "talk",
+          "reason": "stopped_to_talk",
+          "target_id": null,
+          "partner_id": "p-b"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Talking with Bela Ash 2, 3 more simulated minutes.",
+        "why": "Because they met and stopped to talk."
+      }
+    },
+    {
+      "case": "waiting for the other to talk",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "talk",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "waiting_for_partner"
+        },
+        "goal": {
+          "kind": "talk",
+          "reason": "stopped_to_talk",
+          "target_id": null,
+          "partner_id": "p-b"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Waiting for Bela Ash 2, to talk.",
+        "why": "Because the person they are meeting is still on the way."
+      }
+    },
+    {
+      "case": "finished talking, the other left",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "talk",
+          "status": "completed",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "partner_left"
+        },
+        "goal": {
+          "kind": "talk",
+          "reason": "stopped_to_talk",
+          "target_id": null,
+          "partner_id": "p-b"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Just finished talking with Bela Ash 2.",
+        "why": "Because the person they were talking with left."
+      }
+    },
+    {
+      "case": "standing aside",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "idle",
+          "status": "completed",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "made_room"
+        },
+        "goal": null
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing aside.",
+        "why": "Because they stepped out of the way."
+      }
+    },
+    {
+      "case": "deciding, asked to go there",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "idle",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "remembered_target_selected"
+        },
+        "goal": {
+          "kind": "visit",
+          "reason": "remembered_target_selected",
+          "target_id": "target:pillar"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing, deciding where to go.",
+        "why": "Because you asked them to go there."
+      }
+    },
+    {
+      "case": "a reason with no words",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "idle",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "a_reason_nobody_wrote"
+        },
+        "goal": null
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing, deciding where to go.",
+        "why": "Because of a reason this page has no words for (a_reason_nobody_wrote)."
+      }
+    }
+  ]
+}

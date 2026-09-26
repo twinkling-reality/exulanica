@@ -517,7 +517,13 @@ export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer
   return {
     question: remembered.question,
     clauses: [
-      { text: remembered.answerText, type: 'historical', citations: evidence.map((e) => e.token) },
+      // Historical only where it cites what it rests on: an uncited sentence is no statement
+      // about the person's past, whatever it was when it was first drawn.
+      {
+        text: remembered.answerText,
+        type: evidence.length > 0 ? 'historical' : 'meta',
+        citations: evidence.map((e) => e.token),
+      },
     ],
     text: remembered.answerText,
     abstained: remembered.abstained,

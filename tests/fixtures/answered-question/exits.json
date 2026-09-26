@@ -30,6 +30,7 @@
         ]
       },
       "semantic_query": null,
+      "society": null,
       "time": []
     },
     "rejections": [],
@@ -40,7 +41,8 @@
       "includes_proposals": false,
       "intent": "content",
       "total_matched": 0
-    }
+    },
+    "society_packet": null
   },
   "a content Selection found rows": {
     "abstention": null,
@@ -89,6 +91,7 @@
         ]
       },
       "semantic_query": null,
+      "society": null,
       "time": []
     },
     "rejections": [],
@@ -104,7 +107,222 @@
       "includes_proposals": false,
       "intent": "content",
       "total_matched": 1
+    },
+    "society_packet": null
+  },
+  "a name is a saved person's and an unselected inhabitant's": {
+    "abstention": "UNANSWERABLE_NOT_CAPTURED",
+    "answer": [
+      {
+        "citations": [],
+        "text": "Someone in this world shares a name in your question, and this answer is about the person you saved. To ask about the one in the world, select them and ask without the name.",
+        "type": "meta",
+        "value_refs": []
+      },
+      {
+        "citations": [],
+        "text": "I have no evidence for that. Nothing in your library matches, so there is nothing I could cite.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": {
+      "citable": true,
+      "items": [],
+      "total_matched": 0,
+      "values": [
+        [
+          "capture_count",
+          "0"
+        ],
+        [
+          "shown_count",
+          "0"
+        ],
+        [
+          "today",
+          "2026-09-23"
+        ]
+      ]
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "harbour",
+      "society": null,
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": {
+      "captures": [],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "captures",
+      "total_matched": 0
+    },
+    "society_packet": null
+  },
+  "a name is both a saved person's and the selected inhabitant's": {
+    "abstention": "UNANSWERABLE_AMBIGUOUS",
+    "answer": [
+      {
+        "citations": [],
+        "text": "A name in your question belongs both to someone you saved and to the person selected in this world, so I cannot tell who you mean. To ask about the person you saved, use their full name or clear the selection; to ask about the selected person, ask without the name, for example: why are they there?",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": null,
+    "rejections": [
+      "society_refused: synthetic_name_collision"
+    ],
+    "repaired": false,
+    "result": null,
+    "society_packet": null
+  },
+  "a question carries a typed inhabitant label": {
+    "abstention": "UNANSWERABLE_AMBIGUOUS",
+    "answer": [
+      {
+        "citations": [],
+        "text": "A label in square brackets, copied from an earlier answer, names someone only in that answer, so it names nobody here. Use the person's name, or select them in the world, and ask again.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": null,
+    "rejections": [
+      "society_refused: typed_inhabitant_label"
+    ],
+    "repaired": false,
+    "result": null,
+    "society_packet": null
+  },
+  "a society question answered from the society": {
+    "abstention": null,
+    "answer": [
+      {
+        "citations": [
+          "TOKEN00001"
+        ],
+        "text": "[inhabitant A]: Just finished talking with [inhabitant B].",
+        "type": "simulation",
+        "value_refs": []
+      },
+      {
+        "citations": [
+          "TOKEN00001",
+          "TOKEN00002"
+        ],
+        "text": "Because they have been at it as long as they meant to.",
+        "type": "simulation",
+        "value_refs": []
+      },
+      {
+        "citations": [],
+        "text": "These are simulated people, invented for this world: what they do is recorded by its simulation, and none of it is a memory or a real visit.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "society",
+      "limit": 24,
+      "place": null,
+      "semantic_query": null,
+      "society": {
+        "aspect": "why",
+        "scope": "selected"
+      },
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": null,
+    "society_packet": {
+      "inhabitants": [
+        "[inhabitant A]",
+        "[inhabitant B]"
+      ],
+      "items": [
+        [
+          "synthetic_inhabitant",
+          40,
+          "[inhabitant A]: Just finished talking with [inhabitant B]. Because they have been at it as long as they meant to."
+        ],
+        [
+          "simulation_event",
+          40,
+          "Simulated minute 40: [inhabitant A] finished talking, because they have been at it as long as they meant to. They were with [inhabitant B]."
+        ]
+      ]
     }
+  },
+  "a society question with no society in view": {
+    "abstention": "UNANSWERABLE_NOT_CAPTURED",
+    "answer": [
+      {
+        "citations": [],
+        "text": "There are no simulated people in view to ask about. Open a world with people in it, and ask again.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "society",
+      "limit": 24,
+      "place": null,
+      "semantic_query": null,
+      "society": {
+        "aspect": "recent",
+        "scope": "world"
+      },
+      "time": []
+    },
+    "rejections": [
+      "society_refused: no_society_here"
+    ],
+    "repaired": false,
+    "result": null,
+    "society_packet": null
   },
   "no right let the packet reach the composer": {
     "abstention": null,
@@ -195,6 +413,7 @@
       "limit": 24,
       "place": null,
       "semantic_query": "running club",
+      "society": null,
       "time": []
     },
     "rejections": [
@@ -209,7 +428,8 @@
       "includes_proposals": false,
       "intent": "captures",
       "total_matched": 1
-    }
+    },
+    "society_packet": null
   },
   "raises: a supplied plan names an entity nobody has": {
     "message": "unknown_reference: one or more of the 1 entity ids in this plan is not available",
@@ -322,6 +542,7 @@
       "limit": 24,
       "place": null,
       "semantic_query": "running club",
+      "society": null,
       "time": []
     },
     "rejections": [],
@@ -334,7 +555,8 @@
       "includes_proposals": false,
       "intent": "captures",
       "total_matched": 1
-    }
+    },
+    "society_packet": null
   },
   "the composer answered after one repair": {
     "abstention": null,
@@ -449,6 +671,7 @@
       "limit": 24,
       "place": null,
       "semantic_query": "running club",
+      "society": null,
       "time": []
     },
     "rejections": [
@@ -463,7 +686,8 @@
       "includes_proposals": false,
       "intent": "captures",
       "total_matched": 1
-    }
+    },
+    "society_packet": null
   },
   "the composer failed twice": {
     "abstention": null,
@@ -592,6 +816,7 @@
       "limit": 24,
       "place": null,
       "semantic_query": "running club",
+      "society": null,
       "time": []
     },
     "rejections": [
@@ -606,7 +831,8 @@
       "includes_proposals": false,
       "intent": "captures",
       "total_matched": 1
-    }
+    },
+    "society_packet": null
   },
   "the evidence changed while composing": {
     "abstention": "UNANSWERABLE_AMBIGUOUS",
@@ -647,13 +873,15 @@
       "limit": 24,
       "place": null,
       "semantic_query": "running club",
+      "society": null,
       "time": []
     },
     "rejections": [
       "evidence_changed_during_composition"
     ],
     "repaired": false,
-    "result": null
+    "result": null,
+    "society_packet": null
   },
   "the packet held guesses": {
     "abstention": "UNANSWERABLE_AMBIGUOUS",
@@ -684,6 +912,7 @@
       "limit": 24,
       "place": null,
       "semantic_query": "running club",
+      "society": null,
       "time": []
     },
     "rejections": [],
@@ -696,7 +925,8 @@
       "includes_proposals": true,
       "intent": "captures",
       "total_matched": 1
-    }
+    },
+    "society_packet": null
   },
   "the packet was empty": {
     "abstention": "UNANSWERABLE_NOT_CAPTURED",
@@ -740,6 +970,7 @@
       "limit": 24,
       "place": null,
       "semantic_query": "zebra crossing",
+      "society": null,
       "time": []
     },
     "rejections": [],
@@ -750,7 +981,8 @@
       "includes_proposals": false,
       "intent": "captures",
       "total_matched": 0
-    }
+    },
+    "society_packet": null
   },
   "the planner could not fill the form": {
     "abstention": "UNANSWERABLE_NOT_UNDERSTOOD",
@@ -798,10 +1030,11 @@
     "packet": null,
     "plan": null,
     "rejections": [
-      "Qwen/Qwen3-235B-A22B-Instruct-2507 returned JSON that passed the json_schema check and that SelectionPlan refuses, in 1 place(s): <root>: Value error, mode all is a statement about several entities and needs at least two of them; over one entity it is the same query as 'any'. Answer was '{\"intent\": \"captures\", \"entities\": {\"ids\": [\"<id 1>\"], \"mode\": \"all\"}, \"time\": [], \"place\": null, \"capture\": null, \"content\": null, \"epistemic\": \"confirmed\", \"semantic_query\": null, \"limit\": 24}'"
+      "Qwen/Qwen3-235B-A22B-Instruct-2507 returned JSON that passed the json_schema check and that SelectionPlan refuses, in 1 place(s): <root>: Value error, mode all is a statement about several entities and needs at least two of them; over one entity it is the same query as 'any'. Answer was '{\"intent\": \"captures\", \"entities\": {\"ids\": [\"<id 1>\"], \"mode\": \"all\"}, \"time\": [], \"place\": null, \"capture\": null, \"content\": null, \"society\": null, \"epistemic\": \"confirmed\", \"semantic_query\": null, \"limit\": 24}'"
     ],
     "repaired": false,
-    "result": null
+    "result": null,
+    "society_packet": null
   },
   "the planner named an entity nobody has": {
     "abstention": "UNANSWERABLE_NOT_UNDERSTOOD",
@@ -847,13 +1080,15 @@
       "limit": 24,
       "place": null,
       "semantic_query": null,
+      "society": null,
       "time": []
     },
     "rejections": [
       "unknown_reference: one or more of the 1 entity ids in this plan is not available"
     ],
     "repaired": false,
-    "result": null
+    "result": null,
+    "society_packet": null
   },
   "the planner referred to an entity the question does not name": {
     "abstention": "UNANSWERABLE_NOT_UNDERSTOOD",
@@ -899,12 +1134,76 @@
       "limit": 24,
       "place": null,
       "semantic_query": "running club",
+      "society": null,
       "time": []
     },
     "rejections": [
       "unnamed_reference: the plan refers to an entity the question does not name, which the planner could only have guessed"
     ],
     "repaired": false,
-    "result": null
+    "result": null,
+    "society_packet": null
+  },
+  "the world's people could not be read": {
+    "abstention": "UNANSWERABLE_NOT_CAPTURED",
+    "answer": [
+      {
+        "citations": [],
+        "text": "The people in this world could not be read right now, so this answer leaves them out.",
+        "type": "meta",
+        "value_refs": []
+      },
+      {
+        "citations": [],
+        "text": "I have no evidence for that. Nothing in your library matches, so there is nothing I could cite.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": {
+      "citable": true,
+      "items": [],
+      "total_matched": 0,
+      "values": [
+        [
+          "capture_count",
+          "0"
+        ],
+        [
+          "shown_count",
+          "0"
+        ],
+        [
+          "today",
+          "2026-09-23"
+        ]
+      ]
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "ferris wheel",
+      "society": null,
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": {
+      "captures": [],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "captures",
+      "total_matched": 0
+    },
+    "society_packet": null
   }
 }

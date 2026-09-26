@@ -1,7 +1,7 @@
 """Every prompt the Companion sends is pinned to the version its output is recorded under.
 
 Each prompt version is an input to the response cache key and is stored with what the prompt
-produced: an answer's execution block names ``selection-8``, a world style proposal names
+produced: an answer's execution block names ``selection-9``, a world style proposal names
 ``proposal-2``, an environment proposal names ``environment-proposal-1``. A prompt edited without
 its version moving would file new output under a prompt that no longer exists, and would serve a
 cached answer composed under the old wording. So the bytes of every prompt text are hashed here,
@@ -19,6 +19,8 @@ from exulanica.selection import environment_proposal, prompts, proposal
 #: version -> SHA-256 of the canonical JSON of that family's prompt texts, as ``_texts`` reads them.
 PINNED = {
     "selection-8": "127e11c1d78fa9bed8f222ab06a087a6d8ee7388f5751f32949a1a41df83ea20",
+    # `selection-9` adds the society composer's prompt to the family's texts.
+    "selection-9": "9200a1322581ab6df098c87531dae7505640b0ca19a8747cb66e90d0d4f6fb55",
     "proposal-2": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
     # The same texts: `proposal-3` changed the draft schema's construction and no prompt.
     "proposal-3": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
@@ -35,6 +37,7 @@ def _texts() -> dict[str, tuple[str, dict[str, str]]]:
                 "planner_system": prompts._PLANNER_SYSTEM,
                 "composer_system": prompts._COMPOSER_SYSTEM,
                 "empty_catalogue": prompts._EMPTY_CATALOGUE,
+                "society_composer_system": prompts._SOCIETY_COMPOSER_SYSTEM,
             },
         ),
         "proposal": (

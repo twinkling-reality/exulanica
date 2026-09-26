@@ -1,6 +1,7 @@
 import type { Turn } from '@exulanica/companion-runtime';
 import type { AskUnavailable, CompanionAnswer } from '../companion-ask-api.js';
 import { companionNames, type CompanionNames } from '../companion-names.js';
+import type { SocietyNames } from '../companion-simulated.js';
 import type { OpenedEvidence } from '../evidence.js';
 import type { PlaceNameRightsSource } from '../place-name-rights-api.js';
 import {
@@ -53,6 +54,11 @@ export interface CompanionEncounterOptions {
    * has not loaded, never shown as brackets.
    */
   readonly names?: CompanionNames;
+  /**
+   * The society this page shows, for the simulated people and places an answer names. Absent, or
+   * null, each is said in words as one this page is not showing.
+   */
+  readonly society?: () => SocietyNames | null;
 }
 
 export interface CompanionEncounter {
@@ -173,6 +179,7 @@ export function buildCompanionEncounter(
   const speech = buildCompanionSpeech({
     speakerName,
     names: options.names ?? companionNames(() => null),
+    ...(options.society === undefined ? {} : { society: options.society }),
   });
   const choices = buildCompanionChoiceRail(
     handlers,

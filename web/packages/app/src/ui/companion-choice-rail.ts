@@ -5,6 +5,7 @@ import { buildCompanionComposer, type CompanionComposer } from './companion-comp
 import { commandAction, el, replace } from './dom.js';
 import { say } from './copy.js';
 import { buildPlaceNameRights } from './place-name-rights.js';
+import { phrase } from '../society-inhabitant-words.js';
 
 export interface CompanionChoiceHandlers {
   readonly onSelect: (optionId: string) => void;
@@ -12,6 +13,8 @@ export interface CompanionChoiceHandlers {
   readonly onSay: (text: string) => void;
   /** Open the exact photograph the current turn, or the current answer, cites. */
   readonly onEvidence: (handleIndex: number) => void;
+  /** Show the simulated person or event an answer about the world's people cites. */
+  readonly onSimulation?: (index: number) => void;
 }
 
 export interface CompanionChoiceRail {
@@ -236,6 +239,27 @@ export function buildCompanionChoiceRail(
           { class: openable ? 'choice-item' : 'choice-item unavailable' },
           item,
         ));
+      }
+      content.push(list);
+    }
+
+    // What an answer about the world's people cites is simulation, labelled so, and opens in the
+    // inspector rather than as a photograph: it is never a memory or a visit.
+    const simulation = answer.simulation ?? [];
+    if (simulation.length > 0 && handlers.onSimulation !== undefined) {
+      const onSimulation = handlers.onSimulation;
+      const list = el('ul', {
+        class: 'companion-answer-simulation',
+        'aria-label': phrase('citation_list'),
+      });
+      for (const [index, cited] of simulation.entries()) {
+        const chip = el('button', {
+          type: 'button',
+          class: 'companion-choice companion-simulation-chip',
+          'data-truth-class': 'simulation',
+        }, [el('span', { class: 'command-action-label', text: phrase('citation_chip', { minute: cited.tick }) })]);
+        chip.addEventListener('click', () => onSimulation(index));
+        list.append(el('li', { class: 'choice-item' }, [chip]));
       }
       content.push(list);
     }

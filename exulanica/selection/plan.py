@@ -56,6 +56,9 @@ __all__ = [
     "PlaceSelector",
     "ProcessingState",
     "SelectionPlan",
+    "SocietyAspect",
+    "SocietyScope",
+    "SocietySelector",
 ]
 
 #: Cost bounds, checked by the validator rather than trusted here. They live in this module
@@ -83,6 +86,10 @@ class Intent(StrEnum):
     #: Personal memories, admitted geography, and authored variants related through a confirmed
     #: place bridge.
     CONTENT = "content"
+    #: The simulated people of the world the question is asked in: who they are, what they are
+    #: doing, why, and what the simulation recorded. Answered from the world's society, never from
+    #: photographs (:mod:`exulanica.selection.society_question`), so it is never searched.
+    SOCIETY = "society"
 
 
 class ContentScope(StrEnum):
@@ -90,6 +97,45 @@ class ContentScope(StrEnum):
 
     RELATED = "related"
     MEMORIES_ONLY = "memories_only"
+
+
+class SocietyScope(StrEnum):
+    """Whom a question about a world's people is about."""
+
+    #: The person selected in the world, or the one person the question names.
+    SELECTED = "selected"
+    #: Everybody in the world's society.
+    WORLD = "world"
+
+
+class SocietyAspect(StrEnum):
+    """What a question about a world's people asks.
+
+    The last two are what the simulation does not record, named so the planner can say so and the
+    answer can refuse by name rather than answer something else.
+    """
+
+    #: Who somebody is.
+    WHO = "who"
+    #: What they are doing now.
+    DOING = "doing"
+    #: Why they are doing it, or why they are where they are.
+    WHY = "why"
+    #: What has happened lately.
+    RECENT = "recent"
+    #: What anybody said or talked about. Talking has no content in the simulation.
+    TALK_CONTENT = "talk_content"
+    #: Anything else about them: a life outside the world, feelings, a history.
+    UNRECORDED = "unrecorded"
+
+
+class SocietySelector(BaseModel):
+    """Whom a question about the world's simulated people is about, and what it asks."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: SocietyScope
+    aspect: SocietyAspect
 
 
 class ContentPageCursor(BaseModel):
@@ -271,6 +317,7 @@ class SelectionPlan(BaseModel):
     place: PlaceSelector | None = None
     capture: CaptureSelector | None = None
     content: ContentSelector | None = None
+    society: SocietySelector | None = None
     epistemic: EpistemicScope = EpistemicScope.CONFIRMED
 
     semantic_query: Annotated[str | None, Field(max_length=MAX_SEMANTIC_QUERY_CHARS)] = Field(
@@ -325,6 +372,26 @@ class SelectionPlan(BaseModel):
                 )
         elif self.content is not None:
             raise ValueError("the content selector applies only to the content intent")
+        if self.intent is Intent.SOCIETY:
+            if self.society is None:
+                raise ValueError(
+                    "a society selection requires the society selector: the simulated people of "
+                    "the world are asked about by scope and aspect"
+                )
+            if (
+                self.entities is not None
+                or self.time
+                or self.place is not None
+                or self.capture is not None
+                or self.semantic_query is not None
+            ):
+                raise ValueError(
+                    "a society selection is about the world's simulated people and carries no "
+                    "entity, time, place, capture or semantic_query: they are not in the "
+                    "photograph library"
+                )
+        elif self.society is not None:
+            raise ValueError("the society selector applies only to the society intent")
         return self
 
     @property
@@ -336,5 +403,6 @@ class SelectionPlan(BaseModel):
             and self.place is None
             and self.capture is None
             and self.content is None
+            and self.society is None
             and self.semantic_query is None
         )

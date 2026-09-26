@@ -18,7 +18,8 @@ import { companionAppearanceConfiguration } from '@exulanica/presentation';
 import { MemoryUnavailable, rememberedAsAnswer } from '../companion-memory-api.js';
 
 import { createCompanionController, type CompanionController } from '../companion.js';
-import type { CompanionAnswer, CompanionProposal } from '../companion-ask-api.js';
+import type { CompanionAnswer, CompanionProposal, SimulationCitation } from '../companion-ask-api.js';
+import type { SocietyNames } from '../companion-simulated.js';
 import { companionNames } from '../companion-names.js';
 import type { EvidenceCache } from '../evidence.js';
 import { say } from '../ui/copy.js';
@@ -109,6 +110,10 @@ export interface CompanionDependencies {
   readonly onFirstUseAction?: (action: FirstUsePromptAction) => void;
   /** Where the places an answer is about may send their names; the answer's rail shows it. */
   readonly placeNames?: PlaceNameRightsSource;
+  /** The society the world shows, for the simulated people and places an answer names. */
+  readonly society?: () => SocietyNames | null;
+  /** Show a simulated person or event an answer cites, in the world's inspector. */
+  readonly openSimulation?: (cited: SimulationCitation, answer: CompanionAnswer) => void;
 }
 
 export interface MountedCompanion {
@@ -123,6 +128,12 @@ export interface MountedCompanion {
   dismiss(): void;
   /** Summon if away, dismiss if here. The key and the renderer verb both land here. */
   toggle(): void;
+  /**
+   * Summon, and ask `question` through `answer` rather than the question path: for a question the
+   * page already knows the shape of, such as one asked from the inspector. It is not read as a
+   * request to change the world, and it does not answer the open turn.
+   */
+  askAbout(question: string, answer: () => Promise<CompanionAnswer>): void;
   dispose(): void;
 }
 
@@ -213,7 +224,15 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
    */
   const proposalUtterances = new Map<string, string>();
 
+  /** A question `askAbout` hands over, answered by its own function once, then forgotten. */
+  let direct: (() => Promise<CompanionAnswer>) | null = null;
+
   async function askOrPropose(utterance: string): Promise<CompanionAnswer> {
+    if (direct !== null) {
+      const answer = direct;
+      direct = null;
+      return answer();
+    }
     const propose = deps.proposeAppearance;
     if (propose === undefined) return deps.ask(utterance);
     const outcome = await propose(utterance);
@@ -344,6 +363,13 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
         capturedAt: cited?.capturedAt ?? null,
       });
     },
+    ...(deps.openSimulation === undefined ? {} : {
+      onSimulation: (index: number) => {
+        const answer = controller.answer();
+        const cited = answer?.simulation?.[index];
+        if (answer !== null && cited !== undefined) deps.openSimulation?.(cited, answer);
+      },
+    }),
     onSay: (text) => {
       controller.say(text);
       reflectTurnState(controller.current());
@@ -368,6 +394,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     // Every placeholder the Companion's words carry becomes the account holder's own name, read
     // from the library this session loaded, at the moment it is drawn.
     names: companionNames(() => state.snapshot ?? null),
+    ...(deps.society === undefined ? {} : { society: deps.society }),
     ...(deps.placeNames === undefined ? {} : { placeNames: deps.placeNames }),
     ...(deps.onFirstUseAction === undefined ? {} : {
       onFirstUseAction: deps.onFirstUseAction,
@@ -380,7 +407,8 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     }),
     onAnswerShown: (answer) => {
       const remember = deps.rememberAnswer;
-      if (remember === undefined) return;
+      // An answer about the world's people is not kept (`aboutSociety` says why).
+      if (remember === undefined || answer.aboutSociety === true) return;
       void remember(answer).catch((error: unknown) => {
         // Said under the answer rather than in place of it. A durability failure is not an
         // answer failure: what is on the screen is still correct and still cited, and what is
@@ -448,6 +476,13 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     summon();
   }
 
+  function askAbout(question: string, answer: () => Promise<CompanionAnswer>): void {
+    if (panel.state() !== 'open') summon();
+    direct = answer;
+    controller.askDirectly(question);
+    reflectTurnState(controller.current());
+  }
+
   return {
     stage,
     panel,
@@ -457,6 +492,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     summon,
     dismiss,
     toggle,
+    askAbout,
     dispose: () => {
       stopOutcomes();
       if (stopPreviousOutcomes === stopOutcomes) stopPreviousOutcomes = null;

@@ -97,6 +97,11 @@ export interface CompanionController {
   select(optionId: string): void;
   submit(optionIds: readonly string[]): void;
   say(text: string): void;
+  /**
+   * Ask a question that is not an answer to the open turn, such as one a person asked from the
+   * inspector about somebody in the world. The open turn stays open.
+   */
+  askDirectly(question: string): void;
   /** The evidence behind a chip, for opening the photograph it came from. */
   evidenceAt(index: number): EvidenceHandle | null;
   /**
@@ -266,6 +271,7 @@ export function createCompanionController(
       optionIds.map(optionAnswer).filter(Boolean).join(', '),
     ),
     say: said,
+    askDirectly: (question) => void ask(question),
     // The answer's citations while an answer is showing, the turn's evidence otherwise. One
     // index space, because `E` and the chips are one gesture and the surface showing decides
     // what it points at. A citation whose span could not be located resolves to null and stops

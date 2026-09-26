@@ -48,7 +48,12 @@ from exulanica.selection.plan import (
     Intent,
     ProcessingState,
 )
-from exulanica.selection.validation import STATEMENT_TIMEOUT_MS, ValidatedPlan
+from exulanica.selection.validation import (
+    STATEMENT_TIMEOUT_MS,
+    RejectionCode,
+    SelectionRejected,
+    ValidatedPlan,
+)
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput
 from exulanica.world.society_engines import INPUT_ENGINES, LEGACY_ENGINES
@@ -186,6 +191,15 @@ def execute(
     Photographs and admitted environment sources belong to the workspace, not to a world.
     """
     plan = validated.plan
+    if plan.intent is Intent.SOCIETY:
+        # The world's simulated people are not in any table a Selection searches. A question about
+        # them is answered from the society by ``answer_question``, so a society plan that reaches
+        # a search is refused by name rather than run as a photograph search.
+        raise SelectionRejected(
+            RejectionCode.MALFORMED_PLAN,
+            "a society selection is answered from the world's simulation by POST /selection/ask "
+            "and is never searched",
+        )
     with connection.transaction():
         connection.execute(
             sql.SQL("set local statement_timeout = {}").format(sql.Literal(STATEMENT_TIMEOUT_MS))

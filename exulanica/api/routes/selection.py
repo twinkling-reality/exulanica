@@ -33,6 +33,7 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
 )
+from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
 from exulanica.environment import (
     EnvironmentOperationDenied,
@@ -45,6 +46,7 @@ from exulanica.environment.city_context import (
     answer_without_a_bridge,
     resolve_city_selection,
 )
+from exulanica.epistemics.hosted_requests import borrowing, no_place_released
 from exulanica.models.client import ModelClient
 from exulanica.selection import (
     Abstention,
@@ -67,12 +69,17 @@ from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSI
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import (
     PROMPT_VERSION,
+    AnsweredQuestion,
     ModelCall,
     answer_question,
     propose_plan,
     requires_model,
 )
 from exulanica.selection.request_names import RequestNames
+from exulanica.selection.society_question import (
+    SIMULATION,
+    SocietyEvidencePacket,
+)
 from exulanica.world import (
     StyleReference,
     WorldNotConfigured,
@@ -185,6 +192,21 @@ class CityContextRequest(BaseModel):
     feature_id: str = Field(pattern=r"^[0-9a-f]{32}$")
 
 
+class SocietyContextRequest(BaseModel):
+    """The world's society the page shows, by its version, and the inhabitant selected in it.
+
+    Resolved by the server in the world the question is asked in. One this world does not hold, or
+    a person not in it, is answered as a question asked with no society, alike in every case. The
+    page sends it whenever it shows simulated people, so a question about them in general has a
+    society to be answered from.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID | None = None
+
+
 class QuestionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -192,6 +214,7 @@ class QuestionRequest(BaseModel):
     #: A plan the user has already seen and approved. When absent the model proposes one.
     plan: SelectionPlan | None = None
     city_context: CityContextRequest | None = None
+    society_context: SocietyContextRequest | None = None
 
 
 class ModelCallView(BaseModel):
@@ -281,6 +304,34 @@ class ExecutionView(BaseModel):
     rejections: list[str]
 
 
+class SimulationCitationView(BaseModel):
+    """One simulation citation: the society's state for one person, or one recorded event."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    truth_class: Literal["simulation"]
+    result_kind: Literal["synthetic_inhabitant", "simulation_event"]
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID
+    #: Null for the state; the event's id for an event.
+    event_id: uuid.UUID | None
+    #: The simulated minute the state or event is from.
+    tick: int
+    #: The line in fixed words, with placeholders, as the answer's evidence.
+    line: str
+    #: Always false: a simulation is not a memory, and never evidence of a personal visit.
+    personal_visit_evidence: Literal[False]
+
+
+class InhabitantReferenceView(BaseModel):
+    """A simulated person an answer names by placeholder."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID
+
+
 class AnswerView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -312,6 +363,15 @@ class AnswerView(BaseModel):
     #: a person, or a place they did not allow, only by placeholder, and the client restores the
     #: name from the account holder's own data. Additive, and empty when the answer names nothing.
     names: dict[str, uuid.UUID] = Field(default_factory=dict)
+    #: Each simulation citation token, for an answer about the world's simulated people: what it
+    #: cites and its truth class, which is always ``simulation``. Additive, and empty otherwise.
+    simulation: dict[str, SimulationCitationView] = Field(default_factory=dict)
+    #: Each ``[inhabitant A]`` the answer text may carry, and the inhabitant it stands for. No
+    #: inhabitant's name is in the answer: the client draws it from the society it shows.
+    inhabitants: dict[str, InhabitantReferenceView] = Field(default_factory=dict)
+    #: Each ``[spot A]`` the answer text may carry, and the society target it stands for, which
+    #: the client names by the person's own object at that target.
+    spots: dict[str, str] = Field(default_factory=dict)
 
 
 def _society_authorizer(
@@ -414,6 +474,16 @@ def plan_from_question(
     connection: ReadOnlyConnection,
     session: CurrentSession,
 ) -> SelectionPlan:
+    if body.society_context is not None:
+        # The plan route reads no society, so it cannot write an inhabitant's name as its
+        # placeholder: a society context here is refused by name, never silently ignored.
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "society_context_not_planned: POST /selection/plan plans without the world's "
+                "people; ask about them with POST /selection/ask"
+            ),
+        )
     client = _require_model(request, connection, session)
     return propose_plan(
         client,
@@ -461,7 +531,24 @@ def ask(
         if requires_model(plan)
         else get_services(request).hosted_model(connection, session.workspace_id)
     )
-    outcome = answer_question(
+    outcome = _answer(body, request, connection, session, world_id, client, plan)
+    answer = outcome.answer
+    if city_clause is not None:
+        answer = answer_led_by(city_clause, answer)
+    return _answer_view(outcome, answer)
+
+
+def _answer(
+    body: QuestionRequest,
+    request: Request,
+    connection: Any,
+    session: Any,
+    world_id: str,
+    client: ModelClient | None,
+    plan: SelectionPlan | None,
+) -> AnsweredQuestion:
+    """The question answered in the named world, with the society the page shows, if any."""
+    return answer_question(
         connection,
         client,
         body.question,
@@ -471,10 +558,21 @@ def ask(
         store=get_services(request).store,
         society_authorizer=_society_authorizer(request, connection, session),
         before_compose=composer_rights_check(connection, session.workspace_id),
+        society_version_id=(
+            None if body.society_context is None else body.society_context.version_id
+        ),
+        society_client=(
+            None
+            if body.society_context is None
+            else society_answer_model(get_services(request), connection, session.workspace_id)
+        ),
+        selected_inhabitant_id=(
+            None if body.society_context is None else body.society_context.inhabitant_id
+        ),
     )
-    answer = outcome.answer
-    if city_clause is not None:
-        answer = answer_led_by(city_clause, answer)
+
+
+def _answer_view(outcome: AnsweredQuestion, answer: Answer) -> AnswerView:
     return AnswerView(
         answer=answer,
         plan=outcome.plan,
@@ -489,7 +587,36 @@ def ask(
         repaired=outcome.repaired,
         execution=_execution(outcome.calls, outcome.rejections),
         names=dict(outcome.names),
+        **_simulation_views(outcome.society_packet),
     )
+
+
+def _simulation_views(packet: SocietyEvidencePacket | None) -> dict[str, Any]:
+    """The simulation citations and placeholders of an answer about the world's people."""
+    if packet is None:
+        return {}
+    return {
+        "simulation": {
+            item.token: SimulationCitationView(
+                truth_class=SIMULATION,
+                result_kind=item.result_kind,
+                version_id=packet.version_id,
+                inhabitant_id=item.inhabitant_id,
+                event_id=item.event_id,
+                tick=item.tick,
+                line=item.line,
+                personal_visit_evidence=False,
+            )
+            for item in packet.items
+        },
+        "inhabitants": {
+            label: InhabitantReferenceView(
+                version_id=packet.version_id, inhabitant_id=inhabitant_id
+            )
+            for label, inhabitant_id in packet.inhabitants
+        },
+        "spots": dict(packet.spots),
+    }
 
 
 def _city_selection(
@@ -635,6 +762,27 @@ def failure_extensions(failure: BaseException) -> dict[str, object]:
         return {}
     execution = _execution(noted.calls, noted.rejections, prompt_version=noted.prompt_version)
     return {"execution": execution.model_dump(mode="json")}
+
+
+def society_answer_model(
+    services: Services, connection: Any, workspace_id: uuid.UUID
+) -> ModelClient | None:
+    """The client an answer about a world's simulated people is composed through, or None.
+
+    The workspace's own client (:meth:`Services.hosted_model`) with a policy that releases no
+    place's name added after its own. The place-name uses an account holder can allow describe
+    answers about their photographs (``exulanica/consent/place-name-uses.v1.json``); an answer
+    about simulated people is none of them, so no grant reaches it. The call site replaces every
+    saved name as well (``compose_society_answer``); this makes the boundary hold it too.
+    """
+    client = services.hosted_model(connection, workspace_id)
+    if client is None:
+        return None
+    return client.with_policy(
+        services.request_policy(
+            workspace_id, borrowing(connection), released_places=no_place_released
+        )
+    )
 
 
 def _require_model(

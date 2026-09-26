@@ -42,9 +42,10 @@ residents, infer demographic facts or demonstrate general social intelligence.
 The society is the product's core: the people in a world are its agents, and the explicit model
 proposal path below is how an open model proposes what one of them does. Inhabitants interact with
 permitted places and authored objects through declared affordances. What a person brings into and
-changes in their world changes what its people do. Inhabitants never impersonate
-remembered people. The Companion must explain actions from recorded goals, referenced objects and
-simulation events while keeping personal evidence distinct.
+changes in their world changes what its people do. Inhabitants never impersonate remembered people.
+The Companion explains what a person is doing and why from their recorded goal and action, the
+places they use and the events that explain them, cited as simulation and kept apart from personal
+evidence ([Companion questions](companion-question.md#questions-about-a-worlds-people)).
 
 The pure engine and PostgreSQL lifecycle have synthetic fixture coverage. The connected
 personal-world demonstration additionally needs the server composition/rights adapter, accepted
@@ -772,10 +773,14 @@ inputs have lost rights. Advance authorizes that latest input; historical state/
 replay authorize what they materialize individually. That distinction allows recording withdrawal
 consequences without granting permission to display withdrawn historical geometry.
 
-The Companion adapter must use the same recorded goal/action/event references, labeled simulation.
-Historical answer clauses still require personal evidence; simulated visits are never evidence of
-real visits. Selection/Companion integration, authored composition and live visual acceptance are
-separate integration responsibilities, not capabilities inferred from a fixture.
+The Companion answers from the same recorded goal/action/event references, labelled simulation
+([society question](../exulanica/selection/society_question.py)): every citation has truth class
+`simulation` and is never evidence of a personal visit, and simulated visits are never evidence of
+real visits. Historical answer clauses still require personal evidence: a simulated fact is a clause
+of type `simulation`, never `historical`. It answers for the purposeful profile and refuses another
+by name. Authored
+composition and live visual acceptance are separate integration responsibilities, not capabilities
+inferred from a fixture.
 
 ## V3 bounded observations and communication
 
@@ -828,7 +833,9 @@ means a proposal influenced the step. Inhabitant `explanation.event_ids` and bou
 actual events. Communication records transmission of information; the implementation does not
 supply dialogue or imply a model-generated conversation. All identity, goals and summaries remain
 explicitly synthetic. Companion explanations must preserve observation versus hearsay and cite
-these facts; they must not invent biography from a displayed label.
+these facts; they must not invent biography from a displayed label. The Companion's society answers
+cover the purposeful profile only and refuse a V3 society by name (`society_profile_has_no_words`),
+so it composes no V3 explanation.
 
 ## Explicit model proposals and exact replay
 

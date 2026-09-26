@@ -41,26 +41,29 @@ The planner and its catalogue are :mod:`exulanica.selection.planner`, both syste
 from __future__ import annotations
 
 import datetime as dt
+import time
 import uuid
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
 import psycopg
 
-from exulanica.epistemics.saved_names import saved_names
+from exulanica.epistemics.saved_names import SavedName, saved_names
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError, StructuredOutputError, TruncatedResponseError
 from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
 from exulanica.selection.answer import (
+    MAX_NOTES,
     Abstention,
     Answer,
     AnswerClause,
     AnswerRejected,
     ClauseType,
+    ComposedAnswer,
     abstain,
     abstain_from_a_guess,
     abstain_without_a_selection,
@@ -85,6 +88,18 @@ from exulanica.selection.planner import (
 )
 from exulanica.selection.prompts import _COMPOSER_SYSTEM, PROMPT_VERSION
 from exulanica.selection.request_names import RequestNames
+from exulanica.selection.society_question import (
+    SocietyContext,
+    SocietyEvidencePacket,
+    SocietyRefusal,
+    SocietyScene,
+    UnknownSocietyContext,
+    answer_about_society,
+    planner_line,
+    read_scene,
+    refused,
+    still_readable,
+)
 from exulanica.selection.validation import (
     RejectionCode,
     SelectionRejected,
@@ -217,7 +232,7 @@ def requires_model(plan: SelectionPlan | None) -> bool:
     A supplied CONTENT plan needs none. It refuses a semantic query, so there is no query vector
     to embed, and :func:`render_content_answer` writes its sentences without a composer.
     """
-    return plan is None or plan.intent is not Intent.CONTENT
+    return plan is None or plan.intent not in (Intent.CONTENT, Intent.SOCIETY)
 
 
 def render_content_answer(content: tuple[SelectedContent, ...]) -> Answer:
@@ -291,6 +306,9 @@ class AnsweredQuestion:
     #: packet is a search that found nothing, and this is no search at all.
     packet: EvidencePacket | None = None
     content_packet: ContentEvidencePacket | None = None
+    #: The simulation evidence an answer about the world's people rests on, with the inhabitant and
+    #: place placeholders its text may carry. ``None`` for any other answer.
+    society_packet: SocietyEvidencePacket | None = None
     #: Set when the composer failed validation once and was asked again.
     repaired: bool = False
     #: Set when the model's output was discarded and the deterministic answer used instead.
@@ -348,7 +366,7 @@ def compose_answer(
                 # evidence packet." Writing a cited answer from a bounded packet IS that task.
                 Role.REASONING_CHEAP,
                 messages,
-                Answer,
+                ComposedAnswer,
                 prompt_version=PROMPT_VERSION,
                 max_tokens=COMPOSER_MAX_TOKENS,
                 photographs=(item.capture_id for item in packet.items),
@@ -359,7 +377,8 @@ def compose_answer(
             # repair as the only call and the wall clock as half of what it was.
             if log is not None:
                 log.record(composed.call)
-            answer = composed.value
+            # Held to the composer's limit on the way in, and given as the answer it is.
+            answer = Answer(clauses=composed.value.clauses)
             # False, not `attempt == 2`. The second value means "the model's output was
             # discarded", and an answer that passed on the retry was not discarded. Conflating
             # the two reported every successful repair as a fallback.
@@ -421,6 +440,9 @@ def answer_question(
     store: ContentAddressedStore | None = None,
     society_authorizer: Callable[[dict[str, Any]], None] | None = None,
     before_compose: Callable[[Iterable[uuid.UUID], ModelHandoff], None],
+    society_version_id: uuid.UUID | None = None,
+    selected_inhabitant_id: uuid.UUID | None = None,
+    society_client: ModelClient | None = None,
 ) -> AnsweredQuestion:
     """The whole path, once. Pass ``plan`` to answer from a Selection the user already approved.
 
@@ -455,8 +477,18 @@ def answer_question(
     before anything is searched: its id was a guess, and searching it answers about a place or a
     person nobody asked about.
 
-    **``client`` may be ``None`` only for a supplied CONTENT plan** (:func:`requires_model`).
-    Anything else raises before a query runs, rather than answering part of the question.
+    **``client`` may be ``None`` only for a supplied CONTENT or SOCIETY plan**
+    (:func:`requires_model`). Anything else raises before a query runs, rather than answering part
+    of the question.
+
+    ``society_client`` is the client what happened among the people is composed through, one that
+    releases no place's name (``society_answer_model`` in ``exulanica/api/routes/selection.py``);
+    without one that answer is given in fixed words. ``society_version_id`` names the world version
+    whose society the page shows, and ``selected_inhabitant_id`` the inhabitant selected in it. A
+    question about the world's simulated people is answered from it
+    (:mod:`exulanica.selection.society_question`). One this world does not hold, or a person not in
+    it, is answered as a question asked with no society, alike in every case; one that cannot be
+    read under current authorization is left out, and the answer says so first.
     """
     if not callable(before_compose):
         raise TypeError("a packet is composed only after a before_compose right check")
@@ -464,10 +496,14 @@ def answer_question(
         raise ValueError(
             "a model client is required to plan a question or compose a capture answer"
         )
+    # The question's start: an answer about the world's people is bounded from here, so a repair
+    # is not begun that would keep the person waiting past the bound.
+    started = time.monotonic()
     log = CallLog()
     # This question's own copy of the client, so its log hears every attempt it pays for and no
     # other question's; the copy keeps every policy the client has.
     observed = None if client is None else client.with_attempts(log.attempt)
+    observed_society = None if society_client is None else society_client.with_attempts(log.attempt)
     try:
         return _answered(
             connection,
@@ -481,6 +517,13 @@ def answer_question(
             store=store,
             society_authorizer=society_authorizer,
             before_compose=before_compose,
+            society_client=observed_society,
+            started=started,
+            society=(
+                None
+                if society_version_id is None
+                else SocietyContext(society_version_id, selected_inhabitant_id)
+            ),
         )
     except Exception as failed:
         # No answer exists to carry the record, so the error that ended the request
@@ -502,25 +545,162 @@ def _answered(
     store: ContentAddressedStore | None,
     society_authorizer: Callable[[dict[str, Any]], None] | None,
     before_compose: Callable[[Iterable[uuid.UUID], ModelHandoff], None],
+    society: SocietyContext | None,
+    society_client: ModelClient | None,
+    started: float,
 ) -> AnsweredQuestion:
     """:func:`answer_question` after its preconditions, every call recorded in ``log``."""
-    proposed = plan is None
     # A person's saved name never reaches a hosted model, and a place's only under a right the
     # account holder grants for that place and the role. One record serves every request this
     # question makes: the planner and the composer are sent each name no right can release as its
     # placeholder, and each place's name for the boundary to send or to write as the same
     # placeholder. An answer that makes no model call has nothing to name.
-    names = RequestNames(
-        saved_names(connection, session.workspace_id) if requires_model(plan) else ()
+    saved = (
+        saved_names(connection, session.workspace_id)
+        if requires_model(plan) or society is not None
+        else ()
     )
-    asked = names.sendable(question)
+    names = RequestNames(saved)
+    # The world's people, read before anything is sent: every inhabitant's name in the question is
+    # written as its placeholder, so no synthetic name reaches the planner or the saved names'
+    # lookup, and a word that could be either an inhabitant or a saved person is noted.
+    scene: SocietyScene | SocietyRefusal | None = None
+    if society is not None and world_id is not None:
+        try:
+            scene = read_scene(
+                connection,
+                session.workspace_id,
+                world_id,
+                society,
+                authorize=society_authorizer,
+                question=question,
+                saved=saved,
+            )
+        except UnknownSocietyContext:
+            # A society this world does not hold, or a person not in it, whichever it was: the
+            # page's context is stale, and the question is answered as one asked with none, alike
+            # for every case, so nothing here says which it was.
+            scene = None
+    if isinstance(scene, SocietyScene) and (scene.collision or scene.typed_label):
+        # Decided on the words before anything is planned. A name the selected person and a saved
+        # person share, planned first, would be a guess about whom the person meant; a label
+        # typed from an earlier answer names nobody in this one.
+        said = refused(
+            SocietyRefusal.SYNTHETIC_NAME_COLLISION
+            if scene.collision
+            else SocietyRefusal.TYPED_INHABITANT_LABEL
+        )
+        return AnsweredQuestion(
+            answer=said.answer, plan=plan, abstention=said.abstention, rejections=said.rejections
+        )
+    answered = _planned(
+        connection,
+        client,
+        question,
+        session,
+        log,
+        world_id=world_id,
+        plan=plan,
+        now=now,
+        store=store,
+        society_authorizer=society_authorizer,
+        before_compose=before_compose,
+        society=society,
+        society_client=society_client,
+        saved=saved,
+        names=names,
+        scene=scene,
+        started=started,
+    )
+    about_society = answered.plan is not None and answered.plan.intent is Intent.SOCIETY
+    notes = []
+    if scene is SocietyRefusal.UNAVAILABLE and not about_society:
+        # The world's people could not be read, so the question was asked without them, in the
+        # person's own words. A question about the people themselves is refused by name instead.
+        notes.append(_PEOPLE_LEFT_OUT)
+    if isinstance(scene, SocietyScene) and scene.shared_name is not None and not about_society:
+        # A name the question uses is saved and also a simulated person's, and nobody is selected
+        # who has it: it was read as the saved one, the library's by default. Not said of an
+        # answer about the world's people, which is not about anybody saved.
+        notes.append(_SHARED_NAME["person" if scene.shared_name == "person" else "other"])
+    return _led_by_notes(answered, notes)
+
+
+#: Said first when the world's people could not be read and the question was asked without them.
+_PEOPLE_LEFT_OUT: Final = (
+    "The people in this world could not be read right now, so this answer leaves them out."
+)
+#: Said first when a name the question uses is also a simulated person's, read as the saved one:
+#: a saved person, or any other name saved, such as a place's.
+_SHARED_NAME: Final[Mapping[str, str]] = {
+    "person": (
+        "Someone in this world shares a name in your question, and this answer is about the "
+        "person you saved. To ask about the one in the world, select them and ask without the name."
+    ),
+    "other": (
+        "Someone in this world shares a name in your question, and this answer reads it as the "
+        "name you saved. To ask about the one in the world, select them and ask without the name."
+    ),
+}
+
+
+def _led_by_notes(answered: AnsweredQuestion, notes: Sequence[str]) -> AnsweredQuestion:
+    """The answer with ``notes`` said before anything else, each its own ``meta`` clause.
+
+    Code's words, not the composer's: they sit outside its clause limit (``MAX_NOTES`` in
+    ``exulanica/selection/answer.py``), so they cost the answer no clause and are never merged
+    into one of its clauses.
+    """
+    if not notes:
+        return answered
+    if len(notes) > MAX_NOTES:
+        raise ValueError(f"at most {MAX_NOTES} notes lead an answer, not {len(notes)}")
+    clauses = [
+        *(AnswerClause(text=note, type=ClauseType.META) for note in notes),
+        *answered.answer.clauses,
+    ]
+    return replace(answered, answer=answered.answer.model_copy(update={"clauses": clauses}))
+
+
+def _planned(
+    connection: psycopg.Connection,
+    client: ModelClient | None,
+    question: str,
+    session: Session,
+    log: CallLog,
+    *,
+    world_id: str | None,
+    plan: SelectionPlan | None,
+    now: dt.datetime | None,
+    store: ContentAddressedStore | None,
+    society_authorizer: Callable[[dict[str, Any]], None] | None,
+    before_compose: Callable[[Iterable[uuid.UUID], ModelHandoff], None],
+    society: SocietyContext | None,
+    society_client: ModelClient | None,
+    saved: Sequence[SavedName],
+    names: RequestNames,
+    scene: SocietyScene | SocietyRefusal | None,
+    started: float,
+) -> AnsweredQuestion:
+    """The question planned, if it came without a plan, and answered, with the scene read."""
+    proposed = plan is None
+    readable = scene if isinstance(scene, SocietyScene) else None
+    asked = names.sendable(readable.question if readable is not None else question)
     # What the question's own words name: the only entities the planner is sent by name, and so
     # the only ids a Selection it proposes may refer to. Taken before a packet line names more.
     named = frozenset(names.placeholders)
     if plan is None:
         catalogue = entity_catalogue(connection, session.workspace_id)
         try:
-            plan = propose_plan(client, question, catalogue, names=names, now=now, log=log)
+            plan = propose_plan(
+                client,
+                readable.question if readable is not None else question,
+                catalogue,
+                names=names,
+                now=now,
+                log=log,
+                society=planner_line(readable),
+            )
         except StructuredOutputError as refused:
             # The endpoint answered and the answer was not a plan, twice. Nothing was searched
             # and nothing is claimed about the library.
@@ -528,6 +708,20 @@ def _answered(
             return AnsweredQuestion(
                 answer=answer, abstention=reason, rejections=(str(refused),), calls=log.calls
             )
+    if plan.intent is Intent.SOCIETY:
+        return _answered_about_society(
+            connection,
+            session,
+            world_id,
+            society,
+            scene,
+            plan,
+            client=society_client,
+            saved=saved,
+            log=log,
+            authorize=society_authorizer,
+            started=started,
+        )
     try:
         validated = validate(connection, plan, session)
     except SelectionRejected as rejected:
@@ -701,6 +895,77 @@ def _answered(
         rejections=rejections,
         calls=log.calls,
         names=tuple((label, entity_id) for entity_id, label in names.placeholders.items()),
+    )
+
+
+def _answered_about_society(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str | None,
+    society: SocietyContext | None,
+    scene: SocietyScene | SocietyRefusal | None,
+    plan: SelectionPlan,
+    *,
+    client: ModelClient | None,
+    saved: Sequence[SavedName],
+    log: CallLog,
+    authorize: Callable[[dict[str, Any]], None] | None,
+    started: float,
+) -> AnsweredQuestion:
+    """A question about the world's simulated people, answered from its society or refused.
+
+    A composed answer was waited for, so the society is read again under current authorization
+    before it is returned, as a photograph answer's evidence is.
+    """
+    assert plan.society is not None  # SelectionPlan requires it of the society intent
+    if isinstance(scene, SocietyRefusal):
+        said = refused(scene)
+    else:
+        said = answer_about_society(
+            scene,
+            plan.society,
+            client=client,
+            saved=saved,
+            log=log,
+            max_tokens=COMPOSER_MAX_TOKENS,
+            attempts=COMPOSER_ATTEMPTS,
+            started=started,
+        )
+    if (
+        log.calls
+        and said.packet is not None
+        and society is not None
+        and world_id is not None
+        and not still_readable(connection, session.workspace_id, world_id, society, authorize)
+    ):
+        return AnsweredQuestion(
+            answer=Answer(
+                clauses=[
+                    AnswerClause(
+                        text=(
+                            "The people in this world changed while I was answering, and I can no "
+                            "longer read them. Please ask again."
+                        ),
+                        type=ClauseType.META,
+                    )
+                ]
+            ),
+            plan=plan,
+            abstention=Abstention.AMBIGUOUS,
+            rejections=(*said.rejections, "evidence_changed_during_composition"),
+            calls=log.calls,
+        )
+    return AnsweredQuestion(
+        answer=said.answer,
+        plan=plan,
+        society_packet=said.packet,
+        abstention=said.abstention,
+        deterministic=said.deterministic,
+        repaired=said.repaired,
+        rejections=said.rejections,
+        calls=log.calls,
+        # No saved name's placeholder: an answer about simulated people is the inspector's words
+        # and the event lines' own, and names nobody from the library.
     )
 
 

@@ -38,7 +38,14 @@ from dataclasses import dataclass, field
 
 import psycopg
 
-__all__ = ["PLACEHOLDER", "Redacted", "SavedName", "redact_names", "saved_names"]
+__all__ = [
+    "PLACEHOLDER",
+    "Redacted",
+    "SavedName",
+    "recognised_spans",
+    "redact_names",
+    "saved_names",
+]
 
 #: The shortest part of a person's saved name that is recognised on its own. Shorter parts ("Li",
 #: "de", "al") are ordinary words far more often than they are anyone's whole reference to a person.
@@ -124,6 +131,26 @@ def _patterns(names: Iterable[SavedName]) -> list[tuple[re.Pattern[str], SavedNa
         )
         for form, saved in forms
     ]
+
+
+def recognised_spans(text: str, names: Iterable[SavedName]) -> list[tuple[int, int, SavedName]]:
+    """Where in ``text`` a saved name is recognised, as :func:`redact_names` would recognise it,
+    and whose it is.
+
+    The same patterns in the same order, longest first, each span kept only where no longer one
+    and no placeholder already in the text covers it. For a caller that must leave a saved name's
+    own words as they are while it rewrites the rest of a text, such as the Companion writing a
+    simulated person's name as a placeholder (``exulanica/selection/society_question.py``).
+    """
+    taken = [(match.start(), match.end()) for match in PLACEHOLDER.finditer(text)]
+    found: list[tuple[int, int, SavedName]] = []
+    for pattern, saved in _patterns(names):
+        for match in pattern.finditer(text):
+            start, end = match.start(), match.end()
+            held = (*taken, *((a, b) for a, b, _ in found))
+            if all(end <= a or start >= b for a, b in held):
+                found.append((start, end, saved))
+    return sorted(found, key=lambda span: span[:2])
 
 
 def redact_names(
