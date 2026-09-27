@@ -3,16 +3,26 @@ host asks them.
 
 A comparison is defined and run by a local command (``python -m exulanica.orchestration.compare``),
 never from a route: the page only reads what a comparison recorded. The runner plays each run
-through :func:`exulanica.world.society_comparison.play`. A model arm's people are asked as the
-host's playback asks a person whose world's owner chose a model, save that rules which would change
-a question fail the run where the host leaves those people to their routine, and that an ask ends
+through :func:`exulanica.world.society_comparison.play`. Every person a model decides for, the
+group under a model arm and anybody outside it whose world's owner chose a model, is asked as the
+host's playback asks a person whose owner chose a model, save that rules which would change a
+question fail the run where the host leaves those people to their routine, and that an ask ends
 by the contract's deadline alone, with no lease to end within: the workspace's rules judge the
-fixed description and every label once a minute before anybody is asked, a label they would
-change is left out (``_sendable_labels``), and each person is asked by
+fixed description and every label once a minute before anybody is asked, for each model in one
+pass, a label they would change is left out (``_sendable_labels``), and each person is asked by
 :func:`~exulanica.api.society_person_decisions.ask_person`, through the one client, with no
 database connection held while anybody is asked. Each minute's receipts are appended as they are
 paid for, and a run ends in one outcome: completed, with its minutes' digests and the score's
 terms, or failed by name.
+
+A seed's anchors run before any model run of it, and a model run starts only once both of its
+seed's anchors completed: one refused by name while either has no outcome (``anchors_first``), and
+closed as failed before anything is asked when either failed (``anchor_failed``), since its score
+could never be read. The routine's run records its choice points for the group, the denominator
+every rate of what a model answered on that seed is read over. Where everybody outside the group
+follows their routine, as a judged comparison requires, the anchors ask nobody, so that
+denominator is fixed before any model is asked and no model's answers move it; in a development
+comparison with a model outside the group, the anchors ask it too, and the served result says so.
 
 What makes a run fail rather than complete is the host, never the model: a process budget that no
 longer fits one ask of the arm's model, a provider or credential the process refuses, a model the
@@ -44,7 +54,7 @@ from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ManifestError
-from exulanica.models.manifest import Manifest, ModelSpec, Role
+from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec, Role
 from exulanica.models.policy import HostedRequestPolicy
 from exulanica.models.usage import usd_string
 from exulanica.selection.validation import Session
@@ -52,21 +62,25 @@ from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison
 from exulanica.world.society_comparison import PlayedRun, RunPlan, play
 from exulanica.world.society_comparison_repository import (
     SocietyComparisonRepository,
+    run_id_for,
     seed_digest,
 )
 from exulanica.world.society_comparison_result import (
     FAILURE_PROFILE,
+    ComparisonRefused,
+    definition_version,
     protocol_value,
     run_outcome,
 )
+from exulanica.world.society_comparison_verdict import ANCHOR_ROLES
 from exulanica.world.society_decision_contract import (
     PROMPT_VERSION,
     DecisionContract,
     DecisionOption,
     decision_contract,
 )
+from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 from exulanica.world.society_repository import SocietyRepository
-from exulanica.world.society_score import person_score
 
 __all__ = ["RUN_FAILURE_CODES", "ComparisonArm", "SocietyComparisonRunner", "call_facts"]
 
@@ -75,11 +89,13 @@ _LOG = logging.getLogger(__name__)
 #: asking: a budget that no longer fits one ask, a provider or a credential the process refuses, a
 #: model the manifest no longer offers, serves from another provider or asks otherwise than the
 #: definition recorded, rules that would change the question itself, or a request the rules
-#: refused; or a run the process stopped part way, found with receipts and no outcome. A receipt
-#: whose reason is one of them stops its run there; every other reason a turn was not the model's
-#: is the model's own, and is scored (``turns_unanswered``). The page has words for each.
+#: refused; a run the process stopped part way, found with receipts and no outcome; or a model run
+#: whose seed's anchors did not complete, closed before it asks. A receipt whose reason is one of
+#: them stops its run there; every other reason a turn was not the model's is the model's own, and
+#: is reported beside the score. The page has words for each.
 RUN_FAILURE_CODES: Final = frozenset(
     {
+        "anchor_failed",
         "interrupted",
         "model_no_longer_offered",
         "process_budget_spent",
@@ -97,6 +113,8 @@ RUN_FAILURE_CODES: Final = frozenset(
 INTERRUPTED: Final = "interrupted"
 #: Why a run failed before anybody was asked in a minute: the rules would change the question.
 QUESTION_CHANGED: Final = "question_changed_by_rules"
+#: Why a model run is closed before it asks: an anchor of its seed failed, so it has no score.
+ANCHOR_FAILED: Final = "anchor_failed"
 
 
 class _RunStopped(Exception):
@@ -144,48 +162,60 @@ class ComparisonArm:
 
 
 class _Asking:
-    """A model arm's asking, minute by minute, as the host asks a chosen person's model."""
+    """A run's asking, minute by minute, as the host asks a chosen person's model: one or more
+    models, each person asked of the model that decides for them."""
 
     def __init__(
         self,
         client: ModelClient,
         manifest: Manifest,
         contract: DecisionContract,
-        spec: ModelSpec,
-        config: Mapping[str, Any],
+        models: Mapping[str, tuple[ModelSpec, AnsweringMechanism]],
+        model_of: Callable[[str], str],
     ) -> None:
         self.client = client
         self.manifest = manifest
         self.contract = contract
-        self.spec = spec
-        self.config = config
-        self.mechanism = contract.mechanism_for(spec)
+        #: Each model the run asks, by identifier, and how it is asked.
+        self.models = models
+        #: The model that decides for a person a model decides for, by subject id.
+        self.model_of = model_of
 
     def offerable(
         self, tick: int, due: Mapping[str, Sequence[DecisionOption]]
     ) -> dict[str, frozenset[str]]:
-        refused = self.client.refusals.get(self.spec.provider)
-        if refused is not None:
-            raise _RunStopped(refused)
+        asked = sorted({self.model_of(subject) for subject in due})
+        for model_id in asked:
+            refused = self.client.refusals.get(self.models[model_id][0].provider)
+            if refused is not None:
+                raise _RunStopped(refused)
         # Room is judged as the host judges it, on what is spent, with nothing kept back: the
-        # comparison's process does no other work, so the whole budget is the comparison's.
+        # comparison's process does no other work, so the whole budget is the comparison's. One
+        # ask of the dearest model due must fit.
         budget = self.client.budget
-        need = ask_bound_usd(budget, self.spec, self.contract)
+        need = max(ask_bound_usd(budget, self.models[m][0], self.contract) for m in asked)
         calls = self.contract.value("answer_attempts_maximum")
         if budget.ceiling_usd - budget.spent_usd < need or (
             budget.max_calls - budget.billed_calls < calls
         ):
             raise _RunStopped("process_budget_spent")
-        labels = sorted({option.label for options in due.values() for option in options})
-        sendable = _sendable_labels(self.client, self.spec.model_id, labels)
-        if sendable is None:
-            raise _RunStopped(QUESTION_CHANGED)
-        return {subject: sendable for subject in due}
+        sendable: dict[str, frozenset[str]] = {}
+        for model_id in asked:
+            labels = sorted(
+                {
+                    option.label
+                    for subject, options in due.items()
+                    if self.model_of(subject) == model_id
+                    for option in options
+                }
+            )
+            found = _sendable_labels(self.client, model_id, labels)
+            if found is None:
+                raise _RunStopped(QUESTION_CHANGED)
+            sendable[model_id] = found
+        return {subject: sendable[self.model_of(subject)] for subject in due}
 
     def answers(self, requests: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-        mechanism = self.mechanism
-        if mechanism is None:
-            raise _RunStopped("model_no_longer_offered")
         ends_at = time.monotonic() + self.contract.value("decision_deadline_ms") / 1000
         workers = max(1, min(self.contract.value("concurrent_calls_maximum"), len(requests)))
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -193,7 +223,7 @@ class _Asking:
                 pool.submit(
                     ask_person,
                     self.client,
-                    PersonAsk(request, self.spec, mechanism),
+                    PersonAsk(request, *self.models[request["provider_config"]["model_id"]]),
                     self.contract,
                     ends_at,
                 )
@@ -260,8 +290,9 @@ class SocietyComparisonRunner:
 
     # -- definitions -------------------------------------------------------------------------
 
-    def model_arm(self, arm: ComparisonArm, role: str) -> dict[str, Any]:
-        """A model arm as a definition records it: the model, how it is asked and under what."""
+    def _model(self, arm: ComparisonArm, choice_seq: int | None) -> tuple[dict, dict, ModelSpec]:
+        """A model as a definition records it: the decider, and what its requests record of how
+        it is asked and under what, as the host records it for a person whose owner chose it."""
         contract = decision_contract()
         try:
             spec = self.manifest.offered(Role.SOCIETY_DECISION, arm.model_id)
@@ -270,22 +301,95 @@ class SocietyComparisonRunner:
         mechanism = contract.mechanism_for(spec)
         if spec.provider != arm.provider or mechanism is None:
             raise ValueError(f"{arm.provider}/{arm.model_id} is not askable under the contract")
+        decider = {"kind": "model", "provider": spec.provider, "model_id": spec.model_id}
+        config = {
+            "provider": spec.provider,
+            "model_id": spec.model_id,
+            "mechanism": mechanism.value,
+            "choice_seq": choice_seq,
+            "manifest_sha256": self.manifest_sha256,
+            "prompt_version": PROMPT_VERSION,
+            "contract": contract.binding(),
+            "deadline_ms": contract.value("decision_deadline_ms"),
+        }
+        return decider, config, spec
+
+    def model_arm(self, arm: ComparisonArm, role: str) -> dict[str, Any]:
+        """A model arm as a definition records it: the model, how it is asked and under what."""
+        # No owner's choice made the group model-run: the comparison's arm did.
+        decider, config, spec = self._model(arm, None)
         return {
             "role": role,
-            "decider": {"kind": "model", "provider": spec.provider, "model_id": spec.model_id},
-            "provider_config": {
-                "provider": spec.provider,
-                "model_id": spec.model_id,
-                "mechanism": mechanism.value,
-                # No owner's choice made this person model-run: the comparison's arm did.
-                "choice_seq": None,
-                "manifest_sha256": self.manifest_sha256,
-                "prompt_version": PROMPT_VERSION,
-                "contract": contract.binding(),
-                "deadline_ms": contract.value("decision_deadline_ms"),
-            },
+            "decider": decider,
+            "provider_config": config,
             "description": spec.description,
         }
+
+    def _choices(self, version_id: uuid.UUID) -> tuple[list[str], list[dict[str, Any]]]:
+        """The version's people, by subject id, and every choice its owner made, in order."""
+        with self.database.session(self.workspace_id) as connection:
+            row = self._repository(connection).society._row(version_id)
+            if row is None:
+                raise ComparisonRefused("society_unavailable", "the version holds no society")
+            choices = SocietyModelChoiceRepository(
+                connection, self.workspace_id, world_id=self.world_id
+            ).history(version_id)
+        return sorted(person["id"] for person in row["state"]["inhabitants"]), choices
+
+    def group_of_choice(self, version_id: uuid.UUID, choice_seq: int) -> dict[str, Any]:
+        """The group one of the owner's choices named, as a definition's body states it."""
+        _people, choices = self._choices(version_id)
+        choice = next((held for held in choices if held["choice_seq"] == choice_seq), None)
+        if choice is None:
+            raise ComparisonRefused("choice_unknown", f"no choice {choice_seq} in this world")
+        return {
+            "people": sorted(choice["people"]),
+            "source": {
+                "kind": "owner_choice",
+                "choice_seq": choice["choice_seq"],
+                "document_sha256": choice["document_sha256"],
+            },
+        }
+
+    def others_for(self, version_id: uuid.UUID, group: Sequence[str] | None) -> list[dict]:
+        """Everybody outside ``group`` and what decides for them in every arm: the model the
+        owner's latest choice for them names, asked as the host asks it, or their routine. A model
+        the owner chose that this server cannot ask as the contract asks it is refused by name,
+        since every arm would ask it."""
+        people, choices = self._choices(version_id)
+        if group is None:
+            return []
+        latest: dict[str, dict[str, Any]] = {}
+        for made in choices:
+            for subject in made["people"]:
+                latest[subject] = made
+        others = []
+        for subject in sorted(set(people) - set(group)):
+            choice = latest.get(subject)
+            decider: dict[str, Any] = {"kind": "routine"}
+            config: dict[str, Any] | None = None
+            if choice is not None and choice["model"] is not None:
+                model = choice["model"]
+                try:
+                    decider, config, _spec = self._model(
+                        ComparisonArm(model["provider"], model["model_id"]), choice["choice_seq"]
+                    )
+                except ValueError as exc:
+                    raise ComparisonRefused("owner_choice_not_askable", str(exc)) from exc
+            others.append(
+                {
+                    "id": subject,
+                    "decider": decider,
+                    "provider_config": config,
+                    "choice": None
+                    if choice is None
+                    else {
+                        "choice_seq": choice["choice_seq"],
+                        "document_sha256": choice["document_sha256"],
+                    },
+                }
+            )
+        return others
 
     def define(
         self,
@@ -317,10 +421,26 @@ class SocietyComparisonRunner:
             ]
 
     def run_all(self, comparison_id: uuid.UUID, run_ids: Sequence[uuid.UUID]) -> list[dict]:
-        """Play every run that has no outcome yet, the protocol's number at a time."""
+        """Play every run that has no outcome yet, the protocol's number at a time: every
+        anchor first, so each seed's routine run has recorded the group's choice points before any
+        model is asked on that seed. Outcomes come back in the order ``run_ids`` names them."""
         at_once = protocol_value(self.catalogs, "runs_at_once")
-        with ThreadPoolExecutor(max_workers=at_once) as pool:
-            return list(pool.map(lambda run_id: self.run(comparison_id, run_id), run_ids))
+        with self.database.session(self.workspace_id) as connection:
+            repository = self._repository(connection)
+            arms = repository._definition(comparison_id)["document"]["arms"]  # type: ignore[index]
+            roles = {run_id: arms[repository._run(run_id)["arm"]]["role"] for run_id in run_ids}
+        found: dict[uuid.UUID, dict] = {}
+        for first in (True, False):
+            wave = [run_id for run_id in run_ids if (roles[run_id] in ANCHOR_ROLES) == first]
+            with ThreadPoolExecutor(max_workers=at_once) as pool:
+                found.update(
+                    zip(
+                        wave,
+                        pool.map(lambda run_id: self.run(comparison_id, run_id), wave),
+                        strict=True,
+                    )
+                )
+        return [found[run_id] for run_id in run_ids]
 
     def run(self, comparison_id: uuid.UUID, run_id: uuid.UUID) -> dict[str, Any]:
         """Play one reserved run and record its outcome; a run already finished is read back.
@@ -346,7 +466,21 @@ class SocietyComparisonRunner:
                     ),
                 )
             plan, definition = repository.plan(comparison_id, run_id)
-            arm = repository._run(run_id)["arm"]
+            reserved = repository._run(run_id)
+            arm = reserved["arm"]
+            if definition_version(definition) == 2:
+                anchors = self._anchor_statuses(repository, comparison_id, definition, reserved)
+                if None in anchors:
+                    raise ComparisonRefused(
+                        "anchors_first",
+                        "a model run starts once both anchors of its seed have completed",
+                    )
+                if any(status != "completed" for status in anchors):
+                    return repository.finish(
+                        comparison_id,
+                        run_id,
+                        self._failed(definition, arm, reserved["seed_digest"], ANCHOR_FAILED),
+                    )
         digest = seed_digest(plan.seed)
 
         def store(tick: int, requests: Sequence[dict], receipts: Sequence[dict]) -> None:
@@ -371,30 +505,64 @@ class SocietyComparisonRunner:
         with self.database.session(self.workspace_id) as connection, connection.transaction():
             return self._repository(connection).finish(comparison_id, run_id, outcome)
 
+    @staticmethod
+    def _anchor_statuses(
+        repository: SocietyComparisonRepository,
+        comparison_id: uuid.UUID,
+        definition: Mapping[str, Any],
+        reserved: Mapping[str, Any],
+    ) -> tuple[str | None, ...]:
+        """The status of each anchor run of this run's seed, None where it has no outcome yet; an
+        anchor run itself waits for nothing, and reads as nothing to wait for."""
+        arms = definition["arms"]
+        if arms[reserved["arm"]]["role"] in ANCHOR_ROLES:
+            return ()
+        statuses = []
+        for key in sorted(key for key, arm in arms.items() if arm["role"] in ANCHOR_ROLES):
+            outcome = repository.outcome(run_id_for(comparison_id, key, reserved["seed_digest"]))
+            statuses.append(None if outcome is None else outcome["status"])
+        return tuple(statuses)
+
     def _asking(self, plan: RunPlan) -> _Asking | _Anchor:
-        if plan.decider["kind"] != "model":
+        """What a run asks: nobody where no model decides for anybody in it, else every model
+        that does, each checked against the manifest as the definition recorded it."""
+        deciders = [
+            (plan.decider, plan.provider_config),
+            *((held["decider"], held["provider_config"]) for held in plan.others.values()),
+        ]
+        configs = [config for decider, config in deciders if decider["kind"] == "model"]
+        if not configs:
             return _Anchor()
-        config = plan.provider_config or {}
         if self.client is None:
             raise _RunStoppedBeforeStart("provider_credential_absent")
-        try:
-            spec = self.manifest.offered(Role.SOCIETY_DECISION, config["model_id"])
-        except ManifestError:
-            raise _RunStoppedBeforeStart("model_no_longer_offered") from None
-        mechanism = plan.contract.mechanism_for(spec)
-        if (
-            spec.provider != config["provider"]
-            or mechanism is None
-            or mechanism.value != config["mechanism"]
-            or config["prompt_version"] != PROMPT_VERSION
-        ):
-            raise _RunStoppedBeforeStart("provider_configuration_changed")
+        models: dict[str, tuple[ModelSpec, AnsweringMechanism]] = {}
+        for config in configs:
+            assert config is not None
+            try:
+                spec = self.manifest.offered(Role.SOCIETY_DECISION, config["model_id"])
+            except ManifestError:
+                raise _RunStoppedBeforeStart("model_no_longer_offered") from None
+            mechanism = plan.contract.mechanism_for(spec)
+            if (
+                spec.provider != config["provider"]
+                or mechanism is None
+                or mechanism.value != config["mechanism"]
+                or config["prompt_version"] != PROMPT_VERSION
+            ):
+                raise _RunStoppedBeforeStart("provider_configuration_changed")
+            models[spec.model_id] = (spec, mechanism)
+
+        def model_of(subject: str) -> str:
+            _decider, config = plan.decider_for(subject)
+            assert config is not None, "only a person a model decides for is asked"
+            return str(config["model_id"])
+
         return _Asking(
             self.client.with_policy(self.policy_for(self.workspace_id)),
             self.manifest,
             plan.contract,
-            spec,
-            config,
+            models,
+            model_of,
         )
 
     @staticmethod
@@ -408,9 +576,37 @@ class SocietyComparisonRunner:
             "code": code,
         }
 
+    def _catalogs_for(self, definition: Mapping[str, Any]) -> ComparisonCatalogs:
+        """The catalogs a run of ``definition`` is scored under: the runner's own when they are
+        the versions the definition recorded, else those versions as committed."""
+        versions = definition["scoring"]["catalogs"]["versions"]
+        if dict(self.catalogs.versions) == dict(versions):
+            return self.catalogs
+        return load_comparison_catalogs(versions=versions)
+
     def _completed(
         self, plan: RunPlan, definition: Mapping[str, Any], arm: str, digest: str, played: PlayedRun
     ) -> dict:
-        calls = call_facts(played.receipts) if plan.decider["kind"] == "model" else None
-        score = person_score(self.catalogs.score)
-        return run_outcome(plan, definition, arm, digest, played, calls, score)
+        # What the group's asking took, and apart, what asking everybody else took.
+        grouped = [
+            receipt
+            for receipt in played.receipts
+            if plan.group is None or receipt["subject_id"] in plan.group
+        ]
+        outside = [
+            receipt
+            for receipt in played.receipts
+            if plan.group is not None and receipt["subject_id"] not in plan.group
+        ]
+        calls = call_facts(grouped) if plan.decider["kind"] == "model" else None
+        others_calls = call_facts(outside) if outside else None
+        return run_outcome(
+            plan,
+            definition,
+            arm,
+            digest,
+            played,
+            calls,
+            self._catalogs_for(definition),
+            others_calls=others_calls,
+        )

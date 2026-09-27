@@ -2,10 +2,11 @@
 // held here to the Python source that states the codes.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ARM_ROLES, VERDICT_CODES } from '../src/society-comparison-api.js';
+import { ARM_ROLES, GROUP_SOURCES, VERDICT_CODES } from '../src/society-comparison-api.js';
 import {
   EXCLUDED_WORDS,
   FAILURE_WORDS,
+  GROUP_SOURCE_WORDS,
   NOT_JUDGED_WORDS,
   VERDICT_WORDS,
 } from '../src/ui/society-comparison.js';
@@ -60,5 +61,12 @@ describe('the Compare view\'s words for the codes a comparison records', () => {
     const roles = stated('exulanica/world/society_comparison_result.py', 'ARM_ROLES');
     expect(roles).toContain('control');
     expect([...ARM_ROLES]).toEqual(roles);
+  });
+
+  it('reads, and has words for, exactly the places a comparison\'s group comes from', () => {
+    const sources = stated('exulanica/world/society_comparison_result.py', 'GROUP_SOURCES');
+    expect(sources).toContain('owner_choice');
+    expect([...GROUP_SOURCES]).toEqual(sources);
+    expect(Object.keys(GROUP_SOURCE_WORDS).sort()).toEqual([...sources].sort());
   });
 });

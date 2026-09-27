@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import json
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from exulanica.models.manifest import Role, load_manifest
@@ -17,12 +20,27 @@ from exulanica.world.society_decision_contract import PROMPT_VERSION, decision_c
 
 #: The seeds tests run, committed to the development phase of a test copy of the catalogs.
 SEEDS = ("d1" * 32, "d2" * 32)
+ROOT = Path(__file__).resolve().parents[1]
+#: The first judged comparison's pre-registration: what that comparison registered, read from the
+#: record rather than restated here.
+FIRST_PREREGISTRATION = (
+    ROOT / "docs" / "evaluation" / "2026-09-26-society-model-comparison-preregistration.json"
+)
+#: The catalog versions the first judged comparison was defined and scored under.
+FIRST_VERSIONS: dict[str, int] = json.loads(FIRST_PREREGISTRATION.read_text(encoding="utf-8"))[
+    "record"
+]["scoring"]["catalogs"]["versions"]
+#: A group of everybody, as a definition body states it.
+EVERYBODY = {"people": None, "source": {"kind": "everyone"}}
 
 
-def seeded_catalogs(*, population_maximum: int | None = None) -> ComparisonCatalogs:
-    """The committed catalogs with :data:`SEEDS` committed to the development phase, and, for a
-    society larger than a saved world's, a larger population bound."""
-    committed = load_comparison_catalogs()
+def seeded_catalogs(
+    *, population_maximum: int | None = None, versions: Mapping[str, int] | None = None
+) -> ComparisonCatalogs:
+    """The committed catalogs, at ``versions`` or the ones a new comparison is defined under,
+    with :data:`SEEDS` committed to the development phase, and, for a society larger than a saved
+    world's, a larger population bound."""
+    committed = load_comparison_catalogs(versions=versions)
     seeds = {
         f"test_{index}": {
             "phase": "development",
@@ -69,6 +87,8 @@ def development_body(catalogs: ComparisonCatalogs) -> dict[str, Any]:
         "window_ticks": int(catalogs.protocol["window_ticks"]["value"]),  # type: ignore[call-overload]
         "phase": "development",
         "seeds": [hashlib.sha256(seed.encode()).hexdigest() for seed in SEEDS],
+        "group": dict(EVERYBODY),
+        "others": [],
         "arms": {
             "routine": {
                 "role": "one",

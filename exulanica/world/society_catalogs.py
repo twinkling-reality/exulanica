@@ -31,7 +31,9 @@ published beside the old one.
 How such a person's hour is scored, and the protocol and seeds a comparison of the models that run
 them is made under, are read from the same directory too, :func:`load_comparison_catalogs`:
 ``society-person-score``, ``society-comparison-protocol`` and ``society-comparison-seeds``, whose
-entries commit each seed by the SHA-256 of its text and never state the seed.
+entries commit each seed by the SHA-256 of its text and never state the seed. A comparison records
+the versions it was defined under and is read under them, so the first version of each stays beside
+the second for as long as a comparison names it.
 """
 
 from __future__ import annotations
@@ -121,16 +123,22 @@ DECISION_ACTION_KINDS: Final = ("target", "wait")
 PERSON_SCORE_CATALOG: Final = "society-person-score"
 COMPARISON_PROTOCOL_CATALOG: Final = "society-comparison-protocol"
 COMPARISON_SEEDS_CATALOG: Final = "society-comparison-seeds"
+#: The versions a new comparison is defined under: the score of how people fared with what each
+#: model answered reported apart, its protocol, and seeds held out afresh.
 COMPARISON_VERSIONS: Final = {
-    PERSON_SCORE_CATALOG: 1,
-    COMPARISON_PROTOCOL_CATALOG: 1,
-    COMPARISON_SEEDS_CATALOG: 1,
+    PERSON_SCORE_CATALOG: 2,
+    COMPARISON_PROTOCOL_CATALOG: 2,
+    COMPARISON_SEEDS_CATALOG: 2,
 }
 #: Whether a score term is weighed or only reported, and what a term reads: a run's minutes, the
 #: events the engine appended, or the host's record of each call, which only a reader outside the
 #: score reads.
 SCORE_PARTS: Final = ("primary", "held_out")
 SCORE_READS: Final = ("states", "events", "calls")
+#: The second score's parts: its one weighed term, what each model answered, reported beside the
+#: score and never weighed, and the measures it reports with no weight.
+RELIABILITY_PART: Final = "reliability"
+SCORE_V2_PARTS: Final = ("primary", RELIABILITY_PART, "held_out")
 #: The seeds a comparison may run: development seeds, looked at freely, and held-out seeds, judged.
 SEED_PHASES: Final = ("development", "held_out")
 _SHA256: Final = re.compile(r"[0-9a-f]{64}")
@@ -243,6 +251,24 @@ def _score_bounds(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: exactly a term that reads events names what it counts")
     if values["part"] == "primary" and values["reads"] == "calls":
         raise CatalogError(f"{where}: no weighed term reads the host's record of a call")
+
+
+def _score_v2_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    """The second score's rule, held by the catalog itself: exactly a primary term carries a
+    weight and it reads states alone, so no answer, answer time or disposition reaches the score;
+    what a model answered is reliability, which reads the engine's events, names the dispositions
+    it counts and is never weighed."""
+    part, reads = values["part"], values["reads"]
+    if (part == "primary") == (values["weight_milli"] == 0):
+        raise CatalogError(f"{where}: exactly a primary term carries a weight")
+    if part == "primary" and reads != "states":
+        raise CatalogError(f"{where}: a weighed term reads states alone")
+    if (part == RELIABILITY_PART) != (reads == "events"):
+        raise CatalogError(f"{where}: exactly the reliability terms read the engine's events")
+    if (part == RELIABILITY_PART) != bool(values["dispositions"]):
+        raise CatalogError(f"{where}: exactly a reliability term names the dispositions it counts")
+    if values["reasons"] and part != RELIABILITY_PART:
+        raise CatalogError(f"{where}: only a reliability term names reason codes")
 
 
 def _sha256_text(where: str, value: object) -> FieldValue:
@@ -381,20 +407,39 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         ),
         entry_check=_score_bounds,
     ),
-    (COMPARISON_PROTOCOL_CATALOG, 1): CatalogSchema(
-        COMPARISON_PROTOCOL_CATALOG,
-        1,
-        (("value", integer_field(0, 10**9)), ("reason", text_field)),
-    ),
-    (COMPARISON_SEEDS_CATALOG, 1): CatalogSchema(
-        COMPARISON_SEEDS_CATALOG,
-        1,
+    (PERSON_SCORE_CATALOG, 2): CatalogSchema(
+        PERSON_SCORE_CATALOG,
+        2,
         (
-            ("phase", _choice(SEED_PHASES)),
-            ("seed_digest", _sha256_text),
+            ("part", _choice(SCORE_V2_PARTS)),
+            ("weight_milli", integer_field(-1000, 1000)),
+            ("reads", _choice(SCORE_READS)),
+            ("dispositions", key_list_field),
+            ("reasons", key_list_field),
             ("reason", text_field),
         ),
+        entry_check=_score_v2_bounds,
     ),
+    **{
+        (COMPARISON_PROTOCOL_CATALOG, version): CatalogSchema(
+            COMPARISON_PROTOCOL_CATALOG,
+            version,
+            (("value", integer_field(0, 10**9)), ("reason", text_field)),
+        )
+        for version in (1, 2)
+    },
+    **{
+        (COMPARISON_SEEDS_CATALOG, version): CatalogSchema(
+            COMPARISON_SEEDS_CATALOG,
+            version,
+            (
+                ("phase", _choice(SEED_PHASES)),
+                ("seed_digest", _sha256_text),
+                ("reason", text_field),
+            ),
+        )
+        for version in (1, 2)
+    },
 }
 
 

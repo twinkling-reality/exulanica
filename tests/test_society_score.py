@@ -2,7 +2,9 @@
 
 The score of the role "a person in your world" is declared in the society-person-score catalog and
 computed by ``exulanica/world/society_score.py`` from a run's states and the dispositions the
-engine recorded. These tests hold what that promises: the threshold is the recorded routine's, so
+engine recorded. That module computes the first version, the one the first judged comparison
+registered, and these tests read the catalogs at that comparison's versions. They hold what the
+score promises: the threshold is the recorded routine's, so
 another routine moves the need counted; a run's answers, tokens, costs and labels change nothing
 the score reads; the two anchors score 0 and 1 and anything else is shown as it is, below 0 or
 above 1; a seed the routine barely helps on is excluded by name; and every disposition the engine
@@ -42,8 +44,9 @@ from exulanica.world.society_score import (
 )
 
 import living_square_support as square
+from comparison_support import FIRST_VERSIONS
 
-CATALOGS = load_comparison_catalogs()
+CATALOGS = load_comparison_catalogs(versions=FIRST_VERSIONS)
 SCORE = person_score(CATALOGS.score)
 DOCUMENT = square.compose(square.square_objects())
 SEED = "5e" * 32

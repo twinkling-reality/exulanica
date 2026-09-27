@@ -153,8 +153,14 @@ RELEASED_CATALOGS = {
     "society-comparison-protocol.v1.json": (
         "353cfd7cf83a72641be76de7a7ba44e61bc5e81ba69a84de5110bfaffd8b8e89"
     ),
+    "society-comparison-protocol.v2.json": (
+        "0ba9a3b99efdd089aed58578f2fe644ae33ed9f94a28a6fff575180250dcef25"
+    ),
     "society-comparison-seeds.v1.json": (
         "7afa7495492e632f39f88caf48637bbac3767d4ce47e2fb874e4e34bad709ff1"
+    ),
+    "society-comparison-seeds.v2.json": (
+        "5f16217c62da58041b4f6695177e99bb31aee53ef8006efaaa58bd4aa9425473"
     ),
     "society-decision-action.v1.json": (
         "900e91eabcdb60a3d373639a096a7ee3be037bfc2e80431ec6e9f37c715c823f"
@@ -172,6 +178,9 @@ RELEASED_CATALOGS = {
     ),
     "society-person-score.v1.json": (
         "950e712ad96b5f70cd656fb86a0a613f55c56a426142f34a5c89189143df234b"
+    ),
+    "society-person-score.v2.json": (
+        "ee4cfeb295ea1f27c97e5d73fb99ff8211c586f9eba523a64a3d6ec1b35151e1"
     ),
     "society-use-class.v1.json": "ba1f7f4971412bf8c612d32ce0144367f237008116d08b78ca19a9b95df9e541",
 }

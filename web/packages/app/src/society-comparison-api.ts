@@ -40,10 +40,50 @@ export interface ComparisonArm {
   readonly description: string;
 }
 
+/** Where a comparison's group came from, by the server's code for it. */
+export const GROUP_SOURCES = ['everyone', 'named', 'owner_choice'] as const;
+export type GroupSourceKind = typeof GROUP_SOURCES[number];
+
+/** An owner's choice, by its sequence in the world and its digest. */
+export interface OwnerChoice {
+  readonly choiceSeq: number;
+  readonly documentSha256: string;
+}
+
+export type GroupSource =
+  | { readonly kind: 'everyone' }
+  | { readonly kind: 'named' }
+  | ({ readonly kind: 'owner_choice' } & OwnerChoice);
+
+/** A person of the world, by id and the name the society gives them. */
+export interface NamedPerson {
+  readonly id: string;
+  readonly name: string;
+}
+
+/**
+ * The people a comparison's arms decide for. A first-version comparison decided for everybody
+ * and named nobody, so its people are null.
+ */
+export interface ComparisonGroup {
+  readonly people: readonly NamedPerson[] | null;
+  readonly source: GroupSource;
+  readonly size: number;
+}
+
+/** Somebody outside the group, and what decides for them in every arm: their owner's choice. */
+export interface OtherPerson extends NamedPerson {
+  readonly decider: Decider;
+  readonly choice: OwnerChoice | null;
+}
+
 export interface ComparisonListing {
   readonly comparisonId: string;
   readonly createdAt: string;
   readonly phase: Phase;
+  /** The score's version: 1 scored need relief less the turns a model left; 2 need relief alone. */
+  readonly scoreVersion: number;
+  readonly group: { readonly source: GroupSource; readonly size: number };
   readonly arms: readonly ComparisonArm[];
   readonly seeds: number;
   readonly runs: number;
@@ -74,15 +114,44 @@ export interface RunCalls {
 
 export type RunStatus = 'completed' | 'failed' | 'incomplete';
 
+/** Answered, refused and left to the routine, each as a share or a rate the server wrote. */
+export interface ReliabilityRates {
+  readonly answered: Decimal;
+  readonly refused: Decimal;
+  readonly leftToRoutine: Decimal;
+}
+
+/**
+ * What a model answered for the group, served beside every score it carries: its turns, those it
+ * answered, those whose answer was refused and those left to the routine, as counts, as shares of
+ * the run's own turns, and as rates per choice point the routine's own run of the same seed had.
+ */
+export interface Reliability {
+  readonly turns: number;
+  readonly answered: number;
+  readonly refused: number;
+  readonly leftToRoutine: number;
+  /** How the turns left to the routine split, or null where the run did not record it. */
+  readonly notAnswered: number | null;
+  readonly notApplied: number | null;
+  readonly shares: ReliabilityRates | null;
+  /** Null where no routine run recorded its choice points: a first-version comparison, an anchor. */
+  readonly perRoutineChoice: ReliabilityRates | null;
+  readonly routineChoicePoints: number | null;
+  /** Every turn not answered and applied, by the reason the receipt or the minute recorded. */
+  readonly reasons: Readonly<Record<string, number>>;
+}
+
 export interface SeedRun {
   readonly runId: string | null;
   readonly status: RunStatus;
   /** Why the run failed, by the code its outcome records, or null. */
   readonly failure: string | null;
   readonly score: Decimal | null;
-  readonly turns: number;
-  readonly notApplied: number;
+  readonly reliability: Reliability | null;
   readonly calls: RunCalls | null;
+  /** What asking everybody outside the group took, or null where no model decides for them. */
+  readonly othersCalls: RunCalls | null;
 }
 
 export interface ComparisonSeed {
@@ -97,12 +166,15 @@ export interface ComparisonSeed {
 export interface ArmSummary {
   readonly meanScore: Decimal | null;
   readonly interval: Interval | null;
-  readonly notAppliedShare: Decimal | null;
+  readonly reliability: Reliability | null;
   readonly costUsdPerHour: Decimal | null;
   readonly costKnown: boolean;
+  readonly othersCostUsdPerHour: Decimal | null;
   readonly latencyMs: Latency;
   /** The measures that carry no weight, by the score catalog's key. */
   readonly heldOut: Readonly<Record<string, Decimal | null>>;
+  /** The group's person-minutes by what they were doing, or null where a run did not record it. */
+  readonly minutesByActivity: Readonly<Record<string, Decimal>> | null;
 }
 
 export interface ComparisonDifference {
@@ -119,14 +191,28 @@ export interface Verdict {
   readonly higher: string | null;
   /** Why a comparison is not judged, by code, or null. */
   readonly reason: string | null;
+  /**
+   * Whether the primary pair's answered shares differ by more than the control pair's, or null
+   * where an arm of either pair asked nothing or no control was run: the server's, never the page's.
+   */
+  readonly answeredSharesDiffer: boolean | null;
 }
 
 export interface ComparisonResult {
   readonly comparisonId: string;
   readonly createdAt: string;
   readonly phase: Phase;
+  readonly scoreVersion: number;
   readonly windowTicks: number;
   readonly population: number;
+  readonly group: ComparisonGroup;
+  readonly others: readonly OtherPerson[];
+  /**
+   * Whether a model decides for somebody outside the group, asked in every arm, the anchors
+   * included, so the score's 1 and the rates' denominator move with its answers too. Only a
+   * development comparison can have one: a held-out one is refused with it.
+   */
+  readonly othersAsked: boolean;
   readonly preregistration: { readonly record: string; readonly recordSha256: string } | null;
   readonly arms: readonly ComparisonArm[];
   readonly primary: readonly [string, string] | null;
@@ -194,7 +280,8 @@ export interface RunReplay {
   readonly targets: readonly PlanTarget[];
   /** What a person's action may be while they do something, in the routine's own words. */
   readonly activities: readonly { readonly kind: string; readonly label: string }[];
-  readonly people: readonly { readonly id: string; readonly name: string }[];
+  /** Each person, whether the run's arm decides for them, and who does. */
+  readonly people: readonly (NamedPerson & { readonly inGroup: boolean; readonly decider: Decider })[];
   /** Minute 0 is the start, then one state per simulated minute. */
   readonly minutes: readonly { readonly tick: number; readonly people: readonly RunPerson[] }[];
   readonly decisions: readonly RunDecision[];
@@ -244,6 +331,22 @@ function decider(value: unknown): Decider {
   }
 }
 
+function ownerChoice(value: unknown): OwnerChoice {
+  const held = object(value);
+  return { choiceSeq: count(held['choice_seq']), documentSha256: text(held['document_sha256']) };
+}
+
+function groupSource(value: unknown): GroupSource {
+  const held = object(value);
+  const kind = oneOf<GroupSourceKind>(GROUP_SOURCES)(held['kind']);
+  return kind === 'owner_choice' ? { kind, ...ownerChoice(held) } : { kind };
+}
+
+function namedPerson(value: unknown): NamedPerson {
+  const held = object(value);
+  return { id: text(held['id']), name: text(held['name']) };
+}
+
 function arm(value: unknown): ComparisonArm {
   const held = object(value);
   return {
@@ -258,13 +361,16 @@ const phase = oneOf<Phase>(['development', 'held_out']);
 
 export function parseComparisons(value: unknown): readonly ComparisonListing[] {
   const row = object(value);
-  if (row['profile'] !== 'exulanica.society-comparisons/v1') invalid();
+  if (row['profile'] !== 'exulanica.society-comparisons/v2') invalid();
   return Object.freeze(list(row['comparisons']).map((entry) => {
     const held = object(entry);
+    const group = object(held['group']);
     return {
       comparisonId: text(held['comparison_id']),
       createdAt: text(held['created_at']),
       phase: phase(held['phase']),
+      scoreVersion: count(held['score_version']),
+      group: { source: groupSource(group['source']), size: count(group['size']) },
       arms: list(held['arms']).map(arm),
       seeds: count(held['seeds']),
       runs: count(held['runs']),
@@ -285,6 +391,32 @@ function calls(value: unknown): RunCalls {
   };
 }
 
+function rates(value: unknown): ReliabilityRates {
+  const held = object(value);
+  return {
+    answered: decimal(held['answered']),
+    refused: decimal(held['refused']),
+    leftToRoutine: decimal(held['left_to_routine']),
+  };
+}
+
+function reliability(value: unknown): Reliability {
+  const held = object(value);
+  return {
+    turns: count(held['turns']),
+    answered: count(held['answered']),
+    refused: count(held['refused']),
+    leftToRoutine: count(held['left_to_routine']),
+    notAnswered: maybe(held['not_answered'], count),
+    notApplied: maybe(held['not_applied'], count),
+    shares: maybe(held['shares'], rates),
+    perRoutineChoice: maybe(held['per_routine_choice'], rates),
+    routineChoicePoints: maybe(held['routine_choice_points'], count),
+    reasons: Object.fromEntries(Object.entries(object(held['reasons']))
+      .map(([reason, times]) => [text(reason), count(times)])),
+  };
+}
+
 function seedRun(value: unknown): SeedRun {
   const found = object(value);
   return {
@@ -292,9 +424,9 @@ function seedRun(value: unknown): SeedRun {
     status: oneOf<RunStatus>(['completed', 'failed', 'incomplete'])(found['status']),
     failure: maybe(found['failure'], text),
     score: maybe(found['score'], decimal),
-    turns: count(found['turns']),
-    notApplied: count(found['not_applied']),
+    reliability: maybe(found['reliability'], reliability),
     calls: maybe(found['calls'], calls),
+    othersCalls: maybe(found['others_calls'], calls),
   };
 }
 
@@ -306,18 +438,25 @@ function summary(value: unknown): ArmSummary {
       const range = object(found);
       return { low: decimal(range['low']), high: decimal(range['high']) };
     }),
-    notAppliedShare: maybe(held['not_applied_share'], decimal),
+    reliability: maybe(held['reliability'], reliability),
     costUsdPerHour: maybe(held['cost_usd_per_hour'], decimal),
     costKnown: flag(held['cost_known']),
+    othersCostUsdPerHour: maybe(held['others_cost_usd_per_hour'], decimal),
     latencyMs: latency(held['latency_ms']),
     heldOut: Object.fromEntries(Object.entries(object(held['held_out']))
+      .filter(([name]) => name !== MINUTES_BY_ACTIVITY)
       .map(([name, measure]) => [name, maybe(measure, decimal)])),
+    minutesByActivity: maybe(object(held['held_out'])[MINUTES_BY_ACTIVITY], (found) =>
+      Object.fromEntries(Object.entries(object(found)).map(([kind, share]) => [text(kind), decimal(share)]))),
   };
 }
 
+/** The held-out measure that is a share per activity rather than one number. */
+const MINUTES_BY_ACTIVITY = 'minutes_by_activity';
+
 export function parseComparison(value: unknown): ComparisonResult {
   const row = object(value);
-  if (row['profile'] !== 'exulanica.society-comparison-result/v1') invalid();
+  if (row['profile'] !== 'exulanica.society-comparison-result/v2') invalid();
   const verdict = object(row['verdict']);
   const arms = list(row['arms']).map(arm);
   const keys = new Set(arms.map((entry) => entry.key));
@@ -330,8 +469,23 @@ export function parseComparison(value: unknown): ComparisonResult {
     comparisonId: text(row['comparison_id']),
     createdAt: text(row['created_at']),
     phase: phase(row['phase']),
+    scoreVersion: count(row['score_version']),
     windowTicks: count(row['window_ticks']),
     population: count(row['population']),
+    group: ((held) => ({
+      people: maybe(held['people'], (people) => list(people).map(namedPerson)),
+      source: groupSource(held['source']),
+      size: count(held['size']),
+    }))(object(row['group'])),
+    others: list(row['others']).map((entry) => {
+      const held = object(entry);
+      return {
+        ...namedPerson(held),
+        decider: decider(held['decider']),
+        choice: maybe(held['choice'], ownerChoice),
+      };
+    }),
+    othersAsked: flag(row['others_asked']),
     preregistration: maybe(row['preregistration'], (held) => {
       const record = object(held);
       return { record: text(record['record']), recordSha256: text(record['record_sha256']) };
@@ -367,13 +521,14 @@ export function parseComparison(value: unknown): ComparisonResult {
       code: oneOf<VerdictCode>(VERDICT_CODES)(verdict['code']),
       higher: maybe(verdict['higher'], armKey),
       reason: maybe(verdict['reason'], text),
+      answeredSharesDiffer: maybe(verdict['answered_shares_differ'], flag),
     },
   });
 }
 
 export function parseRunReplay(value: unknown): RunReplay {
   const row = object(value);
-  if (row['profile'] !== 'exulanica.society-comparison-run-replay/v1') invalid();
+  if (row['profile'] !== 'exulanica.society-comparison-run-replay/v2') invalid();
   // The server replays a run from its record and says so; a read that could not is an error.
   if (row['replay_verified'] !== true) invalid();
   const place = object(row['place']);
@@ -405,7 +560,7 @@ export function parseRunReplay(value: unknown): RunReplay {
     }),
     people: list(row['people']).map((entry) => {
       const held = object(entry);
-      return { id: text(held['id']), name: text(held['name']) };
+      return { ...namedPerson(held), inGroup: flag(held['in_group']), decider: decider(held['decider']) };
     }),
     minutes: list(row['minutes']).map((entry) => {
       const held = object(entry);

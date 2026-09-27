@@ -3,14 +3,18 @@
     EXULANICA_BUDGET_USD=<bound> python -m exulanica.orchestration.compare \\
         --workspace <uuid> --world <world id> --version <uuid> --actor <uuid> \\
         --model <provider>/<model id> [--model <provider>/<model id>] [--control] \\
+        [--group-choice <n> | --group <person id> [--group <person id> ...]] \\
         --seeds <file> [--seed-count <n>]
 
 It defines a comparison over the version's purposeful society as it stands, with the routine and
 waiting as its two anchors, one arm per ``--model`` and, with ``--control``, the first model run a
-second time; reserves every run, one per arm and seed; plays them; and prints what the page shows
-of it: each arm's score, the registered differences and the server's verdict. A comparison this
-command defines runs on development seeds and is never judged: a judged comparison is
-pre-registered, and its record is written by the measurement that registered it.
+second time; reserves every run, one per arm and seed; plays them, the anchors first; and prints
+what the page shows of it: each arm's score with what its model answered, the registered
+differences and the server's verdict. Every arm decides for one group: everybody, the people the
+world owner's choice ``--group-choice`` named, or the people ``--group`` names; everybody else
+keeps what the owner's latest choice for them names, a model or their routine, in every arm. A
+comparison this command defines runs on development seeds and is never judged: a judged comparison
+is pre-registered, and its record is written by the measurement that registered it.
 
 ``--seeds`` names a file of seeds, one per line. A seed is used only when the SHA-256 of its text
 is one the seed catalog commits to the development phase; the first ``--seed-count`` of those,
@@ -29,7 +33,7 @@ import json
 import os
 import sys
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final
@@ -73,6 +77,10 @@ def development_seeds(path: Path, count: int) -> list[str]:
     return [found[digest] for digest in wanted]
 
 
+#: A group of everybody, as a definition states it: nobody named, nobody outside it.
+EVERYBODY: Final = {"people": None, "source": {"kind": "everyone"}}
+
+
 def comparison_body(
     runner: SocietyComparisonRunner,
     models: Sequence[ComparisonArm],
@@ -81,8 +89,12 @@ def comparison_body(
     control: bool,
     phase: str = PHASE,
     preregistration: dict[str, str] | None = None,
+    group: Mapping[str, Any] | None = None,
+    others: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
-    """A definition's body: the anchors, one arm per model, the control, and the claim."""
+    """A definition's body: the group every arm decides for, what decides for everybody else
+    (:meth:`~exulanica.api.society_comparison_runner.SocietyComparisonRunner.others_for`), the
+    anchors, one arm per model, the control, and the claim."""
     catalogs = runner.catalogs
     arms: dict[str, dict[str, Any]] = {
         ROUTINE_ARM: {
@@ -116,6 +128,8 @@ def comparison_body(
         "window_ticks": protocol_value(catalogs, "window_ticks"),
         "phase": phase,
         "seeds": [seed_digest(seed) for seed in seeds],
+        "group": dict(EVERYBODY if group is None else group),
+        "others": [dict(other) for other in others],
         "arms": arms,
         "claim": {"primary": primary, "family": family, "control": control_pair},
         "preregistration": preregistration,
@@ -135,12 +149,14 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
     )
     return {
         "comparison_id": result["comparison_id"],
+        "group": result["group"],
         "arms": {
             arm["key"]: {
                 "description": arm["description"],
                 "role": arm["role"],
                 "mean_score": result["summaries"][arm["key"]]["mean_score"],
                 "interval": result["summaries"][arm["key"]]["interval"],
+                "reliability": result["summaries"][arm["key"]]["reliability"],
                 "runs": [seed["runs"][arm["key"]]["status"] for seed in result["seeds"]],
             }
             for arm in result["arms"]
@@ -159,6 +175,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--actor", type=uuid.UUID, required=True)
     parser.add_argument("--model", action="append", required=True, help="<provider>/<model id>")
     parser.add_argument("--control", action="store_true", help="run the first model twice")
+    chosen = parser.add_mutually_exclusive_group()
+    chosen.add_argument(
+        "--group-choice", type=int, default=None, help="the owner's choice whose people to swap"
+    )
+    chosen.add_argument(
+        "--group", action="append", default=None, help="a person to swap, by subject id"
+    )
     parser.add_argument("--seeds", type=Path, required=True)
     parser.add_argument("--seed-count", type=int, default=1)
     parser.add_argument("--comparison", type=uuid.UUID, default=None)
@@ -179,10 +202,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("this environment configures no society runtime")
     seeds = development_seeds(arguments.seeds, arguments.seed_count)
     comparison_id = arguments.comparison or uuid.uuid4()
+    group = None
+    if arguments.group_choice is not None:
+        group = runner.group_of_choice(arguments.version, arguments.group_choice)
+    elif arguments.group is not None:
+        group = {"people": sorted(set(arguments.group)), "source": {"kind": "named"}}
+    others = runner.others_for(arguments.version, None if group is None else group["people"])
     runner.define(
         arguments.version,
         comparison_id=comparison_id,
-        body=comparison_body(runner, models, seeds, control=arguments.control),
+        body=comparison_body(
+            runner, models, seeds, control=arguments.control, group=group, others=others
+        ),
     )
     runner.run_all(comparison_id, runner.reserve_all(comparison_id, seeds))
     with services.database.session(arguments.workspace) as connection:

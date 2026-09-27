@@ -577,9 +577,13 @@ Lightning, and almost all of each difference between them came from turns whose 
 applied: Lightning's lead of 0.0367 is 0.0013 of relief and 0.0354 of turns, and the 0.0248
 between Qwen's two runs of the same hours is all turns
 ([decomposition](evaluation/2026-09-26-society-model-comparison-decomposition.json)).
-A comparison's arm decides for every person of the world, so a run that swaps one group's model
-while another group keeps its own is not supported. The Companion, personal photographs and
-reconstruction are not part of this milestone.
+A comparison also swaps one group's model while everybody else keeps the model or routine their
+world's owner chose for them, scores only how the group fared, and serves each arm's share of
+turns its model answered, refused and left to the routine beside its score, since the routine
+decides every turn a model leaves; a judged comparison keeps everybody outside the group on their
+routine, so that its anchors ask nobody
+([comparisons of models](society-experiments.md#comparisons-of-models)).
+The Companion, personal photographs and reconstruction are not part of this milestone.
 
 ### Saved-world foundation
 

@@ -22,7 +22,9 @@ describe('the documents of a comparison of models', () => {
     expect(listing!.runsCompleted).toBe(listing!.runsExpected);
 
     const result = parseComparison(golden.result);
-    expect(result.verdict).toEqual({ code: 'not_judged', higher: null, reason: 'development_seeds' });
+    expect(result.verdict).toEqual({
+      code: 'not_judged', higher: null, reason: 'development_seeds', answeredSharesDiffer: null,
+    });
     expect(result.summaries['routine']!.meanScore).toBe('1.0000');
     expect(result.summaries['wait']!.meanScore).toBe('0.0000');
     expect(result.seeds.length).toBeGreaterThan(1);
@@ -32,6 +34,28 @@ describe('the documents of a comparison of models', () => {
     expect(run.minutes[0]!.tick).toBe(0);
     expect(run.activities.map((activity) => activity.kind)).toContain('rest');
     expect(run.people.length).toBe(run.minutes[0]!.people.length);
+  });
+
+  it('reads a group comparison: its people, where they came from, and who decides for everybody else', () => {
+    const grouped = JSON.parse(
+      readFileSync(new URL('tests/snapshots/society-group-comparison-documents.json', REPOSITORY), 'utf8'),
+    ) as { readonly listing: unknown; readonly result: unknown; readonly run: unknown };
+    const result = parseComparison(grouped.result);
+    expect(result.scoreVersion).toBe(2);
+    expect(result.group.source.kind).toBe('owner_choice');
+    expect(result.group.people!.length).toBe(result.group.size);
+    const kept = result.others.filter((other) => other.decider.kind === 'model');
+    expect(kept.length).toBe(1);
+    expect(kept[0]!.choice).not.toBeNull();
+    for (const arm of result.arms.filter((held) => held.decider.kind === 'model')) {
+      expect(result.summaries[arm.key]!.reliability!.shares).not.toBeNull();
+      expect(result.summaries[arm.key]!.reliability!.perRoutineChoice).not.toBeNull();
+    }
+    const run = parseRunReplay(grouped.run);
+    expect(run.people.filter((person) => person.inGroup).map((person) => person.id).sort())
+      .toEqual(result.group.people!.map((person) => person.id).sort());
+    const [listing] = parseComparisons(grouped.listing);
+    expect(listing!.group).toEqual({ source: result.group.source, size: result.group.size });
   });
 
   it('keeps a score as the server wrote it, below zero or above one, never clipped', () => {

@@ -1,17 +1,22 @@
 """The comparisons of the models that ran a world's people: read, never run.
 
 ``GET /world/versions/{version_id}/society/comparisons`` lists a version's comparisons, newest
-first, each with its arms and how far its runs got. ``GET .../comparisons/{comparison_id}`` gives
-one comparison's scores, per seed and per arm, with intervals, its registered differences and the
-server's verdict, which is the only source of the words a page shows for it. Both name every
-model an arm asks by ``Manifest.model_name``, as the People panel's read does. ``GET
-.../comparisons/{comparison_id}/runs/{run_id}`` replays one completed run from the requests and
-receipts it stored, with no model call, holds the replay to what the run recorded, and returns
-what the page draws: the place, each person's minutes and what every turn did. A replay that
-differs from its record is refused by name (``run_replay_mismatch``), never shown.
+first, each with its arms, the group they decide for and how far its runs got. ``GET
+.../comparisons/{comparison_id}`` gives one comparison's scores, per seed and per arm, with
+intervals, what each arm's model answered beside every score, who decides for everybody outside
+the group, its registered differences and the server's verdict, which is the only source of the
+words a page shows for it. Both name every model a decider asks by ``Manifest.model_name``, as the
+People panel's read does. ``GET .../comparisons/{comparison_id}/runs/{run_id}`` replays one
+completed run from the requests and receipts it stored, with no model call, holds the replay to
+what the run recorded, and returns what the page draws: the place, each person's minutes, who
+decides for each of them and what every turn did. A replay that differs from its record is refused
+by name (``run_replay_mismatch``), never shown.
 
 None of these asks a model or writes anything. A comparison is defined and run by the local command
-``python -m exulanica.orchestration.compare``. No response carries a run's seed.
+``python -m exulanica.orchestration.compare``. No response carries a run's seed. A comparison this
+code cannot read, one naming a binding, catalogs, a definition or a score version it does not hold,
+or whose outcomes scored other people than its group, is answered by name as a conflict (409),
+never as a server error.
 """
 
 from __future__ import annotations
@@ -36,6 +41,7 @@ from exulanica.world.society_comparison_result import (
     verified_replay,
 )
 from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.society_score import ScoreRefused
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/comparisons", tags=["society"])
@@ -63,6 +69,11 @@ def _comparisons(
     )
 
 
+def _unreadable(exc: ComparisonRefused | ScoreRefused) -> JSONResponse:
+    """A comparison this code cannot read, answered by the code it was refused with."""
+    return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
+
+
 def _unavailable(exc: UnavailableSocietyInput) -> JSONResponse:
     return JSONResponse(
         status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
@@ -82,7 +93,10 @@ def society_comparisons(
         raise UnknownSociety("society is unavailable")
     rows = comparisons.definitions(version_id)
     counts = comparisons.run_counts([row["comparison_id"] for row in rows])
-    return listing_document(rows, counts, model_name=load_manifest().model_name)
+    try:
+        return listing_document(rows, counts, model_name=load_manifest().model_name)
+    except (ComparisonRefused, ScoreRefused) as exc:
+        return _unreadable(exc)
 
 
 @router.get("/{comparison_id}")
@@ -96,9 +110,12 @@ def society_comparison(
 ) -> Any:
     comparisons = _comparisons(connection, session, request, world_id)
     row = comparisons.definition(version_id, comparison_id)
-    return comparison_result(
-        row, comparisons.runs(comparison_id), model_name=load_manifest().model_name
-    )
+    try:
+        return comparison_result(
+            row, comparisons.runs(comparison_id), model_name=load_manifest().model_name
+        )
+    except (ComparisonRefused, ScoreRefused) as exc:
+        return _unreadable(exc)
 
 
 @router.get("/{comparison_id}/runs/{run_id}")
@@ -119,7 +136,7 @@ def society_comparison_run(
     except UnavailableSocietyInput as exc:
         return _unavailable(exc)
     except ComparisonRefused as exc:
-        return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
+        return _unreadable(exc)
     if outcome is None or outcome["status"] != "completed":
         return JSONResponse(
             status_code=409,
@@ -129,4 +146,11 @@ def society_comparison_run(
         played = verified_replay(plan, comparisons.stored(run_id), outcome)
     except ReplayMismatch as exc:
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
-    return replay_document(plan, definition, outcome["arm"], outcome["seed_digest"], played)
+    return replay_document(
+        plan,
+        definition,
+        outcome["arm"],
+        outcome["seed_digest"],
+        played,
+        model_name=load_manifest().model_name,
+    )

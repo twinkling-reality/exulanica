@@ -2,10 +2,14 @@
 
 A comparison is defined over one world's purposeful society as it stands: the repository reads the
 society and the inputs it holds, never a caller's copy of either, freezes the newest input by
-sequence and digest, and records a definition naming the window, the arms, the phase and the
-seeds it committed to by digest, and everything it is scored and judged under. Runs are reserved
-before anything is asked, their receipts are appended as they are paid for, and each run ends in
-one outcome.
+sequence and digest, and records a definition naming the window, the arms, the phase, the seeds it
+committed to by digest, the group its arms decide for, who decides for everybody else, and
+everything it is scored and judged under. The group and everybody else are checked against the
+world's own records: every person is one of the society's, named as its state names them, a group
+taken from an owner's choice is exactly the people that choice named, and each other person keeps
+exactly the model or routine the owner's latest choice for them names. Runs are reserved before
+anything is asked, their receipts are appended as they are paid for, and each run ends in one
+outcome.
 
 Nothing here runs a minute or asks a model. :meth:`SocietyComparisonRepository.plan` gives the
 runner and the replay the same :class:`~exulanica.world.society_comparison.RunPlan`, with the
@@ -36,13 +40,20 @@ from exulanica.world.society import (
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
 from exulanica.world.society_comparison import RunPlan
 from exulanica.world.society_comparison_result import (
+    DEFINITION_PROFILES,
     ComparisonRefused,
     check_definition_body,
+    definition_version,
     protocol_value,
     scoring_binding,
 )
-from exulanica.world.society_decision_contract import decision_contract
+from exulanica.world.society_decision_contract import (
+    PROMPT_VERSION,
+    DecisionContract,
+    decision_contract,
+)
 from exulanica.world.society_engines import society_engine
+from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
@@ -55,7 +66,8 @@ __all__ = [
     "seed_digest",
 ]
 
-COMPARISON_PROFILE: Final = "exulanica.society-comparison/v1"
+#: The profile a comparison is defined under: the second, which scores a group.
+COMPARISON_PROFILE: Final = DEFINITION_PROFILES[2]
 _RUN_NAMESPACE: Final = uuid.UUID("5c1b5d2e-6f0a-4c61-9b7e-2f4f3c8d1a90")
 
 
@@ -84,6 +96,45 @@ def _sealed(document: dict[str, Any]) -> dict[str, Any]:
     return {**body, "document_sha256": society_state_sha256(body)}
 
 
+def _held_asking(
+    body: Mapping[str, Any], others: Sequence[Mapping[str, Any]], contract: DecisionContract
+) -> None:
+    """Every model a definition asks, an arm's or a person's outside the group, is asked under the
+    terms the definition records: the contract it is defined under with that contract's deadline,
+    the prompt this code asks with, one manifest digest across them all, and one mechanism for each
+    model, one the contract accepts. A person outside the group asks as the owner's choice it
+    names, which :meth:`SocietyComparisonRepository._people` holds; an arm's model is no owner's
+    choice."""
+    configs = [
+        (f"arm {key}", arm["provider_config"], None)
+        for key, arm in sorted(body["arms"].items())
+        if arm["provider_config"] is not None
+    ] + [
+        (other["id"], other["provider_config"], other["choice"])
+        for other in others
+        if other["provider_config"] is not None
+    ]
+    accepted = {mechanism.value for mechanism in contract.mechanism_order}
+    manifests = {config["manifest_sha256"] for _who, config, _choice in configs}
+    mechanisms: dict[str, set[str]] = {}
+    for who, config, choice in configs:
+        mechanisms.setdefault(config["model_id"], set()).add(config["mechanism"])
+        if (
+            config["contract"] != contract.binding()
+            or config["deadline_ms"] != contract.value("decision_deadline_ms")
+            or config["prompt_version"] != PROMPT_VERSION
+            or config["mechanism"] not in accepted
+            or (choice is None) != (config["choice_seq"] is None)
+        ):
+            raise ComparisonRefused(
+                "asking_not_the_definitions", f"{who} is not asked under the definition's terms"
+            )
+    if len(manifests) > 1 or any(len(found) > 1 for found in mechanisms.values()):
+        raise ComparisonRefused(
+            "asking_not_the_definitions", "every model is asked under one manifest, one way"
+        )
+
+
 class SocietyComparisonRepository:
     """Append and read comparison records in one workspace and world."""
 
@@ -107,10 +158,13 @@ class SocietyComparisonRepository:
         """Record a comparison over this version's society, frozen at its newest input.
 
         ``body`` is everything the definition states that the society does not: ``window_ticks``,
-        ``phase``, ``seeds`` (digests), ``arms``, ``claim`` and ``preregistration``. The society,
-        its population, its newest input and what the comparison is scored under are read here.
-        The same id with the same body returns the stored definition; with another body it is a
-        conflict.
+        ``phase``, ``seeds`` (digests), ``group`` (the people the arms decide for, or None for
+        everybody, and where they came from), ``others`` (who decides for everybody else, each by
+        the owner's choice it keeps), ``arms``, ``claim`` and ``preregistration``. The society, its
+        population and people's names, its newest input and what the comparison is scored under
+        are read here, and the group and everybody else are held to the world's records
+        (:meth:`_people`). The same id with the same body returns the stored definition; with
+        another body it is a conflict.
         """
         catalogs = load_comparison_catalogs() if catalogs is None else catalogs
         check_definition_body(body, catalogs)
@@ -130,7 +184,11 @@ class SocietyComparisonRepository:
             )
         latest = self.society._chain(row)
         frozen = self.society._inputs(row, [latest])[latest]
+        # One input alone: its own stored bytes are read before the lock its authorization takes.
         self.society._authorize(frozen)
+        contract = decision_contract()
+        group, others = self._people(version_id, row, body)
+        _held_asking(body, others, contract)
         document = _sealed(
             {
                 "profile": COMPARISON_PROFILE,
@@ -142,10 +200,12 @@ class SocietyComparisonRepository:
                 "window_ticks": body["window_ticks"],
                 "phase": body["phase"],
                 "seeds": list(body["seeds"]),
+                "group": group,
+                "others": others,
                 "arms": {key: dict(arm) for key, arm in sorted(body["arms"].items())},
                 "claim": body["claim"],
                 "preregistration": body["preregistration"],
-                "contract": decision_contract().binding(),
+                "contract": contract.binding(),
                 "scoring": scoring_binding(catalogs),
             }
         )
@@ -183,6 +243,81 @@ class SocietyComparisonRepository:
                 raise
             raise ComparisonConflict("the comparison id already names another definition") from exc
         return document
+
+    def _people(
+        self, version_id: uuid.UUID, row: Mapping[str, Any], body: Mapping[str, Any]
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """The group and everybody else as a definition records them, held to the world's
+        records: each person one of the society's, named as its state names them; a group from an
+        owner's choice exactly that choice's people; and each other person's decider exactly what
+        the owner's latest choice for them names, or their routine where none does."""
+        names = {person["id"]: person["display_name"] for person in row["state"]["inhabitants"]}
+        group, source = body["group"]["people"], dict(body["group"]["source"])
+        people = sorted(names) if group is None else list(group)
+        if not set(people) <= set(names):
+            raise ComparisonRefused("group_person_unknown", "the group names somebody not here")
+        choices = SocietyModelChoiceRepository(
+            self.connection, self.workspace_id, world_id=self.world_id
+        ).history(version_id)
+        if source["kind"] == "owner_choice":
+            named = next(
+                (choice for choice in choices if choice["choice_seq"] == source["choice_seq"]),
+                None,
+            )
+            if (
+                named is None
+                or named["document_sha256"] != source["document_sha256"]
+                or sorted(named["people"]) != people
+            ):
+                raise ComparisonRefused(
+                    "group_not_the_choice", "the group is exactly the people the choice named"
+                )
+        latest: dict[str, Mapping[str, Any]] = {}
+        for recorded in choices:
+            for subject in recorded["people"]:
+                latest[subject] = recorded
+        outside = sorted(set(names) - set(people))
+        stated = {other["id"]: other for other in body["others"]}
+        if sorted(stated) != outside:
+            raise ComparisonRefused("others", "everybody outside the group is named, and only they")
+        others = []
+        for subject in outside:
+            other = stated[subject]
+            choice = latest.get(subject)
+            model = None if choice is None else choice["model"]
+            kept = (
+                None
+                if choice is None
+                else {
+                    "choice_seq": choice["choice_seq"],
+                    "document_sha256": choice["document_sha256"],
+                }
+            )
+            decider = other["decider"]
+            config = other["provider_config"]
+            if (
+                other["choice"] != kept
+                or (
+                    {"kind": "routine"}
+                    if model is None
+                    else {
+                        "kind": "model",
+                        "provider": model["provider"],
+                        "model_id": model["model_id"],
+                    }
+                )
+                != dict(decider)
+                or (config is not None and config["choice_seq"] != kept["choice_seq"])  # type: ignore[index]
+            ):
+                raise ComparisonRefused(
+                    "others_not_the_owners_choice",
+                    f"{subject} keeps what the owner's latest choice for them names",
+                )
+            others.append({"name": names[subject], **dict(other)})
+        return {
+            "people": [{"id": subject, "name": names[subject]} for subject in people],
+            "source": source,
+        }, others
 
     def _definition(self, comparison_id: uuid.UUID, *, missing_ok: bool = False) -> dict | None:
         row = self.connection.execute(
@@ -368,6 +503,18 @@ class SocietyComparisonRepository:
         if contract.binding() != definition["contract"]:
             raise ComparisonRefused("contract_changed", "the contract's catalogs are not the same")
         arm = definition["arms"][run["arm"]]
+        group, others = None, {}
+        if definition_version(definition) == 2:
+            # A group of everybody is everybody the run holds, as a first-version run's is.
+            if definition["group"]["source"]["kind"] != "everyone":
+                group = frozenset(person["id"] for person in definition["group"]["people"])
+            others = {
+                other["id"]: {
+                    "decider": other["decider"],
+                    "provider_config": other["provider_config"],
+                }
+                for other in definition["others"]
+            }
         plan = RunPlan(
             run_id=run_id,
             society_id=uuid.UUID(definition["society_id"]),
@@ -378,5 +525,7 @@ class SocietyComparisonRepository:
             decider=arm["decider"],
             provider_config=arm["provider_config"],
             contract=contract,
+            group=group,
+            others=others,
         )
         return plan, definition

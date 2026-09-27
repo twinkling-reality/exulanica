@@ -2,16 +2,24 @@
 
 A comparison's definition, checked before it is stored (:func:`check_definition_body`); a run's
 outcome, built from what the run did (:func:`run_outcome`); a version's comparisons
-(:func:`listing_document`); one comparison's scores per seed and per arm, its registered
-differences and the server's verdict, read from its definition and its runs' outcomes alone
-(:func:`comparison_result`); and one run replayed with no call, as the page draws it
-(:func:`replay_document`). No projection here returns a run's seed or a raw state: a reader names
-seeds by digest.
+(:func:`listing_document`); one comparison's scores per seed and per arm, what each arm's model
+answered beside them, its registered differences and the server's verdict, read from its
+definition and its runs' outcomes alone (:func:`comparison_result`); and one run replayed with no
+call, as the page draws it (:func:`replay_document`). No projection here returns a run's seed or a
+raw state: a reader names seeds by digest.
+
+A comparison is read under the catalogs and the binding it recorded, never under whatever is
+newest. The first version (``exulanica.society-comparison/v1``) scores need relief less the turns
+a model did not decide, over everybody; the second (``v2``) scores need relief alone over the
+comparison's group, everybody else keeping the decider the comparison froze for them, and reports
+what each model answered apart (:mod:`exulanica.world.society_score_v2`). Both are served in the
+same documents, a first-version comparison with what it did not record left null.
 
 The verdict's words are the server's: a comparison is judged only when its seeds are held out, it
 registered a claim with a control and a pre-registration, every run completed, and the code that
-scores it is the code it registered (:func:`scoring_binding`). The score and the claim themselves
-are :mod:`exulanica.world.society_score` and :mod:`exulanica.world.society_comparison_claim`.
+scores and judges it is the code it registered (:func:`binding_holds`). The claim is
+:mod:`exulanica.world.society_comparison_claim` and the verdict's assembly
+:mod:`exulanica.world.society_comparison_verdict`.
 """
 
 from __future__ import annotations
@@ -23,9 +31,16 @@ from collections.abc import Callable, Mapping, Sequence
 from decimal import ROUND_HALF_EVEN, Decimal
 from fractions import Fraction
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Final
 
-from exulanica.world import society_comparison_claim, society_score
+from exulanica.grammar.errors import CatalogError
+from exulanica.world import (
+    society_comparison_claim,
+    society_comparison_verdict,
+    society_score,
+    society_score_v2,
+)
 from exulanica.world.society_catalogs import (
     SEED_PHASES,
     ComparisonCatalogs,
@@ -33,43 +48,50 @@ from exulanica.world.society_catalogs import (
 )
 from exulanica.world.society_comparison import (
     DECIDER_KINDS,
+    OTHER_DECIDER_KINDS,
     PlayedRun,
     ReplayMismatch,
     RunPlan,
     replay,
 )
-from exulanica.world.society_comparison_claim import (
-    Protocol,
-    Resamples,
-    family_differences,
-    judge,
+from exulanica.world.society_comparison_claim import Resamples
+from exulanica.world.society_comparison_verdict import (
+    PROTOCOL_KEYS_BY_VERSION,
+    RELIABILITY_THREE,
+    ROUTINE_ROLE,
+    WAITING_ROLE,
+    ComparisonRefused,
+    protocol_for,
+    protocol_value,
+    protocol_values,
+    read_comparison,
+    score_version,
 )
 from exulanica.world.society_decisions import PERSON_PROVIDER_CONFIG
 from exulanica.world.society_planner import routine_of
-from exulanica.world.society_score import (
-    PersonScore,
-    RunTerms,
-    need_threshold,
-    person_score,
-    seed_score,
-    state_measures,
-)
 
 __all__ = [
     "ARM_ROLES",
+    "BINDING_PROFILE",
     "DECIMAL_PLACES",
+    "DEFINITION_PROFILES",
     "FAILURE_PROFILE",
+    "GROUP_SOURCES",
     "LISTING_PROFILE",
     "MINUTES_PER_HOUR",
     "PROTOCOL_KEYS",
     "REPLAY_PROFILE",
     "RESULT_PROFILE",
     "RUN_PROFILE",
+    "RUN_PROFILES",
     "ComparisonRefused",
+    "binding_holds",
     "check_definition_body",
     "comparison_result",
     "decimal_text",
+    "definition_version",
     "listing_document",
+    "others_asked",
     "protocol_value",
     "protocol_values",
     "replay_document",
@@ -78,11 +100,24 @@ __all__ = [
     "verified_replay",
 ]
 
-RUN_PROFILE: Final = "exulanica.society-comparison-run/v1"
+#: A definition's profile by version: the first scores everybody, the second a group.
+DEFINITION_PROFILES: Final = {
+    1: "exulanica.society-comparison/v1",
+    2: "exulanica.society-comparison/v2",
+}
+#: A completed run's outcome by the definition version it belongs to, and a failed one's.
+RUN_PROFILES: Final = {
+    1: "exulanica.society-comparison-run/v1",
+    2: "exulanica.society-comparison-run/v2",
+}
+RUN_PROFILE: Final = RUN_PROFILES[2]
 FAILURE_PROFILE: Final = "exulanica.society-comparison-failure/v1"
-LISTING_PROFILE: Final = "exulanica.society-comparisons/v1"
-RESULT_PROFILE: Final = "exulanica.society-comparison-result/v1"
-REPLAY_PROFILE: Final = "exulanica.society-comparison-run-replay/v1"
+LISTING_PROFILE: Final = "exulanica.society-comparisons/v2"
+RESULT_PROFILE: Final = "exulanica.society-comparison-result/v2"
+REPLAY_PROFILE: Final = "exulanica.society-comparison-run-replay/v2"
+#: The binding a second-version comparison registers, naming every module it is scored and judged
+#: by. The first version's binding has no profile: it names its scorer and claim by digest alone.
+BINDING_PROFILE: Final = "exulanica.society-comparison-binding/v2"
 #: What an arm is to its comparison, in the order a reader lists them: a model compared, the same
 #: model run again to bound run-to-run variation, the routine (the score's one) and waiting (its
 #: zero). The page reads exactly these (``ARM_ROLES`` in
@@ -93,8 +128,19 @@ ARM_ROLES: Final = (
     "one",
     "zero",
 )
-#: The decider each anchor role runs with.
-_ANCHORS: Final = {"one": "routine", "zero": "wait"}
+#: Where a comparison's group came from: everybody in the world, people named by the command, or
+#: the people one of the world owner's choices named, by its sequence and digest.
+#: The page has words for exactly these (``GROUP_SOURCE_WORDS`` in
+#: web/packages/app/src/ui/society-comparison.ts, held to this tuple by a parity test).
+GROUP_SOURCES: Final = (
+    "everyone",
+    "named",
+    "owner_choice",
+)
+#: The decider each anchor role runs with: the routine for the score's one, waiting for its zero.
+_ANCHORS: Final = {ROUTINE_ROLE: "routine", WAITING_ROLE: "wait"}
+#: The definition version a comparison is defined under, and the score version its catalogs hold.
+_DEFINED_VERSION: Final = 2
 #: Places a decimal the server writes carries. A score is exact until it is written; four places
 #: tell apart seeds whose relief differs by a ten-thousandth of what the routine spares, which is
 #: finer than any difference a comparison of eight seeds can claim.
@@ -102,74 +148,144 @@ DECIMAL_PLACES: Final = 4
 _QUANTUM: Final = Decimal(1).scaleb(-DECIMAL_PLACES)
 #: A unit: what a run's cost is stated per, whatever window the protocol sets.
 MINUTES_PER_HOUR: Final = 60
-#: Every value of the comparison protocol catalog this code reads.
-PROTOCOL_KEYS: Final = frozenset(
-    {
-        "bootstrap_resamples",
-        "family_alpha_per_mille",
-        "interval_per_mille",
-        "need_relief_floor",
-        "population_maximum",
-        "runs_at_once",
-        "window_ticks",
-    }
-)
+PROTOCOL_KEYS: Final = PROTOCOL_KEYS_BY_VERSION[2]
+#: What each binding version holds by digest, by the name its record gives each: the first names
+#: the scorer and the claim; the second every module a second-version score and verdict is read by.
+_BOUND_MODULES: Final[dict[int, dict[str, ModuleType]]] = {
+    1: {"scorer_sha256": society_score, "claim_sha256": society_comparison_claim},
+    2: {
+        module.__name__: module
+        for module in (
+            society_score,
+            society_score_v2,
+            society_comparison_claim,
+            society_comparison_verdict,
+        )
+    },
+}
 
 
-class ComparisonRefused(ValueError):
-    """A comparison this society cannot be given, refused by name."""
-
-    def __init__(self, code: str, detail: str) -> None:
-        super().__init__(f"{code}: {detail}")
-        self.code = code
-
-
-def _module_sha256(module: Any) -> str:
-    return hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
+def _module_sha256(module: ModuleType) -> str:
+    return hashlib.sha256(Path(str(module.__file__)).read_bytes()).hexdigest()
 
 
 def scoring_binding(catalogs: ComparisonCatalogs | None = None) -> dict[str, Any]:
-    """What a comparison is scored and judged under: the three catalogs and the two modules that
-    read them, by digest. A comparison read under any other is not judged."""
+    """What a comparison under ``catalogs`` is scored and judged under: the three catalogs and the
+    modules that read them, by digest, in the form of the score version the catalogs hold. A
+    comparison read under any other is not judged."""
     found = load_comparison_catalogs() if catalogs is None else catalogs
-    return {
-        "catalogs": {"versions": dict(sorted(found.versions.items())), "sha256": found.sha256},
-        "scorer_sha256": _module_sha256(society_score),
-        "claim_sha256": _module_sha256(society_comparison_claim),
-    }
+    version = score_version(found)
+    if version not in _BOUND_MODULES:
+        raise ComparisonRefused("score_version_unknown", f"no binding for score v{version}")
+    recorded = {"versions": dict(sorted(found.versions.items())), "sha256": found.sha256}
+    modules = {name: _module_sha256(module) for name, module in _BOUND_MODULES[version].items()}
+    if version == 1:
+        return {"catalogs": recorded, **modules}
+    return {"profile": BINDING_PROFILE, "catalogs": recorded, "modules": modules}
 
 
-def protocol_values(catalogs: ComparisonCatalogs) -> dict[str, int]:
-    """The protocol's values, refused by name unless they are exactly the ones read here: a key
-    added to the catalog and a key removed from it are both refused, as the decision policy's
-    are."""
-    values = {key: int(entry["value"]) for key, entry in catalogs.protocol.items()}  # type: ignore[call-overload]
-    if set(values) != PROTOCOL_KEYS:
+def _binding_version(recorded: Mapping[str, Any]) -> int:
+    if recorded.get("profile") == BINDING_PROFILE and set(recorded) == {
+        "profile",
+        "catalogs",
+        "modules",
+    }:
+        return 2
+    if "profile" not in recorded and set(recorded) == {"catalogs", *_BOUND_MODULES[1]}:
+        return 1
+    raise ComparisonRefused("binding_unknown", "a comparison names a binding this code cannot read")
+
+
+def _recorded_catalogs(recorded: Mapping[str, Any]) -> ComparisonCatalogs:
+    """The catalogs a comparison's binding names, read at the versions it recorded."""
+    try:
+        return load_comparison_catalogs(versions=recorded["catalogs"]["versions"])
+    except CatalogError as exc:
+        raise ComparisonRefused("catalogs_unavailable", str(exc)) from exc
+
+
+def binding_holds(recorded: Mapping[str, Any], catalogs: ComparisonCatalogs | None = None) -> bool:
+    """Whether a comparison is read now under what it registered: the catalogs at the versions it
+    recorded, and every module its binding names, byte for byte. ``catalogs`` stands in for the
+    committed ones where a caller reads under a copy of its own."""
+    version = _binding_version(recorded)
+    found = _recorded_catalogs(recorded) if catalogs is None else catalogs
+    return score_version(found) == version and scoring_binding(found) == dict(recorded)
+
+
+def definition_version(definition: Mapping[str, Any]) -> int:
+    """A stored definition's version, from its profile; any other profile is refused by name."""
+    for version, profile in DEFINITION_PROFILES.items():
+        if definition.get("profile") == profile:
+            return version
+    raise ComparisonRefused("definition_unknown", f"no comparison {definition.get('profile')!r}")
+
+
+# -- definitions --------------------------------------------------------------------------------
+
+
+def _check_config(key: str, decider: Mapping[str, Any], config: Any) -> None:
+    kind = decider["kind"]
+    if (kind == "model") != (config is not None):
         raise ComparisonRefused(
-            "protocol_keys",
-            f"the protocol states {sorted(values)}; read are {sorted(PROTOCOL_KEYS)}",
+            "arm_provider", f"exactly a model decider records its asking: {key}"
         )
-    return values
+    if config is not None and (
+        set(config) != PERSON_PROVIDER_CONFIG
+        or (config["provider"], config["model_id"]) != (decider["provider"], decider["model_id"])
+    ):
+        raise ComparisonRefused("arm_provider", f"{key} records the model it asks")
 
 
-def _protocol(catalogs: ComparisonCatalogs) -> Protocol:
-    values = protocol_values(catalogs)
-    return Protocol(
-        resamples=values["bootstrap_resamples"],
-        interval_per_mille=values["interval_per_mille"],
-        family_alpha_per_mille=values["family_alpha_per_mille"],
-    )
-
-
-def protocol_value(catalogs: ComparisonCatalogs, key: str) -> int:
-    return protocol_values(catalogs)[key]
+def _check_group(body: Mapping[str, Any]) -> None:
+    group, others = body["group"], body["others"]
+    source = group["source"]
+    kind = source.get("kind")
+    people = group["people"]
+    if kind not in GROUP_SOURCES:
+        raise ComparisonRefused("group_source", f"no group source {kind!r}")
+    if (kind == "everyone") != (people is None):
+        raise ComparisonRefused("group_people", "exactly a group of everyone names nobody")
+    if people is not None and (not people or sorted(set(people)) != list(people)):
+        raise ComparisonRefused("group_people", "a group names each person once, in order")
+    if kind == "owner_choice" and set(source) != {"kind", "choice_seq", "document_sha256"}:
+        raise ComparisonRefused("group_source", "an owner's choice is named by sequence and digest")
+    if kind != "owner_choice" and set(source) != {"kind"}:
+        raise ComparisonRefused("group_source", f"a {kind} group names nothing else")
+    ids = [other["id"] for other in others]
+    if ids != sorted(set(ids)) or (people is not None and set(ids) & set(people)):
+        raise ComparisonRefused("others", "everybody outside the group is named once, in order")
+    if people is None and others:
+        raise ComparisonRefused("others", "a group of everyone leaves nobody outside it")
+    for other in others:
+        if set(other) != {"id", "decider", "provider_config", "choice"}:
+            raise ComparisonRefused("others", "a person outside the group states their decider")
+        if other["decider"]["kind"] not in OTHER_DECIDER_KINDS:
+            raise ComparisonRefused("others", f"{other['id']} is decided by their owner's choice")
+        _check_config(other["id"], other["decider"], other["provider_config"])
+        choice = other["choice"]
+        if choice is not None and set(choice) != {"choice_seq", "document_sha256"}:
+            raise ComparisonRefused("others", "an owner's choice is named by sequence and digest")
+        if (other["decider"]["kind"] == "model") and choice is None:
+            raise ComparisonRefused("others", "a model outside the group is an owner's choice")
 
 
 def check_definition_body(body: Mapping[str, Any], catalogs: ComparisonCatalogs) -> None:
-    """Refuse by name a definition this code cannot run or judge as it states itself."""
+    """Refuse by name a definition this code cannot run or judge as it states itself.
+
+    What the society holds, the people of the group and the owner's choices for everybody else, is
+    checked against the society where the definition is recorded
+    (:meth:`~exulanica.world.society_comparison_repository.SocietyComparisonRepository.define`).
+    """
     phase = body["phase"]
     if phase not in SEED_PHASES:
         raise ComparisonRefused("phase_unknown", f"no phase {phase!r}")
+    if score_version(catalogs) != _DEFINED_VERSION:
+        raise ComparisonRefused(
+            "catalogs_not_the_definition_version",
+            f"a comparison is defined under score v{_DEFINED_VERSION}, "
+            f"these catalogs hold v{score_version(catalogs)}",
+        )
     committed = {
         str(entry["seed_digest"]) for entry in catalogs.seeds.values() if entry["phase"] == phase
     }
@@ -185,6 +301,15 @@ def check_definition_body(body: Mapping[str, Any], catalogs: ComparisonCatalogs)
         )
     if body["window_ticks"] != protocol_value(catalogs, "window_ticks"):
         raise ComparisonRefused("window_not_the_protocol", "a comparison runs the protocol's hour")
+    _check_group(body)
+    if phase == "held_out" and any(other["decider"]["kind"] == "model" for other in body["others"]):
+        # A model outside the group is asked in every arm, the anchors included, so the score's
+        # one and the rates' denominator would move with its answers: a judged claim keeps
+        # everybody outside the group on their routine, where both hold exactly.
+        raise ComparisonRefused(
+            "held_out_others_not_routine",
+            "a held-out comparison keeps everybody outside its group on their routine",
+        )
     arms = body["arms"]
     roles = Counter(arm["role"] for arm in arms.values())
     if any(role not in ARM_ROLES for role in roles) or roles["one"] != 1 or roles["zero"] != 1:
@@ -199,17 +324,7 @@ def check_definition_body(body: Mapping[str, Any], catalogs: ComparisonCatalogs)
         anchor = _ANCHORS.get(arm["role"])
         if kind not in DECIDER_KINDS or (anchor or "model") != kind:
             raise ComparisonRefused("arm_decider", f"arm {key} is a {arm['role']} run by {kind}")
-        config = arm["provider_config"]
-        if (kind == "model") != (config is not None):
-            raise ComparisonRefused(
-                "arm_provider", f"exactly a model arm records its asking: {key}"
-            )
-        if config is not None and (
-            set(config) != PERSON_PROVIDER_CONFIG
-            or (config["provider"], config["model_id"])
-            != (arm["decider"]["provider"], arm["decider"]["model_id"])
-        ):
-            raise ComparisonRefused("arm_provider", f"arm {key} records the model it asks")
+        _check_config(f"arm {key}", arm["decider"], arm["provider_config"])
         if arm["role"] == "control" and not any(
             arm["decider"] == other["decider"] for other in candidates.values()
         ):
@@ -251,6 +366,32 @@ def _nearest_rank(values: Sequence[int], share: int) -> int | None:
     return ordered[max(0, -(-share * len(ordered) // 100) - 1)]
 
 
+# -- the two scores, read the same way ----------------------------------------------------------
+
+
+def _reliability_document(counts: Mapping[str, Any]) -> dict[str, Any]:
+    """What a model answered, as a document serves it beside a score: counts, shares of the run's
+    own turns, and rates per choice point of the routine's run where one was recorded."""
+    turns = counts["turns"]
+    points = counts["routine_choice_points"]
+    return {
+        **{key: counts[key] for key in ("turns", *RELIABILITY_THREE)},
+        "not_answered": counts["not_answered"],
+        "not_applied": counts["not_applied"],
+        "shares": None
+        if turns == 0
+        else {key: decimal_text(Fraction(counts[key], turns)) for key in RELIABILITY_THREE},
+        "per_routine_choice": None
+        if not points
+        else {key: decimal_text(Fraction(counts[key], points)) for key in RELIABILITY_THREE},
+        "routine_choice_points": points,
+        "reasons": dict(sorted(counts["reasons"].items())),
+    }
+
+
+# -- outcomes -----------------------------------------------------------------------------------
+
+
 def run_outcome(
     plan: RunPlan,
     definition: Mapping[str, Any],
@@ -258,21 +399,38 @@ def run_outcome(
     seed_digest_text: str,
     played: PlayedRun,
     calls: Mapping[str, Any] | None,
-    score: PersonScore,
+    catalogs: ComparisonCatalogs,
+    *,
+    others_calls: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A completed run's outcome: its minutes' digests, its events and receipts, the score's
-    integer terms and, for a model arm, what its asking took. Every run of a comparison is
-    scored over all of its people."""
-    threshold = need_threshold(routine_of(plan.inputs[-1]))
-    terms = society_score.run_terms(
-        played.states,
-        played.events,
-        people=[person["id"] for person in played.start["inhabitants"]],
-        threshold=threshold,
-        score=score,
-    )
+    integer terms over the people it scores and what its asking took, in the form of its
+    definition's version."""
+    version = definition_version(definition)
+    threshold = society_score.need_threshold(routine_of(plan.inputs[-1]))
+    everybody = [person["id"] for person in played.start["inhabitants"]]
+    if version == 1:
+        terms = society_score.run_terms(
+            played.states,
+            played.events,
+            people=everybody,
+            threshold=threshold,
+            score=society_score.person_score(catalogs.score),
+        ).document()
+        extra: dict[str, Any] = {}
+    else:
+        people = everybody if plan.group is None else sorted(plan.group)
+        terms = society_score_v2.run_terms(
+            played.states,
+            played.events,
+            people=people,
+            threshold=threshold,
+            choice_points=sum(played.choice_points[subject] for subject in people),
+            score=society_score_v2.person_score(catalogs.score),
+        ).document()
+        extra = {"others_calls": None if others_calls is None else dict(others_calls)}
     return {
-        "profile": RUN_PROFILE,
+        "profile": RUN_PROFILES[version],
         "status": "completed",
         "definition_sha256": definition["document_sha256"],
         "arm": arm,
@@ -280,9 +438,13 @@ def run_outcome(
         "minutes": {"count": len(played.states), "state_sha256": played.minute_digests},
         "events_sha256": played.events_sha256,
         "receipts": {"count": len(played.receipts), "sha256": played.receipts_sha256},
-        "terms": terms.document(),
+        "terms": terms,
         "calls": None if calls is None else dict(calls),
+        **extra,
     }
+
+
+# -- documents ----------------------------------------------------------------------------------
 
 
 def _seed_names(catalogs: ComparisonCatalogs) -> dict[str, str]:
@@ -293,15 +455,131 @@ def _arm_order(arms: Mapping[str, Any]) -> list[str]:
     return sorted(arms, key=lambda key: (ARM_ROLES.index(arms[key]["role"]), key))
 
 
-def _difference_document(found: Any, rejected: set[tuple[str, str]] | None) -> dict[str, Any]:
+def _decider_document(
+    decider: Mapping[str, Any], model_name: Callable[[str], str]
+) -> dict[str, Any]:
+    """A decider as the documents serve it. A model carries the name ``model_name`` gives it,
+    which the routes take from ``Manifest.model_name``: the rule the People panel and the Companion
+    name a model by, so one model is never called two things."""
+    if decider["kind"] != "model":
+        return {"kind": decider["kind"]}
+    return {
+        "kind": "model",
+        "provider": decider["provider"],
+        "model_id": decider["model_id"],
+        "name": model_name(decider["model_id"]),
+    }
+
+
+def _arm_document(
+    key: str, arm: Mapping[str, Any], model_name: Callable[[str], str]
+) -> dict[str, Any]:
+    return {
+        "key": key,
+        "role": arm["role"],
+        "decider": _decider_document(arm["decider"], model_name),
+        "description": arm["description"],
+    }
+
+
+def _group_document(definition: Mapping[str, Any]) -> dict[str, Any]:
+    """Who a comparison scores: a first-version comparison scored everybody and named nobody."""
+    if definition_version(definition) == 1:
+        return {"people": None, "source": {"kind": "everyone"}, "size": definition["population"]}
+    group = definition["group"]
+    people = group["people"]
+    return {
+        "people": [dict(person) for person in people],
+        "source": dict(group["source"]),
+        "size": len(people),
+    }
+
+
+def _others_document(
+    definition: Mapping[str, Any], model_name: Callable[[str], str]
+) -> list[dict[str, Any]]:
+    """Everybody outside the group and what decides for them in every arm."""
+    if definition_version(definition) == 1:
+        return []
+    return [
+        {
+            "id": other["id"],
+            "name": other["name"],
+            "decider": _decider_document(other["decider"], model_name),
+            "choice": other["choice"],
+        }
+        for other in definition["others"]
+    ]
+
+
+def _calls_document(calls: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if calls is None:
+        return None
+    return {
+        "asked": calls["asked"],
+        "first_answers_refused": calls["first_answers_refused"],
+        "cost_usd": calls["cost_usd"],
+        "cost_known": calls["cost_known"],
+        "latency_ms": {
+            "p50": _nearest_rank(calls["latencies_ms"], 50),
+            "p95": _nearest_rank(calls["latencies_ms"], 95),
+        },
+    }
+
+
+def _difference_document(found: Any, rejected: bool | None) -> dict[str, Any]:
     return {
         "first": found.first,
         "second": found.second,
         "mean": decimal_text(found.mean),
         "low": decimal_text(found.low),
         "high": decimal_text(found.high),
-        "rejected": None if rejected is None else (found.first, found.second) in rejected,
+        "rejected": rejected,
     }
+
+
+def _measure_text(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, Mapping):
+        return {key: decimal_text(item) for key, item in value.items()}
+    return decimal_text(value)
+
+
+def _mean_measures(measures: Sequence[Mapping[str, Any]], names: Sequence[str]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for name in names:
+        values = [m[name] for m in measures]
+        if not values or any(value is None for value in values):
+            out[name] = None
+        elif isinstance(values[0], Mapping):
+            keys = sorted({key for value in values for key in value})
+            out[name] = {
+                key: decimal_text(
+                    sum((value.get(key, Fraction(0)) for value in values), Fraction(0))
+                    / len(values)
+                )
+                for key in keys
+            }
+        else:
+            out[name] = decimal_text(sum(values, Fraction(0)) / len(values))
+    return out
+
+
+#: The measures read from states a document reports, by the second score's names; a first-version
+#: run records no minutes by activity, which is served as null.
+_MEASURES: Final = society_score_v2.STATE_MEASURES
+
+
+def others_asked(definition: Mapping[str, Any]) -> bool:
+    """Whether anybody outside a comparison's group is decided by a model their world's owner chose,
+    asked in every arm, the anchors included. Derived from the deciders the definition records, so
+    it is never stated twice. A held-out comparison is refused with any such person
+    (:func:`check_definition_body`), so where this holds the comparison is a development one, and
+    its score's one and its rates' denominator move with those answers too."""
+    return definition_version(definition) == _DEFINED_VERSION and any(
+        other["decider"]["kind"] == "model" for other in definition["others"]
+    )
 
 
 def comparison_result(
@@ -311,109 +589,68 @@ def comparison_result(
     *,
     model_name: Callable[[str], str],
 ) -> dict[str, Any]:
-    """A comparison's scores, per seed and per arm, its registered differences and the server's
-    verdict, read from its definition and its runs' outcomes alone. ``model_name`` names each
-    model an arm asks (:func:`_arm_document`)."""
-    found_catalogs = load_comparison_catalogs() if catalogs is None else catalogs
+    """A comparison's scores, per seed and per arm, what each arm's model answered beside them,
+    its registered differences and the server's verdict, read from its definition and its runs'
+    outcomes alone, under the catalogs its binding recorded, by the bound reading of
+    :func:`~exulanica.world.society_comparison_verdict.read_comparison`; this formats what it
+    found. ``catalogs`` stands in for the recorded ones where a caller reads under a copy of its
+    own; ``model_name`` names each model a decider asks."""
     definition = row["document"]
-    score = person_score(found_catalogs.score)
-    protocol = _protocol(found_catalogs)
-    floor = protocol_value(found_catalogs, "need_relief_floor")
+    recorded = definition["scoring"]
+    found_catalogs = _recorded_catalogs(recorded) if catalogs is None else catalogs
+    reading = read_comparison(
+        definition, runs, found_catalogs, binding_held=binding_holds(recorded, catalogs)
+    )
+    protocol = protocol_for(found_catalogs)
     arms = definition["arms"]
     order = _arm_order(arms)
     names = _seed_names(found_catalogs)
     by_seed: dict[str, dict[str, Mapping[str, Any]]] = {seed: {} for seed in definition["seeds"]}
     for run in runs:
         by_seed.setdefault(run["seed_digest"], {})[run["arm"]] = run
-    complete = all(
-        by_seed[seed].get(arm, {}).get("status") == "completed"
-        for seed in definition["seeds"]
-        for arm in arms
-    )
-    scores: dict[str, dict[str, Fraction | None]] = {arm: {} for arm in arms}
+    calls_of: dict[str, list[Mapping[str, Any]]] = {arm: [] for arm in arms}
+    others_of: dict[str, list[Mapping[str, Any]]] = {arm: [] for arm in arms}
     seeds_out = []
-    pooled: dict[str, dict[str, Any]] = {
-        arm: {
-            "turns": 0,
-            "not_applied": 0,
-            "cost": Fraction(0),
-            "cost_known": True,
-            "runs": 0,
-            "asked": 0,
-            "first_refused": 0,
-            "latencies": [],
-            "measures": [],
-        }
-        for arm in arms
-    }
-    anchor = {arms[key]["role"]: key for key in arms if arms[key]["role"] in _ANCHORS}
     for seed in definition["seeds"]:
         held = by_seed[seed]
-        terms = {
-            arm: RunTerms.from_document(run["outcome"]["terms"])
-            for arm, run in held.items()
-            if run.get("status") == "completed"
-        }
-        excluded = None
         runs_out: dict[str, Any] = {}
         for arm in order:
-            run = held.get(arm)
-            status = "incomplete" if run is None or run.get("status") is None else run["status"]
-            value = None
-            if arm in terms and anchor["zero"] in terms and anchor["one"] in terms:
-                scored = seed_score(
-                    terms[arm],
-                    waiting=terms[anchor["zero"]],
-                    routine=terms[anchor["one"]],
-                    score=score,
-                    floor=floor,
-                )
-                excluded = scored.excluded
-                value = scored.score
-            scores[arm][seed] = value
-            calls = None if status != "completed" else run["outcome"]["calls"]  # type: ignore[index]
-            run_terms = terms.get(arm)
-            if run_terms is not None:
-                pool = pooled[arm]
-                counted = dict(run_terms.counted)
-                pool["turns"] += run_terms.turns
-                pool["not_applied"] += sum(counted.values())
-                pool["runs"] += 1
-                pool["measures"].append(state_measures(run_terms))
-                if calls is not None:
-                    pool["cost"] += Fraction(Decimal(calls["cost_usd"]))
-                    pool["cost_known"] = pool["cost_known"] and calls["cost_known"]
-                    pool["asked"] += calls["asked"]
-                    pool["first_refused"] += calls["first_answers_refused"]
-                    pool["latencies"].extend(calls["latencies_ms"])
+            found = held.get(arm)
+            status = (
+                "incomplete" if found is None or found.get("status") is None else found["status"]
+            )
+            outcome = found["outcome"] if found is not None and status == "completed" else None
+            calls = None if outcome is None else outcome["calls"]
+            others_calls = None if outcome is None else outcome.get("others_calls")
+            if calls is not None:
+                calls_of[arm].append(calls)
+            if others_calls is not None:
+                others_of[arm].append(others_calls)
+            value = reading.scores[arm][seed]
+            counts = reading.counts[arm][seed]
             runs_out[arm] = {
-                "run_id": None if run is None else str(run["run_id"]),
+                "run_id": None if found is None else str(found["run_id"]),
                 "status": status,
-                "failure": run["outcome"]["code"] if status == "failed" else None,  # type: ignore[index]
+                "failure": found["outcome"]["code"]
+                if found is not None and status == "failed"
+                else None,
                 "score": None if value is None else decimal_text(value),
-                "turns": 0 if run_terms is None else run_terms.turns,
-                "not_applied": 0 if run_terms is None else sum(dict(run_terms.counted).values()),
-                "calls": None
-                if calls is None
-                else {
-                    "asked": calls["asked"],
-                    "first_answers_refused": calls["first_answers_refused"],
-                    "cost_usd": calls["cost_usd"],
-                    "cost_known": calls["cost_known"],
-                    "latency_ms": {
-                        "p50": _nearest_rank(calls["latencies_ms"], 50),
-                        "p95": _nearest_rank(calls["latencies_ms"], 95),
-                    },
-                },
+                "reliability": None if counts is None else _reliability_document(counts),
+                "calls": _calls_document(calls),
+                "others_calls": _calls_document(others_calls),
             }
         seeds_out.append(
-            {"seed_digest": seed, "name": names.get(seed), "excluded": excluded, "runs": runs_out}
+            {
+                "seed_digest": seed,
+                "name": names.get(seed),
+                "excluded": reading.excluded[seed],
+                "runs": runs_out,
+            }
         )
-    summaries = {}
     key = definition["document_sha256"]
+    summaries = {}
     for arm in order:
-        values = [value for value in scores[arm].values() if value is not None]
-        pool = pooled[arm]
+        values = [value for value in reading.scores[arm].values() if value is not None]
         interval = None
         mean = None
         if values:
@@ -423,131 +660,73 @@ def comparison_result(
                 values
             )
             interval = {"low": decimal_text(low), "high": decimal_text(high)}
-        measures = pool["measures"]
+        counted = reading.pooled[arm]
+        calls = calls_of[arm]
         summaries[arm] = {
             "mean_score": None if mean is None else decimal_text(mean),
             "interval": interval,
-            "not_applied_share": None
-            if pool["turns"] == 0
-            else decimal_text(Fraction(pool["not_applied"], pool["turns"])),
+            "reliability": None if counted is None else _reliability_document(counted),
             "cost_usd_per_hour": None
-            if arms[arm]["decider"]["kind"] != "model" or pool["runs"] == 0
-            else decimal_text(
-                pool["cost"] / pool["runs"] * MINUTES_PER_HOUR / definition["window_ticks"]
-            ),
-            "cost_known": pool["cost_known"],
+            if arms[arm]["decider"]["kind"] != "model"
+            else _hourly_cost(calls, definition),
+            "cost_known": all(found["cost_known"] for found in calls),
+            "others_cost_usd_per_hour": _hourly_cost(others_of[arm], definition),
+            "others_cost_known": all(found["cost_known"] for found in others_of[arm]),
             "latency_ms": {
-                "p50": _nearest_rank(pool["latencies"], 50),
-                "p95": _nearest_rank(pool["latencies"], 95),
+                "p50": _nearest_rank([ms for c in calls for ms in c["latencies_ms"]], 50),
+                "p95": _nearest_rank([ms for c in calls for ms in c["latencies_ms"]], 95),
             },
             "held_out": {
-                "first_answers_refused": None
-                if pool["asked"] == 0
-                else decimal_text(Fraction(pool["first_refused"], pool["asked"])),
-                **{
-                    name: None
-                    if not measures
-                    else decimal_text(sum((m[name] for m in measures), Fraction(0)) / len(measures))
-                    for name in society_score.STATE_MEASURES
-                },
+                "first_answers_refused": _first_refused(calls),
+                **_mean_measures(reading.measures[arm], _MEASURES),
             },
         }
     claim = definition["claim"]
-    differences: list[dict[str, Any]] = []
-    control_bound = None
-    verdict: dict[str, Any] = {"code": "not_judged", "higher": None, "reason": None}
-    if not complete:
-        verdict = {"code": "incomplete", "higher": None, "reason": None}
-    elif definition["phase"] == "development":
-        verdict["reason"] = "development_seeds"
-    elif definition["scoring"] != scoring_binding(found_catalogs):
-        verdict["reason"] = "scored_under_other_code"
-    if claim is not None and complete:
-        family = [tuple(pair) for pair in claim["family"]]
-        control = claim["control"]
-        judged_arms = sorted({arm for pair in family for arm in pair})
-        shared = [
-            seed
-            for seed in definition["seeds"]
-            if all(scores[arm].get(seed) is not None for arm in judged_arms)
-        ]
-        control_shared = (
-            []
-            if control is None
-            else [
-                seed
-                for seed in definition["seeds"]
-                if all(scores[arm].get(seed) is not None for arm in control)
-            ]
-        )
-        if len(shared) >= 2 and control is not None and len(control_shared) >= 2:
-            found = judge(
-                scores,
-                primary=tuple(claim["primary"]),
-                family=family,
-                control=tuple(control),
-                key=key,
-                protocol=protocol,
-            )
-            rejected = set(found.rejected)
-            differences = [_difference_document(d, rejected) for d in found.differences]
-            control_bound = decimal_text(found.control_bound)
-            if verdict["code"] == "not_judged" and verdict["reason"] is None:
-                verdict = {"code": found.code, "higher": found.higher, "reason": None}
-        elif len(shared) >= 2:
-            # Registered differences with no control, or too few seeds its two arms scored,
-            # to bound them: shown, and never judged.
-            differing, rejected = family_differences(
-                scores, family=family, key=key, protocol=protocol
-            )
-            differences = [_difference_document(differing[pair], rejected) for pair in family]
-            if verdict["code"] == "not_judged" and verdict["reason"] is None:
-                verdict["reason"] = "too_few_seeds_scored"
-        elif verdict["code"] == "not_judged" and verdict["reason"] is None:
-            verdict["reason"] = "too_few_seeds_scored"
+    assembled = reading.assembled
     return {
         "profile": RESULT_PROFILE,
         "comparison_id": str(row["comparison_id"]),
         "created_at": row["created_at"].isoformat(),
         "phase": definition["phase"],
+        "score_version": reading.version,
         "window_ticks": definition["window_ticks"],
         "population": definition["population"],
         "preregistration": definition["preregistration"],
+        "group": _group_document(definition),
+        "others": _others_document(definition, model_name),
+        "others_asked": others_asked(definition),
         "arms": [_arm_document(arm, arms[arm], model_name) for arm in order],
         "primary": None if claim is None else list(claim["primary"]),
         "control": None if claim is None or claim["control"] is None else list(claim["control"]),
         "seeds": seeds_out,
         "summaries": summaries,
-        "differences": differences,
-        "control_bound": control_bound,
-        "verdict": verdict,
-    }
-
-
-def _arm_document(
-    key: str, arm: Mapping[str, Any], model_name: Callable[[str], str]
-) -> dict[str, Any]:
-    """An arm as the documents serve it. A model arm carries the name ``model_name`` gives its
-    model, which the routes take from ``Manifest.model_name``: the rule the People panel and the
-    Companion name a model by, so one model is never called two things."""
-    decider = arm["decider"]
-    return {
-        "key": key,
-        "role": arm["role"],
-        "decider": {
-            "kind": decider["kind"],
-            **(
-                {
-                    "provider": decider["provider"],
-                    "model_id": decider["model_id"],
-                    "name": model_name(decider["model_id"]),
-                }
-                if decider["kind"] == "model"
-                else {}
-            ),
+        "differences": [_difference_document(d, rejected) for d, rejected in assembled.differences],
+        "control_bound": None
+        if assembled.control_bound is None
+        else decimal_text(assembled.control_bound),
+        "verdict": {
+            "code": assembled.code,
+            "higher": assembled.higher,
+            "reason": assembled.reason,
+            "answered_shares_differ": assembled.answered_shares_differ,
         },
-        "description": arm["description"],
     }
+
+
+def _hourly_cost(calls: Sequence[Mapping[str, Any]], definition: Mapping[str, Any]) -> str | None:
+    """What the asking of an arm's completed runs cost for the simulated hour, on average; None
+    where none of them asked anybody."""
+    if not calls:
+        return None
+    spent = sum((Fraction(Decimal(c["cost_usd"])) for c in calls), Fraction(0))
+    return decimal_text(spent / len(calls) * MINUTES_PER_HOUR / definition["window_ticks"])
+
+
+def _first_refused(calls: Sequence[Mapping[str, Any]]) -> str | None:
+    asked = sum(c["asked"] for c in calls)
+    if asked == 0:
+        return None
+    return decimal_text(Fraction(sum(c["first_answers_refused"] for c in calls), asked))
 
 
 def listing_document(
@@ -556,18 +735,21 @@ def listing_document(
     *,
     model_name: Callable[[str], str],
 ) -> dict[str, Any]:
-    """A version's comparisons, newest first, each with its arms and how far its runs got;
-    ``model_name`` names each model an arm asks (:func:`_arm_document`)."""
+    """A version's comparisons, newest first, each with its arms, who it scores and how far its
+    runs got; ``model_name`` names each model a decider asks."""
     comparisons = []
     for row in rows:
         definition = row["document"]
         runs, completed = counts.get(row["comparison_id"], (0, 0))
         arms = definition["arms"]
+        group = _group_document(definition)
         comparisons.append(
             {
                 "comparison_id": str(row["comparison_id"]),
                 "created_at": row["created_at"].isoformat(),
                 "phase": definition["phase"],
+                "score_version": 1 if definition_version(definition) == 1 else 2,
+                "group": {"source": group["source"], "size": group["size"]},
                 "arms": [_arm_document(arm, arms[arm], model_name) for arm in _arm_order(arms)],
                 "seeds": len(definition["seeds"]),
                 "runs": runs,
@@ -584,9 +766,12 @@ def replay_document(
     arm: str,
     digest: str,
     played: PlayedRun,
+    *,
+    model_name: Callable[[str], str],
 ) -> dict[str, Any]:
     """One replayed run as the page draws it: the place from the frozen input, each person's
-    minute by minute, and what each turn's receipt and minute did. No seed, no raw state."""
+    minute by minute, who decides for each of them in this run, and what each turn's receipt and
+    minute did. No seed, no raw state."""
     document = plan.inputs[-1]
     routine = routine_of(document)
     positions = {node["node_id"]: node["position_mm"] for node in document["navigation"]["nodes"]}
@@ -676,13 +861,20 @@ def replay_document(
         for event in played.events
         if event.subject_id is not None
     ]
+    deciders = {}
+    for value in played.start["inhabitants"]:
+        decider, _config = plan.decider_for(value["id"])
+        deciders[value["id"]] = {
+            "in_group": plan.group is None or value["id"] in plan.group,
+            "decider": _decider_document(decider, model_name),
+        }
     return {
         "profile": REPLAY_PROFILE,
         "replay_verified": True,
         "run_id": str(plan.run_id),
         "arm": arm,
         "seed_digest": digest,
-        "threshold": need_threshold(routine),
+        "threshold": society_score.need_threshold(routine),
         "place": {
             "nodes": [
                 {"id": node["node_id"], "x": node["position_mm"][0], "z": node["position_mm"][1]}
@@ -696,7 +888,7 @@ def replay_document(
         },
         "activities": activities,
         "people": [
-            {"id": value["id"], "name": value["display_name"]}
+            {"id": value["id"], "name": value["display_name"], **deciders[value["id"]]}
             for value in played.start["inhabitants"]
         ],
         "minutes": minutes,

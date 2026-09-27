@@ -65,8 +65,14 @@ def test_a_comparison_asks_on_the_whole_budget_where_the_host_keeps_part_back():
     model = {"provider": SPEC.provider, "model_id": SPEC.model_id}
     # The positive control: the host's own rule refuses this model now.
     assert model_refusal(client, MANIFEST, CONTRACT, model) == "process_share_spent"
+    mechanism = CONTRACT.mechanism_for(SPEC)
+    assert mechanism is not None
     asking = _Asking(
-        client.with_policy(RecordingPolicy()), MANIFEST, CONTRACT, SPEC, ARM["provider_config"]
+        client.with_policy(RecordingPolicy()),
+        MANIFEST,
+        CONTRACT,
+        {SPEC.model_id: (SPEC, mechanism)},
+        lambda _subject: SPEC.model_id,
     )
     assert asking.offerable(0, DUE) == {"someone": frozenset(o.label for o in DUE["someone"])}
     _spend(budget, Decimal("0.00002"))

@@ -58,7 +58,7 @@ describe('the Compare view', () => {
   it('reads a difference inside its interval as no measured difference, from the verdict alone', () => {
     const inside = result((document) => {
       document['phase'] = 'held_out';
-      document['verdict'] = { code: 'no_measured_difference', higher: null, reason: null };
+      document['verdict'] = { code: 'no_measured_difference', higher: null, reason: null, answered_shares_differ: null };
       document['differences'] = [
         { first: 'model_a', second: 'model_b', mean: '0.0400', low: '-0.0300', high: '0.1100', rejected: false },
       ];
@@ -73,7 +73,7 @@ describe('the Compare view', () => {
     expect(verdict.textContent).not.toContain('fared better');
     // The same numbers under the server's other verdict read as it says: the page decides nothing.
     const called = result((document) => {
-      document['verdict'] = { code: 'different', higher: 'model_b', reason: null };
+      document['verdict'] = { code: 'different', higher: 'model_b', reason: null, answered_shares_differ: null };
       document['differences'] = inside.differences.map((d) => ({ ...d }));
       document['primary'] = ['model_a', 'model_b'];
       document['control_bound'] = '0.0100';

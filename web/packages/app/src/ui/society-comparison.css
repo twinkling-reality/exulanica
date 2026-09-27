@@ -62,6 +62,15 @@
 .comparison-verdict h3 { margin: 0 0 .25rem; font-size: 1rem; }
 .comparison-verdict p { margin: 0; }
 .comparison-registration { color: var(--ink-soft, #4e5d64); font-size: .8rem; overflow-wrap: anywhere; }
+/* Who each arm decides for, and what decides for everybody else. */
+.comparison-verdict .comparison-group { margin-top: .4rem; color: var(--ink-soft, #4e5d64); }
+/* What a model answered sits beside every score: under it in a seed's cell, beside it in an arm's row. */
+.comparison-score { display: block; font-variant-numeric: tabular-nums; }
+.comparison-reliability { color: var(--ink-soft, #4e5d64); font-size: .78rem; }
+.comparison-seeds .comparison-reliability { display: block; max-width: 18rem; }
+.comparison-rate { color: var(--ink-soft, #4e5d64); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.comparison-reasons { display: block; margin-top: .2rem; }
+.comparison-reasons:empty { display: none; }
 .comparison-arms, .comparison-seeds { width: 100%; border-collapse: collapse; font-size: .82rem; }
 .comparison-arms caption, .comparison-seeds caption { caption-side: top; text-align: left; color: var(--ink-soft, #4e5d64); padding-bottom: .25rem; }
 .comparison-arms :is(th, td), .comparison-seeds :is(th, td) { padding: .35rem .5rem; border-bottom: 1px solid var(--edge, #c5cfd2); text-align: left; vertical-align: top; }
@@ -80,6 +89,7 @@
 .comparison-side-head p, .comparison-side-head h3 { margin: 0; }
 .comparison-side-role { color: var(--ink-soft, #4e5d64); font-size: .8rem; }
 .comparison-side-score { font-variant-numeric: tabular-nums; }
+.comparison-side-head .comparison-reliability { margin: 0; }
 .comparison-plan { width: 100%; aspect-ratio: 4 / 3; background: var(--surface, #eef2f1); }
 .comparison-plan-ground line { stroke: var(--edge, #c5cfd2); stroke-width: 60; }
 .comparison-plan-target circle { fill: var(--raised, #fff); stroke: var(--ink-soft, #4e5d64); stroke-width: 60; }
@@ -87,7 +97,12 @@
 .comparison-plan-person { cursor: pointer; }
 .comparison-plan-person circle { fill: var(--comparison-waiting); stroke: var(--ink, #202a2f); stroke-width: 50; }
 .comparison-plan-person text { fill: var(--ink, #202a2f); font: 600 380px/1 var(--ui-font-body, system-ui, sans-serif); pointer-events: none; }
-.comparison-plan-person.is-selected circle { stroke: var(--accent, #40545d); stroke-width: 150; }
+/* The group the arms decide for is ringed on the plans and marked in the strips; everybody else
+   keeps one decider in every arm. A selected person's ring, below, is wider and in the accent. */
+.comparison-plan-person[data-in-group='true'] circle { stroke-width: 120; }
+.comparison-plan-person[data-in-group='false'] { opacity: .7; }
+.comparison-strip[data-in-group='true'] .comparison-strip-name::before { content: '●'; margin-right: .3rem; }
+.comparison-plan-person.is-selected circle { stroke: var(--accent, #40545d); stroke-width: 200; }
 .comparison-plan-person:focus-visible circle { stroke: var(--accent, #40545d); stroke-width: 150; }
 :is(.comparison-plan-person, .comparison-strip-cell, .comparison-strip-key)[data-class='walking'] { --class-colour: var(--comparison-walking); }
 :is(.comparison-plan-person, .comparison-strip-cell, .comparison-strip-key)[data-class='waiting'] { --class-colour: var(--comparison-waiting); }

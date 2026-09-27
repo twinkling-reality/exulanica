@@ -2,9 +2,11 @@
 
 ``exulanica/world/society_comparison_result.py`` checks a definition before it is stored, reads a
 comparison's scores from its runs' outcomes, and gives the server's verdict. These tests hold the
-refusals a definition meets, the order the verdict's cases take (a comparison with a run missing is
-incomplete before anything else; development seeds, scoring code other than the registered code
-and too few scored seeds are each not judged, by name), and how a value is written.
+refusals a definition meets, and, over first-version comparisons, scored under the first score and
+the catalogs the first judged comparison registered, the order the verdict's cases take (a
+comparison with a run missing is incomplete before anything else; development seeds, scoring code
+other than the registered code and too few scored seeds are each not judged, by name), and how a
+value is written: a first-version comparison reads as it always did.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from typing import Any
 import pytest
 from exulanica.models.manifest import load_manifest
 from exulanica.world.society_comparison_result import (
+    DEFINITION_PROFILES,
     ComparisonRefused,
     check_definition_body,
     comparison_result,
@@ -27,21 +30,33 @@ from exulanica.world.society_comparison_result import (
     scoring_binding,
 )
 
-from comparison_support import SEEDS, development_body, model_arm, seeded_catalogs
+from comparison_support import (
+    FIRST_VERSIONS,
+    SEEDS,
+    development_body,
+    model_arm,
+    seeded_catalogs,
+)
 
 CATALOGS = seeded_catalogs()
+#: The catalogs a first-version comparison is read under.
+FIRST = seeded_catalogs(versions=FIRST_VERSIONS)
 #: The rule every served document names a model by.
 NAME = load_manifest().model_name
 DIGESTS = [hashlib.sha256(seed.encode()).hexdigest() for seed in SEEDS]
 MORE = [hashlib.sha256(f"more-{index}".encode()).hexdigest() for index in range(4)]
 
 
-def _catalogs_with(*digests: str, phase: str = "held_out"):
+def _catalogs_with(*digests: str, phase: str = "held_out", base=CATALOGS):
     seeds = {
         f"seed_{index}": {"phase": phase, "seed_digest": digest, "reason": "A test seed."}
         for index, digest in enumerate(digests)
     }
-    return dataclasses.replace(CATALOGS, seeds={**CATALOGS.seeds, **seeds})
+    return dataclasses.replace(base, seeds={**base.seeds, **seeds})
+
+
+def _first_with(*digests: str, phase: str = "held_out"):
+    return _catalogs_with(*digests, phase=phase, base=FIRST)
 
 
 @pytest.mark.parametrize(
@@ -128,7 +143,8 @@ def _terms(urgency: int, *, turns: int = 0) -> dict[str, Any]:
 
 
 def _comparison(phase: str, seeds: list[str], urgencies: dict[str, list[int]], **definition):
-    """A comparison's row and runs, each arm's urgency on each seed given, every run completed."""
+    """A first-version comparison's row and runs, each arm's urgency on each seed given, every run
+    completed."""
     arms = {
         "routine": {
             "role": "one",
@@ -147,6 +163,7 @@ def _comparison(phase: str, seeds: list[str], urgencies: dict[str, list[int]], *
         "model_a_again": model_arm("control"),
     }
     document = {
+        "profile": DEFINITION_PROFILES[1],
         "document_sha256": "d" * 64,
         "phase": phase,
         "seeds": seeds,
@@ -161,7 +178,7 @@ def _comparison(phase: str, seeds: list[str], urgencies: dict[str, list[int]], *
         "preregistration": None
         if phase == "development"
         else {"record": "r", "record_sha256": "0" * 64},
-        "scoring": scoring_binding(CATALOGS),
+        "scoring": scoring_binding(FIRST),
         **definition,
     }
     row = {
@@ -214,8 +231,14 @@ def test_a_registration_belongs_to_a_held_out_comparison_and_is_refused_by_name_
 
 def test_a_held_out_comparison_scored_under_its_own_code_is_judged():
     row, runs = _comparison("held_out", MORE, CLEAR)
-    result = comparison_result(row, runs, _catalogs_with(*MORE), model_name=NAME)
-    assert result["verdict"] == {"code": "different", "higher": "model_b", "reason": None}
+    result = comparison_result(row, runs, _first_with(*MORE), model_name=NAME)
+    # No model was asked in these runs, so no two arms' answered shares can be told apart.
+    assert result["verdict"] == {
+        "code": "different",
+        "higher": "model_b",
+        "reason": None,
+        "answered_shares_differ": None,
+    }
     assert result["summaries"]["routine"]["mean_score"] == "1.0000"
     assert result["summaries"]["wait"]["mean_score"] == "0.0000"
     assert result["control_bound"] == "0.0000"
@@ -223,7 +246,7 @@ def test_a_held_out_comparison_scored_under_its_own_code_is_judged():
 
 def test_a_model_arm_is_named_by_the_manifest_and_an_anchor_names_no_model():
     row, runs = _comparison("held_out", MORE, CLEAR)
-    arms = comparison_result(row, runs, _catalogs_with(*MORE), model_name=NAME)["arms"]
+    arms = comparison_result(row, runs, _first_with(*MORE), model_name=NAME)["arms"]
     deciders = {arm["key"]: arm["decider"] for arm in arms}
     for key in ("model_a", "model_a_again", "model_b"):
         assert deciders[key]["name"] == NAME(deciders[key]["model_id"])
@@ -235,29 +258,31 @@ def test_a_model_arm_is_named_by_the_manifest_and_an_anchor_names_no_model():
 def test_a_run_missing_makes_a_comparison_incomplete_before_anything_else():
     row, runs = _comparison("development", MORE, CLEAR)
     runs[3]["status"] = None
-    result = comparison_result(
-        row, runs, _catalogs_with(*MORE, phase="development"), model_name=NAME
-    )
-    assert result["verdict"] == {"code": "incomplete", "higher": None, "reason": None}
+    result = comparison_result(row, runs, _first_with(*MORE, phase="development"), model_name=NAME)
+    assert result["verdict"] == {
+        "code": "incomplete",
+        "higher": None,
+        "reason": None,
+        "answered_shares_differ": None,
+    }
 
 
 def test_development_seeds_are_never_judged_and_their_differences_still_shown():
     row, runs = _comparison("development", MORE, CLEAR)
-    result = comparison_result(
-        row, runs, _catalogs_with(*MORE, phase="development"), model_name=NAME
-    )
+    result = comparison_result(row, runs, _first_with(*MORE, phase="development"), model_name=NAME)
     assert result["verdict"] == {
         "code": "not_judged",
         "higher": None,
         "reason": "development_seeds",
+        "answered_shares_differ": None,
     }
     assert len(result["differences"]) == 3
 
 
 def test_a_comparison_read_under_other_scoring_code_is_not_judged():
-    other = {**scoring_binding(CATALOGS), "scorer_sha256": "0" * 64}
+    other = {**scoring_binding(FIRST), "scorer_sha256": "0" * 64}
     row, runs = _comparison("held_out", MORE, CLEAR, scoring=other)
-    result = comparison_result(row, runs, _catalogs_with(*MORE), model_name=NAME)
+    result = comparison_result(row, runs, _first_with(*MORE), model_name=NAME)
     assert result["verdict"]["code"] == "not_judged"
     assert result["verdict"]["reason"] == "scored_under_other_code"
 
@@ -265,7 +290,7 @@ def test_a_comparison_read_under_other_scoring_code_is_not_judged():
 def test_seeds_under_the_floor_leave_too_few_to_judge_and_are_named():
     barely = {**CLEAR, "wait": [20_000, 10_100, 10_100, 10_100]}
     row, runs = _comparison("held_out", MORE, barely)
-    result = comparison_result(row, runs, _catalogs_with(*MORE), model_name=NAME)
+    result = comparison_result(row, runs, _first_with(*MORE), model_name=NAME)
     assert [seed["excluded"] for seed in result["seeds"]] == [
         None,
         "need_below_floor",
@@ -276,6 +301,7 @@ def test_seeds_under_the_floor_leave_too_few_to_judge_and_are_named():
         "code": "not_judged",
         "higher": None,
         "reason": "too_few_seeds_scored",
+        "answered_shares_differ": None,
     }
 
 

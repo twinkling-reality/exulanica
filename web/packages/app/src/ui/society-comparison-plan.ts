@@ -136,15 +136,19 @@ export function buildComparisonPlan(
   const people = node('g', { class: 'comparison-plan-people' });
   const dots = new Map<string, SVGGElement>();
   for (const person of run.people) {
+    // A person of the group the arms decide for is ringed; everybody else keeps one decider in
+    // every arm, and is named as outside the group.
+    const label = person.inGroup ? person.name : `${person.name}, outside the group`;
     const dot = node('g', {
       class: 'comparison-plan-person',
       tabindex: 0,
       role: 'button',
-      'aria-label': person.name,
+      'aria-label': label,
       'data-subject-id': person.id,
+      'data-in-group': String(person.inGroup),
     });
     const title = node('title');
-    title.textContent = person.name;
+    title.textContent = label;
     const initial = node('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' });
     initial.textContent = person.name.slice(0, 1);
     dot.append(title, node('circle', { r: PERSON_MM }), initial);

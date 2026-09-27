@@ -8,7 +8,8 @@ consumed in the first minute as a step consumes queued inputs. The people are th
 by identity, all of them; the seed decides where they start, how tired they are and every draw of
 the routine.
 
-A run's arm names who decides for its people:
+A run's arm names who decides for the people its comparison scores, its group, which is
+everybody unless the comparison names one:
 
 *   ``routine``: nothing is asked; the planner decides, as it does for everybody by default.
 *   ``wait``: at every choice point each person waits a minute, under the goal policy a model's
@@ -18,6 +19,10 @@ A run's arm names who decides for its people:
     chose a model for them: the options the rules of the workspace leave unchanged, judged once a
     minute, then one request each (:func:`~exulanica.world.society_decisions.person_request`), and
     each answer a receipt the engine applies or refuses at its own choice point.
+
+Everybody outside the group keeps the decider the comparison froze for them, the same in every
+arm: the model their world's owner chose, asked the same way, or their routine. So two arms differ
+only in who decides for the group.
 
 The minutes run back to back: nothing waits for a playback interval, and a minute waits only for
 its slowest answer. Asking is not done here. :func:`play` takes an :class:`Asking` port; the
@@ -33,6 +38,7 @@ ran over is unchanged by it.
 from __future__ import annotations
 
 import uuid
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final, Protocol
@@ -60,6 +66,8 @@ from exulanica.world.society_planner import (
 
 __all__ = [
     "DECIDER_KINDS",
+    "OTHER_DECIDER_KINDS",
+    "ROUTINE",
     "Asking",
     "PlayedRun",
     "ReplayMismatch",
@@ -71,6 +79,11 @@ __all__ = [
 
 #: Who decides for the people of a run: their routine, nobody (they wait), or a model.
 DECIDER_KINDS: Final = ("routine", "wait", "model")
+#: Who decides for a person outside a comparison's group: what their world's owner chose, a model
+#: or their routine.
+OTHER_DECIDER_KINDS: Final = ("routine", "model")
+#: The routine's decider, for a person nobody chose a model for.
+ROUTINE: Final = {"kind": "routine"}
 
 
 class ReplayMismatch(ValueError):
@@ -91,7 +104,8 @@ class Asking(Protocol):
         self, tick: int, due: Mapping[str, Sequence[DecisionOption]]
     ) -> Mapping[str, frozenset[str]]:
         """For each person due at ``tick``, with the options they have, the labels that may be
-        offered to them. Asked once a minute, for every person due in it."""
+        offered to them. Asked once a minute, for every person due in it, whichever model decides
+        for them."""
         ...
 
     def answers(self, requests: Sequence[dict[str, Any]]) -> Sequence[dict[str, Any]]:
@@ -111,11 +125,17 @@ class RunPlan:
     #: The world's society inputs from the first through the one the comparison froze.
     inputs: tuple[dict[str, Any], ...]
     ticks: int
-    #: The arm's decider, for every person of the run.
+    #: The arm's decider, for every person of its group.
     decider: Mapping[str, Any]
     #: What a model arm's requests record about the model they ask; None for the anchors.
     provider_config: Mapping[str, Any] | None
     contract: DecisionContract
+    #: The people the arm decides for, or None for everybody.
+    group: frozenset[str] | None = None
+    #: Everybody outside the group whose decider the comparison froze, by subject id: a model their
+    #: world's owner chose (``{"decider": ..., "provider_config": ...}``) or their routine. Anybody
+    #: outside the group and not named here follows their routine.
+    others: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.inputs or self.inputs[0]["input_seq"] != 1:
@@ -124,11 +144,39 @@ class RunPlan:
             raise ValueError("a run consumes the society's inputs in order, none left out")
         if self.ticks < 1:
             raise ValueError("a run takes at least one minute")
-        kind = self.decider.get("kind")
-        if kind not in DECIDER_KINDS:
-            raise ValueError(f"no decider {kind!r}")
-        if (kind == "model") != (self.provider_config is not None):
-            raise ValueError("exactly a model arm records what its requests ask")
+        _check_decider(self.decider, self.provider_config, kinds=DECIDER_KINDS, who="arm")
+        if self.group is not None and not self.group:
+            raise ValueError("a group holds at least one person")
+        for subject, held in self.others.items():
+            if self.group is None or subject in self.group:
+                raise ValueError("a person outside the group is not also in it")
+            # Nobody outside the group waits: an owner chooses a model or the routine.
+            _check_decider(
+                held["decider"], held["provider_config"], kinds=OTHER_DECIDER_KINDS, who="person"
+            )
+
+    def decider_for(self, subject_id: str) -> tuple[Mapping[str, Any], Mapping[str, Any] | None]:
+        """Who decides for one person of this run, and what their requests record."""
+        if self.group is None or subject_id in self.group:
+            return self.decider, self.provider_config
+        held = self.others.get(subject_id)
+        if held is None:
+            return ROUTINE, None
+        return held["decider"], held["provider_config"]
+
+
+def _check_decider(
+    decider: Mapping[str, Any],
+    config: Mapping[str, Any] | None,
+    *,
+    kinds: Sequence[str],
+    who: str,
+) -> None:
+    kind = decider.get("kind")
+    if kind not in kinds:
+        raise ValueError(f"no decider {kind!r}")
+    if (kind == "model") != (config is not None):
+        raise ValueError(f"exactly a model {who} records what its requests ask")
 
 
 def request_id(run_id: uuid.UUID, subject_id: str, tick: int) -> uuid.UUID:
@@ -139,13 +187,14 @@ def request_id(run_id: uuid.UUID, subject_id: str, tick: int) -> uuid.UUID:
 @dataclass(slots=True)
 class PlayedRun:
     """What a run did: the genesis, every minute's state after it, its events, requests and
-    receipts."""
+    receipts, and how many minutes each person began at the routine's choice point."""
 
     start: dict[str, Any]
     states: list[dict[str, Any]] = field(default_factory=list)
     events: list[SocietyEvent] = field(default_factory=list)
     requests: list[dict[str, Any]] = field(default_factory=list)
     receipts: list[dict[str, Any]] = field(default_factory=list)
+    choice_points: Counter[str] = field(default_factory=Counter)
 
     @property
     def minute_digests(self) -> list[str]:
@@ -207,8 +256,9 @@ def play(
     """
     state = genesis(plan)
     played = PlayedRun(start=state)
+    if plan.group is not None and not plan.group <= {p["id"] for p in state["inhabitants"]}:
+        raise ValueError("group_person_not_in_run: every person of a group is one of the run's")
     latest = plan.inputs[-1]
-    kind = plan.decider["kind"]
     waiting = _wait_policy(plan.contract)
     sequence = 0
     for minute in range(1, plan.ticks + 1):
@@ -217,34 +267,34 @@ def play(
             (person for person in state["inhabitants"] if at_choice_point(person)),
             key=lambda person: person["id"],
         )
+        played.choice_points.update(person["id"] for person in people)
         directed: dict[str, dict[str, Any]] = {}
         requests: list[dict[str, Any]] = []
-        if kind == "wait":
-            directed = {person["id"]: dict(waiting) for person in people}
-        elif kind == "model":
-            due = {
-                person["id"]: options
-                for person in people
-                if (
-                    options := choice_options(
-                        state, latest, person["id"], plan.contract, seed=plan.seed
-                    )
-                )
-            }
-            kept = asking.offerable(state["tick"], due) if due else {}
-            for subject in sorted(due):
-                request, _status = person_request(
-                    state,
-                    latest,
-                    subject,
-                    request_id=request_id(plan.run_id, subject, state["tick"]),
-                    contract=plan.contract,
-                    seed=plan.seed,
-                    provider_config=dict(plan.provider_config or {}),
-                    offer=_only(kept.get(subject, frozenset())),
-                )
-                if request is not None:
-                    requests.append(request)
+        due: dict[str, Sequence[DecisionOption]] = {}
+        configs: dict[str, Mapping[str, Any] | None] = {}
+        for person in people:
+            decider, config = plan.decider_for(person["id"])
+            if decider["kind"] == "wait":
+                directed[person["id"]] = dict(waiting)
+            elif decider["kind"] == "model":
+                options = choice_options(state, latest, person["id"], plan.contract, seed=plan.seed)
+                if options:
+                    due[person["id"]] = options
+                    configs[person["id"]] = config
+        kept = asking.offerable(state["tick"], due) if due else {}
+        for subject in sorted(due):
+            request, _status = person_request(
+                state,
+                latest,
+                subject,
+                request_id=request_id(plan.run_id, subject, state["tick"]),
+                contract=plan.contract,
+                seed=plan.seed,
+                provider_config=dict(configs[subject] or {}),
+                offer=_only(kept.get(subject, frozenset())),
+            )
+            if request is not None:
+                requests.append(request)
         results = list(asking.answers(requests)) if requests else []
         if len(results) != len(requests):
             raise ValueError("every request of a minute gets exactly one result")

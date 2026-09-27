@@ -70,8 +70,14 @@ export function buildComparisonStrips(
     const track = el('div', { class: 'comparison-strip-track', style: `--minutes: ${minutes}` }, [
       line(0), el('div', { class: 'comparison-strip-marks', 'aria-hidden': 'true' }, marks), line(1), cursor,
     ]);
-    const row = el('div', { class: 'comparison-strip', 'data-subject-id': person.id }, [
-      el('span', { class: 'comparison-strip-name', text: person.name }), track,
+    const row = el('div', {
+      class: 'comparison-strip', 'data-subject-id': person.id, 'data-in-group': String(person.inGroup),
+    }, [
+      el('span', {
+        class: 'comparison-strip-name',
+        text: person.name,
+        title: person.inGroup ? `${person.name}, of the group the arms decide for` : `${person.name}, outside the group`,
+      }), track,
     ]);
     holders.set(person.id, row);
     rows.push(row);
@@ -83,7 +89,7 @@ export function buildComparisonStrips(
     el('h3', { text: 'What each person did' }),
     el('p', {
       class: 'comparison-strip-note',
-      text: `Each row is one person, ${sideNames[0]} above and ${sideNames[1]} below. A mark between them is a minute the two hours went differently for that person.`,
+      text: `Each row is one person, ${sideNames[0]} above and ${sideNames[1]} below. A mark between them is a minute the two hours went differently for that person.${left.people.every((person) => person.inGroup) ? '' : ' A dot before a name marks the group the two sides decide for; everybody else keeps one decider on both sides.'}`,
     }),
     legend,
     ...rows,

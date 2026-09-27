@@ -146,6 +146,8 @@ def test_two_models_run_the_same_hour_and_the_page_reads_their_scores(app):
         "code": "not_judged",
         "higher": None,
         "reason": "development_seeds",
+        # No control was run, so nothing bounds how far two models' answered shares may differ.
+        "answered_shares_differ": None,
     }
     summaries = result["summaries"]
     assert summaries["routine"]["mean_score"] == "1.0000"
@@ -315,6 +317,10 @@ def test_a_run_stopped_part_way_is_closed_as_interrupted_and_nothing_is_asked_ag
             raise psycopg.OperationalError("the database went away")
         return appended(self, *args, **kwargs)
 
+    # The seed's anchors complete, the routine's choice points recorded, before any model run of
+    # the seed starts.
+    for anchor in ("routine", "wait"):
+        assert runner.run(comparison_id, arms[anchor])["status"] == "completed"
     monkeypatch.setattr(SocietyComparisonRepository, "append", stops_on_the_second)
     with pytest.raises(psycopg.OperationalError):
         runner.run(comparison_id, arms["model_a"])
@@ -366,13 +372,36 @@ DOCUMENTS = Path(__file__).resolve().parent / "snapshots" / "society-comparison-
 KEPT = 3
 
 
-def _keys(value: Any) -> Any:
-    """A document's shape: every object's keys, recursively, and a list's by its first entry."""
+#: Objects keyed by data rather than by shape: a reason code or an activity's name, each present
+#: only where a run met it.
+DATA_KEYED = frozenset({"minutes_by_activity", "reasons"})
+
+
+def _keys(value: Any, name: str | None = None) -> Any:
+    """A document's shape: every object's keys, recursively, and a list's by all its entries
+    merged, so no entry's place in the list decides it; an object keyed by data is shape only in
+    being an object."""
     if isinstance(value, dict):
-        return {key: _keys(item) for key, item in sorted(value.items())}
+        if name in DATA_KEYED:
+            return {}
+        return {key: _keys(item, key) for key, item in sorted(value.items())}
     if isinstance(value, list):
-        return [_keys(value[0])] if value and isinstance(value[0], dict | list) else []
+        shapes = [_keys(item) for item in value if isinstance(item, dict | list)]
+        return [_merged(shapes)] if shapes else []
     return None
+
+
+def _merged(shapes: list[Any]) -> Any:
+    """One shape holding every key any of ``shapes`` holds; an object or a list outweighs a
+    scalar, which is a null a value of another entry may fill."""
+    found = [shape for shape in shapes if shape is not None]
+    if not found:
+        return None
+    if isinstance(found[0], dict):
+        keys = sorted({key for shape in found for key in shape})
+        return {key: _merged([shape.get(key) for shape in found]) for key in keys}
+    inner = [entry for shape in found for entry in shape]
+    return [_merged(inner)] if inner else []
 
 
 def _cut(document: dict[str, Any]) -> dict[str, Any]:

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-comparison-protocol",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "bootstrap_resamples",
+      "value": 10000,
+      "reason": "Resamples of the seeds, with replacement, from which an interval and a two-sided test are read: ten thousand leaves the percentile ends of a mean over eight seeds steady to well under the precision a score is shown at, and costs a fraction of a second to draw.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "family_alpha_per_mille",
+      "value": 50,
+      "reason": "The chance of calling any registered difference real when none is, held for the whole family of hypotheses a comparison registers by Holm's step-down procedure: five percent, the level the interval is read at.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "interval_per_mille",
+      "value": 950,
+      "reason": "The share of resampled means an interval holds, the middle ninety-five percent: the conventional level, stated once so every interval a comparison shows is read at the same level.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "need_relief_floor_per_person",
+      "value": 575,
+      "reason": "A seed counts only when the routine spares the scored people at least this much need above the threshold against waiting, per scored person, in need-thousandths times minutes; a comparison scores one group, of any size, so the floor is stated per person. It is the first protocol's floor of 4,600 for the small square's eight people, measured before any model was asked on the eight development seeds through the product's runner with a scripted model (the routine spared from 10,858 to 25,175, median 18,537.5; a quarter of the median, rounded down to the hundred), divided by the eight people it was measured over. A seed under it is excluded by name, never scored, so no seed on which the routine had almost nothing to spare decides a mean.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "population_maximum",
+      "value": 8,
+      "reason": "The most people a comparison runs. A run is replayed from its receipts whenever it is read, and the page reads two runs at once: replaying one run of eight people for the hour through the run route took from 163 to 462 ms on the development machine (scripts/measure_society_comparison.py anchors). Eight is a saved world's own population; a larger society is refused by name rather than read slowly.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "runs_at_once",
+      "value": 2,
+      "reason": "How many runs a runner plays at the same time. Each asks at most the decision policy's eight concurrent calls, so two keep a comparison inside sixteen open requests to one provider, while halving the time a comparison takes.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "window_ticks",
+      "value": 60,
+      "reason": "A comparison runs the same simulated hour with each arm: long enough for a tired person to walk to a seat, stay the three to twenty-five minutes a rest lasts and be relieved, and short enough that two models and a control run on eight seeds within a spend of cents. Every run of one comparison runs exactly this many minutes.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    }
+  ]
+}

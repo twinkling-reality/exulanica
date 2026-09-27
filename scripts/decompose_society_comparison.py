@@ -79,7 +79,8 @@ def _mean(values: list[Fraction]) -> Fraction:
 def decompose(judged: dict[str, Any], registered: dict[str, Any]) -> dict[str, Any]:
     """Each run's score as relief less the share of its turns not applied, and each registered
     difference, and the control's, as the part relief makes and the part those turns make."""
-    catalogs = load_comparison_catalogs()
+    # The catalogs at the versions the comparison registered, whatever a new comparison reads.
+    catalogs = load_comparison_catalogs(versions=registered["scoring"]["catalogs"]["versions"])
     if scoring_binding(catalogs) != registered["scoring"]:
         raise SystemExit("the score read here is not the one the comparison registered")
     weights = person_score(catalogs.score).weights

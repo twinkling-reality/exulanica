@@ -5,7 +5,10 @@
  * runs it replayed, and routes each choice through a handler. Every number is the server's, shown
  * as written and never clipped, so a score below 0 (worse than waiting) or above 1 (better than
  * the routine) reads as it is. Whether two arms differ is the server's verdict, read by its code;
- * nothing here compares two numbers to decide it.
+ * nothing here compares two numbers to decide it. A score says how the group's people fared, and
+ * wherever one is shown, what its arm's model answered is shown beside it: the turns it answered,
+ * those whose answer was refused and those left to the routine, since the routine decides every
+ * turn a model leaves.
  */
 
 import type {
@@ -14,6 +17,9 @@ import type {
   ComparisonListing,
   ComparisonResult,
   ComparisonSeed,
+  Decider,
+  GroupSourceKind,
+  Reliability,
   RunDecision,
   RunReplay,
   VerdictCode,
@@ -45,6 +51,7 @@ export const NOT_JUDGED_WORDS: Readonly<Record<string, string>> = {
 
 /** Why a run failed, by `RUN_FAILURE_CODES` in `exulanica/api/society_comparison_runner.py`. */
 export const FAILURE_WORDS: Readonly<Record<string, string>> = {
+  anchor_failed: 'a run of the routine or of waiting on this seed did not complete, so this run could never be scored and asked nothing',
   interrupted: 'the process that ran it stopped part way, so its hour was not finished; a new comparison runs it again',
   model_no_longer_offered: 'the model is no longer offered for decisions',
   process_budget_spent: 'the model budget it ran under had too little left',
@@ -56,6 +63,71 @@ export const FAILURE_WORDS: Readonly<Record<string, string>> = {
   question_changed_by_rules: 'this world\'s rules would change the question each person is asked',
   request_refused: 'this world\'s rules would not let the question be sent',
 };
+
+/**
+ * Where a comparison's group came from, by `GROUP_SOURCES` in
+ * `exulanica/world/society_comparison_result.py`, held to it by society-comparison-words-parity.test.ts.
+ */
+export const GROUP_SOURCE_WORDS: Readonly<Record<GroupSourceKind, string>> = {
+  everyone: 'everybody in this world',
+  named: 'the people the comparison named',
+  owner_choice: 'the group you chose a model for',
+};
+
+/** A decimal the server wrote as a share, as a percentage: the same digits, the point moved. */
+export function percentText(share: string): string {
+  const negative = share.startsWith('-');
+  const [whole, fraction = ''] = (negative ? share.slice(1) : share).split('.');
+  const digits = `${whole}${fraction.padEnd(2, '0')}`;
+  const point = whole!.length + 2;
+  const integer = digits.slice(0, point).replace(/^0+(?=\d)/, '');
+  const rest = digits.slice(point);
+  return `${negative ? '−' : ''}${integer}${rest.length > 0 ? `.${rest}` : ''}%`;
+}
+
+/**
+ * What an arm's model answered, in words, as it is said beside every score: its share of turns
+ * answered, refused and left to the routine; or that no model decides for the group in the arm.
+ */
+export function reliabilityWords(arm: ComparisonArm, reliability: Reliability | null): string {
+  if (arm.decider.kind !== 'model') {
+    return arm.decider.kind === 'routine'
+      ? 'No model is asked: the group follows its routine.'
+      : 'No model is asked: the group waits.';
+  }
+  if (reliability === null) return 'No completed run to say what its model answered.';
+  if (reliability.shares === null) return `${armName(arm)} was not asked for any turn.`;
+  const { answered, refused, leftToRoutine } = reliability.shares;
+  return `${armName(arm)} answered ${percentText(answered)} of ${reliability.turns} turns; `
+    + `${percentText(refused)} were refused and ${percentText(leftToRoutine)} left to the routine.`;
+}
+
+/**
+ * Why the turns a model did not decide were decided by the routine instead, by the reason each
+ * receipt or minute recorded, most often first, in the words the inspector uses for them.
+ */
+export function reasonWords(reliability: Reliability | null): string {
+  const reasons = Object.entries(reliability?.reasons ?? {}).filter(([, times]) => times > 0)
+    .sort(([one, first], [two, second]) => second - first || one.localeCompare(two));
+  if (reasons.length === 0) return '';
+  return `Why the routine decided instead: ${reasons.map(([code, times]) =>
+    `${DECISION_WORDS[code] ?? `a reason this page has no words for (${code})`} (${times})`).join('; ')}.`;
+}
+
+/**
+ * The same turns per choice point the routine's own run had for the group on the same seed, a
+ * count no model's answers move; or, for a comparison that did not record it, that it did not.
+ */
+export function routineRateWords(arm: ComparisonArm, reliability: Reliability | null, scoreVersion: number): string {
+  if (arm.decider.kind !== 'model' || reliability === null) return '–';
+  if (reliability.perRoutineChoice === null) {
+    return scoreVersion === 1
+      ? 'Not recorded: this comparison predates counting the routine\'s choice points.'
+      : 'No routine run of these seeds recorded its choice points.';
+  }
+  return `${reliability.perRoutineChoice.leftToRoutine} left to the routine per choice point `
+    + `the routine had (${reliability.routineChoicePoints ?? 0})`;
+}
 
 /** Why a seed carries no score, by `BELOW_FLOOR` in `exulanica/world/society_score.py`. */
 export const EXCLUDED_WORDS: Readonly<Record<string, string>> = {
@@ -79,6 +151,27 @@ export const scoreText = (value: string | null): string =>
 const signed = (value: string): string => (value.startsWith('-') ? scoreText(value) : `+${value}`);
 const seconds = (ms: number | null): string => (ms === null ? '–' : `${(ms / 1000).toFixed(1)} s`);
 
+/**
+ * What the primary pair's models answered, in the verdict's own sentence: each one's answered
+ * share, and, by the server's word, whether the two differ by more than the same model's two runs.
+ */
+function answeredClause(result: ComparisonResult): string {
+  if (result.primary === null) return '';
+  const [first, second] = result.primary.map((key) => result.arms.find((arm) => arm.key === key));
+  const share = (arm: ComparisonArm | undefined): string | null => {
+    const shares = arm === undefined ? null : result.summaries[arm.key]?.reliability?.shares ?? null;
+    return arm === undefined || arm.decider.kind !== 'model' || shares === null ? null : shares.answered;
+  };
+  const [one, two] = [share(first), share(second)];
+  if (one === null || two === null) return '';
+  const both = `${armName(first!)} answered ${percentText(one)} of its turns and ${armName(second!)} ${percentText(two)}`;
+  switch (result.verdict.answeredSharesDiffer) {
+    case true: return `; but ${both}, further apart than the same model's two runs, so the routine decided more of one's turns`;
+    case false: return `; ${both}, no further apart than the same model's two runs`;
+    default: return `; ${both}`;
+  }
+}
+
 /** What each verdict says after its heading, filled from the server's numbers. */
 export function verdictDetail(result: ComparisonResult): string {
   const name = (key: string): string => {
@@ -89,17 +182,41 @@ export function verdictDetail(result: ComparisonResult): string {
     (d) => d.first === result.primary![0] && d.second === result.primary![1]);
   const range = primary === undefined ? ''
     : ` ${name(primary.second)} minus ${name(primary.first)}: ${signed(primary.mean)}, from ${scoreText(primary.low)} to ${scoreText(primary.high)}.`;
+  const answered = answeredClause(result);
   switch (result.verdict.code) {
     case 'different':
-      return `${name(result.verdict.higher!)}'s people fared better, by more than the same model varies when it runs the same hour twice (${scoreText(result.controlBound)}).${range}`;
+      return `${name(result.verdict.higher!)}'s people fared better, by more than the same model varies when it runs the same hour twice (${scoreText(result.controlBound)})${answered}.${range}`;
     case 'no_measured_difference':
-      return `On the registered seeds this comparison cannot tell the two apart: the difference is inside its interval, or no larger than the same model varies between two runs.${range}`;
+      return `On the registered seeds this comparison cannot tell how the people fared under the two apart: the difference is inside its interval, or no larger than the same model varies between two runs${answered}.${range}`;
     case 'not_judged':
-      return `${NOT_JUDGED_WORDS[result.verdict.reason ?? ''] ?? 'No difference is claimed from it.'}${range}`;
+      return `${NOT_JUDGED_WORDS[result.verdict.reason ?? ''] ?? 'No difference is claimed from it.'}${answered === '' ? '' : ` ${answered.slice(2, 3).toUpperCase()}${answered.slice(3)}.`}${range}`;
     case 'incomplete':
       return 'A run of this comparison has no result, so nothing is claimed from it.';
   }
 }
+
+/** Who decides for somebody outside the group in every arm, in words. */
+function otherDeciderWords(decider: Decider): string {
+  return decider.kind === 'model' ? `${decider.name}, the model you chose for them` : 'their own routine';
+}
+
+/** Who a comparison compares: its group, and what decides for everybody else in every arm. */
+export function groupWords(result: ComparisonResult): string {
+  const people = result.group.people;
+  const who = people === null || result.group.source.kind === 'everyone'
+    ? 'everybody in this world'
+    : `${people.map((person) => person.name).join(', ')} (${GROUP_SOURCE_WORDS[result.group.source.kind]})`;
+  const others = result.others.map((other) => `${other.name}: ${otherDeciderWords(other.decider)}`);
+  return `Each arm decides for ${who}.${others.length === 0 ? ''
+    : ` Everybody else keeps the same decider in every arm: ${others.join('; ')}.`}${
+    result.othersAsked ? ` ${OTHERS_ASKED_WORDS}` : ''}`;
+}
+
+/**
+ * What a model outside the group means for the score, said wherever the server says one decides
+ * for somebody there: only a development comparison can have one.
+ */
+export const OTHERS_ASKED_WORDS = 'A model you chose for somebody outside the group is asked in every arm, the routine\'s and waiting\'s runs included, so here a model that answers nothing does not score exactly the routine\'s 1, and the routine\'s choice points move with that model\'s answers too. A judged comparison keeps everybody outside its group on their routine.';
 
 /** The arms a comparison shows first: its registered pair, else its first two candidates. */
 export function defaultSides(result: ComparisonResult): { readonly left: string; readonly right: string } {
@@ -109,18 +226,25 @@ export function defaultSides(result: ComparisonResult): { readonly left: string;
   return { left: result.arms[0]!.key, right: result.arms[1]!.key };
 }
 
-/** Who decided a person's latest turn at or before `minute` in one run, in words. */
+/**
+ * Who decided a person's latest turn at or before `minute` in one run, in words: the arm's decider
+ * for a person of the group, and for anybody else the decider they keep in every arm.
+ */
 export function decidedWords(run: RunReplay, arm: ComparisonArm, subjectId: string, minute: number): string {
-  if (arm.decider.kind === 'routine') return 'Their own routine decides everything they do in this run.';
-  if (arm.decider.kind === 'wait') return 'In this run they wait wherever they are; nothing decides for them.';
+  const person = run.people.find((held) => held.id === subjectId);
+  const outside = person !== undefined && !person.inGroup;
+  const decider = outside ? person.decider : arm.decider;
+  const keeps = outside ? ' They are outside the group, so they keep it in every arm.' : '';
+  if (decider.kind === 'routine') return `Their own routine decides everything they do in this run.${keeps}`;
+  if (decider.kind === 'wait') return 'In this run they wait wherever they are; nothing decides for them.';
   const latest = [...run.decisions].reverse()
     .find((d: RunDecision) => d.subjectId === subjectId && d.tick <= minute);
-  if (latest === undefined) return `${armName(arm)} has not been asked for them yet.`;
+  if (latest === undefined) return `${decider.name} has not been asked for them yet.${keeps}`;
   if (latest.disposition === 'applied') {
-    return `${armName(arm)} chose at minute ${latest.tick}: ${latest.chose ?? 'one of the things they could do'}.`;
+    return `${decider.name} chose at minute ${latest.tick}: ${latest.chose ?? 'one of the things they could do'}.${keeps}`;
   }
   const why = latest.status === 'accepted' ? latest.dispositionReason ?? latest.reason : latest.reason;
-  return `Their routine chose at minute ${latest.tick}, because ${DECISION_WORDS[why] ?? `of a reason this page has no words for (${why})`}.`;
+  return `Their routine chose at minute ${latest.tick}, because ${DECISION_WORDS[why] ?? `of a reason this page has no words for (${why})`}.${keeps}`;
 }
 
 export interface ComparisonDay {
@@ -161,7 +285,7 @@ function listingRow(listing: ComparisonListing, selected: boolean, onOpen: () =>
   }, [
     el('ul', { class: 'comparison-listing-models' }, models.map((arm) => el('li', { text: armName(arm), title: arm.description }))),
     el('span', {
-      text: `${listing.phase === 'held_out' ? 'Held-out seeds' : 'Development seeds'}, ${listing.seeds} ${listing.seeds === 1 ? 'seed' : 'seeds'}, ${listing.runsCompleted} of ${listing.runsExpected} runs completed`,
+      text: `${listing.phase === 'held_out' ? 'Held-out seeds' : 'Development seeds'}, ${listing.seeds} ${listing.seeds === 1 ? 'seed' : 'seeds'}, ${listing.group.source.kind === 'everyone' ? 'everybody' : `a group of ${listing.group.size}`}, ${listing.runsCompleted} of ${listing.runsExpected} runs completed`,
     }),
     el('time', { datetime: listing.createdAt, text: when(listing.createdAt) }),
   ]);
@@ -170,7 +294,8 @@ function listingRow(listing: ComparisonListing, selected: boolean, onOpen: () =>
 }
 
 function armsTable(result: ComparisonResult): HTMLElement {
-  const head = el('tr', {}, ['Arm', 'Score', 'Interval', 'Share of turns the model did not decide', 'Cost for the hour', 'Answer time']
+  const head = el('tr', {}, ['Arm', 'How the group fared', 'Interval', 'What its model answered',
+    'Left to the routine, per choice point of the routine\'s own run', 'Cost for the hour', 'Answer time']
     .map((label) => el('th', { scope: 'col', text: label })));
   const rows = result.arms.map((arm) => {
     const summary = result.summaries[arm.key];
@@ -185,7 +310,11 @@ function armsTable(result: ComparisonResult): HTMLElement {
         class: 'comparison-number',
         text: interval === null ? 'fewer than two seeds scored' : `${scoreText(interval.low)} to ${scoreText(interval.high)}`,
       }),
-      el('td', { class: 'comparison-number', text: summary?.notAppliedShare ?? 'none asked' }),
+      el('td', { class: 'comparison-reliability' }, [
+        el('span', { text: reliabilityWords(arm, summary?.reliability ?? null) }),
+        el('span', { class: 'comparison-reasons', text: reasonWords(summary?.reliability ?? null) }),
+      ]),
+      el('td', { class: 'comparison-rate', text: routineRateWords(arm, summary?.reliability ?? null, result.scoreVersion) }),
       el('td', {
         class: 'comparison-number',
         text: summary?.costUsdPerHour === null || summary === undefined ? 'nothing asked'
@@ -199,7 +328,7 @@ function armsTable(result: ComparisonResult): HTMLElement {
     ]);
   });
   return el('table', { class: 'comparison-arms' }, [
-    el('caption', { text: 'Each arm over every seed: the mean score and the middle of its resampled means' }),
+    el('caption', { text: 'Each arm over every seed: how the group fared (the mean score and the middle of its resampled means) and, beside it, what its model answered' }),
     el('thead', {}, [head]),
     el('tbody', {}, rows),
   ]);
@@ -212,10 +341,15 @@ function seedsTable(result: ComparisonResult): HTMLElement {
     el('th', { scope: 'row', text: seedLabel(seed, index) }),
     ...result.arms.map((arm) => {
       const run = seed.runs[arm.key];
-      const text = run === undefined || run.status === 'incomplete' ? 'not run'
-        : run.status === 'failed' ? `failed: ${FAILURE_WORDS[run.failure ?? ''] ?? run.failure ?? 'no reason recorded'}`
-          : scoreText(run.score);
-      return el('td', { class: 'comparison-number', 'data-status': run?.status ?? 'incomplete', text });
+      if (run === undefined || run.status !== 'completed') {
+        const text = run === undefined || run.status === 'incomplete' ? 'not run'
+          : `failed: ${FAILURE_WORDS[run.failure ?? ''] ?? run.failure ?? 'no reason recorded'}`;
+        return el('td', { class: 'comparison-number', 'data-status': run?.status ?? 'incomplete', text });
+      }
+      return el('td', { class: 'comparison-number', 'data-status': run.status }, [
+        el('span', { class: 'comparison-score', text: scoreText(run.score) }),
+        el('span', { class: 'comparison-reliability', text: reliabilityWords(arm, run.reliability) }),
+      ]);
     }),
   ]));
   return el('table', { class: 'comparison-seeds' }, [
@@ -310,6 +444,7 @@ export function buildSocietyComparisonView(handlers: {
         el('section', { class: 'comparison-verdict', 'data-verdict': result.verdict.code }, [
           el('h3', { text: VERDICT_WORDS[result.verdict.code] }),
           el('p', { text: verdictDetail(result) }),
+          el('p', { class: 'comparison-group', text: groupWords(result) }),
           ...(result.preregistration === null ? [] : [el('p', {
             class: 'comparison-registration',
             text: `Registered before it ran: ${result.preregistration.record}`,
@@ -440,7 +575,11 @@ export function buildSocietyComparisonView(handlers: {
               el('h3', { class: 'comparison-side-name', text: armName(arm), title: arm.description }),
               el('p', {
                 class: 'comparison-side-score',
-                text: `Score on this seed: ${scoreText(seed?.runs[arm.key]?.score ?? null)}`,
+                text: `How the group fared on this seed: ${scoreText(seed?.runs[arm.key]?.score ?? null)}`,
+              }),
+              el('p', {
+                class: 'comparison-reliability',
+                text: reliabilityWords(arm, seed?.runs[arm.key]?.reliability ?? null),
               }),
             ]),
             plans[side]!.root,
