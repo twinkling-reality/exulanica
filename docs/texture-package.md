@@ -3,23 +3,16 @@
 Status: IMPLEMENTED for seventeen baked texture sets, their containers, the manifest, migrations
 0065, 0076 and 0078, the backend resolver, and the recipes, makers and object store the sets are
 baked from; and, in migration 0066, for a workspace's own recipes and bakes, their erasure, their
-routes and the bake worker (section 14). Eight sets are the first, opaque v1 containers; glazing,
-foliage and bark are the first sets that state a material class (section 16), pinned with every
-set's class by 0076, and 0078 pins six more: painted timber, awning canvas and a sign panel for a
-shopfront, white and yellow road paint, which are the first sets of the decal class, and the soil of
-a tree pit. The appearance of these sets in the rendered product is UNVERIFIED: the eye-level checks
-belong to the tile runtime's bench and to the corridor lane, against the gate lane's Flatiron
-baseline, and no bench check has accepted a decal. Publishing a set is not a verdict on its look. No
-bake worker runs in any deployment, and no model has been trained.
+routes and the bake worker (section 14). Eight sets are opaque v1 containers; the other nine state
+a material class (section 16): glazing, foliage (cutout), bark, painted timber, awning canvas, a
+sign panel, white and yellow road paint (decal) and tree pit soil. The product draws the sets inside
+the world objects a person places, whose containers embed the sets their catalog entries name
+(`exulanica/world/object_glb.py`), and the generated tile runtime draws them in the development
+preview. Publishing a set is not a verdict on its look. No bake worker runs in any deployment, no
+application screen calls the workspace recipe routes, and no model has been trained.
 
-The plan names what shipped and what this package replaces, and both sentences are quoted
-verbatim:
-
-> "Seven flat hex fills by `doitt_id % 7`; zero texture, no UV channel, no texture field in the schema"
-
-> "A real texture package, six to ten seeded tiling channel-packed sets, baked offline,
-> content-addressed, digest-pinned by a migration exactly as `assets.py` pins GLB bytes, and baked
-> in milestone 1."
+The package replaces flat colour fills with seeded, tiling, channel-packed sets, baked offline,
+content-addressed and digest-pinned by migrations exactly as `assets.py` pins GLB bytes.
 
 The implementation is `web/packages/loom-texture` (the makers and the offline bake), its `library/`
 (one recipe file per published set), `assets/textures/` (the published sets, objects and indexes),
@@ -37,11 +30,11 @@ The implementation is `web/packages/loom-texture` (the makers and the offline ba
 - [5. Tiling](#5-tiling)
 - [6. Physical extent and UV scale](#6-physical-extent-and-uv-scale)
 - [7. Budgets](#7-budgets)
-- [8. The manifest, the contract with the grammar lane](#8-the-manifest-the-contract-with-the-grammar-lane)
+- [8. The manifest, the contract with the grammar](#8-the-manifest-the-contract-with-the-grammar)
 - [9. The backend reader and resolver](#9-the-backend-reader-and-resolver)
 - [10. Migration 0065](#10-migration-0065)
 - [11. Rebaking a set](#11-rebaking-a-set)
-- [12. Follow-ups](#12-follow-ups)
+- [12. Registrations, and what is not built](#12-registrations-and-what-is-not-built)
 - [13. Synthetic dataset](#13-synthetic-dataset)
 - [14. A workspace's own recipes and bakes](#14-a-workspaces-own-recipes-and-bakes)
 - [15. What is not verified](#15-what-is-not-verified)
@@ -146,8 +139,9 @@ mm where a half-module offset is not a whole millimetre):
   water sits. 900 mm is the narrowest pit on the walked street, so one tile covers a pit with no
   repeat inside it.
 
-The corridor needs six. Which six is the grammar's decision, so everything below that depends on
-the choice charges the six most expensive sets, which bounds any six the grammar picks.
+The budgets in section 7 were set for a street that cites six sets, and charge the six most
+expensive, which bounds any six; the generated corridor's material catalog dresses its surfaces from
+sixteen.
 
 ## 2. Recipes, makers and the object store
 
@@ -185,12 +179,11 @@ Every one of these is canonical JSON under `assets/textures/objects/<sha256>.jso
 digest of its bytes, and they refer to each other only by digest, so any of them can be copied into
 another content-addressed store and still resolve. `assets/textures/catalog.json`
 (`exulanica.texture-catalog/v1`) indexes them: the digest of the manifest it accounts for, every
-maker, and one row per set naming its receipt. `manifest.json` is unchanged, byte for byte, and
-still the contract with the grammar lane (section 8).
+maker, and one row per set naming its receipt. `manifest.json` is the contract with the grammar
+(section 8).
 
-The eight published recipes are each maker's defaults on the frame the set was first baked on, and
-rebaking them reproduced every one of the eleven files published before recipes existed, byte for
-byte: no set's version changed.
+The eight v1 recipes are each maker's defaults on the frame its set was first baked on, and they
+rebake the eight v1 containers byte for byte.
 
 **Two languages, one check.** `web/packages/loom-texture/src/recipe.ts` and
 `exulanica/materials/recipes.py` both run every case in
@@ -214,8 +207,8 @@ repairing the variant as a person would: a count an `even` rule needs even is ra
 extent a module rule pins is recomputed, and an extent a proportion rule pins is divided out. Every
 variant the check accepts must bake without throwing, encode a canonical header, tile exactly, and
 state each integer control it states at all under that control's own key with the recipe's value.
-When this was written that was 515 of the 543 variants tried; each of the other 28 is refused by a
-rule, and the test lists them when it fails.
+A variant the check refuses is refused by a rule, and the test lists every such variant when it
+fails.
 
 **What `exulanica.materials` may not do.** It sits below the evidence spine in the layers contract,
 and a forbidden contract in `pyproject.toml` keeps it from importing the evidence address, the
@@ -223,12 +216,11 @@ store, the database, the ingest pipeline, identity, selection, reconstruction, p
 numpy, cv2 or pycolmap. A recipe is invented even when it is fitted to a photograph, and a module
 that cannot name an evidence address cannot make one pass for an observation.
 
-**What comes next, not built here.** Workspace-scoped recipes and bakes (a person's variants) get
-their own migration with forced row-level security and tombstone invalidation. A recipe derived
-from a photograph is an inert object that records the consent it depends on and is invalidated
-when its source is tombstoned; no model infers a recipe from a personal photograph. Any learned
-model that proposes recipes runs behind a process boundary, as the reconstruction container does,
-and every proposal passes the check above.
+**Beyond the published library.** A workspace's own recipes and bakes are section 14's. A recipe
+derived from a photograph is an inert object that records the consent it depends on and is
+invalidated when its source is tombstoned; no model infers a recipe from a personal photograph. A
+learned model that proposes recipes would run behind a process boundary, as the reconstruction
+container does, and every proposal would pass the check above; none is trained.
 
 ## 3. The container, and why PNG is not digested
 
@@ -291,41 +283,18 @@ id and version, and the makers' code.
   printable ASCII, and `test/container.test.ts` compares its output with a string that
   `exulanica.canonical.canonical_json` produced from the same value.
 
-**Evidence.** `web/packages/loom-texture/evidence/2026-09-16-determinism.log.txt` is the output of
-the script printed at its top. It baked the catalog five times: twice on Node 24.15.0 (arm64), once
-on Node 26.7.0 (arm64), once on Node 20.10.0 (arm64) and once on Node 20.10.0 running as x86_64
-under Rosetta 2. Every one of the 11 files in every run was compared with `cmp` against the first
-run and against the committed `assets/textures/`: 0 differ. It names commit 15a2e3d, from before
-this lane was rebased onto main; the rebased commit ff9914f has the same package source and the
-same published files.
-
-`web/packages/loom-texture/evidence/2026-09-16-determinism-objects.log.txt` is the same script run
-again once the sets were baked from recipes, at the commit it names and with no uncommitted change
-anywhere in the package (its library included) or in `assets/textures/`, on the same five
-runtimes. Every one of the 44 files it wrote (the 8 sets, the
-dedication, the 32 objects, the manifest, the catalog and `.gitattributes`) was compared the same
-way: 0 differ, the manifest and every set are the same bytes as in the first record, and the x86_64
-run, which executes the compiled output, found the library through the package root. The package's
+**Evidence.** `web/packages/loom-texture/evidence/2026-09-17-determinism-batch3.log.txt` is the
+record of the published library: the script printed at its top, run at the commit that published the
+last six sets, which the record names in its own header, with no uncommitted change in the package or
+in `assets/textures/`, on five runtimes (Node 24 twice, 26 and 20 on arm64, and 20 under Rosetta on
+x86_64, the last two executing the compiled output). All 88 files of every run were compared file by
+file with `cmp`: 0 differ between runs, and 0 differ from the committed directory.
+`tests/test_texture_sets.py` holds this record to the committed files, and the package's
 `test/published.test.ts` rebakes the whole library on every test run and compares each committed
-file byte for byte.
-
-Both records are of the library before batch 1, whose manifest was `exulanica.texture-manifest/v1`,
-and are kept as history. `web/packages/loom-texture/evidence/2026-09-17-determinism-batch1.log.txt`
-is the same script run at the commit that published glazing, foliage and bark and turned the
-manifest to v2, again with no uncommitted change in the package or in `assets/textures/`, on the
-same five runtimes. Every one of the 59 files it wrote (the 11 sets, the dedication, the 44 objects,
-the manifest, the catalog and `.gitattributes`) was compared the same way: 0 differ between runs,
-and 0 differ from the committed directory. The eight first sets are the same bytes as in both
-earlier records.
-
-`web/packages/loom-texture/evidence/2026-09-17-determinism-batch3.log.txt` is the record of the
-library as it stands: the same script at the commit that published batch 3's six sets, which the
-record names in its own header, with no uncommitted change in the package or in `assets/textures/`,
-and on the same five runtimes
-(Node 24 twice, 26 and 20 on arm64, and 20 under Rosetta on x86_64, the last two executing the
-compiled output). All 88 files of every run were compared file by file: 0 differ between runs, and 0
-differ from the committed directory. `tests/test_texture_sets.py` holds this record to the committed
-files, and the batch 1 record is kept beside the two from 2026-09-16 as history.
+file byte for byte. The records of the library before its later sets were published,
+`web/packages/loom-texture/evidence/2026-09-16-determinism.log.txt`,
+`web/packages/loom-texture/evidence/2026-09-16-determinism-objects.log.txt` and
+`web/packages/loom-texture/evidence/2026-09-17-determinism-batch1.log.txt`, are kept as history.
 
 ## 5. Tiling
 
@@ -358,8 +327,8 @@ were inspected during the bake. They are inspection pictures lit by a fixed ligh
 from the COMMITTED bytes instead, reading each container out of `blobs/` by the digest the manifest
 pins, so what it draws is what a reader reads. The bake's own `--inspect` can only picture the bake
 it just did, which is no use for looking at a set whose maker has moved since it was published, and
-a look tool written against `library-drafts/` stops working the moment a draft is published: that is
-what happened to this lane's scripts when batch 3 published six drafts at once. Each set gets its
+a look tool written against `library-drafts/` would stop working the moment a draft is published.
+Each set gets its
 stored maps at one texel to one pixel, the channel its class leaves over as grey, and one lit
 composite per light over a stated number of tiles. `test/published-look.test.ts` holds every
 published profile and class pair to being pictured. These pictures depend on the zlib build that
@@ -405,21 +374,22 @@ these numbers.
 **Transfer, measured and not a ceiling this package was given.** The containers are raw. The six
 most expensive are 62,927,728 bytes; compressed with gzip at level 6, the usual HTTP setting, they
 are 24,357,693 bytes. Melbourne transferred 28,247,006 bytes for the whole street, geometry
-included, so the corridor lane should expect the texture sets alone to take most of a transfer
-budget of that size. GPU-compressed delivery (KTX2 and Basis) would cut both numbers but brings an
+included, so the texture sets alone would take most of a transfer budget of that size. GPU-compressed delivery (KTX2 and Basis) would cut both numbers but brings an
 encoder whose version becomes a digest input, the same problem as zlib, and is not done here.
 
-**Repository weight.** The published directory is 76,045,080 bytes raw and 30,512,540 bytes in git's
-compressed object store, against a pack of about 89 MiB before this package. Every rebake of a set
-adds its bytes to history for good.
+**Repository weight.** The published directory was 76,045,080 bytes raw and 30,512,540 bytes in
+git's compressed object store when measured. Every rebake of a set adds its bytes to history for
+good.
 
-## 8. The manifest, the contract with the grammar lane
+## 8. The manifest, the contract with the grammar
 
 `assets/textures/manifest.json` is the single index both `exulanica/world/texture_assets.py` and
 the grammar's catalog loader read. It is canonical JSON with no trailing newline, an object
-`{"profile": "exulanica.texture-manifest/v1", "sets": [...]}`, with `sets` sorted by `set_id` and
+`{"profile": "exulanica.texture-manifest/v2", "sets": [...]}`, with `sets` sorted by `set_id` and
 each id once. Each entry holds exactly `set_id`, `version`, `content_sha256`, `byte_size`,
-`resolution`, `channels`, `extent_mm`, `licence_id` and `licence_sha256`. The shapes this package
+`resolution`, `channels`, `extent_mm`, `licence_id` and `licence_sha256`, the nine fields a v1
+manifest states, and `container_profile` and `material_class`, which the v2 profile adds
+(section 16). The shapes this package
 defines for the open fields:
 
 - `resolution`: `{"height": H, "width": W}` in texels.
@@ -441,12 +411,12 @@ set's bytes must bump its version, and the pins in migration 0065 are what catch
 manifest. `read_texture_manifest(raw)` reads it the way every material object is read (strict,
 canonical, printable ASCII, safe integers), then holds every entry to one rule:
 
-- the nine fields exactly;
+- exactly the fields its profile states;
 - a set id matching `^[a-z][a-z0-9.-]*$`;
 - a positive integer version and size;
 - lowercase sha256 digests;
 - a positive resolution and extent;
-- `channels` equal, map for map, to `CONTAINER_LAYOUT`;
+- `channels` equal, map for map, to a layout its container profile and class allow;
 - the licence `CC0-1.0`.
 
 The manifest lists the published library and nothing else, so a set under any other licence
@@ -497,7 +467,7 @@ containers with `true` in place of `1` are refused.
   check is that the maker, run on the recipe, produces these bytes, because the maker is
   TypeScript; `test/published.test.ts` rebakes every set and compares byte for byte, which is what
   catches a recipe edited in a way no header shows, such as a colour. The workspace-recipe Node bake
-  worker is the remaining step that brings that proof to the server.
+  worker would bring that proof to the server; no deployment runs it (section 15).
 - `PinnedTextureSet` carries the manifest fields, `extent_u_mm` and `extent_v_mm`, the header's
   title, summary, seed and height range, the maker id and version, the recipe and receipt digests,
   and `pin()`, which returns the three replay fields. `read_bytes()` re-verifies the digest on every
@@ -509,7 +479,7 @@ There is no default and no fallback. A surface whose material does not resolve i
 surface, and whatever draws it must say so rather than paint a flat colour that reads as
 architecture.
 
-The grammar lane's layering puts `exulanica.grammar` below `world`, so its material stage cannot
+The grammar's layering puts `exulanica.grammar` below `world`, so its material stage cannot
 import this module. It reads the same manifest through the same rule in `exulanica.materials`,
 which sits below it, and refuses an unpublished id with its own schema error. This resolver is for
 the layers above `world`.
@@ -539,7 +509,7 @@ the table 0076 created, in one transaction: the class table's deferred trigger r
 that arrives without its class, so the two inserts cannot be separated. Two of the six are the first
 pinned decals, and the first pinned sets whose tile is not square in the v2 container; every column
 here has carried a tile longer than it is wide since 0065, where `cc0.kerb-stone` is 1024 by 256
-texels over 1800 by 450 mm. Migration 0077 is the corridor lane's, not this lane's.
+texels over 1800 by 450 mm. Migration 0077 records baked tiles, not texture sets.
 
 **Migration 0076** states what kind of surface each pinned set is. It creates
 `world_texture_set_class`, keyed by the same `(set_id, version)` with a foreign key to the pin, holding
@@ -585,34 +555,25 @@ default map or a flat colour.
 included, are not what the source bakes, and `tests/test_texture_set_migration.py` fails if the
 manifest and the pinned rows disagree.
 
-## 12. Follow-ups
+## 12. Registrations, and what is not built
 
-- **Done in this lane.** `world_texture_set` is in `READ_ONLY_TABLES` in `exulanica/db/roles.py`
-  (deferred while that file was closed to every lane, and added once it was released). It is
-  classified in `GLOBAL_TABLES` in `exulanica/orchestration/judge_seed.py` as migration-provided
-  reviewed texture set pins, so a judge-seed export does not refuse a schema with 0065, and it is
-  in `_PRESERVED_TABLES` in `tests/conftest.py`, so the per-test truncation leaves it alone.
-  `tests/test_migration.py` reserves 0064 for the grammar lane's catalogs, the hole 0065 lands
-  above. `docs/all-documents.md` is regenerated with this document.
-- **Registration in `web/`.** The `web/tsconfig.json` reference and the `web/pnpm-lock.yaml`
-  importer came with the fabrication-delete lane. This lane added the `texture` script to
-  `web/package.json` and two dependency-cruiser rules to `web/.dependency-cruiser.cjs`: nothing that
-  ships to a browser imports loom-texture, and loom-texture reaches no workspace package but
-  `atlas-core`.
-- **Tier B.** Built:
-  - the synthetic dataset exporter (section 13);
-  - workspace recipes and bakes, their erasure and routes, and the Node bake worker (section 14);
-  - the inert photograph-derived recipe object;
-  - the training code behind its own environment and container (`ml/README.md`).
-
-  Still to do, each named where it belongs:
-  - a sweep that reclaims a withdrawn recipe's bake sooner than the workspace's deletion, through
-    the one purge machinery;
-  - wiring the bake worker's image into `compose.yaml`, and building it;
-  - the migration after 0073 that replaces the two inert triggers with the personal model right's
-    check and adds the right and model columns a photo-derived recipe needs (section 14);
-  - a lockfile for `ml/`, which has none yet;
-  - the first training run, which waits for an operator's yes and for that lockfile.
+- `world_texture_set` is in `READ_ONLY_TABLES` in `exulanica/db/roles.py`, classified in
+  `GLOBAL_TABLES` in `exulanica/orchestration/judge_seed.py` as migration-provided reviewed texture
+  set pins, so a judge-seed export does not refuse a schema with 0065, and in `_PRESERVED_TABLES` in
+  `tests/conftest.py`, so the per-test truncation leaves it alone. `tests/test_migration.py`
+  reserves 0064 for the grammar's catalog table, the hole 0065 lands above.
+- In `web/`, the `texture` script is in `web/package.json`, and two dependency-cruiser rules in
+  `web/.dependency-cruiser.cjs` hold that nothing that ships to a browser imports loom-texture and
+  that loom-texture reaches no workspace package but `atlas-core`.
+- Built beyond the published library: the synthetic dataset exporter (section 13); workspace
+  recipes and bakes, their erasure and routes, and the Node bake worker (section 14); the inert
+  photograph-derived recipe object; and the training code behind its own environment and container
+  (`ml/README.md`).
+- Not built: a sweep that reclaims a withdrawn recipe's bake sooner than the workspace's deletion,
+  through the one purge machinery; the bake worker's image in `compose.yaml`; the migration after
+  0073 that replaces the two inert triggers with the personal model right's check and adds the right
+  and model columns a photo-derived recipe needs (section 14); a lockfile for `ml/`; and a first
+  training run, which needs that lockfile.
 
 ## 13. Synthetic dataset
 
@@ -667,14 +628,12 @@ output of the script printed at its top: the committed plan exported on Node 24.
 (arm64) and on Node 20.10.0 running as x86_64 under Rosetta 2, at the commit it names and with no
 uncommitted change in the package. All 10 files (the eight shards, the records and the manifest)
 were the same bytes on all three runs, compared with `cmp`, and the manifest is byte for byte the
-committed one. The exported copies were then removed; the plan rebuilds them. An earlier run of the
-same script, taken before this branch was rebased onto the provisioning fix, gave the same digests.
+committed one. The exported copies were then removed; the plan rebuilds them.
 `test/dataset.test.ts` holds the record to the committed manifest.
 
 What the dataset does not settle: whether a model trained on these pictures proposes good recipes
 from real photographs. The pictures are clean, flat and synthetic, and closing that gap needs
-photographs a model may lawfully learn from, which this repository does not have and this lane does
-not use.
+photographs a model may lawfully learn from, which this repository does not have.
 
 ## 14. A workspace's own recipes and bakes
 
@@ -734,9 +693,8 @@ the model's identity. So:
 **Removing a recipe hides it and destroys nothing.** Withdrawal is an append-only row in
 `material_recipe_withdrawal`. The recipe and its bake answer 410 at once, and a bake still waiting
 is cancelled. The bytes stay: they are a cache the recipe reproduces exactly, and they are
-reclaimed when the workspace is deleted. A sweep that reclaims them sooner is a follow-up, and it
-must run through the one purge machinery. When the edit lane lands, removal becomes one of its
-operations and can be undone.
+reclaimed when the workspace is deleted. A sweep that reclaims them sooner is not built, and it
+must run through the one purge machinery. Undoing a removal is not built.
 
 **Photo-derived recipes are inert until the migration after 0073.** Two triggers refuse every such
 row, and the repository refuses first. This much is already built, and tested with those two
@@ -886,7 +844,7 @@ runtime role may update and why, and every material table is there:
 - `material_bake` keeps UPDATE. The worker claims, records and fails bakes and retakes an expired
   lease, a request re-queues a bake, and a withdrawal or a tombstone cancels one.
 - `material_bake_quota` keeps the blanket grant and has no runtime writer. It is a ceiling an
-  operator declares; making it operator-only, with 0062's `tiles_limit`, is the security lane's.
+  operator declares; it is not operator-only, and neither is 0062's `tiles_limit`.
 
 No path locks a recipe row, which would need UPDATE (`SELECT ... FOR UPDATE` does). A bake request
 and a withdrawal read the recipe only once they hold the lifecycle lock, and a withdrawal and a
@@ -918,9 +876,9 @@ The bytes route releases the container only after the 0041 final check.
 - **Worker image.** The bake worker runs Node, so it has an image recipe of its own,
   `deploy/material-bake/Dockerfile`. That recipe is written, not built, and not in `compose.yaml`.
 - **Training.** The training code is in `ml/` (see `ml/README.md`).
-  - **`ml/` has no lockfile yet.** `ml/pyproject.toml` names torch and numpy by range only,
-    because resolving torch is a download, and that waits for a yes.
-  - **A locked environment is required before any training run.** Nothing checks this yet. The
+  - **`ml/` has no lockfile.** `ml/pyproject.toml` names torch and numpy by range only, because
+    resolving torch is a download.
+  - **A locked environment is required before any training run.** Nothing checks this. The
     change that adds the lockfile should also make `train` refuse to start without it, and put
     the lockfile's digest in the run's receipt.
 
@@ -940,14 +898,12 @@ the record to all of that.
 
 ## 15. What is not verified
 
-- **The appearance of these sets in the rendered product: UNVERIFIED.** No renderer draws a set yet.
-  That holds for the v2 drafts too, and doubly: no runtime draws a cutout, decal or glazing set at
-  all, so glass, foliage and bark have been judged only on their stored maps and on crude
-  composites written by scratch scripts. Section 16 records the repetition risks those composites
-  did show, and the levers for them.
-  The contact sheet was inspected, and it shows the stored maps under a fixed light, which is
-  evidence about the bytes and not about the product. The corridor lane verifies appearance against
-  the gate lane's Flatiron baseline.
+- **The appearance of these sets in the product has not been judged.** World objects draw the sets
+  their kinds name, and the generated tile runtime draws all four classes, measured on its bench
+  ([generated tile runtime](generated-tile-runtime.md#3-materials-and-the-uv-rule)), but no visual
+  gate has judged a scene they dress. The contact sheet shows the stored maps under a fixed light,
+  which is evidence about the bytes and not about the product; section 16 records the repetition
+  risks the composites showed, and the levers for them.
 - The transfer figure in section 7 is gzip over the files, not a measured browser load. No transfer
   number in this document is a measured corridor load, and section 16 says so plainly.
 - **Soiling by position** (the dirt a pane collects at its edges and along its bottom, which a
@@ -959,7 +915,6 @@ the record to all of that.
   and no more, until the workspace-recipe Node bake worker runs the maker server-side. A stated parameter
   that is not an integer control (a bond or finish is stated as a sentence) is covered only by the
   reviewed pin and the rebake.
-- The UV derivation in section 6 is arithmetic on stated extents; no surface consumes it.
 - **The workspace bake path has run only in tests.**
   - No deployment runs the bake worker.
   - `deploy/material-bake/Dockerfile` and `ml/container/Dockerfile` have never been built.
@@ -977,8 +932,8 @@ the record to all of that.
 
 ## 16. Material classes, and the v2 container
 
-Every set in sections 1 to 15 is an opaque tiling surface: brick to kerb, one container layout, one
-way to draw it. A street also needs glass you can see into, leaves you can see between, and paint
+The first eight sets are opaque tiling surfaces, brick to kerb: one container layout and one way to
+draw it. A street also needs glass you can see into, leaves you can see between, and paint
 laid over the road, and a renderer cannot draw those the way it draws brick. So a set DECLARES
 what kind of surface it is, as data, and a renderer binds a material by that declaration and by
 nothing else. A class it does not draw is an unavailable surface with a stated reason, never a
@@ -1129,8 +1084,8 @@ The package writes each draft maker's manifest as canonical JSON under `test/dra
 those files to its makers byte for byte, and `tests/test_texture_drafts.py` runs the backend's
 manifest and recipe checks over them and over every entry in `library-drafts/`.
 
-`loom.glazing`, `loom.foliage` and `loom.bark` were drafts until batch 1 published them with
-migration 0076. Between batches there may be no draft at all.
+A maker joins `MAKERS` in the commit that publishes its first set, and there may be no draft at
+all.
 
 ### Publishing a set of a class
 
@@ -1166,14 +1121,14 @@ whoever changes these makers.
   clumping, and the band is faint. The price is that no large opening in a canopy can come from the
   texture, so large openings have to come from the canopy's geometry. If a canopy still reads as a
   leaf-patterned blob at eye level, the answer is not a parameter: it is a non-tiling class of
-  cluster cards in an atlas, with a card expander in the tessellator, which is a design for the
-  orchestrator to schedule across three lanes.
+  cluster cards in an atlas, with a card expander in the tessellator, a design of its own across the
+  texture package, the grammar and the tessellator.
 
 ### Every transfer number here is unverified
 
 Every compressed size in this document, in section 7 and anywhere else, is a measurement of files on
 disk with a compressor at a stated setting. None of them is a measured browser load of a corridor,
 and none of them includes the corridor's geometry. Whether a street fits the 28,247,006-byte
-transfer envelope is UNVERIFIED until the corridor lane bakes one and measures it. That measurement
-is also the trigger for republishing the eight v1 sets in the smaller v2 layout, which nothing has
-done and nothing should do before it.
+transfer envelope is not measured: the corridor is baked, and its transfer has not been measured.
+That measurement is also the trigger for republishing the eight v1 sets in the smaller v2 layout,
+which nothing has done.

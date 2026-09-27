@@ -1,6 +1,8 @@
 # Owned district and source admission
 
 Status: **OWNED DISTRICT DATA PATH AND RENDERER**. Complete-district validation is not established.
+The app draws the district only when no saved world is open, which is the development preview
+(`web/packages/app/src/composition/renderer.ts`); saved and starter worlds open without it.
 
 The bounded Flatiron district is Exulanica's first owned geographic environment. “Owned” means the
 runtime possesses a local, versioned artifact admitted for the declared operations. It does not
@@ -48,7 +50,7 @@ the owned district described here.
 
 ## The admission chain, and the place an admitted source belongs to
 
-An admitted source is always admitted **to a place**. The place is what a memory, a question and
+An admitted source is always admitted **to a place**. The place is what evidence, a question and
 an authored placement all address, and without one an admission is bytes with a licence and no
 subject. Because an external source has no reconstruction behind it, its place cannot be anchored
 by a scene; it declares its frame instead. `place-identity.md` owns that decision, including the
@@ -174,10 +176,9 @@ uv run python scripts/prepare_owned_district.py assets/owned-world/flatiron-inte
 ```
 
 `assets/owned-world/flatiron-interpretation-v1/district-interpretation.json` is the retained
-producer output for the connected demonstration. This is a district mechanics fixture, not
-personal-source acceptance. The PlayCanvas consumer and authenticated society-district read are
-implemented; that connection does not establish street-level visual quality or a production
-personal-world registration.
+producer output the development preview reads, a district mechanics fixture. The PlayCanvas
+consumer and the authenticated society-district read are implemented; they do not establish
+street-level visual quality or register the district to any saved world.
 
 The document binds `base_artifact_sha256` to the exact original bytes, including whitespace.
 `document_sha256` hashes canonical, integer-only UTF-8 JSON excluding only its own field.
@@ -225,8 +226,8 @@ current real-world pedestrian access, ADA accessibility or legal entry.
 Nodes carry shared subjects and positions; edges carry shared subjects, endpoint node IDs and
 ceil-Euclidean `length_mm`. Destinations carry shared subjects, access node IDs and only `visit`
 (one subsequent simulation tick) or `rest` (three subsequent ticks). Routing is deterministic
-shortest distance with lexicographic path ties. No snapping or teleporting is permitted. Existing
-first-person v1 navigation remains available independently of this narrower society envelope.
+shortest distance with lexicographic path ties. No snapping or teleporting is permitted. The
+first-person v1 navigation works independently of this narrower society envelope.
 
 Strict validation rejects bad profiles, extra fields, digest drift, malformed rings, mismatched
 feature/dataset bindings, false observation labels, unsupported recipe uses, unresolved references,
@@ -259,22 +260,18 @@ connector against this envelope, all source obstacles and accepted authored obst
 authored geometry. Unregistered transforms, unavailable dependencies, positions off the envelope
 and blocked connectors produce unavailable targets, never nearest-node snapping. Accepted edits
 must remain ordered even between ticks. Restoring an earlier authored state still checks current
-rights and does not undo simulation history. Persistence, adapter wiring, current-rights resolution,
-Selection/Companion and shared export barrels belong to integration, not this producer. The
-integration supplies PostgreSQL composition, current-rights resolution, the authenticated exact-byte
-district view and a browser adapter for the registered translation-only frame. Selection,
-Companion grounding and package export remain incomplete.
+rights and does not undo simulation history. The server supplies PostgreSQL composition,
+current-rights resolution, the authenticated exact-byte district view and a browser adapter for
+the registered translation-only frame; Selection, Companion grounding and package export of the
+district are incomplete.
 
 The same authorized input exposes canonical `visit` and `rest` targets to the society runtime.
 Typed `go_to` and `perform` requests can name those target IDs through the society action API; the
 server freezes the current target and the next deterministic transition records whether the request
 applied. This adds no road crossing, browser-space destination, teleport or new affordance. The
-browser destination list has a control that issues one typed `perform` against a selected
-synthetic inhabitant and shows the returned record or an explicit unavailable or refused state;
-living (v4) societies refuse it. The control is implemented and unit-tested, and no shipped
-configuration reaches it: saved worlds open without this district, and the development preview
-omits the control. The prerequisites are listed in
-[synthetic-society-contract.md](synthetic-society-contract.md#typed-user-directed-actions).
+browser's control for it is implemented and unit-tested, and no shipped configuration reaches it in
+the district; what it would need is listed under
+[typed user-directed actions](synthetic-society-contract.md#typed-user-directed-actions).
 Simulated action records are not personal evidence.
 
 ## Relationship to authored worlds
@@ -286,8 +283,8 @@ its source location.
 
 The authored-world 1.0 package extension does not export these environment instances. The
 environment-instances 1.0 extension does, without granting source-use rights or embedding
-source bytes. Selection across imported geography, personal memory and authored versions
-remains partial.
+source bytes. Selection across imported geography, personal evidence and authored versions is
+partial.
 
 ## Validation
 

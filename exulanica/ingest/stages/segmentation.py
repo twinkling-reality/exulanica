@@ -231,7 +231,7 @@ def _frontmatter_licence(readme: str) -> str | None:
 def verify_frontmatter_licence(pin: LocalModelPin) -> None:
     """Re-read the pinned README and refuse a checkpoint whose licence has moved.
 
-    ``docs/model-and-service-selection.md`` section 2.3: the licence is read from the raw
+    ``docs/license-matrix.md`` section 5: the licence is read from the raw
     frontmatter at a pinned revision, and a drift fails rather than warns. A revision is immutable,
     so this can only fail if the manifest was edited by hand, which is the case it exists for.
     """

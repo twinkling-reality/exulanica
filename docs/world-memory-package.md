@@ -1,8 +1,11 @@
 # World Memory Package v1
 
-Status: **PROFILE `exulanica-wmp-1.0`, EXIT-GATED**.
+This contract owns the World Memory Package (WMP): the signed, portable projection of one world
+and the authorized workspace state it draws on, under profile `exulanica-wmp-1.0`; its two optional
+extensions for authored state; and the separately selected training dataset profile. Verifying a
+package never loads a world, and a package is never the live store.
 
-**Authored world state:** [product-direction.md](product-direction.md#package-and-api-boundaries)
+**Authored world state:** [product direction](product-direction.md#package-and-api-boundaries)
 asks for authored state and behaviour references without changing the 1.0 profile. Objects,
 overrides and schema-version-1 deltas are carried by an optional, separately versioned
 extension, `exulanica-wmp-ext-authored-world`, in versions 1.0 and 1.1, specified in
@@ -12,9 +15,9 @@ and 1.1, specified in [Environment-instances extension 1.0](#environment-instanc
 Version 1.1 of each also carries the edits that give a placed object a behaviour, change it or
 take it away, so a world with motion exports whole. One rule decides which alternate versions
 an extension carries ([Which versions an extension carries](#which-versions-an-extension-carries)).
-The 1.0 profile, its eighteen required paths and its signature payload are unchanged, and a
-package written without either extension is byte for byte what the projector wrote before the
-extensions existed, apart from the names a withdrawn person's rows withhold (see
+The 1.0 profile, its eighteen required paths and its signature payload do not change with the
+extensions, and a package written without either extension is byte for byte what the projector
+wrote before the extensions existed, apart from the names a withdrawn person's rows withhold (see
 [Inventory and privacy boundary](#inventory-and-privacy-boundary)).
 
 The World Memory Package (WMP) is a signed projection of one PostgreSQL snapshot. It is not the
@@ -33,18 +36,65 @@ rights, carry missing asset bytes or establish a runnable import.
 <details>
 <summary>Sections</summary>
 
+- [Why the package is a projection, not the store](#why-the-package-is-a-projection-not-the-store)
 - [Standards and compatibility boundary](#standards-and-compatibility-boundary)
 - [Snapshot, publication, and receipt](#snapshot-publication-and-receipt)
 - [Inventory and privacy boundary](#inventory-and-privacy-boundary)
 - [Integrity format](#integrity-format)
 - [Commands](#commands)
-- [Exit evidence](#exit-evidence)
+- [Profile verification](#profile-verification)
 - [Which versions an extension carries](#which-versions-an-extension-carries)
 - [Authored-world extension 1.0](#authored-world-extension-10)
 - [Environment-instances extension 1.0](#environment-instances-extension-10)
 - [Explicit training dataset profile](#explicit-training-dataset-profile)
 
 </details>
+
+## Why the package is a projection, not the store
+
+Content addressing, an append-only ledger and a right to erasure cannot all hold of one store: every
+export format that gives strong versioning and reproducibility does so by making history immutable,
+so if the package were the database, deletion would be a lie. GDPR does not itself define erasure,
+and erasure may be satisfied by irreversibly destroying the link between the data and the data
+subject; standard guidance for immutable stores is to keep personal data off them
+(<https://arxiv.org/pdf/2210.04541>, VERIFIED 2026-08-27).
+
+**DECISION (wmp-1): two zones.**
+
+| | Zone 1: live store | Zone 2: World Memory Package |
+| --- | --- | --- |
+| What | PostgreSQL plus blob storage | A materialised RO-Crate produced by projecting zone 1 at an instant |
+| Mutability | Mutable; rows are deletable | Immutable once written, content addressed, signed |
+| Raw media | Lives here, and only here | Excluded by default, described by fetch-style external references with digests, so a recipient can verify but not read |
+| Embeddings and identity exemplars | Live here | Excluded by default |
+| Append-only content | The pipeline ledger only, with payloads scrubbed to hashes on deletion | The whole package, by construction |
+| Deletion | Real and complete | Not possible; an exported package cannot be recalled |
+
+Rejected: making the content-addressed, append-only package the live store, which gives the
+strongest reproducibility story and makes deletion impossible; and DVC or a Git-coupled pointer
+system, where erasing an exemplar is a history rewrite that every clone keeps.
+
+**DECISION (wmp-2): the format.** RO-Crate 1.2 under an Exulanica profile crate, with a Croissant
+1.0 and RAI descriptor for the learning dataset in the same JSON-LD graph, BagIt-style fetch
+semantics for excluded raw media, and a signed Merkle-root manifest supplying the versioning
+RO-Crate lacks. VERIFIED (2026-08-27): RO-Crate 1.2 requires exactly one `ro-crate-metadata.json` at
+the crate root, is JSON-LD over schema.org and is backwards compatible with 1.1; Croissant 1.0 is
+JSON-LD over schema.org with a RAI extension (`rai:dataCollection`, `rai:dataAnnotationProtocol`,
+`rai:personalSensitiveInformation`), so a Croissant `sc:Dataset` can be a node in the RO-Crate
+graph; BagIt (RFC 8493) requires a checksum per payload file, and `fetch.txt` declares payload held
+outside the bag. Sources: <https://www.researchobject.org/ro-crate/specification/1.2/structure>,
+<https://docs.mlcommons.org/croissant/docs/croissant-spec.html>,
+<https://docs.mlcommons.org/croissant/docs/croissant-rai-spec.html>,
+<https://www.rfc-editor.org/rfc/rfc8493.html>. Rejected: OCI image spec 1.1 artifacts as the format
+(they need a registry, registry deletion is tag-and-garbage-collect rather than erasure, and they
+impose no schema; kept as a possible transport); Frictionless Data Package v2; LakeFS; Delta Lake
+and Iceberg; and a hand-rolled content-addressed directory, whose Merkle-root idea is adopted.
+
+**What the product must say.** Deletion in the live store is real and complete, within the limits
+in [privacy-consent-threat-model.md](privacy-consent-threat-model.md) section 5.5. A package
+exported to a third party cannot be recalled, and the export dialog says so before the export runs.
+Re-exporting after a deletion produces another version with a different Merkle root, and the diff
+between two package versions is the honest answer to "what changed".
 
 ## Standards and compatibility boundary
 
@@ -77,10 +127,7 @@ The receipt records the protected current-version IDs, profile version, Merkle r
 digest, optional parent root, Ed25519 public-key fingerprint, actor, export policy, and database
 time. None of those audit rows feed the package root, so exporting unchanged state with the same
 lineage produces the same root. The receipt is a workspace-keyed FORCE RLS table and rejects
-update and delete. It was described here as "the forty-eighth", which stopped being true at the
-next migration that added one: the count is measured by
-`test_the_prose_count_of_workspace_isolated_tables_matches_the_schema` and an ordinal in prose is
-not.
+update and delete.
 
 No signing key is generated implicitly. `project` requires an explicit Ed25519 private-key path.
 `keygen-test` is named and reported as ephemeral test material; tests generate keys only in their
@@ -140,7 +187,8 @@ explicitly.
 ## Commands
 
 ```text
-exulanica-wmp project --workspace UUID --actor UUID --private-key KEY --output DIRECTORY
+exulanica-wmp project --workspace UUID --world WORLD_ID --actor UUID --private-key KEY
+                      --output DIRECTORY [--parent-root ROOT] [--evaluation-report REPORT ...]
                       [--extension authored-world-1.0 | authored-world-1.1]
                       [--extension environment-instances-1.0 | environment-instances-1.1]
 exulanica-wmp verify DIRECTORY
@@ -151,7 +199,9 @@ exulanica-wmp import-check DIRECTORY [--loader-capability CAPABILITY ...]
                            [--supported-interaction-capability KEY@VERSION ...]
 ```
 
-`project` takes at most one version of each extension and refuses a request for two.
+`project` packages the world `--world` names, one of the workspace's worlds (`GET /worlds` lists
+them), and refuses one the workspace does not hold. It takes at most one version of each extension
+and refuses a request for two.
 `verify`, `inspect`, `diff`, and `import-check` do not open PostgreSQL. Diff output reports semantic
 JSON pointers and before/after value hashes, not the values themselves. `import-check` never mutates
 a live world; absent receiver capability declarations produce `indeterminate`, not a fabricated
@@ -166,14 +216,12 @@ signature. It names any extension it does not know as not checked, and `uninterp
 any optional payload outside `extensions/`. Only `import-check`, given what a receiving loader
 declares, says anything about loading.
 
-## Exit evidence
+## Profile verification
 
-The WMP 1.0 exit tests cover a clean subprocess with database URLs removed, one-byte payload and
+The WMP 1.0 tests cover a clean subprocess with database URLs removed, one-byte payload and
 manifest mutation, every prohibited class, symlink and unexpected-file rejection, concurrent
 mutation after the repeatable-read snapshot begins, immutable audit receipts, deterministic
-unchanged re-export, and deletion followed by a new root and semantic removed-state diff. The full
-backend PostgreSQL suite, Ruff, migration count, and import boundaries are run before that exit
-commit; those command results, not this status sentence alone, are the exit gate.
+unchanged re-export, and deletion followed by a new root and semantic removed-state diff.
 
 ## Which versions an extension carries
 
@@ -222,8 +270,8 @@ asset and behaviour references those objects make.
 
 ### Why an extension and not a 1.1 profile
 
-Section 8 of the objects contract sketched a 1.1 profile with new required paths. Two facts rule
-that out without a migration, and this change has none. `REQUIRED_PAYLOAD_PATHS` is checked before
+A 1.1 profile with new required paths is ruled out by two facts, without a migration.
+`REQUIRED_PAYLOAD_PATHS` is checked before
 the signature, so a new required path makes every already-signed 1.0 package unverifiable while its
 bytes are sound (`tests/test_world_package_verifier.py` holds this). Migration 0028 checks
 `world_package_export.profile_version = 'exulanica-wmp-1.0'`, so the projector cannot receipt a
@@ -264,7 +312,7 @@ The export receipt's `export_policy` records the extension; the package root doe
 
 - **Actors.** `created_by` and each edit's `actor` are omitted, as tombstones omit the requesting
   actor. The digests that make the edit chain checkable are kept.
-- **Versions whose source was deleted.** This is the decision section 8 left open. A version is
+- **Versions whose source was deleted.** A version is
   invalid exactly when its source snapshot carries a `world_structure_invalidation` row. The
   projector already withdraws a scene when one member is deleted, and an authored delta posed in the
   regions of withdrawn structure is the same kind of claim, so such a version is withheld and only
@@ -348,7 +396,7 @@ A loader without extension support gets `load: "not loaded"` and a warning namin
 versions and present objects it leaves behind, which it must say rather than present the source
 world as the whole package. A loader with the extension but not a behaviour gets the objects listed
 under `objects_with_unsupported_behaviour`, to be shown present with the behaviour marked
-unsupported, the milestone's "unsupported behavior fails visibly". `import-check` runs no loader: a
+unsupported, so an unsupported behaviour fails visibly. `import-check` runs no loader: a
 declared capability is the loader's claim, and the answer is a comparison of that claim with the
 signed content.
 
@@ -549,7 +597,7 @@ command still writes `exulanica-wmp-1.0`, whose eighteen required paths and sign
 are unchanged. The `exulanica-wmp-training-1.1` profile has its own required documents: RO-Crate metadata, profile,
 materials, training consent, and export provenance. It shares the inventory, Merkle construction
 and Ed25519 verifier with the memory profile. It does not imply that a memory export is licensed
-for training, nor does importing a dataset create an interactive memory world.
+for training, nor does importing a dataset create an interactive world.
 
 Default off has three executable boundaries. `training-export` requires `--opt-in` before opening
 the database; `export_training_dataset` independently defaults `owner_opt_in` to false; and the
@@ -601,11 +649,10 @@ Held-out assignments remain frozen across the package's export history, includin
 licensees and material renaming. Revocation prevents future issuance; it cannot remove bytes a
 licensee already downloaded or reverse training they already performed.
 
-Migration 0039 adds one workspace-isolated receipt table. The live schema assertion confirms
-66 such tables. Exports take an exclusive workspace source lock through validation and publication;
-source mutations take its shared counterpart, so ordinary ingest and withdrawal writers can still
-race as the existing deletion protocol requires. A package lock serializes training decisions
-with exports. This closes the withdrawal/publication race while permitting other workspaces to
+Migration 0039 adds one workspace-isolated receipt table. Exports take an exclusive workspace
+source lock through validation and publication; source mutations take its shared counterpart, so
+ordinary ingest and withdrawal writers race as the deletion protocol requires. A package lock
+serializes training decisions with exports. This closes the withdrawal/publication race while permitting other workspaces to
 continue. The tradeoff is that source mutations and other exports in the exporting workspace wait
 during signing and publication. The authoring API also holds selected asset bytes in memory; it is
 a sample-export path, not a claim of streaming multi-terabyte delivery.
@@ -629,9 +676,8 @@ its role and SHA-256. Scene assets additionally name their retained artifact IDs
 names the scene, job and pose receipt path. The database validator checks those declarations.
 The acceptance fixtures in `tests/test_training_inputs.py` show complete image and scene forms.
 
-The Phase 7B acceptance test produces a synthetic sample with exact source photos, scripted
-recovered cameras/calibration, sparse observations, a structurally valid scripted trained SOG,
-frozen split and provenance. No real COLMAP, CUDA training, or vision-model execution is claimed.
-FR-11 remains outstanding: two prospective licensees must independently evaluate a sample and
-state in writing what they would pay for what volume. That acceptance remains a design until that
-demand evidence exists.
+The acceptance tests (`tests/test_training_export_postgres.py`,
+`tests/test_world_package_dataset.py`) produce a synthetic sample with exact source photos,
+scripted recovered cameras and calibration, sparse observations, a structurally valid scripted
+trained SOG, frozen split and provenance. No real COLMAP, CUDA training or vision-model execution is
+claimed, and whether anyone would license such a dataset is not established.

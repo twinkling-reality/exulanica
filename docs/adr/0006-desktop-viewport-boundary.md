@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-29
 - Supersedes the mobile-delivery portions of ADR-0003 and ADR-0005.
+- Affects: [interaction model](../interaction-model.md)
 
 ## Context
 

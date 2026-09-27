@@ -13,7 +13,7 @@ This record says which receipts a scene must hold before it may claim a higher l
 
 **What it still governs.** Scene-gate composition, the rule that rung 2 does not require a
 splat, and the refusal to let a model-derived scale open the query path. The living
-specification is [product-specification.md](../product-specification.md) section 5.
+specification is [scene reconstruction operations](../scene-reconstruction-operations.md#5-quality-gate-and-recorded-rung), section 5.
 
 - Status: **ACCEPTED; production rung 3 implemented 2026-09-04.** D1, D4, D6, D9, D10, D11 and
   D12 run end to end through the normal ingest and separate scene-worker path. D2, D3, D5,
@@ -23,10 +23,10 @@ specification is [product-specification.md](../product-specification.md) section
 - Deciders: Exulanica build. Four independent proposals were scored by judges on honesty, on the
   metric frame and query path, and on what could be implemented on this machine.
 - Supersedes: nothing wholesale. It corrects two sentences in place, named in D2 and D3.
-- Related: [product-specification.md](../product-specification.md) section 5;
+- Related: [scene reconstruction operations](../scene-reconstruction-operations.md#5-quality-gate-and-recorded-rung), section 5;
   [reconstruction-findings.md](../reconstruction-findings.md);
   [scene-reconstruction-operations.md](../scene-reconstruction-operations.md);
-  [corridor-navigation-artifacts.md](../corridor-navigation-artifacts.md);
+  [rung 2 corridor artifacts](../scene-reconstruction-operations.md#9-rung-2-corridor-artifacts);
   [gsplat-scene-jobs.md](../gsplat-scene-jobs.md);
   [adr/0008-generated-geometry.md](0008-generated-geometry.md);
   [adr/0010-opm-2.md](0010-opm-2.md).

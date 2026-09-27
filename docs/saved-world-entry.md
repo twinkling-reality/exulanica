@@ -1,9 +1,27 @@
 # Saved world entry
 
+This contract owns how an account's worlds are registered, created and reopened: the world
+registry and its count policy, the saved entry a person reopens, the two ways a world is created
+(an empty authored starter, and a world made from the person's reviewed photographs), and the
+reference photographs a saved world keeps.
+
 A saved world entry is the workspace-owned pointer a person uses to reopen an owned world. It
 names one world, one authored alternate branch with its saved digest/edit cursor, and one immutable
-appearance version. It is not a
-simulation save, a generated-world specification, or a replacement for either version authority.
+appearance version. It is not a simulation save, a generated-world specification, or a replacement
+for either [version authority](world-version-authorities.md).
+
+## Contents
+
+- [Stored authority](#stored-authority)
+- [Entry and creation](#entry-and-creation)
+- [The worlds a workspace holds](#the-worlds-a-workspace-holds)
+- [Mutation and reopen](#mutation-and-reopen)
+- [Structural rendering boundary](#structural-rendering-boundary)
+- [Reference photographs](#reference-photographs)
+- [HTTP surface](#http-surface)
+- [Verification](#verification)
+- [Starter placement boundary](#starter-placement-boundary)
+- [Made world placement boundary](#made-world-placement-boundary)
 
 ## Stored authority
 
@@ -209,26 +227,12 @@ created under version 1 keeps its 24 metre by 24 metre ground, keeps refusing pl
 and is not migrated. Changing which version an existing world states would be a separate decision
 about that world, not a consequence of the module gaining a version.
 
-### How far an endless ground actually holds
+### How far an endless ground holds
 
 No extent is stored, because the limit is not a property of the world. It is a property of the
 renderer drawing it, and the browser binding states it as
 `AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M` in `web/packages/atlas-react/src/playcanvas/world-kind.ts`,
 **8192 metres**. It moves when the renderer does, and no stored world changes when it does.
-
-The radius is what the product has been measured carrying a person to, end to end. The world's own
-movement resolver walks from the origin to the soft band at 8096 metres, one 23 millimetre frame at
-a time, without a recovery, and on a release build the [render at distance
-record](evaluation/2026-09-23-render-at-distance.json) walks and draws to 8 kilometres (below). The
-144 metres between the last measured picture and the recovery radius at 8144 metres are not
-measured on their own. The float32 step permits the radius and does not set it. A position reaches
-the GPU as a 32-bit float. The render origin rebases only when the active neighborhood changes,
-neighborhoods are built from the scene's regions, and a starter world's scene has none, so the whole
-walk is drawn at its true distance from the world origin, where the gap between one representable
-position and the next is the float32 step at that distance: 0.0019 mm at 24 metres, 0.061 mm at
-1 kilometre, 0.49 mm from 4096 to 8192 metres and 0.98 mm from 8192 up to 16384 metres. A drawn
-position therefore resolves the millimetre, the unit every stored coordinate in this product is
-written in, to twice the radius.
 
 Beyond it nothing is invented. The walking surface answers everywhere inside that radius, on a
 circle so that no direction runs further than another, and answers nowhere outside it. Walking is
@@ -239,52 +243,19 @@ did, because on a ground that states it has no edge, running out of ground is th
 what happened. Every position movement can reach, including the compressed overshoot, is a position
 the surface answers for.
 
-`web/packages/atlas-react/test/endless-authored-ground.test.ts` measures all of it: the float32
-step is read out of the bits rather than restated, the render origin is shown not to move in a
-scene with no regions, and the walk is run through the world's own movement resolver one 23
-millimetre frame at a time, from the origin to 8 kilometres, without a recovery.
-
-The radius promises positions and walking, and the picture was measured holding with them to 8
-kilometres. Measured on a release build and recorded in the [render at distance
-record](evaluation/2026-09-23-render-at-distance.json), which repeats the walk of the [world scale
-record](evaluation/2026-09-22-world-scale-baseline.json): at 40 and 80 metres and at 1, 4 and 8
-kilometres the sky above the horizon keeps the gradient it has at arrival (29 colours down one
-column at every mark), a placed cube's lit face differs from its arrival by more than eight levels
-in none of the 11,328 pixels measured on it, and without the cube the whole frame differs from the
-arrival frame in no pixel by more than three levels. The cube is drawn on the same pixels as at
-arrival, give or take one pixel at its edge. What moves between positions is the outline of its
-shadow, as the shadow map's texels fall differently at each: it shifts the centre of cube and shadow
-together by 0.4 to 4.1 pixels, near the origin as much as far from it. Frame work while sprinting
-measured within 0.9 ms at the 95th percentile at 1 and 4 kilometres. At 40 and 80 metres the same
-build measured 3.2 and 1.8 ms, from a few long frames in a session run with the machine 59 per cent
-idle, against 0.5 to 0.7 ms before; whether those frames are the machine's load or the change is not
-established. At 8 kilometres the record holds the pixels and no frame time, because every 8
-kilometre session ran on a machine too busy for its idle gate.
-
-The sky is a direction rather than a place: `web/packages/atlas-react/src/playcanvas/composed-world.ts`
-draws it around the eye at the far plane, so no walk leaves it. A sky placed where the world opened
-is what the world scale record measured going flat from 1 kilometre.
-
-The sun's shadow offset no longer depends on what else is in view. The engine fits a directional
-shadow's depth range to the shadow casters in view and offsets every receiver by a fixed
-ten-thousandth of that range, so with one half-metre cube in view the offset is a tenth of a
-millimetre, too little to keep a smooth-shaded face from shadowing itself. The sun of every world
-that is not a city, a starter world or a photo-built one, therefore carries a shadow bias of 0.2
-(`COMPOSED_WORLD_ATMOSPHERE` in `web/packages/atlas-react/src/playcanvas/atmosphere.ts`), which
-offsets each caster in the shadow pass by an amount that grows with its slope to the light, and the
-sky casts no shadow. The record measured the result on one cube in a starter world; other shapes and
-photo-built worlds were not measured. A sky drawn as a caster stretches the range to about two
-kilometres wherever it is in the shadow's view and hides the fault there. The record infers that
-this is why the world scale record found bands only at 4 and 8 kilometres; where between 1 and 4
-kilometres the old sky left the shadow's view was not measured. The float32 step did not band them:
-drawing the whole walk around the render origin left the bands where they were, and the render
-origin does not move in a world with no regions.
-
-The endless walking face holds its depth order at the same distances. It is drawn as a grid of cells
-no wider than the camera's reach, out to the recovery radius plus that reach, and its depth is
-offset behind anything lying on it (`web/packages/atlas-react/src/playcanvas/world-field.ts`), so a
-plate placed flat on the ground draws whole at every pose the record sweeps, at the origin and at 8
-kilometres.
+The radius is what the product has been measured carrying a person to.
+`web/packages/atlas-react/test/endless-authored-ground.test.ts` walks the world's own movement
+resolver from the origin to the soft band at 8096 metres, one 23 millimetre frame at a time, without
+a recovery; it reads the float32 step out of the bits and shows that the render origin does not
+move in a scene with no regions. A starter world's scene has no regions, so its walk is drawn at
+its true distance from the world origin, where the float32 step is 0.49 mm from 4096 to 8192 metres
+and 0.98 mm from 8192 to 16384 metres: a drawn position resolves the millimetre, the unit every
+stored coordinate is written in, to twice the radius. The float32 step permits the radius and does
+not set it. On a release build the [render at distance record](evaluation/2026-09-23-render-at-distance.json)
+measured the drawn frame holding to 8 kilometres, for one cube in a starter world; the 144 metres
+between that last measured picture and the recovery radius are not measured on their own. How the
+sky, shadows, the endless walking face and fog are drawn at those distances is part of the
+[Atlas spatial architecture](atlas-spatial-architecture.md#grounds-sky-and-fog).
 
 ### The spawn on a ground with no extents
 
@@ -296,7 +267,7 @@ carrying an `endless` one, or an endless ground carrying `half_width_mm` or `hal
 are each refused as a descriptor this browser cannot read. Nothing is left that passes because it
 has nothing to compare.
 
-The development demonstration remains a separate, identified preview. It is never saved as an
+The development demonstration is a separate, identified preview. It is never saved as an
 owned entry. Opening an entry omits the bundled Flatiron demonstration district.
 
 ## The worlds a workspace holds
@@ -415,7 +386,7 @@ default geometry.
 
 The browser mounts the authored descriptor as a first-class region and ground. It does not create
 a graph island, capture, evidence card, or reconstructed surface for it. Personal entries return
-`authored_scene: null`; their current graph and reconstruction limitations remain visible.
+`authored_scene: null`; their graph and reconstruction limitations stay visible.
 
 A world made from photographs states no ground, so its entry returns `declared_floor`
 (`half_extent_mm`, `elevation_mm`): the square about each region's origin that its entry in the
@@ -424,6 +395,8 @@ society ground catalog declares (`assets/catalogs/society-ground/society-ground.
 under each region's root, including a region drawn only as photographs, as a tiled surface with a
 darker edge (`web/packages/atlas-react/src/playcanvas/declared-floor.ts`), so where people and
 objects stand is seen as a floor of its own; a photograph is never drawn standing in for ground.
+The same square is the area the region's society walks, starting with the catalog's eight people
+([society contract](synthetic-society-contract.md#a-saved-worlds-own-ground)).
 
 A bounded authored floor uses the descriptor's exact horizontal bounds and elevation, and its
 perimeter marks the supported walking area. An endless ground states no perimeter, so it has no
@@ -433,21 +406,16 @@ reach. Both walking faces use the same lit material, receive object shadows and 
 elevation objects are placed on, so an object placed on either rests on the drawn ground and casts
 its shadow onto it. Both follow the saved appearance palette.
 `web/packages/atlas-react/test/authored-ground.test.ts` checks the material, shadow receiving,
-elevation and palette of each. Far ground dissolves into the sky rather than ending at a line. The
-sky is written to the screen as authored, while lit surfaces are tone-mapped, so lit materials are
-fogged after tone mapping, toward the colour the sky itself shows at eye level: paper for the
-default look's diffuse-canvas sky, the camera's clear colour where no sky sphere is drawn, as in
-Survey relief and the city. Fully fogged ground therefore reaches the screen as exactly the sky
-beside it. The generated-tile preview keeps fog before tone mapping, because its skybox is
-tone-mapped as well. Particles and Gaussian splats still fog before tone mapping, so a splat's far
-fade is greyer than the sky around it. `web/packages/atlas-react/test/display-space-fog.test.ts`
-checks the installed fog order and the eye-level sky colour for each look. Photo-derived
-scene-segment controls are absent from source-independent starters. In-world controls expose the World menu, object placement and photo review alongside
-the editable title. When the starter's Companion has no substantive turn, it presents creation
-guidance and the ordinary question control rather than an acknowledgement of an unstated exchange.
-The arrival prompt provides a Start building button that opens this guidance without requiring
-pointer lock. Opening photo review reads the workspace's authorized source inventory independently
-of composed-world topology.
+elevation and palette of each. Far ground dissolves into the sky rather than ending at a line, by
+the fog order the [Atlas spatial architecture](atlas-spatial-architecture.md#grounds-sky-and-fog)
+states.
+
+Photo-derived scene-segment controls are absent from source-independent starters. In-world controls
+expose the World menu, object placement and photo review alongside the editable title. When the
+starter's Companion has no substantive turn, it presents creation guidance and the ordinary question
+control rather than an acknowledgement of an unstated exchange. The arrival prompt provides a Start
+building button that opens this guidance without requiring pointer lock. Opening photo review reads
+the workspace's authorized source inventory independently of composed-world topology.
 
 Personal source admission does not mutate or rebase a starter snapshot. Reference attachment
 records the relationship described below. Attachment is not a topology write and does not compose
@@ -525,10 +493,10 @@ an existing key's provenance cannot be rebound in place.
 
 A person can remove a reference photograph from one world and later add it back after a new
 human review. The photograph stays in the library, its media and every history row remain, and
-permission is never revived without that review. The history is also the input set a later
-photo-to-world step reads to learn which photographs a world currently uses, so it has to hold
-under retries, concurrent writers, the restricted runtime role, and the migration of existing
-data.
+permission is never revived without that review. The history is also what placing a photograph's
+depth estimate reads to learn which photographs a world uses
+(`exulanica/world/point_map_source_authority.py`), so it has to hold under retries, concurrent
+writers, the restricted runtime role, and the migration of existing data.
 
 | Event | What it is | What it is not |
 | --- | --- | --- |
@@ -562,11 +530,11 @@ or before the latest detach of that photograph from that world, and when either 
 pinned by any earlier membership of the same photograph on the same world. The database refuses
 both for every rebind row, so no writer reaches a membership the route would not.
 
-Each half closes a measured gap. Comparing only the most recent membership let a third membership
-pin the first membership's receipts once the second review expired. Requiring only receipts this
-world had not used let a renewal recorded while the photograph was still a reference bring it
-back, so the person made no decision after choosing to remove it, which is exactly what the
-drawer says they do.
+Each half is needed on its own. Comparing only the most recent membership would let a third
+membership pin the first membership's receipts once the second review expired. Requiring only
+receipts this world had not used would let a renewal recorded while the photograph was still a
+reference bring it back, so the person would make no decision after choosing to remove it, which is
+exactly what the drawer says they do.
 
 `POST /world-entries/{entry_id}/source-attachments` is attach. A photograph the world currently
 uses is refused as `invalid_source_attachment`, including after its pinned receipts expire and

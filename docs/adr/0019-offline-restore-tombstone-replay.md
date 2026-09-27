@@ -3,6 +3,7 @@
 - Status: Accepted for the local offline mechanism; production rehearsal remains OPEN
 - Date: 2026-09-05
 - Deciders: Exulanica build, under the unblocked backend program
+- Affects: [privacy, consent and threat model](../privacy-consent-threat-model.md); extended by ADR-0026
 
 ## Invariant
 

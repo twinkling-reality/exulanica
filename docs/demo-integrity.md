@@ -1,109 +1,92 @@
 # Demonstration integrity
 
-Status: mixed, labelled per item.
-
-This document holds the rules a hosted demonstration of this project has to obey, and the design
-that makes obeying them possible: what may be precomputed and what has to run live for every
-visitor, how the hosted deployment is shaped, how it resets between visitors, what fails during a
-live run and what happens when it does, and the checks that are run before anyone is shown
-anything.
-
-The [demonstration audit archive](demo-runbook.md) retains a historical readiness inspection.
-The hosted design below is a set of requirements, not evidence of a configured deployment.
-[Deployment](deployment.md) owns service configuration; each demonstration must establish its
-actual setup, reset behavior and supported user journey.
+This guide owns the rules a demonstration of Exulanica obeys: what may be seeded and what must run
+live, how a demonstration discloses the difference, how a seeded stack resets, what fails during a
+live run and what happens when it does, the checks run before anyone is shown anything, and the
+automated rehearsal of the first demonstration (section 5). The
+[delivery gates](product-direction.md#delivery-gates-for-the-first-demonstration) define the journey
+a demonstration shows; this guide defines how it is shown honestly. [Deployment](deployment.md) owns
+configuration and the seeded reviewer stack, and the
+[demonstration audit archive](demo-runbook.md) retains an earlier readiness inspection.
 
 ---
 
 ## 1. Pre-seeded versus computed live
 
-The selected demonstration declares which operations are retained and which execute live. The
-[product acceptance gates](product-direction.md#delivery-gates-for-the-first-demonstration) define
-the complete journey; this contract defines disclosure within it.
+A demonstration declares which of what it shows was retained beforehand and which executes live.
 
-**Pre-seeded, and disclosed on the page itself:** photograph ingest and its vision observations,
-embeddings, scene grouping, whatever reconstruction artifacts exist, and the persisted layout. This
-is exactly what a returning user experiences, which is why it is legitimate.
+**Pre-seeded, and disclosed on the page itself:** whatever the seed carries, such as photographs and
+their derivatives (vision observations, caption vectors, point maps and reconstructions), the saved
+worlds and their versions, and the stored decisions and comparisons a replay reads. This is exactly
+what a returning user experiences, which is why it is legitimate.
 
-**Computed live, every time, for every visitor:** focus resolution and view recomposition in the
-browser, the confirmation write, retrieval, the answer turn on Nemotron, evidence resolution behind
-every citation chip.
+**Computed live, every time, for every visitor:** whatever the demonstration shows happening. A
+simulated minute, a model's decision for a person, a Companion answer and the evidence behind each
+citation, and an edit a visitor makes all run on the stated host when they are shown.
 
 **Never, under any framing:**
 
 - a progress bar that is not driven by real job state,
 - a spinner in front of a cached response,
 - hardcoded answers,
-- any query path that special-cases the scripted questions,
+- any path that special-cases the scripted questions or the scripted world,
+- a replay of stored decisions presented as models deciding live,
 - claiming live reconstruction over a precomputed asset.
 
-**DECISION.** One test runs the demonstration questions with the demonstration flag off and asserts
-identical results. That test is the proof that nothing is special-cased, and it belongs in the
-repository where any reader can find it. **OPEN**: it cannot be written until the answer path
-exists.
+**DECISION.** No code path distinguishes a demonstration: there is no demonstration flag, so a
+demonstration runs the same routes, models and checks as any other session. Rejected alternative: a
+demonstration mode, which would need a test that runs the demonstration with the mode off and asserts
+identical results before anyone could trust it.
 
-**Disclosure copy**, on the page and not in the README: one line naming when the captures were
-ingested and stating that everything the visitor does from that point runs live.
+**Disclosure copy**, on the page and not in the README: one line naming what was seeded and when,
+and stating that everything the visitor does from that point runs live.
 
 ---
 
 ## 2. The hosted demonstration
 
-**Status: OPEN in its entirety.** Nothing in this section is built.
-
 ### 2.1 Topology
 
-Per [architecture-overview.md](architecture-overview.md) sections 2.1 and 7.2: the API process and
-PostgreSQL on a Compute VM with a restart policy in eu-north1, assets on Nebius Object Storage, a
-static front-end build on a separate host, and an external check hitting `/healthz` every five
-minutes and alerting a real phone. The Preview-grade serverless option is deliberately not used for
-anything whose death is unrecoverable.
+No host is provisioned. The seeded reviewer stack (`deploy/judge/compose.yaml`) runs a seeded
+workspace on one machine behind a same-origin proxy
+([deployment, section 8](deployment.md#8-a-seeded-deployment-for-a-reviewer)). The hosting options
+and the unattended-operation plan once researched for a hosted demonstration are summarised in
+[deployment, section 10](deployment.md#10-hosting-options-researched-and-not-built); none is built.
 
 ### 2.2 Reset
 
-**DECISION.** Per-visitor ephemeral tenants, not one shared mutable account. This removes the entire
-class of failure where the previous visitor left the demonstration in a strange state, and it is
-worth more than any other reliability work here.
+**DECISION.** A seeded demonstration returns to one versioned seed, never to whatever the previous
+visitor left.
 
-- The seed is one versioned artifact: a PostgreSQL logical dump plus a manifest of
-  content-addressed object storage keys, produced by a real ingest run and identified by a seed
-  hash. It is never hand-edited.
-- A new visitor gets a tenant identifier and a copy of a few thousand graph rows. The rows point at
-  the same shared assets, so nothing large is copied and the operation is milliseconds.
+- The seed is one versioned artifact: a verified archive of one workspace's rows and bytes, produced
+  from a real workspace by `exulanica-seed export`, verified against its own manifest, and never
+  hand-edited.
+- `exulanica-seed reset` returns a used stack to the archive's rows.
 - **Object storage is never touched by a reset.** Keys are content-addressed, so a reset that
-  deleted them would be deleting the evidence the whole product rests on.
-- A visible reset control, and an automatic reset after 30 minutes idle.
-- The seed hash and the catalog snapshot date are displayed somewhere a visitor can find them.
-
-### 2.3 Unattended operation
-
-The demonstration is expected to run unattended for weeks at a time. The controls are in
-[architecture-overview.md](architecture-overview.md) section 7.2 and are not repeated here. Two of
-them are runbook items rather than code: a named person performing a weekly check, and that check
-including a catalog diff rather than only a health ping. A ping succeeds right up until the first
-query reaches a withdrawn model. **OPEN**: the person is not named.
+  deleted them would be deleting the evidence every citation resolves to.
+- Required and not built: a separate workspace per visitor, a visible reset control, an automatic
+  reset after 30 minutes idle, and the seed's digest shown where a visitor can find it.
 
 ---
 
 ## 3. Failure modes and their fallbacks
 
-Ordered by likelihood during a live run. The status column says whether the fallback exists in code
-today.
+Ordered by likelihood during a live run. The status column says whether the fallback exists in
+code.
 
 | # | Failure | Fallback | Status |
 | --- | --- | --- | --- |
-| 1 | A model identifier is withdrawn mid-window | The manifest declares a fallback identifier per role; the client selects it on a 404-class error only; a preflight fails the build if any identifier has disappeared | **Built and covered by tests.** Five tests drive the selection rule through a scripted transport, including the cases that must NOT trigger it. It has never run against the live platform, and there is no continuous integration to run it in, which is why `deployment.md` D-7 still lists it as unexecuted |
-| 2 | Token Factory returns 429 or 5xx during a live query | Retry with backoff on the same model. Do **not** switch models: a rate limit is the platform having a moment, and swapping would hide an incident behind a quality regression nobody would attribute correctly. If retries are exhausted, the surface says the answer is unavailable rather than answering without evidence | **Built.** Client policy, `exulanica/models/client.py` |
-| 3 | Prepaid balance runs out | Spend cannot exceed the balance, so this degrades rather than escalates. Mitigation is to precompute and freeze embeddings so the demonstration never calls the embedding endpoint, plus a balance check in the weekly pass | Partly. The budget guard and usage ledger are built; the frozen-embedding decision is **OPEN** |
-| 4 | The backend host dies | Restart policy, external `/healthz` check every five minutes to a phone, one-command redeploy tested from a clean shell, nightly `pg_dump` to object storage | **OPEN**, none built |
+| 1 | A model identifier is withdrawn during a demonstration | The manifest declares a fallback identifier per role; the client selects it on a 404-class error only; the catalog preflight names any identifier that has disappeared | **Built and covered by tests.** `tests/test_models_client.py` drives the selection rule through a scripted transport, including the cases that must not trigger it. It has never been forced against the live platform ([deployment](deployment.md#11-open-items) D-7). The embedding role and a model a world chose for a person have no fallback |
+| 2 | Token Factory returns 429 or 5xx during a live query | Retry with backoff on the same model where the client is built with more than one attempt. Do **not** switch models: a rate limit is the platform having a moment, and swapping would hide an incident behind a quality regression nobody would attribute correctly. When no attempt is left, the surface says the answer is unavailable rather than answering without evidence, and a person run by a model is decided by their routine | **Built** in `exulanica/models/client.py`. The API's client makes one attempt per call; the ingest command's makes three |
+| 3 | Prepaid balance runs out | Spend cannot exceed the balance, so this degrades rather than escalates, and the process's own ceiling (`EXULANICA_BUDGET_USD`) stops calls before the balance does. Freezing the embeddings a demonstration needs would keep it off the embedding endpoint | Partly. The budget guard and usage ledger are built; frozen embeddings are **OPEN** ([deployment](deployment.md#11-open-items) D-6) |
+| 4 | The backend host dies | A restart policy, an external check of `/healthz`, a one-command redeploy tested from a clean shell, and a database backup to restore | **OPEN**. No host is provisioned; `compose.yaml` restarts its workers, and no redeploy command or backup job exists ([deployment](deployment.md#9-backups-and-recovery)) |
 | 5 | Total backend loss | The static front-end build serves a clearly labelled recorded tour. Labelling it as recorded is the whole point; presenting it as the live application would not be honest | **OPEN** |
 | 6 | Frame rate collapses on the visitor's hardware | Frame-time-driven downgrade through the representation tiers, ending at the source-first layout, which needs no geometry at all. Never device sniffing, so no guessed hardware number is load-bearing | **Built and contract-tested.** Target-hardware thresholds remain unmeasured. |
 | 7 | WebGL context loss | Restore retained decoded resources; if unrecoverable, hand over to the World Index, which is a complete and equivalent path to every function rather than a reduced one | **Built and contract-tested.** PlayCanvas recovery on target hardware remains unmeasured. |
 | 8 | A visitor opens it on a phone or a window at or below 60rem | A factual viewport-boundary notice says the current prototype requires a laptop or desktop window. No mobile controls or alternate Index mode are implied | Built in the authenticated shell; ADR-0006 |
-| 9 | A previous visitor left mutable state | Per-visitor ephemeral tenants, section 2.2 | **OPEN** |
-| 10 | Tavily credits exhausted | The lookup is opt-in and its results can never be cited, so its absence removes a panel and breaks nothing. On failure the panel says the lookup failed. The declared fallback is to cut the feature, never to fake a result | Not built. No product code calls Tavily; `scripts/verify_web_lookup.py` checked the credential once |
-| 11 | Pointer lock is refused by the browser | The keyboard route and the World Index, both of which are complete paths | Partly |
-| 12 | Someone asks to see reconstruction run live | It does not run in the live path, by decision. Each region displays the rung it earned, and the rung is part of the region's identity rather than something hidden | Decided. `rungProperties` exists in `atlas-core` |
+| 9 | A previous visitor left mutable state | `exulanica-seed reset` returns the stack to its seed (section 2.2) | Partly. Per-visitor workspaces are not built |
+| 10 | Pointer lock is refused by the browser | The keyboard route and the World Index, both of which are complete paths | Partly |
+| 11 | Someone asks to see reconstruction run live | It does not run in a request, by decision. Each region displays the rung it earned, and the rung is part of the region's identity rather than something hidden | Decided. `rungProperties` exists in `atlas-core` |
 
 ---
 
@@ -122,11 +105,11 @@ of whoever is watching.
 
 **Demonstration state**
 
-- [ ] The demonstration questions return identical results with the demonstration flag off.
-- [ ] The disclosure line naming the ingestion date is visible on the page.
-- [ ] A fresh tenant has been created, so the session starts from the state a visitor will see.
-- [ ] The seed hash is recorded alongside the session, so what was shown can be reproduced rather
-      than only described.
+- [ ] The disclosure line naming what was seeded and when is visible on the page.
+- [ ] The stack has been reset to its seed (`exulanica-seed reset`), so the session starts from the
+      state a visitor will see.
+- [ ] The seed archive's digest is recorded alongside the session, so what was shown can be
+      reproduced rather than only described.
 - [ ] The automated rehearsal (section 5) ran from a clean start on the build being shown, and no
       step the demonstration relies on failed or was not reachable.
 
@@ -185,6 +168,9 @@ python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <ne
   production worker command the step list names, `exulanica-derivative-worker`, with the
   environment the step list gives it (the depth model and its device), over the run's database and
   workspace, and hands it the key the same way.
+- `--bound-usd` sets a spend bound for one run below the step list's; `--sessions` runs only the
+  named browser sessions; `--reuse-database` reuses the slot's database; `--gpu-slot` names the
+  machine's GPU slot command.
 
 **The launcher on its own.** `scripts/acceptance/launch.py` also runs the application for a
 person, without the rehearsal:
@@ -199,7 +185,8 @@ Slot `n`, from 0 to 6, owns ports 19200 + 5n to 19204 + 5n: the database, the AP
 a browser debugging port and a spare. With `--production` the application is a production build,
 made with no `VITE_` variable in its environment and served by `vite preview`, so the page asks for
 the workspace token, which is in the run directory's `token` file; without it, the Vite development
-server runs with the token built in. `--model` passes `NEBIUS_API_KEY`,
+server runs with the token built in. `--no-derivative-worker` starts the API with
+`EXULANICA_DERIVATIVE_WORKER=off`, the production shape. `--model` passes `NEBIUS_API_KEY`,
 `EXULANICA_EGRESS_ALLOWLIST` and `EXULANICA_BUDGET_USD` from the environment to the API and refuses
 without any of them. `--society-playback` makes the API play the run's own workspace
 (`EXULANICA_SOCIETY_CONTROL_WORKSPACES` names it alone) at the declared base wait, or at
@@ -234,11 +221,11 @@ presses Play in People nearby, lets a minute pass on its own and watches for a m
 counts as continuous when someone is drawn walking and the 95th percentile of the pace walkers are
 drawn at is at most 6 m/s: people walk on rather than rush a minute's path and stand. Standing is
 not a failure, since people linger by design. It reads one inhabitant in the inspector, waits for
-someone to use an object of the square, and pauses the world. These steps serve the first milestone's A world to run and
-the Usable world delivery gate in part: they watch people move under the deterministic planner in
-a starter furnished with one square, not in the small town those gates name. The gates that choose
-or swap the model running people have no step, because the product runs no model for them; the
-result reports them `not_served` with that reason.
+someone to use an object of the square, and pauses the world. These steps serve the first
+milestone's A world to run and the Usable world delivery gate in part: they watch people move under
+the deterministic planner in a starter furnished with one square, not in the small town those gates
+name. No step chooses a model for people, swaps one or runs a comparison, although the product does
+all three, so the result reports the gates that need them `not_served`.
 
 **What it does not do.** It does not observe a person or record demonstration footage. It judges
 no frame time: the walking measure reads how far walkers are drawn to move between frames, not

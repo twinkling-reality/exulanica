@@ -1,10 +1,27 @@
 # Unified world composition and retrieval
 
-Status: **DECISION** for product and architecture direction; **PARTIAL** implementation.
-Existing API, schema, and package contracts describe the supported surface; this document
-does not extend them.
-The Iceland journey illustrates one composition path: import a permitted place, combine it with
-personal media and create a fantasy variation. It is not a prerequisite for world creation.
+This contract owns how content of different origins joins one world: personal sources, permitted
+imports and authored content, placed through [composition preview and
+apply](#composition-preview-and-apply) and found together by place through the
+[CONTENT selection](#unified-queries-and-filters). It is part decision and part implementation: the
+sections name which operations exist and which are target behavior. Existing API, schema and
+package contracts describe the supported surface; this document does not extend them. Optional Earth
+content is one source among others, and the Iceland journey below illustrates combining a permitted
+import, personal media and a fantasy variation; it is not a prerequisite for making a world.
+
+## Contents
+
+- [Purpose and authority](#purpose-and-authority)
+- [Reference user journey](#reference-user-journey)
+- [One connected representation with distinct responsibilities](#one-connected-representation-with-distinct-responsibilities)
+- [Geography, placement and time](#geography-placement-and-time)
+- [Selection and extraction](#selection-and-extraction)
+- [Unified queries and filters](#unified-queries-and-filters)
+- [Natural-language editing](#natural-language-editing)
+- [Data-source fitness and visual quality](#data-source-fitness-and-visual-quality)
+- [Existing implementation](#existing-implementation)
+- [Acceptance for a complete composition journey](#acceptance-for-a-complete-composition-journey)
+- [Composition preview and apply](#composition-preview-and-apply)
 
 ## Purpose and authority
 
@@ -14,11 +31,9 @@ assisted editing, shared query and inspection, and reusable content with stable 
 Earth is a source of usable environmental content inside this experience, not a
 separate orbital map or a navigation-only replacement for the interactive world.
 
-This contract develops [product-direction.md](product-direction.md), which owns
-product priority. It supersedes a reconstruction-only or separate-map reading of
-prior product plans. Existing API/schema/package contracts describe the supported
-surface; this document does not silently extend them. Implementation evidence is retained in scoped evaluation records, including the
-experience integration (`2026-09-12-experience-integration`) and Earth scope correction
+[Product direction](product-direction.md) owns product priority. Implementation evidence is
+retained in scoped evaluation records, including the experience integration
+(`2026-09-12-experience-integration`) and Earth scope correction
 (`2026-09-12-earth-experience-correction`) records, which are local-only: a clone does not contain
 them.
 
@@ -33,14 +48,17 @@ addressable, but disposable render primitives are not promoted to world entities
 
 ## Reference user journey
 
+One illustrative composition, which is a target rather than a delivered journey:
+
 1. Select an Icelandic valley or waterfall from a source permitted for this use.
-2. Bring that selection into an alternate personal world beside a memory scene.
+2. Bring that selection into an alternate version of a world, beside a scene made from the
+   person's own photographs.
 3. Ask: "Blend this valley into my garden and put a floating castle above it."
 4. Inspect the resulting placement, seam treatment and generated addition; apply
    the supported changes, reload them, and undo them without modifying originals.
-5. Ask: "Show everything related to Iceland." See imported Iceland content,
-   supported personal Iceland memories and Iceland-derived authored variations,
-   with an explanation of each relationship and filters to narrow the results.
+5. Ask: "Show everything related to Iceland." See imported Iceland content, the person's own
+   Iceland photographs and Iceland-derived authored variations, with an explanation of each
+   relationship and filters to narrow the results.
 
 This is a target journey, not a demonstration completed by fixtures.
 Imported Iceland content does not prove a visit. A fantasy scene inspired by
@@ -53,7 +71,7 @@ Share stable identities and explicit relationships across source, meaning,
 geometry, authored state and runtime. Do not flatten everything into an opaque
 mesh, a caption embedding, a browser-only state object or a second Earth database.
 Do not create a service per content type without a measured reason to cross the
-existing authority boundary. Exact schema and API changes need scoped briefs.
+existing authority boundary. Exact schema and API changes belong to the contract that owns them.
 
 | Conceptual record | Required meaning | Existing basis and missing extension |
 | --- | --- | --- |
@@ -91,7 +109,7 @@ loops.
 ## Geography, placement and time
 
 Keep four different relationships explicit: captured at, depicts, derived from,
-and currently placed in an authored world. They may point to different places.
+and the placement an authored world gives it. They may point to different places.
 A photograph taken from outside a boundary may depict a landmark inside it.
 Iceland-themed generated content may be inspired by Iceland without depicting a
 specific real site. Preserve uncertainty and human corrections instead of forcing
@@ -107,7 +125,7 @@ Retain capture/observation time, provider revision time and edit time separately
 More observations of the same physical state, a later real-world change and a
 fictional modification are different histories. Asset resolution must disclose
 missing content or version drift instead of silently replacing a selected source
-with today's provider tile.
+with the provider's latest tile.
 
 ## Selection and extraction
 
@@ -141,7 +159,7 @@ Iceland, and CONTENT refuses a semantic-text field.
 
 A CONTENT plan requires a place selector and a content selector. It refuses
 entity, time, and capture filters, and it refuses `semantic_query`. Capture and
-entity intents remain the photograph and who-is-here path; they still accept
+entity intents remain the photograph and who-is-here path; they accept
 those dimensions.
 
 `ContentScope.RELATED` unions the kinds below over a confirmed place-entity
@@ -158,9 +176,9 @@ the named place entity and does not traverse the canonical place.
 | `simulation_event` | `simulated` | `event` | `simulated_at` | `recorded_simulation_event` | false |
 
 Those kinds are the literals [executor.py](../exulanica/selection/executor.py)
-selects. Society inhabitant and event rows appear when the society is the v1
-engine or its input history is authorized. That projection is not a living-world
-loop.
+selects. Inhabitant and event rows appear for a society whose engine takes no input
+(`takes_inputs: false` in `exulanica/world/society-engines.v2.json`), or whose input history
+the host authorizes for the named world. That projection is not a living-world loop.
 
 An undone environment addition is absent. A revoked or never-confirmed bridge
 leaves imported and authored environment rows out of the union; memory captures
@@ -183,10 +201,9 @@ For the reference example, the request shapes and what CONTENT does:
 | My fantasy versions of Iceland | No isolated scope; authored environment instances carry `authored_role`; authored objects do not appear |
 | Iceland memories with a named person from a chosen year | Refused: entity and time filters do not apply |
 
-The Iceland-class journey (permitted import, personal memory scene, fantasy
-variation, and that query set as a completed personal demonstration) is the
-product example, not a completed demonstration. Visual acceptance is a separate
-assessment and is not a retrieval claim.
+The Iceland-class journey (permitted import, a scene from the person's photographs, a fantasy
+variation, and that query set) is an illustrative target, not a completed demonstration. Visual
+acceptance is a separate assessment and is not a retrieval claim.
 
 Origin, content kind, supported place association, world/version, match reason,
 lineage and availability are fields on each CONTENT row. People, capture time,
@@ -215,7 +232,7 @@ and physical/fictional behaviors have separate compatibility requirements. A
 single appearance prompt or segmentation model does not implement all of them.
 The system must retain source and generated contributions through editing,
 selection, reload and export. Users may choose edits freely within supported
-capabilities without turning those edits into claims about their real memories.
+capabilities without turning those edits into claims about their real experiences.
 
 ## Data-source fitness and visual quality
 
@@ -236,14 +253,14 @@ Choose open or appropriately licensed sources through concrete coverage, quality
 and permitted-use checks; this contract selects no replacement vendor or model.
 
 A featureless terrain material and simplified untextured building blocks do not
-meet the operator's desired detailed real-world environment. Neither a successful
+meet the requirement for a detailed real-world environment. Neither a successful
 tile load nor mechanical interaction tests establish visual acceptance. Measure
 actual ground-level views, preserved source textures/geometry, refinement,
 seams, lighting and performance while existing interactions work. Compare named
 locations and retain captures, source limitations and rejected outcomes. Do not
 promise uniform global or street-level coverage from a city-specific sample.
 
-## Existing implementation and staged delivery
+## Existing implementation
 
 What the tree implements, and what this contract names as absent from the completed journey:
 
@@ -254,8 +271,11 @@ What the tree implements, and what this contract names as absent from the comple
   remain outside that contract.
 - `Intent.CONTENT` in `exulanica/selection/plan.py` and `executor.py` returns the
   kinds in [Unified queries and filters](#unified-queries-and-filters) over a
-  confirmed place. Capture and entity intents still resolve photographs and
+  confirmed place. Capture and entity intents resolve photographs and
   entities through place, entity, time and text constraints.
+- [Composition preview and apply](#composition-preview-and-apply) places a reviewed catalog
+  asset, an admitted environment selection, or the depth estimate made from a reviewed photograph
+  into a named authored version.
 - `exulanica/selection/proposal.py` drafts bounded appearance proposals, not general
   structural creation, blending or arbitrary asset generation.
 - `exulanica/ingest/scene_segments.py` and the scene-segments route support lifted
@@ -270,44 +290,23 @@ What the tree implements, and what this contract names as absent from the comple
   not silently alter WMP 1.0 or imply that its signature supplies missing asset
   bytes, source-use rights or runtime behavior.
 
-Implement in dependency order, with exact file ownership and evidence per stage:
+The delivery order of the stages this journey needs beyond that is owned by
+[product direction](product-direction.md).
 
-1. **Source admission and shared identity.** Prove a permitted reusable real-world
-   selection, canonical place association, source version and explicit frames;
-   define the versioned environment/asset contract and detailed rendering target.
-2. **Durable composition and retrieval.** Place that selection with a personal
-   scene in an authored version, save/reload/undo, and query their shared place
-   identity with distinct origin and match reasons. `Intent.CONTENT` unions the
-   kinds named above over a confirmed place bridge, with memories-only
-   exclusion, paging, withdrawal hiding and byte-availability labels. This stage
-   names, and CONTENT does not provide, the Iceland-class personal journey,
-   authored objects as a CONTENT kind, and isolated imported-only, fantasy-only,
-   or person/time request shapes.
-3. **Assisted structural creation.** Execute one natural-language compound edit,
-   including a real geometric or generated addition; preview/apply/undo with
-   measurable asset quality, existing interactions and retained lineage.
-4. **Transfer and expansion.** Add package compatibility and permitted asset
-   resolution, test a second geography/source and expand supported operations
-   through measured needs rather than a speculative universal abstraction.
-
-The frontend Earth lane remains bounded by its issued brief; these stages
-are not permission to edit its unowned backend/query/package files. Briefs
-must name the missing contracts and resolve scope before implementation.
-
-## Acceptance that arriving tasks must preserve
+## Acceptance for a complete composition journey
 
 The first complete vertical slice uses a clearly identified permitted geographic
-selection, an authorized memory scene and a derived fantasy variation. A synthetic
-fixture can validate mechanics but must not be reported as that personal journey.
-The Iceland query example is the semantic test case; a different supplied place
-may be the first measured visual demonstration without claiming Iceland coverage.
+selection, an authorized scene made from the person's photographs and a derived fantasy
+variation. A synthetic fixture can validate mechanics but must not be reported as that personal
+journey. The Iceland query example is the semantic test case; a different supplied place may be the
+first measured visual demonstration without claiming Iceland coverage.
 
 Prove all of the following before calling that slice complete:
-- Detailed environment and authored/memory content coexist with existing movement,
+- Detailed environment, authored and photograph-derived content coexist with existing movement,
   reticle/object interaction and Companion interface in the production engine.
 - Selection, modification, save/reload and undo preserve originals, source
   identity, authored placement and version lineage, including stale-edit recovery.
-- Unified related-place queries include the intended kinds; memory-only queries
+- Unified related-place queries include the intended kinds; `memories_only` queries
   exclude imports/fantasy; unrelated, uncertain, forbidden and withdrawn content
   behave according to explicit policies with explainable matches.
 - Source-use restrictions survive extraction, indexing, editing and export;
@@ -318,21 +317,12 @@ Prove all of the following before calling that slice complete:
   receiver capabilities; no unsupported runnable-world or unrestricted-export claim.
 
 Saved-world source reads are snapshot-addressed: reopening resolves source media through the
-entry’s stored structural snapshot, independently of the global topology pointer. Attachment
-membership is a project-reference write. It does not compose geometry, activate sourced topology
-on an authored starter, or rewrite style.
-
-Structural snapshots and composed style versions are different planes. Compatibility is the
-decision of `classify_structure_style_compatibility`, which takes typed plane identities and
-returns `compatible`, `preview_required`, or `refuse`. `compatibility_key` is profile-family
-binding only. Digest-string equality across planes is not the reason for compatibility; live
-typed identities may still agree when hex strings collide. `preview_required` /
-`style_topology_drift` is a CLASSIFY-family result. Family-matched digest change on
-`register_topology` is the composer handoff. COMPOSE tokens refuse attachment rows as
-composition inputs (`attachment_is_not_composition`, `expired_source_not_composable`); there
-is no attachment-to-geometry compose write. Historical style may be displayed; appearance
-writes and rollback use the live composed digest. Reviewed-photograph composition into
-geometry is absent.
+entry's stored structural snapshot, independently of the global topology pointer
+([saved-world entry](saved-world-entry.md#mutation-and-reopen)). Attachment membership is a
+project-reference write: it does not compose geometry, activate sourced topology on an authored
+starter or rewrite style. Structural snapshots and composed style versions are different planes,
+and whether one may be used with the other is decided by the plane-typed classifier in
+[world version authorities](world-version-authorities.md#structure-and-appearance-compatibility).
 
 ## Composition preview and apply
 

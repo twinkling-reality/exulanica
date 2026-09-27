@@ -18,15 +18,16 @@ The [composition contract](../world-composition-contract.md) defines this target
 
 [Authored starter worlds](../saved-world-entry.md) provide a source-independent starting space.
 Reference photographs can be attached without replacing authored edits; attachment alone does not
-reconstruct or place scene geometry.
+reconstruct or place scene geometry. A world can also be made from the person's reviewed
+photographs ([scene reconstruction](scene-reconstruction.md)). Either kind of saved world can host
+people, whose choices the world's owner can hand to open models
+([people and models in a world](simulation.md)).
 
 Reviewed appearance controls and bounded language-driven appearance proposals
 have preview/apply/rollback contracts. Source snapshots, alternate versions,
 authored object add/move/remove/undo, bounded motion and reload/conflict recovery
-have code and synthetic browser checks. See the
-[object contract](../world-objects-contract.md) and the saved-world evaluation
-(`2026-09-12-world-browser`, a local-only evaluation record a clone does not contain).
-These checks do not prove the complete saved-world journey or visual quality.
+have code and synthetic browser checks; the [object contract](../world-objects-contract.md) owns
+them. These checks do not prove the complete saved-world journey or visual quality.
 
 A person furnishes a world from the
 [world object catalog](../../assets/catalogs/world-objects/world-object.v2.json), read by
@@ -45,7 +46,7 @@ kind names, spaced so that turning an object never crowds two of them together; 
 in their way and offers nothing to do. A resting person is drawn sitting on the seat of the bench,
 the chair or the ledge their place has, and a visitor faces the stall's counter or the tree.
 
-"Place a small square before me" asks for the
+In the Create panel, "Place a small square before me" asks for the
 [small square](../../assets/catalogs/world-objects/world-arrangement.v1.json): a tree between two
 benches, with a market stall, a planter seat and a cafe table behind it and a lamp post at each front
 corner, in front of the person and facing them. The server works out where each object goes from
@@ -63,9 +64,9 @@ minutes, eight inhabitants on the starter ground, the square before its arrival 
 used 5.75 of the square's six usable objects per seed on average, against 5.17 of six when each
 object is the marker of the same use at the same place.
 
-The bounded Flatiron implementation, its admitted source data, and the line between source facts
-and renderer completion are specified in
-[owned district and source admission](../owned-district-and-admission.md).
+The owned Flatiron district, built from admitted New York open data, appears only in the
+development preview. Its source data and the line between source facts and renderer completion are
+specified in [owned district and source admission](../owned-district-and-admission.md).
 
 ## Gaps
 
@@ -74,10 +75,9 @@ across memories/imports/creations, geometric blending and general language-drive
 asset creation require the extensions in the
 [composition contract](../world-composition-contract.md). A segmentation mask is
 not automatically a complete editable object, and a map's display permission is
-not permission to extract and remix its content. The Earth prototype is
-an incomplete visualization path rather than a validated detailed environment.
+not permission to extract and remix its content.
 
-Read the [product roadmap](../product-direction.md) for delivery order, the
+Read [product direction](../product-direction.md) for delivery order, the
 [appearance contract](../atlas-world-customization-contract.md) for supported
 style operations, and the [World Memory Package](../world-memory-package.md) for
 portable-state boundaries. Package verification alone does not load a

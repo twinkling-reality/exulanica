@@ -1,14 +1,25 @@
 # Interaction and spatial model
 
-Status: mixed. Every claim carries exactly one label, per the convention in
-[documentation standard](documentation-standard.md#evidence-labels): **VERIFIED** (primary source URL and retrieval date), **DECISION** (with the
-alternative rejected), **ASSUMPTION** (with the experiment that settles it), **OPEN**.
+This contract owns how a person moves through, points at and talks to a world in the browser:
+navigation and input modes, the attention and affordance system, the Companion encounter, update
+proposals and their confirmation, the World Index, the Map, recomposition as a view transformation,
+processing shown as formation, accessibility and the renderer choice.
 
-Retrieval date for every VERIFIED claim on this page: **2026-08-27**.
-Product scope and delivery order live in [product-direction.md](product-direction.md).
-[Product research and constraints](product-specification.md) retains evidence and reconstruction
-research. [Saved-world entry](saved-world-entry.md) defines the implemented entry flow; historical
-first-run assumptions below do not replace it.
+**The Atlas** is the browser world runtime. `@exulanica/atlas-core` holds its engine-neutral rules
+(coordinate frames, navigation, focus, layout, residency and view manifests) and
+`@exulanica/atlas-react` holds its PlayCanvas binding, `AtlasBinding`, which draws every kind of
+world the application opens: an authored starter, a world made from photographs and, in the
+development preview, the owned district and generated tiles. Other documents use "Atlas" only as
+this name. How it draws grounds, regions and residency is the
+[Atlas spatial architecture](atlas-spatial-architecture.md).
+
+Every claim carries exactly one label, per the convention in the
+[documentation standard](documentation-standard.md#evidence-labels): **VERIFIED** (primary source
+URL, retrieved on 2026-08-27 unless another date is given), **DECISION** (with the alternative
+rejected), **ASSUMPTION** (with the experiment that settles it), **OPEN**. Product scope and delivery
+order live in [product direction](product-direction.md); [product research and
+constraints](product-specification.md) retains evidence and reconstruction research; and
+[saved-world entry](saved-world-entry.md) defines how a world is opened.
 
 **Read section 2.1 first.** Two verified platform facts remove design freedom that a reader would
 otherwise assume exists, and most of this document is downstream of them.
@@ -18,7 +29,7 @@ otherwise assume exists, and most of this document is downstream of them.
 <details>
 <summary>Sections</summary>
 
-- [1. The Atlas is the whole application](#1-the-atlas-is-the-whole-application)
+- [1. One scene per session](#1-one-scene-per-session)
 - [2. Navigation](#2-navigation)
 - [3. Two verbs, and the contextual affordance system](#3-two-verbs-and-the-contextual-affordance-system)
 - [4. The Companion](#4-the-companion)
@@ -32,19 +43,22 @@ otherwise assume exists, and most of this document is downstream of them.
 
 </details>
 
-## 1. The Atlas is the whole application
+## 1. One scene per session
 
 ### 1.1 One scene, for the whole session
 
-**DECISION.** Once the Atlas application opens, there is exactly one scene graph, one camera and one
-render loop for the lifetime of that application session. There is no scene loading between Map,
-World Index and region interiors. The public landing site is a separate lightweight document that
-links to the application; it does not imitate an empty Atlas or mount mock application state.
+**DECISION.** Once the Atlas opens a world, there is exactly one scene graph, one camera and one
+render loop for that world. There is no scene loading between Map, World Index and region
+interiors. The public landing site is a separate lightweight document that links to the
+application; it does not imitate an empty world or mount mock application state. One gap is
+recorded: a write to the entity graph, such as confirming who somebody is, remounts every surface
+including the renderer (`mount` in `web/packages/app/src/main.ts`), while a query's recomposition
+changes no scene.
 
 Rejected alternative: discrete scenes with transitions between an overview map and region interiors,
-which is the conventional structure. Rejected because it forces a loading boundary exactly where the
-Atlas's central claim lives (this person is in both places), and because it makes recomposition a
-rebuild rather than a uniform change.
+which is the conventional structure. Rejected because it forces a loading boundary exactly where
+regions connect (one person present in two places), and because it makes recomposition a rebuild
+rather than a uniform change.
 
 Five consequences follow mechanically and are not separately decided:
 
@@ -70,8 +84,11 @@ does not mean the photographs were taken near each other.
 
 Enforcement is in the type system, not in code review: branded vector types (`AtlasVec3`,
 `LocalVec3`, `MetricVec3`), one legal one-way conversion from local to atlas, deliberately no
-`atlasToLocal` export and no distance function over `AtlasVec3` exported from the query layer, plus a
-lint rule banning distance computation over atlas positions outside the layout module.
+`atlasToLocal` export and no distance function over `AtlasVec3` exported from the query layer
+(`web/packages/atlas-core/src/coords.ts`), plus the boundary rule
+`no-atlas-distance-outside-presentation` in `web/.dependency-cruiser.cjs`, which refuses an import of
+the distance functions in `presentation-metrics.ts` from anywhere but atlas-core and its renderer
+binding.
 
 Query-layer rule: a spatial question ("how far apart were they", "was she behind him") may be
 answered only from metric coordinates inside a single region whose scale is metric. Across regions,
@@ -107,7 +124,8 @@ separate captures of the same place. The plan measures per-scene structure-from-
 cross-capture registration. Until that experiment exists, this exception is architecturally
 permitted and **should not be shipped**. The experiment that settles it: take two photo sets of one
 place from the corpus, run them through the pose pipeline jointly, and measure the fraction of images
-that register into a single model.
+that register into a single model. The [place plane](place-identity.md) specifies the joint
+reconstruction this needs.
 
 ### 1.4 Layout and representation tiers
 
@@ -124,9 +142,8 @@ one line. Under reduced motion the move is instant and the line becomes mandator
 explanation now carries the information the animation would have.
 
 **UNRESOLVED EXPERIMENT.** At three regions a force layout is close to degenerate and a hand-placed
-triangle may look better. Compare the algorithmic and hand-placed result on the three real captures
-before committing. Roughly two hours. **The research did not pick a winner and neither does this
-document.**
+triangle may look better. Compare the algorithmic and hand-placed result on three real captures
+before committing. **The research did not pick a winner and neither does this document.**
 
 Four representation tiers per region, cross-faded on distance, all resident in the same scene:
 
@@ -147,8 +164,10 @@ region stays at tier 2 with an inline caption saying so, and the user keeps walk
 interacting and keeps talking. There is no state in which the application shows a spinner instead of
 the world.
 
-Regions have no edges, walls or platform rims. Each carries a dissolve band over its outer fifth,
-where its own fog ramps up and the between-space particle field ramps up inversely. Standing in the
+Regions have no walls or platform rims. Each carries a dissolve band over its outer fifth, where
+its own fog ramps up and the between-space particle field ramps up inversely. A world made from
+photographs is the one exception to edges: people and objects stand on each of its regions, so each
+has a declared floor drawn with its edge ([saved-world entry](saved-world-entry.md#structural-rendering-boundary)). Standing in the
 band you see two partially resolved regions at once, which is where cross-region identity threads
 render at full strength. The between-space is not empty: its mote density is proportional to the
 number of cross-region entity links whose thread passes overhead, so walking between two tightly
@@ -193,7 +212,7 @@ Internet 4 through 30 as Not supported. Firefox for Android 153 is listed as sup
 https://caniuse.com/pointerlock
 
 > **Consequence: mouse-look first-person navigation is impossible on iOS Safari and Android Chrome.
-> The current prototype is therefore desktop/laptop only and stops at a viewport boundary rather
+> The application is therefore desktop and laptop only and stops at a viewport boundary rather
 > than inventing a second navigation mode.** This is a hard platform limit with no workaround.
 
 ### 2.2 Two explicit input modes
@@ -221,14 +240,13 @@ first-person and third-person views of the same controllable player. Provide a v
 control and a keyboard binding that does not fire while typing. Switching preserves the player's
 position, grounded collision state and interaction context. The player avatar is distinct from the
 synthetic population; its visibility does not create a simulated inhabitant or a new personal
-identity. Simultaneous split-screen rendering is outside this camera milestone.
+identity. Simultaneous split-screen rendering is not supported.
 
 Third-person camera placement must shorten its follow distance around obstructions and avoid
 clipping through ground or buildings. Picking begins at the displayed camera, while interaction
 reach and traversal authority remain with the player. Character facing and movement animation
 must follow actual resolved motion, including blocked movement. Camera transitions respect reduced
-motion. Optional appearance customization can extend the player representation later without
-changing navigation or identity authority.
+motion. Changing the player's appearance changes neither navigation nor identity authority.
 
 Tune pedestrian walk/run speeds, acceleration, braking and turning against the actual street
 scale. Verify diagonal speed, frame-rate behavior, collision sliding, focus loss, camera switching,
@@ -261,8 +279,8 @@ Replacement: automatic step assist, near-full pitch, and the Atlas Map.
 region, while narrowing field of view and ramping the vignette. Rationale: optic flow is generated by
 nearby geometry, and the between-space has almost none, so it is the one place where speed is
 comfortable and also the one place where nothing is happening. Fast where empty, slow where there is
-content. **UNRESOLVED EXPERIMENT:** whether the chosen glide speed is comfortable, or needs a lower
-cap. Half a day with three testers. Glide is out of the MVP cut, so this is not on the critical path.
+content. Glide is not implemented. **UNRESOLVED EXPERIMENT:** whether a glide speed is comfortable,
+or needs a lower cap, with a small group of testers.
 
 ### 2.4 Comfort settings
 
@@ -274,22 +292,29 @@ https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion
 | Setting | Values | Default |
 | --- | --- | --- |
 | Field of view | 60 to 90 | 70 |
+| Look sensitivity | 0.5 to 2.0 | 1.0 |
 | Vignette on move | off / subtle / strong | subtle |
 | Camera bob | on / off | **off** |
-| Turn mode | smooth / snap (30 degree increments) | smooth |
+| Turn mode | smooth / snap | smooth |
 | Transition style | motion / fade | from `prefers-reduced-motion` |
+| Provenance detail | standard / expanded | standard |
 | Companion initiative | normal / minimal / off | normal |
+
+These are the reviewed comfort capabilities a world stores
+([world version authorities](world-version-authorities.md#comfort-settings-authority)). Field of
+view, look sensitivity and the vignette take effect in the renderer; turn mode and camera bob are
+stored and offered as settings, and no renderer path reads them.
 
 ### 2.5 Supported viewport
 
-**DECISION, see [ADR-0006](adr/0006-desktop-viewport-boundary.md).** The current prototype supports
-laptop and desktop windows only. Its existing `60rem` layout breakpoint is a hard viewport boundary:
-below it, the product shows one factual boundary notice and does not expose a mobile Index, mobile
+**DECISION, see [ADR-0006](adr/0006-desktop-viewport-boundary.md).** The application supports
+laptop and desktop windows only. Its `60rem` layout breakpoint is a hard viewport boundary: below
+it, the product shows one factual boundary notice and does not expose a mobile Index, mobile
 commands, touch traversal, a virtual joystick or a rearranged Companion.
 
-The World Index remains the non-spatial desktop accessibility route. It is not a device fallback.
+The World Index is the non-spatial desktop accessibility route. It is not a device fallback.
 Mobile delivery requires a separate product decision, implementation and validation pass; none is
-implied by responsive CSS in this prototype.
+implied by responsive CSS in this application.
 
 ### 2.6 Keyboard-only, and the accessibility route
 
@@ -307,31 +332,35 @@ and focuses each exactly as the reticle would, `Enter` interacts, `X` summons, `
 Map, `I` opens the World Index, `Backspace` pops the view manifest stack. Escape releases pointer
 lock in traversal and dismisses the Companion only after its converse-mode exchange is open (2.1).
 
-**System surfaces use a small, stable command vocabulary.** A quiet command strip makes it visible:
-`I` opens the World Index, `M` changes only the camera into Atlas Map presentation, `O` opens
-Options, and `?` opens the complete controls guide. Options and Controls are the only centred system
-surfaces and only one major surface may own the cursor at a time. Closing either returns to the exact
-surface and detail from which it was opened. Neither binds Escape.
+**System surfaces use a small, stable command vocabulary.** A command strip makes it visible
+(`web/packages/app/src/ui/atlas-commands.ts`): `K` Character, `I` Library (the World Index), `X`
+Companion, `M` Map (only the camera changes, into Atlas Map presentation), `O` Customize (the
+world's appearance) and `?` Settings (display, accessibility, movement and the complete controls
+guide). `H` opens the World menu (`web/packages/app/src/ui/world-menu.ts`), which lists the same
+surfaces beside Place & view and, where the host offers them, Compare models and a recorded
+comparison. Customize and Settings are the only centred system surfaces, and only one major surface
+may own the cursor at a time. Closing either returns to the exact surface and detail from which it
+was opened. Neither binds Escape.
 
-**DECISION: Atlas opens as one living archival landscape, not a list of unfinished themes.**
-Aeroheart is the sole complete user-facing identity: bright living terrain with optical memory
-lenses, water-glass approaches, growth forms, and vector relationship signals. Blue Hour and the former
-Celestial scaffolding are not exposed in the app. The atmosphere has its own non-semantic colours;
-evidence and provenance colours are never reused as decoration.
+**DECISION: a world opens in one complete look, not a list of unfinished themes.** Aeroheart
+(`origin-landscape@1`) is the one supported world profile; Survey Relief is an experimental
+renderer regression fixture and is not offered as a product choice
+([customization contract](atlas-world-customization-contract.md#4-profile-compatibility-and-programmable-controls)).
+The atmosphere has its own non-semantic colours; evidence and provenance colours are never reused
+as decoration. The palette roots are authored in
+`web/packages/presentation/src/world-style-recipes.ts`, and the landscape is a real world shader and
+geometry composition rather than a viewport-wide CSS gradient. Colour is never the only carrier of
+provenance or confirmation state.
 
-The physical landscape uses chalk daylight, moss and mineral ground, dark stone, paper, and brass.
-It is a real world shader and geometry composition rather than a viewport-wide CSS gradient.
-Colour is never the only carrier of provenance or confirmation state.
-
-Options exposes Standard/High contrast, Layered/Reduced transparency, and the active style's
-manifest-generated world controls. It does not expose an incomplete style as a product choice.
-Style controls preview physical terrain/material changes through the same protected transaction
-boundary used by future Companion proposals. Presentation updates keep DOM legibility, point
-provenance tints, and anchor motes coherent.
+Customize and Settings both expose Standard/High contrast and Layered/Reduced transparency;
+Customize also exposes the active style's manifest-generated world controls and never an
+incomplete style as a product choice. Style controls preview physical terrain and material changes
+through the same protected transaction boundary Companion-origin proposals use. Presentation
+updates keep DOM legibility, point provenance tints and anchor motes coherent.
 
 Three material roles exist: archive sheets for evidence and summoned reading, system sheets for
-Options and Controls, and instrument strips for compact persistent chrome. Only instrument strips may
-use a pill silhouette. The implementation lives in `@exulanica/presentation`, so landing, DOM chrome and
+Customize and Settings, and instrument strips for compact persistent chrome. Only instrument strips
+may use a pill silhouette. The implementation lives in `@exulanica/presentation`, so landing, DOM chrome and
 the renderer consume one versioned visual contract rather than copying theme values.
 
 **Canvas content is invisible to screen readers**, so the DOM overlay is the accessibility surface
@@ -343,17 +372,18 @@ image must be reachable from a flat keyboard-navigable list.
 ### Default desktop application workspace
 
 The application presents labeled Character, Library, Companion, Map, Customize and Settings controls.
-Geographic exploration uses a place heading, a compact camera strip and separate Nearby,
-Create and World details panels. Opening one contextual panel closes the previous one;
-selecting a subject opens its inspection. Person activity and source/fiction distinctions
-remain in the foreground, while identifiers, event references and provenance details use
-explicit disclosures. Recorded preview controls and their limitations remain in World details.
-Background simulation refreshes update an existing inspection without reopening a dismissed one.
+A world shows a place heading, a compact camera strip and separate Nearby, Create and About panels
+(`web/packages/app/src/ui/world-workspace.ts`; About is titled About this place). Opening one
+contextual panel closes the previous one; selecting a subject opens its inspection. Person activity
+and source and fiction distinctions stay in the foreground, while identifiers, event references and
+provenance details use explicit disclosures. Recorded preview controls and their limitations are in
+About this place. Background simulation refreshes update an existing inspection without reopening a
+dismissed one.
 
-Character opens with K; C retains the first/third-person camera toggle. The development preview
-provides a full-body character studio backed by a pinned asset catalogue. People can rotate and
-zoom the model, choose an available look, edit its supported material colors and inspect its
-standing, walking and running animations. Controls follow the selected asset's capabilities;
+Character opens with K; C toggles the first and third-person camera. Character opens a full-body
+character studio backed by a pinned asset catalogue. People can rotate and zoom the model, choose
+an available look, edit its supported material colors and inspect its standing, walking and
+running animations. Controls follow the selected asset's capabilities;
 the screen does not invent garment combinations, morph targets or equipment statistics.
 Use in world applies the selected look to the existing player presentation and opens third person.
 Third person is offered in every world whose solid parts the follow camera can keep out of: a
@@ -361,8 +391,11 @@ starter, the regions of a photo-built world and the owned district. A generated 
 collision for its buildings, so there the view stays first person and the studio says the figure
 is not shown
 (`worldViews` in `web/packages/atlas-react/src/playcanvas/world-kind.ts`).
-This is session appearance, explicitly not an account save. An authenticated character catalogue
-and durable character customization are not connected to this application composition.
+In the development preview the chosen look is session appearance. In a signed-in world a catalog
+look is saved on the server per world version, as a recipe over one body's family, with a revision
+history a person can reset or restore (`web/packages/app/src/character-looks-store.ts`,
+[character representation](character-representation-contract.md)); the abstract figure and the
+stylized examples are worn without being saved.
 
 The native character renderer validates the pinned GLB container, rig joints, idle/walk/run clips,
 material slots and optional variants before instantiation. It drives gait from collision-resolved
@@ -402,7 +435,7 @@ contract: the geographic street does not itself establish a reconstructed region
 object can be placed. Development-preview objects, where placement is supported, are
 session state and are not saved. A refusal must remain visible rather than claiming placement.
 
-World details includes a bounded **World to data** inspector for renderer subjects that actually
+About this place includes a bounded **World to data** inspector for renderer subjects that actually
 declare a compatible surface/point pair. It preserves camera and selection, samples only existing
 mesh triangles or borrows retained points, identifies generated samples as presentation rather than
 measurement, and disables the slider for unsupported surfaces. Its record is a resident display
@@ -412,8 +445,10 @@ remain authoritative and can remove both geometry and the record.
 In an authenticated configured world, the same panel can read persisted society state and controls,
 show saved play/pause and 1x/2x/4x settings, advance one simulated minute while paused, and inspect
 recorded activity/event references. In a person's own saved world those controls are in People
-nearby, beside the inhabitants, and are offered only where the host plays that world; World
-details points there instead of repeating them. The development preview instead plays an explicitly labeled
+nearby, beside the inhabitants, and are offered only where the host plays that world; About this
+place points there instead of repeating them. The World menu's Compare models shows two open
+models' runs of the same hour side by side
+([society experiments](society-experiments.md#comparisons-of-models)). The development preview instead plays an explicitly labeled
 recording and is not persistence or model evidence. The backend also accepts typed user requests for
 an inhabitant to go to or perform a canonical target, but no browser control issues those
 requests. Selecting a destination or inhabitant for inspection must not be described as directing it.
@@ -495,7 +530,7 @@ and a **separate decision rail**. The presence remains a rendered object. Speech
 and custom reply remain accessible DOM. They use one fixed visual-novel composition and one optical
 material language, not one generic card or a mirrored dashboard layout.
 
-**DECISION, updated 2026-08-31: SVG geometric avatar.** The geometric silhouette and
+**DECISION: SVG geometric avatar.** The geometric silhouette and
 two slit eyes draw on the visual grammar documented by the MIT-licensed Bloub project.
 The product path is an original DOM/SVG implementation.
 Shape, colour, and two-eye expression are saved device preferences resolved through a versioned
@@ -505,7 +540,7 @@ Resting, attending, uncertain, working, and settled remain operational states, n
 performance. Only `working` has a distinct semantic render: three pulsing dots. Expression
 selection is appearance only and never changes confidence, intent, or what the Companion may do.
 
-**Exchange, corrected from live review 2026-08-30.** The question occupies one dark optical-glass
+**Exchange.** The question occupies one dark optical-glass
 speech squircle across the bottom centre. A small speaker-name pill physically bisects its top
 boundary; the component accepts a name and receives `Companion`, so identity is not
 hard-coded as permanent product chrome. Evidence actions stay in this lens because they support
@@ -515,10 +550,10 @@ arrow icon rather than turning the encounter back into a form card. Unnumbered u
 and correction responses remain in the decision rail. Escape dismisses the complete encounter and
 has the same no-penalty meaning as Later.
 
-**Association.** The presence occupies the upper centre over the current memory backdrop. Speech
+**Association.** The presence occupies the upper centre over the world behind it. Speech
 anchors the bottom and decisions remain on the right. The presence is the Companion; the lens is
-its accessible utterance and evidence; the right rail is what the person can decide. Index, Map,
-Options, and Controls become circular icon controls around the speech band while an encounter is
+its accessible utterance and evidence; the right rail is what the person can decide. Library, Map,
+Customize and Settings become circular icon controls around the speech band while an encounter is
 open, maintaining a consistent control rhythm.
 
 SVG supports the geometric design without an additional scene renderer.
@@ -529,7 +564,7 @@ window frame.
 
 ### 4.2 Spatial placement
 
-**DECISION, CORRECTED 2026-08-29.** The Companion is a screen-space overlay, not an entity in the
+**DECISION.** The Companion is a screen-space overlay, not an entity in the
 Atlas coordinate frame. It occupies the stable upper centre of the view. The presence does not
 trail the camera, travel to anchors, or use inferred geometry for placement.
 
@@ -537,14 +572,14 @@ On ordinary laptop and desktop viewports the presence occupies upper centre, spe
 centre, and decisions remain right. The short 1012 × 324 stress layout preserves that same reading
 order with a smaller character and shallower speech band rather than mirroring or recombining it.
 
-`companion-placement.ts` reports `reference-fixed`. The current memory is intentionally backdrop,
+`companion-placement.ts` reports `reference-fixed`. The world behind is intentionally backdrop,
 so its projected rectangle does not reorder answers or move the question. Choices remain on
 the right and dialogue remains below, preserving a stable reading order.
 
 The screen-space presence does not use an in-world home or errand solver. One placement
 model determines where the Companion appears.
 
-Attention now happens inside the stable silhouette. A local gather marks an open question, and the world
+Attention happens inside the stable silhouette. A local gather marks an open question, and the world
 anchor itself carries any required focus or evidence highlight. This keeps the presence findable and
 lets the actual memory point at what the question concerns.
 
@@ -560,16 +595,15 @@ character entity. A future rights-cleared VRM or GLB character would require a s
 asset-provenance, licensing, performance, and accessibility decision; it is not implied by the
 current geometric-avatar reference.
 
-#### CORRECTED 2026-08-30: summon owns the mode transition
+#### Summon owns the mode transition
 
-**DECISION, CORRECTED.** An open Companion conversation is always `converse`. Summoning releases
+**DECISION.** An open Companion conversation is always `converse`. Summoning releases
 pointer lock because choices need a real cursor position; Pointer Lock freezes that position by
 specification. WASD movement remains available relative to the last heading, while clicking the
 world cannot recapture pointer lock until the conversation is dismissed. With lock already absent,
 Escape dismisses the Companion even when the
 custom reply has focus. Choice-set options keep their number bindings as an efficient keyboard
-route, and the next number opens `Other…`; they no longer imply that an open panel may remain in
-`traverse`.
+route, and the next number opens `Other…`; an open panel never remains in `traverse`.
 
 Two properties this must keep. An unavailable option's key does nothing at all rather than falling
 through to the next available option, because a key that silently selects something adjacent
@@ -695,8 +729,8 @@ dialogue panel and the World Index entity detail view), so the two can never div
 
 Clicking an evidence chip does not leave the Atlas. It opens the source image inline, docked to the
 panel, and simultaneously the corresponding anchor in the world pulses. The written claim and the
-spatial world point at the same evidence at the same time. That simultaneity is the product's central
-promise made visible in one gesture.
+spatial world point at the same evidence at the same time. That simultaneity is the evidence rule
+made visible in one gesture.
 
 ### 5.3 Consequence tiers
 
@@ -735,8 +769,8 @@ people, and merging is not deleting.
   the World Index entity detail view. The Companion may never propose a deletion, in any phrasing,
   under any circumstance.**
 
-Tier 3 is out of the MVP cut. The rule stands regardless, so that adding it later cannot smuggle it
-into the dialogue.
+Tier 3 deletion is not offered in the interface. The rule stands regardless, so that adding it
+cannot smuggle it into the dialogue.
 
 ### 5.4 Audit
 
@@ -764,8 +798,9 @@ Ignoring is a first-class response and costs zero input.
 
 **RISK (medium).** Initiative tuning is the most likely thing to feel wrong and cannot be validated
 without real users. The initiative setting is the escape hatch, and "minimal" means ambient only with
-no spontaneous speech at all. Spontaneous initiative is out of the MVP cut for this reason; the
-ambient channel and the counter ship.
+no spontaneous speech at all. Spontaneous initiative is therefore switched off
+(`SPONTANEOUS_INITIATIVE_IN_MVP` in `web/packages/companion-runtime/src/initiative.ts`); the ambient
+channel and the counter are on.
 
 ---
 
@@ -773,11 +808,12 @@ ambient channel and the counter ship.
 
 ### 6.1 World Index
 
-Non-spatial, keyboard-first, and the desktop accessibility equivalent path (2.6). One entity table
+Non-spatial, keyboard-first, and the desktop accessibility equivalent path (2.6), labelled Library in
+the interface (`web/packages/app/src/ui/world-index.ts`). One entity table
 under four facets:
 
-- **Kind:** person / place / object / event / region. A region is an entity too. (The research listed
-  voice and conversation here; both are deferred, see the product specification.)
+- **Kind:** person / place / object / event / region. A region is an entity too. Voice and
+  conversation are not kinds.
 - **Status:** confirmed / needs review / inferred only / user asserted / rejected / merged away.
 - **Presence:** which regions, occurrence count, first and last seen.
 - **Source of knowledge:** user provided / capture supported / inferred. Multi-select.
@@ -899,11 +935,11 @@ The practical test: anything the Companion does must be inspectable and repeatab
 a user who ignores the Companion entirely loses no capability. That matters for a product in
 which the user stays in control of what gets asserted.
 
-**OPEN: an island may be a cluster rather than a single capture.** With five curated captures, one
-island is one capture. With a few thousand travel photographs that is thousands of islands and the
-Atlas is noise. The likely answer is that an island is a place-on-a-trip cluster with individual
-photographs as shards inside it, but this stays open until the real distribution of the corpus is
-measured. The Selection model must not assume one island per capture.
+**CLOSED: an island is a scene group, not a single capture.** The graph client maps each photograph
+to the scene group that holds it, and a photograph no group placed stands alone
+(`groupIslands` in `web/packages/graph-client/src/islands.ts`); a world made from photographs makes
+each place one region ([saved-world entry](saved-world-entry.md#which-photographs-a-personal-source-world-is-composed-from)).
+The Selection model does not assume one island per capture.
 
 
 ### 7.1 The key structural decision
@@ -1040,12 +1076,12 @@ message, a timestamp and an event id. The client maps events to visual state and
 event id on reconnect. If the stream drops, the visual **freezes** rather than continuing to animate
 optimistically, and the label says contact was lost.
 
-**ASSUMPTION (A-29), and it is the caveat the research attached to this entire design: this section is
-only buildable to the extent the pipeline emits real per-stage counters.** If it cannot, the
-counter-bearing stages degrade to breathing plus elapsed time, which is still honest and still better
-than a fake bar, but is a materially smaller design. Experiment: inspect the pipeline stage boundaries
-for available counters, roughly two hours. **The research says explicitly that this should be checked
-first, because everything else in this section depends on the answer.** Verification is first.
+**CLOSED (A-29): the pipeline emits real per-stage counters for the stages it records.**
+`exulanica/ingest/formation.py` folds the `pipeline_event` rows each stage writes into per-stage
+counters, so a resumed stream reports the same numbers as an uninterrupted one, and a stage nothing
+produces is absent from the stream rather than reported as done. `GET /formation/{batch_id}`
+(`exulanica/api/routes/formation.py`) streams them as server-sent events, polling one indexed query
+every two seconds, ending when the batch ends and sending a comment heartbeat.
 
 ---
 
@@ -1075,7 +1111,8 @@ Other accessibility commitments:
   readers. Every entity, every evidence item and every source image is reachable from a flat
   keyboard-navigable list.
 - Full keyboard operation of every function without moving the camera (2.6).
-- Snap turning in fixed increments for keyboard-only and comfort-sensitive users.
+- Snap turning in fixed increments for keyboard-only and comfort-sensitive users, offered as a
+  setting that no renderer path applies (2.4).
 - Field of view and vignette are user settings, not fixed values (2.4).
 - **The reduced-motion default is read from the platform**, not asked for in an onboarding step.
 
@@ -1111,10 +1148,10 @@ decision and replacement bindings.
 
 | # | Item | Settled by |
 | --- | --- | --- |
-| I-1 | Cross-capture co-registration success rate, which gates the shared-frame exception in 1.3 | An experiment that is absent from the plan. Until it exists, do not ship pooled frames |
+| I-1 | Cross-capture co-registration success rate, which gates the shared-frame exception in 1.3 | A joint reconstruction of two real captures ([place plane](place-identity.md)). Until it runs, do not ship pooled frames |
 | I-2 | Renderer (section 10) | Closed by [ADR-0003](adr/0003-renderer-selection.md): PlayCanvas Engine 2.21.4 |
-| I-3 | Per-stage counters, which gate section 8 | A-29, two hours, do it first |
-| I-4 | Layout at three regions: algorithmic or hand-placed (1.4) | Side-by-side comparison on the three real captures, two hours |
+| I-3 | Per-stage counters, which gate section 8 | Closed: `exulanica/ingest/formation.py` counts them (8.4) |
+| I-4 | Layout at three regions: algorithmic or hand-placed (1.4) | Side-by-side comparison on three real captures |
 | I-5 | The Companion uses the fixed centre/right/bottom encounter composition and needs no tether (4.1) | Closed |
-| I-6 | Whether muting stays legible at high mute ratios, and the right cross-fade duration (7.3) | Debug-panel tuning, half a day |
-| I-7 | Nothing further. The evidence reference shape for stills, previously open here, is settled in [domain-and-evidence-model.md](domain-and-evidence-model.md) section 1.5 | Closed |
+| I-6 | Whether muting stays legible at high mute ratios, and the right cross-fade duration (7.3) | Debug-panel tuning |
+| I-7 | The evidence reference shape for stills is settled in [domain-and-evidence-model.md](domain-and-evidence-model.md) section 1.5 | Closed |

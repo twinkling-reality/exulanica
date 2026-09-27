@@ -1,9 +1,9 @@
 # Generated appearance
 
-Status: Track A measured 64 model-made texture sets on exact structure (section 9). Seams sit inside
-the published sets' own range, structure edges kept, every picked tile looked at at 1:1. Nothing has
-been handed to the texture lane and no set is pinned. Track B has not run. The code is
-`ml/appearance/` ([its README](../ml/appearance/README.md)).
+Status: research, not a product surface. Track A measured 64 model-made texture sets on exact
+structure (section 9): seams sit inside the published sets' own range, structure edges are kept,
+and every picked tile was looked at at 1:1. No model-made set is published or pinned, and Track B
+has not run. The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
 
 ## 1. In plain words
 
@@ -15,8 +15,8 @@ model decide where a wall is or what it is made of.
 Two tracks, in order:
 
 - **A. Model-made texture sets.** The procedural recipe keeps the exact relief (bricks, courses and
-  joints where the catalog says); the model paints the colour on it. Candidates go to the texture
-  lane with full records, and the texture lane publishes or not.
+  joints where the catalog says); the model paints the colour on it. Candidates are handed to the
+  [texture package](texture-package.md) with full records, and publishing one is its decision.
 - **B. Structure-to-photo frames.** The bench street is rendered as exact structure (depth, surface
   identity, edges) at fixed poses and along a walk, a model generates frames on that structure, and
   the frames are measured against it and against the procedural look. These are research
@@ -80,8 +80,8 @@ What decided the list:
 
 ## 4. Structure capture
 
-`capture/export-bench.ts` imports the bench's pure `test-street.ts` (lane 16's; read, never edited)
-and writes its geometry as integers: positions in micrometres, normals in millionths, surface
+`capture/export-bench.ts` imports the bench's pure `test-street.ts`, read and never edited, and
+writes its geometry as integers: positions in micrometres, normals in millionths, surface
 coordinates in millimetres. The bench's poses, eye height, camera and default sets live in
 `bench.ts`, which imports PlayCanvas and cannot run in Node, so the exporter copies those lines
 verbatim and `tests/test_bench_capture.py` fails when `bench.ts` stops saying any of them.
@@ -107,7 +107,7 @@ frames at 1280 by 720 and 24 fps (7 m in 5 s, 1 m out from the kerb line, lookin
 `fc44fb81785043901948c8141e517551ed1b3c84203527d5b7629a5ba086f833`.
 
 **The structure lines up with the render.** The exact edges drawn over the bench's own GPU render
-land on its edges pixel for pixel at every pose (`.exulanica/appearance/before/sheets/`).
+land on its edges pixel for pixel at every pose.
 
 Conditioning pictures (`capture/encode.py`) are derived from the layers when a generation's inputs
 are prepared, and each generation record names them by the sha256 of their raw pixels and of the
@@ -122,8 +122,8 @@ file the model read:
   texture's joints into the structure;
 - normals: the world normal in camera axes, for controls that read normals.
 
-A baked tile replaces the bench when the corridor lane bakes a street: the same rasteriser runs over
-tess's verified `render_batch` triangles, and the identity layer then names records.
+Capturing a baked tile instead of the bench, with the same rasteriser over tess's verified
+`render_batch` triangles and records as the identities, is not built.
 
 ## 5. Records
 
@@ -133,14 +133,14 @@ document is refused.
 
 | Profile | Holds |
 | --- | --- |
-| `exulanica.appearance-weights/v1` | a repository at a 40-hex revision; the licence its card declares and the card's sha256, and where that licence is not a standard identifier the sha256 of the licence text this lane read; lineage of any component from elsewhere, with evidence and a pinned source; the selected files, each by LFS sha256 or git blob id |
+| `exulanica.appearance-weights/v1` | a repository at a 40-hex revision; the licence its card declares and the card's sha256, and where that licence is not a standard identifier the sha256 of the licence text read; lineage of any component from elsewhere, with evidence and a pinned source; the selected files, each by LFS sha256 or git blob id |
 | `exulanica.appearance-structure/v1` | the geometry and pose sources by digest; the camera; the legend; each layer by name, encoding and sha256 of its raw bytes; the rasteriser's parameters and a reason for each; the capture code's digest |
 | `exulanica.appearance-generation/v1` | every weights component by role, and the digest of that listing (what a model-made maker names); code commit and source digest; container image by digest; every conditioning picture by pixel and file digest with the structure records it came from; prompt or parameters; seed; sampler settings; whether guardrails ran; GPU, driver, CUDA and library versions; every output by digest |
-| `exulanica.appearance-gpu-run/v1` | provider, instance, GPU, listed rate and where it was read; start and deletion instants; billed seconds; cost at the listed rate rounded up to a micro-dollar; the estimate and its stop at 150 per cent; the generation records produced |
+| `exulanica.appearance-gpu-run/v1` | the provider, instance and GPU; start and deletion instants; billed seconds and what they cost; the estimate and its stop at 150 per cent; the generation records produced |
 | `exulanica.appearance-texture-job/v1` | one session, fixed before it runs: the texture manifest it read, its candidates (backend, weights components, sampler, estimate per image), its targets (a pinned set, its recipe, the prompt, the conditioning roles), the seeds and their rule, the conditioning pictures by digest, and the stop |
 | `exulanica.appearance-staged-inputs/v1` | every file the rented machine receives, by size, digest, kind and source |
 | `exulanica.appearance-results/v1` | what one run produced: each record, output and measurement, what was verified, and whether and why it stopped |
-| `exulanica.appearance-texture-candidate/v1` | what the texture lane is handed: the maker's generation block (models, seed, sampler, map sources), the maps, the measurements, CC0-1.0 and its statements, and the look record |
+| `exulanica.appearance-texture-candidate/v1` | what the texture package is handed: the maker's generation block (models, seed, sampler, map sources), the maps, the measurements, CC0-1.0 and its statements, and the look record |
 | `exulanica.appearance-third-party-look/v1` | every map cut into 1:1 crops covering every texel, what was looked at, what was found, and anything that might be third-party content |
 
 Rules the readers hold:
@@ -151,9 +151,6 @@ Rules the readers hold:
 - **A regeneration is a new version, never a replay.** GPU generation is not bit-exact across
   hardware, drivers or library versions. The stored output bytes are the artifact, and every
   generation record carries that sentence verbatim.
-- **Spend is recorded as it happened.** A run's billed seconds are its interval, its cost is the
-  listed rate times those seconds, and a run past its stop must say why. The provider's billing
-  page is the only authoritative total.
 
 Layers are stored zlib-compressed by the sha256 of their raw bytes, so the compressor never enters an
 identity. PNG is written for models and people and is never an identity, for the reason
@@ -176,7 +173,7 @@ The same rules measure the procedural look and every generated look, so the numb
 - **Texture sets** (`metrics/textures.py`): seam ratio (the wrap difference over the neighbour
   differences beside it), low-frequency share (luminance variance at 4 cycles per tile or fewer,
   which predicts visible repetition), dominant cycles along u and v (a set on a module must show the
-  recipe's count), texel pitch, and decoded bytes as lane 16's binding uploads them.
+  recipe's count), texel pitch, and decoded bytes as the tile runtime's binding uploads them.
 - **Invented geometry**, when a GPU is available: MoGe-2 re-estimates geometry from a generated
   frame and it is compared with the exact depth. A measurement, never a verdict.
 
@@ -205,45 +202,23 @@ construction, which is the range a candidate is compared with); brick shows its 
 and a 16-cycle half bond; texel pitch 0.977 mm (storefront metal) to 2.344 mm (cast concrete and
 limestone); 16,777,212 decoded bytes a 1024 set.
 
-The reports are `.exulanica/appearance/baseline/procedural-frames.json` (sha256
-`42a6f3ad7976201d3a13c09ab8e5894fcf998f2df7568ef12ceba8fdeee1f188`) and
-`published-textures.json` (`7bb5826245e37c244c5229ce82a449512cf0e8b93cc9fd59605330dcc329386e`);
-the numbers are copied into `ml/appearance/evidence/baseline-measurements.log.txt`.
+The numbers are in `ml/appearance/evidence/baseline-measurements.log.txt`, from reports whose
+sha256 it records.
 
-## 7. The GPU plan
+## 7. Where generation runs
 
-- **One machine type:** an NVIDIA RTX PRO 6000 Blackwell, 96 GB, from MassedCompute through
-  Shadeform on Brev, listed at $2.63 an hour on 2026-09-17 (no stop; deleted after every run). Every
-  candidate fits at bf16 except Wan A14B, which runs in fp8. Fallback: an H200 141 GB on Nebius at
-  $5.40 an hour.
-- **A run has a hard ceiling.** A projected spend that would pass it stops the work: delete the
-  machine and report instead. `gpu_run.ceiling_seconds` turns a ceiling into whole billed seconds at
-  the day's rate, floored, so a run cannot pass it by a second: $25 at $2.63 an hour is 34,220 s.
+- **One machine type:** an NVIDIA RTX PRO 6000 Blackwell with 96 GB, rented for a run and deleted
+  after it. Every candidate fits at bf16 except Wan A14B, which runs in fp8.
+- **A run has a stop.** A job states its estimate per image and stops at 150 per cent of it, and
+  the container runs under a hard time limit.
 - **Track B has not run.**
-- **Every run is documented for a person to read**, not only in the ignored evidence directory:
-  `gpu_run.document_section` writes the dated section that is appended to the operator's GPU compute
-  document, which `.gitignore` keeps out of this repository (section 9). It names the provider and
-  instance type, the rate read that day, the instance name, the creation, deadline and deletion
-  instants, the hours billed, the cost at the listed rate, what the run produced by digest, and
-  what it taught including the false starts. The `appearance-gpu-run` record stays beside it as the
-  machine-readable evidence; the section is what a person reads later.
-- **Consent:** each deploy carries a data-sharing consent with the named provider. That consent
-  is accepted before a machine is created.
-- **The instance is recorded twice:** its name, provider and hard deadline the moment it exists,
-  and again when it is deleted. Both instants and the name are in the run record and in that
-  operator ledger.
 - **The smoke job gates the session by machine-checkable conditions**
   (`exulanica.appearance-smoke-gate/v1`): both backends loaded, every output decoded at the size the
   job names, the seam ratio computed on each, seconds per image within 150 per cent of the estimate,
-  no refusal anywhere, spend inside the smoke budget, and no fallback (every record's runtime names
-  an NVIDIA device, and the backends refuse at load time a parameter that is not on the GPU, not the
-  dtype the job named, or on the meta device because a weight did not load). If every check holds
-  the session continues at once, so the machine never idles waiting for an answer; if any fails, or
-  anything surprises the lane, the machine is deleted and the report says which branch was taken.
-- **Local captures take the machine-wide GPU slot** (`.exulanica/bin/gpu-slot`), and a
-  timing-sensitive capture takes both slots in order (`quiet-slot gpu-slot <command>`), because two
-  lanes capturing at once blocked a page's main thread for ten minutes. Nothing about the rented
-  machine changes.
+  no refusal anywhere, and no fallback (every record's runtime names an NVIDIA device, and the
+  backends refuse at load time a parameter that is not on the GPU, not the dtype the job named, or
+  on the meta device because a weight did not load). If a check fails, the machine is deleted and
+  the report says which.
 - **Weights on the rented machine only**, downloaded at the pinned revisions and checked file by
   file against the manifests before a model loads. The Mac never installs torch: model libraries
   are in `ml/appearance`'s `gpu` extra, which only the container installs.
@@ -276,7 +251,7 @@ below is exercised before any GPU is rented.
    image would pass the job's stop at 150 per cent of its estimate, the run stops and says so. The
    container also runs under a hard `timeout`, and the instance is deleted from the Mac.
 6. **The handover.** `handoff.py` builds `exulanica.appearance-texture-candidate/v1` for the texture
-   lane, to its accepted answers (Q4, 2026-09-17):
+   package:
    - the maker's generation block carries **models**: one entry per role naming the model's id, its
      revision and its weights manifest digest, so a reader sees which models ran without fetching;
    - it carries **generation_sha256** and only the fields a reader checks (models, seed, sampler,
@@ -286,16 +261,16 @@ below is exercised before any GPU is rented.
      rebakes from or the generation that made it. A Track A set keeps the recipe's normal and
      occlusion, so those stay rebakeable by anyone with the maker; only the painted colour is not;
    - the set is **CC0-1.0**, with three statements: that Apache-2.0 and MIT place no condition on
-     outputs; that OpenMDW-1.1 is this lane's reading at a pinned revision, with the licence text's
+     outputs; that OpenMDW-1.1 is the reading recorded at a pinned revision, with the licence text's
      sha256 in the weights manifest; and that every map was looked at at full resolution before the
      set was pinned.
 7. **The look.** `look.py` cuts every map into 1:1 crops that cover every texel exactly once and
    records what was looked at and what was found
    (`exulanica.appearance-third-party-look/v1`). A record whose crops do not cover a map, or whose
-   finding is empty, is refused. Anything that might be a logo, lettering or a mark goes to the
-   a human reviewer, who decides.
+   finding is empty, is refused. Anything that might be a logo, lettering or a mark goes to a
+   human reviewer, who decides.
 
-Seamless tiling is the lane's own, because no upstream method for these models is merged: before
+Seamless tiling is this package's own, because no upstream method for these models is merged: before
 each denoising step the latent grid and the control latents are rolled by an offset derived from the
 seed and the step and rolled back after, so no position stays a grid edge; and the VAE encodes and
 decodes with the input wrap-padded by 64 px and the result cropped, so its convolutions see the
@@ -309,12 +284,10 @@ decode.
 
 ## 9. Session 1, measured
 
-One machine, 2026-09-17T21:57:29Z to 2026-09-18T00:05:56Z: MassedCompute RTX PRO 6000 Blackwell 96
-GB through Shadeform on Brev, name `exulanica-appearance-a1`, 7707 billed seconds (2.14 h), $5.63 at
-the day's listed rate. The dated ledger section is in `docs/reference-gpu-compute.md` (a local
-document in this repository, gitignored since b1444b6a), the machine-readable record is
-[`gpu-run-a1.json`](../ml/appearance/evidence/gpu-run-a1.json), and the whole session including its
-three false starts is in [the evidence log](../ml/appearance/evidence/track-a-session-1.log.txt).
+One RTX PRO 6000 Blackwell 96 GB machine ran it, from 2026-09-17T21:57:29Z to
+2026-09-18T00:05:56Z. The machine-readable record is
+[`gpu-run-a1.json`](../ml/appearance/evidence/gpu-run-a1.json), and the whole session, including
+its three false starts, is in [the evidence log](../ml/appearance/evidence/track-a-session-1.log.txt).
 
 The smoke job ran first, 2 generations at 512 px, and its gate passed all seven conditions; that is
 what allowed session 1 to start. Session 1 then ran 64 generations at 1024 px in 1785 s: four
@@ -330,7 +303,7 @@ Measure it again from what the run wrote:
 - **Seams**: over both axes of all 64 outputs, min 756618, median 988545, max 1335650 per million,
   where 1000000 is no seam. The eight published procedural sets, seamless by construction, read
   290000 to 1770000 on the same measure, so every one of the 128 readings sits inside the range
-  the eight published procedural sets occupy. The lane's own tiling (the per-step cyclic roll with the wrap-padded encode and
+  the eight published procedural sets occupy. This package's own tiling (the per-step cyclic roll with the wrap-padded encode and
   decode) is the only reason for that, and this is the measurement of it.
 - **Structure kept**: the share of the conditioning picture's own edges that have an output edge
   within 2 px. Depth conditioning holds everywhere, 97.2 to 100 per cent. Edge conditioning holds on
@@ -339,7 +312,7 @@ Measure it again from what the run wrote:
   smooth painted wall answers dense outlines with almost no edges. Depth is the role for cell-field
   materials; either role serves brick and paving.
 - **Precision is not a pass condition**: a generated tile invents gum, grime and scuffs no
-  conditioning edge asks for, which is the point of the lane. It ran from 194835 (paving a1, the most
+  conditioning edge asks for, which is what the track is for. It ran from 194835 (paving a1, the most
   invented detail) to 1000000 (asphalt and render, almost none).
 - **Module retention**, amplitude at the period the recipe itself states, as a ratio to the published
   set's amplitude at that period, and only for the two makers whose recipes state a module
@@ -365,25 +338,25 @@ at row 616, 48 grey levels below the tile's own median, dashed. The dash period 
 period in that line; the band is centred exactly on a latent row boundary (616 = 8 x 77); it is
 neutral in all three channels; the conditioning picture has no line there; and 1 of the 64 outputs
 carries it. Nothing learned from photographs lands on precisely the autoencoder's cell pitch, so this
-is a defect of the lane's own latent pipeline and not third-party content. Which stage is not
+is a defect of this package's latent pipeline and not third-party content. Which stage is not
 settled: the per-step roll fitted this one output (step 12 shifted the rows by 51, and 128 - 51 = 77)
 and then failed over the population, where 47 per cent of strong lines sit on a boundary the seed's
 schedule visited against 44 per cent expected by chance. The latents were not retained, so per-latent-row
 statistics at each step remain unrecorded. That set is not offered while the defect
 stands.
 
-Nothing has been handed to the texture lane. Track B has not run.
+No candidate has been handed to the texture package, and Track B has not run.
 
 ## 10. Not verified
 
 - Cosmos 3 transfer's memory and speed on a 96 GB card, and whether vLLM-Omni weights several
   controls at once for it: unpublished, and NVIDIA's documents disagree. It would be measured in
   Track B's first hour, and Track B has not run.
-- Seamless tiling on transformer image models: no published method is merged upstream; the lane
-  builds it (cyclic latent shift, circular VAE decode) and holds every set to the seam check.
+- Seamless tiling on transformer image models: no published method is merged upstream; this
+  package builds it (cyclic latent shift, circular VAE decode) and holds every set to the seam check.
 - Whether a generated look beats the procedural one on the bench says little about a whole street:
-  the bench is one wall, a door and a kerb. The inhabited-street look is judged when the corridor
-  bakes a street, at the gate route's own poses, as research references.
+  the bench is one wall, a door and a kerb. The inhabited-street look has not been judged on a
+  baked street at the gate route's own poses.
 - The structure layers' digests were produced on one Mac (arm64); a cross-machine comparison of the
   rasteriser's bytes has not been run.
 - MEASURED 2026-09-17: both backends ran, tiled and decoded on the card, and the tiling schedule

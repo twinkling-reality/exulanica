@@ -5,7 +5,7 @@ authority. Direct user-authored structural editing remains outside the public su
 
 ## Context
 
-Atlas needs to grow from a five-region preview into a long-lived personal world. Re-running local
+When this was decided, the Atlas was a five-region preview that had to become a long-lived world. Re-running local
 placement code is deterministic but not persistent. Renderer entities cannot be the durable model:
 their names, transforms, enabled state, and assets are implementation details, and style previews
 must not mutate navigation or evidence truth.
@@ -79,7 +79,5 @@ fallback, complete provenance, reachable destinations, invalid attachment reject
 rejection, preview isolation, stale-proposal rejection, protected structural rejection, regional
 scope, immutable apply/rollback history, and unknown-profile fallback.
 
-The architectural evidence and follow-up gates are in the Atlas world research account of
-2026-08-30, an operator record that `.gitignore` holds out of this repository.
 The implemented persistence and API contract is in
-[world-style-backend.md](../world-style-backend.md).
+[world version authorities](../world-version-authorities.md).

@@ -3,7 +3,8 @@
 # deployment target is a human decision that has not been made.
 #
 # `docs/deployment.md` is the document this file implements. Read it before changing anything
-# here, in particular section 6 on the two health signals and the wording rules in invariant 10.
+# here, in particular section 6 on the health signals and section 4 on the content store's
+# append-only wording.
 
 name: exulanica
 

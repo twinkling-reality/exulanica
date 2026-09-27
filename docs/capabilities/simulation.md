@@ -1,35 +1,122 @@
-# Simulation runtime
+# People and models in a world
 
-Give created objects movement, interactions, and rules for responding to the world.
+The people in a world are its agents. They live by a routine, the world's owner can hand their
+choices to an open model, and the same hour can be run again under another model to see what each
+one does differently. This guide explains what works, how to use it and where it stops; the
+contracts it links own the exact rules.
 
-## Scope
+## Which worlds have people
 
-The product goal is configurable behavior for objects, environments and synthetic inhabitants.
-A world can support creative play, ongoing social activity, model-driven tasks or controlled
-experiments, according to its declared capabilities. A/B comparisons are one application of this
-runtime rather than its organizing limit.
+A saved world has people once a society is brought into it. Two kinds of saved world can hold one:
 
-The implementation supplies bounded object motion and deterministic society profiles. The
-[society contract](../synthetic-society-contract.md) defines their supported actions, navigation,
-state, replay and deployment requirements. General physics, user-defined world rules, richer
-relationships and arbitrary model controllers require additional implementation and validation.
+| World | Ground its people walk | Where they arrive |
+| --- | --- | --- |
+| Started from the empty authored starter | The ground the starter states | The starter's spawn point |
+| Made from photographs | A floor the world declares in the region its society lives in, drawn as a floor | The region's origin |
 
-Behavior definitions belong to reviewed runtime capabilities. Saved world state references those
-capabilities and their parameters. The API changes supported state; the runtime executes it.
-A package signature does not prove that a runtime supports a behavior.
+Either way the society starts with eight people on a square about 24 metres across, routed over a
+2 metre lattice, as the ground catalog
+[`society-ground.v1.json`](../../assets/catalogs/society-ground/society-ground.v1.json) states. A
+world made from photographs holds one society, in one region. The owned district built from New York
+open data runs a larger living society of its own and appears only in the development preview.
 
-Simulation state is a separate epistemic plane from memory evidence. Synthetic identities, goals,
-actions and outcomes may share places and objects with a memory without becoming claims about what
-happened there. Rendering may interpolate snapshots but may not invent canonical actions or
-positions.
+Which engine runs a society is data. The engine table
+[`society-engines.v2.json`](../../exulanica/world/society-engines.v2.json) states what each engine
+can do, and a society in a saved world is created with the purposeful engine,
+`exulanica-society/v2`: the one whose people an owner may hand to a model and a comparison may run.
+The server gives every world its own seed.
 
-The deterministic society and bounded object motion do not establish a learned predictive
-world model. That claim requires action-conditioned prediction evaluated against held-out future
-observations, calibrated uncertainty, increasing-horizon error measurements and improvement over
-deterministic and no-memory baselines. See
-[the world-memory research program](../world-memory-model.md#7-dynamics-and-the-claim-to-prediction).
-The implemented population's exact state, event, selection, rendering, training and package
-boundaries are in the [synthetic society contract](../synthetic-society-contract.md).
+## What people do
 
-See [delivery milestones](../product-direction.md#subsequent-milestones) and
-[package compatibility](../product-direction.md#package-and-api-boundaries).
+The routine is data too
+([`society-purposeful-activity.v2.json`](../../assets/catalogs/society/society-purposeful-activity.v2.json)):
+people rest at benches, a planter seat or a cafe table, visit a market stall or a planter tree,
+stand a while and stop to talk, walking to the places they use. What a person places changes where
+they go ([world creation](world-creation.md)). In the application, People nearby brings them in,
+the inhabitants panel can send everyone away and bring them back, and playback advances their
+minutes. They keep bounded records of what they observed or were told; they do not learn
+relationships.
+
+Small birds live in a saved world too: every planter tree hosts three, which fly and perch on the
+objects that declare perches. Their flight is computed in a worker process on a clock every viewer
+shares, so everyone watching a world sees the birds in the same places, and it is derived from the
+world version rather than stored. Walking and flight are the two built
+[movement modules](../movement-modules-contract.md).
+
+## Choosing a model for a person or a group
+
+In the panel "Who decides for them", the world's owner chooses an open model for one person or a
+group, up to eight people at once. With no choice, the routine decides. A model is offered when its
+entry in the [model manifest](../../exulanica/models/models.manifest.json) names a verified way it
+answers a choice. `GET /world/versions/{version_id}/society/models` lists the offered models and
+whether this host can ask each.
+
+At each point where the routine would choose for a chosen person, the host asks their model through
+the one hosted policy boundary, which applies the egress allowlist, the budget and the person's
+rights. The model sees the person's situation and options and answers with one of the actions the
+decision contract offers: go somewhere, wait, stand or talk. The engine checks every answer again
+before applying it; a refused answer, like a turn the model leaves unanswered, is decided by the
+routine. Every request and receipt is stored, so a run replays exactly without calling a model.
+
+How a model decides, for the person and for any later role, is the
+[decision roles contract](../decision-roles-contract.md). The person's own rules, the routes and the
+refusals are in the society contract's section
+[a person run by a model their world's owner chose](../synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose).
+
+## Comparing models
+
+A comparison runs the same simulated hour of a saved world once per arm and scores each run from
+what the engine recorded. An arm names who decides for one group of people: a model, their
+routine, or waiting at every choice point. The routine and waiting anchor the score at 1 and 0, and
+a control arm runs one model twice to bound what run-to-run variation alone produces. Everybody
+outside the group keeps what their owner chose for them in every arm, so two arms differ only in
+who decides for the group. Beside each arm's score, the comparison shows the share of turns its
+model answered, refused or left to the routine.
+
+A comparison is defined and run by a local command, never from the application:
+
+```bash
+EXULANICA_BUDGET_USD=<bound> uv run python -m exulanica.orchestration.compare \
+  --workspace <uuid> --world <world id> --version <uuid> --actor <uuid> \
+  --model <provider>/<model id> --model <provider>/<model id> --control --seeds <file>
+```
+
+The bound is required, and every ask of every run stays within it. `--group` or `--group-choice`
+names the group; without either, the group is everybody. The command runs development seeds, and
+its comparisons are never judged: a judged comparison is pre-registered on held-out seeds and
+recorded under `docs/evaluation/`. In the application, Compare models in the world menu shows a
+comparison's verdict and numbers, and one seed's hour from above on each side.
+
+Two judged comparisons found no measured difference in how people fared between Qwen3 235B
+Instruct and Nemotron 3.5 Lightning, first deciding for all eight people of the small square
+([record](../evaluation/2026-09-26-society-model-comparison.json)) and then for a group of four
+([record](../evaluation/2026-09-26-society-group-comparison.json)). In the second, the group still spent its time visibly differently:
+mostly resting under Qwen3 235B Instruct, and resting less while standing and talking more under
+Nemotron 3.5 Lightning. The [society experiments](../society-experiments.md) contract owns the comparison
+rules, the score and these results.
+
+## Experiments
+
+A society experiment runs paired scenarios with one supported intervention and keeps the raw
+outcomes, a control and replay ([society experiments](../society-experiments.md)).
+
+## Reading it from another program
+
+A society, its events and replay, the owner's model choices, each stored decision and each
+comparison can be read through the authenticated API; the
+[World API guide](world-api.md#people-and-models) lists the routes. No recorded run of a client
+other than the browser has read a comparison.
+
+## What is not built
+
+- Starting a comparison from the application.
+- Any model role other than a person. Traffic, animals, weather and an economy are not run by
+  models: the birds follow their flight module, and road traffic exists as a deterministic
+  simulation, `exulanica/traffic`, that nothing in the application calls.
+- A model choice in the owned district's living society, whose engine takes none.
+- Relationships that evolve and shape later choices, and world rules a person configures.
+- A retraining loop: runs are not exported for training.
+
+The society is a deterministic simulation with bounded model choices, not a prediction of what real
+people would do. The [first milestone](../product-direction.md#first-milestone) and the
+[milestones after it](../product-direction.md#subsequent-milestones) state the delivery order.

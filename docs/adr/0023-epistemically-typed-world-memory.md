@@ -70,11 +70,13 @@ queryable.
 Models remain sensors, proposers, generators, or predictors behind typed boundaries. They do not
 become state authority by producing a plausible output.
 
-## Current capability wording
+## Capability wording
 
-“Personal World Memory Model” names the complete system architecture and research direction.
-In the terminology of machine-learning research, the implementation provides an
-evidence-grounded descriptive world-memory substrate with bounded deterministic behaviors.
+When this was decided, the architecture was named “Personal World Memory Model”. That name no
+longer describes the product, which is Exulanica: Worlds for AI Agents; the world state this
+record decides is the foundation the agents in a world act on. In the terminology of
+machine-learning research, the implementation provides an evidence-grounded descriptive
+world-state substrate with bounded deterministic behaviors.
 
 Exulanica must not claim a general learned predictive world model until action-conditioned,
 held-out future prediction satisfies the gates in

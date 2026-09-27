@@ -1,20 +1,22 @@
 # Authored world versions and created objects
 
-Status: **DECISION** and **IMPLEMENTED** for alternate world versions, authored object add/move/
-remove/behaviour/undo, durable environment placement, the reviewed asset registry, the bounded
-object-behaviour registry, and the opt-in environment-instances 1.0 package extension. Object
-rendering and bounded-motion controls have synthetic browser coverage, and the authored-world
-1.0 package extension exists. Unified retrieval, the conversational authoring service, and
-complete personal-scene visual acceptance are not implemented.
+This contract owns a world's authored plane: alternate versions of a world, the objects a person
+places in them, the reviewed asset and behaviour registries those objects draw from, arrangements
+of several objects placed in one request, durable environment placements, the edit log, undo,
+concurrency and reopening. Object rendering and bounded-motion controls have synthetic browser
+coverage, and the authored-world and environment-instances package extensions project this state.
+Authored objects are not a kind of [unified retrieval](world-composition-contract.md#unified-queries-and-filters),
+the Companion places no objects, and visual acceptance of objects in a scene made from photographs
+is not established.
 
 This is the fourth world plane under [ADR-0007](adr/0007-world-composition-and-customization.md).
-The three that exist are appearance ([world-style-backend.md](world-style-backend.md), migrations
-0017 and 0023), structural authority ([spatial-world-authority.md](spatial-world-authority.md),
-migration 0020) and interaction policy (migration 0021). All three share one shape: immutable
-versions, one mutable current pointer, a preview lifecycle and compare-and-swap. This plane shares
-the discipline and not the lifecycle, for the reasons in section 1. It implements the World state
-contract in [product-direction.md](product-direction.md) and steps 2, 3 and 4 of the first
-milestone. The implementation is migration `0042_authored_world_objects.sql`,
+The other three, structure, appearance and comfort settings, are the
+[world version authorities](world-version-authorities.md), and all three share one shape:
+immutable versions, one mutable current pointer, a preview lifecycle and compare-and-swap. This
+plane shares the discipline and not the lifecycle, for the reasons in section 1. It implements the
+[World state contract](product-direction.md#world-state-contract) and the durable creation and
+bounded interaction gates of the [saved-world foundation](product-direction.md#saved-world-foundation).
+The implementation is migration `0042_authored_world_objects.sql`,
 `exulanica/world/objects.py`, `exulanica/world/object_repository.py`,
 `exulanica/world/edit_kinds.py`, `exulanica/world/authored_delta.py`,
 `exulanica/world/assets.py`, migration `0050_durable_environment_composition.sql`,
@@ -34,6 +36,8 @@ milestone. The implementation is migration `0042_authored_world_objects.sql`,
 - [9. Verification](#9-verification)
 - [10. Opening the first alternate from composed sources](#10-opening-the-first-alternate-from-composed-sources)
 - [11. Durable environment instances](#11-durable-environment-instances)
+- [12. Arrangements of several objects](#12-arrangements-of-several-objects)
+- [13. What a world's society reads from its objects](#13-what-a-worlds-society-reads-from-its-objects)
 - [Bounded scene-extraction preparation](#bounded-scene-extraction-preparation)
 - [Authored district object coordinates](#authored-district-object-coordinates)
 
@@ -41,11 +45,10 @@ milestone. The implementation is migration `0042_authored_world_objects.sql`,
 
 ## 1. The decision: a separate plane, bound to the snapshot the way appearance is
 
-The question this document had to answer first was whether an alternate world version and an
-authored object are a new element kind plus a version lineage on the existing structural snapshot
-plane, or a plane of their own. They are a plane of their own, referencing the structural snapshot
-as its source. Five properties of the existing plane decide it, and each is a property of the code
-rather than a preference.
+An alternate world version and an authored object could have been a new element kind plus a
+version lineage on the structural snapshot plane. They are a plane of their own, referencing the
+structural snapshot as its source. Five properties of the structural plane decide it, and each is a
+property of the code rather than a preference.
 
 **The structural element schema is closed, deliberately.** `_topology_elements` in
 `exulanica/world/structure.py` calls `_exact_keys` with exactly `element_id`, `owner`, `module`,
@@ -63,13 +66,11 @@ burn a permanent identity row, and undo is not a composition.
 rejects UPDATE and DELETE on eight tables, and `world_structure_snapshot` is
 `unique (workspace_id, world_id, revision)` behind a single `world_structure_state` pointer. One
 add, one move and one remove would be three full recompositions with four recomputed section
-digests each. Two alternate versions of one place could not coexist at all, which is what
-product-direction means by "existing component snapshots do not establish complete world
-branching".
+digests each. Two alternate versions of one place could not coexist at all.
 
-**There is deliberately no public topology mutation route.** ADR-0007 and world-style-backend.md
-both state it, and `WorldStyleRepository.register_topology` is named as the internal composer
-handoff. Routing a person's edits into the composer plane would revoke that guarantee rather than
+**There is deliberately no public topology mutation route.** ADR-0007 and the
+[world version authorities](world-version-authorities.md#structural-authority) both state it, and
+`WorldStyleRepository.register_topology` is the internal composer handoff. Routing a person's edits into the composer plane would revoke that guarantee rather than
 extend it.
 
 **The structural plane has no undo.** Appearance has rollback-by-append; structure has preview,
@@ -168,10 +169,9 @@ The delta has four parts, and the version stores all four:
 Source-element suppression and source-element transform are stored, digested, read back and
 tested, because the World state contract requires an alternate version to store removals and
 transforms of its source and because the package extension cannot be specified against a data
-contract that is missing half of the delta. Their public mutation route is deliberately not opened
-in this slice: suppressing a structural element changes what a person can reach, and that is a
-protected-value review, not an object edit. Until that review exists, only the reviewed composer
-writes them.
+contract that is missing half of the delta. They have no public mutation route: suppressing a
+structural element changes what a person can reach, which is a protected-value review rather than
+an object edit, so only the reviewed composer writes them.
 
 ## 3. A created object
 
@@ -237,7 +237,7 @@ parameter is `integer` with an inclusive minimum and maximum, `choice` over at l
 `toggle`. An unknown key, an unknown version, an unknown parameter, a missing parameter, a wrong
 kind, and an out-of-range value all fail closed with `invalid_object_data`.
 
-The one seeded behaviour is the one the first milestone names.
+One behaviour is seeded.
 
 | Key | Version | Parameters |
 | --- | --- | --- |
@@ -332,8 +332,8 @@ defaulting. The three `(asset_key, content_sha256)` pairs 0042 pinned become obj
 committed character import manifests name become components, and any other row stops the migration
 with an error that names it. The migration reads nothing outside the database.
 
-Three small CC0 assets are seeded. Their bytes are **generated deterministically** by
-`exulanica.world.assets`, not committed, which is the rule `tests/conftest.py` states for the
+The seeded objects' bytes are **generated deterministically** by `exulanica.world.assets`, not
+committed, which is the rule `tests/conftest.py` states for the
 Python suite's images: it carries no binary fixture, and a generated asset has an exact
 reproducible digest that the migration can pin. `web/` does commit binary fixtures; this plane
 follows the backend rule, not that one. They are original geometry authored for this repository and
@@ -397,15 +397,11 @@ The registry row is the reviewed decision; the store holds the bytes; the two ar
 a migration cannot write to an object store and should not pretend to.
 
 The application's lifespan calls it at boot, after the schema check and before the derivative
-worker starts. It is idempotent under content addressing, so a warm start costs three hashes of
-about 800 bytes and writes nothing.
-
-Three placements were considered and two rejected. The `exulanica-db` command runs migrations and
-role grants once, which is the right moment, but the composition does not mount the media volume
-into that container, so it cannot reach the store. `build_services` constructs the store and would
-be the tidiest line, but it resolves configuration and returns, and no test calls it: every test
-builds a `Services` by hand, so seeding there would leave the one path a deployment depends on
-unexercised. The lifespan runs for a hand-constructed `Services` too, which is why
+worker starts (`exulanica/api/app.py`). It is idempotent under content addressing: a warm start
+hashes every catalog kind, the flying kinds' components and their licence texts again and writes
+nothing. The `exulanica-db` command cannot seed, because the composition does not mount the media
+volume into that container, and `build_services` would leave the seeding unexercised, because tests
+build a `Services` by hand. The lifespan runs for a hand-constructed `Services` too, which is why
 `tests/test_world_objects_api.py` seeds nothing and asserts the bytes are present anyway.
 
 The call is deliberately not wrapped in `try`/`except`. A store this cannot write is a store the
@@ -537,6 +533,8 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/behaviour` | Give one object a reviewed behaviour, replace it, or take it away with `null` |
 | `POST` | `/world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
+| `POST` | `/world/versions/{version_id}/arrangements/preview` | Where an arrangement's objects would stand, or its refusal; writes nothing |
+| `POST` | `/world/versions/{version_id}/arrangements/apply` | Add an arrangement's objects as ordinary edits |
 | `GET` | `/world/assets` | The reviewed assets a person may place, with availability, each kind's use and what inhabitants do there |
 | `GET` | `/world/assets/{asset_key}` | One reviewed asset of any kind, and whether it may be placed |
 | `GET` | `/world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
@@ -567,13 +565,16 @@ The problem codes are distinct, because the recovery differs:
 | `409` | `busy` | `POST /world/versions` only: another write was in flight and nothing was written; branch again |
 | `409` | `invalid_object_state` | Do not move, remove or change the behaviour of an already-removed object, re-add an existing id, set the behaviour an object already has, or undo an empty history |
 | `409` | `invalidated_source_version` | The source was deleted; branch from a live snapshot instead |
+| `409` | `stale_saved_world_entry` | An edit bound to a saved world whose resume point moved; reload ([saved-world entry](saved-world-entry.md#mutation-and-reopen)) |
 | `424` | `unavailable_asset` | Restore the reviewed bytes; an addition is refused, and the recorded state renders without a substitute |
+| `424` | `unavailable_society_input` | A purposeful society on the version cannot take the edit as its input; the edit rolls back |
 | `404` | `unknown_reference` | Absent and cross-workspace ids are indistinguishable |
 
-`unknown_reference` and `unavailable_asset` reuse the existing application error classes and their
-existing handlers. The four object-edit codes are mapped inside `exulanica/api/world_edit.py`, following
-the local `_problem` helper that `world_write.py` already uses, so registering this surface adds no
-new global exception handler.
+`unknown_reference` and `unavailable_asset` reuse the application-wide error classes and their
+handlers. The edit codes are mapped once, in `OBJECT_PROBLEMS` in `exulanica/api/world_edit.py`,
+which every authored-edit route shares, so this surface adds no global exception handler. When the
+running application has no society input adapter for a purposeful society on the version, an edit
+answers `409 invalid_object_state` and writes nothing.
 
 ## 7. Wire shape
 
@@ -682,8 +683,10 @@ authored object, and counts the other planes' rows across an object edit to show
 writes the other's tables.
 
 `tests/test_world_objects_api.py` covers the full add, move, remove and undo cycle over HTTP, the
-reviewed asset registry including byte and licence delivery, and all six problem codes in the
-table above.
+reviewed asset registry including byte and licence delivery, and the codes `invalid_object_data`,
+`stale_object_base`, `invalid_object_state`, `invalidated_source_version`, `unavailable_asset` and
+`unknown_reference`. `busy` is covered by `tests/test_version_branch_authorization.py`, and
+`unavailable_society_input` on both object routes by `tests/test_composition_authority_postgres.py`.
 
 `tests/test_reviewed_asset_placeability.py` publishes the committed character catalog through its
 own publish step and reads it back through the routes: the list holds only the catalog's kinds, every
@@ -702,20 +705,23 @@ parity described in section 5, and `tests/test_authored_delta.py` holds golden s
 every delta schema version and requires every section to be passed by keyword.
 
 Each invariant carries a negative control: a test that the guard refuses the thing it claims to
-refuse, rather than passing because the operation never ran. Two of them are regressions with a
-recorded cause. An object id that Python accepted and the schema refused reached the caller as a
-500 rather than a 422, twice: once because the two regexes differed, and once because Python's
-`$` also matches before a trailing newline where PostgreSQL's does not. Both are pinned.
+refuse, rather than passing because the operation never ran. The object id rule is pinned where
+Python and PostgreSQL could disagree: the two patterns are the same string, and a trailing newline,
+which Python's `$` accepts and PostgreSQL's does not, is refused as a 422 rather than reaching the
+caller as a 500.
 
 ## 10. Opening the first alternate from composed sources
 
 `POST /world/versions/bootstrap` accepts `base_topology_digest` (the value returned by
 `GET /world/styles/current`) and an optional `title`. It accepts no source slots, evidence,
-placements or replacement topology from the caller. The existing object placement button offers
-this action when no alternate exists, and sends it only after the person confirms. Opening a
-version does not place the selected object; the person then confirms that separate edit.
+placements or replacement topology from the caller. Making a world from photographs calls it to
+open that world's first version ([saved-world entry](saved-world-entry.md#entry-and-creation)), and
+the object placement button offers it when no alternate exists, sending it only after the person
+confirms. Opening a version does not place the selected object; the person then confirms that
+separate edit.
 
-`bootstrap_world` is shared by this route and `prepare_sandbox_world`. Under the structural
+`bootstrap_world` (`exulanica/world/bootstrap.py`) is shared by this route and
+`prepare_sandbox_world` (`exulanica/orchestration/judge_seed.py`). Under the structural
 workspace lock it checks the caller's digest, reads only that world's current composed contract,
 and opens the first snapshot through structural preview/apply. Every source gets an element with
 its original slot key and evidence binding, including missing evidence and world-owned slots.
@@ -725,8 +731,9 @@ contracts and other worlds do not contribute slots. Composition takes the same l
 The snapshot's foreign key requires a contract keyed by the structural topology digest. Bootstrap
 registers that derived contract with the exact original source rows through the shared immutable
 `register_topology_history` writer. It never activates the derived contract or writes appearance
-state. Ordinary composition still uses `register_topology` to register and activate a contract. The structural digest and composed digest
-are different identities; neither is substituted for the other. `/world/source-media` and the
+state; ordinary composition uses `register_topology` to register and activate a contract. The
+structural digest and composed digest are different identities; neither is substituted for the
+other. `/world/source-media` and the
 current composed digest remain unchanged, including across a retry with the original caller token.
 The preservation option on structural apply refuses any candidate other than the exact plain
 composition of the current contract and refuses a non-initial snapshot.
@@ -736,10 +743,10 @@ does not invent gallery spacing, collision, or a measured place. That unplaced l
 reconstruction and is not reviewed-source materialization. Authored objects remain region-local
 deltas against the immutable snapshot, so a subsequent source re-compose leaves them intact.
 
-Style bound to composed topology T1 meeting structural snapshot T2 is classified by
-`classify_structure_style_compatibility`. The same `compatibility_key` is family binding only.
-Hex equality between T1 and T2 is not the reason for compatibility. An existing current snapshot
-is never replaced. Bootstrap reuse reports snapshot regions, not a later composed region's list.
+Style bound to one composed topology meeting a structural snapshot of another is classified by
+the [plane-typed classifier](world-version-authorities.md#structure-and-appearance-compatibility)
+(`bootstrap_initial`, `bootstrap_reuse`). Bootstrap reuse reports snapshot regions, not a later
+composed region's list.
 
 The response contains `snapshot` (`applied` or `reused`), `snapshot_id`, `regions`, `version`
 (`created` or `reused`), `version_id` and `state_sha256`. An existing current snapshot is never
@@ -751,9 +758,9 @@ first alternate is created from it. Invalidated current snapshots or selected ve
 request creates no snapshots, previews, versions, topology contracts or audit events. A failure
 opening the alternate rolls back the snapshot and its preview as well.
 
-Verification is in `tests/test_world_bootstrap.py`, using PostgreSQL and the HTTP surface. No
-migration is required. UI scope: only `web/packages/app/src/composition/objects.ts` changes, reusing
-the existing placement button and confirmation surface.
+Verification is in `tests/test_world_bootstrap.py`, using PostgreSQL and the HTTP surface. In the
+browser, the object placement button in `web/packages/app/src/composition/objects.ts` offers the
+bootstrap and its confirmation.
 
 ## 11. Durable environment instances
 
@@ -826,6 +833,60 @@ extraction, retained-database writes and real-scene visual validation remain out
 implemented environment-instance scope. The existing reviewed CC0 asset registry and its byte
 semantics are unchanged.
 
+## 12. Arrangements of several objects
+
+An arrangement is several world objects a person asks for in one request, such as the small
+square: a tree between two benches, with a market stall, a planter seat and a cafe table behind
+it and a lamp post at each front corner. The
+[arrangement catalog](../assets/catalogs/world-objects/world-arrangement.v1.json) states each
+arrangement once: its title and summary, how far in front of the person it stands, and its
+placements, each a kind of the world object catalog at a position and a number of quarter turns in
+the arrangement's own frame. `exulanica/world/arrangements.py` reads it, and
+`exulanica/api/routes/world_arrangements.py` is its transport.
+
+The request carries references and intent only: the version by path and `world_id`, the
+`base_state_sha256` the caller read, the arrangement's key and version, where the person stands and
+faces (`viewer`: `x_mm`, `z_mm`, `yaw_microradians`, and `region_id` in a world of several regions),
+and the `origin_role` the person gives every object, never inferred. Where each object goes is
+resolved on the server: the heading is taken to the nearest quarter turn, the arrangement's centre
+is its declared distance ahead of the person and then moved to the nearest node of the society's
+route lattice, and the arrangement is turned to face the person. In a world made from photographs
+it stands on the declared floor of the region the person names
+([saved-world entry](saved-world-entry.md#made-world-placement-boundary)).
+
+Preview and apply call one resolver, so they cannot disagree about one stored state; preview writes
+nothing, and apply resolves again in its own transaction, so it needs no token from preview. Apply
+runs in the same transaction wrapper as every authored edit, with the optional saved-entry binding,
+and adds each object with `add_object`, in the arrangement's order and each against the state the
+one before it left. Every object is one change in the version's history, taken back one at a time,
+newest first, by the version's undo, and a refusal part way writes nothing. The objects carry the
+origin role the person gave; the arrangement is named in the answer (`added_object_ids`), not
+stored on them. It brings no inhabitant into a world.
+
+A refusal is `409 arrangement_refused` with the reason code as its detail, from the closed set
+`ARRANGEMENT_REFUSALS`: `arrangement_unknown`; `arrangement_needs_authored_ground` when the world
+has no authored ground or declared floor the society can read there, or several regions and none
+named; `arrangement_outside_ground` when an object or a place its users stand at would lie past a
+navigation clearance inside the ground's edge; `arrangement_covers_arrival` when an object would
+stand where people arrive; `arrangement_overlaps` when it would stand within two clearances of an
+object the world holds or take a place people stand at to use one; and the ordinary edit refusals
+`stale_base`, `source_invalidated`, `asset_bytes_unavailable`, `invalid_placement` and
+`subject_already_present`. `tests/test_world_arrangements.py` covers the placements, preview and
+apply naming each refusal alike, a refusal part way writing nothing, undo taking the objects back
+one at a time, and a saved world's entry advancing with apply;
+`web/packages/app/test/arrangement.test.ts` covers the browser's request and the words it holds for
+each refusal code.
+
+## 13. What a world's society reads from its objects
+
+A saved world's society reads the objects of its version: each accepted authored edit that changes
+what the society reads appends a full immutable society input in the edit's own transaction, and a
+purposeful society that cannot take that input refuses the edit (`424 unavailable_society_input`),
+which rolls it back ([society contract](synthetic-society-contract.md#authored-edits-and-inability-to-act)).
+What people do at each kind, its places, seats and stays, is the `use` and `activity` the asset
+routes serve (section 4). An object carrying a behaviour makes the society's input unavailable
+until the behaviour is taken away (section 3), and an object in another region of a made world is
+no part of this region's society's input.
 
 ## Bounded scene-extraction preparation
 

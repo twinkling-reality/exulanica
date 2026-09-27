@@ -1,16 +1,29 @@
-# Personal admission and re-screening
+# Personal admission and model rights
 
-A personal photograph is admitted under account authority, screened for people, and read by a
-model only under a personal model right. This page is the contract for all three.
+A person can build part of a world from their own photographs. This contract owns how those
+photographs are admitted under account authority, which models may read them (the personal model
+right), and which trainer may read them (the scene training right). Person regions, masking and the
+screening that permits geometry are [person-presentation-consent.md](person-presentation-consent.md);
+serving photographs and geometry under current permission is
+[asset-read-currency.md](asset-read-currency.md).
+
+## Contents
+
+- [Personal model rights](#personal-model-rights)
+- [Scene training right](#scene-training-right)
+- [Not covered](#not-covered)
+- [Captures screened before model rights](#captures-screened-before-model-rights)
+- [Ordinary API batch path](#ordinary-api-batch-path)
+- [Isolated rehearsal command](#isolated-rehearsal-command)
+- [Evidence](#evidence)
 
 ## Personal model rights
 
 A screening receipt answers whether a photograph may be looked at (`person_detection_only`) or
-become geometry (an eligible human review). Neither names a model or a destination, so a receipt
-recorded for one model used to let every other model, local or hosted, receive the same bytes.
-Migration 0073 adds a separate object, the personal model right, and no byte of a personal
-photograph reaches a model unless one is current for that model and that destination. A right is
-not a screening and a screening is not a right: every model read requires both.
+become geometry (an eligible human review); it names no model and no destination. The personal
+model right (migration 0073) does: no byte of a personal photograph reaches a model unless a right
+is current for that model and that destination. A right is not a screening and a screening is not
+a right: every model read requires both.
 
 A right (`personal_model_right`, workspace isolated under row-level security) binds:
 
@@ -24,7 +37,7 @@ A right (`personal_model_right`, workspace isolated under row-level security) bi
 - the personal authority it was granted under, the account holder that authority names as
   `granted_by`, the grant time, a required expiry and a purpose;
 - a withdrawal (`withdrawn_at`, `withdrawn_by`), which is final. Rights are never deleted and
-  nothing else about them changes; a different model, destination or term is a new right.
+  nothing else about them changes; a different model, destination or term is another right.
 
 The receipt is canonical JSON bound by SHA-256, and the database refuses a receipt that disagrees
 with its columns, a grantor who is not the authority's account holder, an authority that was not
@@ -96,9 +109,9 @@ the photograph be indexed again, and the search ranks the entry made under it: a
 only while the stop names it and its purge has not destroyed it, and the stop's record stays. An
 entry is made again only after the purge, since indexing skips a photograph whose entry is still
 stored. `tests/test_search_entries_on_stop.py` holds this through the runtime and purge roles, and
-`tests/test_search_entry_granted_again.py` the right granted again. A restore
-writes the stop again from its checkpoint before it replays the stop's tombstone, so a backup taken
-before the stop comes back with the right stopped and its entries deleted
+`tests/test_search_entry_granted_again.py` the right granted again. A restore writes the stop again
+from its checkpoint before it replays the stop's tombstone, so a backup taken before the stop comes
+back with the right stopped and its entries deleted
 ([ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md)).
 
 **Where it is enforced.** The vision stage (hosted), the depth stage and the segmentation stage
@@ -125,16 +138,47 @@ refusal leaves the capture succeeded, sends nothing, and is recorded as the `mes
 `capture_succeeded` event, readable at `GET /operations/derivative-jobs/{job_id}/events`. Name the
 `embedding` role in `model_rights`, beside `vision`, to grant both in one admission.
 
-**Not covered yet.**
+## Scene training right
 
-- Scene pose (COLMAP, classic feature matching with no learned weights) runs under the scene
-  privacy admission only. Gaussian-splat training runs a learned perceptual metric (LPIPS) in its
-  container on whichever host runs the scene worker, and asks for no model right. Until both
-  require a right naming the model and the host, neither is to be run over personal captures, on a
-  GPU or on a remote machine.
+Training a scene reads photographs on a trainer host and leaves an artifact that outlives any grant,
+so it has its own right (migration 0080, table `scene_training_right`,
+`exulanica/ingest/training_rights.py`), separate from the personal model right and from the
+dataset-export training consent of migration 0039. A right names one photograph and its exact
+bytes, the operation `scene_training`, the personal authority it was granted under with that
+authority's account holder as grantor, a purpose, a grant time, a required expiry and a
+destination: `local-process`, an https origin, or a rented machine spelled
+`rented-host:<provider>/<instance>`. Loopback spellings are refused, because a rented machine
+reached through a tunnel presents itself as localhost and a right recording that spelling would say
+the bytes never left the machine. A right names no model: what outlives the grant is the artifact,
+which `scene_training_artifact` binds to the rights that permitted it when it is published.
+
+A training job states its destination in its build inputs (`scene_training_destination`, set by
+`enqueue_exact_scene_reconstruction(..., training_destination=...)`). For every personal member of
+the job, the database refuses the member insert without a current right for that destination, so
+the run cannot be queued, and refuses the artifact insert that would publish anything if the right
+lapsed during the run. Withdrawing a right cancels any queued, running or failed training job that
+contains the photograph and writes a `scene_training` tombstone (migration 0082) whose cascade
+queues the artifacts trained from that photograph for destruction while the photograph itself
+survives ([domain-and-evidence-model.md](domain-and-evidence-model.md) section 6.2). A restore
+replays the withdrawal ([ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md)). Synthetic and
+benchmark captures need no training right.
+
+No API route or application surface grants or withdraws a scene training right:
+`grant_training_right` and `withdraw_training_right` in `exulanica.ingest.training_rights` are its
+only writers, so an account holder's photograph reaches a trainer only through an operator who calls
+them. The read-side check `require_artifact_training_right` refuses a withdrawn artifact under the
+final read check, but no route calls it; a published trained scene stays readable until the purge
+worker destroys its artifacts.
+
+## Not covered
+
+- Scene pose (COLMAP, classic feature matching with no learned weights) runs under scene admission
+  and screening only. Gaussian training runs a learned perceptual metric (LPIPS) inside the trainer
+  container; the scene training right names the photographs and the destination host, not that
+  metric.
 - Place alignment's joint reconstruction stages original photographs for pose under a deletion
   check only. No API or worker path calls it; a verification script and tests do.
-- Benchmark captures keep their recorded license as their model permission; no per-model right
+- Benchmark captures keep their recorded licence as their model permission; no per-model right
   applies to them.
 - The observation half of the final check restates `privacy_screening_allows_observation`, whose
   detection-only branch does not consult withdrawn people or tombstoned entities, so an unmasked
@@ -147,20 +191,21 @@ refusal leaves the capture succeeded, sends nothing, and is recorded as the `mes
 - The frontier demonstration and its preflight check screening receipts but not rights; a personal
   capture without a right is reported with vision unavailable rather than refused up front.
 
-**Existing data.** Captures screened before migration 0073 have no right, and the migration writes
-none. Their receipts keep their meaning, but no model receives their bytes until the account
-holder grants a right. The detection pass of the ordinary batch path, which used to send every
-admitted photograph to the hosted vision model, now sends nothing unless the batch names the
-vision role. Caption vectors stored before this change stay, and no new caption text about a
-personal capture is sent until its account holder grants the embedding role. The migration path is
-to admit the same captures again with `model_rights`.
+## Captures screened before model rights
+
+A capture screened before migration 0073 has no right, and the migration wrote none. Its receipts
+keep their meaning, but no model receives its bytes until the account holder grants a right, which
+admitting the same capture again with `model_rights` does. The ordinary batch path's detection pass
+sends nothing to the hosted vision model unless the batch names the vision role. Caption vectors
+stored before model rights stay, and no caption text about a personal capture is sent until its
+account holder grants the embedding role.
 
 ## Ordinary API batch path
 
 `POST /intake` returns exact capture IDs and original digests. Send those captures to
 `POST /personal-admission` as one `members` inventory. The route uses the ordinary API connection,
 including its public schema, authenticated workspace and actor. It does not provision or migrate
-schemas. The CLI below retains its isolated-schema restriction.
+schemas; the rehearsal command below keeps its isolated-schema restriction.
 
 The JSON body contains `operation` (`detect` or `review`), `purpose`, `authority` (the same three
 fields as the command), `recorded_at`, and `members`. Each member contains `capture_id`, `sha256`,
@@ -186,22 +231,21 @@ each role the app offers, with the notice a person reads before allowing it and 
 admission the app offers it with: `review` for `depth`, `detect` for `vision`, `embedding` and
 `reasoning_cheap`. An offered role's entry must carry that notice exactly, and any other text, or
 none, is refused; any other role is granted only with no notice. The server records one right per
-member for every model the role can reach, under that member's new personal authority, granted by
-the session actor at `recorded_at`, and the authority's scope records each role's term and notice.
-Each role appears once, and each term must end in the future and no later than the authority.
-`depth` names the MoGe checkpoint the manifest pins as `local_roles.depth`, the one the derivative
-worker loads. The whole list is validated before any receipt is written. Each response receipt
-carries `model_right_ids` and `model_rights` (identity, destination, term and receipt digest, never
-the purpose). A batch that names no role records no right, and the worker then sends its photographs
-to no model. A replay with the same `request_id` reports each granted right as `current` or `ended`,
+member for every model the role can reach, under that member's personal authority, granted by the
+session actor at `recorded_at`, and the authority's scope records each role's term and notice. Each
+role appears once, and each term must end in the future and no later than the authority. `depth`
+names the MoGe checkpoint the manifest pins as `local_roles.depth`, the one the derivative worker
+loads. The whole list is validated before any receipt is written. Each response receipt carries
+`model_right_ids` and `model_rights` (identity, destination, term and receipt digest, never the
+purpose). A batch that names no role records no right, and the worker then sends its photographs to
+no model. A replay with the same `request_id` reports each granted right as `current` or `ended`,
 and `GET /personal-admission` lists the rights the actor granted over each source, each with
 `notice_current`, true only when the server states words for the right's role and the right was
-granted against exactly those words. Neither answer is a permission. A search right granted
-against the role's earlier words, which said the search entries already made would stay, is listed
-with `notice_current` false, and the drawer shows it as allowed without the wording shown; stopping
-it deletes those entries as well, which removes more than those words said and nothing they
-promised to keep for the person.
-`POST /personal-admission/model-rights/{right_id}/withdraw` ends one right.
+granted against exactly those words. Neither answer is a permission. A search right granted against
+the role's earlier words, which said the search entries already made would stay, is listed with
+`notice_current` false, and the drawer shows it as allowed without the wording shown; stopping it
+deletes those entries as well, which removes more than those words said and nothing they promised
+to keep for the person. `POST /personal-admission/model-rights/{right_id}/withdraw` ends one right.
 
 For `review`, supply `reviewed_by_name`, `attestation`, and either `no-person` or `confirmed-regions`
 on every member. The attestation must exactly read:
@@ -210,55 +254,33 @@ on every member. The attestation must exactly read:
 
 The caller supplies that statement; the server never supplies it for them. A no-person review is
 refused when regions remain. A confirmed-regions review requires every proposal to have been
-confirmed or explicitly removed. Optional `edits` use the command's existing format. The named
-review and statement are retained in the authorization scope, which is digest-bound into the same
-human-screening receipt that the command writes. The response's `eligibility_state` is authoritative:
-a recorded review can remain blocked until current masks exist. Account authority and review do
-not establish a subject's likeness consent.
+confirmed or explicitly removed. Optional `edits` use the command's format. The named review and
+statement are retained in the authorization scope, which is digest-bound into the same
+human-screening receipt that the command writes. The response's `eligibility_state` is
+authoritative: a recorded review can stay blocked until current masks exist. Account authority and
+review do not establish a subject's likeness consent.
 
 `POST /identity/subjects/link` accepts `regions: [{capture_id, region_key}, ...]` and an optional
-`subject_id`. Omitting the subject creates one subject for the whole selected set. Supplying the
+`subject_id`. Omitting the subject creates one subject for the whole selected set, and supplying the
 returned ID links further photographs to the same person. Each region gets an immutable human
-confirmation; the transaction refuses unknown subjects or regions without applying a partial set.
-`POST /identity/subjects/unlink` requires the current `subject_id` and selected regions and appends
-confirmations with no linked subject. Existing consents and previous edits remain historical.
-`POST /person-subjects/{subject_id}/consents` continues to record the account holder's consent
-statement. Ordinary outline confirmations preserve an existing subject when `subject_id` is omitted;
-explicit null unlinks it. An edit request names each region at most once; duplicate keys are
-refused before any edit is written. Changed links invalidate screenings through the existing currency policy.
+confirmation, and the transaction refuses unknown subjects or regions without applying a partial
+set. `POST /identity/subjects/unlink` requires the current `subject_id` and selected regions and
+appends confirmations with no linked subject; existing consents and previous edits remain
+historical. `POST /person-subjects/{subject_id}/consents` records the account holder's consent
+statement. Ordinary outline confirmations preserve an existing subject when `subject_id` is
+omitted, and an explicit null unlinks it. An edit request names each region at most once;
+duplicate keys are refused before any edit is written. Changed links invalidate screenings through
+the screening currency rule ([person-presentation-consent.md](person-presentation-consent.md#screening-currency)).
 
-The API path and worker change do not deliver HEIC conversion or a fresh workspace's source
-inspector. Those require extensions outside the writable set, including a distinct decoded
-source permission in SQL. No migration has been applied or reserved for this work. No hosted calls
-have been authorized in this task.
+## Isolated rehearsal command
 
-The final focused run passed 89 PostgreSQL tests on scratch schemas in `exulanica_inspect_test`.
-The fresh public-copy rehearsal then refused all three predecessor JPEGs at `/intake`, before the
-new admission route: `artifact_pkey` collides when another workspace already holds the same bytes.
-`artifact_id_for` derives a global ID from a key without workspace identity, while artifact lookup
-is workspace-scoped. The first-place workspace and bytes were preserved. This is an additional
-release blocker, not a successful acceptance run. The digest-bound attempt is recorded in
-`2026-09-11-personal-path`, a local-only evaluation record a clone does not contain.
-The integration coordinator owns the deferred single full-backend suite and document index update.
-
-## Historical isolated command and evidence
-
-This is an operator command for exact capture bytes. It composes existing intake, personal
-account authority, privacy screenings, person review receipts and mask stages. It writes no
-benchmark provenance, creates no new receipt table and applies no migration. Migration 0039
-must already be installed in the selected isolated schema. Public is not an allowed target.
-
-**Real personal-data activation remains blocked on a separate shared SQL policy follow-up.**
-The existing `privacy_screening_allows_capture` predicate accepts an old eligible receipt after a
-region changes, even when a new human screening is blocked. Frontier preflight, demonstration and
-`admit_reconstruction_scene` have direct SQL-predicate paths. This change strengthens the Python
-`require_privacy_screening` boundary with the existing `capture_mask_is_current` check. It does
-not globally invalidate historical receipts, nor prove that stale geometry was produced or served.
-After a mask is rebuilt, currency alone does not force callers to choose the new screening.
-Operators must explicitly re-screen and use the new receipt. The shared policy follow-up must
-close that historical-receipt gap before real-data activation.
-
-## Command and manifest
+`exulanica.ingest.personal_admission_command` is an operator rehearsal over exact capture bytes. It
+composes intake, personal account authority, privacy screenings, person review receipts and mask
+stages, writes no benchmark provenance, creates no receipt table and applies no migration. It is
+bound to the test database `postgresql://localhost:5433/exulanica_spine_test` and an isolated
+`exulanica_personal_*` schema that the operator creates and migrates beforehand; public is not an
+allowed target. A missing schema or pending migration produces a JSON refusal before provisioning,
+intake or store writes.
 
 ```sh
 uv run python -m exulanica.ingest.personal_admission_command \
@@ -268,14 +290,8 @@ uv run python -m exulanica.ingest.personal_admission_command \
   --data-dir /outside-git/personal-store
 ```
 
-The database is fixed to `postgresql://localhost:5433/exulanica_spine_test`. The operator must
-explicitly create and migrate the isolated `exulanica_personal_*` schema beforehand. A missing
-schema or pending migration produces an actionable JSON refusal before provisioning, intake or
-store writes. The command never invokes a migration operation. The recorder alone creates and
-migrates its own disposable schema, then removes it in a `finally` block.
-
-The strict manifest has exactly these fields. Replace identifiers, bytes, times and authority
-with the actual operator inputs; the timestamps below describe an example, not standing authority.
+The strict manifest has exactly these fields. Replace identifiers, bytes, times and authority with
+the actual operator inputs; the timestamps below describe an example, not standing authority.
 
 ```json
 {
@@ -304,206 +320,33 @@ with the actual operator inputs; the timestamps below describe an example, not s
 ```
 
 Unknown or missing fields, duplicate keys, floats, non-finite numbers, malformed UUIDs,
-noncanonical or escaping paths, symbolic-link sources, changed hashes/sizes, expired authority
-and blank authority/purpose are refused. Each manifest names one exact source, not an assertion
-about every image in its directory. Unlisted files are not read. Store and photo roots must be
-separate and non-nested; symlinks in the store are refused.
+noncanonical or escaping paths, symbolic-link sources, changed hashes or sizes, expired authority
+and blank authority or purpose are refused. Each manifest names one exact source, and unlisted files
+are not read. Store and photo roots must be separate and non-nested, and symlinks in the store are
+refused. The actor is an explicit local operator attestation, not an authenticated subject
+identity. Account authority does not establish consent to presence, naming, likeness, training or
+publication, and the command never records a subject's consent.
 
-The actor is an explicit local operator attestation, not an authenticated subject identity. The
-CLI uses the local database role's authority. Account authority does not establish consent to
-presence, naming, likeness, training or publication. This command never records a subject's
-consent. Human additions without linked consent remain `unknown` and are masked by existing policy.
+The operations run in this order: `admit` hashes and intakes the exact bytes and records personal
+authority; `detect` records `person_detection_only` and runs the permitted ingest pass (no vision,
+detector or depth model is configured, so an empty inventory claims nothing); a `review` records a
+human screening (`no-person` only after actually finding nobody, otherwise `confirmed-regions` with
+every region added or confirmed); `mask` uses the detection permission to build the masked source;
+`rescreen` records a human screening over the current regions and states; `geometry-check` calls the
+privacy policy and current-mask check without running geometry; and `retry` runs the permitted
+derivative pass with an explicit receipt. After a region edit, rebuild the mask with the detection
+receipt, re-screen explicitly, and use the new eligible screening. An edit has exactly `action`
+(`add`, `confirm` or `delete`), `region_key` (64 lowercase hexadecimal characters) and `silhouette`
+(null to reuse an outline, or a polygon in integer parts per million of the display space). The
+command writes workspace partitions, capture and receipt rows, pipeline ledger events and
+content-addressed bytes beneath `--data-dir/blobs`, never modifies original photos or the manifest,
+and reports JSON with a nonzero status on refusal.
 
-## Operator sequence
+## Evidence
 
-1. `admit` hashes and intakes the exact bytes and records personal authority. Save the returned
-   `capture_id` into `source.capture_id` and `authorization_id` into subsequent manifests. Keep
-   the authority fields unchanged. Repeating the same manifest reuses the capture and authority.
-2. `detect` records `person_detection_only` with the explicit purpose and runs the permitted
-   ingest pass. Save its `screening_id` for later mask/retry passes. This bounded command configures
-   no vision, detector or depth model. Their unavailable stages are reported explicitly. An empty
-   inventory therefore makes no claim that no people exist. The receipt permits observation and
-   remains blocked for geometry. No hosted-call flag or environment variable enables a model here.
-3. Inspect the exact source outside this command. Use `review: "no-person"` only after actually
-   reviewing it and finding no person. A nonempty current inventory refuses this attestation.
-   Otherwise use `review: "confirmed-regions"` and explicitly add or confirm every region.
-4. A `review` operation calls the existing person-edit and human-screening seams. A named hidden
-   person without a current mask yields a durable blocked screening, not a false no-person claim.
-   Exit 0 means the requested review was recorded; inspect `eligibility_state` for permission.
-5. `mask` uses the original detection permission as `screening_id` and runs the ordinary ingest
-   derivative pass to build the real masked source. A blocked human screening cannot authorize
-   this observation pass; retain the separate detection permission.
-6. `rescreen`, with a fresh `recorded_at` and explicit review attestation, records the new human
-   screening over the current regions and resolved states. Use its new ID for `geometry-check`.
-7. `geometry-check` calls the real privacy policy and current-mask check. It performs no geometry
-   inference. `retry` runs the permitted derivative pass with the explicit receipt, reusing
-   unchanged stages. After a region edit, use the detection receipt to rebuild the changed mask,
-   explicitly re-screen, and then use the new eligible screening.
-
-An edit has exactly `action`, `region_key` and `silhouette`. Actions are `add`, `confirm` and
-`delete`; keys are 64 lowercase hexadecimal characters. `silhouette` is null to reuse an existing
-outline, or `{"kind":"polygon","points":[[0,0],[500000,0],[500000,500000],[0,500000]]}`.
-Coordinates use the existing integer parts-per-million display convention, not raw sensor pixels.
-The existing silhouette validator rejects degenerate or out-of-range outlines. Repeating an edit
-with the same actor, capture, key and timestamp reuses the existing receipt; conflicting contents
-at that same timestamp are refused. New decisions require a new timestamp.
-
-The command writes workspace partitions, capture and receipt rows, pipeline ledger events and
-content-addressed bytes beneath `--data-dir/blobs`. It never modifies original photos or the input
-manifest. Stage failures can leave successfully committed intake or prior receipts available for
-retry; command output is JSON with a nonzero status on refusal. There is no extra sidecar receipt
-store. JSON output reports identifiers already persisted through the existing repository.
-
-## Executed evidence and limits
-
-The recorder uses labelled generated images, manual fixture regions, real PostgreSQL policy and
-the real ingest/mask stages. No personal photographs, credentials, hosted model calls, actual
-person detector, depth inference or GPU work are used. The generated polygon is a simulated
-sensitive region; its masking is not a measured real-person detector or segmentation result.
-
-The original [record](evaluation/2026-09-08-personal-admission-flow.json) is preserved. Its SQL
-control is a known failing baseline, not a killed mutant. The follow-up record distinguishes that
-baseline from an executed command-local negative control: removing only the Python currency
-guard in subprocess memory makes
-`tests/test_personal_admission_flow.py::test_changed_region_requires_current_mask_before_geometry`
-fail with `DID NOT RAISE`. The recorder requires that selector's exact `FAILED` line.
-
-The evidence retains exact successful and refusal commands, manifests and JSON logs for admission,
-authority expiry/absence, byte mismatch, cross-workspace access, detection-only geometry refusal,
-manual no-person review, a person needing a mask, stale mask refusal, rebuild, re-screening and
-idempotent retry. It also executes the existing frontier preflight CLI against the persisted
-receipts: its exact-source database/screening check passes; the overall preflight refuses the
-intentionally absent signing key. No signing key is created or supplied.
-
-Every evidence envelope has exactly `profile`, `record`, and `record_sha256`; the digest is SHA-256
-of `canonical_json(record)`. There are no floats. Every record names its predecessor and binds its
-retained artifacts by size and digest. Generate a new record with new output/artifact paths:
-
-```sh
-uv run python scripts/record_personal_admission_evidence.py \
-  --output docs/evaluation/NEW-personal-admission-flow.json \
-  --artifacts docs/evaluation/artifacts/NEW-personal-admission-flow \
-  --predecessor docs/evaluation/2026-09-08-personal-admission-flow.json
-```
-
-Historical manifests contain expiring authority and a schema that the recorder removed. Their
-exact commands are audit evidence, not perpetual permissions; rerun the recorder to obtain a fresh
-isolated rehearsal. A successful command-local check is not production activation or a global
-privacy-policy guarantee.
-
-## Final verification and exact executed commands
-
-The [final command evidence](evaluation/2026-09-08-command-personal-admission-flow.json) binds the
-corrected recorder and remaining gates at `ff67b771c6993fcd8d16ae99c79950d69275a4fd`.
-The full backend run at the preceding candidate head returned **2070 passed, 3 skipped, 1 failed**:
-the failure was the retained-record test rejecting absolute workstation paths in command strings.
-The orchestrator authorized replacement of these two unpublished candidate records by real recorder
-reruns and removal of their defective unpublished history. Established main records were unchanged.
-The replacement digests and tested heads are retained in `gates/candidate-replacements.json`.
-
-After correction, all retained-record tests and 38 focused command/privacy/masking tests passed.
-Ruff, all import contracts, web typecheck, boundaries, and all 867 web tests passed. An intermediate
-Ruff failure in the generated mutant program was corrected in the recorder and re-executed; its log
-is retained too. Production and test source did not change after the full backend run. Per the
-orchestrator's explicit direction, the full backend suite was not repeated; independent full gates
-on the rebased integration tree remain pending. The known slow-stage lease test did not fail.
-
-The following commands were actually executed from the repository root. Their exact schema was
-removed after the rehearsal and their authority expires; they document the run, not a live schema.
-The pending-migrations refusal was executed before that isolated schema was migrated by the recorder.
-
-### pending-migrations (exit 1)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/pending-migrations.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### missing-authority (exit 1)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/missing-authority.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### expired-authority (exit 1)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/expired-authority.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### wrong-source-bytes (exit 1)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/wrong-source-bytes.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### admit (exit 0)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/admit.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### detection-only-geometry-refusal (exit 1)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/detection-only-geometry-refusal.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### cross-workspace-refusal (exit 1)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/cross-workspace-refusal.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### unmasked-person-geometry-refusal (exit 1)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/unmasked-person-geometry-refusal.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### stale-mask-geometry-refusal (exit 1)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/stale-mask-geometry-refusal.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### final-geometry-permission (exit 0)
-
-```sh
-uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/final-geometry-permission.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
-```
-
-### frontier-preflight (exit 1)
-
-```sh
-EXULANICA_DATABASE_URL='dbname=exulanica_spine_test host=localhost port=5433 hostaddr=127.0.0.1 options=-csearch_path=exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063,public' uv run python -m exulanica.orchestration.cli preflight --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/frontier-manifest.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data --output docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/frontier-output --private-key docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/not-supplied.pem
-```
-
-
-## HEIC source lineage
-
-HEIC/HEIF intake retains the exact uploaded bytes and evidence address. It also records an
-immutable `decoded_source` PNG artifact, binding the original SHA-256, output SHA-256, actual
-decoder inventory, conversion options, and display pixel grid. The pinned decoder and its
-LGPL components are documented in [the license matrix](license-matrix.md#11-heic-decoder-inspection-and-pin-2026-09-12).
-Only single-frame images within the common pixel limit are accepted. Conversion normalizes
-to RGB8, removes metadata, discards alpha, and does not perform ICC color management.
-
-The source inventory and viewer route select that PNG with `image/png` and explicit decoded
-provenance. The evidence route continues to return the camera original when current permissions
-allow it. A conversion receipt grants no detection, likeness, or geometry permission. Human
-screening and current consent still govern geometry; a capture needing privacy masking uses a
-separate JPEG mask whose receipt binds the normalized predecessor and its decoder receipt.
-Depth and segmentation load those exact persisted bytes, as pose and training do.
-
-Decoder inventory or conversion-option changes invalidate normalized inputs and dependent masks,
-even when a new decoder produces the same PNG bytes. Queued work must be rebuilt and admitted
-again when these bindings move. Depth and segmentation version 2 also invalidate earlier cache
-entries that named a mask JPEG but consumed pixels before its JPEG encoding. No existing artifact
-is relabelled. Splat manifests carry decoded lineage separately from privacy masks and preserve
-the original identity of held-out photographs. Offline readers verify the receipt and selected
-image grid before accepting training inputs or downloaded views.
-
-Migration 0045 is exercised only in owned scratch schemas in this repair. Advancing the running
-API database is an integration operation; the retained first-place database remains untouched.
-Synthetic HEIC tests use local model doubles. They do not establish real model quality or hosted
-vision acceptance, and no paid model call is authorized by this document.
+- [Personal admission flow](evaluation/2026-09-08-personal-admission-flow.json) and
+  [command evidence](evaluation/2026-09-08-command-personal-admission-flow.json): the rehearsal over
+  labelled generated images, manual fixture regions, real PostgreSQL policy and the real ingest and
+  mask stages, with no personal photographs, hosted model calls or GPU work.
+- `tests/test_search_entries_on_stop.py` and `tests/test_search_entry_granted_again.py` for search
+  rights; `tests/test_depth_awaits_admission.py` for a photograph that waits for admission.

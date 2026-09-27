@@ -121,6 +121,8 @@ review as a diff.
   reconciling instead.
 - It does not start motion. It stores a behaviour; trigger, stop and reset are the renderer's
   controls ([world-objects-contract.md](../world-objects-contract.md#behaviours)).
+- It reads no society, model choice, stored decision or comparison. Those routes are in the
+  [World API guide](world-api.md#people-and-models).
 - It follows no redirect and sends no token over plain `http` to another machine. urllib would
   copy the `Authorization` header to a redirect's target.
 

@@ -105,7 +105,8 @@ UTTERANCES: tuple[tuple[str, str, str, str], ...] = (
         "use a serif typeface for all the menus and make the buttons square",
         "appearance",
         "MUST REFUSE with `not_in_catalogue`. Interface layout and typography are outside the "
-        "reviewed registry by design, and `world-style-backend.md` says so: the backend does not "
+        "reviewed registry by design, and `world-version-authorities.md` says so: the backend "
+        "does not "
         "author panel structure or screen layout. Reaching for a nearby control here would be "
         "the failure this path exists against.",
     ),

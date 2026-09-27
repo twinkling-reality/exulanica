@@ -6,7 +6,9 @@
  * form, so an oblique view of four flat placements showed a flat plane with four labels on it. The
  * angle was never the problem; there was nothing up there to see.
  *
- * The obvious fix is a plinth or a platform under each region, and `atlas-visual-language.md` 4
+ * The obvious fix is a plinth or a platform under each region, and the retired
+ * `atlas-visual-language.md` 4 (revision 47f9f7d3; `atlas-spatial-architecture.md` 2 keeps
+ * the rule)
  * rejects exactly that, correctly: a disc under a memory is scenery, it asserts an edge the data
  * does not have, and it makes the Map a diagram of the renderer rather than of the person's life.
  *

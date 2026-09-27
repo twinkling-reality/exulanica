@@ -1,152 +1,41 @@
 # Society experiments
 
-The society experiment surface records controlled comparisons over an existing
-`exulanica-society/v4` society. It freezes the exact immutable input rows used by both arms and
-reserves development attempts. Preparing or reserving a record does not run a simulation. A
-comparison of the open models that decide for a saved world's people, over its
-`exulanica-society/v2` society, is a record family of its own:
-[comparisons of models](#comparisons-of-models).
+A society experiment runs one society's simulated time more than once, changing one thing, and
+records what each run did. There are two record families:
 
-## HTTP surface
+- **Comparisons of models** run the same simulated hour of a saved world's purposeful society
+  (`exulanica-society/v2`) once for each model that could decide for a group of its people, beside
+  their routine and waiting, and score how the group's people fared. This is how a world's owner
+  sees the difference a model makes.
+- **Intervention experiments** freeze two input histories of a living society
+  (`exulanica-society/v4`), a baseline and a treatment such as one more rest amenity, and record
+  paired development attempts over them.
 
-All routes are scoped by the authenticated session's workspace, by the world the authored version
-belongs to, which each request names as a `world_id` query parameter, and by the authored version in
-the path. A definition is read only in the world it binds.
+How a model decides for a person, and what that spends, is the
+[decision roles contract](decision-roles-contract.md)'s; the engines are the
+[synthetic society contract](synthetic-society-contract.md)'s.
 
-| Method and path | Permission | Result |
-| --- | --- | --- |
-| `POST /world/versions/{version_id}/society/experiments` | `world.write` | Records one immutable definition |
-| `GET /world/versions/{version_id}/society/experiments/{experiment_id}` | `world.read` | Reads the compact definition |
-| `POST /world/versions/{version_id}/society/experiments/{experiment_id}/attempts` | `world.write` | Reserves one development attempt |
-| `GET /world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}` | `world.read` | Reads compact attempt status and a terminal result or failure |
+<details>
+<summary>Sections</summary>
 
-The client supplies idempotency UUIDs, immutable input sequence numbers, explicit workload bounds,
-and a supported intervention identity. The server resolves the society and full input documents.
-It verifies those documents through the configured `SocietyRuntime` authority before recording or
-reading an experiment. The request cannot supply an input document, definition document,
-checkpoint, execution evidence, result, or failure record.
+- [Comparisons of models](#comparisons-of-models)
+  - [Records](#records)
+  - [Score](#score)
+  - [Claim](#claim)
+  - [Judged comparisons](#judged-comparisons)
+  - [Reads](#reads)
+  - [Running a comparison](#running-a-comparison)
+  - [Browser view](#browser-view)
+- [Intervention experiments over a living society](#intervention-experiments-over-a-living-society)
+  - [HTTP surface](#http-surface)
+  - [Definitions](#definitions)
+  - [Attempt lifecycle](#attempt-lifecycle)
+  - [Compact reads](#compact-reads)
+  - [Independent read-only consumer](#independent-read-only-consumer)
+  - [Browser result view](#browser-result-view)
+  - [Local reserved-attempt execution](#local-reserved-attempt-execution)
 
-An experiment or attempt under the wrong workspace, version, or parent experiment is an unknown
-reference. A withdrawn source makes its historical experiment unavailable rather than preserving
-access to stale geometry or rights.
-
-## Definitions
-
-The supported definitions are:
-
-| Intervention | Input rule |
-| --- | --- |
-| `noop` | Baseline and treatment name the same genesis input |
-| `add_rest_amenity` | The treatment is the next input and adds exactly one enabled authored rest target backed by the reviewed marker-plate asset |
-
-The stored definition binds the source society, world and authored version, the treatment's
-authored cursor, both immutable input sequence and digest pairs, the deterministic routine, the
-development and held-out seed commitments, and the predeclared metrics. Public reservation accepts
-only a seed from the committed development split. The held-out split cannot be reserved through
-this HTTP surface.
-
-Work is bounded to a population from 1 through 256, warm-up and follow-up lengths from 1 through
-1,440 ticks each, and at most 500,000 person-ticks under the definition's paired-run accounting.
-Definition records are limited to 256 KiB.
-
-## Attempt lifecycle
-
-An attempt reservation is an append-only fact. Its initial status is `incomplete`, which means no
-terminal outcome has been recorded. Internal bounded execution may add one sealed checkpoint and
-then exactly one `completed` or `failed` outcome. Reusing an experiment or attempt UUID with the
-same canonical content is idempotent; reusing it with different content is a conflict.
-
-The HTTP request path does not prepare checkpoints, advance either arm, call a worker or model, or
-finalize outcomes. Those operations remain internal repository and deterministic-core work.
-
-## Compact reads
-
-Attempt reads return the definition, seed, checkpoint, evidence, result and failure digests that
-exist for the record. A completed result includes each arm's raw metric numerators and denominators,
-safety counts, evidence counts and digests, and exact signed comparisons. A failed result includes
-the bounded server-defined failure code and detail. The response never includes checkpoint state or
-full execution evidence.
-
-There is no evidence download or portable experiment package endpoint. A digest in the compact
-response identifies a persisted artifact but does not by itself provide an export surface.
-
-## Independent read-only consumer
-
-[`scripts/society_experiment_result_client.py`](../scripts/society_experiment_result_client.py)
-is a small consumer of the two GET routes. It imports no Exulanica implementation. Its caller
-provides an HTTP client that already owns base URL, authentication, timeout and transport policy,
-then supplies the world the version belongs to and the three explicit resource identifiers:
-
-```python
-outcome = read_experiment_result(
-    http,
-    world_id=world_id,
-    version_id=version_id,
-    experiment_id=experiment_id,
-    attempt_id=attempt_id,
-)
-```
-
-The consumer requests the definition projection first and the nested attempt second, each in the
-named world. It validates the definition's world, the path identities, lifecycle combination, digest syntax and cross-response bindings before
-exposing metrics. For a completed result it independently checks the supported result profile and
-canonical result digest. The compact definition digest is only an identity binding because the GET
-response does not contain the full canonical definition document.
-
-The consumer requests `Accept-Encoding: identity` and refuses a response carrying a nonidentity
-`Content-Encoding` before reading its body. Identity-encoded response bodies are read in bounded
-chunks through byte ceilings before JSON buffering. An over-limit or compressed lazy response is
-closed without consuming the remainder. The ceiling governs work performed through the supplied
-lazy streaming transport; it cannot undo buffering a caller or upstream transport completed before
-the response context was returned. The consumer uses only GET, rejects duplicate JSON fields and
-does not request checkpoint state or execution evidence.
-
-The outcome status is one of `valid`, `invalid_pair`, `incomplete`, `failed` or `unavailable`.
-Metric numerators and denominators remain integers exactly as served. A missing or zero denominator
-marks that metric unavailable; it is not interpreted as zero effect. `left_minus_right` means the
-stored treatment arm minus baseline comparison. The consumer makes no significance, held-out,
-external replay, production authentication or real-human-effect claim.
-
-## Browser result view
-
-An authenticated saved world exposes **Recorded comparison** from the World menu. The view fixes
-the authored version to the active saved-world entry and asks for the experiment and attempt UUIDs
-printed on an existing record receipt. It then uses the two GET routes above to verify and present
-that one compact result. The browser does not offer a record list, preparation, reservation,
-execution or finalization control.
-
-The view presents stored baseline and treatment fractions, signed server-recorded deltas, safety
-summaries, exact record bindings, unsupported metrics, lifecycle failures and unavailable records
-without reinterpreting them. Closing the view cancels its active read. Opening another identity
-supersedes the prior read, so a late response cannot replace the current result.
-
-## Local reserved-attempt execution
-
-The local experiment runner accepts a current server session and one exact already-reserved
-development attempt identity. It rejects held-out phases and seeds before checkpoint preparation,
-arm computation or explicit abort; a held-out reservation remains incomplete. Trusted host
-composition must supply current permission to execute the development reservation. The
-reservation's `created_by` field remains attribution and does not grant execution. The runner also
-applies the configured society runtime's current input authorization, including workspace/version
-registration, immutable stored-input equality, current environment-source operation rights and
-withdrawal state, required byte integrity, authored-source validity, frame and affordance registry
-bindings, and reviewed-asset availability.
-
-Checkpoint preparation and paired-arm computation run outside database transactions. Checkpoint
-and result replay use an open idle autocommit connection before each short append transaction, as
-required by the repository. Each phase reloads the reservation and rechecks execution and source
-authorization. Checkpoint, completion and failure appends recheck execution permission again after
-taking the attempt lock, including after result replay. A crash, missing authorization or other
-exception before a terminal append leaves the attempt incomplete and retryable. A retry reuses the
-exact sealed checkpoint. An explicit operator abort records a bounded development failure.
-Competing runners may duplicate deterministic computation, but attempt locking and the append-only
-outcome allow only one terminal record.
-
-Only a pair with canonical arm evidence is recorded as completed. A core `invalid_pair` refusal has
-no arm evidence, so this runner records it as a failed `execution_refused` outcome with the bounded
-core refusal code and detail. The compact read schema can represent `invalid_pair`, but this runner
-does not fabricate evidence or persist that state as a completed result. Execution remains a local
-composition capability; there is no HTTP execution route, queue discovery or browser launch control.
+</details>
 
 ## Comparisons of models
 
@@ -169,7 +58,9 @@ runs one candidate model a second time to bound what run-to-run variation alone 
 loop and its replay are `exulanica/world/society_comparison.py`; the local runner is
 `exulanica/api/society_comparison_runner.py`.
 
-**Records.** Migration 0113 appends four records, each keyed within its workspace and by a
+### Records
+
+Migration 0113 appends four records, each keyed within its workspace and by a
 registered world, under forced row-level security, and never changed: a definition by the caller's
 comparison id, a run by an id derived from the comparison, its arm and its seed's digest, a receipt
 by its run and decision sequence, and an outcome by its run: `society_comparison` (the definition:
@@ -202,7 +93,9 @@ runner refuses a definition that records another answering than the contract and
 (`answering_not_the_models`), and stops a run before it asks anything when they would now ask one of
 its models otherwise (`provider_configuration_changed`).
 
-**Score.** A comparison is scored under the score version it was defined under. The second, declared
+### Score
+
+A comparison is scored under the score version it was defined under. The second, declared
 in `assets/catalogs/society/society-person-score.v2.json` and computed exactly by
 `exulanica/world/society_score_v2.py`, scores how the group's people fared and nothing else: need
 relief, the need above the recorded routine's rest threshold that a run spares them against waiting,
@@ -238,7 +131,9 @@ turns; the first judged comparison below was scored under it, and a first-versio
 under it, with what it did not record, a split of the turns left to the routine and any rate over
 the routine's choice points, served as null.
 
-**Claim.** `assets/catalogs/society/society-comparison-protocol.v1.json` states the window, the
+### Claim
+
+`assets/catalogs/society/society-comparison-protocol.v1.json` states the window, the
 floor, the bootstrap, the interval level and the family error rate, and
 `exulanica/world/society_comparison_claim.py` reads them: paired differences over seeds, a
 percentile bootstrap drawn from SHA-256 so the same scores give the same interval anywhere, Holm's
@@ -260,55 +155,31 @@ development seeds and commits twelve held-out seeds drawn afresh, none of the fi
 held-out seeds the first judged comparison spent. The seeds themselves stay outside the repository
 until a pre-registered comparison is judged on them.
 
-**First record.** The
-[first judged comparison](evaluation/2026-09-26-society-model-comparison.json), scored under the
-first version, compared Qwen3 235B Instruct and Nemotron 3.5 Lightning deciding for the starter
-world's small square and its eight people over the eight held-out seeds, with Qwen run twice as the
-control, through `scripts/measure_society_comparison.py`; its
-[pre-registration](evaluation/2026-09-26-society-model-comparison-preregistration.json) records
-that it was written before any held-out seed was run. Holm's procedure rejected the primary
-difference, Lightning's score minus Qwen's, 0.0367 on average with an interval from 0.0106 to
-0.0627, but its size is no larger than the far end of the control difference's interval, 0.0537,
-so the verdict is no measured difference. Qwen's people also scored below their routine (0.0488 lower on average), a difference
-the family's test rejects; Lightning's did not differ from their routine by that test. Every run
-replayed from its receipts with no billed call, and the two models' calls cost 0.2997 USD.
+### Judged comparisons
 
-The [decomposition](evaluation/2026-09-26-society-model-comparison-decomposition.json), derived from
-the judged record alone by `scripts/decompose_society_comparison.py`, splits each score into need
-relief and the share of turns whose answer was not applied. People fared almost the same on need
-relief under both models: 0.9880 on average in each of Qwen's two runs and 0.9893 under Lightning.
-The differences between them are almost all turns: Lightning's lead of 0.0367 is 0.0013 of relief
-and 0.0354 of turns, and the 0.0248 between Qwen's two runs of the same hours is all turns. Against
-their routine, Qwen's people scored 0.0488 lower, 0.0120 of relief and 0.0368 of turns. The record
-keeps how many turns were not applied, 24 of Qwen's 703, 9 of 770 in its second run and 2 of
-Lightning's 1527, not why; the run with the most, Qwen's on `held_out_3` with 11 of 81, is the only
-one whose answer time at the 95th percentile, 20,008 ms, reached the contract's 20,000 ms deadline.
+A judged comparison is pre-registered before any of its held-out seeds is run, and its record is
+written by the measurement that registered it. Each record below replayed every run from its
+receipts with no billed call.
 
-**Second record.** The
-[second judged comparison](evaluation/2026-09-26-society-group-comparison.json), scored under the
-second version and run once through `scripts/measure_group_comparison.py`, swapped the model
-deciding for four of the small square's eight people, the half the world's owner had chosen Qwen3
-235B Instruct for, while the other four kept their routine: Qwen as the owner chose, run twice as
-the control, Nemotron 3.5 Lightning and Nemotron 3 Nano 30B, over the twelve fresh held-out seeds.
-Its [pre-registration](evaluation/2026-09-26-society-group-comparison-preregistration.json) records
-the candidates with how each is asked, Nano by a JSON schema, the order measured for it, and the
-others by a forced call; the hours of the clock the run would start within; that DeepSeek V4 Flash
-did not join, since a development run of all four offered models showed it would leave the bound too
-little room; and that it was written before any held-out seed was run. All twelve seeds were scored.
-The verdict is no measured difference: the group's people fared the same under Qwen, its second run
-and Lightning on every seed, to the four decimals the record keeps, 1.0505 on average, so the
-primary difference and the control's are both 0.0000, and under Nano 1.0422 on average; the family's
-test rejected no model's difference from the routine. What each model answered differed: Qwen
-answered 99.25% of the group's turns (99.56% in its second run), Lightning 95.77% and Nano 92.51%.
-None refused a turn and no ask ran out of time: every turn left to the routine was an answer the
-minute could not apply, 65 of the 72 because the person a model chose to talk with was busy. The
-models also spent the hour differently: Qwen's people rested in 73.8% of their minutes and talked in
-1.0%, Lightning's rested in 42.3%, stood in 9.3% and talked in 14.9%. Under this score a model's
-choices while its people are rested neither earn nor cost, and Lightning's moved the group's score
-from Qwen's on no seed. Every run replayed from its receipts with no billed call, and the calls cost
-0.2482 USD, from 22:49 to 23:08 EDT on 2026-09-26.
+- [2026-09-26-society-model-comparison.json](evaluation/2026-09-26-society-model-comparison.json)
+  ([pre-registration](evaluation/2026-09-26-society-model-comparison-preregistration.json),
+  [decomposition](evaluation/2026-09-26-society-model-comparison-decomposition.json)): Qwen3 235B
+  Instruct and Nemotron 3.5 Lightning deciding for all eight people of the starter world's small
+  square over eight held-out seeds, scored under the first score version, with Qwen run twice as
+  the control. No measured difference: Lightning's lead over Qwen was no larger than the control's
+  run-to-run variation, and the decomposition puts almost all of it in turns whose answer was not
+  applied rather than in how the people fared.
+- [2026-09-26-society-group-comparison.json](evaluation/2026-09-26-society-group-comparison.json)
+  ([pre-registration](evaluation/2026-09-26-society-group-comparison-preregistration.json)): four of
+  the square's eight people, the half the world's owner had chosen Qwen3 235B Instruct for, run by
+  Qwen as the owner chose (twice, as the control), Nemotron 3.5 Lightning and Nemotron 3 Nano 30B
+  while the other four kept their routine, over twelve fresh held-out seeds, scored under the
+  second version. No measured difference in how the group fared, while the models answered
+  different shares of the group's turns and spent the hour on different activities.
 
-**Reads.** Three routes read what a comparison recorded; none asks a model or writes anything.
+### Reads
+
+Three routes read what a comparison recorded; none asks a model or writes anything.
 
 | Method and path | Permission | Result |
 | --- | --- | --- |
@@ -323,19 +194,22 @@ catalogs, a definition or a score version it does not hold, or whose outcomes sc
 than its group, is answered as a conflict (409) with the code it was refused by, such as
 `binding_unknown`, never as a server error.
 
-**Running one.** A comparison is defined and run by a local command, never from a route:
+### Running a comparison
+
+A comparison is defined and run by a local command, never from a route:
 
 ```
 EXULANICA_BUDGET_USD=<bound> python -m exulanica.orchestration.compare --workspace <uuid> \
   --world <world id> --version <uuid> --actor <uuid> --model <provider>/<model id> \
   [--model <provider>/<model id>] [--control] \
   [--group-choice <n> | --group <person id> [--group <person id> ...]] \
-  --seeds <file> [--seed-count <n>]
+  --seeds <file> [--seed-count <n>] [--comparison <uuid>]
 ```
 
-It defines a development comparison over the version's society as it stands, its group everybody,
-the people the owner's choice `--group-choice` named, or the people `--group` names, and everybody
-else keeping what the owner's latest choice for them names; reserves every run; plays them
+It takes one or two models. `--comparison` names the comparison's id, a fresh one when it is left
+out. It defines a development comparison over the version's society as it stands, its group
+everybody, the people the owner's choice `--group-choice` named, or the people `--group` names, and
+everybody else keeping what the owner's latest choice for them names; reserves every run; plays them
 `runs_at_once` at a time, the anchors first, with no connection held while a model is asked; and
 prints each arm's score with what its model answered, the differences and the verdict. A person
 outside the group whose owner chose a model is asked of it in every arm, the anchors included, and
@@ -346,7 +220,9 @@ and a live world's hourly bounds do not apply, since a comparison writes nothing
 reads. A comparison runs at most the protocol's `population_maximum` people, a saved world's own
 population; a larger society is refused by name.
 
-**Browser view.** An authenticated saved world exposes **Compare models** from the World menu. It
+### Browser view
+
+An authenticated saved world exposes **Compare models** from the World menu. It
 lists the version's comparisons and opens the newest: the server's verdict in words, with the
 primary pair's answered shares in the same sentence; who each arm decides for and what decides for
 everybody else, with what a model outside the group means for the score where there is one; each
@@ -360,3 +236,158 @@ went differently, and the inspector on a person of either side, saying who decid
 and why, and for a person outside the group, that they keep that decider in every arm. The page
 shows every number as the server wrote it and never decides whether two arms differ; it reads
 nothing but the three routes above.
+
+## Intervention experiments over a living society
+
+An intervention experiment records a controlled comparison over an existing
+`exulanica-society/v4` society. It freezes the exact immutable input rows both arms use and
+reserves development attempts; preparing or reserving a record does not run a simulation.
+
+**Limit.** Only the living engine takes experiments (the engine table's `experiments`, read as
+`EXPERIMENT_ENGINES` in `exulanica/world/society_engines.py`), and the app creates a living society
+only over the owned district, which it draws only in the development preview. A saved world holds a
+purposeful society, so its **Recorded comparison** view ([browser result view](#browser-result-view))
+finds no record for it.
+
+### HTTP surface
+
+All routes are scoped by the authenticated session's workspace, by the world the authored version
+belongs to, which each request names as a `world_id` query parameter, and by the authored version in
+the path. A definition is read only in the world it binds.
+
+| Method and path | Permission | Result |
+| --- | --- | --- |
+| `POST /world/versions/{version_id}/society/experiments` | `world.write` | Records one immutable definition |
+| `GET /world/versions/{version_id}/society/experiments/{experiment_id}` | `world.read` | Reads the compact definition |
+| `POST /world/versions/{version_id}/society/experiments/{experiment_id}/attempts` | `world.write` | Reserves one development attempt |
+| `GET /world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}` | `world.read` | Reads compact attempt status and a terminal result or failure |
+
+The client supplies idempotency UUIDs, immutable input sequence numbers, explicit workload bounds,
+and a supported intervention identity. The server resolves the society and full input documents.
+It verifies those documents through the configured `SocietyRuntime` authority before recording or
+reading an experiment. The request cannot supply an input document, definition document,
+checkpoint, execution evidence, result, or failure record.
+
+An experiment or attempt under the wrong workspace, version, or parent experiment is an unknown
+reference. A withdrawn source makes its historical experiment unavailable rather than preserving
+access to stale geometry or rights.
+
+### Definitions
+
+The supported definitions are:
+
+| Intervention | Input rule |
+| --- | --- |
+| `noop` | Baseline and treatment name the same genesis input |
+| `add_rest_amenity` | The treatment is the next input and adds exactly one enabled authored rest target backed by the reviewed marker-plate asset |
+
+The stored definition binds the source society, world and authored version, the treatment's
+authored cursor, both immutable input sequence and digest pairs, the deterministic routine, the
+development and held-out seed commitments, and the predeclared metrics. Public reservation accepts
+only a seed from the committed development split. The held-out split cannot be reserved through
+this HTTP surface.
+
+Work is bounded to a population from 1 through 256, warm-up and follow-up lengths from 1 through
+1,440 ticks each, and at most 500,000 person-ticks under the definition's paired-run accounting.
+Definition records are limited to 256 KiB.
+
+### Attempt lifecycle
+
+An attempt reservation is an append-only fact. Its initial status is `incomplete`, which means no
+terminal outcome has been recorded. Internal bounded execution may add one sealed checkpoint and
+then exactly one `completed` or `failed` outcome. Reusing an experiment or attempt UUID with the
+same canonical content is idempotent; reusing it with different content is a conflict.
+
+The HTTP request path does not prepare checkpoints, advance either arm, call a worker or model, or
+finalize outcomes. Those operations are internal repository and deterministic-core work.
+
+### Compact reads
+
+Attempt reads return the definition, seed, checkpoint, evidence, result and failure digests that
+exist for the record. A completed result includes each arm's raw metric numerators and denominators,
+safety counts, evidence counts and digests, and exact signed comparisons. A failed result includes
+the bounded server-defined failure code and detail. The response never includes checkpoint state or
+full execution evidence.
+
+There is no evidence download or portable experiment package endpoint. A digest in the compact
+response identifies a persisted artifact but does not by itself provide an export surface.
+
+### Independent read-only consumer
+
+[`scripts/society_experiment_result_client.py`](../scripts/society_experiment_result_client.py)
+is a small consumer of the two GET routes. It imports no Exulanica implementation. Its caller
+provides an HTTP client that already owns base URL, authentication, timeout and transport policy,
+then supplies the world the version belongs to and the three explicit resource identifiers:
+
+```python
+outcome = read_experiment_result(
+    http,
+    world_id=world_id,
+    version_id=version_id,
+    experiment_id=experiment_id,
+    attempt_id=attempt_id,
+)
+```
+
+The consumer requests the definition projection first and the nested attempt second, each in the
+named world. It validates the definition's world, the path identities, lifecycle combination,
+digest syntax and cross-response bindings before exposing metrics. For a completed result it
+independently checks the supported result profile and canonical result digest. The compact
+definition digest is only an identity binding because the GET response does not contain the full
+canonical definition document.
+
+The consumer requests `Accept-Encoding: identity` and refuses a response carrying a nonidentity
+`Content-Encoding` before reading its body. Identity-encoded response bodies are read in bounded
+chunks through byte ceilings before JSON buffering. An over-limit or compressed lazy response is
+closed without consuming the remainder. The ceiling governs work performed through the supplied
+lazy streaming transport; it cannot undo buffering a caller or upstream transport completed before
+the response context was returned. The consumer uses only GET, rejects duplicate JSON fields and
+does not request checkpoint state or execution evidence.
+
+The outcome status is one of `valid`, `invalid_pair`, `incomplete`, `failed` or `unavailable`.
+Metric numerators and denominators remain integers exactly as served. A missing or zero denominator
+marks that metric unavailable; it is not interpreted as zero effect. `left_minus_right` means the
+stored treatment arm minus baseline comparison. The consumer makes no significance, held-out,
+external replay, production authentication or real-human-effect claim.
+
+### Browser result view
+
+An authenticated saved world exposes **Recorded comparison** from the World menu. The view fixes
+the authored version to the active saved-world entry and asks for the experiment and attempt UUIDs
+printed on an existing record receipt. It then uses the two GET routes above to verify and present
+that one compact result. The browser does not offer a record list, preparation, reservation,
+execution or finalization control.
+
+The view presents stored baseline and treatment fractions, signed server-recorded deltas, safety
+summaries, exact record bindings, unsupported metrics, lifecycle failures and unavailable records
+without reinterpreting them. Closing the view cancels its active read. Opening another identity
+supersedes the prior read, so a late response cannot replace the current result. In a saved world
+it finds no record, because only a living society takes experiments.
+
+### Local reserved-attempt execution
+
+The local experiment runner accepts a current server session and one exact already-reserved
+development attempt identity. It rejects held-out phases and seeds before checkpoint preparation,
+arm computation or explicit abort; a held-out reservation remains incomplete. Trusted host
+composition must supply current permission to execute the development reservation. The
+reservation's `created_by` field is attribution and does not grant execution. The runner also
+applies the configured society runtime's current input authorization, including workspace/version
+registration, immutable stored-input equality, current environment-source operation rights and
+withdrawal state, required byte integrity, authored-source validity, frame and affordance registry
+bindings, and reviewed-asset availability.
+
+Checkpoint preparation and paired-arm computation run outside database transactions. Checkpoint
+and result replay use an open idle autocommit connection before each short append transaction, as
+required by the repository. Each phase reloads the reservation and rechecks execution and source
+authorization. Checkpoint, completion and failure appends recheck execution permission again after
+taking the attempt lock, including after result replay. A crash, missing authorization or other
+exception before a terminal append leaves the attempt incomplete and retryable. A retry reuses the
+exact sealed checkpoint. An explicit operator abort records a bounded development failure.
+Competing runners may duplicate deterministic computation, but attempt locking and the append-only
+outcome allow only one terminal record.
+
+Only a pair with canonical arm evidence is recorded as completed. A core `invalid_pair` refusal has
+no arm evidence, so this runner records it as a failed `execution_refused` outcome with the bounded
+core refusal code and detail. The compact read schema can represent `invalid_pair`, but this runner
+does not fabricate evidence or persist that state as a completed result. Execution is a local
+composition capability; there is no HTTP execution route, queue discovery or browser launch control.

@@ -1,31 +1,35 @@
 # Capture overlap and recovery state
 
-Status: **PLACE RECOVERY STATES**. Policy `exulanica.capture-overlap-policy/v1` failed its
-held-out check and is not authorised to refuse a set.
+Before photographs are reconstructed, a cheap measurement can predict whether they overlap enough
+to be placed together; after a run, its receipt says what happened. This contract owns both for a
+set of photographs meant to build a place in a world: the overlap verdict
+(`exulanica/capture/`), the place record with its five recovery states (migration 0063), and the
+read seam (`exulanica/graph/places.py`). The reconstruction itself is
+[scene-reconstruction-operations.md](scene-reconstruction-operations.md).
 
-The place record, its five recovery states and its read seam are in place (migration 0063,
-`exulanica/graph/places.py`). The overlap verdict is cheap and deterministic, and it is **not
-reliable**. At its declared threshold it reproduces three of the four measured capture outcomes
-and refuses the set that registered 12 of 12. It is not monotone in spacing. The read seam does
-not offer its sentences to a person.
+Policy `exulanica.capture-overlap-policy/v1` failed its held-out check and is not authorised to
+refuse a set. The verdict is cheap and deterministic, and it is **not reliable**: at its declared
+threshold it reproduces three of the four measured capture outcomes, refuses the set that
+registered 12 of 12, and is not monotone in spacing.
 
-## What a regular person gets
+## What the record can say
 
-Most photographs a person takes of something will not rebuild into a 3D place. A set like that is
-a room of its own photographs, with a sentence saying why it did not build and what to do next:
+A set of photographs that does not rebuild into a 3D place keeps its photographs, and its record
+can carry a sentence saying why it did not build and what to do next, for example:
 
 > Your photographs are kept here as they are. A rebuild was tried and didn't make a 3D place. None
 > of the 6 photographs could be placed together. Walk around it and take one every few steps, so
 > each photograph overlaps the one before it.
 
-That sentence is built from the real receipt of a real run over six real photographs. The advice
-never asks for a number of photographs, because the measurement below shows that overlap decides
-and count does not.
+That sentence is built from the receipt of a real run over six photographs of the retained volcanic
+collection. The advice never asks for a number of photographs, because the measurement below shows
+that overlap decides and count does not. No route and no part of the application shows these
+sentences to a person (see [What is not here](#what-is-not-here)).
 
-The pre-run verdict exists, and it is cheap, but it is not good enough to speak to anyone. It
-would have turned away the one held-out set, which rebuilt and trained, and one of the four
-calibration sets, which rebuilt. A policy that has not passed a held-out set has its answer
-recorded for evaluation and nobody is told it.
+The pre-run verdict is cheap but not good enough to speak to anyone. It would have turned away the
+one held-out set, which rebuilt and trained, and one of the four calibration sets, which rebuilt. A
+policy that has not passed a held-out set has its answer recorded for evaluation, and nobody is
+told it.
 
 ## What a verdict is, and what it is not
 
@@ -65,7 +69,7 @@ produce a correct but empty result that looks exactly like a downstream bug.
 
 A `withdrawal` basis may only lower a state, and must name a tombstone in the same workspace.
 
-## The measurement the lane is calibrated against
+## The measurement the policy is calibrated against
 
 Measured 2026-09-11 by rebuilding subsets of the 210-photograph Montserrat volcanic sample
 (Mike R. James and Stuart Robson, CC0) on the CPU with pycolmap 4.2.0:
@@ -77,7 +81,7 @@ Measured 2026-09-11 by rebuilding subsets of the 210-photograph Montserrat volca
 | 12 | ~7 deg | 12 of 12 | accepted, 0.40 px |
 | 210 | ~1.7 deg | 210 of 210 | accepted |
 
-**Two corrections, both from the receipts rather than from arithmetic.**
+**The spacing, read from the receipts.**
 
 The photographs each run used are named in its pose receipt by SHA-256, so the index lists
 below are read, not reconstructed. The script that drew them (`small_capture.py`) keeps only the
@@ -132,15 +136,13 @@ curve. That curve contains the photographs of the four rows, so **the rows are n
 the design choice**. Frames 113 to 209 are a different series and were not used to choose
 anything.
 
-**The decode path changed after the first measurement, and the result changed with it.** The
-design was chosen and first measured with Pillow's JPEG draft scaling. The full test suite then
-showed that this opened photographs outside the repository's one decoder
-(`tests/test_ingest_persistence.py::test_a_photograph_becomes_pixels_in_exactly_one_module`).
-With the draft decode, the declared rule chose 8 and all four rows were right at 7, 8 and 9. With
-the sanctioned full decode, the same rule still chooses 8, all four rows are right only at 6 and 7,
-and the set that registered 12 of 12 is refused. Every number below is from the sanctioned decode.
-A separation that flips with a decode detail is not a separation this descriptor can be trusted
-with.
+**The decode is part of the result.** The design was chosen with Pillow's JPEG draft scaling,
+which opens photographs outside the repository's one decoder
+(`tests/test_ingest_persistence.py::test_a_photograph_becomes_pixels_in_exactly_one_module`). Under
+that draft decode all four rows were right at 7, 8 and 9. Under the sanctioned full decode the
+declared rule still chooses 8, all four rows are right only at 6 and 7, and the set that registered
+12 of 12 is refused. Every number below is from the sanctioned decode. A separation that flips with
+a decode detail is not one this descriptor can be trusted with.
 
 ## The policy and its threshold
 
@@ -173,8 +175,8 @@ The last column is where the verdict changes as the edge threshold rises from 1 
 The six is refused for the right decision with a ceiling one state too high. That is allowed for a
 ceiling, which is an upper bound. The set that registered is refused outright: its two weakest
 neighbour links score 7 and 8. **All four rows are decided right only at thresholds 6 and 7.** The
-declared rule chose 8, and choosing 6 or 7 now, after seeing the rows, would be fitting the
-threshold to the rows.
+declared rule chose 8, and choosing 6 or 7 after seeing the rows would be fitting the threshold to
+the rows.
 
 ## Monotonicity
 
@@ -191,7 +193,7 @@ the sequences in which a refusal becomes a run again:
 | 10 | 2 | 1 | no | no |
 | 12 | 0 | 1 | no | no |
 
-**By the lane's own definition, the verdict is a fit wherever it is right.** No threshold is both
+**By its own definition, the verdict is a fit wherever it is right.** No threshold is both
 close to monotone and right about the two twelves. The one threshold that is right on all five
 known outcomes, 6, was found only after seeing them, and it is the least monotone of all. The
 reversals come from chance edges, pairs of coincidental matches that pass the far-pair
@@ -218,22 +220,19 @@ Policy v1 says `registered_partial`: 6 groups, largest 20, 3 photographs overlap
 edges among 1275 pairs, refused from threshold 7 upward. **It would have turned away the one real
 set that trained.** Only 26 of the 50 consecutive handheld shots link at the threshold. Handheld
 photographs change scale and roll between shots, and a descriptor chosen on a fixed-camera
-turntable is invariant to neither. (With the earlier draft decode it said the same with 5 groups
-and 67 edges.)
+turntable is invariant to neither.
 
 So `refusal_authorised` is false. The schema refuses a verdict-based refusal under it, and the
 read seam returns such a verdict for evaluation and offers its sentences neither as `advice` nor
-as a record's `reason`. The
-bowl is now spent as a held-out set: any policy chosen after seeing this result needs a fresh one.
+as a record's `reason`. The bowl is spent as a held-out set: any policy chosen after seeing this
+result needs a fresh one.
 
 ## Cost
 
 The 210-photograph verdict (210 decodes, 21,945 pair scores) took 41.5 and 42.1 seconds of wall
 clock in the two retained runs through the sanctioned decoder, with 138 to 143 MiB peak resident
-memory, because a full 12-megapixel frame is decoded before it is reduced. The draft-scaled
-decode had taken 36 to 47 seconds under varying load from other work. The bowl took 4.4
-seconds. Nothing else is involved: no reconstruction, no
-process, no device. `tests/test_capture_overlap.py` refuses process creation for the whole
+memory, because a full 12-megapixel frame is decoded before it is reduced. The bowl took 4.4
+seconds. Nothing else is involved: no reconstruction, no process, no device. `tests/test_capture_overlap.py` refuses process creation for the whole
 measurement, checks that nothing heavy was imported during it, and checks in a fresh `-I`
 process that importing the package and running a verdict loads none of torch, numpy, cv2,
 pycolmap, psycopg, `exulanica.db`, `exulanica.store`, `exulanica.evidence`,
@@ -255,11 +254,11 @@ point inside Pillow, so the descriptor profile names what was measured and does 
 Whether a chain of photographs comes back round is the natural way to say "one side of the subject
 has no coverage". Two readings of it from the thresholded graph were measured against turntable
 arcs of known extent. Reading the middle layer's spread misread 3 of 22 determined arcs, and
-removing a middle photograph and checking whether the ends still connect misread 2 of 22. With the
-earlier draft decode the same readings misread 7 and 6 of 23. A single chance edge makes an open
-arc look closed, and a reading that moves that much with a decode detail is not established. So the graph does not report closure, and the
-vocabulary entry `one_side_uncovered` exists but no current policy emits it. A pose receipt's
-cameras could measure it after a run.
+removing a middle photograph and checking whether the ends still connect misread 2 of 22; under
+the draft decode the same readings misread 7 and 6 of 23. A single chance edge makes an open arc
+look closed, and a reading that moves that much with a decode detail is not established. So the
+graph does not report closure, and the vocabulary entry `one_side_uncovered` exists but no policy
+emits it. A pose receipt's cameras could measure it after a run.
 
 ## The instruction vocabulary
 
@@ -346,11 +345,10 @@ package.
 ## What is not here
 
 * **No writer outside SQL.** Records and events are written by inserting rows, and the schema
-  enforces every rule above. No pipeline stage writes them yet. That belongs to the ingest side,
-  which this lane does not own.
+  enforces every rule above. No pipeline stage writes them.
 * **A withdrawal event's tombstone is checked only for existence in the workspace**, not for being
   the cause of the lowered state.
-* **No route.** The read seam has no HTTP surface yet.
+* **No route.** The read seam has no HTTP surface, and no part of the application reads it.
 * **Not built:** anchors, frames, scale, precincts, or the rendered form of a refusal.
 
 ## Evidence

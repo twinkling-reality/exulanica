@@ -32,7 +32,7 @@
  *
  * **No remote asset URL is accepted.** An asset is identified by content digest and its bytes are
  * read from `/world/assets/{asset_key}/bytes`. There is no href on the wire at all, which is the
- * strongest form of the rule `world-style-backend.md` states for recipes.
+ * strongest form of the rule `world-version-authorities.md` states for recipes.
  */
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';

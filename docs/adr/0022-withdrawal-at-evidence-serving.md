@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-09-05
 - Deciders: Exulanica build, during the unblocked backend program review
+- Affects: [asset read currency](../asset-read-currency.md)
 
 ## Invariant
 

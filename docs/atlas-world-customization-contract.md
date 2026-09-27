@@ -1,10 +1,13 @@
 # Atlas world customization contract
 
-Status: **DECISION** and **IMPLEMENTED** for global appearance customization. PostgreSQL appearance
-transactions, the HTTP lifecycle, exact frontend recipe handshake, generated controls, transient
-preview, apply/discard/refine/rollback review, provenance/history, authenticated source-media
-loading, and Companion proposals drafted from a person's sentence exist. The regional renderer
-preview, complete multi-style library, and structural topology editor do not.
+This contract owns the browser half of a world's appearance: which values a proposal may never
+change, the appearance proposal and its review in the page, profile compatibility and programmable
+controls, failure rules, source-media loading, the frontend integration boundary, and the
+Companion's own appearance. The server half, with its transactions, registry and HTTP routes, is
+the [appearance authority](world-version-authorities.md#appearance-authority). Global appearance
+customization is implemented, including Companion proposals drafted from a person's sentence; a
+regional renderer preview, a library of several complete styles and a structural topology editor
+are not built.
 
 ## 1. Protected topology
 
@@ -68,11 +71,15 @@ may not change sockets, collision, navigation, evidence, or destination position
 
 A style descriptor owns a parameter manifest. Each control has a stable key, a renderer capability,
 kind, group, label, explanation, safe range/options, and default. Different styles may expose
-different manifests. Options renders the active manifest rather than hard-coding Aeroheart sliders.
+different manifests. Customize renders the active manifest rather than hard-coding Aeroheart sliders.
 
-The frontend recipe contract inspected at `55b1236` is the execution boundary. Its version-one
-recipe contains `schemaVersion`, product/developer availability, authored/generated origin, a
-versioned visual profile, bounded controls, and reviewed local module IDs. The frontend owns the
+The version-one recipe is the execution boundary. Which profiles exist, their availability, modules
+and controls are authored once, in the backend registry whose exact bytes the presentation package
+embeds; the browser authors only how each profile looks
+(`web/packages/presentation/src/world-style-recipes.ts`) and the historical module bindings a saved
+world may carry. A recipe contains `schemaVersion`, product/developer availability,
+authored/generated origin, a versioned visual profile, bounded controls, and reviewed local module
+IDs. The frontend owns the
 visual profile, module implementations, exact capability validation, contrast correction,
 protected component geometry, preview rendering, reduced-motion behavior, and accessibility. The
 backend does not reproduce that visual source. It returns and persists an inert `recipeBinding`
@@ -87,7 +94,7 @@ preview-session state are excluded. Apply records those values on the immutable 
 discard, stale closure, refinement, and rollback remain inspectable without turning transient
 conversation into a durable preference.
 
-The frontend now stores each style definition as a JSON-serializable version-one recipe with:
+Each style definition is a JSON-serializable version-one recipe with:
 
 ```text
 schemaVersion
@@ -103,7 +110,7 @@ world-style registry validates profile data, the control manifest, module existe
 one-to-one capability binding. It then compiles the recipe through the selected reviewed modules.
 Unknown modules, duplicate capability owners, unmatched controls, invalid defaults, and unsafe
 ranges fail closed. The registry itself contains no profile-ID branches, so adding a validated
-recipe does not require adding another conditional path through Options or the renderer binding.
+recipe does not require adding another conditional path through Customize or the renderer binding.
 
 A module is trusted application code and is the only executable part of style resolution. Shared
 modules cover registered surface finish and bounded tempo; authored response modules
@@ -115,20 +122,17 @@ capability still requires a reviewed frontend module and capability-registry ent
 The profile contains one shared visual DNA palette. The renderer consumes its sky, field, source,
 relationship, and unresolved roots directly. A trusted deterministic adapter derives interface
 ground, surface, ink, focus, provenance, uncertainty, and Companion roles from those same roots and
-corrects them to minimum contrast. A profile can no longer author a second, unrelated UI palette.
+corrects them to minimum contrast. A profile cannot author a second, unrelated UI palette.
 
-**CORRECTED.** "Corrects them to minimum contrast" was the whole specification of the adapter, and
-it was not enough to keep a world recognisable. Four constraints now bind it, all in
-`packages/presentation/src/world-style-model.ts` and all profile-agnostic:
+Four profile-agnostic constraints bind the adapter, all in
+`web/packages/presentation/src/world-style-model.ts`:
 
 1. Each role is placed at an authored perceptual lightness before any correction runs. Contrast
-   correction is a floor and never the thing that chooses a colour. Without this every role landed
-   on its own minimum and the interface held two values total.
+   correction is a floor and never the thing that chooses a colour.
 2. Lightness changes happen in OKLCH. Mixing toward black in sRGB preserves the channel ratio and
    destroys the channel difference, so a world with a pale ground lost every hue it authored.
-3. Structural roles read from the ground and the air together. Reading from the ground alone was
-   correct only while the ground happened to be dark, and it silently failed the moment a world
-   authored a light field.
+3. Structural roles read from the ground and the air together, so a world that authors a light
+   field still has a hue to spend.
 4. The reading floor carries a margin above the requirement, because a role corrected against the
    lightest theoretical surface is below the requirement on the actual surface a component builds
    from it.
@@ -161,7 +165,7 @@ runtime. A genuinely new renderer feature remains a reviewed software change. Un
 unknown parameters, invalid values, and out-of-range values fail before preview.
 
 Aeroheart is the sole complete user-facing identity and uses the authored daylight exposure. Survey
-Relief remains an intentionally extreme internal regression fixture, not a product alternative or
+Relief is an intentionally extreme internal regression fixture, not a product alternative or
 evidence that unrelated styles form one family. The
 minimum presentation matrix is therefore:
 
@@ -186,11 +190,11 @@ stroke, and focus uses contrast + outline.
 - unreachable required destination → reject composition;
 - failed/discarded preview → current style and topology remain unchanged.
 
-Settings and Companion are proposal origins, not separate rule engines. Settings exposes the
-active style's generated parameter controls; a different validated style may expose a different
-manifest. It does not expose the incomplete Survey fixture as a product choice. Input changes are
+The `settings` and `companion` origins are proposal origins, not separate rule engines. Customize
+exposes the active style's generated parameter controls; a different validated style may expose a
+different manifest. It does not expose the incomplete Survey fixture as a product choice. Input changes are
 live, isolated previews in both the renderer and backend. The person must choose **Apply world design** to persist them, and may use
-**Undo preview** or leave Options to restore the saved style. The visible editor names what is
+**Undo preview** or leave Customize to restore the saved style. The visible editor names what is
 protected and states that Companion designs arrive there as bounded profile values from an
 upstream proposal service, and that Exulanica does not generate recipes or run model output in the
 browser.
@@ -208,18 +212,18 @@ conversation text are not renderer instructions and never bypass manifest valida
 The production boundary is `exulanica/world/`, migrations `0017_adaptive_world_styles.sql` and
 `0023_frontend_world_recipe_contract.sql`, and the `/world/styles` routes. Durable versions and
 current pointers live there; live conversation and isolated preview sessions remain separate. See
-[world-style-backend.md](world-style-backend.md).
+[world version authorities](world-version-authorities.md#appearance-authority).
 
 The production frontend persists the resulting immutable style version through the backend
 boundary. The per-device preference is only a render cache for the server-owned current version;
 it is not a competing current pointer.
 
-The per-device preference now stores both profile ID and profile version. An unknown pair falls
+The per-device preference stores both profile ID and profile version. An unknown pair falls
 back to the product default and discards its parameters rather than interpreting old values against
 a newer recipe. Product availability also comes from the recipe registry instead of a second
 hard-coded profile allowlist.
 
-The expected personal-world lifecycle is:
+The appearance lifecycle is:
 
 `authored default → human request or direct controls → model selects registered capabilities and values → validation → live world + UI preview → explicit apply → immutable style version → rollback by appending a new version`
 
@@ -239,18 +243,37 @@ plus a provenance-bearing asset reference naming the protected source slot and e
 Unavailable states expose no asset reference. Private media remains in the evidence store and
 never enters a style recipe.
 
-The frontend loads the source list with the workspace bearer token, verifies each asset reference's
-local evidence path and source/span provenance, fetches bytes with the same authorization header,
-and gives the renderer a bounded-lifetime blob URL. It revokes those URLs when the application
+The frontend (`web/packages/app/src/source-media-api.ts`) loads the source list with the workspace
+bearer token, verifies each asset reference's workspace-bearer declaration, local evidence path and
+source/span provenance, fetches bytes with the same authorization header, and gives the renderer a
+bounded-lifetime blob URL; only an image response becomes one. It revokes those URLs when the application
 session ends. Missing evidence, unavailable bytes, authorization failure, provenance mismatch, and
 network failure remain distinct visible states and never receive replacement imagery.
 
 ## 7. Frontend integration boundary
 
+The backend owns immutable versions, the current pointer, the style and topology compare-and-swap
+tokens, proposal status, actor and origin, acceptance and rejection, refinement lineage, rollback,
+references, model and prompt versions, authorization and source-slot provenance. The frontend owns
+the reviewed recipe and module implementations, strict capability and parameter validation,
+contrast correction, protected component geometry, accessibility and preview rendering. No API
+response can introduce CSS, HTML, JavaScript, shaders, renderer programs, layout instructions or a
+remote texture URL.
+
 `web/packages/app/src/world-style-api.ts` is the only camel-case/snake-case translation layer. At
 startup it verifies the catalog contract commit, exact profile versions, control manifests, module
 IDs, and capability mappings against the local recipe registry. Current state and history then
-hydrate the renderer from backend values. Unknown or mismatched data fails closed before rendering.
+hydrate the renderer from backend values; local storage is only a device cache. Unknown or
+mismatched data fails closed before rendering.
+
+Direct controls render immediately through the local trusted modules and create an isolated backend
+preview after a short input debounce. Undo, leaving Customize or replacing a preview closes the
+backend preview without moving the current pointer. Apply posts the exact preview bases and updates
+the page only after the server returns a new immutable version. Customize shows the current revision
+and id, actor, origin and origin reference, model and prompt provenance, warnings, refinement and
+reference information, and the immutable history (Version history). Loading, unavailable, failed,
+checking, saved and stale states are announced through live regions and stay keyboard operable
+inside the modal focus boundary.
 
 Settings input creates a transient local renderer preview and an isolated backend preview. Apply
 uses the preview's exact style and topology bases. If another writer wins, Atlas reads the new
@@ -263,7 +286,7 @@ follows the stricter rule below.
 an already-structured upstream proposal with profile values and provenance. The browser does not
 call a model or translate conversation text. Companion proposals require an origin reference,
 reference IDs, model ID, and prompt version, and refinements retain `refinesProposalId`. The same
-Options review applies or discards them. The Companion supplies those records:
+Customize review applies or discards them. The Companion supplies those records:
 `POST /selection/appearance` (`exulanica/api/routes/selection.py`) drafts one from a person's
 sentence on the server, and `web/packages/app/src/composition/companion.ts` hands it to the inbox.
 
@@ -305,21 +328,26 @@ lifetime is the backend's. `web/packages/app/src/world-style-api.ts` and
 `web/packages/app/src/composition/appearance.ts` hold these rules, and
 `web/packages/app/test/companion-proposals.test.ts` holds them against a scripted authority.
 
-Regional records remain backend-authoritative and are parsed without reinterpretation, but the
-current renderer has only a reviewed global profile preview. The UI therefore refuses to display a
-regional proposal as a global change. Shipping regional controls requires a reviewed per-region
-renderer path first.
+Regional records are backend-authoritative and are parsed without reinterpretation, but the
+renderer has only a reviewed global profile preview. The UI therefore refuses to display a regional
+proposal as a global change. Regional controls require a reviewed per-region renderer path first.
+
+Browser coverage is in `web/packages/app/test/world-style-api.test.ts`,
+`world-style-proposals.test.ts`, `companion-proposals.test.ts`, `source-media-api.test.ts`,
+`options.test.ts` and `surface.test.ts`; the server's guarantees are listed under the
+[world version authorities](world-version-authorities.md#verification).
 
 ## 8. Companion appearance is a separate version family
 
 Companion appearance is not world appearance and neither is memory-graph state. The versioned V3
-shape lives in `packages/presentation/src/companion-appearance.ts` and includes
+shape lives in `web/packages/presentation/src/companion-appearance.ts` and includes
 `companionModelVersion`, one geometric silhouette, colour, two-eye expression, catalog-derived body
 and eye colours, `motionProfile`, and `reducedMotionProfile`. Unknown versions fail closed to the
 current configuration; V1 and V2 prototype records migrate explicitly instead of being
 reinterpreted.
 
-Options exposes six silhouettes, five colours, and five two-eye expressions. The resolved
+Customize lists every silhouette, colour and two-eye expression the presentation package declares
+(`COMPANION_BODY_VARIANTS`, `COMPANION_COLOR_VARIANTS` and `COMPANION_FACE_VARIANTS`, in that order). The resolved
 configuration is applied to the DOM/SVG Companion and persisted only as a device preference. There
 are no accessory or humanoid-body controls. No graph assertion, evidence handle, topology digest,
 navigation destination, or world style version contains or derives these values.

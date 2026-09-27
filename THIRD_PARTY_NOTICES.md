@@ -165,8 +165,10 @@ Item **T-4** in section 9.
 
 The same applies to the Tavily Search API, although no product code calls it: no public-entity
 lookup is built, and `scripts/verify_web_lookup.py` made one credential check with it. Tavily's
-privacy page was read on 2026-08-27 and is summarized in
-[docs/platform-findings.md](docs/platform-findings.md) section 5. Its terms of service were not.
+privacy page, read on 2026-08-27, states that it may use portions of query data to improve future
+responses, that it shares query data with third-party index providers where its own index cannot
+retrieve content, and that queries should not carry personal information. Its terms of service
+were not read.
 
 ---
 

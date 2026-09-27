@@ -1,17 +1,95 @@
-# Representation decisions
+# Generated-world representation decisions
 
-Every choice about how the world is represented, what each one assumes, and the condition that would
-force it to change. A decision is listed here whether or not it is settled. An unsettled one says so.
+This reference owns how a generated world is represented: the tile container the tessellator in
+`web/packages/loom-tess` bakes from a grammar package, what that representation lets a reader name,
+select, vary and compare, each decision it rests on, and the condition that would force the decision
+to change. A decision is listed whether or not it is settled, and an unsettled one says so. A
+representation decision that lives only in the code is indistinguishable from an accident: a reader
+cannot tell a value that was chosen from a value that was never questioned.
 
-The reason this document exists: a representation decision that lives only in the code is
-indistinguishable from an accident. A reader cannot tell a value that was chosen from a value that
-was never questioned, and neither can a rule.
+## Contents
+
+- [A world built from records](#a-world-built-from-records)
+- [What the representation supports](#what-the-representation-supports)
+- [What it does not support](#what-it-does-not-support)
+- [Settled](#settled)
+- [Settled, and only partly built](#settled-and-only-partly-built)
+- [Unsettled, and named so nobody assumes otherwise](#unsettled-and-named-so-nobody-assumes-otherwise)
+
+## A world built from records
+
+A generated world is built from records rather than modelled as a surface, so any part of it can be
+named, selected, varied or held fixed. A controlled comparison of two worlds needs them identical
+except in one respect, and three properties together make that demonstrable:
+
+| Property | Mechanism |
+| --- | --- |
+| Every drawn thing has an identity | `render_batch` preserves the record and stated identity of every triangle, as a contract term |
+| Every world has a name that depends on its inputs | Content addressing: the container digest, `tile_inputs_digest`, per-projection triangle digests, the catalog digest, the tessellator version and the grammar version pins |
+| Generation reads nothing but its declared inputs | A source scan over the tessellator's core |
+
+The third does the most work. Without it two worlds could differ in ways no digest records.
+`web/packages/loom-tess/test/vocabulary-emptiness.test.ts` scans every file in the tessellator's core
+and refuses, among other things:
+
+| Refused | What it would otherwise admit |
+| --- | --- |
+| Domain vocabulary in source | A word the grammar should state, fixed in code where no document can vary it |
+| Bare numeric literals | A dimension nobody declared |
+| `??`, `\|\|`, default parameters, a `switch` default | A fallback that silently supplies a value the inputs did not |
+| `Math.random` | Variation no digest can reproduce |
+| `Date.now` | A result that depends on when it ran |
+| `localeCompare`, unsorted `Object.keys`, `for...in` | An order that depends on the host |
+| Filesystem and dynamic imports | An input arriving from outside the declared ones |
+
+The scan carries its own positive control: planted violations must be found first, so a scan that
+stopped working would fail rather than pass. These rules are why two containers with the same inputs
+are byte-identical, and therefore why a difference between two worlds can be attributed to what was
+changed.
+
+## What the representation supports
+
+**Selection and counting by identity.** Each drawn entry names its record and its triangle range, and
+each surface within it names its role, orientation and material record, or states that none exists.
+No role is inferred from geometry, so how many square metres a role covers, or every triangle of one
+record, is answered from the container without rendering anything.
+
+**Attributing a change to its cause.** Digests move independently. A catalog change moves the
+container digest and not the triangle digests, so provenance changes and geometry changes are told
+apart without inspecting either. The corridor street's
+[six bakes](generated-corridor-street.md#9-the-bakes-of-one-street) show
+this, including a bake where nothing drawn or walked changed and only the container digest moved.
+
+**Stating what is absent.** A container entry carries `unavailable` with the needs that would satisfy
+it, or `not_admitted`, `not_in_projection` or `halo`, so a comparison distinguishes a thing that is
+missing from a thing that was never admitted.
+
+**Predicting before measuring.** The visual gate commits its predictions to the repository before a
+run and keeps the wrong ones ([visual gate targets](visual-gate-targets.md)).
+
+## What it does not support
+
+**Naming a record from a pixel.** Identity reaches the triangle, not the frame. Going from a rendered
+pixel through the depth buffer to the triangle and its record is not built, so a container can be
+queried by identity but a picture cannot be captioned by one, and a claim about what a frame shows
+rests on a person looking at it.
+
+**A world variant as a first-class object.** Nothing in the tile schema says that two tiles are the A
+and the B of one comparison, which input distinguishes them, or what question they were built to
+answer; that relationship lives in prose beside them, and a comparison whose design is prose can
+drift from what was run. Comparisons of models are different: a comparison runs the same hour of one
+saved world once per model and is stored and replayed as a declared object
+([society experiments](society-experiments.md#comparisons-of-models)).
+
+**Occupancy and picking.** `collision_proxy` and `pick_geometry` are named by the grammar and have no
+contract (below). A consumer needing solid occupancy has no projection that offers it, and
+`nav_envelope` must not be substituted: its contract is support and clearance, not solidity.
 
 ## Settled
 
 ### Coordinates are exact integers
 
-Recorded in `docs/adr/0024-declared-coordinate-quantum.md`.
+Recorded in [ADR-0024](adr/0024-declared-coordinate-quantum.md).
 
 The quantum is one millimetre, declared in the container header and refused on mismatch by
 `checkHeader`, and stated by a tile document in its tile record, closed to that one value by the
@@ -35,9 +113,7 @@ evaluates to -5.551e-17.
 
 A container entry carries its state: `drawn`, `unavailable` with the needs that would satisfy it,
 `not_admitted`, `not_in_projection`, or `halo`. A record the tessellator cannot draw produces a
-statement about why, not a gap.
-
-This is unusual and it is deliberate. Most generated worlds represent absence as nothing, which makes
+statement about why, not a gap. Most generated worlds represent absence as nothing, which makes
 absence indistinguishable from an oversight.
 
 **Forcing condition:** none. This one is a floor, not a compromise.
@@ -45,12 +121,9 @@ absence indistinguishable from an oversight.
 ### Record identity reaches the triangle
 
 `render_batch` preserves "the record and stated identity of every triangle" as a contract term, not
-as an implementation detail. Each drawn entry names its record and its triangle range, and each
-surface within it names its role, orientation and material record, or states that none exists. No
-role is inferred from geometry.
+as an implementation detail. This is what makes the world queryable rather than merely renderable.
 
-**Forcing condition:** none. This is what makes the world queryable rather than merely renderable.
-See `docs/world-variation-and-segments.md`.
+**Forcing condition:** none.
 
 ## Settled, and only partly built
 
@@ -61,12 +134,9 @@ The grammar names `render_batch`, `collision_proxy`, `nav_envelope`, `pick_geome
 two: `render_batch` and `nav_envelope`.
 
 The three that are not materialised have no contract, which is why they are absent rather than
-approximated. A reader wanting solid occupancy wants `collision_proxy` and must not substitute
-`nav_envelope`, whose contract is support and clearance, not solidity.
-
-**Consequence today:** a consumer needing occupancy or picking either does without or improvises one
-from a projection whose contract forbids that use. `render_batch` names `support height`, `collision`
-and `measurement` as inadmissible uses.
+approximated. A consumer needing occupancy or picking either does without or improvises one from a
+projection whose contract forbids that use: `render_batch` names `support height`, `collision` and
+`measurement` as inadmissible uses.
 
 **Forcing condition:** a consumer that needs one. Design the contract before the geometry, as the two
 materialised projections were.
@@ -74,20 +144,18 @@ materialised projections were.
 ### One level of detail
 
 `MATERIALISED_LOD` is 0. A tile at any other level is refused rather than drawn at this one and
-labelled as the other.
+labelled as the other. Drawing one level and calling it another is how a world starts lying about
+its own fidelity.
 
-The refusal is the decision. Drawing one level and calling it another is how a world starts lying
-about its own fidelity.
-
-**Forcing condition:** a scene too large to draw at one level. Nothing in the tree is yet.
+**Forcing condition:** a scene too large to draw at one level. No such scene exists in the
+repository.
 
 ## Unsettled, and named so nobody assumes otherwise
 
 ### The step rule is absolute, not a gradient
 
-The walking rule compares a height difference against a fixed step. The world states a step it will
-climb, measured at 0.18 m in the gate's run record in `docs/visual-gate-targets.md`. A surface that
-rises more is refused.
+The walking rule compares a height difference against a fixed step: the walker climbs a step of
+180 mm ([visual gate targets](visual-gate-targets.md)), and a surface that rises more is refused.
 
 **The defect this hides:** a real ramp rises continuously and would be refused, correctly by the
 letter of the rule and wrongly by its intent. Nothing on the corridor is a ramp, so the defect has
@@ -105,21 +173,21 @@ A catalog entry states its provenance as English prose, and the gate matches on 
 that sentence. Matching on the opening of a sentence is a parser over English, and English is not a
 schema.
 
-**The revision, decided in principle and deliberately unscheduled:** a declared field from a closed
-set the schema names, so the loader refuses an unknown value and the field enters the digest like
-every other schema field.
+**The revision, decided in principle and not scheduled:** a declared field from a closed set the
+schema names, so the loader refuses an unknown value and the field enters the digest like every other
+schema field.
 
 **Two hazards recorded with it.** The proposed third value, `depicts`, is a weak name and was left
 unchosen rather than picked quietly. And the obvious field name is taken: `origin_kind` is already a
 column on world objects in `exulanica/world/object_repository.py`, describing a different axis. A
 catalog field of the same name would collide in every reader that handles both.
 
-**Separable and cheaper, needing no digest move:** the licence contradiction test alone. Measured
-across 133 city entries: 98 authored with an original licence, which the gate asserts; 19 derived
-with a derived licence, which nothing asserts; 16 carrying the material sentence with an original
-licence, whose origin nothing ties to its register. The hole is 35 entries wide.
+**Separable and cheaper, needing no digest move:** the licence contradiction test alone. Measured on
+2026-09-18 at 782ab758 across 133 city entries: 98 authored with an original licence, which the gate
+asserts; 19 derived with a derived licence, which nothing asserts; 16 carrying the material sentence
+with an original licence, whose origin nothing ties to its register. The hole was 35 entries wide.
 
-**Forcing condition:** the next catalog change that is already moving the digest, so the world rebakes
+**Forcing condition:** the next catalog change that already moves the digest, so the world rebakes
 once for two reasons rather than twice for one each.
 
 ### A surface knows its look and not its physics
@@ -134,5 +202,5 @@ classes already exist.
 
 **Forcing condition:** a question about the world that is not about looking at it. Do not build it
 before that question is real, and do not build it before `collision_proxy` and `pick_geometry`, which
-are named, needed and still missing. A design that grows a sixth projection while three of five are
+are named, needed and missing. A design that grows a sixth projection while three of five are
 unbuilt is getting wide instead of deep.

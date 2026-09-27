@@ -34,7 +34,7 @@ million public model repositories; roughly 85.6% of models with fewer than 200 l
 downloads).</sub>
 
 <p align="center">
-  <img src="assets/brand/exulanica/readme-world-model.svg" width="100%" alt="Product direction: a world you build sits at the centre, and open models run the agents in it, each model in its own role. Swap the model behind a role and compare the two runs. Hand building, photographs and imported content are ways to build the world.">
+  <img src="assets/brand/exulanica/readme-worlds-for-ai-agents.svg" width="100%" alt="Product direction: a world you build sits at the centre, and open models run the agents in it, each model in its own role. Swap the model behind a role and compare the two runs. Hand building, photographs and imported content are ways to build the world.">
   <br><sub>Product direction. The capability boundaries below distinguish implemented foundations from delivery targets.</sub>
 </p>
 
@@ -54,28 +54,30 @@ animals and shopkeepers are not model roles. Every hosted model call passes one 
 that enforces the egress allowlist, the budget and the person's rights.
 
 Built: several open models serve hosted roles through that boundary (the
-[model manifest](exulanica/models/models.manifest.json)). The people in a saved world follow a
-deterministic planner, and the world's owner can choose an open model to decide for one person or a
-group; each choice is validated, stored and replayed without calling the model again
-([model choice](docs/synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose)).
-A comparison runs the same simulated hour once per model for one group of people, scores how they
-fared against a control run, and the application shows the runs side by side; judged comparisons
-are recorded ([comparisons of models](docs/society-experiments.md#comparisons-of-models)). Not
-built: people and models in a world made from photographs, comparisons started from the
-application, model roles other than a person, and a retraining loop. The
+[model manifest](exulanica/models/models.manifest.json)). The people in a saved world, whether it
+started from the empty starter or was made from photographs, follow a deterministic planner, and
+the world's owner can choose an open model to decide for one person or a group; each choice is
+validated, stored and replayed without calling the model again
+([people and models in a world](docs/capabilities/simulation.md)). A comparison runs the same
+simulated hour once per model for one group of people, scores how they fared against a control
+run, and the application shows the runs side by side; judged comparisons are recorded
+([comparisons of models](docs/society-experiments.md#comparisons-of-models)). Not built:
+comparisons started from the application, model roles other than a person, traffic, weather or an
+economy run by models, and a retraining loop. The
 [first milestone](docs/product-direction.md#first-milestone) is two open models running one town,
-shown side by side.
+shown side by side; the implementation runs one simulated hour of a small square's eight people.
 
 ## The world
 
-The [product roadmap](docs/product-direction.md) defines six connected parts of the experience:
+The experience has six connected parts; [product direction](docs/product-direction.md) sets the
+order they are delivered in:
 
 <table>
   <tr>
     <td width="50%" valign="top">
       <h3>Models run your world</h3>
-      Open models decide what the people in your world do. The engine validates every decision and stores it, so a run replays exactly. The world's owner chooses the model for each person or group of people; with no choice, their routine decides.
-      <p><a href="docs/capabilities/simulation.md">Simulation</a> · <a href="docs/model-and-service-selection.md">Model selection</a></p>
+      Open models decide what the people in your world do: where to go, whether to wait, stand a while or stop to talk. The engine validates every decision and stores it, so a run replays exactly. The world's owner chooses the model for each person or group of people; with no choice, their routine decides.
+      <p><a href="docs/capabilities/simulation.md">People and models</a> · <a href="docs/decision-roles-contract.md">Decision roles</a> · <a href="docs/model-and-service-selection.md">Model selection</a></p>
     </td>
     <td width="50%" valign="top">
       <h3>Swap a model, see the difference</h3>
@@ -86,13 +88,13 @@ The [product roadmap](docs/product-direction.md) defines six connected parts of 
   <tr>
     <td valign="top">
       <h3>Build your world</h3>
-      Place pieces from the catalogs by hand, make a world from photographs of a real place, or import content with its origin labelled, and your edits persist as versions. Models decide for people only in worlds started from the empty authored starter, and a world made from photographs holds no people.
+      Place pieces from the catalogs by hand, make a world from photographs of a real place, or import content with its origin labelled, and your edits persist as versions. A world started from the empty starter and a world made from photographs each host eight people on their ground, and the world's owner chooses the model that decides for them.
       <p><a href="docs/capabilities/world-creation.md">World creation</a> · <a href="docs/capabilities/scene-reconstruction.md">Reconstruction</a></p>
     </td>
     <td valign="top">
       <h3>Give the world life</h3>
-      The people in your world follow routines, walk to the places they use and respond to what you change. How the world and its time behave is its engine's; a person does not configure those rules.
-      <p><a href="docs/synthetic-society-contract.md">Society contract</a> · <a href="docs/product-direction.md#configurable-world-rules">World rules</a></p>
+      The people in your world follow routines, walk to the places they use and respond to what you change. Small birds fly and perch on the trees that host them, on a clock everyone watching shares. How the world and its time behave is its engine's; a person does not configure those rules.
+      <p><a href="docs/synthetic-society-contract.md">Society contract</a> · <a href="docs/movement-modules-contract.md">Movement modules</a> · <a href="docs/product-direction.md#configurable-world-rules">World rules</a></p>
     </td>
   </tr>
   <tr>
@@ -129,11 +131,11 @@ supported operations; the full product direction is broader than those component
 
 | Area | Implemented foundation | Delivery target |
 | --- | --- | --- |
-| Models in the world | Open models in hosted roles through one policy boundary; a model chosen per person or group of a saved world's people, validated, stored and replayed; comparisons of models scored against a control and shown side by side | Comparisons started from the application, model roles other than a person, people in every kind of world and a retraining loop |
-| Persistent worlds | Authored starter worlds, saved versions, object edits and undo, appearance state, reference photographs | A complete personal-media-to-editable-world journey |
+| Models in the world | Open models in hosted roles through one policy boundary; a model chosen per person or group of a saved world's people, validated, stored and replayed; comparisons of models scored against a control and shown side by side | Comparisons started from the application, model roles other than a person, and a retraining loop |
+| Persistent worlds | Authored starter worlds, worlds made from reviewed photographs, saved versions, object edits and undo, appearance state, reference photographs | A complete personal-media-to-editable-world journey |
 | Inspectable data | Supported point and surface representations, subject selection, structured records and source references | Complete reusable object extraction and consistent semantic coverage across sources |
-| Companion | Conversation, selection context and reviewed appearance proposals | Shared activity, durable personal continuity and broader creation tools |
-| Life and experiments | Deterministic societies, bounded motion, recorded paired comparisons with specific interventions | Richer social behavior, customizable world rules and validated model-driven scenarios |
+| Companion | Grounded answers, including about a world's simulated people; conversation memory kept across reloads; reviewed appearance proposals | Shared activity, durable personal continuity and broader creation tools |
+| Life and experiments | Societies of eight people on a saved world's ground, with routines as data (rest, visit, stand, talk); small birds on a shared clock; recorded paired experiments with specific interventions | Richer social behavior, traffic in a world, customizable world rules and validated model-driven scenarios |
 | Developer access | Authenticated world APIs, an independent Python client and signed partial world packages | General model adapters, dataset workflows and runnable interchange |
 
 General model adapters, user-defined world rules and dataset generation are delivery targets.
@@ -149,16 +151,18 @@ authored content and simulation results retain distinct origins and meanings.
 
 | Module | Responsibility | Reference |
 | --- | --- | --- |
-| World state | Versions, sources, identities and edit history | [World state architecture](docs/world-memory-model.md) |
+| World state | Identity, epistemic planes and representations; versions and edit history | [World state architecture](docs/world-memory-model.md) · [World objects](docs/world-objects-contract.md) |
 | Creation and representation | Reconstruction, authored objects, appearance and browser rendering | [World composition](docs/world-composition-contract.md) |
-| Simulation | Supported behaviors, inhabitants and replayable outcomes | [Society contract](docs/synthetic-society-contract.md) |
-| Model integration | Replaceable reconstruction, generation and decision providers, with validated outputs | [Model selection](docs/product-direction.md#model-selection-and-compute-priorities) |
+| Simulation | Societies, the engines and routines that run them, movement modules and replayable outcomes | [Society contract](docs/synthetic-society-contract.md) · [Movement modules](docs/movement-modules-contract.md) |
+| Models deciding | Decision roles as data, one validated decision path, comparisons of models | [Decision roles](docs/decision-roles-contract.md) · [Comparisons](docs/society-experiments.md#comparisons-of-models) |
+| Model integration | Replaceable reconstruction, generation and decision providers behind one policy boundary, with validated outputs | [Model selection](docs/model-and-service-selection.md) · [Model manifest](exulanica/models/models.manifest.json) |
 | API and portability | Authorized reads and edits; signed, capability-declared snapshots | [Developer client](docs/capabilities/developer-client.md) · [World package](docs/world-memory-package.md) |
 
 Python and PostgreSQL carry the backend; TypeScript and PlayCanvas carry the browser experience.
 The configured Companion answer path uses **NVIDIA Nemotron through Nebius Token Factory** to
-compose answers from validated evidence. Other model roles support perception, retrieval and
-reviewed proposals. The [model and service selection](docs/model-and-service-selection.md) describes
+compose answers from validated evidence. The open models a world's owner can choose for a person
+are those the manifest records as verified to answer a choice. Other model roles support
+perception, retrieval and reviewed proposals. The [model and service selection](docs/model-and-service-selection.md) describes
 the implemented callers, evaluation evidence and hosting boundaries. This does not imply that the
 whole application or its background workers are deployed on Nebius Serverless.
 
@@ -181,7 +185,8 @@ pnpm app
 
 Open [http://localhost:5173/?preview=1](http://localhost:5173/?preview=1), or the address Vite
 prints if that port is occupied, with `?preview=1` appended. This development preview uses fixture
-data. It does not create an authenticated saved world or demonstrate media reconstruction.
+data. It does not create an authenticated saved world or demonstrate media reconstruction, and
+choosing or comparing the models that decide for a world's people needs the persistent application.
 
 ### Persistent application
 
@@ -189,18 +194,21 @@ The authenticated application uses a separate API, PostgreSQL, local asset stora
 accounts. Backend development requires Python 3.11 and [uv](https://docs.astral.sh/uv/);
 reconstruction and processing use additional dependencies and workers.
 
-Follow [development setup](docs/development-setup.md) for installation and services,
-[account configuration](docs/deployment.md) for deployment requirements, and
-[the Python client guide](docs/capabilities/developer-client.md) to build against a configured API.
+Follow [development setup](docs/development-setup.md) for installation and services, and its
+[people and models section](docs/development-setup.md#seeing-people-and-models-locally) to see
+models decide in a local world; [account configuration](docs/deployment.md) for deployment
+requirements; and [the Python client guide](docs/capabilities/developer-client.md) to build against
+a configured API.
 
 ## Documentation
 
 | Start here | Go deeper |
 | --- | --- |
-| [Product direction and delivery gates](docs/product-direction.md) | [World composition](docs/world-composition-contract.md) |
-| [Saved worlds](docs/saved-world-entry.md) | [Authored objects and behaviors](docs/world-objects-contract.md) |
+| [Product direction and delivery gates](docs/product-direction.md) | [Architecture overview](docs/architecture-overview.md) |
+| [People and models in a world](docs/capabilities/simulation.md) | [Society contract](docs/synthetic-society-contract.md) · [Decision roles](docs/decision-roles-contract.md) |
+| [Society experiments and comparisons](docs/society-experiments.md) | [Movement modules](docs/movement-modules-contract.md) |
+| [Saved worlds](docs/saved-world-entry.md) | [Authored objects and behaviors](docs/world-objects-contract.md) · [World composition](docs/world-composition-contract.md) |
 | [World API](docs/capabilities/world-api.md) | [Independent Python client](docs/capabilities/developer-client.md) |
-| [Society experiments](docs/society-experiments.md) | [Simulation tooling and adoption gates](docs/product-direction.md#modular-simulation-and-scientific-tooling) |
 | [Documentation hub](docs/README.md) | [Complete document catalog](docs/all-documents.md) |
 
 For bugs and focused proposals, [open an issue](https://github.com/twinkling-reality/exulanica/issues)

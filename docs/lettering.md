@@ -5,8 +5,7 @@ layout rule in both languages, and their shared cases. NOTHING DRAWS A LETTER: n
 carries a sign's typeface or cap height, no tess expander turns a placed sign into triangles, and no
 tile has been baked with lettering, so the appearance of raised letters on a fascia is UNVERIFIED.
 The kerning rule is UNVERIFIED against a shaper (section 4). The lettering fields the city grammar
-needs and the expander tess needs are specified in the lettering design note, which is kept with
-the lane briefs outside this repository and was handed to those two lanes to build.
+would need and the tessellator expander that would draw them are not built.
 
 ## What a person gets
 
@@ -24,8 +23,8 @@ Letters are exact geometry, not runtime text.
   own units. `assets/catalogs/lettering/<key>.v1.json`, canonical JSON.
 - The **conversion tool**, `tools/lettering`, makes the catalogs once from the four committed fonts
   under `assets/fonts/`. It has its own environment and its own lock, because fontTools must never
-  enter the product's `uv.lock`: every lane runs `uv sync --locked --offline`, so one new root
-  dependency breaks all of them. `tests/test_lettering_boundary.py` and two import contracts in
+  enter the product's `uv.lock`, which every checkout syncs with `uv sync --locked --offline`, so one
+  new root dependency would break them all. `tests/test_lettering_boundary.py` and two import contracts in
   `pyproject.toml` keep the tool and fontTools out of the product.
 - The **reader and the layout rule** are one rule in two languages: `exulanica/lettering/` (Python,
   for the city grammar's validator, which must know a sign fits its fascia) and
@@ -155,16 +154,16 @@ x-advance adjustment. Anything outside that refuses the catalog rather than bein
 lookup that is not pair positioning, a value that moves anything else, a legacy `kern` table, or a
 glyph in the set that GDEF calls a mark.
 
-**UNVERIFIED:** this follows HarfBuzz's semantics as read, not as tested. No shaper is installed and
-none is approved for download, so there is no comparison against one. All four families use the
+**UNVERIFIED:** this follows HarfBuzz's semantics as read, not as tested. No shaper is among the
+repository's dependencies, so there is no comparison against one. All four families use the
 simplest form (pair positioning, x-advance on the first glyph only), which is the case least likely
 to differ.
 
 ### The character set
 
 Space, `& ' , - .`, the digits, the capitals and the small letters: 68 characters, the same set in
-every catalog, so the grammar may pair any typeface with any text. The lexicon needs only letters and
-the space today; the digits and the five marks are for street numbers and names such as
+every catalog, so the grammar may pair any typeface with any text. The lexicon's texts use only
+letters and the space; the digits and the five marks are for street numbers and names such as
 "Bread & Coffee". No accented letters in version 1: a catalog names its set and a character outside
 it is refused, never substituted.
 
@@ -223,9 +222,9 @@ Triangle counts do not depend on the size: the catalog holds one outline per gly
 Front faces are `vertices + 2 holes - 2 parts`; a wall is two triangles per ring edge; a closed
 solid adds a back face. Fourteen signs of this size, one per building in the corridor, are 24,136 to
 29,680 triangles as front and walls, which is 10.6 to 13.1 per cent of Melbourne's 227,173-face
-envelope; painted lettering, depth 0, is 8,008 to 9,856 (3.5 to 4.3 per cent). The levers, for tess
-and the grammar to set, are in the design note: painted against raised by typology, walls only above
-a stated depth, and a back face only where a standoff could show one.
+envelope; painted lettering, depth 0, is 8,008 to 9,856 (3.5 to 4.3 per cent). The levers, for the
+tessellator and the grammar to set, are painted against raised by typology, walls only above a
+stated depth, and a back face only where a standoff could show one.
 
 ## 7. Rebuilding, and the boundaries
 
@@ -247,6 +246,5 @@ a stated depth, and a back face only where a standoff could show one.
   `tests/test_lettering_catalog.py` fails if it stops doing so. That file also holds
   `tools/lettering/catalogs.json` against the directory in both directions, because only half of
   that list is a judgement: which role a typeface serves is written there by hand, and which fonts
-  are committed is not. Until that check existed a fifth family converted to nothing and, once its
-  notices entry was added, no lettering test failed, because the tool builds what the list names
-  and never looks at what else is committed.
+  are committed is not: the tool builds what the list names and never looks at what else is
+  committed.

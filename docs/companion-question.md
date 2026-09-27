@@ -3,7 +3,8 @@
 This contract owns grounded questions, retained conversation state and the boundary between a
 model answer and a reviewed editing proposal. The Companion is the person's AI partner within the
 world. [Product direction](product-direction.md) owns its broader role and continuity goals;
-[interaction policy](interaction-policy-backend.md) owns durable capability policy.
+[world version authorities](world-version-authorities.md#comfort-settings-authority) own durable
+comfort-settings policy.
 
 ## Reading map
 
@@ -30,7 +31,7 @@ inferring execution from the manifest.
 
 The browser's `companion-ask-api.ts` calls `POST /selection/ask` and obtains the packet needed to
 resolve citations. The [application composition](../web/packages/app/src/main.ts) connects question,
-appearance and conversation-memory clients. The [frontend contract](atlas-frontend-integration.md)
+appearance and conversation-memory clients. The [customization contract](atlas-world-customization-contract.md#7-frontend-integration-boundary)
 defines how a reviewed proposal becomes a preview and an accepted world change.
 
 A question is asked in a world. `POST /selection`, `POST /selection/ask` and `POST /selection/packet`
@@ -51,8 +52,8 @@ exact response shapes and refusal codes live in the route models and API schema 
 
 **It is a read and it cannot become a write.** `interaction-model.md` 4.3 fixes that free text "is
 parsed into the same update proposal draft that a choice would produce and goes through the
-IDENTICAL confirmation flow", and that "No path writes to the graph without a proposal". That is
-still true of every utterance the parser can turn into a change. The question branch is what
+IDENTICAL confirmation flow", and that "No path writes to the graph without a proposal". That holds
+for every utterance the parser can turn into a change. The question branch is what
 happens when it cannot, or when all it makes of the words is a note: the parser keeps whatever
 follows a first comma as a note, so a draft of notes alone, typed while one of the Companion's own
 questions is open, is cancelled unwritten and asked as a question, unless the words answer that
@@ -154,7 +155,8 @@ leaves; a right withdrawn between the two checks refuses the request there, with
 product only because the account holder typed it: who a person is, what a place is called. A
 person's name never goes to a hosted model, with or without a right, and a confirmed place name goes
 only under a right the account holder grants for that place and that model. Every hosted request
-passes one boundary that applies the rule, described after the limitations below. The requests this
+passes one boundary that applies the rule
+([privacy and consent threat model](privacy-consent-threat-model.md), section 4.4). The requests this
 section describes also replace, before the request is built, every saved name no right can release:
 a person's, a voice's, an object's, an event's and a conversation's. A place's name is left to the
 boundary, which sends it or withholds it for each request and each hand-over. One record per
@@ -245,9 +247,9 @@ occurrence to that place, and only a person's decision writes a confirmed link
 own saved name alone, and `_render_packet` states it under the photograph's token as
 `user_confirmed_place: [place A]`. The composer's prompt says that line is the
 user's confirmation that the photograph was taken there, which supports a historical clause citing
-it, and that it says nothing about what the photograph shows. Without it, each such photograph
-reached the composer as a bare line with no description, and asked which photographs were taken at
-the place, the composer answered that no photograph could be identified as taken there (measured
+it, and that it says nothing about what the photograph shows. Without it, each such photograph reaches the composer as a bare line with no description, and asked
+which photographs were taken at the place, the composer answers that no photograph can be
+identified as taken there (measured
 under Evidence and limits). The line names the place as the request names it: by its placeholder,
 or by its saved name where the account holder allowed that place's name for the composer, whose
 role, `reasoning_cheap`, the uses file (`exulanica/consent/place-name-uses.v1.json`) offers for
@@ -261,7 +263,7 @@ person occurrences to that person. `build_packet` keeps that link on the photogr
 person's id (`ConfirmedPerson`), and `_render_packet` states it as
 `user_confirmed_person: [person A]`: the request's placeholder, never the name, because a person's
 saved name never reaches a hosted model, with or without a right, and the browser restores it. The
-composer's prompt, `selection-8`, says that line is the account holder's statement that the person
+composer's prompt, from `selection-8` on, says that line is the account holder's statement that the person
 is in the photograph, not something anybody saw; that it supports a historical clause saying so;
 and that it says nothing about how they look, where they are in the picture, what they wear or
 what they are doing, which only the photograph's own description may say, and never that a person
@@ -271,91 +273,14 @@ statement that they are in a photograph is the same fact in other words; a perso
 name has no placeholder and is not stated; and an object linked the same way is not stated.
 `tests/test_companion_person_link.py` holds the line, each person who is not stated, and the
 absence of every form of the person's saved name from every request, with no right granted and
-with every entity released as though a right existed for each. Measured on a synthetic library whose
-descriptions and detections the measuring script writes, with the live planner and composer, the
-baseline arm being the answer path without the line and with the previous prompt, paired within
-each run, gates written before any held-out call: on the held-out split, answers to the six
-questions about a person cited only the photographs linked to that person in 30 of 30 with the
-line and 7 of 30 without it, the measurer marked no clause as saying a person was seen or
-describing them, and the four questions that name no person passed 20 of 20 in both arms
-(`docs/evaluation/2026-09-24-companion-person-link-preregistration.json`,
-`docs/evaluation/2026-09-24-companion-person-link-outcome.json`). The library, eight photographs
-with two named people, is small, and how the vision role describes people on personal photographs
-is not measured.
+with every entity released as though a right existed for each. Its effect on answers is measured
+under [Evidence and limits](#evidence-and-limits).
 
-**Every hosted request passes one boundary.** `ModelClient` in `exulanica/models/client.py` hands
-every request it sends, from `chat`, `structured`, `vision` and `embed` alike, to the policies
-attached to it before the response cache key is computed, and sends exactly the text they return.
-A client with no policy refuses to send, by name, with `NoHostedRequestPolicy`
-(`exulanica/models/policy.py`), and the one client an instance builds carries none. The policy
-that applies the account holder's rules is `WorkspaceRequestPolicy` in
-`exulanica/epistemics/hosted_requests.py`, attached where the workspace is known: a route sends
-through `Services.hosted_model`, the caption-vector pass and the vision stage attach it for the
-photograph whose text or bytes they send, and the society runtime for the decision it asks for. As each request leaves
-it:
-
-* replaces every saved name in every user and assistant message and every embedding input: a
-  person's, a voice's, an object's, an event's and a conversation's always, and a place's unless
-  the place-name right releases it for every model that request's role can reach, at its
-  destination;
-* writes each name it withholds with the placeholder the caller's record gives that entity when the
-  request carries one (`placeholders` on `chat` and `structured`), so the requests of one question
-  name a withheld place one way. It refuses a record that gives two entities one label, gives an
-  entity something that is not a placeholder, or gives an entity another class's placeholder, and it
-  drops an entry for an entity with no saved name and keeps that label reserved. `embed` and
-  `vision` take no record: an embedding request is text for a vector with nothing to restore, and
-  the vision stage sends the product's own instruction and a photograph;
-* checks a current personal model right for every photograph the request names, all or nothing:
-  the composer names its packet's captures, the caption pass its capture, and the vision stage its
-  photograph; a capture screened under a synthetic or benchmark authority passes as it does
-  everywhere else, and a request with an image part and no photograph is refused.
-
-`tests/test_hosted_boundary.py` finds every hosted call the product package makes by walking its
-syntax trees, requires each to be a registered path with a scripted run, and runs each through the
-code the product runs over a person and a place saved through `name_occurrence` and written on a
-photograph's sign. No request carries either name, system messages included; every request the
-transport recorded was admitted by the policy, text for text; and the five paths whose call site
-prepares names itself hold with that preparation disabled.
-
-**Which requests honour a place right.** Every request of a role the uses file offers
-(`exulanica/consent/place-name-uses.v1.json`) leaves a place's name to the boundary, and the file
-names each such request path by module and function: the caption-vector pass and the embedding of a
-question's query for the embedding role, the composer for `reasoning_cheap`, and the planner, the
-request classifier, the appearance drafter and the environment drafter for `structured_extraction`.
-A place whose right names a role's whole chain at its endpoint reaches that role's requests by name,
-and a stop holds it back from the next request; a person's name reaches none of them, with or
-without a right. The caption pass sends a photograph's text as it is stored, so a sign naming an
-allowed place goes by that name. The query carries a place's name only where the query itself names
-it, as a plan the caller supplies can: the planner puts a place the question names in the plan's
-place dimension, by id, and removes both its name and its placeholder from the semantic query, so
-neither becomes a search term. A decision changes the requests sent after it and no vector already
-stored: the index is keyed by the text as stored, so a caption embedded before a grant is not sent
-again, and a vector made while the name was allowed stays after a stop. The resolver that reads the
-right, `released_place_names` in `exulanica/consent/place_name_rights.py`, is the one every instance
-runs: `build_services` injects it as `Services.released_place_names`, which the Companion's routes
-and the API's derivative worker ask, and `exulanica/ingest/worker_command.py` gives it to the
-standalone worker's caption pass. A `Services` built by hand, as most tests build one, keeps the
-resolver that releases nothing. A society decision releases no place's name on whatever role it
-runs: `Services.request_policy` requires the release to be named, and the rules the decision host
-and a comparison attach to every ask (`Services.person_decision_policy`) name
-`no_place_released`, because a grant for the Companion's roles describes the Companion's requests.
-The vision stage sends the product's own instruction and the photograph, and its policy releases no
-place's name. `tests/test_place_name_release_paths.py` runs each path the uses file names and
-requires it to carry an allowed name, so a use cannot be offered while inert, and holds that a
-request to another destination, or one that can reach a model the grant does not name, carries the
-placeholder. `tests/test_companion_place_release.py` holds that a place allowed for the composer
-reaches the composer's request and no other, that a stop holds the composer's next request back, and
-that no person's name leaves on any registered path with every place use allowed, whether the
-boundary, the call sites or both prepare the names.
-
-**What the boundary does not do.** It never rewrites a system message: a system message is product
-instruction, and rewriting one would put `[person A]` for every "may" in every prompt of somebody
-saved as May. The byte test holds that no system message on any path carries a saved name
-instead. It cannot recognise a name the account holder has not saved. And an embedding request
-carries no record, so the boundary assigns its placeholders per request, in the order it recognises
-names: in embedding text `[place A]` is a different place in each caption and in each query, and a
-query about one withheld place shares that token with every caption that holds any saved place.
-That leaks nothing, and what it costs vector retrieval is measured under Evidence and limits.
+**Every hosted request passes one boundary.** The Companion's requests, like every other hosted
+request, pass the one policy boundary that applies the account holder's naming and model-right
+rules as each request leaves; the boundary, the requests that honour a place-name right and what
+the boundary does not do are owned by the
+[privacy and consent threat model](privacy-consent-threat-model.md), section 4.4.
 
 ## Questions about a world's people
 
@@ -446,8 +371,8 @@ nothing the simulation did not record, what anybody said above all, can reach an
 lines the composer chooses. The notes an answer leads with are the code's and cost it no clause.
 
 What it does not do: it answers for the purposeful profile the words catalog names, and refuses any
-other society by name (`society_profile_has_no_words`); it does not name the model behind an
-inhabitant's decision; and an answer about the world's people is not kept in the Companion's memory,
+other society by name (`society_profile_has_no_words`); and an answer about the world's people is
+not kept in the Companion's memory,
 which holds photograph citations and saved names only. A remembered answer that cites nothing is
 drawn as a statement about the search, never as the person's past.
 
@@ -576,7 +501,7 @@ The page waits for the route as long as the server may take: `appearance_bound_s
 proposal implementation, the classifier and the draft and its repair at their role's worst case,
 plus the page's read allowance, held by
 [test_companion_propose_deadline.py](../tests/test_companion_propose_deadline.py). Apply remains a separate
-reviewed operation through [world style](world-style-backend.md) and the
+reviewed operation through the [appearance authority](world-version-authorities.md#appearance-authority) and the
 [customization contract](atlas-world-customization-contract.md). Conflicts require review against
 the relevant version; natural language does not bypass the same validation as direct controls.
 
@@ -587,112 +512,27 @@ model's permission to act without review.
 ## Evidence and limits
 
 The [model selection record](model-and-service-selection.md) identifies implemented callers and
-measured candidate comparisons. The question, memory, proposal, prompt and place-query investigations
-are retained with their original inputs and limitations in the
+measured candidate comparisons. Earlier question, memory, proposal, prompt and place-query
+investigations are retained with their original inputs and limitations in the
 [fixed implementation history](https://github.com/twinkling-reality/exulanica/blob/857cffe730dad97f9edb34535c773115277e2769/docs/companion-question.md).
 Some cited campaign artifacts are local-only; a clone does not contain them. Do not present a
 historical result, patch or unconfigured route as a live end-to-end demonstration.
 
-**A confirmed place, end to end.** A place-class entity comes from the vision role's place
-proposal, which `exulanica/ingest/vision.py` makes under a versioned rule: a place is written only
-when its name is read whole on a sign the photograph transcribes
-(`exulanica/ingest/place_proposal.py`, measured in
-`docs/evaluation/2026-09-23-vision-place-proposal-d-outcome.json`). One measurement takes that
-proposal through to the answer a person reads, on two synthetic workspaces on an acceptance runtime
-with the model client, through the routes the browser uses: four synthetic drawings of one place,
-MIRELAND HALL (two whole nameplates, one with its last word covered, one with no text), each with a
-recorded capture time, admitted with the model rights the synthetic account holder granted. The
-vision stage wrote the place for the two whole nameplates and for neither of the others, and the
-measuring script confirmed it as the account holder. Three questions, registered with the answers
-the photographs support before any model call, were asked once each, with the packet before the
-change (`selection-6`) and with the confirmed place on each photograph's line (`selection-7`):
-
-| Question | `selection-6` | `selection-7` |
+| Measured result | Records | Limits |
 | --- | --- | --- |
-| What does the sign say at Mireland Hall? | wrong: "The sign says this photograph." | right: "The sign reads '[place A]'." |
-| Which of my photographs were taken at Mireland Hall? | wrong: "No description mentions [place A], so no photograph can be identified as taken there." | right: "These photographs were taken at place A.", citing both |
-| When were my photographs at Mireland Hall taken? | wrong: "The provided evidence does not contain any information about place A." | right: "Your photographs were taken on 2026-08-14 and 2026-08-16.", citing both |
+| **A confirmed place, end to end.** With the confirmed place on each photograph's line (`selection-7`), three registered questions about a synthetic place were answered right, citing its photographs; without it (`selection-6`) all three were wrong. In the running app the Companion showed each answer with the confirmed name, opened the cited photograph inside the Companion from the masked route, and said a photograph the server no longer served could not be shown. | `docs/evaluation/2026-09-23-companion-place-link-preregistration.json`, `docs/evaluation/2026-09-23-companion-place-link-outcome.json` | One draw per question per arm; synthetic drawings of one place; English questions; no remembered answer or rename |
+| **A confirmed person, by placeholder.** On the held-out split, answers to six questions about a person cited only that person's photographs in 30 of 30 with the line and 7 of 30 without it; no clause said a person was seen or described them; four questions naming no person passed 20 of 20 in both arms. | `docs/evaluation/2026-09-24-companion-person-link-preregistration.json`, `docs/evaluation/2026-09-24-companion-person-link-outcome.json` | A synthetic library of eight photographs with two named people; how the vision role describes people on personal photographs is not measured |
+| **Withheld places in vector search.** One placeholder per saved place gained 0.6111 in mean R-precision over the caption vectors alone and 0.0833 as the executor ranks, against the registered gates of 0.25 and 0.10, so the placeholder assigned per request stays. | `docs/evaluation/2026-09-23-embedding-placeholders-preregistration.json`, `docs/evaluation/2026-09-23-embedding-placeholders-outcome.json`, made by `scripts/measure_embedding_placeholders.py` | Synthetic drawings, English names and six places, one run of captions; a placeholder stable across requests would let a provider link a withheld place's photographs, so adopting one needs the account holder's decision |
+| **A place nobody saved.** With the two abstention rules, 0 of 60 held-out answers about an unsaved place cited a photograph (22 of 60 without them) and all 60 abstained; answers about a saved place cited a photograph confirmed there 60 of 60 in both arms. | `docs/evaluation/2026-09-24-companion-absent-place-preregistration.json`, `docs/evaluation/2026-09-24-companion-absent-place-outcome.json`, made by `scripts/measure_companion_absent_place.py` | Synthetic drawings; libraries of one and three saved places with no saved person; a planner that leaves an unsaved place out of its plan never occurred |
 
-In the running app the Companion showed each answer with the confirmed name in place of the
-placeholder, opened the cited photograph inside the Companion from the masked route, and said "This
-photograph cannot be shown." with no picture when the capture script answered that read 410. Costs,
-from the provider's reported usage: 0.00771565 and 0.00864106 US dollars for the two arms and
-0.00282130 for the final browser run. What this does not establish: one draw per question per arm,
-so a difference is one observation each and not a rate; synthetic drawings of one place; English
-questions; no remembered answer or rename. The records are
-`docs/evaluation/2026-09-23-companion-place-link-preregistration.json` and
-`docs/evaluation/2026-09-23-companion-place-link-outcome.json`.
-
-**Caption vectors in use.** The derivative worker runs the caption-vector pass for each admitted
-photograph, through the boundary above and under a personal model right for the embedding role
-(`exulanica/ingest/worker_command.py`); a capture's tombstone reaches its caption vectors
-(migration 0044 records each vector a tombstone targets, and the purge worker deletes it;
-`tests/test_caption_vector_lifecycle.py`). In the measurement above, the one question whose plan
-carried a semantic query made one query-vector call each time it was asked, of two prompt tokens,
-taking 7858, 9586 and 10907 ms. Embedding quality, the 0.65 threshold and latency over a large
-corpus are not measured.
-
-**Withheld places in vector search.** One pre-registered measurement compared three things a
-withheld place's name can become in text sent for a vector: the placeholder the boundary assigns
-per request, one placeholder per saved place for the whole workspace (the alternative), and the
-place's name allowed through `POST /place-name-rights` (a reference, never a candidate). Twenty-four
-synthetic drawings went through the product's admission, vision and naming path; the vision stage
-proposed a place on twenty, and the six places drawn on three photographs each were saved. Twelve
-queries named a place and five described content. Each was scored by R-precision, the share of the
-photographs it should find that rank among its first that many, over the caption vectors alone and
-in the order the executor returns:
-
-| Mean R-precision | Per request | Per place | Allowed name |
-| --- | --- | --- | --- |
-| Place-named queries, vectors alone | 0.1667 | 0.7778 | 1.0000 |
-| Place-named queries, as the executor ranks | 0.8889 | 0.9722 | 1.0000 |
-| Content queries, vectors alone | 0.5692 | 0.5205 | 0.5538 |
-| Content queries, as the executor ranks | 0.4897 | 0.4897 | 0.4897 |
-
-The alternative gained 0.6111 over the vectors alone and 0.0833 as the executor ranks, and the
-registered gate asked for 0.25 and 0.10, so the placeholder assigned per request stays. The
-executor's lexical match reads each caption as stored, with the place's name in it, which is the
-likely reason it recovers most of what the vectors lose; that was not measured separately. A pass
-would not have been enough on its own: a placeholder stable across requests lets a provider link
-the photographs of one withheld place, so adopting one needs the account holder's decision. What
-this does not establish: synthetic drawings, English names and six places; one run of captions,
-shared by every arm; and place-named queries that stand for a plan a person supplies, since a
-question asked in words never puts a place's name or placeholder in its query. No person is named
-in the corpus. The run made 191 model calls for 0.03437730 US dollars, from the provider's reported
-usage. The records are `docs/evaluation/2026-09-23-embedding-placeholders-preregistration.json` and
-`docs/evaluation/2026-09-23-embedding-placeholders-outcome.json`, made by
-`scripts/measure_embedding_placeholders.py`.
-
-**A place nobody saved.** One pre-registered measurement asked about places the account holder saved
-and about places nobody saved and no photograph shows, over synthetic drawings admitted through the
-product's routes: a library with one saved place, and one with three saved places, a sign whose
-place was never saved and a photograph with no text, each saved place drawn on two nameplates.
-Twelve held-out questions named a saved place and twelve an unsaved one, in names and wordings the
-development questions did not use. Each was asked five times in two arms that shared each run's plan
-and query vector, one without the two rules above and one with them.
-
-| Held-out answers | Without the rules | With the rules |
-| --- | --- | --- |
-| About an unsaved place, citing a photograph | 22 of 60 | 0 of 60 |
-| About an unsaved place, abstaining | 0 of 60 | 60 of 60 |
-| About a saved place, citing a photograph confirmed there | 60 of 60 | 60 of 60 |
-
-In every plan for an unsaved place, 40 in development and 60 held out, the planner stood a saved
-place in for it, so every answer with the rules was the abstention the first one writes. Without
-them, the answers that cited a photograph included "The sign at Kestrel Point reads PLACE A." and "I
-took these photographs at Netherby Cross.", each citing a photograph of the saved place. The rule
-for `meta` clauses never acted in either split: no question about a saved place drew a cited
-statement about the search, and questions about unsaved places, which drew 11 across the two splits
-without the rules, no longer reach the composer; the transport tests in
-`tests/test_companion_absent_place.py` hold it. What this does not establish: a planner that leaves
-an unsaved place out of its plan, which never happened here, would have the question's other words
-searched, and what the composer says about the photographs found is not measured; synthetic
-drawings, English names and questions; libraries of one and three saved places with no saved person.
-The runs made 196 and 282 requests for 0.08059216 and 0.13705072 US dollars, from the provider's
-reported usage. The records are
-`docs/evaluation/2026-09-24-companion-absent-place-preregistration.json` and
-`docs/evaluation/2026-09-24-companion-absent-place-outcome.json`, made by
-`scripts/measure_companion_absent_place.py`.
+A place-class entity comes from the vision role's place proposal, written only when its name is
+read whole on a sign the photograph transcribes (`exulanica/ingest/place_proposal.py`, measured in
+`docs/evaluation/2026-09-23-vision-place-proposal-d-outcome.json`). The derivative worker runs the
+caption-vector pass for each admitted photograph through the hosted-request boundary and under a
+personal model right for the embedding role (`exulanica/ingest/worker_command.py`); a capture's
+tombstone reaches its caption vectors (migration 0044 records each vector a tombstone targets, and
+the purge worker deletes it; `tests/test_caption_vector_lifecycle.py`). Embedding quality, the 0.65
+threshold and latency over a large corpus are not measured.
 
 Changes to this contract require checking the affected route, repository, request-policy and
 browser boundary. Broader continuity, live-model usefulness and personal-source acceptance need

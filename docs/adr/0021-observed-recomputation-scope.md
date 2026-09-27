@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-05
+- Affects: [domain and evidence model](../domain-and-evidence-model.md)
 
 ## Invariant and rationale
 

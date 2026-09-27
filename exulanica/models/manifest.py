@@ -10,7 +10,7 @@ Four consequences follow, and all four are enforced here rather than by conventi
 *   Identifiers live in ``models.manifest.json`` beside this module, never in Python source.
     ``tests/test_models_manifest.py`` greps the package and fails if one leaks into code. A
     data file rather than a Python table is what makes that test possible at all, and it is what
-    `model-and-service-selection.md` section 6 mitigation 1 asks for by name.
+    the model catalog preflight (`docs/deployment.md` section 7) reads.
 *   Every role declares a fallback identifier, so a withdrawal degrades answer quality instead
     of killing the request. One role, embedding, genuinely has no same-tier fallback in the
     catalog; it declares ``null`` and the client raises rather than substituting a model from a

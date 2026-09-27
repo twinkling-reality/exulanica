@@ -402,7 +402,7 @@ SUPERSEDED_VERSIONS: Final[tuple[SupersededVersion, ...]] = (VERSION_2, VERSION_
 #: lane that needed it: a development preview reading its street from the real API with a credential
 #: satisfies neither of the first two, and the lane whose run it would unblock proposed it, stated
 #: what a yes admits at its widest, and held until the decision was made. The case is in
-#: ``docs/visual-gate-third-authentication-condition.md`` and the rule lives in the harness.
+#: ``docs/visual-gate-targets.md`` (Authentication conditions) and the rule lives in the harness.
 AUTHENTICATION_CONDITIONS: Final[tuple[str, ...]] = (
     "credentialed-api",
     "vite-preview-api",

@@ -1,32 +1,31 @@
 # Atlas spatial architecture
 
-Status: **DECISION** for the spatial grammar and engine boundaries. Section 8 describes the
-frontend/core work. This record does not claim that backend persistence, reconstructed traversal
-artifacts, physical asset streaming, or full-library production scale are complete.
+This contract owns how the Atlas, the browser world runtime ([interaction model](interaction-model.md)),
+lays out a world's regions and moves a person through them: the spatial grammar of regions over one
+continuous field, engine-neutral navigation in `@exulanica/atlas-core`, reconstruction-rung
+traversal, persistent layout and neighborhoods, Map correspondence and recovery, how grounds, sky
+and fog are drawn, and residency and renderer hardening. Regions come from the photographs a world
+holds; an authored starter and the owned district present their own grounds on the same navigation
+rules. Reconstructed traversal artifacts, physical asset streaming in the application and
+full-library production scale are not built.
 
 ## 1. World decision
 
-This contract governs the Atlas: the spatial presentation of a person's photograph library, which
-is one feature of a world and one way to build one. The product is a world that open models run
-([product direction](product-direction.md)).
+A world with regions is one logical semantic world, viewed at three scales:
 
-The Atlas is a **grounded memory archipelago**.
-
-It is one logical semantic world, viewed at three scales:
-
-1. **Atlas**: the complete personal library and its stable semantic organization.
-2. **Neighborhood**: a bounded local memory field containing a comprehensible working set of
+1. **World**: all of its regions and their stable semantic organization.
+2. **Neighborhood**: a bounded local field containing a comprehensible working set of
    regions and routes to other neighborhoods.
 3. **Region**: a soft footprint whose interior presentation and movement model are determined by
    the reconstruction rung it actually earned.
 
-Ground view is walking on one continuous, low-frequency memory field. The field supplies contact,
+Ground view is walking on one continuous, low-frequency field. The field supplies contact,
 eye height, a horizon, between-space, and recovery. Regions rise from it and dissolve back into it;
 they do not sit on platforms, acquire rims, or become disconnected levels. The Atlas Map remains the
 elevated overview and direct-navigation surface.
 
 Atlas placement is presentational. Proximity and paths may express **confirmed** semantic
-relationships. They never imply where a memory happened, real distance, or geography. Proposed and
+relationships. They never imply where a photograph was taken, real distance, or geography. Proposed and
 provisional identity links may change emphasis or appear as explicitly speculative traces; they
 never change a placement or neighborhood.
 
@@ -43,7 +42,10 @@ vertical information axis that does not exist.
 
 Rejected. Rims, drops, glowing discs, and explicit platform edges imply discrete game levels,
 platforming, and literal territory. They conflict with the documented dissolve boundary and create
-comfort and collision problems without encoding any true property of a memory.
+comfort and collision problems without encoding any true property of a region. A world made from
+photographs draws one declared floor under each region, with its edge, because its people and
+objects stand there ([saved-world entry](saved-world-entry.md#structural-rendering-boundary)); that
+floor states where standing is supported, not a level.
 
 ### Disconnected scenes
 
@@ -59,7 +61,7 @@ that every detailed asset is resident or that every region is traversable in one
 
 ## 3. Spatial grammar
 
-The continuous memory field is a subtly legible navigation surface. It uses restrained directional
+The continuous field is a subtly legible navigation surface. It uses restrained directional
 variation, a field/sky convergence volume, source-coloured reflection, sparse confirmed
 relationship seams, and low-frequency optical interference. It does not use grass, tiles, a
 generic grid, noisy terrain, decorative gradient blobs, or glowing circles. Renderer geometry
@@ -79,11 +81,10 @@ long-term footprints are authored or derived polygons, unions, or signed-distanc
 count must not determine recovered spatial coverage.
 
 Standing and walking are communicated first through optic flow and source parallax, not permanent
-labels. Approach and entry are communicated through the shared footprint transition, relationship
-seam, and source-aperture registration. Text is reserved for capability truth, arrival/recovery,
-focused evidence actions, and the permanent non-geographic disclosure. The rejected rounded
-onboarding surface is absent from the architecture-only opening; first-use instruction is an
-explicit next UX slice rather than a renderer prop.
+labels. Approach and entry are communicated through the shared footprint transition and
+relationship seam. Text is reserved for capability truth, arrival/recovery, focused evidence
+actions, and the permanent non-geographic disclosure. First-use instruction belongs to the
+interface, not to a renderer prop.
 
 ## 4. Engine-neutral navigation
 
@@ -119,9 +120,10 @@ surface blocks sight or travel.
 - **Rung 3: photographic panels.** The common field connects panel viewpoints. Each panel allows
   only its measured micro-parallax; relief never becomes an invented walkable floor, and unseen
   backs are blocked by coarse panel proxies.
-- **Rung 4: evidence-card grove.** Evidence surfaces and focus stops are arranged on the common
-  field. The cards are citations, not reconstructed geometry. Missing or preview-unavailable media
-  is visibly an archive placeholder rather than a fabricated photograph.
+- **Rung 4: anchor motes.** A region with no reconstructed geometry draws one mote per anchor on
+  the common field (`web/packages/atlas-react/src/playcanvas/anchor-motes.ts`), and people only as
+  presence markers. Original photographs open in the source gallery and the Companion; none is
+  drawn in the world as a card or veil standing in for geometry.
 
 Between regions, every rung returns to the same field and eye-height model.
 
@@ -136,8 +138,8 @@ rotation.
 Only confirmed semantic edges influence placement. Reliable time/place grouping may organize
 capture groups, but Atlas coordinates never become factual coordinates.
 
-The current five-region solver is retained as a local MVP/neighborhood layout kernel, not treated as
-a library maximum. Long-term runtime state is split into:
+The layout solver refuses more than five regions and is a local neighborhood kernel, not a
+library maximum. Runtime state is split into:
 
 - a lightweight full-library Atlas index;
 - neighborhood sigils and stable placements;
@@ -165,138 +167,85 @@ transition is motion or reduced-motion fade.
 Recovery is concentric rather than an invisible hard wall:
 
 1. beyond meaningful content, field detail and traces diminish and inward route cues strengthen;
-2. a transient action offers return to the nearest memory or Map;
+2. a transient action offers return to the nearest region or Map;
 3. an invalid surface, fall, or hard-envelope crossing restores the last safe pose with a factual
    arrival caption.
 
 The World Index and Map remain direct-navigation escape routes. Recovery does not add permanent
 dashboard chrome.
 
-## 8. Implemented frontend/core slice
+## Grounds, sky and fog
 
-The implementation establishes the long-term contract without fabricating reconstruction or
-backend state:
+The field and the sky share one horizon value: at grazing angles and distance the field converges
+analytically to the sky's haze colour, so a local rise disappears into air instead of drawing a
+hard ground and sky cut, and on the Map the sky shell is hidden and the camera clears to the
+field's colour. The palette roots are the active profile's
+([customization contract](atlas-world-customization-contract.md#4-profile-compatibility-and-programmable-controls)).
+ACES tone mapping is on, and exposure and fog are per-world presets in
+`web/packages/atlas-react/src/playcanvas/atmosphere.ts`.
 
-- engine-neutral flat-field surface sampling, eye-height resolution, spatial phases, coarse circular
-  collision, bounded full-path surface sampling, slope/step rejection, corridor constraint, soft
-  envelope, last-safe recovery, semantic traces, and Map pose stack in `atlas-core`;
-- immutable versioned module and recipe catalogs plus a deterministic world composer that emits
-  stable IDs, element provenance, attachments, honest reconstruction fallbacks, navigation
-  destinations, streaming keys, diagnostics and a validated draft topology digest;
-- an appearance customization controller with isolated preview, validation, discard, immutable
-  apply/rollback history, optimistic style/topology conflict checks, regional scope, and safe
-  fallback for removed profiles; structural proposals fail closed pending recomposition support;
-- a protected preview/apply/discard boundary shared by Settings and future Companion-origin
-  proposals; Options generates Aeroheart controls from the active capability-backed manifest while
-  withholding incomplete renderer fixtures, and the separately owned Companion interface is unchanged;
-- a JSON-safe, versioned `AtlasLayoutSnapshot` validator carrying complete transforms, monotonic
-  creation ordinals, lineage and migration reason; explicit present/missing/stale coverage; and an
-  app adapter that consumes the artifact without making graph transport own Atlas layout;
-- full-transform pin preservation in the layout solver, stable creation-ordinal ordering, and
-  deterministic draft ordinals for newly observed regions that remain explicitly reported as
-  unpersisted;
-- confirmed-only placement relationships;
-- deterministic semantic neighborhood partitioning for hundreds of regions, bounded chronological
-  packing when no semantic relation exists, explicit semantic versus index-only routes, stable
-  sigil IDs, adjacency, and a lightweight full-library index; plus a separate JSON-safe,
-  versioned membership snapshot with layout-version coupling and present/missing/stale coverage;
-- bounded neighborhood composition for large high-fanout corpora: ubiquitous entities cease acting
-  as layout discriminators, semantic route degree is capped, and a 10,000-region regression fixture
-  guards the former quadratic path;
-- a pure budgeted residency planner with stub/proxy/coarse/full stages, target pinning, current and
-  adjacent-neighborhood demand, cancellation, stale-completion rejection, hysteresis and release;
-- a PlayCanvas continuity field with low-frequency optical interference, source reflection, soft
-  region presence, confirmed relationship seams, field/sky convergence, Map ground marker, and
-  source apertures for the current no-geometry state;
-- PlayCanvas realization of the composed artifact using shared meshes/materials, with Aeroheart as
-  the only complete user-facing identity and Survey Relief retained as an internal
-  topology-compatibility regression fixture;
-- a PlayCanvas residency/action seam and representation gating for the preconstructed present
-  assets; physical fetch/disposal remains the loader's job rather than being simulated;
-- WASD resolution through the core field instead of forcing camera Y independently;
-- overview tier forcing and exact Map pose restoration;
-- safe deterministic region-entry and anchor-vantage resolution through the same surface, blocker
-  and line-of-sight rules as walking and focus; one exact 1.2-second transition sampler plus the
-  reduced-motion zero-duration path. The renderer preserves the validated rung-4 arrival position
-  and turns only its presentation orientation toward the canonical source body;
-- projected, keyboard-focusable Map region sigils derived from live region transforms, with Map to
-  ground travel; citation-level “Locate in Atlas” with exact anchor arrival and refocus;
-- one-shot last-safe recovery events and contextual, truthful arrival/failure feedback with no
-  permanent recovery chrome;
-- removal of ambient generic anchor callouts so attention remains single-valued; place, object, and
-  event motes now have distinct hard silhouettes, while people remain paired presence brackets;
-- tests for surface-derived eye height, spatial bands, collision, recovery, corridor limits, Map
-  restoration, confirmed-only layout, durable layout parsing/coverage, full-transform pinning,
-  hundreds-region neighborhoods, budget/cancellation/hysteresis, direct navigation, Map targets,
-  citation navigation and the app persistence seam.
+- **The sky is a direction rather than a place.** `composed-world.ts` draws it around the eye at the
+  far plane, so no walk leaves it; a sky placed where the world opened was measured going flat from
+  one kilometre ([world scale record](evaluation/2026-09-22-world-scale-baseline.json)).
+- **Shadows.** The engine fits a directional shadow's depth range to the casters in view and offsets
+  every receiver by a fixed ten-thousandth of that range, too little for one half-metre cube. The
+  sun of every world that is not a city therefore carries a shadow bias of 0.2
+  (`COMPOSED_WORLD_ATMOSPHERE`), which grows with a caster's slope to the light, and the sky casts
+  no shadow. This was measured on one cube in a starter world; other shapes and photo-built worlds
+  were not measured.
+- **The endless walking face** of an authored starter is a grid of cells no wider than the camera's
+  reach, drawn out to the recovery radius plus that reach, with its depth offset behind anything
+  lying on it (`world-field.ts`), so a plate placed flat on the ground draws whole at the origin and
+  at 8 kilometres. How far such a ground holds is in
+  [saved-world entry](saved-world-entry.md#how-far-an-endless-ground-holds).
+- **Fog order.** The sky is written to the screen as authored while lit surfaces are tone-mapped, so
+  lit materials are fogged after tone mapping, toward the colour the sky shows at eye level: paper
+  for the default look's sky, the camera's clear colour where no sky sphere is drawn, as in Survey
+  Relief and the city. Fully fogged ground therefore reaches the screen as the sky beside it. The
+  generated-tile preview fogs before tone mapping, because its skybox is tone-mapped too; particles
+  and Gaussian splats also fog before tone mapping, so a splat's far fade is greyer than the sky
+  around it. `web/packages/atlas-react/test/display-space-fog.test.ts` checks the fog order and the
+  eye-level sky colour for each look.
 
-Not completed in this slice: backend authority for topology/style/placement/neighborhood versions,
-canonical cryptographic digests, reconstructed navmeshes, camera-trajectory ingestion, measured
-panel envelopes and media, structural customization previews, asynchronous physical asset
-fetch/disposal, origin rebasing, a full-library app adapter beyond the current five-region local
-solver kernel, GPU batching of module realizations, scalable world-field buffers, or a GPU
-ray/capsule acceleration structure. Those remain phased work and are not represented as shipped
-behavior.
+On a release build the [render at distance record](evaluation/2026-09-23-render-at-distance.json)
+measured, at 40 and 80 metres and at 1, 4 and 8 kilometres, a sky that keeps its arrival gradient,
+a placed cube whose lit face differs from arrival by more than eight levels in none of the 11,328
+pixels measured, and a frame that otherwise differs from arrival by at most three levels.
 
-## 9. Repository audit
+## Residency and renderer hardening
 
-| State | Grounded finding |
-| --- | --- |
-| Decided and kept | One semantic scene, pointer-lock WASD plus Interact/Summon, distance tiers, soft dissolve bands, Map as a camera presentation, presentation-only coordinates, single-valued focus, reconstruction rungs, and the permanent non-geographic disclosure. |
-| Implemented but contradictory | Movement was planar X/Z with camera Y reset to 1.62, but there was no surface, contact, collision, step, boundary, or recovery. Map altitude passed through ground distance tiers. Pointer unlock cleared keys but allowed residual velocity. A “pinned” layout preserved X/Z while silently recomputing yaw and scale. |
-| Missing at audit; core/frontend contract now implemented | Persistent-layout schema and consumption, distinct region-creation ordinal, deterministic neighborhood index, residency budgets, safe direct-navigation poses, last-safe recovery feedback, Map marker and region targets, and a spatial test suite. Durable storage, authored rung artifacts, real streaming and view-cone polish remain open. |
-| Unsuitable at target scale | The app sliced the first five records and the solver rejected more than five; all detail was described as resident; a graph write disposed and rebuilt the rendered world; footprints were estimated from anchor count; ambient neutral labels competed with focus; and capture time stood in for region creation order. |
-| Honest present constraint | The app supplies no point maps. The correct current rung is source-bearing apertures, unavailable-evidence contours, and semantic motes on the shared field, not fabricated terrain or reconstructed shells. |
+**Measurement-driven downgrade.** `RepresentationPressureController`
+(`web/packages/atlas-core/src/performance-pressure.ts`) reads rolling 95th-percentile frame time,
+and resident bytes over a declared budget when a caller supplies them; the binding supplies frame
+time only, and hidden-tab and non-positive samples are ignored. Two overloaded windows lower the
+maximum residency stage and budget; five healthy windows restore one level. It receives no device
+name, user agent, GPU model or hardware allowlist.
 
-## 10. Phased roadmap and ownership
+**Precision.** `renderOriginForNeighborhood` (`web/packages/atlas-core/src/render-origin.ts`)
+chooses a stable, quantized GPU origin from the active neighborhood. The binding shifts one render
+root and the camera by that origin, overlays and the field apply the inverse translation, and
+canonical Atlas positions never change. A world with no regions has no neighborhood, so its origin
+never moves. The world field's shader capacity and typed buffers are generated from the exact
+topology counts, and `web/packages/atlas-react/test/world-field-buffers.test.ts` checks that 120
+regions all reach the buffer.
 
-### Phase A: spatial authority
+**Physical residency executor.** `PhysicalResidencyRuntime`
+(`web/packages/atlas-react/src/playcanvas/physical-residency.ts`) executes the planner's `load`,
+`cancel` and `release` actions as authenticated fetch, decode, GPU upload and publication, checking a
+monotonic generation after every asynchronous step so a stale fetch can never become current;
+`missing`, `unavailable`, `unsupported` and `deleted` descriptors settle as fallbacks without a
+fetch, and context loss keeps decoded state, disposes GPU state and re-uploads.
+`fetchAuthenticatedAsset` puts the bearer in a header, never the path, checks an expected SHA-256,
+and records whether a requested byte range came back as `206` with `Content-Range` or as a whole
+object. The binding's seam is `AtlasBinding.onResidencyActions`. **The application installs no
+executor**: already decoded maps settle at once, and the authenticated point-map and splat routes
+serve whole objects `no-store`, so useful range streaming, deployed object-store behaviour and a
+target-hardware trace are not established.
 
-**Frontend/core status: implemented; backend durability is not present.**
+**Context loss.** A WebGL context-loss event opens the complete World Index and says the 3D surface
+is unavailable (`web/packages/app/src/composition/input-modes.ts`).
 
-Define and persist `AtlasLayoutSnapshot`, region creation ordinals, authored/derived footprint data,
-safe entry poses, and layout migrations. `atlas-core` owns validation and deterministic transforms;
-the graph/backend owns durable storage and version conflicts; the app only adapts snapshots. Exit
-criterion: adding or confirming unrelated graph data cannot move an existing region without an
-explicit layout migration.
-
-### Phase B: neighborhoods and residency
-
-**Core planner/index status: implemented; physical streaming and production full-library adapter
-are not present.**
-
-Partition the full-library index into stable semantic neighborhoods, add sigils and adjacency, and
-implement a budgeted residency planner with target pinning and cancellation. `atlas-core` owns the
-planner and state machine; PlayCanvas owns assets, origin rebasing, and disposal; the app owns no
-parallel world model. Exit criterion: a library much larger than five regions remains navigable
-without loading every detailed asset or changing logical coordinates.
-
-### Phase C: rung traversal
-
-**Status: foundational policies only; measured pipeline artifacts are not present.**
-
-Ingest trusted nav surfaces for rung 1, trajectory corridors for rung 2, measured panel envelopes
-for rung 3, and real source media for rung 4. The reconstruction pipeline supplies measured
-artifacts; `atlas-core` validates capability and resolves movement; PlayCanvas builds only the
-coarse proxies and visuals the rung allows. Exit criterion: collision, focus occlusion, Locate, and
-visual coverage agree under every rung fixture.
-
-### Phase D: direct navigation and recovery
-
-**Frontend/core status: region and citation travel, reduced motion, Map targets, and recovery
-feedback implemented; residency-aware asynchronous arrival and far-field action cues are not present.**
-
-Add Map/Index target travel, residency-aware safe-vantage resolution, reduced-motion transitions,
-soft far-field cues, and explicit last-safe recovery feedback. `atlas-core` owns target resolution
-and invariant state; the app owns commands and truthful captions; PlayCanvas realizes the camera
-transition. Exit criterion: Map cancel restores bit-for-bit ground state and every target either
-arrives at a validated pose or reports why it cannot.
-
-### Phase E: scale and comfort hardening
-
-**Status: representative production assets and profiling are not present.**
-
-Profile streaming churn, large-coordinate rebasing, collision broad phase, focus rays, frame pacing,
-and the authored daylight/contrast modes across representative large libraries. Exit criterion: movement and
-Map transitions meet the performance budget without reducing evidence legibility or introducing
-permanent dashboard chrome.
+Not built: reconstructed navmeshes, camera-trajectory ingestion, measured panel envelopes, structural
+customization previews, asynchronous physical asset fetch and disposal in the application, a
+full-library adapter beyond the five-region solver, GPU batching of module realizations, and a GPU
+ray or capsule acceleration structure.

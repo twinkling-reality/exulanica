@@ -156,7 +156,7 @@ staging is not authorization to commit. Ignored working notes never enter the ca
 
 ```bash
 uv run python scripts/generate_docs_index.py
-uv run pytest -q tests/test_documentation_links.py tests/test_documentation_structure.py
+uv run pytest tests/test_documentation_links.py tests/test_documentation_structure.py
 uv run python scripts/generate_docs_index.py --check
 git diff --check
 ```

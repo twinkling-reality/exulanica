@@ -1,129 +1,182 @@
-# Production reconstruction scenes
+# Reconstruction scenes
 
-Status: **PRODUCTION RUNG-3 MULTI-PHOTOGRAPH PATH**. Scene selection, durable work, pose
-recovery, placement, graph delivery, rendering, deletion and recovery. The completed ETH3D
-`pipes` run is one licensed indoor benchmark, reconstructed, measured in the browser, withdrawn
-and purged through that path. It is not a representative real-corpus or personal-media
-acceptance gate. No consented personal capture set was admitted for that campaign.
+Reconstruction is one way to build a world: an admitted set of photographs of a real place becomes
+a scene a world can place and draw. This contract owns that pipeline from an exact capture set to
+a published scene: selection, the durable job, pose recovery, point-map placement, the quality
+gate and recorded rung, the graph projection, delivery, deletion and the scene worker.
 
-## Verification baseline
+Neighbouring owners: scene training in [gsplat-scene-jobs.md](gsplat-scene-jobs.md), object and
+person segments in [scene-segments.md](scene-segments.md), coverage verdicts before a run in
+[capture-overlap-and-recovery-state.md](capture-overlap-and-recovery-state.md), admission and model
+rights in [personal-admission.md](personal-admission.md), masking and screening in
+[person-presentation-consent.md](person-presentation-consent.md), and serving under current
+permission in [asset-read-currency.md](asset-read-currency.md). The product guide is
+[capabilities/scene-reconstruction.md](capabilities/scene-reconstruction.md).
 
-**VERIFIED 2026-09-04 through the completed withdrawal work.** The exact campaign database and
-required clean-bytecode command sequence completed with 1,354 passed tests, 2 intentional skips,
-and 3 warnings. Ruff passed, and all four import-layer contracts passed over 257 files and 1,770
-dependencies. The complete web workspace passed type checking, all dependency boundaries, and 670
-tests across 87 files. The production Atlas application build also completed.
+## Contents
 
-```bash
-find . -name __pycache__ -not -path './.venv/*' -exec rm -rf {} +
-EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest
-uv run ruff check .
-uv run lint-imports
-```
+- [1. Scene selection and the durable job](#1-scene-selection-and-the-durable-job)
+- [2. Durable artifact chain](#2-durable-artifact-chain)
+- [3. Placement: coordinates, scale and correspondence fitting](#3-placement-coordinates-scale-and-correspondence-fitting)
+- [4. Graph delivery and rendering](#4-graph-delivery-and-rendering)
+- [5. Quality gate and recorded rung](#5-quality-gate-and-recorded-rung)
+- [6. Deletion and scratch lifecycle](#6-deletion-and-scratch-lifecycle)
+- [7. Running the worker](#7-running-the-worker)
+- [8. The graph projection](#8-the-graph-projection)
+- [9. Rung 2 corridor artifacts](#9-rung-2-corridor-artifacts)
+- [10. Evidence](#10-evidence)
+- [11. Limits](#11-limits)
+- [12. The pose job controller](#12-the-pose-job-controller)
 
-The withdrawal workflow lives in the top-level orchestration layer because it composes World
-Memory Package projection. Commit `d60be1c` moved that workflow without changing its retained
-record. Ledger reads and writes qualify to the connection's current schema so a deployment schema
-cannot inherit another search-path schema's `schema_migrations` table. Commit `ea70b80` added a
-decoy-ledger PostgreSQL regression for that qualification.
+## 1. Scene selection and the durable job
 
-## 1. Production flow
+Ingest runs scene grouping after capture processing. `run_scene_grouping` records the groups,
+applies `SceneGroupPosePolicy` and enqueues a selected exact member set only after every member
+has a current point-map artifact. The automatic policy, `exulanica.scene-group-pose-selection/v1`,
+is deliberately narrow:
 
-The normal ingest flow runs scene grouping after capture processing. `run_scene_grouping` records
-the groups, applies `SceneGroupPosePolicy`, and enqueues a selected exact member set only after
-every member has a current point-map artifact. The
-initial policy is deliberately narrow and versioned as
-`exulanica.scene-group-pose-selection/v1`:
-
-- it considers the deterministic presentation order already produced by `scene_group` version 1;
-- it selects groups with at least three members because the current sparse backend discards
+- it reads the deterministic presentation order produced by `scene_group` version 1;
+- it selects groups with at least three members, because the sparse backend's defaults discard
   two-view tracks; and
-- it records that the policy has not been validated against a representative photograph corpus
-  and does not predict registration or quality.
+- its selection record states that it is not validated against a representative photograph
+  corpus and does not predict registration or quality.
 
-The grouping stage's current one-hour and 250-metre boundaries are unvalidated stage parameters.
-They are not hidden product rules. Changing them changes the stage digest and therefore creates a
-new deterministic grouping result. A reviewed selection policy can replace
-`SceneGroupPosePolicy` without changing scene identity, job leasing, placement, or delivery.
+The grouping stage's one-hour and 250-metre boundaries (`max_time_gap_s` and `max_distance_m`)
+are unvalidated stage parameters, not product rules. Changing them changes the stage digest and
+therefore the grouping result. A reviewed policy can replace `SceneGroupPosePolicy` without
+changing scene identity, job leasing, placement or delivery.
 
-Sources that honestly lack the automatic policy's EXIF assumptions may use
-`enqueue_exact_scene_reconstruction`. This is a narrow operator-authorized selection interface,
-not a metadata repair. Its versioned policy binds the operator, authorization time, purpose,
-ordered capture ids, and source digests. It still waits for every privacy-bound point map and uses
-the same admission, build-input, queue, worker, and publication contracts as automatic grouping.
+Sources whose metadata does not satisfy the automatic policy may use
+`enqueue_exact_scene_reconstruction`, an operator-authorized selection and not a metadata repair.
+Its versioned policy (`exulanica.operator-exact-set-pose-selection/v1`) binds the operator,
+authorization time, purpose, ordered capture ids and source digests. It waits for every
+privacy-bound point map and uses the same admission, build-input, queue, worker and publication
+contracts as automatic grouping. It also carries an optional training request and the destination
+a training run sends photographs to ([gsplat-scene-jobs.md](gsplat-scene-jobs.md)).
 
 The queue row is durable before compute starts. It owns an immutable ordered membership table, the
-complete member-set digest, the selection-policy digest, an exact build-input record and digest, a
-deterministic job id, and the deterministic `reconstruction_scene` id. The build-input record binds
-every member to one point-map artifact id and content digest plus the pose, placement and gate stage
-versions and parameter digests. Registration is not part of scene or job identity. The completed
-scene and the per-build registration outcomes are inserted only after pose recovery.
+member-set digest, the selection-policy digest, an exact build-input record and digest, a
+deterministic job id and the deterministic `reconstruction_scene` id. The build-input record binds
+every member to one point-map artifact id and content digest plus the pose, placement and gate
+stage versions and parameter digests. Registration is not part of scene or job identity; the
+completed scene and the per-build registration outcomes are written only after pose recovery.
 
-`reconstruction_scene` remains the stable identity of the exact capture set. A replacement point
-map or scene-stage version creates a new immutable job under that scene. Each successful job keeps
-its own registration rows and output artifacts. Only the scene's `current_job_id` advances, in the
-same transaction that publishes the new rung assertion and successful job state. Graph and package
-readers follow that pointer. Older successful builds remain inspectable and reproducible.
+`reconstruction_scene` is the stable identity of the exact capture set. A replacement point map or
+scene-stage version creates another immutable job under that scene. Each successful job keeps its
+own registration rows and output artifacts. Only the scene's `current_job_id` advances, in the
+transaction that publishes the rung assertion and the job's success. Graph and package readers
+follow that pointer, and older successful builds stay inspectable and reproducible.
 
-The separate `exulanica-scene-worker` process then performs this sequence:
+The `exulanica-scene-worker` process runs this sequence:
 
 1. Claim the next eligible exact set with `FOR UPDATE SKIP LOCKED` and a renewable lease.
-2. Stage only the declared source blobs under the job's canonical workspace/job scratch key,
-   verifying every byte digest and refusing undeclared files.
-3. Run checkpointed pycolmap feature extraction, matching, sparse mapping, and model conversion.
-4. Resolve and verify the exact point-map artifacts declared by the job, then compute a pose
-   receipt, point-map placement record, and scene-gate decision without writing object bytes early.
-5. Hold purge-compatible session locks for all three content digests, then commit the completed
-   scene, per-build registration outcomes, and artifact rows through the tombstone guards.
-6. Flush the exact receipt bytes to the content-addressed store after that row transaction commits.
-7. In one final transaction, record the scene-rung assertion, mark the job succeeded, and advance
+2. Stage only the declared source blobs under the job's canonical workspace and job scratch key,
+   verifying every byte digest and refusing undeclared files. A member whose person must be
+   hidden is staged as its declared masked derivative.
+3. Run checkpointed pycolmap feature extraction, matching, sparse mapping and model conversion
+   (section 12).
+4. Resolve and verify the exact point-map artifacts the job declares, then compute a pose receipt,
+   a placement record and a scene-gate decision without writing object bytes early. A job that
+   carries a training request trains under the same lease before publication.
+5. Hold purge-compatible session locks for the receipt digests, then commit the completed scene,
+   per-build registration outcomes and artifact rows through the tombstone guards.
+6. Flush the exact receipt bytes to the content-addressed store after that transaction commits.
+7. In one final transaction, record the scene-rung assertion, mark the job succeeded and advance
    the current-build pointer. These writes are the publication point.
-8. Remove the sensitive scratch directory after success, handled failure, or cancellation.
+8. Remove the sensitive scratch directory after success, handled failure or cancellation.
 
-The graph and World Memory Package omit a prepared job until that publication transaction succeeds.
-If storage fails after the prepared rows commit, the job remains retryable and a deterministic
-retry verifies those rows and heals the missing bytes. If deletion lands between row commit and
-publication, the session locks make the purger wait until the writer stops; publication is refused,
-then the normal purge removes the receipt bytes. This prevents a late writer from recreating an
-object after the purger marked it gone.
+The graph and the World Memory Package omit a prepared job until publication succeeds. If storage
+fails after the prepared rows commit, the job stays retryable and a deterministic retry verifies
+those rows and heals the missing bytes. If a deletion lands between row commit and publication, the
+session locks make the purger wait until the writer stops; publication is refused, then the
+normal purge removes the receipt bytes. A late writer therefore cannot recreate an object after the
+purger marked it gone.
 
 ## 2. Durable artifact chain
 
-The accepted chain has three independently versioned records:
+Every published build has three independently versioned receipts:
 
-| Record | Current profile | What it binds |
+| Record | Profile | What it binds |
 | --- | --- | --- |
 | Pose receipt | `exulanica.colmap-pose-receipt/v2` | exact source manifest, source digests, code revision, pycolmap version, runtime image digest, commands, sparse outputs, recovered cameras, registration and quality |
-| Placement | `exulanica.posed-point-map-placement/v2` | scene id, complete ordered member set, pose receipt digest, pose manifest digest, each current point-map artifact id and content digest, correspondence-fit evidence, transform, scale status, and every exclusion |
-| Gate | `exulanica.reconstruction-scene-gate/v1` | every receipt digest it read, complete and registered counts, awarded rung, and all withholding reasons |
+| Placement | `exulanica.posed-point-map-placement/v2` | scene id, complete ordered member set, pose receipt digest, pose manifest digest, each current point-map artifact id and content digest, correspondence-fit evidence, transform, scale status and every exclusion |
+| Gate | `exulanica.reconstruction-scene-gate/v1` | every receipt digest it read, complete and registered counts, awarded rung and all withholding reasons |
+
+The same acceptance publishes the graph projection (section 8), and a trained build adds its
+training receipt, SOG delivery and private evaluation bundle
+([gsplat-scene-jobs.md](gsplat-scene-jobs.md)).
 
 Artifact ids are deterministic functions of the scene, stage version and parameters, and exact
-input digests. A retry may reproduce and verify the same row. It cannot create a second conflicting
-truth for the same input key.
+input digests. A retry may reproduce and verify the same row. It cannot create a second,
+conflicting truth for the same input key.
 
 The placement validator refuses unsupported versions, missing or duplicate members, outcomes that
 do not cover the exact member set, point maps from outside the scene, unknown or changed artifact
 rows, content-digest disagreement, pose-member disagreement, non-finite transforms, non-affine
-matrices, non-orthonormal rotations, reflections, and non-positive scales. It rebuilds the expected
+matrices, non-orthonormal rotations, reflections and non-positive scales. It rebuilds the expected
 record from the current pose receipt and point-map inputs and requires exact equality.
 
-## 3. Coordinate and scale convention
+## 3. Placement: coordinates, scale and correspondence fitting
 
-OPM/2 remains a per-photograph artifact in its source-camera frame. Placement never changes its
-bytes.
+OPM/2 is a per-photograph artifact in its source-camera frame
+([adr/0010-opm-2.md](adr/0010-opm-2.md)). Placement never changes its bytes.
 
 COLMAP reports `camera_from_world` with camera axes +X right, +Y down, +Z forward. OPM uses +X
 right, +Y up, -Z forward. The placement producer first applies `diag(1, -1, -1)` to map OPM axes
-into COLMAP camera axes, then applies the inverse recovered camera pose. The stored transform is a
-row-major 4 by 4 `scene_from_opm` matrix.
+into COLMAP camera axes, then applies the inverse recovered camera pose. The stored transform is
+the row-major 4 by 4 matrix `scene_from_opm = [s R^T diag(1,-1,-1), -R^T t; 0,0,0,1]`, acting
+directly on raw OPM coordinates. `local_units_to_scene_units = s` describes the scale already in
+its linear block, so a consumer must not multiply positions by it a second time. Camera centres are
+not scaled by the per-image fit.
 
-COLMAP world units are scale ambiguous. Historical placement version1 used
-`local_units_to_scene_units = 1.0` and `scale_status = unvalidated-identity` for display only.
-As of2026-09-05, [placement version2](scene-placement-alignment.md) fits and validates scale against
-exact COLMAP image/track correspondences; identity-scale placements are withheld until rebuilt.
-This alignment is still nonmetric. No query, corridor, navigation, or rung gate may treat those
-units as metres. The [retained reference workflow](retained-reference-workflow.md) records the
-current real-input state and the independent requirements for a visual baseline.
+`scene_placement` version 2 gives a registered photograph a scene transform only when its exact
+OPM bytes align with actual COLMAP sparse correspondences. Missing or inconsistent correspondence
+never substitutes an identity scale, and pose registration alone does not establish that a
+monocular point map fits it.
+
+- **Inputs.** `scene_pose` retains the COLMAP model parameters, image dimensions and a bounded,
+  deterministic sample of pixel and 3D tracks for each recovered camera. When one image observes
+  the same sparse point at two keypoints, every observation of that point from that image is
+  dropped rather than one chosen. Camera and observation fields enter the quality digest; no
+  learned feature descriptors are persisted.
+- **Fitting.** The producer reconstructs the OPM's model-image sample lattice from its declared
+  centred pinhole camera and matches COLMAP pixels to retained samples, using each sample at most
+  once. Tracks need at least two observations and at most two pixels of reprojection error. A
+  deterministic fold by sample location reserves every fifth correspondence for validation. A
+  robust median scalar fits all three camera-space components of the rest, followed by an inlier
+  refit; rotation and translation come from COLMAP and are not fitted. Residuals over all three
+  components stop a wrong focal geometry from passing because its depth ratio agrees.
+- **Acceptance.** `ALIGNMENT_POLICY` in `exulanica/reconstruction/alignment.py`, which enters stage
+  identity, requires at least 24 fitting and 6 validation correspondences, at least 6 occupied
+  cells of a 4 by 4 source-image grid, and at least 60 percent inliers within 15 percent relative
+  3D residual in both folds. The P90 residual is retained for inspection and is not a second
+  threshold. These are engineering choices, not corpus-calibrated quality claims.
+- **Result.** An accepted member records `scale_status: colmap-correspondence-fit` and
+  `physically_validated: false` with its correspondence counts, spatial coverage, inliers and
+  residuals. An excluded member records `pose-not-registered`, `point-map-unavailable`,
+  `alignment-unavailable`, `alignment-insufficient-correspondences` or `alignment-inconsistent` and
+  keeps ordinary source access. Both outcomes reproduce from the exact pose and point-map bytes.
+
+A version 1 identity-scale placement is not upgraded or reinterpreted. The client draws only
+`colmap-correspondence-fit` placements (`web/packages/app/src/geometry-api.ts`), so such a scene
+falls back to its source photographs until a build runs under the version 2 stages.
+
+The fit is coordinate alignment, not physical measurement. Scene coordinates are the selected
+COLMAP world with no assumed gravity or physical unit, and no query, corridor, navigation or rung
+gate may treat them as metres. Agreement between models does not establish collision,
+navigability, complete surfaces or visual quality. Scale-only alignment cannot correct nonrigid
+monocular depth warping.
+
+Registered members also expose an independent recovered camera from the accepted pose receipt: a
+unit-scale renderer-camera-to-scene transform at the recovered camera centre, and a calibration
+that keeps `fx`, `fy`, `cx`, `cy`, image dimensions, model name and every original parameter.
+PINHOLE and SIMPLE_PINHOLE projection is exact; a distortion model is disclosed as
+`pinhole-approximation`. Camera arrival and inspection therefore work even when every point map is
+unavailable, without changing the recorded rung.
+
+The placement rule's synthetic verification and mutation controls are retained in
+[the placement record](evaluation/2026-09-05-placement-alignment.json). They concern numeric
+synthetic geometry, not visual acceptance of a real scene.
 
 ## 4. Graph delivery and rendering
 
@@ -131,59 +184,60 @@ current real-input state and the independent requirements for a visual baseline.
 transaction. Each `reconstruction_scenes` entry carries one authoritative scene description:
 
 - ordered registered and unregistered members;
-- pose, placement, and gate digests;
+- pose, placement and gate digests;
 - recorded rung and recorded withholding reasons from the assertion;
 - displayed rung and display reasons;
-- current rendering substrate;
+- the rendering substrate;
 - each registered member's validated point-map descriptor and transform; and
 - an explicit exclusion reason for every member without a placement.
 
-Before exposing any transform, the server retrieves and digest-checks the three durable records,
-reproduces the gate decision, validates the placement against the immutable scene members, and
-requires each placed point map to match its exact live artifact row. Missing or invalid scene
-receipts preserve the recorded assertion for explanation but switch delivery to source photographs.
+Before exposing any transform, the server re-reads the scene's members and gate agreement and
+requires each placed point map to match its exact live artifact row and reproduce its content
+digest. The transforms come from the graph projection when it proves its bindings (section 8);
+otherwise the server rebuilds them by validating the placement against the pose receipt and the
+point-map bytes. Missing or invalid scene receipts keep the recorded assertion for explanation but
+switch delivery to source photographs.
 
 The browser fetches every available placed map with its workspace bearer, verifies the declared
 SHA-256 before decoding OPM/2, validates the matrix, and creates one scene root with one transformed
-point-cloud child per accepted member. Residency cost, footprint, arrival framing, and camera
-coverage include all loaded children. A corrupt or missing member degrades independently, while
-the member's source photograph remains available through the ordinary source-first region.
+point-cloud child per accepted member. Residency cost, footprint, arrival framing and camera
+coverage include all loaded children. A corrupt or missing member degrades independently, while its
+source photograph stays available.
 
 Captures that have ever belonged to a reconstruction scene are omitted from the unposed
-`GET /geometry` list. This prevents deletion or a broken scene receipt from silently putting a
-surviving member back at an invented island origin. Exact bytes for a live point-map artifact remain
-available when another validated scene refers to them.
+`GET /geometry` list, so a deletion or a broken scene receipt cannot put a surviving member back at
+an invented origin. Exact bytes for a live point-map artifact stay available when another validated
+scene refers to them.
 
 ### Photographs joined from one standpoint
 
 Photographs taken from about one position give pose recovery no parallax, so their scene publishes
 with no member registered. The `scene_standpoint` stage
-([`exulanica/ingest/standpoint_scenes.py`](../exulanica/ingest/standpoint_scenes.py)) measures
-how such photographs were turned relative to one another and writes one `standpoint_scene` artifact
+([`exulanica/ingest/standpoint_scenes.py`](../exulanica/ingest/standpoint_scenes.py)) measures how
+such photographs were turned relative to one another and writes one `standpoint_scene` artifact
 (`exulanica.standpoint-scene/v1`,
-[`standpoint_record.py`](../exulanica/reconstruction/standpoint_record.py)) that the graph serves
-in place of an unmeasured arrangement. It runs from the scene worker's refresh pass
+[`standpoint_record.py`](../exulanica/reconstruction/standpoint_record.py)) that the graph serves in
+place of an unmeasured arrangement. It runs from the scene worker's refresh pass
 (`--standpoints-refresh-seconds`) or on demand with
-`python -m exulanica.ingest.standpoint_scenes --workspace <uuid> [--scene <uuid>]`, where pycolmap is
-installed; it needs pycolmap and numpy only, which the scene worker's image carries. It never touches
-a scene whose pose recovery placed a member.
+`python -m exulanica.ingest.standpoint_scenes --workspace <uuid> [--scene <uuid>]` where pycolmap is
+installed; it needs pycolmap and numpy only, which the scene worker's image carries. It never
+touches a scene whose pose recovery placed a member.
 
 - **Method.** COLMAP SIFT features per photograph, a rotation-only fit per pair through each
   photograph's EXIF 35 mm equivalent focal length, a global rotation solve over the set, the focal
-  length refined from the overlaps against a prior on the stated lens, and each photograph's MoGe-2
-  depth brought to one scale on the overlaps
+  length refined from the overlaps against a prior on the stated lens, and each photograph's
+  MoGe-2 depth brought to one scale on the overlaps
   ([`standpoint.py`](../exulanica/reconstruction/standpoint.py)). No model runs in this stage; the
   depth estimates come from the depth stage. Every parameter is in the versioned stage entry in
   [`exulanica/ingest/stages/__init__.py`](../exulanica/ingest/stages/__init__.py).
 - **Refusal by name.** A pair is joined or refused as `insufficient_overlap`,
   `moved_between_photographs`, `scene_changed` or `inconsistent_with_set`. A member is `joined`,
-  `not_joined`, or never read: `not_permitted`, `point_map_unreadable`, or `focal_length_unstated`
+  `not_joined`, or never read: `not_permitted`, `point_map_unreadable` or `focal_length_unstated`
   (a photograph that does not state its lens stays a separate photograph, because the depth model's
   own field-of-view estimate joins visibly wrong). Photographs that overlap nothing stay separate.
   A pair is `scene_changed` when more than 2 percent of the view the two photographs share shows
   something else. A smaller change may be joined, and the arrangement then shows it as the
-  photograph drawn there has it: an object that appeared over 1.2 to 1.9 percent of a pair's shared
-  view, as counted from one photograph or the other, was joined by every version measured.
+  photograph drawn there has it.
 - **Permission and withdrawal.** A member is read only under the permission the depth stage
   requires for its point map, including a personal model right naming the depth model where the
   capture needs one, and the question is asked again inside the publication transaction. The graph
@@ -202,123 +256,128 @@ within the single-photograph limit and keeps the seams joined. An edge that no o
 continues is drawn as a thin line in the theme's absence colour instead of fading out. Nobody can
 walk round to the far side of anything: only what the photographs saw from the standpoint exists.
 
-MEASURED on synthetic same-standpoint sets with exact ground truth, held-out split of 66 sets and
-210 photographs, both with the stated lens and with the stated lens off by up to 3 percent: every
-pre-registered gate passed. No pair taken metres apart and no pair across a change was joined.
-Joined photographs lined up from the standpoint within 0.34 and 0.41 degrees at the 95th percentile
-beyond their own parallax, and their depths agreed across a seam to a median of 2.4 percent (20
-percent at the 90th percentile). 4 and 5 of 129 joinable pairs were refused as changed or moved.
-The arrangement's up direction was not gated and leans by 1.4 degrees at the median and up to 4.0
-degrees. Records: `docs/evaluation/2026-09-23-standpoint-join-preregistration.json` and
-`docs/evaluation/2026-09-23-standpoint-join-outcome.json`.
+MEASURED on synthetic same-standpoint sets with exact ground truth, under pre-registered gates:
+version 1 passed every gate on a held-out split of 66 sets and 210 photographs, with no pair taken
+metres apart and no pair across a change joined
+([pre-registration](evaluation/2026-09-23-standpoint-join-preregistration.json),
+[outcome](evaluation/2026-09-23-standpoint-join-outcome.json)). Versions 2 and 3, which add an up
+direction from vertical edges, a zoom in the pair fit and a cause named only where it is measured,
+failed their gates on fresh held-out splits
+([version 2](evaluation/2026-09-24-standpoint-join-v2-outcome.json),
+[version 3](evaluation/2026-09-25-standpoint-join-v3-outcome.json)). The stage therefore registers
+version 1; the later paths are selectable only through their parameters.
 
-MEASURED for version 2 on a second held-out split of 72 synthetic sets and 228 photographs, in the
-same two arms: the pre-registered gates failed in both arms. The join carries version 2's paths (up
-from vertical edges, a zoom in the pair fit, a cause named only where it is measured), selected by
-its parameters, and the stage registers version 1 because version 2 failed. The arrangement stood within 0.19
-degrees of true up at the median and 0.66 degrees at the 95th percentile, 1.01 at worst (version 1
-on the same split: 1.50, 3.48 and 4.02), and no moved pair was joined or named changed (version 1
-named 3 and 4 moved pairs changed). One changed pair was joined, as version 1 joins it: an object
-covering 1.2 percent of the pair's shared view, under the 2 percent the comparison refuses. 2 and 3
-of 133 joinable pairs were refused as changed; each of the five was traced after the run to the
-change comparison, which applies the motion fitted with a zoom of the second lens while carrying
-that photograph through its unzoomed lens. With the lens off by up to 3 percent, joined photographs
-lined up within 0.46 degrees at the 95th percentile against the gate's 0.41 (version 1 on the same
-split: 0.43). Records: `docs/evaluation/2026-09-24-standpoint-join-v2-preregistration.json` and
-`docs/evaluation/2026-09-24-standpoint-join-v2-outcome.json`.
+## 5. Quality gate and recorded rung
 
-MEASURED for version 3 on a third held-out split of 72 synthetic sets and 228 photographs, in the
-same two arms and beside version 1 on the same sets: the pre-registered gates failed in both arms.
-Version 3 is version 2 with the change compared through the lens the pair's fit found, selected by
-its parameters, and the stage registers version 1. A change was counted by the changed object's own
-visible surface, and the join was required to refuse every change over the 2 percent its policy
-names. No moved pair and no changed pair was joined, in either version. In each arm 2 of 138
-joinable pairs were refused as changed (version 1: 6 and 5), the arrangement stood within 0.18
-degrees of true up at the median and 0.82 and 0.83 at the 95th percentile (version 1: 1.47 and 1.50,
-4.45 and 4.40), and 79 and 77 of 97 joinable pairs were joined (version 1: 74 and 75). The name
-gates and the naming rates failed (4 of 16 moved and 4 of 10 changed pairs named; version 1: 4 and 5
-of 16, 5 of 10): in each arm one moved pair was named changed, a landscape walk the depth model's
-scale read as 0.2 m, and one changed pair was named moved, where an added object covered a third of
-the shared view; version 1 named 6 and 5 moved pairs changed and the same changed pair moved. With
-the stated lens, joined photographs lined up within 0.39 degrees at the 95th percentile against
-version 1's 0.29 and one pixel (0.075 degrees) allowed over it: on the pairs both versions joined
-the two are equal, and the difference is hand-held pairs only version 3 joins. Records:
-`docs/evaluation/2026-09-25-standpoint-join-v3-preregistration.json` and
-`docs/evaluation/2026-09-25-standpoint-join-v3-outcome.json`.
+**Point-map validation.** `exulanica.reconstruction.validate_opm` validates every production point
+map before it is persisted, and the PlayCanvas reader independently validates its untrusted byte
+boundary before it constructs typed-array views. Both check the format, version, rung, explicit
+metric flag, camera axes, source dimensions and aspect, field of view, bounds, section types, exact
+lengths, alignment and container range. Under OPM/2 both refuse version 1 by name with a message
+naming the regeneration path, check that `colorAlpha` declares which quantity the alpha channel
+holds, and check that `modelImage` is reachable from `sourceImage` by one uniform resize. The
+production validator also checks per point that every position is finite, in front of the source
+camera and within the declared bounds, that every segment id is one the renderer's semantic table
+can index, and that every reserved bit of the tags channel is zero. The reader does none of those,
+because its one requirement is no per-point JavaScript: the writer's boundary is the one in front of
+a durable artifact.
 
-## 5. Recorded rung, displayed rung, and substrate
+The renderer's source-panel envelope, derived from the artifact's measured depth bounds and
+source-camera frustum, is an observed presentation extent only. It is not navigation, collision, a
+world-space scale, or permission to move away from the source viewpoint.
 
-These are separate facts:
+**Point-map stage parameters.** `min_valid_fraction_milli = 150` and `max_depth_step_milli = 100`
+are explicitly unvalidated stage parameters, so an edit changes the stage key and regenerates. The
+depth-step limit drops points that span a silhouette, where a monocular model's pixel covers two
+surfaces at different depths; it was chosen on one photograph, where 100 removed 3.04 percent of the
+map and kept a bicycle standing proud of a wall, and 50 began deleting its frame. Every `.opm`
+carries the `discontinuityDropped` and `oneSidedPoints` statistics, so both thresholds can be
+reviewed against a real corpus.
+
+**The quality report.** `exulanica.reconstruction.quality` is the versioned report contract for the
+real checks: structural OPM integrity, PlayCanvas consumption and load duration, authorized source
+opening and evidence linkage, visual alignment from the exact source-camera pose, metric versus
+non-metric behaviour, deletion closure, production duration, byte size and returned cost, and the
+valid-fraction distribution. Missing values stay absent and block the gate, and synthetic or
+development observations can test the contract but never pass the real-corpus gate. No worker or
+route calls it, and no real corpus has passed it.
+
+**Pose policy.** `scene_pose` version 4 requires at least 80 percent registration, a mean
+reprojection error of at most 1.0 pixel, and a COLMAP-normalized camera-translation extent of at
+least 5.0 units (`min_registered_fraction_millionths`, `max_mean_reprojection_error_micropixels`
+and `min_camera_translation_microunits` in the stage registry). Version 2 selected its values by
+declared rules from one synthetic scene and the licensed ETH3D benchmark
+([benchmark pose record](evaluation/2026-09-04-benchmark-pose.json)): the product floor of 80
+percent registration, the smallest whole-pixel ceiling above the largest observed reprojection
+error, and the greatest whole unit below the smallest observed extent, 9.0. Version 4 keeps the
+first two and lowers the extent to 5.0, because fully registered, sub-pixel handheld builds of the
+retained bowl collection measured 8.13 and 8.96 units and were refused
+([real reconstruction record](evaluation/2026-09-05-real-reconstruction.json)). COLMAP normalizes
+central camera centres to a 10-unit extent, so the value is a non-degeneracy check within this
+controller and not a metric distance. Every earlier build keeps its own parameter digest; new
+corpus evidence creates a new stage version and a new build rather than changing one in place.
+
+**Recorded rung, displayed rung and substrate.** These are separate facts:
 
 - `recorded_rung` is the durable scene assertion produced by the scene gate;
 - `displayed_rung` is the worst-first mode this client can honestly show; and
-- `rendering_substrate` is either `posed_point_maps` or `source_photographs` in this client.
+- `rendering_substrate` is `posed_point_maps` or `source_photographs` in this client.
 
-Decoded geometry never promotes `recorded_rung`. The measured `scene_pose` policy requires at least
-80 percent registration, no more than 1.0 pixel mean reprojection error, and a COLMAP-normalized
-camera-translation extent of at least 5.0 units (version 4; versions 2 and 3 required 9.0). The last
-value is a non-degeneracy check, not a metric distance. MEASURED 2026-09-05 on the first retained real
-collection: two fully registered handheld captures circling a bowl measured 8.13 and 8.96 units and
-were refused by the 9.0 floor, while a third mapping of the same 51 photographs measured above 9 and
-passed. COLMAP normalizes the central camera centres to a 10-unit extent, so the maximum pairwise
-camera distance of any normalizable model lies near 10 and the floor can only distinguish a model
-whose centres could not be normalized; 5.0 does that without being crossed at random by a
-nondeterministic mapper. The retained sparse tracks, calibration record and receipt profile are
-unchanged from version 3, and every version 3 build keeps its own parameter digest. A passing pose and placement still record rung 3 because rung 1 has no reviewed splat
-receipt and rung 2 lacks physically validated scale, measured coverage, and a measured corridor. If
-no verified placed bytes are available, the client displays rung 4 source photographs while
-retaining the recorded rung and reasons in the disclosure. If a future assertion records rung 1 or
-2 before this client supports that substrate, the displayed rung stays 3 and the disclosure says
-why.
+`decide_scene_rung` in `exulanica/reconstruction/scene_gate.py` awards the highest rung whose exact
+receipt chain is present and accepted. Rung 1 needs accepted scale, coverage and splat receipts;
+rung 2 needs accepted scale, coverage and corridor receipts; rung 3 needs a registered member with
+an accepted placement; anything less records rung 4, source photographs. The scene worker produces
+pose, placement and, for a training build, splat receipts. Nothing produces scale, coverage or
+corridor receipts, so a published scene records rung 3 or rung 4, trained or not.
 
-The status disclosure is the authoritative render site for rung copy. Its sentence comes from the
-single `RUNG_COPY` table in `web/packages/formation/src/labels.ts`; the app carries no second table.
-It names the recorded scene rung, displayed rung, substrate, registered count, and all gate or
-fallback reasons.
+Decoded geometry never promotes `recorded_rung`. If no verified placed bytes are available, the
+client displays rung 4 source photographs while keeping the recorded rung and reasons in the
+disclosure. If an assertion records a rung whose substrate this client does not support, the
+displayed rung stays 3 and the disclosure says why. The status disclosure is the authoritative
+render site for rung copy; its sentence comes from the single `RUNG_COPY` table in
+`web/packages/formation/src/labels.ts`, and names the recorded rung, displayed rung, substrate,
+registered count and every gate or fallback reason.
 
 ## 6. Deletion and scratch lifecycle
 
-A tombstone for any scene or queued-job member, including an unregistered member, does all of the
-following:
+A tombstone for any scene or queued-job member, including an unregistered member:
 
-- cancels a queued, failed, or running scene job in the database;
+- cancels a queued, failed or running scene job in the database;
 - makes the running worker's cancellation check stop pycolmap;
 - retracts the current scene-rung assertion with a durable retraction tied to the tombstone;
 - blocks completed scene artifacts immediately;
 - removes the scene from graph delivery and World Memory Package projection; and
 - makes scene artifact bytes eligible for the separately authorized purge flow.
 
-COLMAP databases, feature descriptors, staged sources, and sparse working files live only under
+COLMAP databases, feature descriptors, staged sources and sparse working files live only under
 `EXULANICA_DATA_DIR/reconstruction-scratch/<workspace>/<job>`. Durable receipts live in the
 content-addressed store, outside scratch. Receipt writes use the shared post-commit store boundary
-and keep purge-compatible session locks through final publication. The worker also holds a
-non-blocking filesystem lock for the whole sensitive scratch lifetime. Cleanup accepts only
-canonical UUID path pairs, refuses symbolic links, skips a locked directory, and never deletes
-scratch protected by queued, running, or retryable work.
+and keep purge-compatible session locks through publication. The worker also holds a non-blocking
+filesystem lock for the whole sensitive scratch lifetime. Cleanup accepts only canonical UUID path
+pairs, refuses symbolic links, skips a locked directory, and never deletes scratch protected by
+queued, running or retryable work.
 
 A process crash leaves its checkpointed scratch in place. After lease expiry, another worker
 reclaims the same job and the pose controller skips only checkpoints whose required outputs still
 verify. A startup sweep removes old unprotected scratch. If a process dies on the final allowed
 claim, startup first changes the expired job to terminal `failed` with
-`failure_class = claim_exhausted`, then makes its old scratch eligible for that sweep. A retry after
-handled cleanup safely restages the exact source set.
+`failure_class = claim_exhausted`, then makes its scratch eligible for that sweep. A retry after
+handled cleanup restages the exact source set.
 
-A later deliberate re-import of the same source bytes creates or reuses a new live capture identity.
-Under the shared purge lock it also restores a globally purged blob row's storage key and clears its
-purged marker before the post-commit store publication finishes. The old capture tombstone continues
-to block the old scene identity. Without a new exact privacy screening receipt, a derivative worker
-produces no replacement point map: its depth stage records that the photograph awaits admission and
-sends nothing to the model.
+A deliberate re-import of the same source bytes creates or reuses a live capture identity. Under
+the shared purge lock it also restores a globally purged blob row's storage key and clears its
+purged marker before the post-commit store publication finishes. The old capture tombstone keeps
+blocking the old scene identity. Without an exact privacy screening for the re-imported capture, a
+derivative worker produces no replacement point map: its depth stage records that the photograph
+awaits admission and sends nothing to the model.
 
 ## 7. Running the worker
 
-Compose builds two dependency-specific images from one reviewed Dockerfile. The derivative worker
-selects the reconstruction extra and starts MoGe, while the API and scene worker use the default
-server and pinned `pycolmap==4.2.0` pose extras. Torch and pycolmap never need to load in one
-process. The derivative worker's model cache shares the durable media volume.
-
-The derivative worker requires no depth flag in Compose. For a local source checkout, configure it
-explicitly:
+Compose builds dependency-specific images from one reviewed Dockerfile. The derivative worker
+image adds the `reconstruction` extra and runs MoGe; the API and scene worker images carry the
+default `server` and `pose` extras, with `pycolmap==4.2.0` pinned. Torch and pycolmap never load in
+one process. [derivative-worker-operations.md](derivative-worker-operations.md) owns the derivative
+worker's configuration. For a local source checkout, run depth explicitly:
 
 ```bash
 export EXULANICA_DEPTH_MODEL=moge
@@ -343,7 +402,7 @@ derivative job makes when it is claimed. The worker returns such a job to the qu
 attempts ([derivative_queue.py](../exulanica/ingest/derivative_queue.py)) the job fails as
 `retry_exhausted`, with each refusal in its error.
 
-For the scene worker, install or invoke the pose extra explicitly.
+For the scene worker, install or invoke the pose extra explicitly:
 
 ```bash
 export EXULANICA_DATABASE_URL=postgresql://exulanica_app:<password>@localhost:5433/${POSTGRES_DB:-exulanica}
@@ -354,199 +413,204 @@ export EXULANICA_POSE_RUNTIME_IMAGE=<registry/image@sha256:digest>
 uv run --extra pose exulanica-scene-worker
 ```
 
-Both provenance variables are required. A mutable image tag or guessed checkout is not accepted.
-The worker also refuses an owner, superuser, or BYPASSRLS database role and an empty workspace set.
-Use `--once` to drain the work currently eligible and exit. Repeat `--job <job-uuid>` (or set
+Both provenance variables are required; a mutable image tag or guessed checkout is not accepted.
+The worker refuses an owner, superuser or BYPASSRLS database role and an empty workspace set.
+`--once` drains the work eligible at that moment and exits. Repeat `--job <job-uuid>` (or set
 `EXULANICA_SCENE_JOB_IDS`) to claim only the named jobs; without it the worker takes every eligible
-job in its workspaces oldest first, including a stale retryable job another operator forgot. A
-job-scoped worker that finds nothing in its scope claims nothing and exits cleanly under `--once`.
-Defaults are a 900-second lease, 30-second heartbeat, 2-second polling interval, and 3600-second
-abandoned-scratch age.
+job in its workspaces oldest first, including a stale retryable job. A job-scoped worker that finds
+nothing in its scope claims nothing and exits cleanly under `--once`. Defaults are a 900-second
+lease, 30-second heartbeat, 2-second polling interval and 3600-second abandoned-scratch age.
+Training builds need the GPU runtime described in [gsplat-scene-jobs.md](gsplat-scene-jobs.md).
 
 After a scene publishes, the worker lifts its members' object masks and reviewed, shown people into
-scene segments, in the same run and with numpy alone ([scene-segments.md](scene-segments.md)
-section 5). A lift that fails is `stage_failed` on `scene_segments` and the scene stays published.
-After each drain it also lifts again any published scene whose members all have masks its newest
-segments do not bind, at most every `--segments-refresh-seconds` (default 300; `0` turns it off),
-and reports what it did as one `segments_refreshed` event. A job-scoped worker lifts the scenes it
-publishes and does not sweep.
+scene segments in the same run, with numpy alone ([scene-segments.md](scene-segments.md) section
+5). A lift that fails is `stage_failed` on `scene_segments` and the scene stays published. After
+each drain it also lifts again any published scene whose members all have masks its newest segments
+do not bind, at most every `--segments-refresh-seconds` (default 300; `0` turns it off), and
+reports what it did as one `segments_refreshed` event. The standpoint join (section 4) runs on the
+same kind of pass, at most every `--standpoints-refresh-seconds` (default 300; `0` turns it off). A
+job-scoped worker lifts the scenes it publishes and does not sweep.
 
-Authenticated operators can read top-level state from `GET /operations/reconstruction-scenes`.
-It distinguishes derivative work, ready or running scene work, groups blocked on missing point
-maps, published scenes, and superseded builds. `GET /operations/reconstruction-scenes/{job_id}`
-returns one job's exact inputs, member outcomes, outputs, failure and current-build state. A
-retryable failure can be made immediately eligible with
-`POST /operations/reconstruction-scenes/{job_id}/retry`; succeeded, cancelled and exhausted jobs
-are immutable and return a conflict instead of being rewritten.
+Authenticated operators read top-level state from `GET /operations/reconstruction-scenes`, which
+distinguishes derivative work, ready or running scene work, groups blocked on missing point maps,
+published scenes and superseded builds. `GET /operations/reconstruction-scenes/{job_id}` returns one
+job's exact inputs, member outcomes, outputs, failure and current-build state. A retryable failure
+can be made immediately eligible with `POST /operations/reconstruction-scenes/{job_id}/retry`;
+succeeded, cancelled and exhausted jobs are immutable and return a conflict instead of being
+rewritten.
 
-## 8. Deterministic synthetic plumbing fixture
+## 8. The graph projection
 
-**BUILT AND VERIFIED 2026-09-04.**
-`exulanica.evaluation.synthetic_multiview` generates eight overlapping 800 by 600 views of one
-explicit textured 3D room. The seed, room surfaces, point sampling, camera arc, intrinsics,
-extrinsics, renderer versions, and image inventory are stored in canonical digest-bound scene,
-camera, and source manifests. Every frame has a visible SYNTHETIC banner and a synthetic EXIF
-description. No generated image call or personal input participates.
+A deterministic `scene_projection` artifact (`exulanica.scene-graph-projection/v1`,
+`exulanica/ingest/scene_projection.py`) publishes inside the same atomic acceptance as the pose
+receipt, placement and gate. It carries what a graph reader would otherwise rebuild on every cold
+`GET /graph`: each placed member's `scene_from_opm` transform, scale and point-map references, each
+excluded member's reason, and the recovered cameras. It is a cache of conclusions the receipts
+already stand behind, not a receipt, and it promotes nothing.
 
-Generate it in ignored Exulanica storage:
+A reader proves five bindings before using it: the pose, placement and gate content digests, so a
+projection of a superseded build cannot answer for the current one; the scene's member capture
+refs in scene order, the one input no digest covers, because withdrawing a member leaves all three
+receipts byte-identical; and the placement's point-map references in record order, a self-check
+derived from placement bytes the second binding already pins. The reader's live query sees a
+superseded, re-pointed or purged point-map row, and the reader confirms each point map is present
+and reproduces its content digest; presence is a live fact and is never carried in the artifact.
+The reader also refuses a transform that lacks an affine last row, a positive scale or a proper
+orthonormal rotation, the conditions a rebuilt record must meet. An absent, purged, repair-flagged,
+unparseable or self-inconsistent projection falls back to the rebuild, so a refused projection
+costs the read time and nothing else. Artifact rows, members, gate agreement, person regions, review states and
+the asset-read policy are re-read on every request regardless.
 
-```bash
-uv run python scripts/generate_synthetic_multiview.py .exulanica/validation/synthetic-v1
-```
+Nothing privacy-bearing enters a projection: no person region, review state, source photograph
+digest or pose manifest frame. `scene_allowed` denies a scene by comparing the pose manifest's frame
+digest with the live artifact row, and re-masking a withdrawn person moves `read_source_sha256`, so
+a durable copy of those digests would be a second, stale answer to a question the asset-read policy
+asks fresh. A projection that cannot be built is recorded as a failed `scene_projection` stage and
+the three receipts publish anyway.
 
-On the measured Apple M3 Pro host, the exact default source manifest digest was
-`a419ad40ce6dd4769750a40eedb687fe3bc39c734ecabfed2dea4d78d2a0ec0f`. Real pycolmap 4.2.0
-registered all eight views through `run_colmap_pose_job`. The pinned
-`Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968` checkpoint executed on MPS
-at the production 512-pixel edge, producing 196,608 points with 196,583 valid points. Model load
-took 9.466 seconds and inference took 2.384 seconds on that run. Those values prove executable
-plumbing, coordinate conversion, and manifest provenance only. A procedural room is not evidence
-of real-photograph reconstruction quality.
+The projection has no column on the job row. The graph selects the newest few live projections for
+the scene and proves each from its own bindings, because nothing sets `artifact.superseded_by` on
+a scene artifact. `scripts/backfill_scene_projections.py` gives an already published scene the
+projection of its current job and records what it wrote as JSON; it is idempotent because the
+artifact id derives from the three receipt digests.
 
-## 9. Licensed real benchmark
+That id has generations, because `artifact` is unique on its identity key over every row, purged or
+not, and a purged row keeps its id. `projection_identity_key` returns the receipt-derived key for
+generation 0, which is the only generation the worker writes, and a length-prefixed digest of that
+key and the generation number after it. The backfill walks generations from 0 before any expensive
+work:
 
-**EXECUTED, MEASURED, WITHDRAWN, AND RETAINED 2026-09-04.** The selected corpus is the 14-image
-`pipes` training scene from the ETH3D High-resolution Multi-view Stereo Benchmark. ETH3D's official
-site licenses its data under CC BY-NC-SA 4.0. The selected undistorted archive is 145,321,540 bytes
-and includes 14 images at 6,220 by 4,141 pixels plus COLMAP-format camera calibration and sparse
-points. Surface ground truth is available separately and was not downloaded.
+| At the first generation that is not spent | What the backfill does |
+| --- | --- |
+| No row | Writes the projection there. |
+| A live row whose bytes are present | Nothing; reports `already-present`. |
+| A live row whose bytes are gone, reproduced by the receipts | Writes the bytes back under the same id and reports `repaired_missing_bytes`. |
+| A live row naming content the receipts do not reproduce | Refuses; the stage has disagreed with itself. |
 
-The committed digest-bound source manifest is
-`exulanica/evaluation/benchmarks/eth3d-pipes-v1.json`. It fixes the official source URL, retrieval
-date, archive checksum, license legal-code checksum, exact file inventory, per-image checksums and
-dimensions, ground-truth availability, and privacy-inspection state. Acquire only those declared
-bytes into ignored Exulanica storage:
+A generation is spent when the graph would never offer its row to a reader: purged, flagged
+`needs_repair`, or recording no content. That is the reader's own candidate predicate, and every
+generation passed over is named in the backfill's record. A purged row is never deleted,
+un-purged, rewritten or reused; it stays the record that those bytes were destroyed. A deletion
+that reaches the scene makes `tombstone_blocks_scene` keep the backfill from selecting it, and the
+artifact insert guard refuses every generation alike (`tests/test_scene_projection_backfill.py`).
+A refused disagreement is resolved by finding out why the stage produced other bytes, then flagging
+the row `needs_repair` so the next run passes over it.
 
-```bash
-uv run python scripts/acquire_benchmark_scene.py \
-  .exulanica/validation/benchmark/eth3d-pipes
-```
+## 9. Rung 2 corridor artifacts
 
-On 2026-09-04 the downloader verified source-manifest digest
-`4402e042b99153d1cbf247449b16b36f2864338bac28e44dc59f631a25815814` and archive digest
-`718981351c14e84759fcc73215e7251fce93d6e9ea1fe24f9e15f1028232c12c`. The benchmark operator
-reviewed all 14 exact frames and confirmed that they show the pipes mechanical room with no visible
-people. Fourteen immutable authorization and screening receipts bind that review, the source and
-license digests, the operator, and the exact capture digests. Before that review, the ordinary
-production worker refused to process the queued scene.
+`exulanica/reconstruction/navigation.py` builds a rung-2 corridor artifact
+(`exulanica.corridor-artifact/v1`) from a `CorridorBuildManifest` (`exulanica.corridor-build/v1`)
+of ordered metric pose samples. Each sample records a camera reference, position in metres, unit
+forward vector, independently measured clearance radius and slope, and whether it is a source
+vantage or a recovery pose. The manifest also pins the reconstruction and topology digests, agent
+radius, lateral cap, maximum pose gap, slope limit, look envelope and required destinations.
 
-The pinned MoGe checkpoint produced all 14 point maps through the normal derivative queue. Real
-pycolmap 4.2.0 then registered 14 of 14 photographs. The measured version 2 build passed with
-0.569790 pixel mean reprojection error and a 10.913192-unit normalized camera span. The retained
-camera-truth comparison reports 0.006594 ground-truth-unit camera-centre RMS error, 0.014844 maximum
-error over a 2.593471-unit camera extent, and 0.354748 degrees maximum relative-rotation error.
-These values are bound in `docs/evaluation/2026-09-04-benchmark-pose.json`.
+The lateral half-width at each pose is the smaller of the lateral cap and the measured clearance
+minus the agent radius, floored at zero; it is never inferred from splat opacity or pixels.
+Insufficient clearance, excessive slope, a gap wider than the maximum, a missing destination, no
+source vantage or no recovery pose makes the artifact publish rung 3 with every reason. An
+artifact binds its centreline, widths, clearances, slopes, forwards, look envelope, destination,
+source-vantage and recovery indices to a canonical SHA-256. `validate_corridor_artifact` refuses a
+changed digest, a stale reconstruction or topology base, arrays that describe different poses,
+and a result whose rung contradicts its acceptance.
 
-The actual authenticated browser application rendered all 14 placed maps as one scene: 2,371,957
-points and 47,457,908 geometry bytes. On an Apple M3 Pro with 18 GiB physical unified memory,
-Chrome 152 and PlayCanvas 2.21.4 reported a 574.8 millisecond first meaningful render, 285.9
-millisecond geometry load, 16.8 millisecond p99 frame time, 59.52 FPS one-percent low, 80.90 MiB
-peak JavaScript heap, no geometry issues, and no GPU error over a visible 60-second static view.
-The digest-bound record is `docs/evaluation/2026-09-04-benchmark-browser.json`. It names the local
-hardware and does not call it representative of the eventual production host.
+The browser adapter `corridorRuleFromArtifact` (`web/packages/atlas-core/src/corridor.ts`)
+independently checks the profile, digests, bases, accepted rung 2, array shapes, finite values,
+clearance for the agent radius and look bounds. It transforms the metric centreline through the
+island placement and uses the narrowest measured width across the whole path, so it can only
+narrow the recorded envelope, never widen it. `constrainCorridorLook` clamps the camera to the
+recorded envelope around each pose's forward direction.
 
-After publication, an authorized tombstone for `DSC_0634.JPG` immediately removed the complete
-scene from graph and browser delivery and retracted its Rung 3 assertion. Signed WMP projection
-removed the scene and scene artifacts. The purge role destroyed all six old and current scene
-receipt objects plus the deleted member's unique source and derivative objects. Thirteen unrelated
-point maps survived. One shared probe object was correctly deferred because live captures still
-held it. Re-import restored the source under a distinct capture identity, did not resurrect the old
-scene, and produced no point map without a new privacy receipt. The full audit is
-`docs/evaluation/2026-09-04-benchmark-scene-withdrawal.json`.
+Nothing produces a corridor. No worker builds a manifest from measured clearance, no application
+code calls the adapter, and the scene gate never receives a corridor receipt, so no scene records
+rung 2.
 
-The archive and source images remain ignored local inputs. They are not committed. Although the
-license permits qualified redistribution, the validation campaign avoids adding ShareAlike media
-to the Apache-2.0 source tree. Benchmark results can establish engineering and reconstruction
-measurements only. They cannot establish personal-media acceptance.
+## 10. Evidence
 
-## 10. Synthetic person-withdrawal exercise
-
-**EXECUTED AND RETAINED 2026-09-04.** A clearly simulated person occurrence was linked through
-the normal identity path to one capture in the all-synthetic production scene. The normal entity
-tombstone immediately removed the scene and its rung claim from graph delivery and World Memory
-Package projection. The dedicated `exulanica_purge` role then destroyed the target point map, pose
-receipt, placement receipt, and scene-gate receipt. Seven unrelated point maps remained live and
-stored. A late artifact publication attempt was refused with SQLSTATE 23000.
-
-The exact database, package, purge, and retained-source observations are digest-bound in
-`docs/evaluation/2026-09-04-synthetic-person-withdrawal.json`. The first evaluator process stopped
-after committing the tombstone because its probe caught a database exception below the repository
-domain-error boundary. No purge job had run. The corrected evaluator resumed the durable tombstone
-and queue, then completed the exercise. This interruption is recorded as evidence rather than
-discarded.
-
-The follow-up production browser observation is digest-bound in
-`docs/evaluation/2026-09-04-synthetic-person-withdrawal-browser.json`. The authenticated graph had
-zero live islands, occurrences, and reconstruction scenes. Chrome rendered one semantic empty
-state, hid the canvas, and mounted no renderer. The exact original still returned HTTP 200 from its
-authorized evidence citation with the admitted 768,370 bytes and SHA-256, while the higher-level
-source catalog returned `world_not_configured` because no protected topology remained. The latter
-distinction matters: source retention and citation retrieval succeeded, but the result does not
-claim that a topology-dependent catalog still discovers the retained file.
-
-The occurrence, entity, and name in this exercise are synthetic simulation records. The evidence
-proves dependency reachability, immediate serving withdrawal, package withdrawal, late-write
-refusal, privileged stored-byte purge, browser disappearance, and source retention for this exact
-synthetic scene. It does not prove a real person's identity, request, legal basis, consent, or
+These records establish behaviour at their own scope. None is a representative real-corpus or
 personal-media acceptance.
 
-## 11. Known blockers
+- **Synthetic plumbing fixture.** `exulanica.evaluation.synthetic_multiview` generates eight
+  overlapping 800 by 600 views of one explicit textured room, with a visible SYNTHETIC banner and
+  digest-bound scene, camera and source manifests
+  (`uv run python scripts/generate_synthetic_multiview.py .exulanica/validation/synthetic-v1`).
+  Real pycolmap 4.2.0 registered all eight views, and the pinned MoGe checkpoint ran at the
+  production 512-pixel edge. That proves executable plumbing, coordinate conversion and manifest
+  provenance only.
+- **Licensed benchmark.** The 14-image ETH3D `pipes` training scene (CC BY-NC-SA 4.0) is declared
+  by the digest-bound manifest `exulanica/evaluation/benchmarks/eth3d-pipes-v1.json` and acquired
+  into ignored storage with `scripts/acquire_benchmark_scene.py`; its media is not committed. The
+  production path registered 14 of 14 photographs under pose version 2 with 0.569790 pixel mean
+  reprojection error and a 10.913192-unit span, and camera centres matched ETH3D's cameras to
+  0.006594 ground-truth units RMS ([pose](evaluation/2026-09-04-benchmark-pose.json)). The
+  authenticated browser rendered all 14 placed maps as one scene
+  ([browser](evaluation/2026-09-04-benchmark-browser.json)). A tombstone for one member removed the
+  scene from graph and browser delivery, retracted its rung, and purged the scene receipts and the
+  member's unique objects while unrelated point maps survived; re-import produced no point map
+  without a new screening ([withdrawal](evaluation/2026-09-04-benchmark-scene-withdrawal.json)).
+- **Synthetic person withdrawal.** A clearly simulated person linked to one capture of the
+  synthetic scene was withdrawn through the entity tombstone: the scene and its rung left graph and
+  package delivery, the purge role destroyed the dependent point map and scene receipts, unrelated
+  point maps stayed, and a late artifact publication was refused
+  ([record](evaluation/2026-09-04-synthetic-person-withdrawal.json),
+  [browser](evaluation/2026-09-04-synthetic-person-withdrawal-browser.json)). It proves dependency
+  reachability and serving withdrawal for that synthetic scene, not a real person's request.
+- **Retained reference collections.** Two public CC0 collections ran the full path, including GPU
+  training; [retained-reference-workflow.md](retained-reference-workflow.md) is the guide and the
+  [real reconstruction record](evaluation/2026-09-05-real-reconstruction.json) the outcome.
+- **Standpoint joins.** The measurements are in section 4.
 
-Rung 2 is not implemented by this path. It requires a physically validated scale receipt, measured
-coverage, a measured collision-safe corridor, required destinations, and structural-world
-authority. Rung 1 is not implemented by this path. It requires a reviewed resumable gsplat runner,
-compatible GPU execution, physically validated scale, measured coverage, and real held-out quality
-results.
+## 11. Limits
 
-Those producers are additive inputs to the scene gate. They do not change scene identity, member
-registration, OPM/2, the placement record, deletion reachability, or the graph's distinction among
-recorded rung, displayed rung, and substrate.
+- Rung 1 and rung 2 are not reachable: nothing produces scale, coverage or corridor receipts
+  (sections 5 and 9). A trained scene records rung 3.
+- Placement scale is COLMAP-normalized, not metres, and scale-only alignment cannot repair depth
+  warping or missing surfaces.
+- The automatic grouping boundaries, the point-map thresholds and the placement acceptance policy
+  are unvalidated against a representative corpus, and the quality report has no caller.
+- Standpoint join version 1 is the registered stage; versions 2 and 3 failed their gates.
+- Pose recovery reads photographs under scene admission and screening; it asks for no personal
+  model right, because COLMAP carries no learned weights
+  ([personal-admission.md](personal-admission.md)).
 
-## 12. The pose job controller, absorbed from a retired document
+## 12. The pose job controller
 
-This section absorbs the retired `colmap-pose-jobs.md`, which stood at the root of `docs/`
-until 2026-09-09. It is named without a path on purpose: the file is gone, and a live-looking
-path to it would fail the documentation link check, which is the intended behaviour. That document was the operating
-note for `exulanica.reconstruction.pose` before this one existed, and it was retired rather than
-kept because its status line had become false: it read "no authorized real dense capture run" while
-three committed documents record real runs, including the ETH3D benchmark in section 9 above and the
-volcanic and bowl reconstructions. A document whose own status line contradicts the tree is worse
-than no document, because a reader who trusts it is misled in the one place they were looking for
-the truth. Everything below is its durable content, unedited except where marked.
+`exulanica.reconstruction.pose` runs COLMAP feature extraction, exhaustive matching and sparse
+mapping from an exact authorized source manifest, through a `CommandExecutor` seam. The scene
+worker supplies `PycolmapExecutor` (`exulanica/reconstruction/pycolmap_executor.py`), which performs
+each command shape through pycolmap in process. The default subprocess executor shells out to a
+`colmap` binary that is not in the container image.
 
-**The manifest and the job directory.** `exulanica.reconstruction.pose` runs COLMAP feature
-extraction, exhaustive matching and sparse mapping from an exact authorized source manifest. The
-manifest pins every staged filename and byte digest, an exact Git revision, an exact COLMAP version,
-a digest-pinned execution image, explicit reviewed quality thresholds, capture-set membership, and an
-optional measured scale with its method. Original paths, media bytes, semantic labels and inferred
-consent are absent. Each manifest has one content-addressed job directory outside Git, and a
-filesystem lock serializes claimants.
+**The manifest and the job directory.** The manifest pins every staged filename and byte digest,
+an exact Git revision, the recorded COLMAP version, a digest-pinned execution image, explicit
+reviewed quality thresholds, capture-set membership, and an optional measured scale with its
+method. Original paths, media bytes, semantic labels and inferred consent are absent. Each manifest
+has one content-addressed job directory outside Git, and a filesystem lock serializes claimants.
+
+**The recorded COLMAP version.** `PoseBuildManifest.colmap_version` must be non-empty and is not
+checked against the library that ran. The in-process backend closes that gap by building the string
+from the library about to do the work (`pycolmap_version`); the subprocess backend leaves it open.
 
 **What a stage records, and what a restart may skip.** Every executor result records the exact
 argument vector, actual duration, return code, and stdout and stderr digests. A checkpoint is
-fsynced after feature extraction, matching, mapping, and each binary-to-text model conversion. A
+fsynced after feature extraction, matching, mapping and each binary-to-text model conversion. A
 restart skips only completed stages whose required durable outputs still exist, and a completed
 receipt is reused only after the current sparse artifacts reproduce its quality digest.
 
-CORRECTED 2026-09-09: the retired document described the recorded COLMAP version as pinned exactly.
-It is not. `PoseBuildManifest.colmap_version` is required to be non-empty and is never checked
-against the library that ran; `exulanica/reconstruction/pycolmap_executor.py` closes that gap for
-the in-process backend only, by building the string from the library about to do the work.
-
 **What the parser reads.** Registered image names and camera centres from COLMAP `images.txt`, and
 actual reprojection errors from `points3D.txt`. It reports registration fraction, mean reprojection
-error, camera-translation extent, all output digests and sizes, the selected connected model, and
-every fallback reason. The largest connected model is selected deterministically by registered image
-count and path; a place name never participates.
+error, camera-translation extent, all output digests and sizes, the selected connected model and
+every fallback reason. The largest connected model is selected deterministically by registered
+image count and path; a place name never participates.
 
 **Co-registration is not metricity.** Multiple capture sets are co-registered only when registered
 images from every declared set occur in one connected model. That still does not make the result
 metric: a shared metric frame also requires an explicit positive measured scale and its method.
 Failure, low coverage, poor reprojection, insufficient translation, disconnection or missing scale
-retains rung 3 with the recorded reason.
+keeps rung 3 with the recorded reason.
 
 **Sensitive scratch.** Staged images, COLMAP databases, descriptors and sparse working files are
 separate from the durable receipt and are removed after success, handled failure or cancellation. A
-process crash retains only restartable scratch until lease reclaim or the age-gated startup sweep,
-and a crash on the final claim is terminalized before that sweep, so no expired job remains
-permanently `running`. Section 6 above is the fuller deletion contract.
+process crash keeps only restartable scratch until lease reclaim or the age-gated startup sweep,
+and a crash on the final claim is made terminal before that sweep, so no expired job stays
+`running`. Section 6 is the fuller deletion contract.

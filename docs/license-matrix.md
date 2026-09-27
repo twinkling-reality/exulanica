@@ -27,7 +27,7 @@ Apache-2.0 release and an invalid one.
 - [9. Mechanical enforcement](#9-mechanical-enforcement)
 - [10. Provenance](#10-provenance)
 - [11. HEIC decoder inspection and pin, 2026-09-12](#11-heic-decoder-inspection-and-pin-2026-09-12)
-- [12. Generated appearance models, 2026-09-17](#12-generated-appearance-models-2026-09-17)
+- [12. Generated appearance models](#12-generated-appearance-models)
 
 </details>
 
@@ -147,14 +147,14 @@ the NVIDIA Open Model License must not be vendored, and per section 6 must not b
 
 | Instrument | Models |
 | --- | --- |
-| **OpenMDW-1.1** (permissive) | `nvidia/Nemotron-3_5-Lightning` / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*`, `nvidia/nemotron-3.5-asr-streaming-0.6b`, `nvidia/Nemotron-3-Embed-1B-BF16`, `nvidia/Nemotron-3-Embed-8B-BF16`. All four VERIFIED in raw HF frontmatter (F39). `nvidia/Nemotron-3-Ultra-550b-a55b` is **catalog-only**, see section 5. Added 2026-09-17: `nvidia/Cosmos3-Nano`, `nvidia/Cosmos3-Super` and `nvidia/Cosmos3-Edge`, VERIFIED in raw HF card data at pinned revisions, see section 12 |
+| **OpenMDW-1.1** (permissive) | `nvidia/Nemotron-3_5-Lightning` / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*`, `nvidia/nemotron-3.5-asr-streaming-0.6b`, `nvidia/Nemotron-3-Embed-1B-BF16`, `nvidia/Nemotron-3-Embed-8B-BF16`. All four VERIFIED in raw HF frontmatter (F39). `nvidia/Nemotron-3-Ultra-550b-a55b` is **catalog-only**, see section 5. `nvidia/Cosmos3-Nano`, `nvidia/Cosmos3-Super` and `nvidia/Cosmos3-Edge`, VERIFIED in raw HF card data at pinned revisions, see section 12 |
 | **NVIDIA Nemotron Open Model License** (permissive) | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-*`, `nvidia/nemotron-3-super-120b-a12b`. Both per HF card; the Nebius catalog disagrees, see section 5 |
-| **NVIDIA Open Model Agreement** (permissive) | `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-*`. Per HF card; the Nebius catalog disagrees. Removed from Token Factory Serverless 2026-08-31 (F4), so it has no role in the plan |
-| **NVIDIA Open Model License** (restrictive) | Cosmos family before Cosmos 3's public weights (`Cosmos3-Super-Reasoner`, not a public Hugging Face repository on 2026-09-17, see section 12; `Cosmos-Transfer1-*`, `Cosmos-Transfer2.5-*`, the Cosmos DiffusionRenderer and the Cosmos guardrail models, added 2026-09-17; `Cosmos-Reason1-7B`, `Cosmos-Reason2-*`, `Cosmos-Embed1-*`, `C-RADIOv4-H`), `nvidia/parakeet-unified-en-0.6b`, `nvidia/multitalker-parakeet-streaming-0.6b-v1`, `nvidia/diar_streaming_sortformer_4spk-v2.1`, `nvidia/NVIDIA-Nemotron-Parse-v1.2`, `nvidia/NV-DINOv2`, `nvidia/nv-grounding-dino`, `nvidia/Llama-3_1-Nemotron-Ultra-253B-v1` |
+| **NVIDIA Open Model Agreement** (permissive) | `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-*`. Per HF card; the Nebius catalog disagrees. Removed from Token Factory Serverless 2026-08-31 (F4), so it has no role in the manifest |
+| **NVIDIA Open Model License** (restrictive) | Cosmos family before Cosmos 3's public weights (`Cosmos3-Super-Reasoner`, not a public Hugging Face repository on 2026-09-17, see section 12; `Cosmos-Transfer1-*`, `Cosmos-Transfer2.5-*`, the Cosmos DiffusionRenderer and the Cosmos guardrail models; `Cosmos-Reason1-7B`, `Cosmos-Reason2-*`, `Cosmos-Embed1-*`, `C-RADIOv4-H`), `nvidia/parakeet-unified-en-0.6b`, `nvidia/multitalker-parakeet-streaming-0.6b-v1`, `nvidia/diar_streaming_sortformer_4spk-v2.1`, `nvidia/NVIDIA-Nemotron-Parse-v1.2`, `nvidia/NV-DINOv2`, `nvidia/nv-grounding-dino`, `nvidia/Llama-3_1-Nemotron-Ultra-253B-v1` |
 | **NVIDIA Community Model License** (unusable) | No model Exulanica needs is only available here |
 | **"NVIDIA License", per repo, non-commercial** | `nvidia/LocateAnything-3B` |
 
-**Consequence for the model plan.** All four surviving text Nemotrons in the reasoning plan
+**Consequence for the manifest.** All four text Nemotrons the model manifest names
 (`Nemotron-3_5-Lightning`, `nemotron-3-super-120b-a12b`, `Nemotron-3-Ultra-550b-a55b`,
 `NVIDIA-Nemotron-3-Nano-30B-A3B`) sit under permissive instruments, not the restrictive one. The
 NVIDIA-compliance requirement and the Apache-2.0 requirement do not conflict.
@@ -172,12 +172,12 @@ bases.
 
 | Component | Code license | Weights license | Apache-2.0 compatible | Source URL | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| `nvidia/Nemotron-3_5-Lightning` (Token Factory) / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*` | NeMo / Nemotron Apache-2.0 | OpenMDW-1.1 | **Yes** | <https://openmdw.ai/license/1-1/> | **SHIP.** Primary NVIDIA compliance vehicle |
+| `nvidia/Nemotron-3_5-Lightning` (Token Factory) / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*` | NeMo / Nemotron Apache-2.0 | OpenMDW-1.1 | **Yes** | <https://openmdw.ai/license/1-1/> | **SHIP.** The fallback of the Companion's reasoning role, and a model offered for a person's decisions |
 | `nvidia/nemotron-3-super-120b-a12b` (Token Factory) | Apache-2.0 | nvidia-nemotron-open-model-license per HF; nvidia-open-model-license per Nebius catalog | Yes per HF | <https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license> | **SHIP**, trust HF (section 5) |
-| `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-*` | Apache-2.0 | nvidia-nemotron-open-model-license per HF; nvidia-open-model-license per Nebius catalog | Yes per HF | <https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B> | **SHIP**, trust HF (section 5) |
+| `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-*` | Apache-2.0 | nvidia-nemotron-open-model-license per HF; nvidia-open-model-license per Nebius catalog | Yes per HF | <https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B> | **SHIP**, trust HF (section 5). The Companion's reasoning primary, and a model offered for a person's decisions |
 | `nvidia/Nemotron-3-Ultra-550b-a55b` (Token Factory) | Apache-2.0 | `openmdw-1.1` **per Nebius catalog only** | Yes if catalog is right | <https://tokenfactory.nebius.com/api/public/models_info> | **UNVERIFIED direction of error.** No role in Exulanica. See section 5 |
 | `nvidia/Nemotron-3-Embed-1B-BF16` / `-8B-BF16` | Apache-2.0 | OpenMDW-1.1 (base Ministral is Apache-2.0, so nothing restrictive flows through) | **Yes** | <https://huggingface.co/nvidia/Nemotron-3-Embed-1B-BF16> | **SHIP** |
-| `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-*` | Apache-2.0 | NVIDIA Open Model Agreement | **Yes** | <https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-agreement/> | SHIP by license, but **removed from Token Factory Serverless 2026-08-31** (F4). Not in the plan |
+| `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-*` | Apache-2.0 | NVIDIA Open Model Agreement | **Yes** | <https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-agreement/> | SHIP by license, but **removed from Token Factory Serverless 2026-08-31** (F4). No role in the manifest |
 | `nvidia/omnivinci` | n/a | apache-2.0 | **Yes** | <https://huggingface.co/nvidia/omnivinci> | **SHIP.** Joint video-plus-audio, self-hosted only. No current role given the photo corpus |
 | `nvidia/nemotron-3.5-asr-streaming-0.6b` | Apache-2.0 | OpenMDW-1.1 | **Yes** | <https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b> | **SHIP.** Deferred capability |
 | `nvidia/parakeet-tdt-0.6b-v3` (25 languages) | NeMo Apache-2.0 | cc-by-4.0 | Conditional: attribution | <https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3> | **SHIP-ATTRIB.** Deferred capability |
@@ -211,12 +211,12 @@ noted, which per section 5 is a derived label and not authoritative.
 
 | Component | Code license | Weights license | Apache-2.0 compatible | Source URL | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| `openbmb/MiniCPM-V-4_5` | n/a, API | "Apache 2.0 License" per catalog, URL points at the **code** repo LICENSE | **Yes per catalog** | <https://github.com/OpenBMB/MiniCPM-V/blob/main/LICENSE> | **SHIP.** Primary vision sensor. **OPEN:** under the standing rule the HF card frontmatter has not been read; confirm it |
-| `MiniMaxAI/MiniMax-M3` | n/a, API | custom, named only "MiniMax-M3" | **UNVERIFIED** | <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE> | **UNVERIFIED.** Nebius' own recommended replacement for the removed NVIDIA vision models, and the only catalog model declaring the `video` use case. **Read this license before depending on it.** See section 8 |
-| `Qwen/Qwen3-Embedding-8B` | n/a | Apache 2.0 | **Yes** | catalog | **SHIP.** The only embedding model on Token Factory |
-| `Qwen/Qwen3-235B-A22B-Instruct-2507`, `Qwen3-30B-A3B-Instruct-2507`, `Qwen3.5-397B-A17B` | n/a | Apache 2.0 | **Yes** | catalog | **SHIP.** Extraction fallback if Nemotron structured output fails |
+| `openbmb/MiniCPM-V-4_5` | n/a, API | "Apache 2.0 License" per catalog, URL points at the **code** repo LICENSE | **Yes per catalog** | <https://github.com/OpenBMB/MiniCPM-V/blob/main/LICENSE> | **SHIP.** The vision role's fallback. **OPEN:** under the standing rule the HF card frontmatter has not been read; confirm it |
+| `MiniMaxAI/MiniMax-M3` | n/a, API | custom, named only "MiniMax-M3" | **UNVERIFIED** | <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE> | **UNVERIFIED.** The vision role's primary: every photograph observation is asked of it, and its license text has not been read (L-2, section 8). Nebius recommended it to replace the removed NVIDIA vision models, and it declares the `video` use case |
+| `Qwen/Qwen3-Embedding-8B` | n/a | Apache 2.0 | **Yes** | catalog | **SHIP.** The embedding role, and the only embedding model on Token Factory |
+| `Qwen/Qwen3-235B-A22B-Instruct-2507`, `Qwen3-30B-A3B-Instruct-2507`, `Qwen3.5-397B-A17B` | n/a | Apache 2.0 | **Yes** | catalog | **SHIP.** `Qwen3-235B-A22B-Instruct-2507` is the structured-extraction primary and a model offered for a person's decisions; the other two have no role |
 | `openai/gpt-oss-120b` | n/a | Apache 2.0 | **Yes** | catalog | SHIP |
-| `deepseek-ai/DeepSeek-V4-Flash-0731` | n/a | MIT | **Yes** | <https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/main/LICENSE> | SHIP. Carries the catalog "JSON mode" tag |
+| `deepseek-ai/DeepSeek-V4-Flash-0731` | n/a | MIT | **Yes** | <https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/main/LICENSE> | SHIP. The structured-extraction fallback, and a model offered for a person's decisions. Carries the catalog "JSON mode" tag |
 | `moonshotai/Kimi-K2.6` / `Kimi-K2.7-Code` | n/a | `mit` per catalog | Yes | catalog | SHIP if needed |
 | `zai-org/GLM-5.1` / `GLM-5.2` | n/a | MIT | Yes | catalog | SHIP if needed |
 | `google/gemma-3-27b-it` | n/a | **Gemma License**, imposes use restrictions Apache-2.0 does not | **Conditional, likely No** | <https://ai.google.dev/gemma/terms> | **UNVERIFIED, avoid.** Declares image use, but nobody read the terms |
@@ -302,10 +302,10 @@ corpus.
 | Component | Code license | Weights license | Apache-2.0 compatible | Source URL | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | three.js | **MIT** | n/a | Yes | <https://github.com/mrdoob/three.js/blob/dev/LICENSE> | **SHIP** |
-| `@sparkjsdev/spark` 2.1.0 | **MIT** | n/a | Yes | <https://github.com/sparkjsdev/spark> | **SHIP.** Recommended splat renderer for the three.js path |
+| `@sparkjsdev/spark` 2.1.0 | **MIT** | n/a | Yes | <https://github.com/sparkjsdev/spark> | **SHIP.** A splat renderer for three.js; not a dependency of the application |
 | react-three-fiber | MIT | n/a | Yes | <https://github.com/pmndrs/react-three-fiber/blob/master/LICENSE> | SHIP |
 | drei | MIT | n/a | Yes | <https://github.com/pmndrs/drei/blob/master/LICENSE> | SHIP, but use `<Html>` sparingly for performance reasons, not license reasons |
-| PlayCanvas engine 2.21.4 | **MIT** | n/a | Yes | <https://github.com/playcanvas/engine> | SHIP. Alternative engine, still under bake-off |
+| PlayCanvas engine 2.21.4 | **MIT** | n/a | Yes | <https://github.com/playcanvas/engine> | **SHIP.** The application's renderer |
 | `@playcanvas/splat-transform` v3.3.3 | **MIT** | n/a | Yes | <https://github.com/playcanvas/splat-transform> | **SHIP.** Needed for SOG regardless of which engine wins |
 | playcanvas/supersplat | MIT | n/a | Yes | <https://github.com/playcanvas/supersplat> | SHIP |
 | playcanvas/sogs (python) | Apache-2.0, **archived 2025-09-10** | n/a | Yes | <https://github.com/playcanvas/sogs> | Superseded by splat-transform |
@@ -321,7 +321,7 @@ corpus.
 
 | Component | Code license | Weights license | Apache-2.0 compatible | Source URL | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| Label Studio | **Apache-2.0** | n/a | Yes | <https://github.com/HumanSignal/label-studio/blob/develop/LICENSE> | **SHIP.** Chosen annotator |
+| Label Studio | **Apache-2.0** | n/a | Yes | <https://github.com/HumanSignal/label-studio/blob/develop/LICENSE> | SHIP. No annotation tool is part of the repository |
 | CVAT | MIT | n/a | Yes | <https://github.com/cvat-ai/cvat/blob/develop/LICENSE> | SHIP. Dropped by design, not by license |
 | FiftyOne | Apache-2.0 | n/a | Yes | <https://github.com/voxel51/fiftyone/blob/develop/LICENSE> | SHIP. Note it pulls MongoDB |
 | PostgreSQL 18 | PostgreSQL License | n/a | **UNVERIFIED in this corpus** | <https://www.postgresql.org/support/versioning/> | **UNVERIFIED.** Nobody read the license text. Widely understood to be permissive. One `curl` settles it (X-0g) |
@@ -434,10 +434,10 @@ licensing blocker into a licensing footnote for the Token Factory calls.
 1. **An API-only consumer is instead bound by the hosted endpoint's terms of service, which have
    not been retrieved. OPEN.** The Nebius Token Factory terms of service and acceptable use
    policy have not been retrieved. Read them before deployment.
-2. **The perception pipeline is not API-only.** The plan self-hosts detection, segmentation, face
-   embedding and (if ever revived) ASR and diarization in containers on Nebius AI Cloud. **That is
-   downloading and running weights.** The API-only escape hatch covers the Token Factory calls and
-   does not cover the self-hosted stack.
+2. **Local inference is not API-only.** The derivative worker runs detection, segmentation and
+   depth models on its own hardware, and the generated appearance models run self-hosted on rented
+   GPUs (section 12). **That is downloading and running weights.** The API-only escape hatch covers
+   the Token Factory calls and does not cover the self-hosted stack.
 
 **Working the self-hosted case through precisely:**
 
@@ -463,16 +463,16 @@ capability delta over the clean alternatives. Rejected alternative: allowing NVI
 License weights in containers on the reasoning that "use is not distribution", which is true of the
 redistribution clauses and false of the guardrail, revocation and amendment clauses.
 
-The current self-hosted stack satisfies this by construction: YuNet (MIT), dlib 5-point (public
-domain), SFace (Apache-2.0), SAM 2.1 (Apache-2.0), Grounding DINO (Apache-2.0), DINOv2 (Apache-2.0),
-gsplat (Apache-2.0), MoGe-2 (MIT).
+The self-hosted stack satisfies this. The manifest's local models are SAM 2.1 Hiera Tiny, Grounding
+DINO Tiny and OWLv2 Base Patch16 Ensemble (all Apache-2.0) and MoGe-2 ViT-L (MIT), each pinned with
+the license read from its frontmatter; scene training uses gsplat (Apache-2.0); the generated
+appearance models are in section 12. No face detection or face embedding model is part of it.
 
 ---
 
 ## 7. THIRD_PARTY_NOTICES and the NOTICE-file obligations
 
-Naming note: this document uses `THIRD_PARTY_NOTICES.md`. Pick one filename and use it consistently
-in the repository root.
+The notice file is `THIRD_PARTY_NOTICES.md` at the repository root.
 
 ### 7.1 What `THIRD_PARTY_NOTICES.md` must contain
 
@@ -539,8 +539,8 @@ that closes it.
 | # | Item | Why it matters | Check |
 | --- | --- | --- | --- |
 | L-1 | `nvidia/diar_streaming_sortformer_4spk-v2` license, **DISPUTED** | Determines whether diarization is commercially clean | X-0e, section 4a. 5 min |
-| L-2 | `MiniMaxAI/MiniMax-M3` license text never read | It is Nebius' recommended replacement for the removed NVIDIA vision models and the only catalog model declaring the `video` use case | Read <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE>. 10 min |
-| L-3 | `openbmb/MiniCPM-V-4_5` license is recorded from the Nebius catalog, whose URL points at the **code** repo | It is the primary vision sensor. Under the section 5 rule, a catalog reading is not authoritative | `curl` the HF card frontmatter for the pinned SHA. 5 min |
+| L-2 | `MiniMaxAI/MiniMax-M3` license text never read | It is the vision role's primary, asked about every photograph, so the product depends on a license nobody has read | Read <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE>. 10 min |
+| L-3 | `openbmb/MiniCPM-V-4_5` license is recorded from the Nebius catalog, whose URL points at the **code** repo | It is the vision role's fallback. Under the section 5 rule, a catalog reading is not authoritative | `curl` the HF card frontmatter for the pinned SHA. 5 min |
 | L-4 | `nvidia/Nemotron-3-Ultra-550b-a55b` OpenMDW-1.1 attribution is catalog-only, and is the one row where the catalog is **more** permissive than any verified reading | The error direction that ends a project. Exposure is zero because Ultra has no role | `curl` the HF card before any use. 5 min |
 | L-5 | PostgreSQL 18 and pgvector 0.8.6 license text never read | Two core dependencies | X-0g. 15 min, with the GitHub chip check |
 | L-6 | ffmpeg build configuration in the container: LGPL or GPL | Matters only if the binary is redistributed. We invoke it as a subprocess and do not link it | Inspect the container's ffmpeg build flags |
@@ -555,26 +555,38 @@ that closes it.
 
 ## 9. Mechanical enforcement
 
-All cheap, and all of it should exist before the perception pipeline is written.
+Built:
 
-- One `models.manifest.json` holding, for every model: repo id, **revision SHA**, and the license read
-  from the raw HuggingFace frontmatter at that SHA.
-- CI job that re-fetches each pinned revision's `cardData.license` and **fails on drift**.
-- CI job that scans the full transitive dependency tree for **GPL and AGPL**.
-- CI job that greps the built image for: `insightface`, `shape_predictor_68`,
+- `exulanica/models/models.manifest.json` pins every model the product runs on its own hardware by
+  repo id, **revision SHA** and the license read from the raw HuggingFace frontmatter at that SHA
+  (`local_models`), and the segmentation stage re-reads that frontmatter before it loads weights and
+  refuses on drift.
+- `ml/appearance/weights/` pins each accepted appearance model's files, and
+  `ml/appearance/exulanica_appearance/licences.py` refuses any card outside section 6's decision.
+- `THIRD_PARTY_NOTICES.md` at the repository root.
+
+Not built:
+
+- A CI job that re-fetches each pinned revision's `cardData.license` and **fails on drift** without
+  loading the model.
+- A CI job that scans the full transitive dependency tree for **GPL and AGPL**.
+- A CI job that greps the built image for `insightface`, `shape_predictor_68`,
   `diff_gaussian_rasterization`, `ultralytics`, `boxmot`, `crisperwhisper`, `canary-1b` (exact match,
-  not `canary-1b-v2`), `sortformer_4spk-v1`, `map-anything` without the `-apache` suffix.
-- `THIRD_PARTY_NOTICES.md` plus a CC-BY attribution surface in the application's credits UI.
-- Verify GitHub renders the **Apache-2.0 chip** at the top of the repository page.
+  not `canary-1b-v2`), `sortformer_4spk-v1`, and `map-anything` without the `-apache` suffix.
+- A CC-BY attribution surface in the application's credits, needed once a CC-BY artifact ships
+  (section 7.2).
+- A check that GitHub renders the **Apache-2.0 chip** at the top of the repository page.
 
 ---
 
 ## 10. Provenance
 
-Primary sources for the rows above were retrieved **2026-08-27**. No claim in this document has been
-re-verified since. **No model identifier in this corpus has ever been invoked**, so every hosted-model
-row describes a catalog entry, not an observed response. This matrix is the standing document; it
-does not require a private research tree.
+Primary sources for the rows above were retrieved on **2026-08-27**, except where a section names a
+later reading (sections 11 and 12). A row records the license a primary source stated at its
+reading; it is not re-verified by use. A hosted-model row describes a catalog entry and its license,
+not the behaviour of the model; [model selection](model-and-service-selection.md) owns what the
+product runs and how it was measured. This matrix is the standing document; it does not require a
+private research tree.
 
 
 ## 11. HEIC decoder inspection and pin, 2026-09-12
@@ -620,18 +632,18 @@ Conversion lineage is separate from privacy masking. Migration 0045 requires a c
 normalized predecessor and, when consent requires it, a current mask of that predecessor.
 
 
-## 12. Generated appearance models, 2026-09-17
+## 12. Generated appearance models
 
 Status: VERIFIED from raw Hugging Face card data (`/api/models/<id>/revision/<revision>`) and the
-recursive file tree at the revisions below, read 2026-09-17 by the generated appearance lane. Every
+recursive file tree at the revisions below, read 2026-09-17. Every
 weights file of an accepted row is pinned by its LFS sha256, and every small file by its git blob
 id, in `ml/appearance/weights/`, which also holds each component's lineage evidence.
 `ml/appearance/exulanica_appearance/licences.py` holds section 6's decision over what a card
 declares, and refuses everything else. These weights are run self-hosted on a rented GPU and never
 vendored into this repository; the outputs they generate are labelled invented.
 
-**Correction to sections 2 and 3.1.** Cosmos 3's public weights are OpenMDW-1.1, not the NVIDIA Open
-Model License: `nvidia/Cosmos3-Nano` at `e59a53c25979a090fa8706c9acc0c254a6e89b92`,
+**Cosmos 3's public weights are OpenMDW-1.1**, not the NVIDIA Open Model License, as sections 2 and
+3.1 record: `nvidia/Cosmos3-Nano` at `e59a53c25979a090fa8706c9acc0c254a6e89b92`,
 `nvidia/Cosmos3-Super` at `f543c56225b2e04d0ad141e29655be3a45d9c455` and `nvidia/Cosmos3-Edge` at
 `344d602b128d1bbdacb43b08d0a3626f46343e29` each declare `license: other`,
 `license_name: openmdw1.1-license`, `license_link: https://openmdw.ai/license/1-1/`, and none is

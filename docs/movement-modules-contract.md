@@ -260,9 +260,9 @@ a development measurement, named among the earlier measurements of the
 Measured on the release server with 24 flyers
 ([record](evaluation/2026-09-26-flight-worker-v3.json)): beside a cold flight read (0.58 to 0.62 s,
 the worker computing an episode), the slowest health answer in each of five runs took 2.9 to 7.7 ms,
-and reading the same window again took 15.6 to 19.0 ms. On main's release server, where the flight
-computed on the request's thread, the same measurement found 136 to 197 ms beside cold reads of
-0.55 to 0.64 s ([record](evaluation/2026-09-26-flight-worker.json)). The worker spawns in 0.24 to
+and reading the same window again took 15.6 to 19.0 ms. With the flight computed on the request's
+thread instead, the same measurement found 136 to 197 ms beside cold reads of 0.55 to 0.64 s
+([record](evaluation/2026-09-26-flight-worker.json)). The worker spawns in 0.24 to
 0.38 s at a server's first flight read and computes a cold 24-flyer episode in 0.46 to 1.33 s. With
 the freeze, the API process's resident memory 10 s after startup was 184,464 to 203,056 KiB, and
 189,008 to 203,392 KiB without it, three starts each.
@@ -324,14 +324,15 @@ between the traffic's one-second step and the society's one-minute tick.
 
 ## A model choosing for a flyer
 
-The one choice a model could make for a flyer is where it flies next when its perch or wander runs
-out: one of `allowed_choices`, a free perch its kind can use or wandering. A model's answer is a
-proposal, held to `validate_choice` exactly as the seeded chooser's is, the way the society holds a
-person's proposed goal to its own validation; a refused proposal would leave the choice to the seeded
-chooser, with the reason kept. No model chooses for a flyer: choices a model makes have to be
-recorded to replay, which needs a persisted flight run advanced by a host. Viewers share the
-flight's clock because its choices are drawn from its seed; a model's choices would have to be
-recorded before viewers could share them.
+No model chooses for a flyer. The one choice a model could make for one is where it flies next
+when its perch or wander runs out: one of `allowed_choices`, a free perch its kind can use or
+wandering, held to `validate_choice` exactly as the seeded chooser's is, with a refused answer
+leaving the choice to the seeded chooser and its reason kept. A flyer would be a decision role
+([decision roles](decision-roles-contract.md#adding-a-role)), and a role needs an engine that
+stores its receipts and consumes them in its minutes, so that they replay. The flight is derived
+and never stored, and viewers share its clock because its choices are drawn from its seed; a
+model's choices would have to be recorded, by a persisted flight run a host advances, before
+viewers could share them.
 
 ## What movement modules do not do
 
@@ -342,7 +343,8 @@ recorded before viewers could share them.
 - Flyers do not see people. They keep above the society's walker capsule by their band, and every
   perch the catalog declares is above it.
 - A perch is a point on a surface, not an area; a kind wider than a perch's span cannot use it.
-- Flight runs over a saved world's authored ground only, not a district.
+- Flight runs over a saved world's authored ground only: the page reads no flight for the district
+  or for a world made from photographs, which has no authored scene.
 - The flight renderer draws a kind's body and one wing turned for each side; there is no skeleton or
   animation clip.
 
@@ -362,69 +364,12 @@ recorded before viewers could share them.
 | Page and renderer | `web/packages/app/src/flight-api.ts`, `composition/saved-world-flight.ts`, `web/packages/atlas-react/src/playcanvas/flight/` | `flight-api.test.ts`, `saved-world-flight.test.ts`, `environment-selection-flight.test.ts`, `flight-flock.test.ts`, `authored-society-flight-assets.test.ts`, `tests/test_flight_page_words.py` (the page's words against the server's codes) |
 | Measurement | `scripts/measure_flight_bounds.py` | `tests/test_flight_bounds_record.py`, `tests/test_flight_worker_record.py` |
 
-The first flight bounds registration
-([pre-registration](evaluation/2026-09-25-flight-bounds-preregistration.json),
-[record](evaluation/2026-09-25-flight-bounds.json)) failed. Its run reported every rule passed, but
-its checker never tested whether a flyer was home when an episode ended, skipped the move into an
-episode, checked each window alone and let a landing pass any solid cell its column called its own.
-Judged again on the same windows by the corrected checker, 141 of 864 flyer episodes among the
-crowded crowns ended with the flyer away from home, each put back at the next episode's first step
-in one move through the crowns; the small square and the eight trees were clean, every window
-replayed exactly, and 24 flyers were drawn within one 60 Hz frame on the release build (1,400
-microseconds of main-thread work at the 95th percentile). The routes home, the grown air, the column
-rule and the page's handling of refusals answer that record.
+**Evidence.** Each flight record was pre-registered before its seeds were run:
 
-The second registration
-([pre-registration](evaluation/2026-09-25-flight-bounds-v2-preregistration.json),
-[record](evaluation/2026-09-25-flight-bounds-v2.json)) judged them on 12 seeds no run had used
-before it, 30 simulated minutes each in four worlds: the small square, the eight trees, the crowded
-crowns and a cluttered square. The crowded crowns fly 12 of the 24 flyers their trees host; the other
-12 are unplaced as `home_perch_unusable`. It passed. The checker named no violation, every flyer was home at
-all 4,536 episode ends, every window replayed exactly, and 24 flyers were drawn with 1,500
-microseconds of main-thread work at the 95th percentile. Its request cost is process time of the
-flight module alone, the median of five in one run that began at a one-minute load of 8.3: composing
-the air took 3.6 ms for the eight trees and 9.6 ms for the cluttered square; a cold window from the
-step before an episode ends 518 and 549 ms; a cold window from an episode's first step 93 and 95 ms;
-a window resumed from the one before 102 and 92 ms. Only cold windows were judged.
-
-Those two records' checker was independent of the steering and the guard, not of where parts are
-placed: it bounded each part with `air._solid_bounds`, the function that also marks the grid the
-flight steps in, and read that grid itself, so a catalog part placed wrongly would have been wrong in
-both. The independent checker ([`flight_checks.py`](../exulanica/world/flight_checks.py)) derives
-everything it checks on its own, from the catalogs and the placed objects: each part's box is the
-extent of the triangles the renderer draws for it, turned by the object's yaw with the checker's own
-trigonometry, scaled, placed and rounded outward; each perch is the catalog's point placed the same
-way, a perching flyer compared with it within the millimetre the flight rounds to; its grid and cell
-lookup are its own; each kind's figures are read from the flight kind catalog's file. It imports
-nothing of the flight's air, arithmetic, step, episodes or composer, which a test holds. With the
-flight's composer made to ignore each object's yaw, the flight composes, flies and agrees with
-itself, and the checker names birds at home on perches no tree declares
-(`tests/test_flight_checks.py`). Judged again by it, record B's twelve seeds show no violation and
-every flyer home at every episode's end, and this flight, served from its worker process, serves
-exactly the windows record B judged in all 48 runs
-([record](evaluation/2026-09-26-flight-independent-check.json)). Record B's seeds were spent, so that
-is a re-judgment, not a held-out test.
-
-The flight worker registration
-([pre-registration](evaluation/2026-09-26-flight-worker-preregistration.json),
-[record](evaluation/2026-09-26-flight-worker.json)) judged the flight served from its worker on 12
-seeds no run had used before it, 30 simulated minutes each in the same four worlds. The independent
-checker named no violation, every flyer was home at every episode's end, and every window the
-worker served equalled the one computed in the measuring process. No flyer searched for its route
-home more than twice in an episode and no search took more than 93 entries off its queue, so the
-search bounds changed no flight there. It failed its timing rule: beside a cold read of 24 flyers,
-the slowest health answer took 2.2 to 4.3 ms in four runs and 30.9 ms in one, over the rule's
-25 ms. Its measuring script parsed each answer in the process that timed the health requests, as
-the answer arrived; a second registration with that fixed and the answer encoded one flyer to an
-encoder call ([pre-registration](evaluation/2026-09-26-flight-worker-v2-preregistration.json),
-[record](evaluation/2026-09-26-flight-worker-v2.json)) failed the same way, 2.7 to 8.0 ms in four
-runs and 30.9 ms in one. That pause is inferred, not measured per run, to be the server's full
-garbage collection: the two runs' pauses agree to 6 microseconds, main's release server showed a
-31.2 ms health answer with no flight read beside it, and the third registration
-([pre-registration](evaluation/2026-09-26-flight-worker-v3-preregistration.json),
-[record](evaluation/2026-09-26-flight-worker-v3.json)), with what startup made frozen, passed: 2.9 to
-7.7 ms in all five runs. The search bounds' cost was timed beside it: bounded, a search that finds no
-route on the largest grid the module admits ends in 12 to 22 ms; unbounded it took 424 to 444 ms.
-All three timing records say a run was discarded below 50 percent mean idle; their scripts discarded
-nothing, and no run fell below it: seven runs, 59.3 to 77.4 percent mean idle
-([erratum](evaluation/2026-09-26-flight-worker-erratum.json)).
+| Record | What it found |
+| --- | --- |
+| [Flight bounds](evaluation/2026-09-25-flight-bounds.json) ([pre-registration](evaluation/2026-09-25-flight-bounds-preregistration.json)) | Failed. Its checker did not test that a flyer was home when an episode ended, skipped the move into an episode, checked each window alone and let a landing pass any solid cell its column called its own; judged again by the corrected checker, 141 of 864 flyer episodes among the crowded crowns ended with the flyer away from home. The routes home, the grown air, the column rule and the page's handling of refusals answer it. |
+| [Flight bounds, second registration](evaluation/2026-09-25-flight-bounds-v2.json) ([pre-registration](evaluation/2026-09-25-flight-bounds-v2-preregistration.json)) | Passed on 12 new seeds, 30 simulated minutes each in four worlds (the small square, the eight trees, the crowded crowns and a cluttered square): no violation, every flyer home at all 4,536 episode ends, every window replayed exactly, and 24 flyers drawn with 1,500 microseconds of main-thread work at the 95th percentile. Composing the air took 3.6 to 9.6 ms, and a cold window 93 to 549 ms of the flight module's process time. |
+| [Independent check](evaluation/2026-09-26-flight-independent-check.json) | The checker in `flight_checks.py`, which derives every part box, perch and cell on its own, found no violation on the second registration's seeds, and the worker served exactly the windows that registration judged, in all 48 runs. Those seeds were spent, so this is a re-judgment, not a held-out test. |
+| [Flight worker](evaluation/2026-09-26-flight-worker.json) ([pre-registration](evaluation/2026-09-26-flight-worker-preregistration.json)) and its [second registration](evaluation/2026-09-26-flight-worker-v2.json) ([pre-registration](evaluation/2026-09-26-flight-worker-v2-preregistration.json)) | The flight served from its worker was correct on 12 new seeds, and both failed their timing rule: one run in five answered a health request in 30.9 ms against the rule's 25 ms, a pause inferred, not measured per run, to be the server's full garbage collection. |
+| [Flight worker, third registration](evaluation/2026-09-26-flight-worker-v3.json) ([pre-registration](evaluation/2026-09-26-flight-worker-v3-preregistration.json), [erratum](evaluation/2026-09-26-flight-worker-erratum.json)) | Passed with what startup made frozen: the slowest health answer beside a cold flight read took 2.9 to 7.7 ms in all five runs. A route search that finds no route on the largest grid ends in 12 to 22 ms bounded, against 424 to 444 ms unbounded. The erratum records that the timing scripts discarded no run for machine load, and none fell below the idle rule. |

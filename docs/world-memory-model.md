@@ -1,68 +1,47 @@
 # World state architecture
 
-Status: **DECISION AND RESEARCH PROGRAM**. Evidence, graph, reconstruction,
-spatial-authority, authored-version, World Read, generated-receipt, and package contracts implement
-parts of this architecture. Exulanica does not claim a learned general world model, reliable
-physical prediction, autonomous open-world simulation, or complete object-level scene memory.
+This contract owns the principles every world's state follows: what must be addressable, the
+planes that keep observations, interpretations, authored alternatives, generated content and
+simulation apart while they share identity, and what a representation must declare about what it
+preserves. A world's state is the retained state and history of the world its agents act in; it
+supports creation, inspection, simulation, model decisions and replay. The evidence, graph,
+reconstruction, structural authority, authored-version, World Read, generated-receipt and package
+contracts implement parts of it and own their exact wire, database and package behavior.
+[Product direction](product-direction.md) owns priority, and
+[ADR-0023](adr/0023-epistemically-typed-world-memory.md) records the decision, the research it
+weighed and the alternatives it rejected.
 
-This document defines the architecture of a world's state: the retained state and history of
-the world that agents act in, supporting creation, inspection, simulation, model decisions and
-replay. World memory is that retained state and history; remembering personal experiences is one
-use of it. Product priority remains in [product-direction.md](product-direction.md); exact wire,
-database, and package behavior remains in the corresponding implementation contracts.
+## Contents
 
-## 1. The research position
+1. [What kind of system this is](#1-what-kind-of-system-this-is)
+2. [The central invariant](#2-the-central-invariant)
+3. [One world, several epistemically distinct planes](#3-one-world-several-epistemically-distinct-planes)
+4. [The world state is hybrid, temporal, and partially observed](#4-the-world-state-is-hybrid-temporal-and-partially-observed)
+5. [Materialization and representation contracts](#5-materialization-and-representation-contracts)
+6. [Observation, belief, and intervention](#6-observation-belief-and-intervention)
+7. [Dynamics and the claim to prediction](#7-dynamics-and-the-claim-to-prediction)
+8. [Read, write, inspect, and train](#8-read-write-inspect-and-train)
+9. [What is distinct, and what is not](#9-what-is-distinct-and-what-is-not)
+10. [Falsifiable research program](#10-falsifiable-research-program)
+11. [Non-goals](#11-non-goals)
 
-Exulanica is not one neural network and should not be redesigned to imitate one.
+## 1. What kind of system this is
 
-The term *world model* names at least three different systems:
+The term *world model* names at least three different systems: a **descriptive** model estimates
+what exists, where it is, how it is related and how that estimate changed; a **predictive** model
+estimates future state or observations conditioned on actions; and a **generative** model
+synthesizes plausible observations or environments from prompts and controls. Exulanica is none of
+them. World models generate how a world looks; Exulanica is the world AI models live in. It stores
+the kind of state a descriptive model estimates, runs bounded deterministic behavior, and offers
+interfaces through which predictive and generative models may read and propose changes, without
+claiming either as a general capability. Generated video, generated 3D scenes and latent predictors
+do not by themselves provide durable identity, exact source citation, consent withdrawal, editable
+alternatives or a signed account of what changed.
 
-1. a **descriptive world model** stores an estimate of what exists, where it is, how it is related,
-   and how that estimate changed;
-2. a **predictive world model** estimates future state or observations conditioned on actions; and
-3. a **generative world model** synthesizes plausible observations or environments from prompts and
-   controls.
-
-Exulanica is none of these. In plain words: world models generate how a world looks; Exulanica is
-the world AI models live in. It stores the kind of state the first describes, runs bounded
-deterministic behavior, and offers interfaces through which models of the second and third kind may
-read and propose changes. It makes no claim to the second or third as a general capability.
-
-That distinction is material. V-JEPA 2 predicts latent future representations and demonstrates
-action-conditioned robot planning, but reports camera sensitivity and error accumulation during
-long rollouts. Genie 3 generates interactive video at 720p and 24 fps with consistency measured in
-minutes and visual memory described on approximately a one-minute horizon. Marble generates and
-edits persistent 3D worlds and exports meshes or Gaussian splats, while its own documentation warns
-that image-conditioned unseen space is plausible generation rather than the source floor plan.
-None of those properties, by itself, provides durable personal identity, exact source citation,
-consent withdrawal, editable historical alternatives, or a signed account of what changed.
-
-Exulanica's research hypothesis is therefore:
-
-> A world becomes more useful to people and models when observations, interpretations,
-> authored alternatives, and simulated consequences share stable identity and spatial context
-> without sharing an epistemic status.
-
-This is a systems hypothesis, not a novelty claim already proved. It becomes a research result only
-if the experiments in section 10 beat simpler baselines.
-
-Primary references retrieved 2026-09-13:
-
-- [Genie 3](https://deepmind.google/blog/genie-3-a-new-frontier-for-world-models/), Google DeepMind,
-  2025: autoregressive interactive visual worlds and their stated time horizon.
-- [Marble](https://www.worldlabs.ai/blog/marble-world-model), World Labs, 2025: persistent
-  generated 3D worlds, multimodal conditioning, editing, composition, and export.
-- [V-JEPA 2](https://arxiv.org/abs/2506.09985), Meta AI, 2025: latent physical prediction and
-  action-conditioned planning, including reported limitations.
-- [Learning 3D Persistent Embodied World Models](https://proceedings.neurips.cc/paper_files/paper/2025/file/970f59b22f4c72aec75174aae63c7459-Paper-Conference.pdf),
-  NeurIPS 2025: action-conditioned video prediction coupled to persistent 3D feature memory.
-- [3D-Mem](https://openaccess.thecvf.com/content/CVPR2025/papers/Yang_3D-Mem_3D_Scene_Memory_for_Embodied_Exploration_and_Reasoning_CVPR_2025_paper.pdf),
-  CVPR 2025: complementary snapshot and dense representations for embodied scene memory.
-- [ConceptGraphs](https://arxiv.org/abs/2309.16650), ICRA 2024: compact open-vocabulary,
-  object-centric 3D scene graphs and the limitations of dense feature maps.
-- [DynaMem](https://arxiv.org/abs/2411.04999), 2024: online dynamic spatio-semantic voxel memory.
-- [PROV-DM](https://www.w3.org/TR/prov-dm/), W3C Recommendation: entities, activities, agents, and
-  derivation as an interoperable provenance model.
+The working hypothesis is that a world becomes more useful to people and models when observations,
+interpretations, authored alternatives and simulated consequences share stable identity and spatial
+context without sharing an epistemic status. It is a systems hypothesis, not a proved result;
+section 10 states how it is tested.
 
 ## 2. The central invariant
 
@@ -113,7 +92,7 @@ The planes may refer to the same stable entity or place. They may not borrow one
 status. A simulated visit does not become a memory. A generated back side does not become an
 observation. Reconstruction does not admit generated completion of unobserved space as spatial
 state; the decision is recorded in [ADR-0008](adr/0008-generated-geometry.md), with validation
-in the [reconstruction quality contract](reconstruction-quality-gate.md).
+in the [reconstruction quality gate](scene-reconstruction-operations.md#5-quality-gate-and-recorded-rung).
 A user correction may supersede an inference without rewriting the original output.
 
 ### 3.1 Provenance class, content truth class, and world plane are different axes
@@ -143,10 +122,13 @@ Object-centric scene graphs are efficient for identity, relations, language quer
 updates, but reduce shape, free space, uncertainty, and view-dependent appearance too aggressively.
 Dense points, voxels, neural fields, and Gaussians preserve spatial and visual detail, but are
 expensive, difficult to update semantically, and poor as sole authorities for identity or events.
-Current research reaches the same conclusion from different directions: ConceptGraphs favors
-object-level structure; DynaMem favors dynamic voxel memory; 3D-Mem explicitly combines
-complementary representations; persistent embodied world models couple predictive models to a 3D
-memory.
+Published research reaches the same conclusion from different directions:
+[ConceptGraphs](https://arxiv.org/abs/2309.16650) favors object-level structure;
+[DynaMem](https://arxiv.org/abs/2411.04999) favors dynamic voxel memory;
+[3D-Mem](https://openaccess.thecvf.com/content/CVPR2025/papers/Yang_3D-Mem_3D_Scene_Memory_for_Embodied_Exploration_and_Reasoning_CVPR_2025_paper.pdf)
+explicitly combines complementary representations; and
+[persistent embodied world models](https://proceedings.neurips.cc/paper_files/paper/2025/file/970f59b22f4c72aec75174aae63c7459-Paper-Conference.pdf)
+couple predictive models to a 3D memory.
 
 Exulanica therefore uses:
 
@@ -170,26 +152,21 @@ holds. No query may silently collapse those axes.
 
 ### World time and fictional calendars
 
-The [configurable world rules](product-direction.md#configurable-world-rules) require a separate
-simulation chronology. Canonical event ordering, elapsed world time, calendar presentation and
-playback pacing are distinct quantities. Their mappings and any changes to them need explicit
-versioned definitions. A fictional calendar does not reinterpret observation or transaction time.
-
-Schedule and environmental rules declare which quantity or event they depend on: elapsed time,
-calendar boundaries, daylight or another supported condition. Changing day length, a calendar
-boundary or the existence of sunset therefore requires checking affected rules. It must not
-silently reinterpret stored timestamps or invent events that were never simulated.
-
-Rule changes bind an effective simulation position, base state and rule version. Replay retains
-the definitions and recorded model decisions that produced the events. An incompatible change
-requires a declared state migration or branch; a playback rewind leaves historical events intact.
-World reads, model adapters and package projections must declare the temporal semantics they
-support. This is an architecture requirement, not a claim that the runtime supports arbitrary
+Simulation keeps a chronology of its own. Canonical event ordering, elapsed world time, calendar
+presentation and playback pacing are distinct quantities with versioned mappings, and a fictional
+calendar never reinterprets observation or transaction time. A rule change binds an effective
+simulation position, base state and rule version; replay keeps the definitions and recorded model
+decisions that produced its events, and a playback rewind leaves recorded history intact. The
+[configurable world rules](product-direction.md#configurable-world-rules) state the product scope
+this serves; this is an architecture requirement, not a claim that the runtime supports arbitrary
 calendars or nonuniform time across regions.
 
 ## 5. Materialization and representation contracts
 
-Every derived spatial or visual artifact declares a machine-readable representation contract:
+Every derived spatial or visual artifact must declare a machine-readable representation contract.
+The fields below are the requirement; a generated grammar output records one per admitted
+projection ([grammar package](grammar-package.md)), and each other artifact family's contract states
+which of them it records:
 
 ```text
 representation_id and version
@@ -257,7 +234,10 @@ Rendering interpolates simulation snapshots but does not invent canonical positi
 The ordinary synthetic population should use bounded, inspectable transition systems: needs,
 goals, plans, affordances, actions, resources, relationships, and events. A language or predictive
 model may propose a plan or estimate an outcome, but the result carries its model receipt and is
-validated against allowed actions and state constraints.
+validated against allowed actions and state constraints. A person whose choices the world's owner
+hands to an open model is decided this way: the model answers with one offered action, the engine
+checks it again before applying it, and the stored receipt replays without a call
+([people and models in a world](capabilities/simulation.md)).
 
 Exulanica earns a **predictive world-model** claim only after it demonstrates all of:
 
@@ -306,14 +286,17 @@ bases and incomplete runs remain explicit outcomes; partial output is not a comp
 
 ### World Read
 
-World Read returns a query-scoped, rights-scoped bundle rather than dumping a database or selecting
-one privileged representation. A caller requests subjects, time/branch, modalities,
-representations, quality, and intended operation. The response carries stable identities, exact
-digests, coordinate frames, epistemic classes, uncertainty, dependencies, and unavailable reasons.
+The requirement: World Read returns a query-scoped, rights-scoped bundle rather than dumping a
+database or selecting one privileged representation. A caller requests subjects, time/branch,
+modalities, representations, quality, and intended operation, and the response carries stable
+identities, exact digests, coordinate frames, epistemic classes, uncertainty, dependencies, and
+unavailable reasons. The implemented World Read routes read one scene or one place of a named
+world, a place optionally at a requested instant, and a scene's observations
+([World API](capabilities/world-api.md)); they take no modality, representation or quality request.
 
 ### World Write
 
-World Write accepts typed proposals:
+The requirement: World Write accepts typed proposals:
 
 - assertion or identity proposal;
 - spatial interpretation proposal;
@@ -323,7 +306,11 @@ World Write accepts typed proposals:
 - user correction, dispute, supersession, or withdrawal.
 
 Each proposal names its base versions and intended plane. The backend validates authority, rights,
-capabilities, topology, collision, and stale bases. A raw renderer scene is not a write format.
+capabilities, topology, collision, and stale bases. A raw renderer scene is not a write format. The
+implemented World Write route records a generated-scene receipt tied to its conditioning sources.
+Authored edits go through the version routes of the [world objects contract](world-objects-contract.md),
+and a society's directed actions and model choices through the society routes; each names the base
+it was made against.
 
 ### Inspection
 
@@ -374,17 +361,17 @@ Task benefit requires comparison with a relevant baseline; real-world usefulness
 independent real-world evaluation. These requirements extend the training boundary above without
 changing the implemented package inventory below.
 
-### 8.1 Current export coverage
+### 8.1 Export coverage
 
 Export is intentionally partial and capability-declared:
 
-| Plane/content | Current package status |
+| Plane/content | Package status |
 | --- | --- |
 | Evidence descriptors, semantic graph, reconstruction descriptors, structure, appearance, interaction, provenance | WMP 1.0 |
-| Alternate versions, authored objects, reviewed assets and behaviors | Optional authored-world 1.0 extension |
-| Durable environment instances | Optional environment-instances 1.0 extension; not present in authored-world 1.0 |
+| Alternate versions, authored objects, reviewed assets and behaviors | Optional authored-world 1.0 and 1.1 extensions; 1.1 also carries versions that give, change or take away a behavior |
+| Durable environment instances | Optional environment-instances 1.0 and 1.1 extensions; not present in authored-world |
 | Owned-district source/interpretation | Not exported as a reusable district contract |
-| Society state and simulation events | Not exported |
+| Society state, simulation events and model decisions | Not exported |
 | Raw private media | Excluded by default |
 | Training dataset | Separate opt-in profile and consent boundary |
 
@@ -439,26 +426,13 @@ metrics, practical effect threshold, and failure action. A visual demonstration 
 appearance only. A fixture proves mechanics only. A benchmark score does not establish personal
 usefulness.
 
-## 11. Immediate architecture consequences
+No experiment in this table has an evaluation record. The comparisons of models
+([society experiments](society-experiments.md)) score how people fare under their routine, under
+waiting and under open models, which bears on WMM-9 without being that experiment. What the owned
+district's interpretation, roads and rendered inhabitants must become is recorded in
+[ADR-0023](adr/0023-epistemically-typed-world-memory.md).
 
-1. The owned district's admitted building and sidewalk records remain valid source-derived spatial
-   inputs. Browser-only storefronts, windows, trees, lamps, furniture, and pedestrian routes are
-   not promoted to world state.
-2. District interpretation moves to a versioned compiler that emits semantic/interpreted elements,
-   parametric facade and ground records, source dependencies, uncertainty, and a materialization
-   receipt. The renderer consumes that output.
-3. Roads require an admitted or explicitly derived road representation. “Asphalt everywhere not
-   occupied by a building” is a visual fallback, not road data.
-4. Synthetic inhabitants require durable goals, routes, actions, and events. The 24-avatar limit
-   remains a representation budget over a larger population, never a population limit.
-5. Semantic selection, collision, simulation, and rendering resolve through shared stable subjects
-   but may consume different validated projections.
-6. No visual work is accepted if its meaningful content exists only in PlayCanvas entity names or
-   mesh-generation loops.
-7. Renderer-only detail remains permitted when it is demonstrably non-consequential and covered by
-   a declared style/runtime version.
-
-## 12. Non-goals
+## 11. Non-goals
 
 - one universal tensor, ontology, scene format, or database table;
 - storing every render primitive as semantic state;

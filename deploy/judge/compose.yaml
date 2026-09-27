@@ -1,18 +1,19 @@
-# The judge deployment: four services, read-mostly, seeded from an archive.
+# The judge deployment: five services, read-mostly, seeded from an archive.
 #
 # Standalone rather than an override of the repository's `compose.yaml`, and the reason is not
 # style. That file's worker services declare `${EXULANICA_CODE_REVISION:?}` and
 # `${EXULANICA_POSE_RUNTIME_IMAGE:?}`, and Compose interpolates every service in a file whether or
 # not it is selected, so a judge stack layered on top would have to supply a digest-pinned pose
 # runtime for a worker it never starts. Inventing one would be writing down a provenance claim
-# that is not true, and `docs/deployment.md` invariant 10 is about exactly that kind of wording.
+# that is not true, and `docs/deployment.md` section 4 is about exactly that kind of wording.
 #
 # Read `docs/judge-access.md` before changing anything here. The two facts that are load bearing:
 #
 #   1. `api` connects as `exulanica_judge`, NOT as `exulanica_app`. That role holds SELECT on
-#      every table, INSERT and UPDATE on thirteen, and DELETE on none. It is the only place the
-#      sentence "a judge cannot touch sources or deletion" is enforced rather than intended: the
-#      bearer token carries no permissions at all, so nothing above the database can enforce it.
+#      every table, INSERT and UPDATE on thirteen, and DELETE on none, so the database enforces
+#      "a judge cannot touch sources or deletion" whatever the API does. The judge's bearer token
+#      is also limited, to the permissions JUDGE_PERMISSIONS names in
+#      exulanica/orchestration/judge_seed.py, which the API checks on every route.
 #   2. `web` and `api` are one origin. The browser client calls `window.location.origin + '/api'`
 #      and the API installs no CORS middleware, so a second origin does not work and cannot be
 #      made to work from the client side.

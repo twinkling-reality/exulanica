@@ -1,38 +1,42 @@
 # Model and service selection
 
-Status: implemented stack; model upgrades require task-specific evidence.
+This reference owns which models the product runs in each role, the evidence behind each choice,
+and the candidates worth comparing. A world's people are its agents, and a world's owner chooses the
+open model that decides for a person or a group; this document records how those models were
+verified and compared. Model upgrades require task-specific evidence. The
+[model manifest](../exulanica/models/models.manifest.json) is the configuration, and the
+[product roadmap](product-direction.md#model-selection-and-compute-priorities) records the ordered
+work and adoption gates.
 
 ## 0. Implemented stack and selection decision
 
-This section supersedes the routing and deployment descriptions in sections 1-8 below, and
-it is the living correction of [ADR-0002](adr/0002-model-routing.md). ADR-0002 remains the
-accepted original decision (Nemotron Lightning as the reasoning core). The Companion caller
-is Nemotron 3 Nano 30B-A3B with Lightning as fallback. The ADR number is
-not reused. Sections 1-8 retain the research, its prices and rejected alternatives;
-they are historical rationale, not a runtime inventory. The manifest describes the implemented structured-extraction callers and distinguishes
-configured reasoning candidates from actual production routes.
-The [product roadmap](product-direction.md#model-selection-and-compute-priorities) records the
-ordered work and adoption gates. This section does not change model configuration.
+This section is the living correction of [ADR-0002](adr/0002-model-routing.md), which remains the
+accepted original decision (Nemotron Lightning as the reasoning core); the Companion caller is
+Nemotron 3 Nano 30B-A3B with Lightning as fallback, and the ADR number is not reused. The research
+that preceded it, with its prices and rejected alternatives, is historical rationale kept at a fixed
+revision ([Historical selection rationale](#historical-selection-rationale)), not a runtime
+inventory. The manifest distinguishes configured reasoning candidates from the roles that have
+production callers.
 
 ### Implemented roles
 
-Reviewed against the integration tree. Implemented means there is a production call path;
-it does not mean every configured model is running, deployed or has passed a quality comparison.
-Provider availability and prices must be checked again before an execution campaign.
+Implemented means there is a production call path; it does not mean every configured model is
+running, deployed or has passed a quality comparison. Provider availability and prices must be
+checked again before an execution campaign.
 
-| Role | Current implementation | Evidence and boundary |
+| Role | Implementation | Evidence and boundary |
 | --- | --- | --- |
 | Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. A pre-registered held-out comparison kept Nano against Super and Ultra: neither cleared the margin on hard grounded questions ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). |
-| Request classification, search planning and appearance drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request` and `draft_appearance` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
+| Request classification, search planning, appearance drafts and environment drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request`, `draft_appearance` and `draft_environment_operation` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
 | Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. On synthetic held-out photographs M3 omitted and misplaced fewer objects than MiniCPM, which also reported people who were not there ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). Synthetic drawings do not establish accuracy on real photographs. |
-| A person's decisions in a world | The open model the world's owner chose for that person, among those the manifest offers the person's decision role (`society_decision`, declared by the decision role registry); none unless chosen | `exulanica/api/decision_host.py` asks through `ModelClient.choose` before a minute of play, and the planner takes only a validated answer ([below](#providers-chosen-roles-and-a-persons-decisions)). Each offered model's mechanism was verified by a pre-registered probe ([record](evaluation/2026-09-25-society-person-models-probe.json)); the measurement compares what four models decide ([record](evaluation/2026-09-25-society-person-models.json)). |
+| A person's decisions in a world | The open model the world's owner chose for that person, among those the manifest offers the person's decision role (`society_decision`, declared by the decision role registry); none unless chosen | `exulanica/api/decision_host.py` asks through `ModelClient.choose` before a minute of play, and the planner takes only a validated answer ([below](#providers-chosen-roles-and-a-persons-decisions)). Each offered model's mechanism was verified by a pre-registered probe ([record](evaluation/2026-09-25-society-person-models-probe.json)); measurements compare what four models decide, and two judged comparisons found no measured difference between the models they compared ([below](#judged-comparisons-of-models-deciding-for-people)). |
 | Caption/text semantic retrieval | Nebius Token Factory: Qwen3-Embedding-8B, 4096 dimensions | `exulanica/epistemics/caption_embeddings.py` and `exulanica/selection/embeddings.py`; lexical and cosine retrieval, not direct image embeddings. No model fallback is configured for embeddings. |
 | Object boxes | Grounding DINO Tiny; OWLv2 Base Patch16 Ensemble fallback | `exulanica/ingest/stages/segmentation.py`; local inference when hosted observations lack suitable boxes. |
 | Object masks | SAM 2.1 Hiera Tiny | Same segmentation module; masks are distinct from human identity confirmation, source rights and placement into recovered shared coordinates. |
 | Single-image geometry | MoGe-2 ViT-L | `exulanica/reconstruction/moge.py` loads the v2 implementation and a pinned checkpoint. MoGe-3 is not an implemented automatic fallback. |
 | Multi-view camera recovery | pycolmap 4.2.0 / COLMAP, SIFT and exhaustive matching | `exulanica/reconstruction/pycolmap_executor.py`; registration must be measured before training. MapAnything is not an implemented rescue path. |
 | Scene training and compression | gsplat / PyTorch CUDA; PlayCanvas splat-transform | Production trainer and publication boundaries exist. The September 12 generated L40S check validates packaging and forward/backward execution, not personal-place quality. |
-| Browser | TypeScript, Vite, DOM UI, PlayCanvas 2.21.4 | The app imports the PlayCanvas binding. Three.js/Spark is retained as a separate implementation; the `atlas-react` package name does not establish a React application. |
+| Browser | TypeScript, Vite, DOM UI, PlayCanvas 2.21.4 | The app imports the PlayCanvas binding, and no three.js implementation is in the repository; the `atlas-react` package name does not establish a React application. |
 | API, durable state and jobs | Python 3.11, FastAPI, Pydantic, PostgreSQL, pgvector, PostgreSQL-backed job leases/retries | Existing replaceable model/stage interfaces and enforced module boundaries are the extension points. No new orchestration framework is selected. |
 | Original bytes and compute | Local content-addressed file store; local API/workers and Docker GPU execution; hosted model calls on Nebius | `exulanica/api/services.py` constructs `LocalContentAddressedStore`. Brev/MassedCompute L40S execution is measured; Nebius GPU hosting and an S3 store implementation are not established by that run. |
 
@@ -251,7 +255,9 @@ tiredness as the minute began rather than as the minute has it, it counted a per
 taken when drawing where they stand, and a choice to talk that came first could take in somebody
 whose own model had chosen to talk with someone else.
 
-**Spend.** Two bounds apply to a person's decisions. The decision contract bounds each world: at
+### What a person's decisions may spend
+
+Two bounds apply to a person's decisions. The decision contract bounds each world: at
 most 600 asked decisions and 0.25 USD of their cost in its last hour, counted from its receipts with
 an unknown cost at its bound and each ask already admitted that minute at its bound; past either,
 the routine decides and each receipt says which. The process's budget guard (`EXULANICA_BUDGET_USD`,
@@ -269,6 +275,54 @@ either; playback keeps advancing minutes with the routine deciding, `/readyz` sa
 where a playback host runs, and the models route and the page tell the world's owner. A host that
 plays people run by models sizes both ceilings for how long it runs between restarts.
 
+### Judged comparisons of models deciding for people
+
+Two comparisons were judged under rules pre-registered before any held-out seed was run. Each ran
+the product's own comparison runner on the small square of a starter world with its eight people,
+one simulated hour per run: every candidate, the first candidate a second time as a control, the
+routine alone and everybody waiting. A difference counts only when Holm's procedure over the
+pre-registered family rejects equality and the difference is larger than the control's own
+interval; otherwise the verdict is no measured difference. The runner, the score and the Compare
+view are the [society experiments](society-experiments.md#comparisons-of-models) contract's, which
+lists every [judged comparison](society-experiments.md#judged-comparisons).
+
+| | [Every person](evaluation/2026-09-26-society-model-comparison.json) ([pre-registration](evaluation/2026-09-26-society-model-comparison-preregistration.json)) | [A group](evaluation/2026-09-26-society-group-comparison.json) ([pre-registration](evaluation/2026-09-26-society-group-comparison-preregistration.json)) |
+| --- | --- | --- |
+| Decided by a model | All eight people | Four people, the group the owner chose a model for; the other four keep their routine |
+| Candidates | Qwen3 235B Instruct and Nemotron 3.5 Lightning, each asked by a forced call | Qwen3 235B Instruct (the owner's choice) and Nemotron 3.5 Lightning by a forced call, Nemotron 3 Nano 30B by a JSON schema |
+| Held-out seeds | 8 | 12 |
+| Score | `society-person-score.v1`: need relief against the routine's, less the turns whose answer was not applied | `society-person-score.v2`: how the people fared and nothing else |
+| Mean score (routine 1, waiting 0) | Qwen 0.9512 and 0.9760 in its control run; Lightning 0.9879 | Qwen 1.0505 in both runs; Lightning 1.0505; Nano 1.0422 |
+| Verdict | No measured difference | No measured difference |
+| Spent | 0.2997 of a 0.38 USD bound | 0.2482 of a 0.40 USD bound |
+
+In the comparison over every person, Lightning's mean was 0.0367 above Qwen's (interval 0.0106 to
+0.0627) and Holm's procedure rejected equality, but Qwen against itself differed by up to 0.0537, so
+the difference is within run-to-run variation. The
+[decomposition](evaluation/2026-09-26-society-model-comparison-decomposition.json) shows where it
+came from: the need people were spared was almost the same, 0.9880 in each of Qwen's runs and 0.9893
+under Lightning, and 0.0354 of the 0.0367 came from turns whose answer was not applied, 3.7 percent
+of the turns in Qwen's first run, 1.2 percent in its second and 0.1 percent under Lightning. The
+control's own difference of 0.0248 came entirely from such turns. Against the routine, Qwen's first
+run scored 0.0488 lower and Holm's procedure rejected equality; 0.0368 of that came from turns not
+applied. The record keeps how many turns were not applied, not why. What people did differed: Lightning's people waited in 31 percent of
+person-minutes and Qwen's in 8. Lightning answered in 4.2 seconds at the median against Qwen's 0.8,
+and cost 0.0200 USD per simulated hour against 0.0088.
+
+In the group comparison the group's people fared the same under Qwen and Lightning and slightly
+less under Nano, with no difference the protocol lets a comparison claim. What each model answered
+differed, and the verdict records that the answered shares differ: Qwen answered 99.3 percent of the
+group's turns (99.6 in its control run), Lightning 95.8 and Nano 92.5; the rest were left to the
+routine, and no answer was refused. All 35 of Lightning's turns left to the routine, and 26 of Nano's
+29, chose to talk with somebody who was already busy. The behaviour differed most: Lightning's group
+talked in 15 percent of person-minutes and stood in 9, close to the routine's own 15 and 4, where
+Qwen's group talked and stood in 1 percent each and rested in 74; Nano's group waited in 2 percent of
+person-minutes against Qwen's 13.
+
+In both comparisons every run replayed from its stored decisions with no billed call. Each measured
+one square, one hour per seed and the models named; neither establishes how the models compare in
+another world or over a longer run.
+
 ### Decision and evidence
 
 **DECISION:** retain the implemented stack as the comparison baseline. Add the evaluations in the
@@ -280,7 +334,7 @@ when it fits the demonstrated hardware and interaction budget; cheapest is not t
 The September 9 comparison recorded median Nano latency 3627 ms versus Lightning 18617 ms at the
 selected ceiling, with zero Nano validator rejections in 24 calls. Its answer-quality measurement is
 explicitly null. The September 12 Companion record prepares retrieval checks and an evaluation
-corpus; live answers and human quality judgments remain pending. The segmentation record records
+corpus; it holds no live answers and no human quality judgments. The segmentation record records
 masks but no positive first-place person lift because pose was absent. The GPU record establishes
 generated CUDA execution and cleanup. None proves an optimal model set. These four are local-only
 evaluation records a clone does not contain: `2026-09-09-companion-memory`,
@@ -294,7 +348,8 @@ question than Nano and Ultra on none; the frozen margin was two, so Nano stays. 
 answered an empty evidence packet by stating that the library held no photographs, which was
 false, and Super exposed an internal packet field name in answer text. They were faster than
 Nano and cost more. The rubric was applied by an automated reviewer rather than the blinded human
-review the roadmap requires, so the answer-quality half of this comparison is still owed. For
+review the roadmap requires, so the answer-quality half of this comparison has not been judged by
+a person. For
 observations, MiniCPM had a higher combined rate of omitted and unsupported objects than M3 and
 reported a person on two photographs with nobody in them, so M3 stays. On unsigned photographs
 MiniCPM, the fallback, returned generic scene labels such as "outdoor urban area" as places; the
@@ -354,95 +409,87 @@ board passes every check if the observation proposes it, and the observation pro
 all 6 such photographs of the experiment. The measurements are synthetic drawings of one style,
 with the fallback disabled; the fallback's sign judgement is refused by name, never measured.
 
-### Quality and runtime requirements, updated 2026-09-13
+### Quality and runtime requirements
 
 The living-world preview uses source-footprint building meshes and catalog-backed rigged characters,
-with an abstract procedural fallback. Its appearance is not evidence of frontier scene-generation
-or character-generation quality. The district's live society (`exulanica-society/v4`) is
+with an abstract procedural fallback. Its appearance is not evidence of scene-generation or
+character-generation quality. The district's live society (`exulanica-society/v4`) is
 deterministic and refuses model decisions. A saved world's purposeful society
 (`exulanica-society/v2`) follows its routine too, except for a person whose world's owner chose a
-model: the host asks that model at the routine's choice points, before a minute of play. The
-opt-in v3 backend adds local simulated observations, communicated beliefs and a bounded decision
-adapter through the existing ModelClient. No model role is enabled for that adapter by default.
-Its authenticated persistence and provider path are tested with scripted responses; live-model
-quality, dialogue and memory reflection remain separate evaluation work. A configured model role,
-an expensive GPU or a working API response does not establish these capabilities.
+model: the host asks that model at the routine's choice points, before a minute of play. The v3
+engine is retired: no society is created with it and its explicitly requested model proposals are
+refused, while the proposals it stored replay without a model call. Generated dialogue between
+people and memory reflection are not built. A configured model role, an expensive GPU or a working
+API response does not establish these capabilities.
 
 The quality target is the strongest demonstrated result for each user task. Compare stronger
-reasoning models for grounded Companion answers and the small-cast social scenario; compare
-perception/geometry candidates against actual source failures; evaluate reusable rigged assets,
-materials and animation for character quality. Rendering and collision retain their existing local
-runtime. Save expensive outputs and reuse them. Track model/provider/checkpoint, quality judgments,
-latency, memory and cost for each comparison. Promote quality improvements within an explicit
-interactive or offline execution budget; do not select solely by model size or price.
+reasoning models for grounded Companion answers and for the people of a world; compare
+perception and geometry candidates against actual source failures; evaluate reusable rigged assets,
+materials and animation for character quality. Rendering and collision keep their existing local
+runtime. Save expensive outputs and reuse them. Track model, provider, checkpoint, quality
+judgments, latency, memory and cost for each comparison. Promote quality improvements within an
+explicit interactive or offline execution budget; do not select solely by model size or price.
 
-### Stronger candidates to compare, checked 2026-09-13
+### Candidates to compare
 
-These are challengers for targeted comparisons, not established winners or enabled runtime roles.
-Comparative inference results are pending; the implemented baseline remains unchanged.
+These are challengers for targeted comparisons, not established winners or enabled runtime roles;
+the implemented baseline stands until a comparison beats it. Their sources were read on 2026-09-12
+and 2026-09-13, and availability, licences and runtime compatibility must be checked again before
+any comparison.
 
-For customizable people, first compare established parametric/rigged asset pipelines rather
-than training a model solely to obtain body and wardrobe variation. [MPFB](https://static.makehumancommunity.org/mpfb/docs.html)
-provides character, asset, rigging and export workflows; its [core assets](https://static.makehumancommunity.org/about/license.html)
-are CC0 while the authoring code uses a separate license. [MHR](https://github.com/facebookresearch/MHR)
-provides a parametric body, skinned mesh, detail levels and corrective shapes. MPFB now powers the
-local editable-human preview with fitted rigs and clothing; MHR remains a candidate. Version-scoped
-appearance storage now has an authenticated backend with revision history. The development editor
-uses a loopback-only MPFB preparation adapter and applies its result to session presentation.
-Connecting that editor to authenticated history, configuring production families and authenticated
-production generation remain work. Garment fit, contact, stylization and browser performance still
-require visual acceptance; a functioning editor is not a measured visual-quality selection.
+For customizable people, compare established parametric and rigged asset pipelines before training
+a model solely to obtain body and wardrobe variation.
+[MPFB](https://static.makehumancommunity.org/mpfb/docs.html) provides character, asset, rigging and
+export workflows; its [core assets](https://static.makehumancommunity.org/about/license.html) are
+CC0 while the authoring code uses a separate license.
+[MHR](https://github.com/facebookresearch/MHR) provides a parametric body, skinned mesh, detail
+levels and corrective shapes. The MPFB builder in the repository, and what a person's saved look
+holds, are the [character contract](character-representation-contract.md)'s. Garment fit, contact,
+stylization and browser performance require visual acceptance; a functioning editor is not a
+measured visual-quality selection.
 
-Pretrained inference, per-source body fitting, and model training have different inputs and
-costs. Evaluate inference first where an existing model addresses a real gap. TRELLIS.2 provides
-textured asset generation and training code, but its image-to-GLB output alone does not establish
-an animation-ready human. Fine-tuning requires a defined target failure and dataset; budget
-inference hardware separately from training hardware. Retain generator versions, inputs,
-seeds, material/rig dependencies and outputs for reuse and reproducibility.
+Pretrained inference, per-source body fitting and model training have different inputs and costs.
+Evaluate inference first where an existing model addresses a real gap. TRELLIS.2 provides textured
+asset generation and training code, but its image-to-GLB output alone does not establish an
+animation-ready human. Fine-tuning requires a defined target failure and dataset; budget inference
+hardware separately from training hardware. Retain generator versions, inputs, seeds, material and
+rig dependencies and outputs for reuse and reproducibility.
 
-| Task | First comparison | Remaining condition |
+The sparse-capture research candidate is a self-hosted Cosmos 3 Nano or Super comparison: rebuild
+from real photographs alone versus those photographs plus generated views, with held-out real views
+excluded from both runs. Pin the exact model revision, licence and runtime before an experiment; the
+[license matrix](license-matrix.md#12-generated-appearance-models) records both checkpoints under
+OpenMDW-1.1 and pins Cosmos 3 Nano. Generated content stays labeled as imagined and outside observed
+evidence and spatial claims; it cannot increase an observed-coverage claim. Measure geometry,
+reprojection and visual consistency under equal capture inputs. The comparison requires the relevant
+personal model and host rights and does not authorize a deployment or compute run.
+
+| Task | Candidates | What is not established |
 | --- | --- | --- |
-| Grounded answers and bounded social decisions | Current Nano versus Nemotron Super; include [Nemotron 3 Ultra](https://research.nvidia.com/labs/nemotron/Nemotron-3-Ultra/) when healthy | The [Nebius public catalog](https://tokenfactory.nebius.com/api/public/models_info) reported Super active and Ultra error during this check. Recheck before execution; listing alone does not establish inference health. |
-| Photograph understanding | Current M3 versus [Kimi-K3](https://huggingface.co/moonshotai/Kimi-K3), listed active and image-capable | Compare supported observations and omissions on the same authorized images; do not inherit vendor rankings. |
-| Mask quality | [SAM 2.1 Large](https://github.com/facebookresearch/sam2) versus current Tiny with the same boxes | Test SAM 3 separately for concept/detection failures. SAM 3.1 video tracking improvements alone do not justify changing the still-image pipeline. |
-| Scene geometry | [MoGe-3](https://github.com/microsoft/MoGe) versus MoGe-2; [MapAnything Apache](https://github.com/facebookresearch/map-anything) for adequate multi-view captures that fail registration | Separate single-image shape from multi-view pose; verify scale, held-out views, memory and Linux GPU compatibility. |
-| Authored textured 3D assets | [TRELLIS.2](https://github.com/microsoft/TRELLIS.2) for generated PBR assets; [SAM 3D Objects](https://github.com/facebookresearch/sam-3d-objects) for masked objects | Generated completion is not observed geometry. The TRELLIS.2 reference runtime needs Linux and at least 24 GB NVIDIA memory; rigging and in-app visual acceptance remain separate work. |
-| Scene-derived character bodies | [SAM 3D Body](https://github.com/facebookresearch/sam-3d-body) as a source-to-body fitting candidate | A fitted body is not established identity, a complete texture or a finished animation pipeline. Preserve uncertainty, source lineage and existing person-link authority. |
-| Retrieval | [Qwen3-Reranker-8B](https://huggingface.co/Qwen/Qwen3-Reranker-8B) for misranking; [SigLIP 2 SO400M](https://huggingface.co/google/siglip2-so400m-patch14-384) for visual details omitted by captions | Use only after diagnosing the retrieval failure; version a changed vector space and retain permission filtering. |
+| Grounded Companion answers | Larger reasoning models against Nano, judged with the blinded human review the roadmap requires | The 2026-09-22 comparison kept Nano against Nemotron Super and Ultra on an automated rubric. A listing in the [Nebius public catalog](https://tokenfactory.nebius.com/api/public/models_info) does not establish inference health |
+| A person's decisions | Further open models through the comparison runner ([judged comparisons](#judged-comparisons-of-models-deciding-for-people)) | A model is offered to the role only after a recorded probe verifies it answers a choice |
+| Photograph understanding | M3 against [Kimi-K3](https://huggingface.co/moonshotai/Kimi-K3), listed as image-capable | Supported observations and omissions on the same authorized images; its custom licence is UNVERIFIED in the [license matrix](license-matrix.md#32-non-nvidia-models-on-nebius-token-factory) |
+| Mask quality | [SAM 2.1 Base+ or Large](https://github.com/facebookresearch/sam2) against the Tiny checkpoint in use, with the same boxes; [SAM 3](https://github.com/facebookresearch/sam3) separately, for concept and detection failures | Better boundaries, or acceptable memory and latency, on our photographs. SAM 3 uses the SAM License and a different integration, and the license matrix blocks it for use in the repository. SAM 3.1's video tracking alone does not justify changing the still-image pipeline |
+| Single-image geometry | [MoGe-3](https://github.com/microsoft/MoGe) against MoGe-2 on the Linux GPU path | Scale, held-out views and memory; upstream reports no macOS support, and it does not replace absent multi-view coverage |
+| Multi-view pose | [MapAnything, Apache variant](https://github.com/facebookresearch/map-anything), for adequate captures that fail registration | Reliable recovered geometry on our scenes; learned predictions still need independent validation |
+| Authored textured 3D assets | [TRELLIS.2](https://github.com/microsoft/TRELLIS.2) for generated PBR assets; [SAM 3D Objects](https://github.com/facebookresearch/sam-3d-objects) for masked objects | Generated completion is not observed geometry. The TRELLIS.2 reference runtime needs Linux and at least 24 GB of NVIDIA memory; rigging and in-app visual acceptance are separate work |
+| Scene-derived character bodies | [SAM 3D Body](https://github.com/facebookresearch/sam-3d-body) as a source-to-body fitting candidate | A fitted body is not an established identity, a complete texture or a finished animation pipeline. Preserve uncertainty, source lineage and existing person-link authority |
+| Retrieval | [Qwen3-Reranker-8B](https://huggingface.co/Qwen/Qwen3-Reranker-8B) or [0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B) for misranking; [SigLIP 2 SO400M](https://huggingface.co/google/siglip2-so400m-patch14-384) or [Base Patch16 224](https://huggingface.co/google/siglip2-base-patch16-224) for visual details captions omit | Use only after diagnosing the retrieval failure. Token Factory availability and cost; a changed vector space needs versioned re-embedding and keeps permission filtering |
 
 Begin with a small fixed set of representative failures, ordinary tasks and cases that should
-abstain. Score factual support, task success, visual/mask/geometry quality and human preference
+abstain. Score factual support, task success, visual, mask or geometry quality and human preference
 separately from latency and cost. Include source withdrawal and branch isolation cases. The first
 screening narrows candidates; it cannot prove a universal best model or establish human behavior
-prediction from a fluent answer. For model-driven society decisions, persist the accepted proposal
-and its inputs/model identity so replay consumes recorded decisions instead of repeating inference.
+prediction from a fluent answer. Model-driven society decisions are stored with their inputs and
+model identity, so replay consumes recorded decisions instead of repeating inference.
 
-### Candidate capabilities checked against primary sources
-
-Retrieved 2026-09-12. These sources establish what can be evaluated, not a measured benefit in
-Exulanica. Pin exact checkpoint revisions and verify runtime compatibility before comparison.
-
-| Candidate | Reason to evaluate | What is not established |
-| --- | --- | --- |
-| [SAM 2.1 Base+ or Large](https://github.com/facebookresearch/sam2) | Larger variants of the current segmentation family exist, allowing a comparison with Tiny on the same prompts and masks | Improved boundary quality or acceptable memory/latency on our photographs |
-| [SigLIP 2 Base Patch16 224](https://huggingface.co/google/siglip2-base-patch16-224) | Image/text representations could retrieve visual details omitted by captions | Better retrieval on our queries, or identity matching across photographs |
-| [Qwen3-Reranker-0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B) | A separate query/document reranker could improve ordering when relevant evidence is already retrieved | Token Factory availability, deployment cost, or a cure for missing candidate evidence |
-| [MapAnything Apache variant](https://github.com/facebookresearch/map-anything) | Feed-forward multi-view reconstruction is a candidate when otherwise suitable captures fail the current pose pipeline | Reliable recovered geometry on our scenes; learned predictions still require independent validation |
-| [MoGe-3](https://github.com/microsoft/MoGe) | A finer single-image geometry candidate for the Linux GPU path | A macOS replacement or a fix for absent multi-view coverage; upstream reports no macOS support |
-| [SAM 3](https://github.com/facebookresearch/sam3) | Text/concept-driven detection and segmentation may address a failure that larger SAM 2 masks cannot | A compatible replacement under our deployment and license constraints; it uses the SAM License and a different integration |
-
-**Scale boundary:** the current exact search uses `halfvec(4096)`. Standard pgvector HNSW/IVFFlat
-half-vector indexes support at most 4000 dimensions. Before claiming large-library scalability,
-compare indexed reduced-dimension/subvector or quantized recall with exact full-vector reranking
-and permission filtering; changing a model or vector space needs versioned re-embedding, not
-mixing old and new vectors. [Primary limit](https://github.com/pgvector/pgvector#hnsw).
-The current file store and worker topology also need shared-storage and concurrency evidence
-before a multi-host claim. Reuse their interfaces; do not introduce infrastructure on speculation.
-
-The [hackathon criteria](https://nebiusglobalaihackathon.devpost.com/) require Nebius execution and
-an NVIDIA open model, and assess implementation, coherent design, impact and originality. They
-do not require every role to use NVIDIA or reward parameter count. Keep functional Nemotron use
-in the demonstrated experience and identify the actual executed model/provider.
+**Scale boundary:** exact search uses `halfvec(4096)`. Standard pgvector HNSW and IVFFlat half-vector
+indexes support at most 4000 dimensions. Before claiming large-library scalability, compare indexed
+reduced-dimension, subvector or quantized recall with exact full-vector reranking and permission
+filtering; changing a model or vector space needs versioned re-embedding, not mixing old and new
+vectors. [Primary limit](https://github.com/pgvector/pgvector#hnsw). The local file store and worker
+topology also need shared-storage and concurrency evidence before a multi-host claim. Reuse their
+interfaces; do not introduce infrastructure on speculation.
 
 ---
 

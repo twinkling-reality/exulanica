@@ -1,13 +1,23 @@
 # Scene segments
 
-Status: **SCENE SEGMENTS ON THE INGEST, LIFT AND READ PATH**. The derivative worker's environment
-switch for the segmenter (section 4) and the automatic lifts at publication and after late masks
-(section 5) are part of that path. The application tints segments, lists them and resolves a
-click to one from the wire shape in section 6.
+This contract owns object and person segments for a reconstructed scene: the per-photograph
+segmentation stage, the lift that carries what the photographs found into the scene they
+reconstructed as per-entity segments, and the read route a renderer tints and a click resolves.
+The vision pass returns boxes and people get reviewed outlines; segments are one bridge from
+geometry back to that evidence. The scene pipeline is
+[scene-reconstruction-operations.md](scene-reconstruction-operations.md), and person outlines and
+consent are [person-presentation-consent.md](person-presentation-consent.md).
 
-The vision pass returns boxes, people get reviewed outlines, and click-to-evidence is one bridge
-from geometry to data. This contract also carries what the photographs found into the scene they
-reconstructed, as per-entity segments a renderer can tint and a click can resolve to.
+## Contents
+
+- [1. The two halves](#1-the-two-halves)
+- [2. No migration, and why](#2-no-migration-and-why)
+- [3. Models](#3-models)
+- [4. The stage](#4-the-stage)
+- [5. The lift](#5-the-lift)
+- [6. The read and the wire shape](#6-the-read-and-the-wire-shape)
+- [7. Measured](#7-measured)
+- [8. Parameters, limitations and open decisions](#8-parameters-limitations-and-open-decisions)
 
 ## 1. The two halves
 
@@ -24,9 +34,9 @@ limit stated plainly.
 
 * **The span is the mask's bounding rectangle.** Migration 0033's `evidence_span_region_shape`
   admits `kind = 'rect'` and nothing else, and [ADR-0013](adr/0013-region-encoding.md) keeps `kind`
-  as the discriminator a polygon kind would be added under. A polygon ON the span would need a
+  as the discriminator a polygon kind would be added under. A polygon on the span would need a
   migration, a change to `exulanica/evidence/region.py`, new span-digest vectors and a change to
-  graph-client's `EvidenceRegion`, none of which this work owns.
+  graph-client's `EvidenceRegion`, none of which a segment needs.
 * **The polygon is in the stage's artifact**, as integer ppm vertices beside the digest of the span
   it belongs to, the same split [ADR-0016](adr/0016-ocr-is-a-region.md) makes for text: the pixels
   are the address and what was read off them is the value.
@@ -38,13 +48,13 @@ limit stated plainly.
   in one object value would need a migration; nothing here needed one.
 
 `artifact.kind` is free text, and `stage_definition` rows are written by
-`exulanica/ingest/spine/stage_registry.py`, so neither new artifact kind needed schema either.
+`exulanica/ingest/spine/stage_registry.py`, so neither artifact kind needed schema either.
 
 ## 3. Models
 
 Pinned in the manifest's `local_models` and `local_roles` sections, beside the Token Factory
 roles, by revision SHA with the licence read from the raw README frontmatter at that revision
-(`docs/model-and-service-selection.md` section 2.3). `pipeline_version` moved from 2 to 3.
+([license matrix](license-matrix.md) section 5).
 
 | Role | Checkpoint | Revision | Licence |
 | --- | --- | --- | --- |
@@ -77,7 +87,7 @@ before it settled.
 * **Prompts.** The hosted vision pass's located objects when it located any, otherwise Grounding
   DINO over the declared vocabulary in the stage parameters (thirty things, no stuff, no person
   term). Grounding DINO's own post-processor merges every token above threshold into one label
-  (MEASURED: `'rock boulder cliff mountain hill'` for one box on the first volcanic photograph), so
+  (MEASURED: `'rock boulder cliff mountain hill'` for one box on a volcanic sample photograph), so
   each vocabulary entry is scored over its own token span and a box takes the best one.
 * **The person path is untouched.** The segmenter reads the masked derivative whenever anybody in
   the photograph is hidden, as depth does. People are never prompts. A detector label outside the
@@ -86,7 +96,8 @@ before it settled.
 * **Gated like the geometry it feeds.** It needs an eligible privacy screening. With none, or with a
   person-detection-only receipt, the stage is `unavailable` with the reason in the ledger rather
   than failing the run, which is deliberately softer than depth: a worker with a segmenter must
-  not fail the pass that looks for people.
+  not fail the pass that looks for people. Where the capture needs one, the stage also asks for a
+  personal model right naming the segmenter and detectors ([personal-admission.md](personal-admission.md)).
 * **Keyed** on the intake probe, the masked derivative and consent digests when one was read, the
   hosted observation offered, and the segmenter's identity (checkpoints, revisions, licences,
   torch and transformers versions). Swapping a checkpoint re-segments; a rerun reuses.
@@ -109,24 +120,22 @@ native runtime.
 
 ## 5. The lift
 
-`publish_scene_segments(repository, store, scene_id)`, which runs at three moments.
+`publish_scene_segments(repository, store, scene_id)` runs at three moments.
 
 * **As the scene publishes.** `SceneReconstructionProcessor` lifts right after the publication
-  commit, in the scene worker's process and in the run that published the scene, beside the
-  projection. It hands over the placement it has just validated (`ValidatedBuild`), and the lift
-  uses it only when the scene's current build in the database has those exact receipts, so it does
-  not validate the placement a second time; a test holds that the result is byte for byte what the
-  command writes after validating the stored placement itself. The point maps are still checked
-  live. A lift failure never takes the scene down, which is the projection's rule applied more
-  widely: every exception is caught, not only the refusals a malformed receipt raises, because
-  anything escaping after the commit would report a published scene as failed. The failure is
-  `stage_failed` on `scene_segments` in that run, and a worker asked to stop records
-  `stage_skipped` instead of lifting. When the build trained a delivery that was accepted, the
-  lift also samples the accepted training output the delivery was compressed from, still in the
-  job's scratch, and binds it as the Gaussian source: the PLY by digest and the delivery by its
-  artifact digest. The trained Gaussians are one surface where the posed point maps are one
-  guess per photograph, so these segments follow what a trained scene draws (section 8 says why
-  that matters).
+  commit, in the scene worker's process and in the run that published the scene. It hands over the
+  placement it has just validated (`ValidatedBuild`), and the lift uses it only when the scene's
+  current build in the database has those exact receipts, so it does not validate the placement a
+  second time; a test holds that the result is byte for byte what the command writes after
+  validating the stored placement itself. The point maps are still checked live. A lift failure
+  never takes the scene down: every exception is caught, because anything escaping after the commit
+  would report a published scene as failed. The failure is `stage_failed` on `scene_segments` in
+  that run, and a worker asked to stop records `stage_skipped` instead of lifting. When the build
+  trained an accepted delivery, the lift also samples the accepted training output the delivery
+  was compressed from, still in the job's scratch, and binds it as the Gaussian source: the PLY by
+  digest and the delivery by its artifact digest. The trained Gaussians are one surface where the
+  posed point maps are one guess per photograph, so these segments follow what a trained scene
+  draws.
 * **When masks complete after the build.** `scenes_due_segments` finds every published scene where
   every member of the current build has a live segmentation artifact and the newest segments are
   absent, unreadable, bound to another build or bound to other masks.
@@ -136,11 +145,17 @@ native runtime.
   in a job-scoped worker. A scene is attempted once for each state it is due in, so a lift that
   fails the same way every time is not repeated on every pass. A scene whose newest segments of
   this build were lifted over trained Gaussians is reported as skipped rather than lifted: the
-  accepted PLY is not retained, and lifting it from point maps alone would replace segments that
+  accepted PLY is not retained, and lifting from point maps alone would replace segments that
   follow the trained surface with ones that follow the per-photograph maps.
 * **On demand**, from `python -m exulanica.ingest.scene_segments --workspace <uuid> --scene <uuid>`,
   which is also how a published trained scene is lifted over its Gaussians again: `--gaussian-ply`
   with a PLY decoded from the delivery, bound by `--gaussian-delivery-sha256`.
+
+The command and the sweep read the scene's validated graph projection
+([scene-reconstruction-operations.md](scene-reconstruction-operations.md) section 8) and check its
+payload digest, all three receipt bindings, ordered members and point-map inputs before using its
+transforms; a missing, damaged or mismatched projection falls back to placement validation. Every
+path still checks point-map liveness and content digests.
 
 All three are numpy and nothing else, which is what lets the first two run in the pycolmap
 process. All three skip a scene with nothing to lift, no object masks and no reviewed, shown
@@ -172,7 +187,10 @@ A receipt, point map or mask that has gone is `stage_failed` and returned as a s
 The artifact binds the pose, placement and gate receipts, the member list, the placement's point
 maps, the exact segmentation artifact of every member (and which members had none), every person
 region by digest, and the Gaussian source. Every segment names the regions and point maps it rests
-on, and its id is a digest over its kind, label, subject and voxels.
+on, and its id is a digest over its kind, label, subject and voxels. A person segment carries a
+subject reference and never a name, is re-checked on every read, and is reached by a scene
+tombstone like every scene artifact. A consent withdrawal withholds it at once; its bytes stay until
+the scene is rebuilt or purged.
 
 ## 6. The read and the wire shape
 
@@ -206,47 +224,64 @@ detector masks, which are what the naming flow names.
 synthetic scene in `tests/test_scene_segments.py` with one object and one reviewed, shown person.
 It is stable once published: fields may be added, and no field may be renamed, retyped or removed.
 
+**Naming an object.** A local detector mask gets one unnamed `object` occurrence standing on the
+mask's bounding span, and its `prompt_span_digest` names that span, as it names a hosted
+occurrence's box span for a hosted mask; the hosted path creates no additional occurrence.
+Segmentation creates no entity and no confirmed link. The account holder's confirmation through
+`POST /identity/name` creates the entity and records the name as a user assertion. The input
+contract re-keys older masks, so a rerun supplies missing occurrences.
+
 ## 7. Measured
 
-On the volcanic scene, on a frozen copy of `exulanica_inspect_test` with a hardlinked copy of the
-reference store, on an Apple M3 Pro with 18 GiB, MPS. The retained database and store were not
-written. The digest-bound record is `2026-09-11-scene-segments-backend`, with the harness, the
-measurement, the mutation controls and both backend suite logs beside it under
-`docs/evaluation/artifacts/2026-09-11-scene-segments-backend/`. The record and those artifacts are
-local-only: a clone does not contain them.
-
-The subject turned out to be a volcanic rock photographed on a white turntable, 210 photographs of
-it from around the turntable. The workspace carries no hosted vision observations on the copy, so
-every photograph was prompted by Grounding DINO; the OWLv2 fallback was never needed.
+MEASURED on the retained 210-photograph volcanic collection (a rock on a white turntable, CC0) on
+an Apple M3 Pro with 18 GiB and MPS, against a frozen copy of the database and store; the
+digest-bound record of this run is local to the machine that ran it and is not in this repository.
+The workspace had no hosted vision observations, so Grounding DINO prompted every photograph.
 
 | Per photograph, 210 photographs, 0 errors | Value |
 | --- | --- |
-| Masks | min 2, median 2, mean 2.37, max 5; 497 in all (142 photographs with 2, 61 with 3, 5 with 4, 2 with 5) |
+| Masks | min 2, median 2, mean 2.37, max 5; 497 in all |
 | Labels | `boulder` 210, `plate` 181, `sign` 55, `table` 35, `statue` 7, `bridge` 4, `cup` 3, `bottle` 1, `umbrella` 1 |
-| Dropped | 19 below the minimum area, 0 over a person (the set has no person regions) |
-| Stage seconds, from the ledger | median 0.795, mean 0.814, p90 0.834, max 2.369 (the first photograph, which loaded Grounding DINO) |
-| Wall seconds per photograph, including decoding the 12 MP original | median 0.891, mean 0.910 |
-| SAM 2.1 load, weights cached | 1.6 s |
+| Stage seconds, from the ledger | median 0.795, p90 0.834, max 2.369 (the first photograph, which loaded Grounding DINO) |
 
 | The lift | Value |
 | --- | --- |
-| Cameras, samples | 210 recovered cameras; 215,040 point-map samples, 212,667 seen by at least one view, 35,428 assigned |
-| Voxel edge | 24,834 millionths of a scene unit |
-| `boulder` | 6,781 samples in 3,975 voxels, outlined in all 210 views; votes median 123, max 206; majority median 69.5 per cent |
-| `plate` | 28,616 samples in 20,979 voxels, 179 views; votes median 7, max 110 |
-| `table` | 26 samples in 20 voxels, 2 views, 2 votes each |
-| Wall time | 48.6 s, most of it re-validating the placement against 210 point maps and a 107,742,795 byte pose receipt |
-| Artifact | 551,491 bytes |
-| Read | `available`, allowed at the snapshot and under the final lock, 0.45 s |
+| Samples | 215,040 point-map samples from 210 recovered cameras; 212,667 seen by at least one view, 35,428 assigned |
+| `boulder` | 6,781 samples in 3,975 voxels, outlined in all 210 views |
+| `plate` | 28,616 samples in 20,979 voxels, 179 views |
+| `table` | 26 samples in 20 voxels, 2 views |
+| Artifact | 551,491 bytes; the read answered `available` in 0.45 s |
 
-Two findings, both visible when the voxels are projected back into the photographs. The rock and
-the turntable separate cleanly. But the turntable is one object under two labels, `plate` in 181
-photographs and `table` in 35; labels are entity keys, so the lift keeps them apart, and the
-majority rule leaves `table` a 26-sample fringe that cleared the thresholds by two votes of four. And
-the `plate` segment carries a sparse spray of voxels past the turntable's far edge, most likely the
-depth model's points along that silhouette. Neither is corrected here; both are in section 8.
+The rock and the turntable separate cleanly. The turntable is one object under two labels, `plate`
+and `table`; labels are entity keys, so the lift keeps them apart and the majority rule leaves
+`table` a small fringe. The `plate` segment also carries a sparse spray of voxels past the
+turntable's far edge, most likely the depth model's points along that silhouette. Neither is
+corrected; both are open in section 8.
 
-## 8. Limitations and open decisions
+## 8. Parameters, limitations and open decisions
+
+Every threshold is a stage parameter, so changing one re-keys what it produced. None is validated
+for general deployment: the only tuning evidence is a sample of six photographs whose target
+outlines were traced without human review, with no held-out set.
+
+| Parameter | Value | Evidence status |
+| --- | --- | --- |
+| Detector box threshold | 300,000 | Least restrictive value that found every traced target with no extra mask on the tuning sample |
+| Detector text threshold | 250,000 | Unused by the per-word scorer; not an independent control |
+| Fallback detector threshold | 200,000 | Unmeasured |
+| Duplicate box IoU | 700,000 | 0.50, 0.70 and 0.90 tied on the tuning sample |
+| Minimum mask area | 500 ppm | 500 and 2,000 tied; 500 excludes fewer small objects |
+| Person overlap drop | 500,000 | Dropped every person-dominant mask on the tuning sample; unlabelled objects prevent a claim about false rejections |
+| Maximum prompts | 24 | Never reached on the tuning sample; no recall claim for crowded scenes |
+| Image edge, outline simplification, vertex cap | 1,024 px, 1,500 ppm, 256 | Fixed, not compared |
+| Samples per member | 1,024 | Kept; 512 scored lower and 2,048 slightly higher at twice the samples |
+| Gaussian sample cap | 200,000 | Unmeasured |
+| Region margin | 0 | Chosen to avoid enlarging boundaries; not tuned |
+| Occlusion grid, tolerance | 96 cells, 150,000 | 50,000 improved the projected check on the tuning sample and is not applied |
+| Region raster, voxel grid | 512, 128 | Alternatives did not establish a better boundary |
+| Vote minimum, vote fraction | 2, 500,000 | Kept for corroboration and precision |
+| Instance link distance | 2 voxels | Can join nearby objects; no instance ground truth |
+| Minimum segment samples | 8 | 32 removed a fringe segment on the tuning sample and is not applied |
 
 * **The lift after a build waits for every member's masks.** Section 5 lifts a scene again only
   once every member of its build has a segmentation artifact, because a derivative worker segments
@@ -257,133 +292,20 @@ depth model's points along that silhouette. Neither is corrected here; both are 
   reader's `stale_inputs` while everything else is served; it reaches the scene at the next lift,
   from the sweep or the command.
 * **Only publication lifts over Gaussians automatically.** The sweep has no PLY and leaves a
-  trained scene whose masks changed to the command (below), and it reports that it did.
-* **What the lift costs now.** MEASURED 2026-09-11 on the volcanic scene, loading what the scene
-  worker hands the lift at publication from a frozen copy and timing `build_scene_segments` alone,
-  with the peak taken from traced allocations (numpy's arrays included):
-
-  | Build | Seconds | Peak |
-  | --- | --- | --- |
-  | Every placed point map held until the vote | 10.4 | 1,052 MiB |
-  | Each view's occlusion grid built as its map is placed | 9.8 | 599 MiB |
-  | Cameras read by `validated_receipt_cameras`, without the sparse observations | 5.4 | 126 MiB |
-
-  The artifact was byte for byte the stored one every time. The 599 MiB was the pose receipt: its
-  sparse observations are about 99.9 per cent of 107,742,795 bytes and the lift never reads them,
-  and most of what remains is the text the parser decodes the receipt into. The light reader skips
-  the receipt's digest checks, so the lift first holds the bytes to the digest its placement is
-  bound to; building or validating that placement read the whole receipt. Placement validation,
-  which publication skips, took 36 to 42 s of the command's run. None of this was measured inside a
-  running scene worker.
+  trained scene whose masks changed to the command, and it reports that it did.
+* **Gaussian centres need a decoded PLY after publication.** The trained delivery is SOG and no PLY
+  is retained, so lifting a published trained scene again takes the decode the masked-geometry
+  evaluation performs. At publication the accepted training output is used instead, which differs
+  from the delivery only by the delivery's quantisation.
+* **What the lift costs.** MEASURED on the volcanic scene, timing `build_scene_segments` alone
+  from a frozen copy: 10.4 s and 1,052 MiB peak when every placed point map was held until the
+  vote, 9.8 s and 599 MiB when each view's occlusion grid was built as its map was placed, and
+  5.4 s and 126 MiB when cameras were read by `validated_receipt_cameras` without the sparse
+  observations, which are about 99.9 per cent of the 107,742,795 byte pose receipt. The artifact
+  was byte for byte the stored one every time. The light reader skips the receipt's digest checks,
+  so the lift first holds the bytes to the digest its placement is bound to. None of this was
+  measured inside a running scene worker.
 * **The polygon is not on the span.** Section 2 says what that would cost.
-* **Detector-prompted objects have naming targets.** Segmentation writes an unnamed object
-  occurrence only for a local-detector mask, using its bounding span. Hosted masks retain the
-  hosted occurrence. The existing identity naming route creates the object entity, naming
-  assertion and confirmed link only when the user confirms a name. The input contract re-keys
-  older masks so a rerun supplies the missing occurrences. No identity or web change is needed.
-* **Threshold evidence is tiny and provisional.** Section 9 scores three volcanic and three
-  first-place photographs. The labels were traced by Codex, not reviewed by a human. These are
-  tuning photographs, with no held-out set; no threshold is validated for general deployment.
-  Thresholds remain stage parameters, so changing them re-keys.
-* **The command and sweep read the validated projection.** They check its payload digest, all
-  three receipt bindings, ordered members and point-map inputs before using its transforms. A
-  missing, damaged or mismatched projection falls back to placement validation. Both paths still
-  check point-map liveness and content digests. Publication keeps its already-validated build.
-* **Gaussian centres need a decoded PLY after publication.** The trained delivery is SOG and no
-  PLY is retained, so lifting a published trained scene again takes the decode the
-  masked-geometry evaluation already performs. At publication the accepted training output is
-  used instead, which differs from the delivery only by the delivery's quantisation.
-* **Synonymous labels split one object** (`plate` and `table` above), and the segment floor of eight
-  samples is low beside 215,040: a fringe segment clears it. Merging labels would need a
+* **Synonymous labels split one object** (`plate` and `table` in section 7), and the segment floor
+  of eight samples is low beside 215,040, so a fringe segment clears it. Merging labels would need a
   vocabulary with synonyms or a cross-label association step; neither exists.
-* **A person segment is written durably.** It carries a subject reference and never a name, it is
-  re-checked on every read, and a scene tombstone reaches it as it reaches every scene artifact. A
-  consent withdrawal withholds it at once; the bytes stay until the scene is rebuilt or purged.
-
-
-## 9. Production follow-up, 2026-09-11
-
-The production branch starts at `d13b01d`. The worker switch and publication hook, including the
-late-mask sweep and their tests, already exist at that base. This follow-up supplies projection
-reuse for later lifts and detector-only naming occurrences. The measurement record is
-`2026-09-11-scene-segments-production`, with the backend record as predecessor; both are local-only
-evaluation records a clone does not contain. No migration, hosted inference, merge or push occurred.
-
-The first comparison used the same three completed volcanic masks on both paths: 47.59 s with
-placement validation, 4.49 s with projection reuse, byte-identical artifacts. Placement alone
-fell from 43.026 s to 0.011 s. With 207 masks still missing that artifact contained zero segments;
-the completed 210-mask comparison took **46.54 s before and 6.88 s after**, again with
-byte-identical output, containing three segments. Placement took 39.540 s versus 0.011 s.
-These are single sequential wall-clock measurements, not latency percentiles or memory tests.
-
-### Naming
-
-A local detector mask gets one unnamed `object` occurrence standing on the mask's bounding span.
-Its `prompt_span_digest` names that backing occurrence span, just as it names a hosted
-occurrence's box span for hosted masks. The existing graph reader and panel can therefore find
-it without a wire-shape change. Segmentation creates no entity or confirmed link. The account
-holder's confirmation through `POST /identity/name` creates the entity and records the name as a
-user assertion. The hosted path does not create an additional segmentation occurrence.
-
-### First-place and consent
-
-The local stage ran on all three photographs of workspace
-`9e69f7e8-2372-489b-8eb3-b71ea74c16b2` in `exulanica_inspect_test`. Each produced one cliff mask;
-one additional mask in the close-up was dropped for person overlap. None of the retained masks
-covered a pixel inside the manually traced people. Eleven reviewed regions, naming the four
-consenting subjects, were offered to the real lift. It wrote zero segments in 0.025 s because
-this scene has zero recovered cameras and zero placed maps. Consent does not supply geometry.
-
-The accepted synthetic scene test proves the positive and negative cases: only a reviewed subject
-with current presentation consent produces a person segment; withdrawal immediately withholds it
-on read, and a new lift omits it from the durable artifact. This is **partial acceptance** of the
-people requirement. No shared-scene person appearance was established for first-place, and no
-per-photo coordinates were passed off as recovered shared geometry.
-
-### Tiny threshold study
-
-The annotation fixture records source digests and manual polygons, without photographs or faces.
-The volcanic targets are the visible rock and turntable; the first-place targets are all eleven
-visible people, including their clothing and held helmets. Other first-place objects are
-unlabelled, so the person-overlap study does not establish object precision or recall there.
-The six volcanic target-mask IoUs average 0.843: rocks 0.967, 0.949, 0.950; turntables 0.801,
-0.524, 0.869. Matching is one-to-one at IoU at least 0.5. Labels such as rock/boulder and
-plate/table are combined for scoring only; production still separates these labels.
-
-| Parameter | Measured trade or remaining limit |
-| --- | --- |
-| Detector box threshold 300,000 | Six targets found with zero extra masks at 0.30 to 0.40. At 0.15 there are seven extras; at 0.50 four targets are lost. Retain 0.30 as the least restrictive measured optimum. |
-| Duplicate box IoU 700,000 | 0.50, 0.70 and 0.90 tie at the selected detector threshold. This sample cannot distinguish the defaults; retain 0.70. Lower values suppress nearby distinct objects as well as duplicates. |
-| Minimum area 500 ppm | Zero retains a speck. 500 and 2,000 tie on these targets; retain 500 to avoid increasing the small-object exclusion without evidence. |
-| Person overlap drop 500,000 | At 0.25 through 0.90 all three person-dominant raw masks are dropped, together with five other masks. At 0.10 eight other masks are dropped. Retain 0.50; unlabelled objects prevent a claim about false rejections. |
-| Vocabulary | Tested only for the observed targets. Held helmets are not a vocabulary term. No claim of general object recall. |
-| Text threshold 250,000 | Unused by the per-word Grounding DINO scorer. It is not an effective independent control. |
-| Fallback detector threshold 200,000 | No fallback measurement on these six photographs. Remains unvalidated. |
-| Image edge 1,024, contour simplification 1,500 ppm, vertex cap 256 | Fixed for this study. Finer contours can retain detail at greater storage cost; no comparative measurement establishes an optimum. |
-| Maximum prompts 24 | No selected photograph reached the cap under production defaults. No recall claim for crowded scenes. |
-| Gaussian sample cap 200,000 | No trained-Gaussian ground truth in this study. Remains unvalidated. |
-| Region margin 0 | Avoids deliberately enlarging boundaries. Not empirically tuned here. |
-| Instance link distance 2 voxels | Connects sparse samples but can join nearby objects. No instance-separation ground truth here. |
-
-For the scene study, all 210 cameras and masks vote over 215,040 placed samples. Of the 3,072
-samples belonging to the three labelled views, 911 project inside their own recovered camera and
-can be scored against a source pixel: 300 turntable, 243 rock, 368 background. The remaining 2,161
-are outside the recovered frame or behind it and are excluded, never clamped to border labels.
-This is a projection-based check of depth, placement, voting and voxel coverage together, not an
-independent 3D ground truth or a way to attribute every miss to voting.
-
-| Scene parameter | Measured trade |
-| --- | --- |
-| Vote minimum 2 | Keep the requirement for corroboration. One view admits more fringe segments; three does not improve this sample enough to justify excluding two-view support. |
-| Vote fraction 500,000 | Current rock precision/recall is 1.000/0.284; turntable 0.677/0.357. Lowering to 0.40 with the proposed tolerance improves coverage but reduces precision to 0.863 for rock and 0.620 for turntable. Retain 0.50 in the proposal. |
-| Occlusion tolerance 150,000 | **Propose 50,000**, unapplied: with floor 32 and the other defaults, mean IoU rises from 0.294 to 0.476. Rock precision/recall becomes 0.954/0.601; turntable 0.734/0.423. A stricter visibility test removes conflicting views from the denominator, which also increases assignments; it is not simply a stricter mask. |
-| Minimum segment samples 8 | **Propose 32**, unapplied: removes the third fringe segment with no change to any scored sample, both at the 150,000 tolerance and in the combined proposal. Smaller real objects could also disappear. |
-| Samples per member 1,024 | At 512, mean IoU is 0.239; at 2,048, 0.303 versus current 0.294, with twice as many samples to vote. Retain 1,024 provisionally. |
-| Voxel grid 128 | Grid 64 raises mean IoU to 0.388 through coarser occupied cells; grid 256 lowers it to 0.273. This metric rewards filled area and cannot establish boundary quality; retain 128. |
-| Region raster 512 | 256 gives mean IoU 0.293 and 1,024 gives 0.290. Retain 512; this sample does not establish a meaningful improvement from either change. |
-| Occlusion grid 96 | Grids 48 and 192 give mean IoU 0.293 and 0.296. Retain 96; the tiny difference does not justify a claim of better general visibility. |
-
-The evaluation records every tested configuration, including the combined proposal. Registry
-edits remain unauthorized, so these proposed values are **not deployed defaults**. General
-validation and changes requiring registry edits remain open acceptance items. The full backend suite is deferred to the integration task's
-single serialized run; this task reports its focused and static checks.

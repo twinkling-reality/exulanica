@@ -1,30 +1,37 @@
 # Companion
 
-The Companion is your AI partner within the world: someone to explore and create with, who helps
-you understand what happens and continue shared activities. This is the intended experience; the
-implementation boundaries are described below. The Companion is one feature of a world; the
-product is a world that open models run ([product direction](../product-direction.md)).
+The Companion is an AI partner inside a world. It answers questions about the world from cited
+sources, drafts changes the person reviews, and helps a person explore and create. It is one
+feature of a world; the product is a world that open models run
+([product direction](../product-direction.md)). Direct controls reach the same supported
+operations, so using a world never requires a conversation. This guide separates what the
+Companion does from the experience it is meant to become.
 
-## Product role
+## What it does
 
-The Companion provides company and creation assistance within the world. Conversation, awareness of the current activity,
-and continuity across shared experiences support that role. Its purpose includes participating
-in the experience, beyond retrieving places or answering questions.
+| Tool | What the person gets |
+| --- | --- |
+| Grounded answers | An answer composed from the evidence the person's rights allow, with its sources cited. A question it cannot answer from evidence gets an abstention, not a guess. |
+| Answers about a world's people | Who somebody is, what they are doing, why they are there or what has happened among them, read from the society's state and recorded events, cited and marked as simulation, never as memory. |
+| Appearance proposals | A reviewed change to the world's appearance, shown as a preview in Customize for the person to apply or discard. The Companion speaks about a proposal only once that preview has been shown or refused. |
+| Conversation memory | What was asked, what was answered and what the person corrected, kept across reloads. The person can read it back, correct it and delete it. |
 
-## Design requirements
+The rules for each are in [Companion questions, memory and proposals](../companion-question.md),
+and the appearance authority a proposal is applied through is in
+[world version authorities](../world-version-authorities.md).
 
-A recognizable personality, awareness of what the person is doing, and shared history should
-shape its responses. These are design requirements for the intended experience, not claims of
-implemented capabilities. Appearance, initiative, and the boundaries of shared-history retention
-need concrete interaction design. Familiarity does not authorize edits or identity decisions.
+An NVIDIA Nemotron model on Nebius Token Factory composes its answers, through the one hosted policy
+boundary that applies the egress allowlist, the budget and the person's rights. A model's output is
+an answer or a proposal, never a direct write to the world, an identity or a permission.
 
-## Implementation
+## What it is meant to become
 
-Conversation, selection, and reviewed appearance proposal machinery exist. Persistent shared
-history and participation in world activities require further implementation and evaluation.
-Creation assistance must use supported, reviewable editing operations; arbitrary creation commands
-and simulation control depend on the editing and runtime contracts.
+A recognizable personality, awareness of what the person is doing, shared history and taking part
+in the world's activities are design requirements, not implemented capabilities. Appearance,
+initiative and the limits of what it retains need concrete interaction design. Familiarity never
+authorizes an edit or an identity decision, and creation help uses supported, reviewable editing
+operations only.
 
-See [interaction design](../interaction-model.md),
-[frontend integration](../atlas-frontend-integration.md), and
-[grounded question contract](../companion-question.md).
+See [interaction design](../interaction-model.md#4-the-companion) for the Companion's encounter in the
+world, and the [frontend integration boundary](../atlas-world-customization-contract.md#7-frontend-integration-boundary)
+for how the browser reviews what it proposes.

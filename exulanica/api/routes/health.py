@@ -97,7 +97,7 @@ def readyz(request: Request, response: Response) -> dict[str, Any]:
     """Report each check separately, and return 503 when any of them fails.
 
     Separately, because a single boolean tells an operator at 3am that something is wrong and
-    nothing about which thing. The checks are the four in section 6.2, and each one's entry says
+    nothing about which thing. The checks are the ones section 6.2 lists, and each one's entry says
     what it proves rather than only whether it passed.
     """
     services: Services = request.app.state.services

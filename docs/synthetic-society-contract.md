@@ -2,65 +2,78 @@
 
 Status: **BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL**.
 
-The default `exulanica-society/v1` retains seeded synthetic motion. Opt-in
-`exulanica-society/v2` adds reachable goals, routes, reviewed visit/rest actions and reactions to
-versioned authored inputs, and lets a model its world's owner chose decide for a person at the
-routine's own choice points. `exulanica-society/v3` added a bounded synthetic cast with local
-observations, communicated beliefs and explicitly requested, validated model proposals; it is
-retired, so no society is created with it and its proposals are refused, while a stored one reads
-and replays as recorded. `exulanica-society/v4`, the living society, adds catalogued routines,
-occupancy and a population sized to its place. The engine table names which engine a new society
-over each kind of ground is created with: the browser creates live societies in the owned district
-with v4, and a person's own saved world gets a v2 society when the person asks for one. In a saved world
-each destination gives its occupants places of their own, an object the society cannot use
-costs only its own activity, and the person can send everyone away and bring them back. All
-profiles are fictional simulation, separate from personal evidence. They do not model real
+A society is the population of a world: the simulated people who are its agents. This contract
+owns the society engines, what each reads and records, and how a society is composed, stored,
+advanced, directed and replayed. How an open model a world's owner chose decides for one of its
+people is the [decision roles contract](decision-roles-contract.md)'s, how people walk is the
+[walking movement module](movement-modules-contract.md#walking)'s, and how the app draws them is
+the [character representation contract](character-representation-contract.md#drawing-a-societys-people)'s.
+
+Four engines exist, and the engine table below says which one a new society over each kind of
+ground is created with:
+
+- `exulanica-society/v1`, which a creation naming no engine gets, keeps seeded synthetic motion
+  with no routes.
+- `exulanica-society/v2`, the purposeful society, walks its people to reachable goals under a
+  routine that is data, reacts to versioned authored inputs, and lets a model its world's owner
+  chose decide for a person at the routine's own choice points. A person's saved world, the
+  starter or one made from photographs, gets a v2 society when the person asks for one: each
+  destination gives its occupants places of their own, an object the society cannot use costs
+  only its own activity, and the person can send everyone away and bring them back.
+- `exulanica-society/v4`, the living society, adds catalogued needs and routines, occupancy and a
+  population sized to its place. The app creates it over the owned district, which it draws only
+  in the development preview.
+- `exulanica-society/v3`, a bounded social cast that took explicitly requested model proposals, is
+  retired: nothing creates one and its proposals are refused, while a stored one reads, advances
+  and replays as recorded.
+
+All profiles are fictional simulation, separate from personal evidence. They do not model real
 residents, infer demographic facts or demonstrate general social intelligence.
 
 <details>
 <summary>Sections</summary>
 
 - [Connection to the world](#connection-to-the-world)
+- [Engines and what each can do](#engines-and-what-each-can-do)
 - [Identity, branches and compatibility](#identity-branches-and-compatibility)
-- [V2 input authority](#v2-input-authority)
-- [Goals, routes and actions](#goals-routes-and-actions)
-- [Opt-in local activity failures](#opt-in-local-activity-failures)
-- [A saved world's own ground](#a-saved-worlds-own-ground)
-- [Authored edits and inability to act](#authored-edits-and-inability-to-act)
-- [Events, persistence and replay](#events-persistence-and-replay)
-- [Server integration and HTTP](#server-integration-and-http)
-- [V3 bounded observations and communication](#v3-bounded-observations-and-communication)
-- [Explicit model proposals and exact replay](#explicit-model-proposals-and-exact-replay)
-- [A person run by a model their world's owner chose](#a-person-run-by-a-model-their-worlds-owner-chose)
-- [Validation](#validation)
-- [Persisted playback controls and bounded host progression](#persisted-playback-controls-and-bounded-host-progression)
-- [Typed user-directed actions](#typed-user-directed-actions)
+- [The purposeful society (v2)](#the-purposeful-society-v2)
+  - [V2 input authority](#v2-input-authority)
+  - [Goals, routes and actions](#goals-routes-and-actions)
+  - [Opt-in local activity failures](#opt-in-local-activity-failures)
+  - [A saved world's own ground](#a-saved-worlds-own-ground)
+  - [Authored edits and inability to act](#authored-edits-and-inability-to-act)
+  - [Typed user-directed actions](#typed-user-directed-actions)
+  - [Sending inhabitants away](#sending-inhabitants-away)
+  - [A person run by a model their world's owner chose](#a-person-run-by-a-model-their-worlds-owner-chose)
+- [Storing, replaying and playing a society](#storing-replaying-and-playing-a-society)
+  - [Events, persistence and replay](#events-persistence-and-replay)
+  - [Versions that survive upgrades](#versions-that-survive-upgrades)
+  - [Persisted playback controls and bounded host progression](#persisted-playback-controls-and-bounded-host-progression)
+  - [Server integration and HTTP](#server-integration-and-http)
 - [V4 living society: routines, places and occupancy](#v4-living-society-routines-places-and-occupancy)
-- [The surface under a walker where the records state several heights](#the-surface-under-a-walker-where-the-records-state-several-heights)
+- [Retired and frozen engines](#retired-and-frozen-engines)
+  - [The frozen first engine (v1)](#the-frozen-first-engine-v1)
+  - [V3 bounded observations and communication](#v3-bounded-observations-and-communication)
+  - [Explicit model proposals and exact replay](#explicit-model-proposals-and-exact-replay)
+- [Validation](#validation)
 - [Traffic boundary](#traffic-boundary)
 
 </details>
 
 ## Connection to the world
 
-The society is the product's core: the people in a world are its agents, and the model path below
-is how an open model decides what one of them does: a person a world's owner chose a model for, in
-a purposeful society. The social society's explicit proposals are retired; those it stored still
-read and replay. Inhabitants interact with permitted places and authored objects through declared
-affordances. What a person brings into and changes in their world changes what its people do.
-Inhabitants never impersonate remembered people. The Companion explains what a person is doing and
-why from their recorded goal and action, the places they use and the events that explain them, cited
-as simulation and kept apart from personal evidence ([Companion
-questions](companion-question.md#questions-about-a-worlds-people)).
+The society is the product's core: the people in a world are its agents. Inhabitants interact
+with permitted places and authored objects through declared affordances, so what a person brings
+into and changes in their world changes what its people do. Inhabitants never impersonate
+remembered people. The Companion explains what a person is doing and why from their recorded goal
+and action, the places they use and the events that explain them, cited as simulation and kept
+apart from personal evidence
+([Companion questions](companion-question.md#questions-about-a-worlds-people)).
 
-The pure engine and PostgreSQL lifecycle have synthetic fixture coverage. The connected
-personal-world demonstration additionally needs the server composition/rights adapter, accepted
-authored edits, shared selection, renderer presentation and grounded Companion integration.
-A fixture establishes mechanics, not personal relevance or visual acceptance. Default operation
-remains manual. A host can make the API's playback worker advance a saved playing society whose
-engine the table below lets it play, for the workspaces its environment lists or, with accounts,
-for every account-owned workspace, under the bounded lease policy below; persistence alone starts
-no worker.
+A society advances one simulated minute at a time: when somebody steps it, or when a host runs the
+API's playback worker, which advances a saved playing society whose engine the table below lets it
+play, for the workspaces its environment lists or, with accounts, for every account-owned
+workspace, under the bounded lease policy below. Persistence alone starts no worker.
 
 Implementation:
 
@@ -84,7 +97,11 @@ Implementation:
 - the authored-object projection shared by every composition:
   `exulanica/world/society_composition.py`, and the saved-world projection over a world's own
   declared ground: `exulanica/world/society_authored_ground.py`;
-- bounded observations and communication: `exulanica/world/society_social.py`;
+- a person run by a model their world's owner chose: the modules the
+  [decision roles contract](decision-roles-contract.md#implementation-and-evidence) lists;
+- comparisons of models and intervention experiments: [society experiments](society-experiments.md);
+- the retired social engine's observations and communication, `exulanica/world/society_social.py`,
+  and its stored proposals, `exulanica/world/society_decisions.py`;
 - persistence and compare-and-swap: `exulanica/world/society_repository.py`;
 - typed user action policy and persistence: `exulanica/world/society_actions.py` and
   `exulanica/world/society_action_repository.py`;
@@ -94,44 +111,6 @@ Implementation:
 - authenticated API: `exulanica/api/routes/society.py`,
   `exulanica/api/routes/society_actions.py` and
   `exulanica/api/routes/society_control.py`.
-
-## Identity, branches and compatibility
-
-The v1 to v3 population is 128 over a district; their pure initializer accepts 100 to 512 there.
-A society on a saved world's own ground starts with the population its ground's entry in the
-society ground catalog states, 8 for the built-in starter (below). V4 sizes its population to its
-place (below). Each engine's bounds are stated once, in the engine table (below). The population
-is canonical state, independent of how many people a renderer draws. Inhabitant UUIDv5 identities derive from
-society identity and ordinal. The same society ID/seed/population preserves those identities across
-profiles, but a stored society's profile and seed cannot change. The society UUID derives from its
-authored version UUID with the existing `exulanica-society/v1` identity domain, including for v2 and v3.
-
-The server derives a new society's seed from its world, and no request names one
-(`world_society_seed` in `exulanica/world/society.py`): the SHA-256 of the canonical document
-`{profile: exulanica.society-seed/v1, workspace_id, world_id}`. It names the world by its identity,
-its workspace and its id, and no version, so a world's people are the same people across its edits:
-an edit is an input to the version's own society, and a new version of the world, a branch or
-photographs added, starts a society again whose people draw the same roles, needs and first places
-over the same ground. Two worlds start their people differently: their roles, needs and schedules
-and every later draw differ, while over the same ground the initializer's spread still starts them
-at the same nodes. A stored society keeps the seed it recorded, and replay reads that one. A
-response never carries a seed: a snapshot, and its state and each event where the stored document
-holds one, carry `seed_digest`, the SHA-256 of the seed's text, in its place, while `state_sha256`
-and `document_sha256` still name the stored bytes (`served_snapshot` and `served_events`); the
-first engine's state and events hold no seed, so they carry neither. Leaving the seed out is
-presentation, one form of a society on the wire, not secrecy: it is derived from identifiers the
-caller already holds, so anyone who knows them can compute it. A comparison commits each seed it
-runs by the same digest: one function, `seed_digest` in `exulanica/world/society.py`, names a seed
-wherever it is shown or committed.
-`tests/test_society_world_seed.py` holds two worlds starting differently, a second version starting
-the same people, an edit leaving every person as they were, and a society stored under a seed the
-page once sent keeping it and replaying.
-
-One society belongs to one workspace, world and authored version. V2/v3 `branch_id` equals that version
-UUID; the authored version supplies its user-facing name. Same-named objects in two versions remain
-different targets. This slice does not fork existing simulation history. To opt in when a version
-already has another profile, create a new authored version and a new society. No implicit migration,
-identity substitution, tick reset or history rewrite occurs.
 
 ## Engines and what each can do
 
@@ -158,12 +137,12 @@ retired one is refused by name when a creation asks for it (`409 society_engine_
 table's first shape, `society-engines.v1.json`, stays beside it because evaluation records name it,
 held to this one's rows by a test.
 
-| Engine | Created | Inputs | Playback | Directed actions | Model decisions | Owner chooses models | Compared | Sent away | Saved world | Population |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `exulanica-society/v1` | yes | no | no | no | no | no | no | no | no | 100 to 512 |
-| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | yes | yes | 1 to 512 |
-| `exulanica-society/v3` | no (retired) | yes | yes | yes | yes | no | no | no | yes | 1 to 512 |
-| `exulanica-society/v4` | yes | yes | yes | no | no | no | no | no | no | 1 to 65,536 |
+| Engine | Created | Inputs | Playback | Directed actions | Model decisions | Owner chooses models | Compared | Experiments | Sent away | Saved world | Population |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `exulanica-society/v1` | yes | no | no | no | no | no | no | no | no | no | 100 to 512 |
+| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | no | yes | yes | 1 to 512 |
+| `exulanica-society/v3` | no (retired) | yes | yes | yes | yes | no | no | no | no | yes | 1 to 512 |
+| `exulanica-society/v4` | yes | yes | yes | no | no | no | no | yes | no | no | 1 to 65,536 |
 
 The browser reads the same file: `pnpm run society-engines:sync` writes it byte for byte, with the
 union of its profiles, into `web/packages/app/src/society-engines.generated.ts`, which
@@ -179,14 +158,58 @@ fails any comparison of an engine's identity under `exulanica/` outside an engin
 implementation and the dispatch to each engine's initializer, each listed with its count and why,
 and `web/packages/app/test/society-engine-literals.test.ts` does the same for the app's source.
 
-V1 initialization and successful transitions remain byte-compatible, pinned by deterministic digest
-vectors. V1's home/work nodes are labels; its motion ignores them and has no obstacle or arrival
-semantics. Replay now additionally checks every persisted v1 event against regenerated events.
-Unknown engine/input profiles are refused. WMP 1.0, the authored-world 1.0 extension and the
-environment-instances 1.0 extension still omit society and its input/event history; they
-cannot resume this simulation.
+## Identity, branches and compatibility
 
-## V2 input authority
+The v1 to v3 population is 128 over a district; their pure initializer accepts 100 to 512 there.
+A society on a saved world's own ground starts with the population its ground's entry in the
+society ground catalog states, 8 for the built-in starter (below). V4 sizes its population to its
+place (below). Each engine's bounds are stated once, in the engine table (above). The population
+is canonical state, independent of how many people a renderer draws. Inhabitant UUIDv5 identities derive from
+society identity and ordinal. The same society ID/seed/population preserves those identities across
+profiles, but a stored society's profile and seed cannot change. The society UUID derives from its
+authored version UUID with the existing `exulanica-society/v1` identity domain, including for v2 and v3.
+
+The server derives a new society's seed from its world, and no request names one
+(`world_society_seed` in `exulanica/world/society.py`): the SHA-256 of the canonical document
+`{profile: exulanica.society-seed/v1, workspace_id, world_id}`. It names the world by its identity,
+its workspace and its id, and no version, so a world's people are the same people across its edits:
+an edit is an input to the version's own society, and a new version of the world, a branch or
+photographs added, starts a society again whose people draw the same roles, needs and first places
+over the same ground. Two worlds start their people differently: their roles, needs and schedules
+and every later draw differ, while over the same ground the initializer's spread still starts them
+at the same nodes. A stored society keeps the seed it recorded, and replay reads that one. A
+response never carries a seed: a snapshot, and its state and each event where the stored document
+holds one, carry `seed_digest`, the SHA-256 of the seed's text, in its place, while `state_sha256`
+and `document_sha256` still name the stored bytes (`served_snapshot` and `served_events`); the
+first engine's state and events hold no seed, so they carry neither. Leaving the seed out is
+presentation, one form of a society on the wire, not secrecy: it is derived from identifiers the
+caller already holds, so anyone who knows them can compute it. A comparison commits each seed it
+runs by the same digest: one function, `seed_digest` in `exulanica/world/society.py`, names a seed
+wherever it is shown or committed.
+`tests/test_society_world_seed.py` holds two worlds starting differently, a second version starting
+the same people, an edit leaving every person as they were, and a society stored under a seed its
+creation request named keeping it and replaying.
+
+One society belongs to one workspace, world and authored version. V2/v3 `branch_id` equals that version
+UUID; the authored version supplies its user-facing name. Same-named objects in two versions remain
+different targets. A society's history is never forked: to opt in when a version already has
+another profile, create a new authored version and a new society. No implicit migration, identity
+substitution, tick reset or history rewrite occurs.
+
+Unknown engine and input profiles are refused. WMP 1.0, the authored-world 1.0 extension and the
+environment-instances 1.0 extension omit society and its input and event history; they cannot
+resume this simulation.
+
+## The purposeful society (v2)
+
+`exulanica-society/v2` walks its people to reachable goals under the purposeful routine, over
+inputs an authorised server adapter composes: a district's interpretation, or a saved world's own
+ground. The sections below state what it reads, how it chooses, what edits and requests do to it,
+and how a model its world's owner chose decides for one of its people. A stored v3 society reads
+the same inputs and takes the same directed actions
+([retired and frozen engines](#retired-and-frozen-engines)).
+
+### V2 input authority
 
 The policy consumes `exulanica.society-input/v1`, a validated projection from an authorized server
 composition adapter. It does not compile a second district, infer navigation, or accept geometry
@@ -217,7 +240,7 @@ visit markers are not real doors, and the policy does not enter interiors or inv
 Initial v2 creation requires an available graph and an enabled reachable target. Initial subjects
 are distributed deterministically among declared nodes in components containing enabled targets.
 
-## Goals, routes and actions
+### Goals, routes and actions
 
 Each tick is one simulated minute. People walk by the walking movement module
 ([movement modules contract](movement-modules-contract.md#walking)): shortest routes minimize
@@ -249,8 +272,8 @@ Version 1: a scalar need of at least 750 prefers rest; otherwise visit is prefer
 reachable candidates, the policy prefers a different target from the last completed one, then
 lower route cost and target ID. `visit` takes one subsequent tick and `rest` three, and completion
 reduces the need by 20 for a visit or 500 for rest, clamped at zero. A v2 history through twelve
-minutes and 24 completed activities is pinned by its state digest, produced by the code before
-places existed (`tests/test_society_destination_room.py`), and a saved world's v2 society stored
+minutes and 24 completed activities over an input that states no places is pinned by its state
+digest (`tests/test_society_destination_room.py`), and a saved world's v2 society stored
 before inputs recorded a routine, with a directed request, an edit, and everyone sent away and
 brought back, replays byte for byte (`tests/test_society_v2_history_replay.py`).
 
@@ -307,7 +330,7 @@ Additional engine state retains exact node/edge position, target binding and bou
 Rendering interpolates along `motion_path_mm`, never directly across its corners, and must retain
 stable synthetic subject identity. Render motion cannot create canonical actions or events.
 
-## Opt-in local activity failures
+### Opt-in local activity failures
 
 The `exulanica.society-composition/v1` projection keeps its original behavior, including
 making the whole input unavailable when an active authored affordance has no supported access
@@ -344,8 +367,8 @@ Migration 0057 admits strict input/v1 and input/v2 profiles without modifying mi
 0055. Engines v2/v3 accept both input profiles and replay each retained input with its original
 semantics; v1 engine behavior is unchanged. V1 projection, state and event digest vectors are
 pinned in tests. Historical authorization selects policy references from the stored input profile,
-not the currently selected projection policy, while continuing to recheck current rights and
-asset bytes. The runtime binding structure and its digest do not change.
+not from the projection policy the host selects, while still rechecking current rights and asset
+bytes. The runtime binding structure and its digest do not change.
 
 Apply the reader/schema support before opting a host into `exulanica.society-composition/v2`. Subsequent accepted
 edits append the chosen projection. To recover an already paused society immediately, explicitly
@@ -355,7 +378,7 @@ same authored edit cursor/delta digest while increasing `input_seq`. Replay ther
 earlier global pause and the later locally degraded input exactly. Local records are available in the
 stored input document for authorized adapters; no new browser endpoint is introduced.
 
-## A saved world's own ground
+### A saved world's own ground
 
 A world a person saved has no district. Its spatial authority is the flat authored ground its own
 structural snapshot states: one authored region, an elevation, a spawn point and, depending on
@@ -375,7 +398,7 @@ happen at no object, and the reviewed footprint, collision and reach table is th
 projection already uses.
 
 Where inhabitants walk is the society's walkable area, and it is kept apart from what the ground
-is, because the ground module no longer always states an edge.
+is, because a ground module need not state an edge.
 
 - Ground module version 1 states a 24 m square. The society reads that extent and its input marks
   the area `source: "ground"`.
@@ -418,8 +441,8 @@ is, because the ground module no longer always states an edge.
   regions out again on each open (`buildScene` with no stored placement, in
   `web/packages/app/src/main.ts`), so a region can stand somewhere else after the world gains a
   photograph, and its people move with it, because every position they have is in the region's
-  own frame. Flyers are read over the starter's ground only
-  (`web/packages/app/test/environment-selection-made-world.test.ts`).
+  own frame. The page reads a flight only for a world with an authored scene, the starter, so a
+  made world has no birds (`web/packages/app/src/composition/environment-selection.ts`).
 
 The declared figure keeps the lattice at 121 nodes, which holds one tick of 128 inhabitants near a
 tenth of a second, and it equals the only bounded starter ground the product has shipped, so an
@@ -489,7 +512,7 @@ Under the first saved-world profile a society had no capacity: with one reachabl
 idle inhabitant chose it, walked to its access node and stood there with the others. The second
 profile gives every destination room (below).
 
-### One object at a time
+#### One object at a time
 
 The second profile decides every object on its own
 (`exulanica/world/society_authored_ground.py`, `_objects_one_by_one`). An object the society cannot
@@ -533,7 +556,7 @@ Under the first saved-world profile an object off the ground plane, in another r
 behaviour, scaled, or of an unsupported origin, any environment placement and any override made
 the whole input unavailable with the object named; its stored inputs keep saying so.
 
-### Room at a destination
+#### Room at a destination
 
 Every activity in a second-profile input states the places its occupants stand at
 (`destination_places`), and a place holds one person.
@@ -674,14 +697,14 @@ holds that it records a routine and no earlier profile does. A check passes when
 null, so each of these rules is asked whether it holds: a newest-profile row whose routine names no
 catalog versions, or that omits its `unread_placements`, is refused rather than admitted by a null.
 0108 also re-creates the request binding 0060 wrote, which refused a request for anybody part way
-through anything: it now asks `society_person_may_be_directed`, which admits exactly whom the
+through anything: it asks `society_person_may_be_directed`, which admits exactly whom the
 society may direct ("Typed user-directed actions").
 Migration 0095 lets a v2 or v3 society hold 1 to 512 people, keeping
 v1 at 100 to 512 and v4 as 0075 left it. A row does
 not say which kind of ground its society stands on, so the district's floor of 100 is held by the
 initializer that every creation and every replay passes through.
 
-## Authored edits and inability to act
+### Authored edits and inability to act
 
 Each relevant accepted authored edit appends a full immutable input snapshot in its transaction,
 even if several edits happen between simulation ticks. An edit is relevant when the input composed
@@ -713,7 +736,155 @@ current authorization. It never reverses completed actions, rewinds society time
 resurrects withdrawn sources. A move followed by undo before a tick still has two retained inputs;
 replay must verify both. Earlier simulated observations remain in their original version/input scope.
 
-## Events, persistence and replay
+### Typed user-directed actions
+
+A person can ask one of a society's people to go to a place or do something there. Migration 0060
+adds the append-only `world_society_action_request` and `world_society_transition_action` tables
+for these requests: a bounded external input for v2 and stored v3 societies, separate from model
+decisions and playback controls. They do not broaden the affordance registry or accept free-form
+movement.
+
+The authenticated base route is
+`/world/versions/{version_id}/society/actions`:
+
+- `POST` accepts exactly an idempotency key, base tick/state digest, synthetic subject ID and
+  either `{kind: "go_to", target_id}` or
+  `{kind: "perform", target_id, affordance: "visit" | "rest"}`;
+- `GET` returns newest-first authorized request envelopes; and
+- `GET /{request_id}` returns one request and its pending or consumed status.
+
+The client supplies no position, route, target document, workspace, actor or branch. Under the
+workspace lock the server resolves the current v2/v3 society and latest consumed input, rechecks
+current source authority, freezes the exact canonical target and records the requesting actor.
+Requests require an idle/blocked/completed inhabitant, or one part way through a stay under a
+routine that draws its stays, current available input, an enabled reachable target and no other
+request for that inhabitant at the same state. The database's request binding holds a recorded
+request to the same rule about the person (`society_person_may_be_directed`, migration 0108), and
+`tests/test_society_request_rule_parity.py` holds the two equal. A request to go where the person
+already is, part way through a stay there, is refused `inhabitant_already_there`, which the page
+says in words: ending the stay would only begin it again. Exact retries return the existing
+envelope; changed reuse or stale bases fail without another write.
+
+Recording a request does not advance society time. The next normal deterministic step consumes
+ordered pending requests through the planner's goal-policy seam. `go_to` constrains the next goal
+to the target; `perform` also binds the target's affordance. Each request receives one
+`applied`, `stale`, `unavailable`, `rejected` or `superseded` disposition and a
+`user_action_requested` event. The transition binding requires the exact request, previous state,
+input span, tick and event digest. Replay regenerates the disposition and event from genesis using
+the stored request and original inputs; it never calls a model or treats the request itself as
+completed movement.
+
+There is no cancellation or expiry. A stay drawn from a routine's range can last up to 25 minutes,
+so under such a routine a request to somebody part way through one ends it in the minute the
+request is consumed, before anybody chooses: a `replanned` event with reason `called_away` and
+outcome `stay_ended`, no relief, and for a talk the other person stops in that same minute
+(`partner_left`), whichever of the two the minute reaches first. A walk is left to arrive, and
+under the rules the society was released with, which every input that records no routine is read
+under, a request to anybody mid-action is refused `inhabitant_action_in_progress`
+(`tests/test_society_square_requests.py`). A request can direct only the next eligible goal and
+ordinary navigation/action checks remain authoritative. Over an
+input that states places, a request is refused `destination_full` when every place of its target is
+held by somebody else, and an applied request is promised its place before the minute, so nobody
+choosing freely in the same minute takes it first. It cannot
+teleport, cross unsupported space, undo completed actions or simulation history, or replace a
+withdrawn target. The browser has a control on a declared visit or rest destination that issues
+one typed `perform` request through this API and shows the returned pending or consumed record, or
+an explicit unavailable or refused state. It re-checks its gate whenever the persisted society
+refreshes. Living (v4) societies refuse it: the engine table gives v4 no directed actions.
+Simulated action records stay labeled as simulation and are never presented as personal evidence.
+
+In a person's own saved world the control is reached like this. Opening the world reads its
+society and creates nothing; the People nearby panel says when nobody lives there, what
+inhabitants need, and offers "Bring in inhabitants", which is the creation request above. Once
+they live there, the panel lists every object with what the consumed input says of it (somewhere
+to rest or visit, out of reach, or not noticed until the next simulated minute), and "Advance one
+minute" performs one control step while the world is paused. A chosen inhabitant's panel carries
+one request per usable place. Every request names the saved world.
+
+The same panel holds the world's only Play, Pause and pace controls; About points to them. Play
+is offered only where the control read's `host_playback.running` says this host plays the world;
+otherwise the panel shows the server's own `reason` and keeps "Advance one minute". While a world
+plays, the page reads the control about every two seconds (half the effective interval when that
+is shorter, never more often than every 500 ms) and reads the society only when the control's
+tick differs from the one drawn (`web/packages/app/src/composition/environment-selection.ts`).
+Minutes the page did not read are rebuilt, for drawing only, from the paths their event
+documents record (`society-unread-minutes.ts`); a minute the bounded event window cannot vouch
+for is not rebuilt. After the person places or moves an object while people are there, one line
+says the simulated minute that notices it: the server's current tick plus one, confirmed once a
+state consumes a later input. The inspector's top lines say who the person is, what they are
+doing and why, turning the engine's reason codes into words and naming places by the titles of
+the person's objects (`inhabitantWords` in `web/packages/app/src/ui/world-inhabitants.ts`); a
+code it has no words for is shown by name. The recorded explanation and bindings stay in its
+details.
+
+In the owned district the control is implemented and unit-tested
+(`web/packages/app/test/society-directed-action.test.ts`,
+`web/packages/app/test/environment-selection.test.ts`), and no shipped configuration reaches it:
+
+| Prerequisite | What the shipped app does instead |
+| --- | --- |
+| The owned district's interpretation, which publishes the destinations | Saved and starter worlds open without the owned district, and its interpretation is read only by a caller that supplies current dependency resolution |
+| A mounted control | The development preview (`?preview=1`) omits it |
+| A held v2 or v3 society | A district needs a host district binding, and the browser creates a district society as v4 (`web/packages/app/src/composition/live-society.ts`), for which the API accepts no directed actions |
+
+### Sending inhabitants away
+
+The person whose world it is can send everyone away and bring them back
+(`exulanica/world/society_presence.py`), in a v2 society; the engine table says which engines
+allow it. Each is one recorded minute of the society, bound to the request that asked for it:
+
+- Sending everyone away is a transition in which every person emits a `departed` event, in order,
+  with where they stood; the state then holds nobody and says so,
+  `presence: {status: "away", since_tick, request_id, request_sha256}`. Time goes on while they
+  are away, with nobody in it.
+- Bringing them back is a transition in which the same people, with the same identities and names
+  derived from the society's seed, arrive at the starting places a genesis gives them over the
+  world as it is then, with no goal, each emitting an `arrived` event. It is a new arrival, never an
+  undo: nothing of what they did before they left is restored, and nothing about the departure is
+  erased.
+
+Every state before the departure, its events and its transitions stay where they were, so replay
+rebuilds every minute on both sides of both changes from the stored request and inputs, and the
+authored version they lived in is untouched by their leaving. A world reopened while they are away
+has nobody in it.
+
+`POST /world/versions/{version_id}/society/presence?world_id=W` accepts exactly
+`{idempotency_key, presence: "away" | "here", base_tick, base_state_sha256}` and answers with the
+society. The server resolves the world, the society, the rights and the minute under the same lock
+and compare-and-swap as a step. An exact retry answers with the society as it is. A request against
+a state that has moved on is `409 stale_society_state`. A request the state cannot honour is a
+`409` naming why: `nobody_to_send_away`, `already_here`, `a_request_is_waiting` (a directed request
+waits for the next ordinary minute), `nowhere_to_arrive` (no reachable place over the world as it
+is), or `engine_keeps_its_people`. Migration 0098 adds `world_society_presence`, one append-only
+row per such minute, bound to its transition, with forced row-level security; its trigger holds the
+row to the minute it took and to an engine that allows it.
+
+In a person's own saved world the People nearby panel offers "Send everyone away" while they are
+there, for a society whose engine allows it, and "Bring them back" while they are not, says which
+is the case and since which simulated minute, and says a refusal in words.
+
+### A person run by a model their world's owner chose
+
+A world's owner may choose an open model for one of a purposeful society's people, or for a group.
+At the routine's own choice points, when a person has no goal or has just finished what they were
+doing, the playback host asks that model before the minute to pick one of the things the routine
+itself could start for them then: go to a place with room for them, wait a minute, stand a while
+nearby, or stop to talk with somebody the routine could pair them with. The minute checks the
+answer again and applies it as a goal policy, recording `chosen_by_their_model`, or records why it
+could not; replay applies the stored receipts and calls no model. With no choice recorded, nothing
+is asked or reserved and the routine decides, so a society's history reads no decision row until
+its owner chooses a model. The registry of decision roles, the owner's choice, the person's
+contract, the host's asking and its spend bounds, and each decision's disposition in its minute
+are the [decision roles contract](decision-roles-contract.md)'s. The same hour run once per model
+and scored is described under [comparisons of models](society-experiments.md#comparisons-of-models).
+
+## Storing, replaying and playing a society
+
+Every engine stores a society as a current snapshot with its events. An engine that takes inputs
+also keeps every input and transition, immutable, and replays from its first input. The playback
+controls and the HTTP routes below serve every engine the table lets them.
+
+### Events, persistence and replay
 
 V2 emits `goal_selected`, `route_progressed`, `action_completed`, `replanned` and `blocked`, and
 `social_contact` when two people start talking under a routine that has talking; its document names
@@ -750,31 +921,18 @@ one before it when it was recorded, the table takes no update or delete, and rep
 whole chain again from the first input, so nothing a read skips goes unchecked. Opening never
 replays: the browser calls no replay route, and the server's reads rebuild no state.
 
-Measured in the release build (`docs/evaluation/2026-09-23-society-open-cost.json`), the moment
-a world's inhabitants are handed to the renderer, and the society and playback reads, do not grow
-with the number of stored inputs. The events read still does: it authorizes every input its page
-of events names (`SocietyRepository.events`), and each authorization reads the authored version
-with its whole edit list (`SocietyRuntime._authored_version`), so a page that names many inputs
-costs more the longer the world's edit history. Edits consumed in one minute leave events naming
-most of those inputs; a page holds at most 256 events.
+Measured in the release build ([record](evaluation/2026-09-23-society-open-cost.json)), on a
+starter world with one Marker plate and eight inhabitants whose history grew by moving the plate:
+the moment a world's inhabitants are handed to the renderer, and the society and playback reads, do
+not grow with the number of stored inputs (the society read's median stayed at 16 to 22 ms from 1
+to 400 stored inputs, where validating every stored input took 15 to 1,094 ms). The events read
+still does: it authorizes every input its page of events names (`SocietyRepository.events`), and
+each authorization reads the authored version with its whole edit list
+(`SocietyRuntime._authored_version`), so a page that names many inputs costs more the longer the
+world's edit history (a median of 24 to 761 ms over the same range). Edits consumed in one minute
+leave events naming most of those inputs; a page holds at most 256 events.
 
-The record's figures are medians in milliseconds over five opens per size, on a starter world with
-one Marker plate and eight inhabitants whose history grew by moving the plate, each size's edits
-consumed in one minute. "World shown" runs from submitting the access form to the page handing the
-society's current minute to the renderer. "Validating every stored input" is the same tree with
-the read change above reversed, measured beside it to show what the change removes; at 400 inputs
-its events read left no timing entry within 1.5 s of the world being shown, so it is unmeasured.
-
-| Stored inputs | 1 | 25 | 100 | 400 |
-| --- | --- | --- | --- | --- |
-| World shown, reads validating every stored input | 233 | 285 | 460 | 1425 |
-| World shown, reads as described | 261 | 286 | 287 | 267 |
-| Society read, validating every stored input | 15 | 62 | 236 | 1094 |
-| Society read, as described | 16 | 22 | 21 | 19 |
-| Events read, validating every stored input | 20 | 157 | 586 | no entry 1.5 s after the world was shown |
-| Events read, as described | 24 | 104 | 318 | 761 |
-
-## Versions that survive upgrades
+### Versions that survive upgrades
 
 A routine catalog is published beside the versions before it and never edited in place
 (`exulanica/world/society_catalogs.py`). Schemas are keyed by catalog id and version, the directory
@@ -805,419 +963,7 @@ registry is held to those three shapes. A reviewed asset the catalog does not st
 the registry, so an instance still starts, and a placed copy of it is refused by name as
 `unknown_active_asset`.
 
-## Sending inhabitants away
-
-The person whose world it is can send everyone away and bring them back
-(`exulanica/world/society_presence.py`), in a v2 society; the engine table says which engines
-allow it. Each is one recorded minute of the society, bound to the request that asked for it:
-
-- Sending everyone away is a transition in which every person emits a `departed` event, in order,
-  with where they stood; the state then holds nobody and says so,
-  `presence: {status: "away", since_tick, request_id, request_sha256}`. Time goes on while they
-  are away, with nobody in it.
-- Bringing them back is a transition in which the same people, with the same identities and names
-  derived from the society's seed, arrive at the starting places a genesis gives them over the
-  world as it is then, with no goal, each emitting an `arrived` event. It is a new arrival, never an
-  undo: nothing of what they did before they left is restored, and nothing about the departure is
-  erased.
-
-Every state before the departure, its events and its transitions stay where they were, so replay
-rebuilds every minute on both sides of both changes from the stored request and inputs, and the
-authored version they lived in is untouched by their leaving. A world reopened while they are away
-has nobody in it.
-
-`POST /world/versions/{version_id}/society/presence?world_id=W` accepts exactly
-`{idempotency_key, presence: "away" | "here", base_tick, base_state_sha256}` and answers with the
-society. The server resolves the world, the society, the rights and the minute under the same lock
-and compare-and-swap as a step. An exact retry answers with the society as it is. A request against
-a state that has moved on is `409 stale_society_state`. A request the state cannot honour is a
-`409` naming why: `nobody_to_send_away`, `already_here`, `a_request_is_waiting` (a directed request
-waits for the next ordinary minute), `nowhere_to_arrive` (no reachable place over the world as it
-is), or `engine_keeps_its_people`. Migration 0098 adds `world_society_presence`, one append-only
-row per such minute, bound to its transition, with forced row-level security; its trigger holds the
-row to the minute it took and to an engine that allows it.
-
-In a person's own saved world the People nearby panel offers "Send everyone away" while they are
-there, for a society whose engine allows it, and "Bring them back" while they are not, says which
-is the case and since which simulated minute, and says a refusal in words.
-
-## Server integration and HTTP
-
-Existing authenticated society create/read/step/events/replay routes remain. Creation may name
-any engine the table creates with; omission keeps v1, and a retired engine is refused with
-`409 society_engine_retired` before anything is written. A creation names no seed: the server
-derives the world's own (above), and a body that names one is malformed (`422`). A version holds
-one society: a creation for a version that already holds it reads it back with nothing composed,
-and one naming another region is refused with `409 society_lives_elsewhere`. Step bodies still
-contain only `base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected. Every
-snapshot these routes return, and the society a playback step returns, carries `seed_digest` in
-place of the seed, and so does every state and event document that holds one; the first engine's
-hold none.
-
-Every society, action, playback, decision, experiment and district route requires the world as a
-`world_id` query parameter, as every world route does, and a world the workspace does not hold
-answers `404 unknown_reference`. The repositories scope their reads to workspace, world and version
-together, so a version that does not belong to the named world reads as an unavailable version
-rather than reaching another world's society.
-
-`GET /world/versions/{id}/society?places=true` adds `places` to a society with inputs: the input
-sequence and digest the current state consumed, its availability and reason, the walkable area and
-clearance, the targets an inhabitant can be directed to, and each object activity the input names
-as `authored_affordance_unreachable`. They are copied from that one authorised input; an input a
-later edit queued is not described until a step consumes it. Without the parameter the read is
-unchanged.
-
-The application supplies `society_initial_input(connection, session, version_id, place_id, region_id)`
-and `society_input_authorizer(connection, session, document)` on application state. The repository
-accepts an `input_authorizer(document)` callback and exposes internal `record_input(version_id, doc)`
-for the authored-edit transaction. The adapter must take appropriate source/asset locks and validate
-current bindings. An absent authorizer/provider fails closed. The public routes report
-`424 unavailable_society_input`; invalid state/replay is a `409`, malformed creation a `422`, and
-stale state remains `409 stale_society_state`. Existing unknown/cross-workspace handling remains `404`.
-
-An explicitly unavailable latest input may be authorized for recording a pause even when older
-inputs have lost rights. Advance authorizes that latest input; historical state/event reads and
-replay authorize what they materialize individually. That distinction allows recording withdrawal
-consequences without granting permission to display withdrawn historical geometry.
-
-The Companion answers from the same recorded goal/action/event references, labelled simulation
-([society question](../exulanica/selection/society_question.py)): every citation has truth class
-`simulation` and is never evidence of a personal visit, and simulated visits are never evidence of
-real visits. Historical answer clauses still require personal evidence: a simulated fact is a clause
-of type `simulation`, never `historical`. It answers for the purposeful profile and refuses another
-by name. A `decision_applied` event records what a decision receipt did and is never one of its
-lines: the person's own events say what they did, a goal their model chose by the reason
-`chosen_by_their_model`, and that goal's line names the model from the one `decision_applied` event
-of its minute and person that applied a choice, or names none when there is not exactly one.
-Authored composition and live visual acceptance are separate integration responsibilities, not
-capabilities inferred from a fixture.
-
-## V3 bounded observations and communication
-
-V3 preserves the complete population and existing navigation/action enforcement. Only the first
-three stable inhabitant IDs participate in the social policy. Other inhabitants retain the v2
-utility policy. This is a bounded social cast, not a claim of 128 independent model agents.
-Existing v1/v2 states are never upgraded in place; their transition and event bytes remain stable.
-
-The state adds `social: {profile, cast_ids, last_decision_seq, agents}` with profile
-`exulanica.social-state/v1`. Each cast member has `observations`, `beliefs` keyed by target ID,
-and `communication_ids`. Each collection is capped at 16 records; a decision context includes at
-most eight observations and 16 beliefs belonging to that subject. Earlier records remain in the
-immutable event/input history, not an unbounded prompt. The social engine does not read wall time;
-optional playback schedules calls to the unchanged deterministic step operation.
-
-An inhabitant stopped at a declared navigation node observes authored affordances within 4,000 mm
-of graph travel. This is synthetic graph proximity, not recovered vision or line of sight. Observed
-facts record `fact_id`, `observer_id`, `observed_tick`, exact `input_seq`/`input_sha256`, a typed
-`target`, and `available`. A removed, disabled or locally vacated target can be observed as
-unavailable. Noticing a vacated location does not reveal a distant new location. Retained ordered
-inputs allow multiple edits between ticks to be noticed in order at that tick's starting position;
-this does not claim perception at the edits' actual wall-clock times.
-
-A stopped cast member can communicate one retained fact per tick to another stopped cast member
-within 8,000 mm of graph travel. It cannot transmit something it first learned that same tick.
-Deterministic cast and target ordering chooses the interaction. A recipient's belief records
-`origin: communication`, sender `source_subject_id`, original `source_fact_id`, `communication_id`,
-original input sequence/digest, `learned_tick`, target and availability. Direct beliefs instead use
-`origin: observation` and a null communication ID. Newer factual input sequences supersede older
-ones; an existing belief wins a same-input tie. Relaying earlier information later does not make its
-source newer. These are bounded records of claims, not trusted global truth or learned relationships.
-
-Cast members know public district destinations. They can choose an authored goal only when their
-own available belief matches the current authoritative target exactly and its route is reachable.
-Missing or outdated knowledge can produce `no_known_reachable_affordance`. Current physical route
-and action preconditions always apply, including to a mistaken or outdated belief. Undo/restore
-is another input: it can produce a new observation and later communication, but does not erase
-prior beliefs, interactions, completed actions or simulation time. An authorized unavailable pause
-clears materialized cast memory; historical records remain rights-gated.
-
-V3 adds `observed`, `communicated` and `decision_applied` events to the existing event envelope.
-Use envelope `event_kind`, document `reason`/`outcome` and these structured fields:
-
-- `observed`: `observation` holds the complete fact;
-- `communicated`: `communication_id`, `sender_id`, `receiver_id`, `belief`, and `dialogue: null`;
-- `decision_applied`: `decision_seq`, `request_id`, `decision_sha256`, and `disposition`.
-
-`decision_applied` records consumption, including rejection/staleness; only `disposition: applied`
-means a proposal influenced the step. Inhabitant `explanation.event_ids` and bounded `memory` cite
-actual events. Communication records transmission of information; the implementation does not
-supply dialogue or imply a model-generated conversation. All identity, goals and summaries remain
-explicitly synthetic. Companion explanations must preserve observation versus hearsay and cite
-these facts; they must not invent biography from a displayed label. The Companion's society answers
-cover the purposeful profile only and refuse a V3 society by name (`society_profile_has_no_words`),
-so it composes no V3 explanation.
-
-## Explicit model proposals and exact replay
-
-Retired with `exulanica-society/v3`. `POST /world/versions/{version_id}/society/decisions` resolves
-the world and its society and then refuses every request with `409 society_proposals_retired`: a
-model decides for a person only as the world's owner chose (below), which is one rule for one
-thing, where proposals were a second; `build_services` configures no provider for them. What follows
-describes the proposals a stored v3 society holds, which `GET .../society/decisions/{request_id}`
-still reads and replay still verifies (`tests/test_society_social_postgres.py`).
-
-Stepping, reading and replaying never call a model. A stored v3 receipt was made through the
-`ModelClient.structured` boundary with a fixed prompt version and a strict `GoalProposal` schema;
-the client chose no role, model, prompt or context, and a receipt made where no provider was
-configured says `provider_not_configured`. No server makes a new receipt of this kind. No
-production model quality or learned social behavior is established by offline transport tests.
-
-The bounded context profile is `exulanica.society-decision-context/v1`. It contains subject/branch,
-tick, position, `can_choose_goal`, that subject's `own_beliefs`/`own_observations`, current goal and
-allowed actions. Canonical context bytes may not exceed 64,000. Only `choose_goal` with a known,
-available target or `wait` with a null target is allowed. The validator checks the current target,
-reachability and absence of an action in progress. Wait lasts one explicit step. A chosen goal
-uses `remembered_target_selected`; replay revalidates the stored choice without new inference.
-
-A stored v3 request is exactly
-`{idempotency_key: UUID, subject_id: UUID, base_tick: integer, base_state_sha256: SHA256}`, and its
-idempotency key is its request ID. `GET /world/versions/{version_id}/society/decisions/{request_id}`
-returns `{request, decision: receipt-or-null, status: in_progress|completed}`. A request never
-advanced society time, and an accepted receipt affects only the explicit step that consumed it.
-
-Each request is an immutable reservation with profile `exulanica.society-decision-request/v1`:
-subject, branch, base tick and state digest, the exact input reference, the full context and its
-hash, the configured role, primary model and manifest hash or null, and the request document hash.
-At most one request exists per subject and base tick. A request reserved and never completed reads
-as pending; nothing retries it or records a success for it.
-
-A receipt's status says what its completion found: `stale` where the state or input had changed,
-`unavailable` where a dependency had been withdrawn, `rejected` for a semantic or schema violation,
-and otherwise the validated proposal or null. It stores the actual call's metadata where the call
-succeeded (served model, role, manifest, prompt, schema and message hashes, attempts, fallback and
-cache status, token usage and cost) and the explicit failure with a null provider where it did not.
-No raw reasoning or unrestricted prose is stored.
-
-`world_society_decision_request` stores the immutable request. `world_society_decision` stores the
-contiguous receipt sequence, profile `exulanica.society-decision/v1`, request/hash binding, subject,
-branch, base state/tick, input/context hashes, status/reason, proposal/provider and document hash.
-`world_society_transition_decision` binds each consumed receipt exactly once to a committed
-transition, with `applied`, `rejected`, `unavailable`, `stale` or `superseded` disposition. These
-workspace-isolated tables and v3 guards are supplied by migration 0055. State, events, transition
-and consumption bindings commit atomically. Replay uses the exact stored receipts consumed by
-that transition, checks context/decision hashes and dispositions, regenerates state/events, and
-verifies the final digest. A provider change cannot retroactively change replay.
-
-## A person run by a model their world's owner chose
-
-A purposeful society (`exulanica-society/v2`) with no choice recorded is the routine it always
-was: nothing is asked or reserved, and its replay reads no decision row. From the moment its
-world's owner chooses a model for one of its people, or for a group, that person's decisions at
-the routine's own choice points come from that model, validated, whenever the host asks it, and
-from the routine whenever it does not. Stored v2 histories have no decision rows and replay
-unchanged.
-
-**Roles as data.** The person is the first decision role (`exulanica/world/decision_roles.py`): a
-kind of thing in a world that changes and chooses at choice points of its own, whose choices a
-world's owner may hand to an open model. Each role is one entry in the registry catalog
-`assets/catalogs/roles/decision-roles.v1.json`, which states what it decides for, the engines whose
-minutes consume its receipts (those whose owner may choose a model, `owner_model_choice` in the
-engine table), the use cases a model must declare to be offered it, its action and policy catalogs
-with the versions a new request records, the profiles of its request, receipt, choice and context
-documents, its prompt version and prompt texts, and the name of its adapter module in
-`exulanica/world/roles/`. The adapter is the only code a role has of its own: which of its subjects
-are at a choice point, their options, what a model reads, and how the engine checks again and
-applies a validated choice. Everything else is one path for every role: requests, receipts and their
-checks (`exulanica/world/role_decisions.py`), the ask, its bounds and the host's decision phase
-(`exulanica/api/decision_host.py`), and the decision tables, which admit any role's documents by the
-shape of their profile (migration 0117) while the registry decides which profiles are read. A role
-declared in test data alone, a traffic signal at a junction, runs through the minute loop, the one
-hosted ask and the stored replay (`play_minutes`, `ask` and `replay_minutes`) with a scripted model,
-and replays with no call (`tests/test_decision_roles.py`); no society engine hosts it, so the host,
-the repositories and a society's step are not run for it. The person's key, `society_decision`, is
-the name every stored call record carries. No role but the person is registered: the People panel
-and the comparisons serve the person alone, one subject is decided for by one role at a time, and
-the host's decision phase is built for one role, reserving every role's requests as one unit asked
-again together after a race and asking the roles one after another.
-
-**Choosing.** `POST /world/versions/{version_id}/society/models` records one choice,
-`{idempotency_key, people: [subject_id, ...], model: {provider, model_id} | null}`, where null is
-their own routine. It requires `world.write` and `model.invoke`, which in a browser only the
-workspace's owner holds. Choices are appended in order to `world_society_model_choice`
-(migration 0110), each naming who made it, and are never changed; a person's model is the latest
-choice naming them. A choice names people of this society and a model the manifest offers the
-person's role, by the use cases its registry entry names, and its contract can ask, or it is
-refused by name
-(`CHOICE_REFUSALS` in `exulanica/world/society_model_choice_repository.py`): 422 for what the body
-names, 409 for a society whose engine takes no choice or a key reused for another choice. Both
-routes answer 409 `role_not_registered` where the registry states no role deciding for people. A
-choice naming one person twice is refused (`person_named_twice`), and an exact retry of a key is
-answered with the choice it recorded before anything else is checked, so it still returns after
-its model stops being offered. At most `model_people_maximum` people are run by models at once.
-`GET` at the same path, with `world.read`, returns the offered models in plain words with whether
-this process can ask each; whether this host asks models for the world at all, and why not
-(`host_refusal`); each person's choice, with why its model is not asked here when it is not
-(`refusal`), and their latest decision; and per model the decisions asked, accepted and applied,
-why the rest were not acted on, latency and cost, over the society's latest 2,000 decisions.
-
-**The contract.** `assets/catalogs/society/society-decision-action.v2.json` and
-`society-decision-policy.v2.json` state the actions and bounds a new request is asked under; the
-person's registry entry names them and the versions a new request records, and
-`exulanica/world/society_decision_contract.py` holds the person's own rules for what they offer and
-how a choice is checked again; every request records the versions it was asked under, and a
-request asked under the first versions, which offered places and waiting
-alone, is read and replayed under them. A person is at a choice point where the routine itself
-chooses for them: when they have no goal, or their action has completed. A person blocked on the
-way to a goal keeps it, as the routine keeps it for them, and is not asked. Their options are only
-what the routine itself could start for them then, by its own rules: each enabled place they can
-reach with room for them, labelled by what it is and how far ("resting on a bench, 5 m away");
-where the input's routine has people stand and talk, standing a while at an open spot within the
-routine's standing reach ("stand a while nearby"), and talking with each person the routine could
-pair them with, somebody within its talking reach who is free to choose or standing, with two open
-spots beside each other both can walk to ("talk with person 4, 6 m away", the number the other
-person's simulated name ends with and the walk to them); and waiting a minute. The model replaces
-the routine's draws and its preference that a tired person rests first, never its rules of what
-can be done. The nearest places and people are kept, `options_maximum` actions in all with
-standing and waiting, in an order shuffled by the society's seed, the person and the minute. The
-model reads a fixed instruction and that person's situation: tiredness, what they just did and
-their options. Nothing in it is a name: another person is the number their simulated name ends
-with, so no rule about a saved name can change an option. It answers through one function, `act`,
-forced by name, whose one argument, `action`, is an enum of exactly those labels, or through a
-strict JSON schema of the same enum. What four open models chose under the second version, and
-where a decision's time goes, is measured in
-[model and service selection](model-and-service-selection.md#standing-and-talking-and-where-a-decisions-time-goes). The function's name, its
-argument's and its description are fixed product values, no caller's text; the mechanism is the first
-the manifest names as verified for the model by a recorded probe, in the answering order the
-model's own entry states where a measurement gave it one (under the decision policy's second
-version), and otherwise the policy's highest ranked. An answer that is
-not an offered label is asked once more, saying so; after `answer_attempts_maximum` answers the
-routine decides that turn.
-
-**The host.** Before each minute of a playing purposeful society in a workspace its environment
-lists, the playback worker's claim runs the host's decision phase (`exulanica/api/decision_host.py`,
-the one path every role is asked by). It first closes, with the reason
-`unanswered_in_its_minute`, any request an earlier host reserved in the last few minutes and never
-answered, one that stopped between the two; that request's minute has already run with the routine
-deciding. An older one stays as it is: nothing replays or waits on a request without a receipt. What
-the host cannot ask, it decides before reserving anything, and it writes nothing for it: a process
-with no model client, or whose budget or share (below) leaves too little for the smallest ask of any
-offered model (`HOST_REFUSALS`), and a person whose chosen model is no longer offered, is served by
-another provider than the choice names, is served by a provider this process refuses, or needs more
-for one ask than the budget or the share has left (`MODEL_REFUSALS`). The models route says which,
-for the host and for each choice, and the page says the person follows their own routine until the
-host can ask it, and why. Once a minute, before it reserves anything and with no lock held, the
-host has the workspace's rules judge the function's fixed description and every label anybody it
-may ask could be offered, in one pass for each chosen model. A description the rules would change,
-as a saved name one of whose parts is a word of it would, asks nobody of that model and writes
-nothing; the models route names it for each such choice (`question_changed_by_rules`). Each other
-chosen person at a choice point is offered the options the rules send as they are, leaving out any
-whose words they would change, a place a saved name happens to match; a person left nothing but
-waiting, or fewer than two options, is not asked and nothing is written. It reserves a request (`exulanica.society-decision-request/v2`), commits and closes its connection,
-asks the models concurrently, at most `concurrent_calls_maximum` at once, and records each receipt
-(`exulanica.society-decision/v2`) in its own transaction; then that claim advances one minute, so no
-later choice point of a person a model runs passes unasked. Every ask of the minute ends by one
-time: the contract's `decision_deadline_ms` after the phase begins, and never later than the lease
-leaves the minute to commit in. A phase with no time left asks nobody, and an ask that could only
-start after that time records `no_time_to_ask`. Nothing is asked for a person once the world's last
-hour holds `decisions_per_world_hour_maximum` asked decisions or `spend_per_world_hour_microusd` of
-their cost, counted from its receipts with an unknown cost at its bound and each ask already
-admitted that minute at its bound; each such receipt names the bound (`DECISION_REASONS`). A person
-whose situation is larger than `context_bytes_maximum` is not asked, and nothing is reserved for
-them. The page never asks a model, and a manual step takes only receipts already recorded.
-
-**Spend.** Two bounds hold whoever plays the world. The hourly bounds above hold each world. The
-process's model budget (`EXULANICA_BUDGET_USD`, `EXULANICA_BUDGET_MAX_CALLS`) is a ceiling for the
-life of the process that every model call it makes shares, the Companion, photograph ingestion,
-vision and caption search among them. People's decisions may use all of it but the contract's
-`process_reserve_percent`, which they leave for that other work, so a world played for hours never
-leaves the Companion or ingestion refused. The budget holds each admitted call's reservation until
-its usage is recorded, so calls admitted at once never cross a ceiling together. The host decides on
-what the process has spent, whoever spent it, never on what calls under way hold: once what is left,
-beside the part kept for other work, fits no ask, it asks nobody, and the models route and, where a
-playback host plays workspaces its environment lists, `/readyz` say so (`process_share_spent`, or `process_budget_spent` when the
-whole budget does not fit). Spending only grows while the process runs, so either holds until it
-restarts. A person whose own model needs more for one ask than is left is not asked either, while a
-cheaper model may still be asked for others, and the models route says so for their choice. An ask's
-need is its bound: every answer the contract allows, each with the largest situation a request may
-carry. A call under way can still leave one ask no room for its reservation, which that ask's
-receipt names. The recorded choice is what authorizes this spending: a caller who may play the world
-(`world.write`) starts it by playing, without holding `model.invoke`, and never beyond these bounds.
-
-**Sending everyone away.** `POST .../society/presence` waits while a model decides: it is refused
-with `a_request_is_waiting` while a person's request exists at the current minute or a receipt is
-unconsumed, as it is while a direct request waits, and the next minute consumes it. A receipt for
-somebody no longer here, one closed after its minute for a person sent away since, is consumed by
-their id alone and moves nobody.
-
-**The minute.** An accepted receipt is checked again against the minute. Asked over another state
-or input it is `stale`; a person's own direct request that minute supersedes it
-(`person_asked_directly`), as a second receipt for somebody already decided does
-(`subject_already_decided`). When the chosen place can no longer be reached or used, or another
-choice or request was promised it first this minute, the receipt is `rejected` with that reason;
-a choice to stand with no open spot left within reach is `rejected` as `no_room_to_stand`.
-Choices to talk are checked after every other choice of the minute, in decision order. The other
-person is busy (`partner_busy`) whenever anybody decided for them in that minute, their own model
-included whatever it chose and whichever receipt came first, or an earlier choice took them into
-another conversation; they must still be free to choose or standing and within reach by the
-routine's rule, judged by their tiredness as the minute will have it (`partner_not_free`
-otherwise), and two open spots beside each other must be left for the pair (`no_room_to_talk`).
-Two people whose models chose each other are both applied, to one conversation. Otherwise the receipt is `applied`, as a
-goal policy, and what it takes is promised before the minute, as a direct request's place is: a
-chosen place is the planner's goal with the reason `chosen_by_their_model`; a chosen wait keeps the
-person where they are for the minute, which the planner records as blocked with the reason
-`validated_model_wait`; a chosen stand walks the person to the spot the routine's own draw picks
-among the open ones as the minute begins, and they stand as long as the routine draws; a chosen
-conversation is paired before the routine's own pairs, at the spots and for the length the
-routine's pairing gives, the chooser's goal recording `chosen_by_their_model` and the other
-person's `stopped_to_talk`, and the routine's own pairs take neither person nor any promised
-spot. A promise that an edit and its undo inside the one minute left somebody else holding stops
-the chooser with the planner's reason `route_invalidated`, and the other person is left to their
-routine. A receipt that is not
-accepted leaves the turn to the routine and keeps its status. Every consumed receipt
-appends one `decision_applied` event after the minute's other events, naming its `request_id`,
-`decision_seq`, `decision_sha256`, disposition and reason, the model as `{provider, model_id}` and
-the chosen label; `GET /world/versions/{version_id}/society/decisions/{request_id}` reads the
-request and its receipt, which names the calls, tokens and cost.
-
-**Replay.** Replay applies each transition's bound receipts exactly as they were recorded and
-calls no model, so the receipts, not the provider, determine the history. A model or provider
-that changes or is withdrawn later changes nothing already recorded.
-
-**Comparing models.** The same hour of such a society can be run once per model, beside its routine
-and waiting, from one genesis and one seed, and scored from what the engine recorded; each run is
-asked as this host asks, save where the comparison states otherwise, and replayed from its own
-receipts, and none changes the society it ran over.
-[Comparisons of models](society-experiments.md#comparisons-of-models) states the records, the
-score, the claim and the Compare view.
-
-## Validation
-
-Dedicated society tests distinguish pure policy fixtures from PostgreSQL scratch-schema evidence.
-They cover v1 digest compatibility, reachable/disconnected routes, turn-preserving motion,
-action timing, edit/undo reactions, no-snap blockage, population independence, malformed inputs,
-authenticated reload, stale writes, branch/workspace isolation and event-history forgery refusal.
-The database cases use real migrations and a synthetic authorized-input adapter, not production
-sources or personal material. Live connected acceptance and renderer performance require the
-integrated experience and explicit user evaluation.
-
-V4 pure fixtures cover catalog refusal, place projection and sizing on the committed Flatiron
-input, a 500-minute Flatiron run with no stationary collisions or over-capacity minutes, the same
-properties over twelve seeds on a synthetic grid, graph-bound motion within each walking speed,
-pinned state and event digests, edits without teleporting, source withdrawal, the city grammar's
-hand-written v2 fixture tile as a place (doors, corners, crossings, street identities, spot
-spacing and every refusal), a simulated day on that tile with five more flats behind the same
-front door, and a real-engine preview recording that replays frame for frame. PostgreSQL cases cover v4 creation, advance, reload, replay, withdrawal,
-playback through the worker on admitted Flatiron inputs, and selection labels without names.
-
-Saved-world fixtures cover per-object decisions at non-default yaw, scale, height, behaviour,
-placement and override against the first profile's refusal of the same world
-(`tests/test_society_saved_world_objects.py`), room at a destination over many minutes
-(`tests/test_society_destination_room.py`), versions surviving a catalog bump and a registry
-change on PostgreSQL (`tests/test_society_versions_survive_upgrades.py`), the engine table against
-every copy of it (`tests/test_society_engine_table.py`), reads that load only what they show
-(`tests/test_society_open_cost.py`), and sending everyone away and back through replay, reopening
-and HTTP (`tests/test_society_send_away.py`).
-
-V3 pure fixtures cover local information boundaries, transmission delay, remembered choices,
-vacated locations, stale hearsay, wait, proposal rejection and replay. Authenticated PostgreSQL
-cases exercise committed reservations, pending/completed retries, stale input/state admission,
-withdrawal, provider absence, transition consumption and reload/replay. Those HTTP operations use
-a provisioned nonowner role with neither superuser nor BYPASSRLS privileges. The model path uses
-the real client adapter with a scripted offline transport; this is not live-provider quality
-evidence, admitted personal-scene evidence or browser acceptance.
-
-
-## Persisted playback controls and bounded host progression
+### Persisted playback controls and bounded host progression
 
 Playback is separate from engine versions and deterministic simulation time. Migration 0059 adds
 `world_society_control` and append-only `world_society_control_event`, both workspace scoped under
@@ -1232,7 +978,7 @@ refusals. Account-wide discovery is off by default and refuses startup without c
 accounts and the reviewed current-input runtime. The worker asks a model only in the decision
 phase before a minute of a purposeful society whose owner chose one for someone, and only for a
 workspace its environment lists
-([A person run by a model their world's owner chose](#a-person-run-by-a-model-their-worlds-owner-chose)).
+([the host's decision phase](decision-roles-contract.md#the-hosts-decision-phase)).
 
 The authenticated base route is `/world/versions/{version_id}/society/control`:
 
@@ -1258,22 +1004,21 @@ The authenticated base route is `/world/versions/{version_id}/society/control`:
   returns 409. Unknown/foreign branches are indistinguishable 404s. Invalid input types are 422;
   unsupported settings or v1 play are 409. Unavailable current inputs are 424.
 - `POST /steps` accepts `{base_revision, base_tick, base_state_sha256}` and requires paused mode.
-  It performs exactly one existing deterministic step and returns `{control, society, receipt}`.
-  Both control revision and simulation tick/digest must match. First successful use persists
-  paused settings; a failed step rolls back that configuration too. V1 remains manually usable.
+  It performs exactly one deterministic step and returns `{control, society, receipt}`. Both
+  control revision and simulation tick/digest must match. First successful use persists paused
+  settings; a failed step rolls back that configuration too. A v1 society is stepped by hand.
 - `GET /events?limit=64` returns newest-first hash-checked scheduling receipts, capped at 128.
   These explain control changes, claimed/reclaimed leases, committed tick spans, discarded timing
   debt and failures. They are distinct from inhabitants' action/event explanations.
 
-The older `/society/steps` endpoint retains its existing semantics and can explicitly advance a
-playing or paused society. The authenticated browser playback UI uses `/control/steps` to enforce
-pause-before-step and reads the control after connection, refresh and control conflicts. It exposes
-play, pause, 1x/2x/4x speed and one simulated-minute advancement without deriving canonical ticks
-from render frames.
-Control revision tracks user configuration or automatic pause, while simulation tick/digest track
-progress. A normal automatic tick does not increment control revision. It still uses the existing
-simulation compare-and-swap operation and workspace edit lock, serializing authored edits and
-manual or model-decision reservations through the existing domain boundary.
+`POST /world/versions/{version_id}/society/steps` advances a playing or paused society by one
+minute. The authenticated browser playback UI uses `/control/steps` to enforce pause-before-step
+and reads the control after connection, refresh and control conflicts. It exposes play, pause,
+1x/2x/4x speed and one simulated-minute advancement without deriving canonical ticks from render
+frames. Control revision tracks user configuration or automatic pause, while simulation tick/digest
+track progress. A normal automatic tick does not increment control revision. It uses the
+simulation's compare-and-swap operation and workspace edit lock, serializing authored edits and
+manual or model-decision reservations through the same domain boundary.
 
 Speed is a playback multiplier, never a real-time claim: a simulated tick still represents 60
 simulated seconds. The host default base wait is 8,000 ms; 1x/2x/4x request minimum waits of
@@ -1308,115 +1053,71 @@ three unsuccessful attempts the next recovery check persists paused `lease_recov
 A user may resume with the new revision. A source authorization failure instead rolls back the
 batch immediately and persists paused `source_unavailable`; invalid state records
 `invalid_society_state`. These records claim zero committed ticks. Local unavailable affordances
-under composition/v2 continue to produce their existing per-action reasons and do not pause an
-otherwise available district.
+under composition/v2 produce their per-action reasons and do not pause an otherwise available
+district.
 
 Playback receipts reference completed engine transitions; wall timestamps and random lease tokens
-are not replay inputs to the engine. Exact state replay still uses the original ordered district
-inputs, authored edits and optional persisted decision receipts, including intervening input
-changes. It neither reads current geometry as a substitute nor schedules new work. Control
-configuration and undo do not rewind society time. Object undo/restore continues to append an
-ordered authored input under the existing supported version semantics. Historical source withdrawal
-continues to deny historical replay even when control metadata remains readable. No sleeping
-process is required for default/manual use, and no production rollout is implied by these modules.
+are not replay inputs to the engine. Exact state replay uses the original ordered inputs, authored
+edits and persisted decision receipts, including intervening input changes. It neither reads
+current geometry as a substitute nor schedules new work. Control configuration and undo do not
+rewind society time. Object undo and restore append an ordered authored input. Historical source
+withdrawal denies historical replay even when control metadata stays readable. Stepping by hand
+needs no background process.
 
-## Typed user-directed actions
+### Server integration and HTTP
 
-Migration 0060 adds append-only `world_society_action_request` and
-`world_society_transition_action`. This is a bounded external-input foundation for v2/v3 societies,
-separate from optional model decisions and playback controls. It does not broaden the affordance
-registry or accept free-form movement.
+The authenticated society routes (`exulanica/api/routes/society.py`) create a society, read it,
+step it, list its events and replay it. Creation may name any engine the table creates with;
+omission gives v1, and a retired engine is refused with
+`409 society_engine_retired` before anything is written. A creation names no seed: the server
+derives the world's own (above), and a body that names one is malformed (`422`). A version holds
+one society: a creation for a version that already holds it reads it back with nothing composed,
+and one naming another region is refused with `409 society_lives_elsewhere`. Step bodies contain
+only `base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected. Every
+snapshot these routes return, and the society a playback step returns, carries `seed_digest` in
+place of the seed, and so does every state and event document that holds one; the first engine's
+hold none.
 
-The authenticated base route is
-`/world/versions/{version_id}/society/actions`:
+Every society, action, playback, decision, experiment and district route requires the world as a
+`world_id` query parameter, as every world route does, and a world the workspace does not hold
+answers `404 unknown_reference`. The repositories scope their reads to workspace, world and version
+together, so a version that does not belong to the named world reads as an unavailable version
+rather than reaching another world's society.
 
-- `POST` accepts exactly an idempotency key, base tick/state digest, synthetic subject ID and
-  either `{kind: "go_to", target_id}` or
-  `{kind: "perform", target_id, affordance: "visit" | "rest"}`;
-- `GET` returns newest-first authorized request envelopes; and
-- `GET /{request_id}` returns one request and its pending or consumed status.
+`GET /world/versions/{id}/society?places=true` adds `places` to a society with inputs: the input
+sequence and digest the current state consumed, its availability and reason, the walkable area and
+clearance, the targets an inhabitant can be directed to, and each object activity the input names
+as `authored_affordance_unreachable`. They are copied from that one authorised input; an input a
+later edit queued is not described until a step consumes it. Without the parameter the read is
+unchanged.
 
-The client supplies no position, route, target document, workspace, actor or branch. Under the
-workspace lock the server resolves the current v2/v3 society and latest consumed input, rechecks
-current source authority, freezes the exact canonical target and records the requesting actor.
-Requests require an idle/blocked/completed inhabitant, or one part way through a stay under a
-routine that draws its stays, current available input, an enabled reachable target and no other
-request for that inhabitant at the same state. The database's request binding holds a recorded
-request to the same rule about the person (`society_person_may_be_directed`, migration 0108), and
-`tests/test_society_request_rule_parity.py` holds the two equal. A request to go where the person
-already is, part way through a stay there, is refused `inhabitant_already_there`, which the page
-says in words: ending the stay would only begin it again. Exact retries return the existing
-envelope; changed reuse or stale bases fail without another write.
+The application supplies `society_initial_input(connection, session, version_id, place_id, region_id)`
+and `society_input_authorizer(connection, session, document)` on application state. The repository
+accepts an `input_authorizer(document)` callback and exposes internal `record_input(version_id, doc)`
+for the authored-edit transaction. The adapter must take appropriate source/asset locks and validate
+current bindings. An absent authorizer/provider fails closed. The public routes report
+`424 unavailable_society_input`; invalid state/replay is a `409`, malformed creation a `422`, and
+stale state `409 stale_society_state`. An unknown or cross-workspace reference is a `404`.
 
-Recording a request does not advance society time. The next normal deterministic step consumes
-ordered pending requests through the existing goal-policy seam. `go_to` constrains the next goal to
-the target; `perform` additionally binds its existing affordance. Each request receives one
-`applied`, `stale`, `unavailable`, `rejected` or `superseded` disposition and a
-`user_action_requested` event. The transition binding requires the exact request, previous state,
-input span, tick and event digest. Replay regenerates the disposition and event from genesis using
-the stored request and original inputs; it never calls a model or treats the request itself as
-completed movement.
+An explicitly unavailable latest input may be authorized for recording a pause even when older
+inputs have lost rights. Advance authorizes that latest input; historical state/event reads and
+replay authorize what they materialize individually. That distinction allows recording withdrawal
+consequences without granting permission to display withdrawn historical geometry.
 
-There is no cancellation or expiry. A stay drawn from a routine's range can last up to 25 minutes,
-so under such a routine a request to somebody part way through one ends it in the minute the
-request is consumed, before anybody chooses: a `replanned` event with reason `called_away` and
-outcome `stay_ended`, no relief, and for a talk the other person stops in that same minute
-(`partner_left`), whichever of the two the minute reaches first. A walk is left to arrive, and
-under the rules the society was released with, which every input that records no routine is read
-under, a request to anybody mid-action is refused `inhabitant_action_in_progress` as it always was
-(`tests/test_society_square_requests.py`). A request can direct only the next eligible goal and
-ordinary navigation/action checks remain authoritative. Over an
-input that states places, a request is refused `destination_full` when every place of its target is
-held by somebody else, and an applied request is promised its place before the minute, so nobody
-choosing freely in the same minute takes it first. It cannot
-teleport, cross unsupported space, undo completed actions or simulation history, or replace a
-withdrawn target. The browser has a control on a declared visit or rest destination that issues
-one typed `perform` request through this API and shows the returned pending or consumed record, or
-an explicit unavailable or refused state. It re-checks its gate whenever the persisted society
-refreshes. Living (v4) societies refuse it because directed actions are a v2/v3 foundation.
-Simulated action records stay labeled as simulation and are never presented as personal evidence.
-
-In a person's own saved world the control is reached like this. Opening the world reads its
-society and creates nothing; the People nearby panel says when nobody lives there yet, what
-inhabitants need, and offers "Bring in inhabitants", which is the creation request above. Once
-they live there, the panel lists every object with what the consumed input says of it (somewhere
-to rest or visit, out of reach, or not yet noticed until the next simulated minute), and "Advance
-one minute" performs one control step while the world is paused. A chosen inhabitant's panel
-carries one request per usable place. Every request names the saved world. The placement of this
-panel is provisional.
-
-The same panel holds the world's only Play, Pause and pace controls; About points to them. Play
-is offered only where the control read's `host_playback.running` says this host plays the world;
-otherwise the panel shows the server's own `reason` and keeps "Advance one minute". While a world
-plays, the page reads the control about every two seconds (half the effective interval when that
-is shorter, never more often than every 500 ms) and reads the society only when the control's
-tick differs from the one drawn (`web/packages/app/src/composition/environment-selection.ts`).
-Minutes the page did not read are rebuilt, for drawing only, from the paths their event
-documents record (`society-unread-minutes.ts`); a minute the bounded event window cannot vouch
-for is not rebuilt. After the person places or moves an object while people are there, one line
-says the simulated minute that notices it: the server's current tick plus one, confirmed once a
-state consumes a later input. The inspector's top lines say who the person is, what they are
-doing and why, turning the engine's reason codes into words and naming places by the titles of
-the person's objects (`inhabitantWords` in `web/packages/app/src/ui/world-inhabitants.ts`); a
-code it has no words for is shown by name. The recorded explanation and bindings stay in its
-details.
-
-In the owned district the control is implemented and unit-tested
-(`web/packages/app/test/society-directed-action.test.ts`,
-`web/packages/app/test/environment-selection.test.ts`), and no shipped configuration reaches it:
-
-| Prerequisite | What the shipped app does instead |
-| --- | --- |
-| The owned district's interpretation, which publishes the destinations | Saved and starter worlds open without the owned district, and its interpretation is read only by a caller that supplies current dependency resolution |
-| A mounted control | The development preview (`?preview=1`) omits it |
-| A held v2 or v3 society | A district needs a host district binding, and the browser creates a district society as v4 (`web/packages/app/src/composition/live-society.ts`), for which the API accepts no directed actions |
+The Companion answers from the same recorded goal/action/event references, labelled simulation
+([society question](../exulanica/selection/society_question.py)): every citation has truth class
+`simulation` and is never evidence of a personal visit, and simulated visits are never evidence of
+real visits. Historical answer clauses still require personal evidence: a simulated fact is a clause
+of type `simulation`, never `historical`. It answers for the purposeful profile and refuses another
+by name. A `decision_applied` event records what a decision receipt did and is never one of its
+lines: the person's own events say what they did, a goal their model chose by the reason
+`chosen_by_their_model`, and that goal's line names the model from the one `decision_applied` event
+of its minute and person that applied a choice, or names none when there is not exactly one.
 
 ## V4 living society: routines, places and occupancy
 
-V4 is a successor profile. It never changes v1, v2 or v3 bytes: their pinned digest vectors and
-replay tests are unchanged, and the names, roles, `home:{n}`/`work:{n}` labels, fixed weather and
-resources blocks and the 300 m wander bound those profiles hash now live only in
-`society_legacy.py`, labelled as a frozen encoding that exists so stored histories replay.
+V4 is a successor profile: it changes no byte of v1, v2 or v3, whose pinned digest vectors and
+replay tests hold ([retired and frozen engines](#retired-and-frozen-engines)).
 
 **Routine as data.** Needs, activities, capacity rules, the premises use-class mapping and policy
 values live in versioned catalogs under `assets/catalogs/society/`, in the city grammar's
@@ -1467,7 +1168,7 @@ sorted list of what the place cannot supply. Two producers exist:
   stand within one step of each other. Merging two places at one plan point into one node is
   plan-only, and the place states how many of the surfaces it merged stood at another height.
 - **What a person may stand on is the city descriptor's navigation table, read as data**
-  (`city_navigation`), never a list of kinds in this lane's code. A footway exists because
+  (`city_navigation`), never a list of kinds in the producer's code. A footway exists because
   `city.curb_edge` is support, and a place whose curbs are not is refused; a crossing or a door is
   walked only while its own kind is support, and a place that drops either says so. Standing spots
   keep two standing radii apart and keep the nav envelope's capsule radius (340 mm) clear of
@@ -1502,6 +1203,20 @@ above a walker, and it carries no level identity, so a walkway over a walkway is
 `place_from_society_input` keeps publishing v1, because a society's state pins its place by digest
 and re-deriving a stored society's place has to produce the same bytes it was created under.
 
+**Measured on a generated street.** On the generated corridor's tile (2, 0), baked by tessellator
+17 (`nav_envelope` `35388d7849`), the tile runtime's support surface carries the heights the curb
+records state rather than one height for the tile. At the six walking-line points on the tile's
+north-south midline the records state 123, 163, 163, 146, 146 and 96 mm, and the runtime reads each
+at most 0.593 mm below, two of them exactly. Of the 284 footway stations the place states for the
+tile, the runtime reads a surface at 278, none above the records and none a millimetre or more
+below; the six it reads no surface at lie about 1.1 m from a bench, where the place's own
+obstruction predicate already refuses the walking pieces that touch them. The records and the
+runtime's reading are [walking-lines-records.log.txt](artifacts/society/walking-lines-records.log.txt)
+and [walking-lines-runtime.log.txt](artifacts/society/walking-lines-runtime.log.txt), each beside the
+script that wrote it. Whether a walker can walk the 40 and 50 mm steps between neighbouring curbs
+was not exercised, and no test holds per-curb heights: the shared conformance fixture states one
+walking-line height, 95 mm, for all six of its curbs.
+
 **Population.** A place with homes is populated by one inhabitant per catalogued home place. A
 place without homes holds the catalogued share (half) of its standing spots and indoor visitor
 places, and a requested population above nine tenths of that capacity is refused. Workplace
@@ -1514,13 +1229,12 @@ that would do so is refused at creation, naming how many pieces its walking grap
 many of its inhabitants are stranded. The rule is about the assignment and never about the
 graph's shape: a place may honestly be in pieces, an island is a place, and so is one tile cut
 out of a city whose joining corners lie outside it, which such a place already states in its own
-`unsupported`. What a society may not do is hand somebody a job across a cut and then say
-nothing, which is what it did until 2026-09-19: the shift found no reachable target, the choice
-stepped over it in silence, and on one corridor tile 37 of 64 inhabitants spent a simulated day
-unable to reach work while every run measurement reported a healthy society. `_targets` now says
-which shortage emptied its list, since nothing here offers it, the places that do are full, and
-no route reaches them are three findings with three fixes; no v4 transition consumes that reason,
-because a goal's `because` is canonical state and a change to a v4 transition is a new profile.
+`unsupported`. What a society may not do is hand somebody a job across a cut and say nothing: a
+shift with no reachable target would be stepped over in silence while every run measurement
+reported a healthy society. `_targets` says which shortage emptied its list, because nothing here
+offers it, the places that do are full and no route reaches them are three findings with three
+fixes; no v4 transition consumes that reason, because a goal's `because` is canonical state and a
+change to a v4 transition is a new profile.
 
 **What a run reports.** Beside the population's own measurements, `measure_run` states what the
 place OFFERED: how many destinations it publishes, which needs its inhabitants can hold at all,
@@ -1540,9 +1254,9 @@ Reservations are taken in inhabitant order within the minute: a standing spot ho
 an indoor destination holds its visitor capacity, and homes and workplace positions belong to
 their inhabitants. An inhabitant never chooses the spot or destination it is already at, a
 finished activity lowers its need by the catalogued relief, and a population never exceeds its
-place's capacity. Together these rule out the absorbing state v2 reached on Flatiron, where
-every inhabitant preferred the one visit target forever: no two stationary people share a
-position, and an outdoor inhabitant moves again within a bounded number of minutes.
+place's capacity. Together these rule out the absorbing state the v2 routine reaches over the
+Flatiron input, where every inhabitant prefers the one visit target forever: no two stationary
+people share a position, and an outdoor inhabitant moves again within a bounded number of minutes.
 
 **Motion.** Each inhabitant walks at its own seeded speed of 66 to 84 m per simulated minute
 along shortest graph routes, from spot to access node, along edges and onto its target spot; the
@@ -1558,289 +1272,122 @@ from its recorded motion and speed. Summaries are templates naming the role or "
 
 **Persistence.** Migration 0075 admits v4 in the engine-version check, allows v4 populations of
 1 to 65,536 while keeping 100 to 512 for earlier profiles, and extends the versioned event order
-index and the input and event binding triggers. V4 uses the existing input, event and transition
-tables, playback controls and replay. Typed user actions and model decisions remain v2 and v3
-features; v4 refuses them.
+index and the input and event binding triggers. V4 uses the same input, event and transition
+tables, playback controls and replay as v2, and takes no typed user actions or model decisions.
 
-**Rendering.** A saved world's inhabitants are drawn by the same crowd, hung from the authored
-region's root, which is the frame their input states positions in and the frame the person's
-objects are placed in. A resting inhabitant is one whose `action.kind` is `rest` with
-`action.status` `active`, and it rests at its own place, a standing spacing from anybody else. The
-crowd hands the kind of an action under way to whatever draws the person, as `activity` in
-`CrowdPose` (`web/packages/atlas-react/src/playcanvas/society/types.ts`), once the path recorded for
-the minute has been walked. With each state the page hands the crowd a seating layout
-([`society/seating.ts`](../web/packages/atlas-react/src/playcanvas/society/seating.ts)): each kind's
-use as `GET /world/assets` serves it from the world object catalog, the drawn version's objects, and
-the object each target of the consumed input belongs to. A person whose action, under way or just
-completed, names a target holds the catalog place whose position, carried into the object's frame,
-lies within the turn's outward rounding of their recorded position (`PLACE_MATCH_MM`, the square
-root of two millimetres and a micrometre). They face as their activity's rule says
-([`society/activity-facing.ts`](../web/packages/atlas-react/src/playcanvas/society/activity-facing.ts)):
-`rest` and `visit` face the object across the place, so a visitor at the market stall faces its
-counter and one at the tree faces the tree, also in the minute after a visit completes, while the
-visitor still stands there; `talk` faces the partner the goal names; the rest keep the way they last
-walked. Where the place has a seat and the character catalog declares a seat posture for the
-activity (`seatPostures`, `rest` to `perched`), the person sits on it: they walk at their own pace
-to stand before the seat (in front of it, or beside it when their place is off to its side, as at
-the cafe chairs, so the walk does not pass through the table), then turn and lower onto it over the
-posture's 0.8 s blend, pelvis on the seat at its height and facing: a full character with its feet
-planted on the ground below, a far figure lifted to the same height. Getting up runs the same way
-back, feet planted as they rise, before they walk on. Moved without walking (a named jump), they
-leave the seat at once rather than glide from it. After an object is moved or taken away the page
-hands the crowd a new layout at once, so a person whose seat is gone gets up without waiting for the
-next minute. The move from the place to the seat is presentation, and the person's recorded position
-stays the place. A place with no seat, such as a marker plate's, keeps the ground rule: resting is
-drawn sitting on the ground in front of it. A person matched to no place, or performing an activity
-with no facing rule, is drawn as everyone else is and named with its reason
-(`SocietyCrowd.seatingMisses`, which the page records on the canvas as
-`data-society-seating-misses`); the owned district hands no layout. An activity with no declared
-posture, such as making room, is drawn standing, and so is everybody drawn by a renderable with no
-postures, which also stays standing at its place rather than being lifted onto a seat. While
-everyone is away the state holds nobody, so the crowd draws nobody.
+**Drawing.** The app draws a living society's people as it draws every society's, from their
+recorded paths and actions
+([drawing a society's people](character-representation-contract.md#drawing-a-societys-people)).
+The development preview plays a recording made by the real engine over the committed Flatiron
+input (`scripts/record_living_society.py`), with every frame bound to its state digest.
 
-The app draws the whole population by distance: up to 24 nearest outdoor
-inhabitants as full characters (the native character runtime's resident limit) and every other
-outdoor inhabitant within 700 m as a simple instanced figure of the same identity, one draw call
-per palette. Indoor inhabitants are counted, not drawn. People at the same position are all drawn
-there. A v4 inhabitant walks the recorded path at its recorded `walk_speed_mm_per_tick`, one
-tick's worth per interval, and stops where the path ends. A v2 state records only a bound,
-`movement_budget_mm_per_tick`, which is usually far longer than the path a person walks in a
-tick; a v2 person therefore walks what they have left evenly until the next tick is expected (the
-interval plus the caller's start lag), never faster than 1.5 times the bound's own pace, so
-nobody sprints and then stands. A v2 person whose newly read tick adds nothing to walk finishes what
-is left at no slower than their own walking pace, the walk clip's measured ground speed at their
-height: a remainder spread again at every tick would shrink by the same share each time and never
-end (measured with host playback: ticks read every 8.1 s against 10 s of spreading left a fifth each
-tick, and nobody ever arrived to rest or face anything). Nothing is interpolated off the path. Each
-later tick's path is
-appended to what the person has still to walk when it starts where that ends, so a walk through
-several minutes does not stop between them, and a caller that learns of ticks late passes that
-delay as a start lag. A v4 person behind catches up along the path at most 1.5 times their speed;
-anyone moved without walking (a path that starts elsewhere, unread minutes, more than two ticks
-of walking waiting, no recorded path, or an older state) is named with its reason rather than
-moved silently (`CrowdJump` in `web/packages/atlas-react/src/playcanvas/society/types.ts`). A
-state without a pace is eased along its path over the interval. The development
-preview plays a recording made by the real engine over the committed Flatiron input
-(`scripts/record_living_society.py`), with every frame bound to its state digest.
+## Retired and frozen engines
 
-**Detail by distance applies to time too.** Solving and skinning one full character costs about
-0.53 ms of main-thread time, so the crowd poses the 4 nearest every frame, the next 8 every second
-frame and the rest every third, 12 poses a frame instead of 24, and carries each character to its
-recorded point on every frame in between. A selected inhabitant, and anyone whose snapshot jumped,
-is posed at once. Measured in the preview at 1440x900 in headless Chrome on an M3 Pro, over the
-debug PlayCanvas build a development server serves: main-thread work per frame is 9.4 ms at p50
-and 9.9 ms at p95 with the cadence, against 15.9 ms and 16.6 ms posing every character every
-frame, and at most 2 frames in 1,199 passed 16.7 ms. A steady 16.7 ms frame interval is not proof
-of a met budget: the browser stamps each frame on schedule while its callbacks run late, so the
-figures above are main-thread work, not intervals.
+Two engines are kept only so that what they stored still reads and replays: the first engine,
+which is frozen, and the social engine, which is retired.
 
-## The surface under a walker where the records state several heights
+### The frozen first engine (v1)
 
-`exulanica.society-place/v2` states beside each node the height of the surface a person stands on,
-taken from the records. The corridor's records state many heights: eleven distinct footway walking
-lines from 96 to 167 mm across its 46 curbs, no curb's line varying along its own length, and the
-two curbs of one street segment differing on all 23 segments, by 2 mm at the closest and 63 mm at
-the widest. The only walk whose parameters this repository states runs east ALONG one curb's
-footway, at a constant height, so nothing measured before this separates a runtime whose surface
-carries the heights the records state from one that stands a walker at a single height the records
-do not state anywhere.
+`exulanica-society/v1` initialization and successful transitions stay byte-compatible, pinned by
+deterministic digest vectors, and replay checks every persisted v1 event against regenerated
+events. V1's home and work nodes are labels; its motion ignores them and has no obstacle or arrival
+semantics. The names, roles, `home:{n}`/`work:{n}` labels, fixed weather and resources blocks and
+the 300 m wander bound the v1 to v3 profiles hash live only in `society_legacy.py`, labelled as a
+frozen encoding that exists so stored histories replay. No later engine changes a v1, v2 or v3
+byte.
 
-The parameters, the expected heights and the response to each outcome below are committed before
-the container is baked and before anything is sampled, so that what is reported afterwards has
-something to be checked against rather than something to be chosen to fit.
+### V3 bounded observations and communication
 
-**The line.** Tile (2, 0)'s own north-south midline: x `320000`, the midpoint of the tile's x span
-256,000 to 384,000, from y `0` to y `128000`. It is the same x the east-west walk already captures
-a frame at, so the two lines cross at that frame. Six curbs state a footway across it: the tile
-carries six east-west kerb lines whose x span covers the tile's midline, their shared x span is
-261,950 to 378,050, and the midpoint of that span is also 320,000, so the line meets no curb near
-its end.
+`exulanica-society/v3` is retired: a creation that names it is refused with
+`409 society_engine_retired`, and nothing records a new proposal for it. A stored v3 society still
+reads, advances, takes directed actions, plays back and replays by the rules it was recorded under
+(`exulanica/world/society_social.py`). It kept the whole population and the v2 navigation and
+action rules; only its first three stable inhabitants form the social cast, and everybody else
+follows the v2 routine. Its state adds `social: {profile, cast_ids, last_decision_seq, agents}` with
+profile `exulanica.social-state/v1`: each cast member's `observations`, `beliefs` keyed by target
+and `communication_ids`, each capped at 16 records, with earlier records kept in the immutable
+input and event history.
 
-| | |
-| --- | --- |
-| line | x `320000`, y `0` to `128000`, in the records' own `city_local` frame, integer millimetres |
-| step | 50 mm, which is `SUPPORT_SAMPLE_SPACING_M`, the spacing the runtime resamples support at |
-| samples | 2,561 along the line, plus the six walking-line points exactly |
-| what is asked | `navEnvelopeSupport(nav_envelope).surface.sample(...)`, the runtime's own support sampler, over the tile's own container |
-| frame of the ask | renderer metres, `tileToRenderer(x, y, 0)`, and the height it returns in metres multiplied by 1,000 to compare with the records' millimetres |
-| what it is compared with | `_Kerb.surface_z`, the society place's own reading of the curb record, in millimetres |
-| container | baked from the tile (2, 0) document by `pnpm tess bake`; both triangle digests recorded beside the result |
+A cast member stopped at a navigation node observes authored affordances within 4,000 mm of graph
+travel, a synthetic graph proximity rather than vision, and can pass one fact it did not learn that
+same tick to another stopped cast member within 8,000 mm. A belief records whether it was observed
+or communicated, from whom and from which input, and a fact from a newer input supersedes one from
+an older input. A cast member chooses an authored goal only when their own belief matches the
+current target and its route is reachable, else `no_known_reachable_affordance`. Its events add
+`observed` (the complete fact), `communicated` (`communication_id`, `sender_id`, `receiver_id`,
+`belief` and `dialogue: null`) and `decision_applied` (`decision_seq`, `request_id`,
+`decision_sha256` and `disposition`, where only `applied` means a proposal influenced the step).
+Communication records the transmission of information, not a conversation. The Companion's society
+answers cover the purposeful profile only and refuse a v3 society by name
+(`society_profile_has_no_words`).
 
-**What the records state on that line**, south to north, read from the curb records of this tree
-by [walking-lines-records.py.txt](artifacts/society/walking-lines-records.py.txt), which reads the
-city's records and no container, and whose
-[log](artifacts/society/walking-lines-records.log.txt) is the table below:
+### Explicit model proposals and exact replay
 
-| curb | kerb line y | footway strip | walking line y | walking line z |
-| --- | --- | --- | --- | --- |
-| Linden Terrace 2 right | 4,450 | 1,000 to 4,450 | 2,575 | **123** |
-| Linden Terrace 2 left | 11,550 | 11,550 to 15,300 | 13,500 | **163** |
-| Harbour Way 7 right | 60,450 | 56,700 to 60,450 | 58,500 | **163** |
-| Harbour Way 7 left | 67,550 | 67,550 to 72,900 | 70,300 | **146** |
-| Foundry Street 12 right | 116,450 | 111,100 to 116,450 | 113,700 | **146** |
-| Foundry Street 12 left | 123,550 | 123,550 to 125,750 | 124,800 | **96** |
+The v3 proposal route is retired with its engine:
+`POST /world/versions/{version_id}/society/decisions` resolves the world and its society and
+refuses every request with `409 society_proposals_retired`, because a model decides for a person
+only as the world's owner chose ([decision roles](decision-roles-contract.md)). What a stored v3
+society holds still reads and replays:
+`GET /world/versions/{version_id}/society/decisions/{request_id}` returns
+`{request, decision: receipt-or-null, status: in_progress|completed}`.
 
-Four of the eleven heights the street states, and the differences between neighbours along the line
-are +40, 0, -17, 0, -50 millimetres. The seven the line does not reach are 125, 137, 151, 155, 158,
-159 and 167.
+A stored request (`exulanica.society-decision-request/v1`) is an immutable reservation, at most one
+per subject and base tick: the subject, branch, base tick and state digest, the exact input
+reference, the bounded context (`exulanica.society-decision-context/v1`, at most 64,000 canonical
+bytes of the subject's own beliefs and observations, current goal and allowed actions) and its
+hash, and the configured role, model and manifest hash or null. A request reserved and never
+completed reads as pending; nothing retries or answers it. A receipt
+(`exulanica.society-decision/v1`) says what its completion found: `stale`, `unavailable`,
+`rejected` for a semantic or schema violation, or the validated proposal (`choose_goal` with a
+known, available target, recorded as `remembered_target_selected`, or `wait` for one step) or null,
+with the call's metadata where the call succeeded and no raw reasoning or prose. Migration 0055
+supplies the workspace-isolated tables: `world_society_decision_request`, `world_society_decision`
+and `world_society_transition_decision`, which binds each consumed receipt exactly once to a
+committed transition with an `applied`, `rejected`, `unavailable`, `stale` or `superseded`
+disposition. Replay uses the exact stored receipts each transition consumed, checks their context
+and decision hashes and dispositions, regenerates state and events and verifies the final digest;
+stepping, reading and replaying never call a model.
 
-**The two-part signature, decided here so a partial match reads as a partial match.**
+## Validation
 
-| outcome | signature |
-| --- | --- |
-| steps with the records | the six heights are 123, 163, 163, 146, 146 and 96, each within 1 mm, AND their differences are +40, 0, -17, 0, -50, each within 1 mm |
-| stays flat | the six heights are equal to one another within 1 mm |
-| neither | anything else, reported as the six numbers it is |
-| no surface | the sampler returns null at a walking-line point |
+Dedicated society tests distinguish pure policy fixtures from PostgreSQL scratch-schema evidence.
+They cover v1 digest compatibility, reachable/disconnected routes, turn-preserving motion,
+action timing, edit/undo reactions, no-snap blockage, population independence, malformed inputs,
+authenticated reload, stale writes, branch/workspace isolation and event-history forgery refusal.
+The database cases use real migrations and a synthetic authorized-input adapter, not production
+sources or personal material. Live connected acceptance and renderer performance require the
+integrated experience and explicit user evaluation.
 
-The millimetre is not a judgement about what is acceptable; it is what the carve can lose. Support
-triangles are cut with their heights taken from the source triangle's own plane and floored, so a
-sample between two carved vertices can read up to a millimetre below the plane the records state.
-Where the two agree exactly, that is reported as exact rather than as within tolerance.
+V4 pure fixtures cover catalog refusal, place projection and sizing on the committed Flatiron
+input, a 500-minute Flatiron run with no stationary collisions or over-capacity minutes, the same
+properties over twelve seeds on a synthetic grid, graph-bound motion within each walking speed,
+pinned state and event digests, edits without teleporting, source withdrawal, the city grammar's
+hand-written v2 fixture tile as a place (doors, corners, crossings, street identities, spot
+spacing and every refusal), a simulated day on that tile with five more flats behind the same
+front door, and a real-engine preview recording that replays frame for frame. PostgreSQL cases
+cover v4 creation, advance, reload, replay, withdrawal, playback through the worker on admitted
+Flatiron inputs, and selection labels without names.
 
-**What each outcome is answered with, fixed before the run.**
+Saved-world fixtures cover per-object decisions at non-default yaw, scale, height, behaviour,
+placement and override against the first profile's refusal of the same world
+(`tests/test_society_saved_world_objects.py`), room at a destination over many minutes
+(`tests/test_society_destination_room.py`), versions surviving a catalog bump and a registry
+change on PostgreSQL (`tests/test_society_versions_survive_upgrades.py`), the engine table against
+every copy of it (`tests/test_society_engine_table.py`), reads that load only what they show
+(`tests/test_society_open_cost.py`), and sending everyone away and back through replay, reopening
+and HTTP (`tests/test_society_send_away.py`).
 
-- *Steps.* Report the distribution of differences over every footway station the place states inside
-  the tile, not only the six, so one lucky line cannot decide it. Then state what is still untested:
-  whether a walker can WALK a 40 mm and a 50 mm step, which is the controller's rule and not the
-  surface's, and the seven walking lines this line does not reach.
-- *Flat.* Report the constant, and then ask the container which triangle covers each of the six
-  points and print its three vertices. A constant is a circumstance; the triangle is the cause, and
-  this project has paid for the difference more than once.
-- *Neither.* Report the six numbers and the covering triangles, and name no mechanism that is not
-  read out of the container.
-- *No surface.* Report which points, and what record covers that plan point by extent. An absence
-  has at least two explanations and the records can say which.
-
-**What is not predicted.** What the line reads over the two carriageways and the two blocks of
-buildings between the streets. The nav envelope is carved to keep a capsule clear of what obstructs
-it and the records' footway strips stop at the frontage, so the two are not measuring the same
-surface there; that stretch is reported as a profile and not as an agreement or a disagreement.
-
-**What this line cannot answer.** Whether a person could walk it. It crosses two carriageways and
-two blocks, so it is a line through a surface, not a route. It also passes 795 mm east of one tree
-trunk at y 68,549 and 795 mm west of another at y 115,451, and 18 mm east of the first one's pit, so
-a gap in support near those two y values is the tree carve and is expected. Both walking-line points
-on those two curbs are 1,923 mm from the nearer trunk, which is clear of the 1,153 mm the record
-states as that tree's exclusion radius even before a capsule radius is added to it.
-
-**Two sentences of this section's opening paragraph were corrected after the run, and neither is a
-parameter.**
-It said the two curbs of a segment "can differ by 50 mm", which is what this line crosses and not
-what the street states: all 23 segments differ, from 2 mm to 63 mm. And it said every walk taken on
-this city had run along one curb, which is not something this lane can produce; what it can produce
-is that the only walk whose parameters the repository states does. The line, the step, the six
-heights, the signature and the responses are as committed.
-
-**Which tree these numbers are true of.** They were first produced on the tree this lane branched
-from, and then produced again, unchanged to the byte in both logs, on each later tree the work moved
-through: a main that had carried a tile's route obstruction rings into the navigation world and
-added a descriptor pin to the container reader, a main that had added the lettering catalog's
-two-way check, and the tree this section was merged into. The middle of those was reproduced by the
-orchestrator's own run rather than by this lane, which had inspected which paths those commits
-touched and said that inspection was all it had. Neither log moves at any of them, the container's
-own sha256 does not move, and the tessellator stays at 17: none of that work changes what a walk
-stands on.
-
-**What it read. The surface steps with the records.** Both halves of the signature hold. Measured by
-[walking-lines-runtime.py.txt](artifacts/society/walking-lines-runtime.py.txt), whose
-[log](artifacts/society/walking-lines-runtime.log.txt) is where these numbers are read from, over a
-container it bakes: 11,153,540 bytes, sha256 `93df0715f5`, tessellator 17, `nav_envelope`
-`35388d7849`, 96,745 walkable triangles.
-
-| curb | walking line y | records | the runtime | difference |
-| --- | --- | --- | --- | --- |
-| Linden Terrace 2 right | 2,575 | 123 | 123 | 0 |
-| Linden Terrace 2 left | 13,500 | 163 | 162.440 | -0.560 |
-| Harbour Way 7 right | 58,500 | 163 | 162.407 | -0.593 |
-| Harbour Way 7 left | 70,300 | 146 | 145.809 | -0.191 |
-| Foundry Street 12 right | 113,700 | 146 | 145.809 | -0.191 |
-| Foundry Street 12 left | 124,800 | 96 | 96 | 0 |
-
-The records' differences between neighbours are 40, 0, -17, 0, -50; the runtime's are 39.44, -0.03,
--16.60, 0.00, -49.81. Every height and every difference is inside the millimetre the signature
-allowed, so the runtime is not standing a walker at one height the records do not state: it carries
-the step at each street and the level stretch across each block.
-
-**The population, so one line cannot decide it.** All 284 footway stations the place states for this
-tile, over six curbs and four stated heights. The runtime reads a surface at 278 of them. Counted at
-a nanometre, which is far below anything the geometry means: 76 equal, 202 below by under a
-millimetre, none above, none differing by a millimetre or more, furthest below 0.593 mm.
-
-**Where the fraction of a millimetre comes from, read out of the container rather than assumed.** The
-log names the triangle each of the six heights comes from and asks the records what the footway
-surface is at each of its corners. Fifteen of the eighteen corners carry exactly the height the
-records state at that corner's own distance across the footway; the other three are a millimetre
-below, and all three belong to the two small triangles the carve left beside an obstruction, whose
-heights the carve floors. So the deficit is interpolation between floored integers and nothing else.
-Where the covering triangle spans the strip's own two edges, and the walking line is the middle of
-the strip, the arithmetic lands on an integer and the two readings are equal rather than close: that
-is the 123 and the 96.
-
-**Six stations the runtime reads no surface at, and the place says so first.** All six are on the two
-curbs whose walking line is 163, each about 1.1 m from a bench. The place's own obstruction predicate
-refuses 12 walking pieces; the 16 nodes those pieces touch include all six, and no station the
-runtime refuses is outside that set. None of the six carries a standing spot, so the
-place already walks through them rather than standing anybody there, which is what the contract says
-it does. Two implementations in two languages, sharing the grammar's numbers and no code, put the
-same six points out of reach of a body.
-
-**The gap this line was told to expect did not appear.** The parameters said a break in support near
-y 68,549 and y 115,451 would be the tree carve. There is none: support runs unbroken from y 57,050 to
-y 72,550 and from y 111,450 to y 126,500 at the 50 mm step, and the millimetre pass finds no stretch
-without support anywhere between y 1,000 and y 125,750. The line passes 795 mm from each of those two
-trunks and 18 mm outside the nearer one's pit, so it misses the carve rather than showing there is
-none. An expectation written down and not met is reported here because it was written down.
-
-**What else the line shows.** The camber crowns at z 0 at y 8,000, 64,000 and 120,000, which is
-where the three street segment records put their own centrelines, each at z 0. Support stops 344 mm
-inside the strip's far edge at each of the four edges a building frontage stands on, and 0 mm at the
-two that are not frontages, where open ground carries on. 344 is the capsule's 340 mm radius plus
-the carve's integer stepping, measured here from a second direction. The vertex that ends the north
-footway of Harbour Way 7 left carries z 170 at y 72,556, and the records' own surface 5,006 mm out
-across that strip is 170 as well, so both halves of the 170 that took three readings to settle are
-reproduced here from one line.
-
-**A defect in the sampler, found on the way, which is not about heights.** At a plan point lying
-exactly on an edge two envelope triangles share, `navEnvelopeSupport` returns no surface: the
-barycentric weight comes out at -5.551e-17 instead of 0 and both triangles are refused. Its own
-comment says that a point on an edge belongs to the triangle. At 1 mm this line has 260 such
-stretches, all 1 or 2 mm wide, every one refused by that same weight, all on flat ground at z 0 and
-none between y 1,000 and y 125,750, which is every footway and carriageway the line crosses. The
-count is a property of THIS line: x 320,000 is a terrain grid line, so the line lies along a shared
-edge for its whole length. It is not only this line's problem, because `tileNavigation` picks a
-tile's opening stance by probing the middle of the envelope's x span, which for this tile is that
-same 320,000; it does not bite there today, since the first probe is at y 0 and y 0 has support. It
-belongs to the tile runtime rather than to this producer, and it is recorded here rather than
-changed here.
-
-**Why no test holds this, and what it would take.** The shared conformance fixture carries six
-curbs and its two footway shapes, 4,000 mm at 20,000 millionths and 3,500 mm at 22,858, put their
-walking line at the same 95 mm: `_Kerb.footway_z` reads 95 for all six, which the records log above
-prints from the fixture itself. A guard written over that
-fixture would pass whether the runtime carried a height per curb or one height for the tile, which
-is the shape of test this project has learned to distrust. Either the fixture gains a curb whose
-walking line differs from its neighbour's, which moves the golden digests every consumer pins, or
-the guard runs against a generated tile and pays for a bake. That is a decision across the
-tessellator, the corridor and this producer rather than one this section should take.
-
-**What this does not answer.** Whether a walker can WALK the steps. 40 mm and 50 mm are inside the
-180 mm a walking edge may climb and inside the 0.18 m the movement rule allows, but neither number
-was exercised by a moving body here; this is the surface, not the controller. And the seven walking
-lines this line does not reach, 125, 137, 151, 155, 158, 159 and 167, are still only stated.
+V3 pure fixtures cover local information boundaries, transmission delay, remembered choices,
+vacated locations, stale hearsay, wait, proposal rejection and replay (`tests/test_society_social.py`).
+PostgreSQL cases refuse a v3 creation and a new proposal by name, and plant a stored v3 society and
+its stored proposals as their creation wrote them (`tests/retired_society_support.py`) to hold that
+they read, advance and replay and that a request never answered reads as pending
+(`tests/test_society_social_postgres.py`). A person's model decisions have their own tests, listed
+in the [decision roles contract](decision-roles-contract.md#implementation-and-evidence).
 
 ## Traffic boundary
 
-Cars likewise remain outside the pedestrian implementation. Road movement is stated as the movement
-module `exulanica-movement/roads/v1`, not connected and refused by name as `roads_not_connected`
-([movement modules contract](movement-modules-contract.md#roads)). A traffic producer must supply
-a separate versioned road input contract: stable road/lane/junction and movement IDs, directional
-lane connectivity, permitted turns and vehicle classes, lane geometry and clearance envelopes in
-the agreed coordinate frame, speed limits, right-of-way/signal rules and their effective ordering,
-plus rights/source provenance and exact per-edit input digests. A vehicle policy would additionally
-need explicit spawn/removal rules, stable synthetic vehicle identities, collision/occupancy and
-headway rules, bounded routing, intersection arbitration, gridlock/failure reasons and deterministic
-branch/seed lineage. Playback clocks must declare how pedestrian and vehicle ticks synchronize;
-shared rendered coordinates alone do not establish collision safety. Historical road geometry,
-rule changes and interventions must be retained for replay. Neither the pedestrian graph nor a
-visual road mesh is an adequate traffic contract, and this slice supplies no vehicle simulation.
+Vehicles are outside the society: road movement is the movement module
+`exulanica-movement/roads/v1`, stated and refused as `roads_not_connected`
+([movement modules](movement-modules-contract.md#roads)), and the traffic simulation, which nothing
+in the application calls, is the [traffic contract](traffic-contract.md)'s.

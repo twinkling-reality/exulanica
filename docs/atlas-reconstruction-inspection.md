@@ -1,9 +1,11 @@
 # Atlas reconstruction inspection
 
-The production Atlas reads scene identity, ordered capture membership, quality gates,
-and immutable artifact references from the authenticated graph. This work keeps the
-existing Aeroheart authored world and its navigation policy. A reconstructed scene
-does not become a measured walking surface because its renderer can display it.
+This contract owns how the browser delivers, draws and inspects a reconstructed scene: point-map
+and trained-geometry delivery, the display frame and arrival, the proof lens and click-to-evidence,
+the source gallery and startup states, and the World to data view. The Atlas reads scene identity,
+ordered capture membership, quality gates and immutable artifact references from the authenticated
+graph. A reconstructed scene does not become a measured walking surface because its renderer can
+display it.
 
 ## Coordinates and camera comparisons
 
@@ -29,7 +31,7 @@ the scene and capture identities (or legacy artifact identities), so comparisons
 return to the same views.
 The canvas aspect ratio and exact calibration are recorded; horizontal image coverage
 may differ from the original photograph. Walking input is suspended during inspection,
-and **Return to Atlas** restores the previous position, orientation, field of view,
+and **Return to your world** restores the previous position, orientation, field of view,
 and projection.
 
 Point-map inspection disables point-map atmospheric fog and boundary thinning and
@@ -43,13 +45,12 @@ does not enable reconstruction inspection when no geometry actually loaded.
 
 ## Display frame, arrival and residency
 
-MEASURED 2026-09-05 on the first retained real scene (40 bowl photographs, 38 placed maps):
-drawn as delivered, the scene stood tilted on its COLMAP axes, off the region centre, about six
-times larger than the walking world, 1.2 units under the authored landscape, and its region was
-left at the residency stub stage, so the arrival frame showed landscape alone while the
-inspector, which bypasses residency, showed the geometry. Four presentation rules now apply to
-every drawn scene. None changes a receipt, a rung, or a physical claim, and the status line says
-so beside the rung.
+Drawn as delivered, a scene stands on its COLMAP axes: measured on 2026-09-05 on the first retained
+real scene (40 bowl photographs, 38 placed maps), it stood tilted, off the region centre, about six
+times larger than the walking world and under the ground, and its region stayed at the residency
+stub stage, so the arrival frame showed no geometry while the inspector, which bypasses residency,
+did. Four presentation rules apply to every drawn scene. None changes a receipt, a rung, or a
+physical claim, and the status line says so beside the rung.
 
 - **Display frame.** `sceneDisplayFrame` in atlas-core derives one similarity per scene from
   its recovered cameras: up is the mean camera up (or the negated mean forward for a top-down
@@ -66,8 +67,7 @@ so beside the rung.
   "its recovered cameras do not agree on an up direction, so no upright is claimed." The bowl's 51
   recovered cameras agree (mean up length 0.68) and it stands upright.
 - **Grounding.** Every region, reconstructed or not, sits on the solver's y = 0 plane, which is the
-  flat datum the visitor stands on, so a reconstruction's local y = 0 is that ground. The authored
-  landscape height that reconstructed regions were once lifted onto no longer exists.
+  flat datum the visitor stands on, so a reconstruction's local y = 0 is that ground.
 - **Arrival.** A world of scene regions opens in the region holding the most of the person's
   placements in the version it opens (objects, environment pieces and depth estimates that are not
   removed); a tie goes to the region earlier in the scene's order, and with no placement in a drawn
@@ -154,19 +154,56 @@ a button inside the inspector, which resolves the centre of the view.
 
 The pick runs on the server. The browser turns a click into a cursor in the photograph's own pixels
 and asks `GET /world-read/scenes/{id}/observations/resolve` for the one recorded point it selects;
-opening a view asks `.../observations/summary` for the counts the idle sentence shows. It used to
-read the whole observation graph and pick in the browser, and that could not survive a large scene:
-measured on 2026-09-11 against a frozen copy of the 210-photograph volcanic scene, the whole graph is
-1,015,016,928 bytes of JSON, which V8 cannot hold as one string, so the panel failed with
-"Unexpected end of JSON input". A resolved click is kilobytes (11,277 bytes for a point eight
+opening a view asks `.../observations/summary` for the counts the idle sentence shows. Picking in
+the browser over the whole observation graph cannot survive a large scene: measured on 2026-09-11
+against a frozen copy of the 210-photograph volcanic scene, the whole graph is 1,015,016,928 bytes
+of JSON, which V8 cannot hold as one string. A resolved click is kilobytes (11,277 bytes for a point eight
 photographs observed, 1,784 for a miss) and is bounded by the scene's photograph count rather than
 its point count; the heaviest point a click can select on that scene, 78 retained photographs, is
 92,547 bytes. The server builds an index of the pose receipt on a scene's first read, 6.3 to 6.5 s
 for the volcanic scene, and answers in 0.2 to 0.3 s after that. `exulanica/graph/observations.py`
 records the rest, including what that index does not hold, and the before and after measurements
-are bound in `docs/evaluation/2026-09-11-observation-resolve.json`. None of these reads carries a digest of
+are bound in `docs/evaluation/2026-09-11-observation-resolve.json`, a local-only record a clone does
+not contain. None of these reads carries a digest of
 its own, unlike the World Read bundle: they are recorded provenance served over an authenticated
 route, not a receipt a recipient can verify offline.
+
+## Reconstructed geometry delivery
+
+The backend serves scene facts through `GET /graph` and artifact bytes through
+`GET /geometry/{artifact_id}`. A reconstruction-scene record carries the immutable ordered member
+set, registered and unregistered outcomes, placement and receipt digests, each placed point-map
+descriptor and transform, the recorded rung and reasons, the displayed rung and reasons, and the
+available substrate. The graph route reads that description inside the same repeatable-read
+snapshot as the rest of the world. `GET /geometry` lists descriptors only for per-capture maps that
+never belonged to a posed scene, so a surviving member cannot reappear at an invented origin after
+its placement is withdrawn.
+
+`web/packages/app/src/geometry-api.ts` reads the scene records, checks that every reference
+declares `workspace-bearer` and a local `/geometry/` path, fetches bytes with the bearer header,
+computes SHA-256 over what arrived, and compares it **to the descriptor** rather than to the
+response's own `ETag`. Bytes that fail never reach the decoder, and a page with no `SubtleCrypto`
+loads no geometry at all and says so. The loader accepts the `opm/2` container (a constant in that
+file, moving with the decoder in `@exulanica/atlas-react`); by [ADR-0010](adr/0010-opm-2.md) a
+descriptor naming `opm/1` is refused from the list, with the version as the reason, rather than
+fetched and failed at the decoder. A descriptor whose container is null is attempted, because null
+means no stage definition was recorded for that artifact's parameters, and the decoder is then the
+check.
+
+`GeometryClient.loadScenes` attempts every placed member the validated scene record declares.
+`AtlasBinding` creates one island root and one transformed point-cloud child for each decoded map,
+using the receipt's `scene_from_opm` matrix and never the Atlas layout as reconstruction placement.
+One missing, corrupt, timed-out or unsupported map degrades independently; an unregistered
+photograph is shown through its source-first region rather than as a geometric hole; if no map
+survives, the scene displays rung 4. Every request has its own deadline. The disclosure names
+`recordedSceneRung`, `displayedRung` and `renderingSubstrate` separately: the recorded value comes
+only from the scene-rung assertion, decoded bytes cannot promote it, and the displayed-rung
+sentence comes from the one shared rung copy in `@exulanica/formation`. The load runs on every
+mount, carrying unchanged decoded maps forward by artifact id, so deleting any member removes the
+complete scene on the next mount; bytes are served `no-store`, so a deleted scene cannot be redrawn
+from the browser's own cache. `web/packages/app/test/geometry-api.test.ts`,
+`tests/test_geometry_delivery.py` and the router-generated authorization sweep in
+`tests/test_api.py` cover this path.
 
 ## Trained artifact delivery
 
@@ -194,16 +231,12 @@ test material, not a trained reference, and is never loaded by production code.
 
 ## Sources and startup
 
-`sourcePresentation` is the one renderer input that decides where originals appear.
-The default `world` presentation keeps the source-first grove: each rung-4 region shows
-a veil, a flat photograph with softened edges, and the startup and arrival cameras aim
-at it. `inspection` omits every veil and that camera targeting while the authoritative
-scene, topology, source authorization and inspector stay unchanged, and the app shows a
-**No 3D reconstruction is loaded** panel whose count is the inspector's exact inventory.
-The panel is hidden as soon as any scene renders point maps or Gaussians, while the
-inspector is open, and in Index or Map. It is an unavailable state, never a
-reconstruction result. The reference launcher selects inspection through
-`VITE_EXULANICA_SOURCE_PRESENTATION=inspection`; without that setting Atlas uses world.
+Original photographs are never drawn in the world as geometry or as a card standing in for it: a
+region without reconstructed geometry shows its anchor motes, and its photographs open in the
+source gallery and the Companion. When no scene renders point maps or Gaussians, the app shows a
+**No 3D reconstruction is loaded** panel whose count is the inspector's exact inventory. The panel is
+hidden as soon as any scene renders point maps or Gaussians, while the inspector is open, and in
+Index or Map. It is an unavailable state, never a reconstruction result.
 
 Source cards use authoritative topology region membership, so a scene does not
 need detected entities to expose its original photographs. Source descriptors carry
@@ -292,8 +325,8 @@ A generated tile registers subjects through the contract in
 record the tile owns that states an extent, with the id `generated:<kind>:<identity>`, a
 box from the drawn range that must lie inside the record's declared extent, and the frame
 `city_local:<city subject identity>`. Halo records, relation records and surface materials
-get no subject; a surface material is listed under the subject it dresses. Nothing wires
-the contract to a tile yet.
+get no subject; a surface material is listed under the subject it dresses. No tile registers
+subjects through the contract.
 
 ## Evidence limits
 

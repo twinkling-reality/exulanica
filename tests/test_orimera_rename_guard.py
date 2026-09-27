@@ -40,17 +40,6 @@ ALLOWED_PATHS: dict[str, str] = {
     "docs/development-setup.md": (
         "documents the withdrawn Orimera names and that the store ignores .orimera/"
     ),
-    "docs/evaluation-corpus-contract.md": (
-        "records a dated local-discovery result that searched private .orimera "
-        "state and found the synthetic orimera-corpus fixture"
-    ),
-    "docs/person-presentation-consent.md": (
-        "records a corrected pre-rename launch configuration that still named "
-        "ORIMERA_ and orimera.api.app"
-    ),
-    "docs/retained-reference-workflow.md": (
-        "documents ~/exulanica as the new host checkout and ~/orimera as the existing layout"
-    ),
     "docs/world-memory-package.md": (
         "records that the pre-release orimera-wmp-1.0 profile was withdrawn"
     ),

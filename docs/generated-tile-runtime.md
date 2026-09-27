@@ -2,12 +2,11 @@
 
 Status: Development evaluation only: the browser reads baked texture sets and
 baked `.owd` tiles, draws a tile's `render_batch` with physically based materials under one
-versioned look, and stands the player on its `nav_envelope`. No generated tile appears in any
-person's world, and none may until a superseding governance ADR is accepted in writing. A baked
-corridor street exists in the tile store and has been loaded through the product route and
-walked on the development page (2026-09-17): 4 of its 854 records drew, and 851 named a tessellator
-expander that does not exist, so what a walker saw was the stated unavailable hatch rather than a
-street. Textured tile geometry has still been seen only on a test-only bench.
+versioned look, and stands the player on its `nav_envelope`. The app draws a generated tile only in
+the development preview, never in a saved world. The baked corridor street loads through the
+product route on the development page with its surfaces dressed: at tessellator 17, 1,496 of the
+corridor tile's 1,582 drawn surfaces are dressed by a material record
+([generated corridor](generated-corridor-street.md#7-what-draws-and-what-does-not)).
 
 The code is `web/packages/atlas-core/src/texture-set.ts` (the texture set reader),
 `web/packages/atlas-react/src/playcanvas/generated-tile/` (materials, look, environment, tile
@@ -15,7 +14,7 @@ loading, navigation and the binding contract, exported as `@exulanica/atlas-reac
 the `generatedTile` option of `web/packages/atlas-react/src/playcanvas/atlas-binding.ts`, and the
 development entry in `web/packages/app/src/composition/generated-tile.ts` and
 `web/packages/app/src/dev/`. The container is tess's, documented in `web/packages/loom-tess/README.md`;
-the sets are the texture lane's, documented in [texture-package.md](texture-package.md).
+the sets are the [texture package](texture-package.md)'s.
 
 <details>
 <summary>Sections</summary>
@@ -28,8 +27,8 @@ the sets are the texture lane's, documented in [texture-package.md](texture-pack
 - [6. The look, measured](#6-the-look-measured)
 - [7. The evaluation entry](#7-the-evaluation-entry)
 - [8. Budget](#8-budget)
-- [8.1 The paired walk, stated before it is taken](#81-the-paired-walk-stated-before-it-is-taken)
-- [9. After this runtime](#9-after-this-runtime)
+- [8.1 The walk on a baked street](#81-the-walk-on-a-baked-street)
+- [9. Limits](#9-limits)
 
 </details>
 
@@ -48,14 +47,14 @@ missing (no `collision_proxy`, so nothing blocks the capsule), how many of the r
 lists are drawn and how many surfaces are drawn as unavailable, and lists each such surface (record,
 role and orientation, with its reason) and every record not drawn, with the geometry it waits on.
 
-The eight texture sets are seen on real surfaces only on the test-only bench,
+The looks below were measured on the test-only bench,
 `web/packages/atlas-react/test/generated-tile-bench/`: a few metres of hand-built street
 (carriageway, 150 mm kerb, footway, a wall with a stone plinth, a recessed metal door and a
 projecting cornice), lit by the same look. The bench is never shipped and is not a placeholder
 for a tile.
 
-With no tile requested, the app is unchanged: a GPU readback of the default view at three poses
-is byte-identical to main (section 8).
+With no tile requested, the app draws what it would without this runtime: a GPU readback of the
+default view at three poses is byte-identical with and without it (section 8).
 
 ## 2. The texture set reader
 
@@ -110,7 +109,7 @@ Conformance, two ways. `web/packages/atlas-core/test/texture-set.test.ts` decode
 published v1 containers and requires, per map, the byte offset, length, SHA-256 and first and last
 bytes the Python reader (`exulanica/world/texture_assets.py`) produced, from a fixture beside the test
 written by `texture-set-python-decode.py.txt`. `web/packages/atlas-core/test/texture-set-cases.test.ts`
-runs the texture lane's shared case file, `web/packages/loom-texture/test/texture-set-cases.json`, the
+runs the texture package's shared case file, `web/packages/loom-texture/test/texture-set-cases.json`, the
 one the baker and the backend run too: every manifest case and every container case, over one v2
 fixture per class plus a v1 and a model-made one, each accepted or refused for the same reason every
 reader gives. The file and its fixtures are read by path, which is not an import, so nothing that ships
@@ -184,7 +183,7 @@ glass, because the scene copy holds only what was drawn in front of it. The film
 declares is for laying more film by position, which waits for its inputs.
 
 Measured on the bench on the published `cc0.float-glazing`, against a test-only checker backing 0.6 m
-behind the pane, since no interior stands behind glass yet
+behind the pane
 (`evidence/glazing-acceptance.log.txt`): the backing reads through at 2, 4 and 6 m (luminance
 correlation 0.89 to 0.90, 0.89 to 1.00 of its contrast kept); with the backing at about a shop
 interior's brightness the sky's reflection is 38 per cent of the pane's light face on, passes half
@@ -243,7 +242,7 @@ material and one orientation, so a kerb's vertical face and its horizontal top, 
 roles, are separate surfaces of one record. A surface is textured when its material is a version 2
 `surface_material` record whose set is pinned and verifies; a surface whose material is
 `none-exists`, or whose material does not resolve, is the unavailable surface with its reason. An
-`unavailable` entry is geometry tess has not produced yet: it has no
+`unavailable` entry is geometry tess does not produce: it has no
 triangles and is listed with the needs tess stated ("Not drawn yet: its geometry waits on
 massing_faces."). A `not_admitted` entry is listed too. A `halo` entry is a neighbouring record
 carried as context and is neither drawn nor listed, and neither is `not_in_projection`. Every set a
@@ -259,9 +258,9 @@ the camera's yaw 0.
 
 Identity for picking: `rangeAtTriangle(triangle)` returns the record a `render_batch` triangle
 belongs to, and `pick(origin, direction)` returns the nearest drawn triangle along a ray with its
-record; both stay per entry, whatever surfaces it has. Version 2 records state their identity (the conformance terrain is
-`2f14328d-39f8-5bee-a06a-f963b701ccf3`), and every range carries it. Data view selection through
-`registerRepresentationSubjects` is not wired yet; it waits for the data view lane to merge.
+record; both stay per entry, whatever surfaces it has. Version 2 records state their identity
+(the conformance terrain is `2f14328d-39f8-5bee-a06a-f963b701ccf3`), and every range carries it.
+Data view selection through `registerRepresentationSubjects` is not wired for tiles.
 
 ## 5. Standing and walking
 
@@ -295,7 +294,7 @@ Every look parameter lives in one descriptor, `TILE_LOOK_V1` in `look.ts` (id
 key, a wrong kind or an out-of-range value. Three ranges are the architecture's look targets and are
 enforced there: fog onset 40 to 60 m, an environment probe with no off switch, and contact
 shadowing with no off switch whose radius must reach a 100 mm kerb without spanning a storey. The
-corridor lane changes the look by editing this descriptor and bumping its version; geometry, UV
+look changes by editing this descriptor and bumping its version; geometry, UV
 scale and texture choice are world data and are not in it.
 
 `environment.ts` applies the look. Its camera frame (tone mapping and the occlusion pass) builds
@@ -345,8 +344,7 @@ A tile can be named only on the synthetic development preview route:
   configuration and resolves every pinned set to its URL and its pinned bytes.
   Baked corridor streets are not repository files; they go to the baked tile store and a permission
   gated route, and nothing here reaches them.
-- The preview title is left alone: the visual gate harness holds the shell to its title, and
-  choosing a harness target for tiles belongs to the corridor lane.
+- The preview title is left alone: the visual gate harness holds the shell to its title.
 - `environment-selection.ts` treats a mounted tile like the owned district and chooses the neutral
   overlay, so no NYC footprint lines are drawn over it.
 
@@ -391,8 +389,8 @@ page, and the difference between the two is where the container comes from:
 **The split, which is a decision and not an accident.** The CONTAINER comes from the route with a
 credential, because a generated tile must never be committed. The TEXTURE SETS come from the
 committed library through the development page (`committedTextureLibrary()`), because they are
-committed and no route serves the published texture library yet. A published-texture route is a real
-gap and a future lane's work. The statement panel says both, with the container's digest and whether
+committed and no route serves the published texture library; a published-texture route is
+not built. The statement panel says both, with the container's digest and whether
 the bytes were fetched, held or not modified, so no picture of a walk can imply a product path that
 does not exist; the golden path prints its own line, so the two can never be mistaken for each other.
 
@@ -418,159 +416,40 @@ headless Chrome through `.exulanica/bin/quiet-slot`, with the load average befor
 | 28 MB transferred | The 7 cited sets: 65,551,200 bytes raw, 21,292,652 gzip, 17,955,391 brotli | Only from a compressing host |
 | About 227,000 faces | 40 on the bench street; 512 on the conformance tile | Not measured at corridor scale |
 
-Only the sets a tile cites are fetched. A GPU compressed transfer container is a texture lane
-follow-up. The frame figures are the look's per-pixel cost at full screen; what 227,000 faces in a
-handful of texture batches cost is unverified until the corridor lane bakes a street.
+Only the sets a tile cites are fetched, and no GPU-compressed transfer container is built. The
+frame figures are the look's per-pixel cost at full screen; what a corridor-scale tile costs in
+faces and draws is not measured.
 
 Default view unchanged: `evidence/default-view-comparison.log.txt` records a GPU readback (SHA-256 of
-the whole backbuffer) at three poses on `?preview=1` with no tile, byte-identical between this
-runtime's branch and main, first on 2026-09-16 and again after the rebase onto main 36e6d2dd.
+the whole backbuffer) at three poses on `?preview=1` with no tile, byte-identical with and without
+this runtime, on 2026-09-16 and again at 36e6d2dd.
 
-## 8.1 The paired walk, stated before it is taken
+## 8.1 The walk on a baked street
 
-Written before the tessellator 14 bake exists, so the numbers reported afterwards have something to be
-checked against rather than something to be chosen to fit. The corridor lane pre-registered the same
-walk from its side (its street document, commit 15d1352a); these are the parameters this lane will
-match, so the two runs are one experiment from two directions rather than two similar ones.
+Walked on the development page over the corridor tile's tessellator 14 container (`2adf282b`), from
+the corridor's stated pose with the product's own walking, a held W key stepped at exactly 1/30 s
+with no camera override and no written position, the walk advanced 121,982 mm continuously at
+1.62 m/s, 23 to 55 mm a step, its y constant at `70300`. A standing eye is exactly the stated eye
+height above the support it sampled, 146 mm plus 1620 on the walked footway, 1766 mm, which
+`generated-tile-runtime.test.ts` holds. At x `378334` the eye fell 146 mm: the walker stepped off
+the end of the pavement onto terrain at the datum, 34 mm past where the kerb ends, with the tile
+continuing 5.7 m further, so a walk is reported as segments by the surface under it rather than as
+one distance. What a walker does at a gap in support is not measured on this runtime, because the
+carve leaves the walked line supported.
 
-| | |
-| --- | --- |
-| path | east along the footway centre line, y `70300`, from x `262000` toward x `378000` |
-| pose | stated, `pose_x_mm=262000&pose_y_mm=70300&facing_dx=1&facing_dy=0`, never a default |
-| movement | the product's own walking, a held W key through its movement and support resolution |
-| stepping | `beginTileCapture().advance(dt)`, dt exactly 1/30 s, no clock consulted |
-| never | no camera override and no writing of a position: a walk that teleports proves nothing about support |
-| viewport | 1080 square, which is above the 960 px the app requires before it serves its boundary page |
-| recorded | the camera's position every step, plus frames at the start, at x `320000` and at the end |
-| compared against | the same capture on the tessellator 13 bake, where the walk advanced almost not at all |
+## 9. Limits
 
-**The question, and why one run could not answer it.** On tessellator 13 the walk barely advanced. Two
-things could have caused that and the run cannot separate them: the seven tree-canopy holes, which
-left 53 m of the 116 m unsupported, or the movement rule that returns a walker to safety each frame
-instead of sliding along what it cannot enter. Tessellator 14's carve leaves the walked line
-supported while `render_batch` is unchanged, so the picture is held constant and the only thing that
-moves is the support. If the walk advances, the holes were the limit. If it does not, this is a
-measurement of the recovery behaviour alone, which is worth more than the first run was.
-
-**Neither half decides it alone, which is why both are stated here.** This lane's trace says where the
-walker WENT. The corridor lane samples its own container every 100 mm along the same line and says
-where the bake states a walker COULD have stood. Laid against each other at an x the container calls
-unsupported, the trace either stops, drops 170 mm to the terrain, or passes over, and which of the
-three it is cannot be read off a film. A trace without the container's support is a behaviour with no
-ground truth; the sampling without a trace is ground truth with nothing walking on it. Both halves key
-on the CONTAINER DIGEST rather than on a file name, so they can be lined up without either lane
-trusting the other's label.
-
-**What is not predicted.** What a walker does when they meet a metre of unsupported footway is the
-corridor lane's open question and it is open here too: stopping, dropping to the terrain 170 mm below,
-and stepping over are all honest answers. Recording the question in advance is what stops whichever
-happens from being described afterwards as the expected behaviour.
-
-**What the eye height is, read rather than remembered, and what it makes decidable.** The capsule comes
-from the tile's own grammar table: city version 2 states `eye_height_mm` 1620 (`loom-tess/src/core/
-city-v2.ts`), `tileCapsule` reads it and refuses a tile whose grammar states none, and the movement
-rule puts the eye exactly that above the sampled support (`navigation.ts`: the target is
-`sample.height + world.eyeHeight`, and the resolved position is `finalSample.height + world.eyeHeight`).
-So a standing eye is support plus 1620 mm and nothing else, which is what lets this lane's trace and the
-corridor lane's support heights SUBTRACT. On tessellator 13, whose footway support measures 147 to 170
-mm, a standing eye reads 1767 to 1790 mm, and the behaviours separate:
-
-| behaviour | signature in the pair |
-| --- | --- |
-| stops | x stops advancing, eye height holds near 1790 |
-| passes over nothing | x advances across a gap the container calls unsupported while the eye holds near 1790 |
-| drops to terrain | eye falls about 170 mm to near 1620 while x advances |
-
-**A fourth signature this lane can predict from its own code**, which neither half would have guessed
-from the street: a tile's navigation world states no regions (`tile-navigation.ts` passes an empty
-list), so if movement ever recovers with no last safe position to return to, `nearestRegionEntry`
-answers the world CENTRE at `world.eyeHeight` above the datum rather than above any support. That
-reads as an eye at exactly 1620 mm, not 1767 to 1790, and an x that jumps to the middle of the tile.
-If a trace shows that, it is not a walk at all and must not be reported as one.
-
-**Read the pair, never x alone, and this is fixed before the run rather than after the number.** The
-corridor lane's pre-registered midpoint capture is x `320000`, and tile (2,0) spans x 256000 to 384000
-and y 0 to 128000, so ITS CENTRE IS ALSO x 320000. A trace reading x 320000 is therefore either a
-walker who reached the midpoint or the recovery signature above, and x cannot tell them apart. The
-disambiguator is y, 6.3 m of it: the walked line is y `70300` and the tile centre is y `64000`, which
-is the far side of the carriageway.
-
-| reading | what it is |
-| --- | --- |
-| x 320000, y 70300 | the walker reached the midpoint |
-| x 320000, y 64000 | a recovery to the world centre, which is not a walk |
-
-The eye height stands beside it as the second test: a recovery answers exactly 1620 above the datum,
-while a walker standing on the footway answers that bake's support plus 1620.
-
-**The mirror of this lane's eye caveat, from the corridor lane, recorded before the run:** its support
-heights are the CONTAINER's, not the runtime's. If the runtime applied a step height, a ground offset,
-or held the last known support where it found none, its idea of the floor would differ from the
-container's by a constant or by a history, and neither half would see that alone. A clean difference
-that is not 1620 is therefore the first thing to suspect, and a fact about the runtime worth having
-rather than an error in either measurement.
-
-**The walk, run 2026-09-18, and what the pair found.** On the tessellator 14 container
-(`dd0dc7f6`, digest `2adf282b`) the walk ADVANCED: 121,982 mm continuously at 1.62 m/s, 23 to 55 mm a
-step at dt 1/30, with the walked line's y constant at `70300` for all 3,000 steps. So this lane's
-claim of the night before, that the walk barely advances, was about the tessellator 13 tree-canopy
-holes and not about the capture or the movement rule. At x `378334` the eye fell 146 mm and the walker
-came to rest at x `383999` for the remaining 779 steps.
-
-That last stretch was first reported here as "the end of the world" and that was wrong. A third lane
-read the records along the walked line and found the fall is 34 mm past where the Harbour Way 7 left
-kerb ends, with the tile continuing 5.7 m further: it is the end of the PAVEMENT, not of the world,
-and the 146 mm is exactly the footway's own height, so the walker stepped off the footway onto terrain
-at the datum. Reading the trace for x `383000` to `383999` alone confirms it from this side: 797 steps,
-the eye at 1620 for every one of them with no variation, y constant at `70300` throughout. So the
-walked line held and the KERB turned away from it, not the other way about. A third lane's sampling of
-the walked points against the records puts numbers on that drift: from x `379017` the point's distance
-from the kerb line grows from 2,750 to 5,460 mm as the records' surface climbs 146 to 174 mm across the
-crossfall, and by x `383767` it is 679 mm beyond the nearest footway's back edge.
-
-**Report a walk as segments by surface, not as one distance.** "121,982 mm continuous" is true and
-hides that the surface changed 5.7 m before the end. A continuity claim is about the walker and says
-nothing about what they were walking on, and neither of this lane's numbers, advance and eye height,
-distinguishes a footway from terrain: only the eye height's VALUE does, and only against a support
-height measured by somebody else.
-
-Two instrument faults came out of it, and only the pair could have found the second.
-
-*This lane's:* the trace records the CAMERA's world position, and the tile is mounted with its root
-64 m away in x and z, so every raw reading was 64 m from the city frame the corridor lane samples in.
-Corrected, the stated pose landed 17 mm from where it was stated, one step of walking, and that
-agreement is what proves the correction rather than the correction proving itself. A frame mismatch
-survives every check that compares a number with itself.
-
-*The corridor lane's, and the reason the experiment was worth running from two directions:* its
-sampler read the HIGHEST CORNER of the triangle under a sample point rather than interpolating the
-plane at the point, and the footway falls 56 mm across its width to the gutter, so it overstated the
-walked line by about 24 mm. Its number said a standing eye would be 1790; this lane measured 1766.
-Corrected, support on that line is 146 mm everywhere and 146 + 1620 is exactly 1766. Nothing on
-either side could have exposed that alone: the corridor lane's readings were all measured the same
-wrong way and were internally consistent, and an eye height of 1766 says nothing without a support
-height to subtract from it. `generated-tile-runtime.test.ts` holds the line they agree on, that a
-resolved move puts the eye exactly the stated eye height above the support it sampled.
-
-**One candidate excluded by measurement, 2026-09-18, before either half ran.** The pre-registration
-above is left as written; this is what has since been measured against it. The corridor lane sharpened
-its sampler after finding that a point supported at 170 mm and a point supported at 0 mm both counted
-as "supported", so a walker dropping off the kerb would have read as a continuous walk: the tool meant
-to catch that behaviour could not see it. Reporting the support HEIGHT at 100 mm along the walked line
-of the tessellator 13 container gives 1,161 samples, every supported one of them footway at 147 to 170
-mm, no terrain level anywhere, and seven runs of NO SUPPORT AT ANY HEIGHT totalling 60.7 m of the 116,
-which is more than the 53 to 56 m a 500 mm sampling had reported. So on that bake the candidate "drops
-170 mm to the terrain" is excluded by the ground truth rather than by argument: where the footway is
-carved away the envelope holds no triangle at any height, because the terrain had already yielded to
-the footway's own record and the carve removes both. Two candidates remain there, stopping or passing
-over nothing, and a trace can tell those apart. Whether the third returns on tessellator 14 is a
-question for that container's own sampling, not for this paragraph.
-
-## 9. After this runtime
-
-- The corridor lane bakes the street and iterates on its look, at most three times, by editing
-  `look.ts` and these modules.
-- Dressed surfaces are drawn by the UV rule above as soon as tess draws a range that cites a
-  material record; no tile does yet, so that path is covered by the `surfaceUv` tests only.
-- Data view selection through `registerRepresentationSubjects`, after the data view lane merges.
-- `collision_proxy` is consumed when tess materialises it.
+- No tile carries `collision_proxy`, so nothing blocks the capsule (section 5).
+- Data view selection through `registerRepresentationSubjects` is not wired for tiles.
+- No route serves the published texture library; the development page reads the committed one
+  (section 7.1).
+- **The support sampler can refuse a point on a shared edge.** At a plan point lying exactly on an
+  edge two envelope triangles share, `navEnvelopeSupport` (`tile-navigation.ts`) can return no
+  surface: the third barycentric weight, computed as one minus the other two, comes out at about
+  -5.6e-17 rather than 0, and both triangles are refused, although the sampler's own comment says a
+  point on an edge belongs to the triangle. On the corridor tile's north-south midline, x 320,000,
+  a terrain grid line and so a shared edge for its whole length, a 1 mm sampling found 260 stretches
+  of 1 or 2 mm with no surface, all on flat ground outside every footway and carriageway
+  ([walking-lines-runtime.log.txt](artifacts/society/walking-lines-runtime.log.txt)). The opening
+  stance probes that same midline from its southern edge and finds support at its first probe on
+  that tile.

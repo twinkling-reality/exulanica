@@ -1,13 +1,33 @@
 # Character representation and movement
 
 Status: **CATALOG PEOPLE FOR THE PLAYER AND INHABITANTS**. This contract defines the shared
-character foundation for the player, synthetic inhabitants, and people observed in scenes. A
-committed catalog of fitted, textured people supplies the player's default body, every
-inhabitant's look in saved, starter and district worlds, the character studio and saved looks,
-with near and distant detail levels, planted feet, a seated rest drawn for the activity a society
-states, on the ground or on the seat of the furniture a person uses, and a frame budget measured on a
-production build. It does not establish likeness reconstruction, automatic rigging of new source
-material, or crowd collision avoidance.
+character foundation for the player and a world's synthetic inhabitants, how the app draws a
+society's people, and the representation boundary a scene's observed people would bind to, for
+which no adapter is built. A committed catalog of fitted, textured people supplies the player's
+default body, the look of every inhabitant of every world that holds a society, the character
+studio and saved looks, with near and distant detail levels, planted feet, a seated rest drawn for
+the activity a society states, on the ground or on the seat of the furniture a person uses, and a
+frame budget measured on a production build. It does not establish likeness reconstruction,
+automatic rigging of new source material, or crowd collision avoidance.
+
+<details>
+<summary>Sections</summary>
+
+- [One foundation, distinct subjects](#one-foundation-distinct-subjects)
+- [Extensible asset and customization pipeline](#extensible-asset-and-customization-pipeline)
+  - [Catalog people](#catalog-people)
+  - [Inhabitant looks and the display function](#inhabitant-looks-and-the-display-function)
+  - [Player, studio and saved looks](#player-studio-and-saved-looks)
+  - [Authenticated appearance history](#authenticated-appearance-history)
+  - [Editable human builder](#editable-human-builder)
+- [Visual direction](#visual-direction)
+- [Representation boundary](#representation-boundary)
+- [Movement quality](#movement-quality)
+- [Detail levels and frame budget](#detail-levels-and-frame-budget)
+- [Drawing a society's people](#drawing-a-societys-people)
+- [Limits](#limits)
+
+</details>
 
 ## One foundation, distinct subjects
 
@@ -128,19 +148,9 @@ catalog maps to nothing is drawn standing. A caller that draws the person at a s
 (`seated`), and the family's seat posture for the activity is drawn instead where it declares one
 (`seatPostures`, `rest` to `perched`). The renderable never infers an activity from motion.
 
-The society display (`society/crowd.ts`), which saved, starter and district worlds share, draws every
-inhabitant this way. The nearest inhabitants within 60 m are catalog people, up to
-`NEAR_INHABITANT_BUDGET`, which is `NEAR_CHARACTER_BUDGET` less the place the player's own body holds
-(`PLAYER_NEAR_PLACES`); everyone else within 700 m is drawn in the far form of their own look
-(`society/far-figures.ts`, `farAppearance`), the same form a catalog person shows while its parts load,
-so nobody changes colour or build crossing the boundary. The crowd reads `action.kind` from the
-snapshot when `action.status` is `active` and hands it on once the path recorded for the tick has been
-walked, so a person asked to rest walks there and then sits. Everyone faces the way their recorded
-path last took them and keeps that facing when they stop, in either form, so a person first drawn in
-full after arriving, or again after a spell in the far form, faces as their far figure did, except
-where their activity's facing rule says otherwise, as at an object they use
-([synthetic society contract](synthetic-society-contract.md)). The abstract figure remains a factory
-a caller can name (`society/near-character.ts`); it has no seated posture, so it stands at a place
+The society display draws every inhabitant this way
+([drawing a society's people](#drawing-a-societys-people)). The abstract figure is a factory a
+caller can name (`society/near-character.ts`); it has no seated posture, so it stands at a place
 rather than being lifted onto a seat.
 
 ### Player, studio and saved looks
@@ -201,7 +211,7 @@ only, and a production build test proves no container is bundled.
 
 ### Editable human builder
 
-The earlier MakeHuman/MPFB builder remains in the repository: a loopback-only preparation adapter
+A MakeHuman/MPFB builder is also in the repository: a loopback-only preparation adapter
 (`scripts/parametric_character/preview_server.py`) fits a generated body for a full parameter recipe,
 and `scripts/prepare_parametric_character.py` prepares its committed default. The studio's catalog
 flow does not use it; generated bodies are development experiments, not saved looks, and they do not
@@ -238,12 +248,13 @@ from the person's own look, one draw call each, with a step rhythm and a lean in
 distant figures opened cracks at knees and ankles and are not used. Visual detail does not change simulation state or which person
 an interaction targets.
 
-People sharing an exact simulated position must not render as intersecting skins. Until the society
-supports personal space, destination capacity and queueing, exact co-location may use an explicitly
-counted group with a stable visible representative and access to each member. This is a display
-fallback, not crowd avoidance. Report drawn bodies separately from nearby subjects and total
-population. Genuine spacing and collision-aware crowd motion require planner support; do not move
-canonical people to unrecorded positions for presentation.
+The renderer never moves a canonical person to an unrecorded position for presentation, and it
+does not steer walkers around each other. Keeping people apart is the simulation's rule: a
+purposeful society over an input that states places holds one person to a place and keeps people
+standing still a standing spacing apart, and the living society holds one person to a standing
+spot ([synthetic society contract](synthetic-society-contract.md)). Where a society puts two people
+on one point, both are drawn there. The crowd reports the bodies it draws separately from the
+nearby subjects and the total population.
 
 ## Representation boundary
 
@@ -328,8 +339,7 @@ or less bent; the far form is lifted without planting. The perched clip, like th
 generated by this repository's own posture script from the definition's numbers, and is CC0 under the
 family's licence; the bases' reviewed import summary says so. Postures are baked in the order the
 definition declares them, the order is part of the build's cache stamp, and adding `perched` left the
-seated clip's keyed bytes as they were (`tests/test_character_postures.py`). Conversational gestures, gaze, reaching, contact-aware
-interaction and individual motion styles remain absent.
+seated clip's keyed bytes as they were (`tests/test_character_postures.py`).
 
 ## Detail levels and frame budget
 
@@ -346,7 +356,7 @@ least 2 m nearer than the person it would replace, so someone walking along the 
 does not switch forms every frame. A resident set of any size is accepted.
 
 The budget is per this machine's release build. It was measured on 2026-09-23 on a production bundle
-of the tree this change belongs to (base e9dee3c2 with the character work; script `index-Bdu_k0ox.js`,
+of the character catalog work on base e9dee3c2 (script `index-Bdu_k0ox.js`,
 sha256 `3127a8cb3106376b...`), which carries PlayCanvas's release engine (`playcanvas`, as the bundle's
 own engine-build record states), in headless Chrome 153 on an Apple M5 Max at 1440x900. The harness
 mounts the real Atlas over the Flatiron owned district in third person, with the player drawn in full as
@@ -384,11 +394,9 @@ the harness that produced it (page, Vite configuration, driver, idle gate and ru
 digest in the log), and `character-budget.test.ts` reads it and fails if the constants, the rule, the
 gate, the engine build or the retained harness disagree.
 
-A development server serves the debug engine (`playcanvas.dbg`) instead, so a measurement there does not
-state this budget. The development-preview run of 2026-09-17 (headless Chrome 152, Apple M3 Pro, debug
-engine, a crowd of 128 in the same district) measured 7.5 ms of frame work p95 at 24 full characters and
-9.0 ms at 36; it is retained as `frame-budget-2026-09-17.log.txt`, beside a discarded run from a busy
-machine. A weak-machine measurement is open.
+A development server serves the debug engine (`playcanvas.dbg`) instead, so a measurement there does
+not state this budget; the development-preview runs of 2026-09-17 retained beside the production run
+(`frame-budget-2026-09-17.log.txt`) state none. No weaker machine has been measured.
 
 A person can also be carried instead of posed: `follow(position)` moves the body to a new ground
 contact and keeps the pose it has, the clips still playing, and the caller hands the time it skipped
@@ -403,28 +411,102 @@ person, or stopping a distant person's animation, each of which changes how a pe
 its own decision. The run is retained as `follow-saving-2026-09-17.log.txt` beside the 2026-09-17
 budget run.
 
-## Delivery and acceptance
+## Drawing a society's people
 
-1. **Delivered.** The shared rig and catalog-backed representation model, with catalog people and an
-   abstract canvas option, stable subject identity and the one display function inhabitants use.
-2. **Delivered, with the limits named above.** Visibly distinct silhouettes, hair, clothing and
-   material combinations; studio editing with saved selections, reset and restore, in the preview and
-   in signed-in worlds, with a saved or starter world keeping an account's looks per world version;
-   the player from behind, beside and close; catalog people as the inhabitants of saved, starter and
-   district worlds, seated when resting; idle, slow walk, walk, run, turn and stop captured in the
-   world; planted feet measured; the frame budget measured on this machine's release build. Open: a
-   weak-machine frame measurement, and saved looks for a session that names no account.
-3. Add an explicit scene-person adapter using existing confirmed or unresolved observation IDs.
-   Start with a source-linked abstract character. Do not require a complete photoreal likeness to
-   map an observed person into world representation.
-4. Add reviewed source-to-character fitting: selected source references, uncertainty-aware body
-   fitting, compatible rig/retargeting, face/body textures, editing, dependency withdrawal and undo.
-   Demonstrate this on authorized material before claiming personal likeness support.
+The society display (`web/packages/atlas-react/src/playcanvas/society/crowd.ts`) draws the whole
+population of every world that holds a society, by distance, and never truncates it: the
+population is canonical state. The nearest inhabitants within 60 m are catalog people, up to
+`NEAR_INHABITANT_BUDGET` (60, the measured budget less the player's own place,
+[above](#detail-levels-and-frame-budget)), and every other outdoor inhabitant within 700 m is drawn
+in the far form of their own look (`society/far-figures.ts`, `farAppearance`), one draw call each,
+the same form a catalog person shows while its parts load, so nobody changes colour or build
+crossing the boundary. Indoor inhabitants are counted, not drawn. A saved world's inhabitants hang
+from their region's root, the frame their input states positions in and the frame the person's
+objects are placed in. While everyone is away the state holds nobody, so the crowd draws nobody.
 
-The first showcase should prove character variety, movement quality and the living world's behavior.
-A source-linked character demonstration may show the mapping extension when available, with the
-observed source and generated completion distinguishable. Automatic identity recognition, complete
-body recovery from one image and faithful personality simulation are not claims of this milestone.
+**Walking the recorded path.** Motion follows the recorded path (`motion_path_mm`) only, and no
+position is invented between its points. A v4 inhabitant walks the path at its recorded
+`walk_speed_mm_per_tick`, one tick's worth per interval, and stops where the path ends. A v2 state
+records only a bound, `movement_budget_mm_per_tick`, usually far longer than the path a person walks
+in a tick, so a v2 person walks what they have left evenly until the next tick is expected (the
+interval plus the caller's start lag), never faster than 1.5 times the bound's own pace, so nobody
+sprints and then stands. A v2 person whose newly read tick adds nothing to walk finishes what is
+left at no slower than their own walking pace, the walk clip's measured ground speed at their
+height; a remainder spread again at every tick would never end. Each later tick's path is appended
+to what the person has still to walk when it starts where that ends, so a walk through several
+minutes does not stop between them. A v4 person behind catches up along the path at most 1.5 times
+their speed. Anyone moved without walking (a path that starts elsewhere, minutes not read, more
+walking waiting than can be caught up, no recorded path, or an older state) is named with its reason
+rather than moved silently (`CrowdJump` in `society/types.ts`). A state without a pace is eased
+along its path over the interval. Everyone walks on the ground plane: an inhabitant that states the
+height of the surface it stands on is refused rather than drawn under it.
+
+**Facing and activity.** Everyone faces the way their recorded path last took them and keeps that
+facing when they stop, in either form, so a person first drawn in full after arriving, or again
+after a spell in the far form, faces as their far figure did. What a person is doing comes from the
+state, never from how they move: the crowd hands the kind of an action under way (`action.kind`
+with `action.status` `active`) to whatever draws the person, as `activity` in `CrowdPose`, once the
+path recorded for the tick has been walked, so a person asked to rest walks there and then sits.
+They face as their activity's rule says (`society/activity-facing.ts`): `rest` and `visit` face the
+object across the place, so a visitor at the market stall faces its counter and one at the tree
+faces the tree, also in the minute after a visit completes while the visitor still stands there;
+`talk` faces the partner the goal names; standing and walking keep the way they last walked, and an
+activity with no rule is drawn that way and named.
+
+**Seats.** With each state the page hands the crowd a seating layout (`society/seating.ts`): each
+kind's use as `GET /world/assets` serves it from the world object catalog, the drawn version's
+objects, and the object each target of the consumed input belongs to. A person whose action, under
+way or just completed, names a target holds the catalog place whose position, carried into the
+object's frame, lies within the turn's outward rounding of their recorded position
+(`PLACE_MATCH_MM`, the square root of two millimetres and a micrometre). Where the place has a seat
+and the catalog declares a seat posture for the activity (`seatPostures`, `rest` to `perched`), the
+person sits on it: they walk at their own pace to stand before the seat (in front of it, or beside
+it when their place is off to its side, as at the cafe chairs, so the walk does not pass through the
+table), then turn and lower onto it over the posture's 0.8 s blend, pelvis on the seat at its height
+and facing: a full character with its feet planted on the ground below, a far figure lifted to the
+same height. Getting up runs the same way back, feet planted as they rise, before they walk on.
+Moved without walking (a named jump), they leave the seat at once rather than glide from it. After
+an object is moved or taken away the page hands the crowd a new layout at once, so a person whose
+seat is gone gets up without waiting for the next minute. The move from the place to the seat is
+presentation, and the person's recorded position stays the place. A place with no seat, such as a
+marker plate's, keeps the ground rule: resting is drawn sitting on the ground in front of it. A
+person matched to no place, or performing an activity with no facing rule, is drawn as everyone else
+is and named with its reason (`seatingMisses`, which the page records on the canvas as
+`data-society-seating-misses`); the owned district hands no layout. An activity with no declared
+posture, such as making room, is drawn standing, and so is everybody drawn by a renderable with no
+postures, which also stays standing at its place rather than being lifted onto a seat.
+
+**Posing by distance.** Every drawn inhabitant is placed at its recorded point every frame, but only
+the nearest full characters are posed every frame: the nearest 4 every frame, the next 8 every
+second frame and the rest every third (`POSE_INTERVAL` in `society/crowd.ts`), each carried to its
+recorded point in between. A selected inhabitant, and anyone whose snapshot jumped, is posed at once.
+The cadence is what makes the abstract figure affordable, whose pose costs about 0.53 ms of
+main-thread time in the development preview, almost all of it CPU skinning; a catalog person's pose
+costs about 2.6 microseconds, since the engine animates and skins every drawn catalog person whether
+or not it is posed ([carrying](#detail-levels-and-frame-budget) above).
+
+## Limits
+
+Built: the shared rig and catalog-backed representation model, catalog people and the abstract
+figure, stable subject identity and the one display function inhabitants use; visibly distinct
+silhouettes, hair, clothing and material combinations; studio editing with saved selections, reset
+and restore, in the preview and in signed-in worlds, a saved or starter world keeping an account's
+looks per world version; the player from behind, beside and close; catalog people as the
+inhabitants of every world that holds a society, seated when resting; idle, slow walk, walk, run,
+turn and stop; planted feet, measured; and the frame budget, measured on one machine's release
+build.
+
+Not built, and not claimed:
+
+- a frame measurement on a weaker machine, and saved looks for a session that names no account;
+- a scene-person adapter that represents a confirmed or unresolved observation from a photograph,
+  starting from a source-linked abstract character, without requiring a photoreal likeness;
+- reviewed source-to-character fitting (selected source references, uncertainty-aware body
+  fitting, a compatible rig and retargeting, face and body textures, editing, dependency withdrawal
+  and undo), which must be shown on authorized material before any claim of personal likeness;
+- conversational gestures, gaze, reaching, contact-aware interaction and individual motion styles;
+- automatic identity recognition, complete body recovery from one image and faithful personality
+  simulation.
 
 Scope and delivery order are owned by [product direction](product-direction.md). See also the
 [interaction model](interaction-model.md), [synthetic society contract](synthetic-society-contract.md)

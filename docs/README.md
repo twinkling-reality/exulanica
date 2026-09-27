@@ -10,25 +10,30 @@ difference. World models generate how a world looks; Exulanica is the world AI m
 | I want to… | Read |
 | --- | --- |
 | Understand the goal and delivery order | [Product direction](product-direction.md) |
+| See how people and models run a world, and how two models are compared | [People and models in a world](capabilities/simulation.md) |
 | Understand how the system fits together | [Architecture overview](architecture-overview.md) |
 | Run or change the application | [Development setup](development-setup.md), then the contract for the affected behavior |
+| Keep a world's database on my own computer | [Local database](local-database.md) |
 | Build something using a world | [World API](capabilities/world-api.md) and [Python client](capabilities/developer-client.md) |
 | Write, update or consolidate documentation | [Documentation standard](documentation-standard.md) |
 
 ## Capability guides
 
+[People and models](capabilities/simulation.md) ·
 [World creation](capabilities/world-creation.md) ·
 [Scene reconstruction](capabilities/scene-reconstruction.md) ·
 [Companion](capabilities/companion.md) ·
-[Simulation](capabilities/simulation.md) ·
 [World API](capabilities/world-api.md) ·
 [Developer client](capabilities/developer-client.md)
 
-**Models inside the world** are the product's core: the [simulation guide](capabilities/simulation.md)
-and the [society contract](synthetic-society-contract.md) describe how the people in a world decide
-and how model decisions are validated, stored and replayed. The **Companion**, personal photographs
-and reconstruction from photographs are features and ways to build a world; the Companion's guide
-separates its role from the implemented tools.
+**Models inside the world** are the product's core. The
+[people and models guide](capabilities/simulation.md) explains how a world's people live, how its
+owner hands their choices to open models and how two models are compared; the
+[decision roles contract](decision-roles-contract.md) and the
+[society contract](synthetic-society-contract.md) specify how a model's decision is validated,
+stored and replayed. The **Companion**, personal photographs and reconstruction from photographs
+are features and ways to build a world; the Companion's guide separates what it does from what it
+is meant to become.
 
 ## Contracts
 
@@ -38,12 +43,17 @@ what it owns. Read the relevant owner rather than loading every document as cont
 | Subject | Questions it answers |
 | --- | --- |
 | [Product and architecture](all-documents.md#orientation) | What is the product, how is it built, and how do contributors work? |
+| [Capability guides](all-documents.md#capabilities) | What can a person or another program do with a world, and where does each feature stop? |
+| [Agents and simulation](all-documents.md#simulation) | How do a world's people live, how do models decide for them, how are runs replayed and compared, and how do movement and traffic work? |
 | [World state and creation](all-documents.md#world-state) | What persists, how do edits work, and what can a package carry? |
-| [Sources, perception and evidence](all-documents.md#perception) | What may be processed, reconstructed, cited and served? |
+| [Generated and admitted environments](all-documents.md#environments) | How are environments generated or admitted from outside sources, and how are their streets, tiles, textures and lettering made? |
 | [Interaction and Companion](all-documents.md#interaction) | How do controls, proposals, selection and representations behave? |
-| [Simulation and generated environments](all-documents.md#simulation) | How are environments generated and inhabitants, traffic and appearance represented? |
+| [Photographs, reconstruction and evidence](all-documents.md#perception) | What may be processed, reconstructed, cited and served? |
 | [Runtime, security and model selection](all-documents.md#operations) | How are services configured, protected and connected to models? |
 | [Verification and evidence](all-documents.md#verification) | What constitutes a valid measurement or acceptance result? |
+| [Historical context](all-documents.md#history) | Which earlier plans and recorded findings exist, and which living documents succeeded them? |
+
+The [decision catalog](all-documents.md#decisions) lists the decision records.
 
 ## Capability boundaries
 

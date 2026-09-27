@@ -7,9 +7,10 @@
  * colour, and drawing it as a cluster of abstract blocks throws away the one thing it has that
  * the others do not.
  *
- * **This is not the plinth `atlas-visual-language.md` 4 rejects, and the difference is the whole
- * justification.** That section removes "plinth discs" and "terrain platforms" from the origin
- * profile, and it is right to: a disc under a memory asserts an edge the data does not have. The
+ * **This is not the plinth the retired `atlas-visual-language.md` 4 (revision 47f9f7d3)
+ * rejects, and the difference is the whole justification.** That section removes "plinth discs"
+ * and "terrain platforms" from the origin profile, and it is right to: a disc under a memory
+ * asserts an edge the data does not have. The
  * same section defines a semantic object as one deriving from "graph, evidence, navigation, or
  * RECONSTRUCTION state". A height sampled out of a point map is reconstruction state. It is not a
  * platform placed under the evidence to make it look founded; it IS the evidence, seen from

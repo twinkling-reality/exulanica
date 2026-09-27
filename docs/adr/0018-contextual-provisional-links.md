@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-09-05
 - Deciders: Exulanica build, under the unblocked backend program
+- Affects: [domain and evidence model](../domain-and-evidence-model.md)
 
 ## Invariant
 

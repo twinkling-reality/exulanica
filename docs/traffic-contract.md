@@ -1,11 +1,31 @@
 # Traffic simulation
 
-Status: **TRAFFIC V1 ON CITY V2 ROAD RECORDS**. No runtime stores or draws a run.
+Status: **TRAFFIC V1 ON CITY V2 ROAD RECORDS**. Nothing in the application calls it: no runtime
+advances, stores or draws a run, and nothing feeds it the society's crossings or reads its events.
 
-Cars, vans, buses and bicycles drive a generated city's streets second by second: they keep their lanes, stop at stop lines, take turns at junctions by the junction's rule,
+In this simulation, cars, vans, buses and bicycles drive a generated city's streets second by second: they keep their lanes, stop at stop lines, take turns at junctions by the junction's rule,
 wait for people on crosswalks, and park. The same inputs always give the same bytes. This document
 is the contract for what traffic reads, what it writes, what it refuses, and the record a renderer
 draws a vehicle from.
+
+<details>
+<summary>Sections</summary>
+
+- [In plain words](#in-plain-words)
+- [What a run reads](#what-a-run-reads)
+- [Reading the city](#reading-the-city)
+- [The network](#the-network)
+- [A second](#a-second)
+- [What a run writes](#what-a-run-writes)
+- [Checks](#checks)
+- [Metrics](#metrics)
+- [Vehicle presentation contract](#vehicle-presentation-contract)
+- [Catalogs](#catalogs)
+- [The layer](#the-layer)
+- [Limits of v1](#limits-of-v1)
+- [Where to look](#where-to-look)
+
+</details>
 
 ## In plain words
 
@@ -31,7 +51,7 @@ A vehicle here is always synthetic. No record, event or presentation of it is ev
 | Seed | A string. Its SHA-256 is written into the state; the only draws are the fleet's placement, body family and colour at the start. |
 | Fleet | A count per vehicle class. Vehicles start parked in spaces that admit their class. |
 | Trip requests | `exulanica.traffic-trip-request/v1`: a vehicle, the second it wants to leave, and a destination, either a parking space by record identity or a society destination by its `destination_id` and frontage `street_segment_ordinal`. Numbered from 1 with no gaps. |
-| Crossing feed | `exulanica.traffic-crossing-feed/v1`: which crosswalk each walker steps onto, when, and for how long, taken from the society's `route_progressed` events. Each feed states the last second it covers. |
+| Crossing feed | `exulanica.traffic-crossing-feed/v1`: which crosswalk each walker steps onto, when, and for how long, as the living society's `route_progressed` events record crossings; nothing produces a feed from them. Each feed states the last second it covers. |
 
 A step at second `t` refuses to run unless the crossing feeds cover `t + 60`: traffic runs one society
 minute behind, so no pedestrian can step onto a crosswalk a vehicle has already committed to. A
@@ -263,7 +283,7 @@ is and what class, body family and colour it has; the renderer owns what a body 
 angles, doors, occupants, a manoeuvre path between bay and lane, and any height other than the
 catalog's.
 
-The body families and colours in the catalog today:
+The body families and colours the catalog states:
 
 | Class | Body families | Colours |
 | --- | --- | --- |
@@ -306,58 +326,17 @@ a city signal record names the signal-plan catalog by those bytes.
 
 ### Declared values
 
-These 47 values cite no source. Each says why; they are listed here for review, generated from the
-catalogs by `declared_values`.
-
-| Catalog | Entry | Field | Why it is declared |
-| --- | --- | --- | --- |
-| vehicle-class | `bicycle` | `body_families` | presentation keys the tessellator resolves to geometry; the simulation only draws one per vehicle from the seed |
-| vehicle-class | `bicycle` | `colours` | presentation keys awaiting art direction; the simulation only draws one per vehicle from the seed |
-| vehicle-class | `bicycle` | `front_overhang_mm` | follows from presenting the bicycle as one rigid footprint with no overhang |
-| vehicle-class | `bicycle` | `height_mm` | no bicycle-and-rider height was found in the sources read; the 85th percentile eye height of fhwa_hrt_04_103 Table 7 (150 cm) is used as the envelope height, which understates the rider's head; presentation only, the simulation never reads it |
-| vehicle-class | `bicycle` | `minimum_gap_mm` | no bicycle jam distance was found in the sources read; the passenger car jam distance of thh_2000 Table I (2 m) is applied |
-| vehicle-class | `bicycle` | `minimum_turning_radius_mm` | no bicycle minimum turning radius was found in the sources read; 1 m is used only so that a connector tighter than that refuses bicycles |
-| vehicle-class | `bicycle` | `parking_entry_ms` | no measured time to leave a bicycle at a stand was found; 10 s is chosen |
-| vehicle-class | `bicycle` | `parking_exit_ms` | no measured time to take a bicycle from a stand was found; 10 s is chosen |
-| vehicle-class | `bicycle` | `rear_overhang_mm` | follows from presenting the bicycle as one rigid footprint with no overhang |
-| vehicle-class | `bicycle` | `turning_inward_extent_mm` | no bicycle off-tracking was found in the sources read; the turning corridor is the body half-width, 345 mm |
-| vehicle-class | `bicycle` | `turning_outward_extent_mm` | no bicycle off-tracking was found in the sources read; the turning corridor is the body half-width, 345 mm |
-| vehicle-class | `bicycle` | `turning_speed_mm_per_s` | no bicycle turning speed was found in the sources read; the design-vehicle turning speed of aashto_2011 (15 km/h, 4166 mm/s) is applied |
-| vehicle-class | `bicycle` | `wheelbase_mm` | no bicycle wheelbase was found in the sources read; the bicycle is presented as one rigid footprint whose axle span is its whole length |
-| vehicle-class | `city_bus` | `body_families` | presentation keys the tessellator resolves to geometry; the simulation only draws one per vehicle from the seed |
-| vehicle-class | `city_bus` | `colours` | presentation keys awaiting art direction; the simulation only draws one per vehicle from the seed |
-| vehicle-class | `city_bus` | `minimum_gap_mm` | no bus jam distance was found in the sources read; the passenger car jam distance of thh_2000 Table I (2 m) is applied |
-| vehicle-class | `city_bus` | `parking_entry_ms` | a search summary of a measured study of conventional parallel parking (295 participants, 'Impact of the additional parking space on parallel parking maneuver time') reports a mean entry time of 22.3 s; the primary paper could not be read, so the rounded value is declared rather than cited; no bus value was found, so the car value is applied to a bus pulling into a layover bay |
-| vehicle-class | `city_bus` | `parking_exit_ms` | the same search summary reports a mean exit time of 10.9 s; the primary paper could not be read, so the rounded value is declared rather than cited; no bus value was found, so the car value is applied |
-| vehicle-class | `city_bus` | `speed_cap_mm_per_s` | no class cap is intended below an urban posted limit, so the cap is 130 km/h (36111 mm/s, floored) and the lane's posted limit always governs |
-| vehicle-class | `passenger_car` | `body_families` | presentation keys the tessellator resolves to geometry; the simulation only draws one per vehicle from the seed |
-| vehicle-class | `passenger_car` | `colours` | presentation keys awaiting art direction; the simulation only draws one per vehicle from the seed |
-| vehicle-class | `passenger_car` | `parking_entry_ms` | a search summary of a measured study of conventional parallel parking (295 participants, 'Impact of the additional parking space on parallel parking maneuver time') reports a mean entry time of 22.3 s; the primary paper could not be read, so the rounded value is declared rather than cited |
-| vehicle-class | `passenger_car` | `parking_exit_ms` | the same search summary reports a mean exit time of 10.9 s; the primary paper could not be read, so the rounded value is declared rather than cited |
-| vehicle-class | `passenger_car` | `speed_cap_mm_per_s` | no class cap is intended below an urban posted limit, so the cap is 130 km/h (36111 mm/s, floored) and the lane's posted limit always governs |
-| vehicle-class | `van` | `body_families` | presentation keys the tessellator resolves to geometry; the simulation only draws one per vehicle from the seed |
-| vehicle-class | `van` | `colours` | presentation keys awaiting art direction; the simulation only draws one per vehicle from the seed |
-| vehicle-class | `van` | `parking_entry_ms` | a search summary of a measured study of conventional parallel parking (295 participants, 'Impact of the additional parking space on parallel parking maneuver time') reports a mean entry time of 22.3 s; the primary paper could not be read, so the rounded value is declared rather than cited |
-| vehicle-class | `van` | `parking_exit_ms` | the same search summary reports a mean exit time of 10.9 s; the primary paper could not be read, so the rounded value is declared rather than cited |
-| vehicle-class | `van` | `speed_cap_mm_per_s` | no class cap is intended below an urban posted limit, so the cap is 130 km/h (36111 mm/s, floored) and the lane's posted limit always governs |
-| right-of-way-policy | `all_way_stop` | `arrival_order` | vehicles proceed in the order in which they came to a full stop at the line, the practice driver handbooks teach; no statute or standard giving this order was read |
-| right-of-way-policy | `priority_two_way_stop` | `arrival_order` | priority rank decides order; arrival order is not used |
-| right-of-way-policy | `signalised` | `arrival_order` | a signal decides order; arrival order is not used |
-| right-of-way-policy | `uncontrolled_continuation` | `arrival_order` | unused, because no movements conflict |
-| right-of-way-policy | `uncontrolled_continuation` | `rule` | a node where no two movements from different approaches conflict needs no control; the compiler refuses the policy anywhere two such movements conflict |
-| right-of-way-policy | `uncontrolled_continuation` | `turn_priority` | unused, because no movements conflict |
-| signal-plan | `fixed_two_phase_60s` | `intervals[1].duration_ms` | the rest of a 30 second phase in a fixed-time plan for the synthetic network, not an optimised timing; the compiler checks that it covers pedestrian clearance at 3.5 feet per second for every crossing the group governs |
-| signal-plan | `fixed_two_phase_60s` | `intervals[5].duration_ms` | the rest of a 30 second phase in a fixed-time plan for the synthetic network, not an optimised timing; the compiler checks that it covers pedestrian clearance at 3.5 feet per second for every crossing the group governs |
-| lane-use-access | `buffer` | `classes` | a painted buffer carries no traffic, as the city's lane-use catalog states, so no class may drive in it |
-| lane-use-access | `bus` | `classes` | a bus lane is modelled as carrying buses only; local rules often also admit bicycles or taxis, which this mapping does not model and no source read for this catalog settles |
-| lane-use-access | `cycle` | `classes` | a cycle lane carries bicycles and no motor vehicle |
-| lane-use-access | `general` | `classes` | a general traffic lane carries every vehicle class this catalog knows; a class the geometry cannot carry is dropped by the network compiler with its reason, never by this mapping |
-| lane-use-access | `parking` | `classes` | a parking lane carries no through traffic, as the city's lane-use catalog states; a vehicle reaches a bay in it from the traffic lane its parking space names |
-| parking-kind-access | `accessible` | `classes` | an accessible bay is kept for a car or van carrying a person who needs room beside it; permits are not modelled, so either class may use it |
-| parking-kind-access | `bus_layover` | `classes` | a layover is where a bus waits at the end of a trip, and no other class uses it |
-| parking-kind-access | `cycle_stand` | `classes` | cycle stands hold bicycles only; how many is the space record's capacity, never this mapping |
-| parking-kind-access | `general` | `classes` | a kerbside bay for one car; the van class has the passenger car's design dimensions in the vehicle-class catalog, so it fits the same bay |
-| parking-kind-access | `loading` | `classes` | a loading bay is for deliveries, and of this catalog's classes only the van carries goods |
+A value that cites no source is declared, with its reason in its entry's `sources`.
+`declared_values` in `exulanica/traffic/catalogs.py` lists every one for review, and
+`tests/test_traffic_catalogs.py` holds that list to the reviewed one (`DECLARED`), so a value
+cannot become declared unnoticed. They fall into a few kinds: the presentation keys (body families
+and colours), which the simulation only draws from the seed; bicycle figures and the bus's jam gap,
+which no source read gives (for the bicycle: overhangs, height, jam gap, turning radius and
+envelope, turning speed, wheelbase and stand times); parking manoeuvre times from a study summary
+whose primary paper could not be read; class speed caps set above any urban limit, so the lane's
+posted limit governs; arrival orders, and the uncontrolled continuation's rule and turn priority;
+the two remaining intervals of the fixed signal plan; and the lane-use and parking-kind access
+mappings.
 
 ## The layer
 
@@ -365,9 +344,9 @@ catalogs by `declared_values`.
 layers, and a forbidden contract keeps it from `psycopg`, the database and store, the evidence spine,
 ingest, migrations, identity, selection, reconstruction, capture, the world package, models, the API,
 `numpy` and `torch`. It may import the grammar, because the road records are grammar records, and only
-`exulanica/traffic/city_roads.py` does. The society composition above both passes crossing events down
-as data. A test holds that no other traffic module imports the city grammar, so a new city version
-changes one file.
+`exulanica/traffic/city_roads.py` does. A composition above both would pass the society's crossing
+events down as data; none does. A test holds that no other traffic module imports the city grammar,
+so a new city version changes one file.
 
 ## Limits of v1
 
@@ -384,8 +363,8 @@ changes one file.
 - **Parking manoeuvres are stops on the lane**, with no path between the lane and the bay.
 - **Society destinations are frontage by segment ordinal**: a trip to a society destination parks in
   the first free space on that segment, in identity order, that admits its class, not the nearest.
-- **Nothing runs it yet.** No runtime advances it, no store keeps its states, no renderer draws its
-  presentation records, and the society engine does not read its events.
+- **Nothing calls it.** No runtime advances it, no store keeps its states, no renderer draws its
+  presentation records, and nothing feeds it the society's crossings or reads its events.
 
 ## Where to look
 

@@ -1,6 +1,7 @@
 # Gaussian optimization and recorded scene rung are separate decisions
 
 Date: 2026-09-05. Status: accepted for implementation; CUDA execution remains unverified.
+Affects: [scene training jobs](../gsplat-scene-jobs.md) and [scene reconstruction operations](../scene-reconstruction-operations.md).
 
 The previous standalone controller required a physical metric scale before optimizing any
 Gaussians. Gaussian image optimization needs consistent camera/point coordinates but does not

@@ -579,7 +579,7 @@ export function checkedWalkWorld(statement, containers, reachWasStated) {
  * The gate records HOW a scored page got its content before it will score what that page drew, and
  * it refuses rather than guess. Two conditions were always known. The third was measured on the
  * corridor page, put to the operator as a decision with the evidence attached, and admitted by them
- * on 2026-09-18; the case is in `docs/visual-gate-third-authentication-condition.md`.
+ * on 2026-09-18; the case is in `docs/visual-gate-targets.md` (Authentication conditions).
  *
  * `preview-shell-credentialed-tiles` is a development preview that reads its street from the real
  * API with a credential, which is neither of the other two and not a hybrid by accident: a street

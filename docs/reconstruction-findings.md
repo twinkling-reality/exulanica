@@ -1,11 +1,14 @@
 # Reconstruction findings
 
-Status: **Single-photograph findings on `glasshouse-courtyard.jpg` plus a retained-bowl geometry observation.**
-Sections 1 through 7 are that photograph; section 8 is the trained bowl. This is the findings
-document [architecture-overview.md](architecture-overview.md) section 8 reserves for "reconstruction
-rungs and their quality bar". It records what was measured, on what, with what caveat, so that a
-number in the code carries its provenance. Decisions drawn from these numbers live in the decision
-records from [adr/0008-generated-geometry.md](adr/0008-generated-geometry.md) onward, not here.
+This archive records reconstruction measurements with their inputs, versions and caveats, so that
+a number in the code or in a decision record carries its provenance. Sections 1 through 7 measure
+one photograph, `glasshouse-courtyard.jpg`, on 2026-09-02 and 2026-09-03; section 8 counts masked
+geometry on a trained bowl on 2026-09-08. The numbers apply to those inputs only. The living owners
+are [scene reconstruction operations](scene-reconstruction-operations.md) for processing, validation
+and the [recorded rung](scene-reconstruction-operations.md#5-quality-gate-and-recorded-rung), and
+[capture overlap](capture-overlap-and-recovery-state.md) for which photograph sets can rebuild.
+Decisions drawn from these numbers live in the decision records from
+[ADR-0008](adr/0008-generated-geometry.md) onward.
 
 Every number in sections 1 through 7 was measured on 2026-09-02 or 2026-09-03 on an Apple M3 Pro with 18 GiB of
 unified memory, macOS 26.5.1, PyTorch 2.14.0 on MPS, and pycolmap 4.2.0 on CPU. The one photograph
@@ -14,13 +17,12 @@ a figure, a bicycle and a glasshouse. **One photograph is not a corpus.** Every 
 rests on it is labelled unvalidated in the code and stays so until the corpus contract in
 [evaluation-corpus-contract.md](evaluation-corpus-contract.md) is met.
 
-**What a later reader can and cannot reproduce from the repository.** Neither the photograph nor
-the point map derived from it is committed: `web/.gitignore` excludes the whole fixtures directory,
-and the only tracked `.opm` in the repository is the small cross-language pin at
-`web/packages/atlas-react/test/fixtures/python-writer.opm`. The point map these numbers were taken
-from was produced by a stage that is registered non-deterministic, so re-running the model does not
+**What a reader can reproduce from the repository.** The photograph is tracked, and so is a point
+map derived from it, `web/packages/app/public/fixtures/memory/glasshouse-courtyard.opm`, but that
+map is a later, migrated copy rather than the file these numbers were taken from. The stage that
+produced the measured map is registered non-deterministic, so re-running the model does not
 guarantee the same bytes. The scripts are committed and the conventions are recorded here, so the
-method reproduces; the exact percentages do not without the same file.
+method reproduces; the exact percentages may not.
 
 The scripts that produced each table are in `scripts/` and are named in each section. They are
 standalone harnesses in the same spirit as `scripts/verify_platform.py`: committed so the evidence
@@ -30,12 +32,11 @@ is reproducible, not part of the package.
 
 ## 1. The single-photograph reconstruction
 
-Measured by the session that shipped the rung 3 support channel, on the fixture above, with
-`Ruicheng/moge-2-vitl` at 512 px longest edge.
+Measured on the fixture above with `Ruicheng/moge-2-vitl` at 512 px longest edge.
 
 | Quantity | Value |
 | --- | --- |
-| Inference on MPS | 2 to 6 s (re-measured at 1.9 to 5.3 s during the lock work in section 6) |
+| Inference on MPS | 2 to 6 s (1.9 to 5.3 s in the later runs of section 6) |
 | Points placed at 512 px, after the silhouette drop | 190,570 |
 | File size | 3.27 MiB |
 | Valid fraction from the model, before the drop | 0.9997 |
@@ -63,9 +64,8 @@ visibly better from the same camera, and slightly worse close up because sprites
 
 ## 2. Top-down coverage, decomposed
 
-The handoff to this work carried one number, 27.1 percent of the region's own bounding box filled
-at a 12x12 grid, and called a single-view shell "a curtain, not a landscape". That number is
-correct and it is the support-filtered figure the Map draws (`MIN_RELIEF_SUPPORT = 0.25` in
+A single-view shell was summarised by one number: 27.1 percent of the region's own bounding box
+filled at a 12x12 grid. That number is correct, and it is the support-filtered figure the Map draws (`MIN_RELIEF_SUPPORT = 0.25` in
 `web/packages/atlas-react/src/playcanvas/region-relief.ts`). Decomposing it changes what it means.
 
 Script: `scripts/reconstruction_coverage.py`. Grid over the header's bounding box in X and Z.
@@ -156,7 +156,7 @@ unmodified against the export:
 - `run_colmap_pose_job` shells out to a `colmap` executable that this environment does not have,
   but it accepts an `executor` callable, so an in-process backend can drive it unchanged.
 
-That backend now exists as `exulanica/reconstruction/pycolmap_executor.py`, and
+That backend is `exulanica/reconstruction/pycolmap_executor.py`, and
 `tests/test_reconstruction_pycolmap_executor.py` runs six synthetic views through the unmodified
 controller: all six register, the receipt and checkpoint are written, a second call reuses the
 receipt without invoking COLMAP, and `shared_metric_frame` stays false because no measured scale
@@ -224,11 +224,10 @@ photographs against a distance somebody physically measured.
 
 ## 5. Reading a point map as a surface without a container change
 
-The handoff proposed that "oriented, soft edged splats with normals" were the fix for a point map
-that reads as dust, and that screen-space methods should be tried before the container is opened
-for a normal attribute. Measured in the app preview against the committed courtyard map, at three
-fixed cameras, on the WebGL2 point-sprite path (full patch and 83 screenshots in the session
-record; the harness and cameras are reproducible from the patch).
+One proposal held that oriented, soft-edged splats with normals would fix a point map that reads
+as dust, and that screen-space methods should be tried before the container gained a normal
+attribute. This was measured in the app preview against the courtyard map, at three fixed cameras,
+on the WebGL2 point-sprite path; the measuring patch and its screenshots are not in the repository.
 
 Four findings that correct the premise:
 
@@ -271,8 +270,8 @@ justifies, and it is not a normal.
 
 ## 5.1 What OPM/2 costs, and what its one-sided flag actually marks
 
-**MEASURED 2026-09-03**, on the same photograph, by regenerating it through the current depth
-stage under the new container. Harness: a standalone script in the same spirit as the ones above,
+**MEASURED 2026-09-03**, on the same photograph, by regenerating it through that date's depth
+stage under the OPM/2 container. Harness: a standalone script in the same spirit as the ones above,
 run once and not committed; every number below is reproducible from the committed writer plus the
 photograph. The run reproduced section 1 exactly, which is the check that says the container
 change moved nothing else: 190,570 points, a 3.04 percent silhouette drop, mean support 0.733 and
@@ -299,8 +298,8 @@ the tags section's second uint16 channel. The JSON header grew by 58 bytes for `
 Read that against what it replaces rather than against zero. The WebGPU binding was allocating a
 20-byte-per-point buffer anyway and filling the extra 2 bytes with a per-point CPU loop over every
 point of every cloud, so on that path the change costs 11.11 percent of transfer and disk to
-remove a pass over 190,570 points at load. On WebGL2 it is 11.11 percent for a flags channel
-nothing renders yet. **At 512 px a photograph is 3.8 MB rather than 3.4 MB, and a thousand-region
+remove a pass over 190,570 points at load. On WebGL2 it was 11.11 percent for a flags channel
+nothing rendered at that date. **At 512 px a photograph is 3.8 MB rather than 3.4 MB, and a thousand-region
 library is 3.8 GB rather than 3.4 GB.** That is the number to weigh, and it is the reason
 `max_edge_px` is a stage parameter: the same decision at 1024 px is four times the figure either
 way.
@@ -328,8 +327,9 @@ it at load, because a point marked on both row neighbours is exactly the degener
 nothing is lost by the coarse flag and the record's cost/benefit sentence understates the marked
 population by twenty times.
 
-What is still unmeasured is the thing D4 itself names: whether consuming bit 0 removes the
-silhouette fringing, "by rendering with and without it and looking". Nothing consumes it yet.
+Unmeasured when this was recorded: the thing D4 itself names, whether consuming bit 0 removes the
+silhouette fringing, "by rendering with and without it and looking". Nothing consumed the flag at
+that date.
 
 ---
 
@@ -346,8 +346,8 @@ silhouette fringing, "by rendering with and without it and looking". Nothing con
   a real sync into a fresh venv, the reconstruction tests, ruff, lint-imports, the Dockerfile's
   older uv 0.9.5 accepting the lock, and three byte-identical MoGe runs on the courtyard.
 - MoGe-2 imports torch, numpy, cv2, scipy, huggingface_hub and utils3d_moge and nothing else outside
-  the standard library, traced through `sys.modules` on 2026-09-03. The `moge.py` docstring's list
-  of four is short by scipy and huggingface_hub.
+  the standard library, traced through `sys.modules` on 2026-09-03. The `moge.py` docstring then
+  listed four of them, leaving out scipy and huggingface_hub.
 - A `torch 2.14.0` wheel for `macosx_14_0_arm64` exists on PyPI and reports MPS available on this
   machine.
 
@@ -355,18 +355,18 @@ silhouette fringing, "by rendering with and without it and looking". Nothing con
 
 ## 7. What was not measured, and why
 
-- **Multi-view coverage on photographs.** No two fixture photographs overlap and no consented
-  multi-view capture exists locally, so every multi-view number above is on renders of one map.
+These were unmeasured when sections 1 to 6 were recorded.
+
+- **Multi-view coverage on photographs.** No two fixture photographs overlapped and no consented
+  multi-view capture was available, so every multi-view number above is on renders of one map.
 - **Any feed-forward multi-view model on this machine.** The one license-clean candidate,
   `facebook/map-anything-apache` (Apache-2.0 code and weights, an MPS path merged upstream on
-  2026-03-23, 4.9 GB of weights), was not downloaded; its peak memory on 18 GiB is unknown.
-- **Splat training anywhere.** gsplat remains CUDA-only and non-resumable (verified 2026-09-02);
-  no GPU job has ever run on the platform. The nearest sourced timing is 19.39 minutes for a
-  30k-iteration Mip-NeRF 360 scene on an A100, which at the sourced Nebius L40S preset price of
-  $1.548 per hour on demand would be about $0.50 per scene if an L40S matched an A100, which is
-  unmeasured.
+  2026-03-23, 4.9 GB of weights), was not downloaded, so its peak memory on 18 GiB was unknown.
+- **Splat training.** gsplat was CUDA-only and non-resumable (verified 2026-09-02), and no GPU
+  training had run for this work. The nearest sourced timing was 19.39 minutes for a
+  30k-iteration Mip-NeRF 360 scene on an A100; how another GPU compares was unmeasured.
 - **The fraction of places in a personal library that carry enough overlapping views for pose
-  recovery.** No primary source measures it. The closest proxies are 1.6 percent registration over
+  recovery.** No primary source measured it. The closest proxies are 1.6 percent registration over
   an unfiltered user-uploaded corpus (YFCC100M) and 20 to 25 percent over landmark-filtered
   collections; personal libraries have burst structure (about 6.5 near-duplicate images per
   cluster in the one published personal collection) that cuts both ways. The experiment that
@@ -384,8 +384,8 @@ measures quantized delivery coordinates, not the original training PLY, which is
 | --- | ---: |
 | Actual decoded Gaussians | 1,000,000 |
 | Recovered cameras evaluated | 51 |
-| Current recorded masked regions across those cameras | 0 |
-| Current recorded confirmed regions across those cameras | 0 |
+| Recorded masked regions across those cameras | 0 |
+| Recorded confirmed regions across those cameras | 0 |
 | Gaussian/view intersections over masked regions | 0 |
 | Gaussian/view intersections over confirmed regions | 0 |
 
@@ -399,8 +399,8 @@ The delivered artifact is `c37d30fa-50b7-5612-8b22-e306ec7fa5ae`, bound to SHA-2
 The decoded PLY SHA-256 is
 `266d67266ffdbe128e13a9362f88f0645496f4fb5dee18db996f5d9a3551ab92`.
 The [dated measurement record](evaluation/2026-09-08-bowl-retrospective-masked-geometry.json)
-binds the publication and pose receipts, prior evaluation ZIP, current
-region snapshot, executed decoder source, evaluator code and predecessor record. PostgreSQL's
+binds the publication and pose receipts, prior evaluation ZIP, the region snapshot of that date,
+executed decoder source, evaluator code and predecessor record. PostgreSQL's
 transaction was repeatable-read and enforced read-only; no public row or retained artifact was
 changed. Reproduce against the retained local state with a new output filename:
 
@@ -412,19 +412,19 @@ uv run python scripts/reference_instance.py evaluate-geometry --scene bowl \
 ```
 
 This is a new retrospective evaluation bundle containing `masked_geometry`; it does not rewrite
-the old training ZIP. The production trainer has no current region/consent snapshot input, so it
-cannot truthfully manufacture this count itself. The seven-component corpus `SCORED` registry is
-unchanged. Historical training masks are unavailable. Non-pinhole cameras use an explicitly
+the old training ZIP. The production trainer took no region or consent snapshot as input, so it
+could not produce this count itself. The seven-component corpus `SCORED` registry was not changed.
+Historical training masks are unavailable. Non-pinhole cameras use an explicitly
 labelled pinhole approximation with a 20,000 ppm margin; the margin is not proof of conservative
 distortion inversion.
 
 **Zero over zero recorded regions does not establish privacy or masking effectiveness.** No real
 photograph screening, COLMAP run, CUDA training or hosted model ran in this follow-up. The fact
 that this bowl was trained earlier comes from retained receipts/logs; the decoded geometry and
-current empty-region count were executed here. The volcanic point-map scene was not retrained.
+the empty-region count were measured here. The volcanic point-map scene was not retrained.
 
 Verification includes a nonempty region regression, refusal of nonfinite opacity even with empty
-regions, and exact predecessor/blob integrity checks. An isolated 23-test baseline passed before
+regions, and exact predecessor/blob integrity checks. An isolated baseline passed before
 three exactly-one-occurrence mutations: dropping masked intersections, bypassing empty-region
 PLY validation, and omitting the bundle's count. Each mutation failed its named test. These
 controls demonstrate test sensitivity; they do not substitute for a masked real-person scene.

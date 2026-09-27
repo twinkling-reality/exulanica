@@ -16,6 +16,16 @@ choice), four projection contracts, licensed catalogs, and one identity rule.
 together and what it measures. `city.v1.json` and `city.v2.json` remain as pinned migration
 source schemas; they are not registered.
 
+The package also holds the product's one catalog envelope and loader, `exulanica.grammar.catalogs`
+(section 8): versioned, licensed data files, each entry with a reason, refused on any float, stray
+key or name that disagrees with its contents. Every data catalog is read through it, not only the
+city's: the society's routines and grounds (`society_catalogs.py`, `society_grounds.py`), the
+decision role registry and its contract catalogs (`decision_roles.py`, `role_catalogs.py`), the
+world object catalog, arrangements and flying kinds (`object_catalog.py`, `arrangements.py`,
+`flight_kinds.py`), traffic's catalogs (`exulanica/traffic/catalogs.py`), the inhabitant words the
+page and the Companion read (`exulanica/selection/inhabitant_words.py`) and the detector vocabulary
+(`exulanica/ingest/detector_vocabulary.py`).
+
 <details>
 <summary>Sections</summary>
 
@@ -52,8 +62,7 @@ repository. That is the arrangement `exulanica.reconstruction` already has, one 
 reconstruction sits above `evidence` and is kept away from it by a forbidden contract alone, while
 the generator system sits below it and could not import it even without one.
 
-No existing package moved. `capture` is a new sibling of `reconstruction`, placed at the request
-of the lane that owns it; siblings may not import each other.
+`capture` is a sibling of `reconstruction`, and siblings may not import each other.
 
 ## 2. What the contracts prevent
 
@@ -99,7 +108,7 @@ tracked or not. An AST test fails if any module names `EvidenceAddress`, `BlobId
 | `migration.py` | `ParameterMigration` between two versions of a grammar, and `migrate_chain` |
 | `registry.py` | `GrammarRegistry`, empty by default |
 | `catalogs.py` | The versioned, licensed catalog loader and `catalog_digest` |
-| `textures.py` | The reader for the texture lane's manifest, and the pin a texture set carries |
+| `textures.py` | The reader for the texture package's manifest, and the pin a texture set carries |
 | `documents.py` | Strict JSON reading for every data file |
 | `grammars/` | The grammars, and `builtin_registry()`, the one place that names them |
 
@@ -142,6 +151,13 @@ returns a `GrammarReceipt` beside the emissions. The receipt carries the six fac
 record: the admitted subject identity, the grammar id and version, the resolved parameters with
 where each came from, the seed, the output digest, and the declared semantics. The declared plane
 is always `invented`, and it is a field of every receipt.
+
+**Asking for a world over HTTP.** `GET /world-generation/grammars` lists every parameter each
+registered grammar declares, read off the registered grammar, and `POST /world-generation/worlds`
+states a specification and returns the world it makes or a refusal naming the parameter, charging
+the workspace's tile quota (`tiles.materialise`) for the tiles the resolved specification covers
+before any record is made (`exulanica/api/routes/world_generation.py`). No application screen calls
+them; `scripts/bake_a_specified_world.py` does.
 
 **A stage with no implementation emits nothing and says so.** `UnimplementedStage` returns a
 `not_implemented` emission with a reason and no records. `StageEmission` refuses records on a
@@ -307,6 +323,11 @@ at every level carry across, and a version 1 binding that names any parameter is
 machinery itself is tested on probe grammars (carried, mapped, removed, introduced, a chain from
 version 1 to 3, and every refusal).
 
+**The version 2 to 3 migration carries every parameter.** Version 3 changes one record shape and no
+subject rule, so its identity policy is `preserved`: every `(kind, owner, ordinal)` derives the
+identity version 2 derived for it, and each of the 91 parameters is carried or mapped
+(`city-migration.v3.json`).
+
 **The tile document** (`exulanica.tile-document/v2`, `document.py`) is one tile's records as a bake
 reads them: canonical JSON of the tile record, and per grammar its descriptor digest, declared
 semantics, the admitted city identity, the owned and halo records, each list sorted, and the
@@ -343,7 +364,7 @@ kerb arcs, and its extent must hold the kerb line ends nearest its node and ever
 between its legs. `tests/test_grammar_city_corners.py` samples every integer point a corner owns,
 for convex, mitred, concave and slanted corners, and requires it inside the box.
 
-**Navigation** (`navigation` in `city.v2.json`, `[facade_clearance]`, `[canopy_clearance]`).
+**Navigation** (`navigation` in `city.v3.json`, `[facade_clearance]`, `[canopy_clearance]`).
 Support: terrain, street segments, curbs, junctions, crossings (a crossing draws its own band, not
 only paint on the carriageway), blocks, lots, recessed entrance floors and tree pits. A building
 covers the ground under its base ring and obstructs by that ring; furniture and trees obstruct by
@@ -401,9 +422,11 @@ lane of a segment), `approaches` in the direction that every approach's segment 
 every carried one), `ground_bays` for one bay record per bay (a halo facade may carry fewer, never
 more), `output_digest`, and the report's building figures, which count owned buildings.
 
-**Not enforced yet: `city_reference_closure`.** Every external identity of every tile is carried by
-some tile of the same city. That is a rule over a whole generated city, not over one document, and
-it belongs to the first real generator's output check, in the corridor lane.
+**`city_reference_closure` is a check over a whole city, not over one document.** Every external
+identity of every tile must be carried by some tile of the same city, which one document cannot
+see: `check_city_reference_closure` in `exulanica/grammar/grammars/city/generation/tiles.py` holds
+it, and every bake script runs it over the city's tile documents before baking
+(`tests/test_corridor_generation.py`).
 
 **The fixture**, `tests/fixtures/city-v2/tile-document.json`, is written by hand in
 `build_fixture.py`: one signalised T-junction, a memory precinct lot and a four-storey shophouse
@@ -434,8 +457,7 @@ from there into a baked tile key: a statement about an absence must not rebake t
 declares the field. Three registers ship: authored vocabulary begins "Authored", a derived entry
 begins "Derived:" and names the source its licence points at, and a material says which texture
 set it depicts. `tests/test_catalog_provenance.py` discovers the catalogs rather than listing
-them, and holds both the reasons and the registers; until 2026-09-18 the rule ran over a list of
-fourteen ids while eighteen catalogs shipped, and two schemas did not declare the field at all.
+them, and holds both the reasons and the registers.
 
 **Every entry carries a licence**, stated the way [license-matrix.md](license-matrix.md) states
 one: `spdx`, `verdict`, `origin`, `licence_source` and `content_source`. Only `SHIP` and
@@ -443,13 +465,12 @@ one: `spdx`, `verdict`, `origin`, `licence_source` and `content_source`. Only `S
 and names `LICENSE` as the licence it was read from. A `derived` entry names its real source's
 licence and may not cite `LICENSE`.
 
-**A material entry must name a published texture set.** The texture set id contract was fixed
-with the orchestrator on 2026-09-16, before the texture lane started:
+**A material entry must name a published texture set.** The texture set id contract:
 
 - An id matches `^[a-z][a-z0-9.-]*$`, the rule an authored-world asset key already follows, by
   convention `<licence>.<name>`. It is a stable name and never contains a version or a digest.
   Both the material catalog and `SurfaceMaterialRecord` check it.
-- The texture lane publishes `assets/textures/manifest.json` as
+- The texture package publishes `assets/textures/manifest.json` as
   `{"profile": "exulanica.texture-manifest/v1", "sets": [...]}`, with `sets` sorted by `set_id`,
   each id once, and each entry carrying exactly `set_id`, `version`, `content_sha256`,
   `byte_size`, `resolution`, `channels`, `extent_mm`, `licence_id` and `licence_sha256`.
@@ -485,7 +506,7 @@ exist, a sign for a use class that takes none, and a signed use class with no si
 | `crossing-type.v1.json` | 3 | Raised table, signalised and zebra: kerb treatment, marking, signal and width range. |
 | `era.v1.json` | 4 | Prewar masonry, interwar, postwar and contemporary: wall materials, roof families, storey heights and cornice. |
 | `fitout.v1.json` | 7 | Vitrine fitout units as explicit parts, with the use classes each dresses. |
-| `junction-control.v1.json` | 4 | Right-of-way classes; the keys equal the traffic lane's right-of-way policy keys. |
+| `junction-control.v1.json` | 4 | Right-of-way classes; the keys equal traffic's right-of-way policy keys. |
 | `lane-use.v2.json` | 6 | General, bus, bus layover, cycle, parking and buffer, with width ranges and the tightest turn each must admit; traffic maps them to vehicle classes. |
 | `material.v4.json` | 16 | One material per pinned texture set it dresses with, with the surface roles it dresses, its baked modules and whether its texture runs one way. |
 | `parking-kind.v1.json` | 5 | General, loading, accessible, bus layover and cycle stand, with placement and size. |
@@ -497,17 +518,15 @@ exist, a sign for a use class that takes none, and a signed use class with no si
 | `street-name.v1.json` | 147 | Generic street names and the hierarchies each suits, composed from authored elements and street types. Presentation, never identity. |
 | `tree-species.v2.json` | 19 | Derived from the 2015 NYC Street Tree Census: each named species of at least one percent of the named trees. |
 | `typology.v2.json` | 7 | Building types: storeys, frontage, attachment, ground and upper floor uses, eras and roof families. |
-| `use-class.v1.json` | 11 | Exactly the living society lane's use-class keys; it maps them to roles through its own catalog. |
+| `use-class.v1.json` | 11 | Exactly the living society's use-class keys; it maps them to roles through its own catalog. |
 
 **The street names are composed, not listed.** A name is an element and a street type, and each
 part states the band of street-hierarchy ranks it suits: a composition is admissible when the two
 bands meet, and the composed name suits exactly the hierarchies in both. The parts are authored in
 `assets/catalogs/sources/street-name-parts.json` and `scripts/generate_street_names.py` writes the
-catalog from them, so a word authored once reaches every street type it can take. The catalog held
-twelve names until 2026-09-19, and that was a cap on how large a city could be: a district lays one
-high street and a local street between each pair of blocks, and six local names refused a world part
-way through generation with a message naming no parameter.
-`tests/test_street_name_vocabulary.py` holds the committed catalog to what the generator writes,
+catalog from them, so a word authored once reaches every street type it can take. The vocabulary
+caps how large a city can be, because a district lays one high street and a local street between
+each pair of blocks, so `tests/test_street_name_vocabulary.py` holds the committed catalog to what the generator writes,
 holds the composition rule over the committed file, and holds the vocabulary to the most streets the
 declared parameter space can lay out, deriving both sides so that widening an extent or narrowing a
 block fails there rather than in a bake.
@@ -515,20 +534,18 @@ block fails there rather than in a bake.
 **The tree census source** is retained unchanged at
 `assets/catalogs/sources/nyc-2015-street-tree-census-species.json`, SHA-256
 `68865bbbfdbcff42ce2492eadb218313e20c5f54845e7a4cac93885873b3ae15`, with a provenance file beside
-it. It came from one approved GET on 2026-09-17. A test re-derives every tree species entry from
+it. It was fetched once, on 2026-09-17. A test re-derives every tree species entry from
 those bytes, and the source is listed with its attribution, terms and modifications in the shipped
 data section of `THIRD_PARTY_NOTICES.md`.
 
-**The ground band entry** is transcribed from the target stated in the dated 2026-09-15
-target-architecture brief, which the operator authored: a ground band from grade to a top edge
-between 4.0 and 6.0 m, carrying a stall riser, glazing, a transom, a recessed entrance, a
-threshold, a fascia, an awning, and a lit vitrine behind the glass. It is recorded as
-`top_minimum_mm` 4000, `top_maximum_mm` 6000, and those eight elements. The same brief also names
-string courses of 60 to 200 mm and cornices of 400 to 900 mm. Version 2 reads those as the height
-of one string course and the total height of a cornice's stack of mouldings, declares them as face
-parameters and checks them on every facade record (section 7), rather than in this catalog. The
-reading of "band" as a horizontal facade band is this document's interpretation of the brief's
-vocabulary list.
+**The ground band entry** records the authored target architecture: a ground band from grade to a
+top edge between 4.0 and 6.0 m, carrying a stall riser, glazing, a transom, a recessed entrance, a
+threshold, a fascia, an awning, and a lit vitrine behind the glass, as `top_minimum_mm` 4000,
+`top_maximum_mm` 6000 and those eight elements. The same target names string courses of 60 to
+200 mm and cornices of 400 to 900 mm, which the grammar reads as the height of one string course and
+the total height of a cornice's stack of mouldings, declares as face parameters and checks on every
+facade record (section 7), rather than in this catalog. "Band" is read as a horizontal facade
+band.
 
 ## 9. The `invented` truth class
 
@@ -538,18 +555,12 @@ means an origin the map does not know. `tests/test_selection_packet_invented.py`
 
 ## 10. Open gaps
 
-Each of these is known and deliberately not done here.
+Each of these is known and not built.
 
-- **No published texture set dresses glazing, doors, transoms, road paint or a tree.** Those
-  surfaces are drawn unavailable rather than painted with something else, and the counts are in
+- **Terrain has no published texture set.** A terrain surface has no material record and draws as
+  the unavailable surface rather than being painted with something else; the corridor's counts,
+  including the facade ground bands its tile leaves undressed, are in
   [generated-corridor-street](generated-corridor-street.md).
-- **The city v1 consumers have not been ported.** The tessellator's bake stage and its fixture and
-  the traffic lane's provisional records read city v1 record classes, while the living society's
-  city place adapter reads v2 tile documents. The tessellator lane ports on a branch stacked on
-  this one and both merge together; the society and traffic lanes port before they merge.
-- **Texture gaps.** No published texture set is glazing, a door, road paint, terrain, a tree pit,
-  foliage, bark, timber, fabric or a sign panel, so those surfaces have no material record and
-  draw as unavailable. They are queued with the texture lane.
 - **Tree roles.** A street tree's parts take surface roles 25 `canopy` and 26 `trunk`, appended
   so foliage and bark are dressed apart; every other object's parts take object roles, and a
   catalog part may take only an object role.
@@ -561,28 +572,24 @@ Each of these is known and deliberately not done here.
   works in a checkout. Tiles are baked offline from a checkout; an installed service would need
   the files packaged.
 - **The edit subsequence digest.** `city.tile` carries `edit_delta_digest` and the empty
-  subsequence has its one encoding, but how a non-empty subsequence is digested belongs to the
-  edit log, which does not exist yet. What a pinned subject keeps across a reseed is the edit
-  log's decision too.
-- **`city_reference_closure` is not enforced.** No check yet holds that every external identity
-  of every tile is carried by some tile of the same city; the corridor lane's first generator
-  output check does.
+  subsequence has its one encoding, but how a non-empty subsequence is digested belongs to an edit
+  log of generated subjects, which is not built. What a pinned subject keeps across a reseed is
+  that edit log's decision too.
 - **A junction's anchor is the centre of its extent**, because its node is a point no junction
   extent can lie inside. An edit that grows a junction's extent across a tile boundary moves the
   junction, its approaches, its signal and its lane connections to the next tile.
 - **Root identity minting.** Every generated identity derives from the admitted city identity.
   Nothing here mints that root.
-- **Signal durations.** A signal record carries the traffic lane's plan key and the SHA-256 of
-  the plan catalog it was generated against, never a duration. The plan catalog is the traffic
-  lane's and is re-checked when that lane merges.
-- **Street dimensions** are authored values citing well-known guides that were not re-read in
-  this build.
+- **Signal durations.** A signal record carries a plan key of traffic's signal-plan catalog and
+  the SHA-256 of that catalog's file, never a duration; traffic refuses a signal whose catalog
+  bytes differ ([traffic contract](traffic-contract.md#reading-the-city)).
+- **Street dimensions** are authored values citing well-known guides that were not re-read.
 - **`objects_inside_footprints`** in the document report is 0 whenever a report exists: an object
   inside a footprint is refused by `[footprint_intersection]` rather than counted.
 - **Content answers.** `render_content_answer` in `exulanica/selection/question.py` has no clause
-  for invented content and would describe it as authorized related content. That file is outside
-  this lane.
+  for invented content and would describe it as authorized related content.
 - **The truth-class table in [world-memory-model.md](world-memory-model.md) section 3.1** lists
-  four values and does not list `invented_world`. That document is outside this lane.
-- **Reachability.** Nothing here makes a generated world reachable from any person's atlas. The
-  superseding ADR comes first.
+  four values and does not list `invented_world`.
+- **Reachability.** No saved world draws a generated tile: the app draws one only in the
+  development preview ([generated tile runtime](generated-tile-runtime.md)), and the tile routes
+  serve only a credential whose grant names `tiles.materialise`, which no grant holds by default.

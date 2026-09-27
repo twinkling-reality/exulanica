@@ -171,7 +171,8 @@ describe('the desktop viewport boundary', () => {
     const appearance = readFileSync('packages/app/src/appearance.css', 'utf8');
     // This also asserted that appearance.css consumed `var(--field-image)`. Its only consumer
     // there was the atmosphere-picker's swatches, including a `[data-atmosphere='blue-hour']`
-    // variant for a treatment atlas-visual-language.md lists among the rejected ones. No `.ts`
+    // variant for a treatment the retired atlas-visual-language.md (revision 47f9f7d3)
+    // rejected. No `.ts`
     // in the workspace has emitted that markup for some time, so the assertion was guarding dead
     // rules for a dropped feature. The token is still defined once in tokens.css and still used
     // once by the landing page, and both of those are asserted by their own suites

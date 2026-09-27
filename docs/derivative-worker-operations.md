@@ -1,14 +1,18 @@
 # Derivative worker operations
 
-- Status: **IMPLEMENTED, PostgreSQL-tested, and image-smoke-tested 2026-09-04**.
-- Scope: photograph derivative delivery, including production point-map generation. Scene pose,
-  publication, indexing, package export, and Atlas layout remain separate processes.
+This guide owns running `exulanica-derivative-worker`, the process that turns an uploaded
+photograph into its derivatives: its delivery contract, progress, observability, shutdown and
+recovery. Photographs are one way to build a world; this worker is what makes an upload usable.
+Scene pose recovery and publication, purges and material bakes are separate processes
+([deployment](deployment.md#2-processes)), and every setting the worker reads is in
+[deployment, section 5.2.2](deployment.md#522-the-derivative-worker).
 
 ## Process shape
 
 `POST /intake` validates and content-addresses source bytes, commits capture evidence, and enqueues a
-PostgreSQL job containing capture UUIDs. It never places source bytes in the queue. Production runs
-the API with `EXULANICA_DERIVATIVE_WORKER=off` and starts a separately restartable process:
+PostgreSQL job containing capture UUIDs. It never places source bytes in the queue. A production
+composition runs the API with `EXULANICA_DERIVATIVE_WORKER=off` and starts a separately restartable
+process:
 
 ```bash
 export EXULANICA_DATABASE_URL=postgresql://exulanica_app:<password>@postgres:5432/${POSTGRES_DB:-exulanica}
@@ -18,36 +22,37 @@ export EXULANICA_DEPTH_MODEL=moge
 uv run --extra reconstruction exulanica-derivative-worker
 ```
 
-Repeat `--workspace <uuid>` instead of the environment variable when that is easier to manage.
+Repeat `--workspace <uuid>` instead of the environment variable when that is easier to manage, or
+set `EXULANICA_ACCOUNT_DATABASE_URL` to drain every active account-owned workspace as well.
 `--name` provides a stable operator-chosen worker identifier; otherwise the command combines host,
-PID, and a random suffix. `--once` drains currently eligible work with the same durable start/stop
-events and exits. An empty or malformed workspace set is a startup failure.
+PID, and a random suffix. `--once` drains the work that is eligible at that moment, with the same
+durable start and stop events, and exits. An empty or malformed workspace set with no account
+source is a startup failure.
 
-The API and worker must connect as a role that owns no RLS table and has neither SUPERUSER nor
-BYPASSRLS. Both inspect the active database role at startup and refuse an unsafe one. The bootstrap
-owner URL belongs only to `exulanica-db`; `compose.yaml` enforces that split.
+The worker must connect as a role that owns no RLS table and has neither SUPERUSER nor BYPASSRLS.
+It inspects the active database role at startup and refuses an unsafe one, as the API does. The
+bootstrap owner URL belongs only to `exulanica-db`; `compose.yaml` enforces that split.
 
-`EXULANICA_DEPTH_MODEL` accepts only `moge` or `unavailable` and defaults to the latter outside
-Compose. The checkpoint is the one `exulanica/models/models.manifest.json` pins as
+The depth model is the checkpoint `exulanica/models/models.manifest.json` pins as
 `local_roles.depth`, at a full Git commit that is part of the model identity stored with each point
-map. `EXULANICA_DEPTH_MODEL_ID` and `EXULANICA_DEPTH_MODEL_REVISION` are no longer read, and the
-worker refuses to start while either is set. `EXULANICA_DEPTH_DEVICE` may pin `cuda`,
-`mps`, or `cpu`; when absent, the model selects MPS, then CUDA, then CPU according to measured
-runtime availability. Compose persists `HF_HOME` under the media volume so a restart does not
-download the reviewed checkpoint again.
+map; `EXULANICA_DEPTH_MODEL=moge` turns it on. Compose keeps `HF_HOME` on the media volume, so a
+restart does not download the checkpoint again.
 
-`EXULANICA_SEGMENTATION_MODEL` accepts only `local` or `unavailable` and defaults to the latter
-everywhere, Compose included. `local` loads the object segmenter the manifest's `local_roles` pin
-(SAM 2.1, with Grounding DINO and OWLv2 for boxes) and re-reads each pinned licence before any
-weights load; there is no checkpoint override, because swapping one re-keys every mask.
-`EXULANICA_SEGMENTATION_DEVICE` may pin `mps`, `cuda`, or `cpu`; when absent the segmenter selects
-MPS, then the CPU. It needs the `segmentation` extra (`uv run --extra reconstruction --extra
-segmentation exulanica-derivative-worker`), and a worker without it refuses to start rather than
-segmenting nothing. The Compose derivative image is built with `--extra reconstruction` alone, so
-turning it on there means adding the extra to that build and the variable to that service. Only
-this worker builds a segmenter: it already holds torch, and pycolmap and torch cannot share a
-process on macOS, so nothing that runs in the scene worker may load one. See
-[scene-segments.md](scene-segments.md) section 4.
+Object segmentation (`EXULANICA_SEGMENTATION_MODEL=local`) loads the segmenter the manifest's
+`local_roles` pin (SAM 2.1, with Grounding DINO and OWLv2 for boxes) and re-reads each pinned
+licence before any weights load. There is no checkpoint override, because swapping one re-keys every
+mask. It needs the `segmentation` extra (`uv run --extra reconstruction --extra segmentation
+exulanica-derivative-worker`), and a worker without it refuses to start rather than segmenting
+nothing. The Compose derivative image is built with `--extra reconstruction` alone, so turning it on
+there means adding the extra to that build and the variable to that service. Only this worker
+builds a segmenter: it already holds torch, and pycolmap and torch cannot share a process on macOS,
+so nothing that runs in the scene worker may load one. See [scene-segments.md](scene-segments.md)
+section 4.
+
+Person regions (`EXULANICA_PERSON_DETECTOR=recorded-observation`) are proposed from the people the
+vision observation located. The default, `unavailable`, proposes none, and the region stage says
+that nothing looked; [person presentation consent](person-presentation-consent.md) owns what a
+region then hides.
 
 ## Delivery contract
 
@@ -85,20 +90,26 @@ missing rather than being estimated.
 ## Real progress and state
 
 The pipeline ledger registers reviewed stage definitions additively and accepts stage events only
-for a registered `(stage key, version, parameter digest)`. The implemented per-capture stages are:
+for a registered `(stage key, version, parameter digest)`. The per-capture stages run in this order
+(`exulanica/ingest/pipeline.py`), and every stage event records its actual start, end and monotonic
+duration:
 
-| Stage | Meaning | Durable timing |
+| Stage | Meaning | Also recorded |
 | --- | --- | --- |
-| `intake` | Hash, probe, upright normalization, evidence and source artifact | Actual start/end and monotonic duration |
-| `rendition` | Bounded display JPEG used by later stages | Actual start/end and monotonic duration |
-| `vision` | Structured observation when a vision implementation is configured | Actual start/end, model identity, attempts, tokens and returned cost |
-| `depth` | Point-map production when a depth implementation is configured | Actual start/end and model identity |
+| `intake` | Hash, probe, upright normalization, evidence and source artifact | |
+| `decoded_source` | For a HEIF photograph only: the lossless decoded image later stages read | Decoder and library versions |
+| `rendition` | Bounded display JPEG, the only pixels a model receives | |
+| `vision` | Structured observation when a vision model is configured | Model identity, attempts, tokens and returned cost |
+| `person_regions` | Person regions from the vision observation when a person detector is configured | |
+| `masked_source` | The derivative in which every region whose person has not consented is filled; depth and segmentation read it | |
+| `depth` | Point-map production when a depth model is configured | Model identity |
+| `segmentation` | Object masks when the segmenter is configured | Model identity and device |
 
-**CORRECTED 2026-09-04.** Rendition stage version 2 records `optimize: false` in its parameters.
-Version 1 always enabled Pillow's optional JPEG entropy-table optimization. The libjpeg encoder
-then failed on reproducible, valid high-entropy frames with `broken data stream when writing image
-file` before any model call. Version 2 makes the robust encoding choice deterministic and visible in
-the artifact identity. It does not retry the same input with a hidden alternative encoder setting.
+The rendition encodes without Pillow's optional JPEG entropy-table optimization and records
+`optimize: false` in its parameters. With that optimization the libjpeg encoder failed on
+reproducible, valid high-entropy frames with `broken data stream when writing image file` before any
+model call, so the robust choice is deterministic and part of the artifact identity, and the stage
+never retries the same input with a hidden alternative setting.
 
 Rendition stage version 3 writes an empty JPEG comment, so a comment (COM marker) in the source
 photograph does not reach the rendition a model receives; the rendition already carries no EXIF
@@ -110,7 +121,7 @@ the vision stage computes a new key from them.
 There are no indexing, publication, or reconstruction events. New stage names require a reviewed
 stage definition before the database accepts their events.
 
-`stage_succeeded`, `stage_failed`, and `stage_reused` keep their existing meanings.
+`stage_succeeded`, `stage_failed` and `stage_reused` mean what they say.
 `stage_unavailable` means the real stage had no configured implementation;
 `stage_missing` means a required durable input was absent; `stage_skipped` is reserved for a
 reviewed stage deliberately disabled by policy. Unavailable optional vision or depth does not turn
@@ -174,8 +185,8 @@ For a growing queue:
 
 ## Verified acceptance boundary
 
-The PostgreSQL acceptance test kills a real process after each committed existing stage boundary:
-intake, rendition, vision, and depth. It expires the abandoned lease and starts two competing clean
+The PostgreSQL acceptance test (`tests/test_derivative_reclaim.py`) kills a real process at each of
+the intake, rendition, vision and depth stage boundaries. It expires the abandoned lease and starts two competing clean
 processes. Every case produces one canonical artifact per stage and capture, one job terminal event,
 no running pipeline ledger row, and one returned paid vision result per capture. Separate tests cover
 two-connection contention, independent lease renewal, mid-job lease loss, deletion during work,

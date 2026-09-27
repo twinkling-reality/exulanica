@@ -1,10 +1,11 @@
 # One place across captures and time
 
-Status: **PLACE PLANE AND SYNTHETIC ALIGNMENT**. The vocabulary and tables are decided and the
-geometry is measured against a synthetic fixture. No joint reconstruction of two real captures
-has run. A place may also carry a frame a provider declared instead of one a reconstruction
-measured; that path is reachable through the product's own routes and no real external dataset
-has been admitted through it.
+This contract owns the place plane: how several captures of one physical place become one place
+with a shared coordinate frame and versions ordered by capture time, and how a place created for an
+admitted external source declares its frame instead. The vocabulary and tables are decided
+(migrations 0038 and 0091) and the alignment geometry is measured against a synthetic fixture. No
+joint reconstruction of two real captures has run, and no real external dataset has been admitted
+through a declared frame, although that path is reachable through the product's own routes.
 
 <details>
 <summary>Sections</summary>
@@ -12,13 +13,13 @@ has been admitted through it.
 - [Scene and place](#scene-and-place)
 - [The one hard constraint, stated first](#the-one-hard-constraint-stated-first)
 - [What a place is](#what-a-place-is)
-- [What a place is in the schema, decided 2026-09-07](#what-a-place-is-in-the-schema-decided-2026-09-07)
-- [A place a provider documented, decided 2026-09-22](#a-place-a-provider-documented-decided-2026-09-22)
+- [What a place is in the schema](#what-a-place-is-in-the-schema)
+- [A place a provider documented](#a-place-a-provider-documented)
 - [The alignment, and what makes it refusable](#the-alignment-and-what-makes-it-refusable)
 - [Forward migration](#forward-migration)
-- [What Atlas does with it](#what-atlas-does-with-it)
-- [The exit, and why it is still open](#the-exit-and-why-it-is-still-open)
-- [Relationship to the rest of Phase 10](#relationship-to-the-rest-of-phase-10)
+- [How a place is to be shown](#how-a-place-is-to-be-shown)
+- [What is exercised, and what needs real data](#what-is-exercised-and-what-needs-real-data)
+- [Reading a place](#reading-a-place)
 
 </details>
 
@@ -29,25 +30,23 @@ occasion, reconstructed into one recovered frame. Two captures of one kitchen ar
 share a subject and share nothing else. Their coordinate frames are unrelated, their regions are
 separate, and no query can ask what changed.
 
-A place is the join that supplies that history. A generative world model reading this system
-should be able to ask for a place and get its versions, not get whichever capture happened to be
-indexed. Persistence across time is the thing a stateless model most lacks and the thing this
-product exists to supply.
+A place is the join that supplies that history: a reader asking for a place gets its versions,
+not whichever capture happened to be indexed.
 
 ## The one hard constraint, stated first
 
 **Retained receipts alone cannot align two captures, and no amount of care makes them.**
 
-`docs/scene-placement-alignment.md` records the rule: "No learned feature descriptors are
-persisted." What the pose stage keeps of COLMAP's output is a bounded sample of tracks per image:
+[Scene reconstruction operations](scene-reconstruction-operations.md#3-placement-coordinates-scale-and-correspondence-fitting)
+records the rule that no learned feature descriptors are persisted. What the pose stage keeps of COLMAP's output is a bounded sample of tracks per image:
 `[point id, source x, source y, world x, world y, world z, reprojection error, track length]`. Point
 ids are global **within one reconstruction** and mean nothing across two. Two captures of one
 kitchen produce two disjoint id spaces over two unrelated coordinate systems, and matching them
 would need the descriptors that were deliberately not kept.
 
 So cross-capture alignment is not a post-hoc computation over stored artifacts. It is a
-**reconstruction**, run over the union of both capture sets, exactly as experiment FR-2 specifies:
-"Jointly reconstruct two consented sets and inspect one connected model plus metric consistency."
+**reconstruction**, run over the union of both consented capture sets, which yields one connected
+model whose consistency can be inspected.
 
 This is not a workaround. Persisting descriptors would mean storing, per photograph, a
 representation whose purpose is to recognise that same content elsewhere, which is the shape of the
@@ -79,7 +78,7 @@ room labelled as another.
 The user may **name** a place and may **refuse** a proposed join. The user may not assert one:
 naming a thing does not make two reconstructions share a frame.
 
-## What a place is in the schema, decided 2026-09-07
+## What a place is in the schema
 
 The section above says what a place is. This one says where it lives, because the word already
 means something else in this schema and a durable entity has to be addressable before anything can
@@ -91,7 +90,7 @@ It is not an entity, it is not a region, and it is not a property of a scene.**
 ### Why not the entity table
 
 `entity` already carries a `class` drawn from `occurrence_class`, and that enum already contains
-`'place'` (`exulanica/migrations/0001_spine.sql:75`). An entity of class `'place'` is not only
+`'place'` (`exulanica/migrations/0001_spine.sql`). An entity of class `'place'` is not only
 expressible, it is reachable in production, so putting the durable place there would have been the
 cheapest change: it inherits naming, merging, confirmation and the identity ledger, and it would
 have needed no new plane at all.
@@ -100,15 +99,15 @@ It is the wrong plane, for three reasons that compound.
 
 The identity plane establishes identity by linking **occurrences** to entities through
 `entity_link`, whose `basis_digest` records "WHICH signals were shown"
-(`exulanica/migrations/0001_spine.sql:560`). A place's identity comes from a joint reconstruction
+(`exulanica/migrations/0001_spine.sql`). A place's identity comes from a joint reconstruction
 over two capture **sets**. That is not an occurrence in any one photograph, so binding it through
 `entity_link` would mean inventing an occurrence to stand for a fact about a set, and the invented
 row would then be indistinguishable from an observed one.
 
 Worse, the entity plane is the machinery that turns a *name* into identity: `display_name` is
-"written ONLY via a 'user' assertion" (`exulanica/migrations/0001_spine.sql:544`), and
+"written ONLY via a 'user' assertion" (`exulanica/migrations/0001_spine.sql`), and
 `assertion_kind` reserves `'user'` as "the only kind permitted to carry a name"
-(`0001_spine.sql:69`). That machinery is correct for what it does, and the section below keeps it.
+(`0001_spine.sql`). That machinery is correct for what it does, and the section below keeps it.
 It is the wrong machinery for this: a place asserted from a label is a claim the system cannot
 support, and putting the geometric place on the same table would put both identities behind one
 `entity_id`, so a place that a user had merely named would be indistinguishable from one two
@@ -124,37 +123,31 @@ Promoting `reconstruction_scene` to carry a nullable `place_id` and a version or
 least new surface. It is refused by the database, not by taste.
 
 `reconstruction_scene` carries `tg_reconstruction_scene_append_only`. MEASURED 2026-09-07 by reading
-`pg_proc.prosrc` on the permitted instance: the trigger permits exactly one UPDATE, advancing
+`pg_proc.prosrc` on the reference database: the trigger permits exactly one UPDATE, advancing
 `current_job_id` to a job that has already succeeded, and it identifies that case by requiring
 `to_jsonb(new) - 'current_job_id' = to_jsonb(old) - 'current_job_id'`. Setting a `place_id` on an
-existing scene row changes a key outside that exception and is refused. So option C is not the cheap
-one: it costs the append-only guarantee that protects every scene in the repository, and it would
-buy an inversion of ownership the roadmap explicitly asks against.
+existing scene row changes a key outside that exception and is refused. So this is not the cheap
+option: it costs the append-only guarantee that protects every scene in the repository, and it
+would make a scene a property of a place, inverting which owns which.
 
 It is also wrong on its own terms, twice. A place needs a shared frame, an ordered series and a
 series of alignment receipts, and none of those is a property of any one scene. And a scene's
 identity **is** its member set: `scene_id_for` is a uuid5 over the digest of the sorted member
-capture ids (`exulanica/evidence/scene.py:105-112`), so a place cannot be modelled as a scene that
+capture ids (`exulanica/evidence/scene.py`), so a place cannot be modelled as a scene that
 grew, because adding a capture does not extend a scene, it names a different one.
 
 ### The collision with `occurrence_class`, and how it is closed
 
 Two things named `place` in one schema is how a query silently returns the wrong one, so the word
-has to resolve. The first draft of this decision closed it by refusing an `entity` row of class
-`'place'` outright, on the belief that such an entity could only ever be a place recognised from a
-label, which this note forbids. **That belief was wrong and the refusal is withdrawn.**
-
-What is actually there, checked 2026-09-07: the vision stage emits a whole-image occurrence of class
-`'place'` for every photograph whose model output carried a proposed place, alongside a `place_is`
-assertion (`exulanica/ingest/stages/vision.py:323-343`). Naming any occurrence creates an entity
-whose class is copied from it (`exulanica/identity/decisions.py:107`), and 0002's naming guard
-already requires an active user assertion before any entity may carry a name
-(`exulanica/migrations/0002_naming_and_admission.sql:246`). So an `entity` of class `'place'` is a
-live product path: it is a place **a person named**, admitted by the same guard that admits every
-other name. `tests/test_selection.py:163` has said so in a comment since long before this note
-existed: "Places are entities too, and the same mechanism names them." Refusing it would have
-deleted a working capability to solve a vocabulary problem, which is the wrong trade, and it would
-have been made on a false premise.
+has to resolve, and refusing an `entity` of class `'place'` outright is not the way: it is a live
+product path. The vision stage emits a whole-image occurrence of class `'place'` for every
+photograph whose model output carried a proposed place, alongside a `place_is` assertion
+(`exulanica/ingest/stages/vision.py`). Naming any occurrence creates an entity whose class is copied
+from it (`exulanica/identity/decisions.py`), and 0002's naming guard requires an active user
+assertion before any entity may carry a name (`exulanica/migrations/0002_naming_and_admission.sql`).
+So an `entity` of class `'place'` is a place **a person named**, admitted by the same guard that
+admits every other name; `tests/test_selection.py` names places by the same mechanism as people.
+Refusing it would delete a working capability to solve a vocabulary problem.
 
 So there are two real things, and they get two planes rather than one plane and a prohibition.
 
@@ -162,9 +155,9 @@ So there are two real things, and they get two planes rather than one plane and 
   assertion over an occurrence in one photograph. It has no frame, no versions and no geometry.
   The epistemic vocabulary already says as much about the predicate behind it: `place_is` is "a
   label for where a photograph was taken", a proper noun a model is permitted to propose
-  (`exulanica/epistemics/vocabulary.py:94-107`). A label is the whole of what that plane claims.
+  (`exulanica/epistemics/vocabulary.py`). A label is the whole of what that plane claims.
 - A `place` row is **a place the geometry established**. Its identity comes from a joint
-  reconstruction over two capture sets, exactly as this note's identity section requires, and never
+  reconstruction over two capture sets, exactly as this contract's identity section requires, and never
   from a name.
 
 **Neither creates the other, and that is the invariant worth testing.** Naming a place occurrence
@@ -174,12 +167,11 @@ alignment must not mint an entity, because geometry is not a name. It is asserte
 `::test_admitting_a_place_version_creates_no_entity`, the first driving the real `name_occurrence`
 path rather than a raw insert.
 
-An earlier draft of this note proposed a nullable `place.named_entity_id` linking the two planes,
-and 0038 does not carry it. The link is not needed to keep them separate, which is what the tests
-above establish, and a column would have been a second place to look for a place's name. When
-naming a place is wanted, it belongs where every other user statement in this system belongs: an
-assertion whose `subject_ref` names the place, under the guard 0002 already applies to names. That
-is not built, and this note does not claim it is.
+0038 carries no `place.named_entity_id` linking the two planes. The link is not needed to keep
+them separate, which is what the tests above establish, and a column would be a second place to look
+for a place's name. Naming a geometric place belongs where every other user statement in this
+system belongs: an assertion whose `subject_ref` names the place, under the guard 0002 applies to
+names. That is not built.
 
 The ambiguity that remains is a reader's, not a query's, and the identifier closes it: `place_id`
 names the geometric plane and nothing else, while the identity plane uses `entity_id` everywhere and
@@ -224,7 +216,7 @@ with three scenes has two accepted alignment receipts, and the third scene's fra
 measured against the second rather than against the anchor. Without this column that composition is
 invisible and a reader would take a composed transform for a measured one.
 
-`unique (workspace_id, scene_id)` enforces the rule this note already states: a scene belongs to at
+`unique (workspace_id, scene_id)` enforces the rule stated above: a scene belongs to at
 most one place, because two places claiming one scene would be two coordinate frames claiming one
 set of photographs.
 
@@ -248,28 +240,26 @@ would have to be right before anybody could measure it.
 
 ### An artifact may name a place
 
-`artifact` carries `an_artifact_names_one_subject`, which reads
-`CHECK ((source_blob_sha256 IS NOT NULL) <> (scene_id IS NOT NULL))` (read from the live schema,
-2026-09-07). An artifact names exactly one subject: a blob or a scene.
+Before 0038, `artifact` carried `an_artifact_names_one_subject`, which read
+`CHECK ((source_blob_sha256 IS NOT NULL) <> (scene_id IS NOT NULL))`: an artifact names exactly one
+subject, a blob or a scene.
 
 A place alignment's subject is a **pair of scenes**, which is neither. Attaching its receipt to one
 of the two scenes would be a lie about what was measured, and the lie would be invisible from the
 scene side. So 0038 adds a nullable `place_id` to `artifact` and generalises the constraint to
-exactly-one-of-three. The invariant is unchanged and every existing row still satisfies it; what
-changes is that a place is now a subject a build may be about.
+exactly-one-of-three. The invariant is unchanged and every row written before 0038 satisfies it;
+a place is one more subject a build may be about.
 
-### Where a place is, decided 2026-09-07
+### Where a place is
 
-**A place derives its position from its photographs and stores none. Migration 0038 needs no
-amendment for this.**
+**A place derives its position from its photographs and stores none.**
 
-Every capture ingested with EXIF GPS already writes a durable `gps_position_is` claim.
-`exulanica/ingest/exif.py:157-167` defines `GpsFix` as latitude and longitude in integer
-ten-millionths of a degree, deliberately never a float, and `exulanica/ingest/stages/intake.py:151`
-writes it for every capture that has one. MEASURED 2026-09-07 on the permitted instance: the
-retained corpus holds **zero** such claims, because the bowl and volcanic sets are published
-datasets with EXIF stripped. The signal is real, it is already recorded, and nothing has exercised
-it.
+Every capture ingested with EXIF GPS writes a durable `gps_position_is` claim. `GpsFix` in
+`exulanica/ingest/exif.py` is latitude and longitude in integer ten-millionths of a degree,
+deliberately never a float, and the intake stage (`exulanica/ingest/stages/intake.py`) writes it
+for every capture that has one. Measured on 2026-09-07 on the retained reference corpus: it holds
+**zero** such claims, because the bowl and volcanic sets are published datasets with EXIF
+stripped.
 
 #### Why not a column on `place`
 
@@ -281,7 +271,7 @@ withdrawn photograph was taken. That is a retained inference over withdrawn evid
 the withdrawal machinery exists to prevent, and it would be invisible: an integer pair on a row
 looks like configuration, not like a derived fact somebody has a right to remove.
 
-`gps_position_is` is also **functional** (`exulanica/migrations/0006_functional_predicates.sql:14`),
+`gps_position_is` is also **functional** (`exulanica/migrations/0006_functional_predicates.sql`),
 so its claim can be superseded or retracted. A column cannot follow that; a read can.
 
 #### Why not its own receipt
@@ -316,7 +306,7 @@ Georeferencing a frame needs metric scale, which needs the independent physical 
 attached a real-world coordinate to a scale-free COLMAP frame would be making exactly the unearned
 claim the rung ladder exists to prevent.
 
-#### The read basis, implemented 2026-09-08
+#### The read basis
 
 `PlaceHistory.position` reaches the place-addressed World Read bundle, including an unresolved
 time address, and participates in its digests. It describes current, untimed active claims over
@@ -335,71 +325,66 @@ corpus, and the reconstruction executors used by these tests remain scripted.
 #### The trade, stated
 
 A derived position cannot be indexed, so "which places are near here" is a sequential scan over
-assertions. That is the cost, and it is accepted on three grounds: nobody has asked for
-that query, the roadmap explicitly defers Earth and map views to a later bridge view, and the
-corpus holds zero fixes to scan. When it is wanted, the right answer is a materialized position
-carrying an explicit invalidation edge, following the pattern `world_structure_invalidation`
-already implements, and it will properly be a migration then, because it will need that edge. This
-decision does not give it one, which is the point: a materialized column without invalidation is
-the version that is wrong, and it is the version an amendment without that invalidation edge would have shipped.
+assertions. That cost is accepted because no product surface asks that query and Earth and map
+views are optional content ([product direction](product-direction.md)). When it is wanted, the
+right answer is a materialized position carrying an explicit invalidation edge, following the
+pattern `world_structure_invalidation` implements, and it will be a migration then, because it needs
+that edge: a materialized column without invalidation is the version that is wrong.
 
 ### The build, and why it needs its own queue
 
 The joint reconstruction is a new stage, `place_alignment`, producing one artifact kind. It has to
-be a stage rather than a read-time join for the reason this note opens with, and adding it moves
+be a stage rather than a read-time join for the reason this contract opens with, and adding it moves
 `pipeline_digest()`, which is computed over the whole `STAGES` registry
 (`exulanica/ingest/stages/__init__.py`). That is a reason to add it once and re-record, not a reason
 to avoid it.
 
 Its inputs are the two scenes' retained pose receipts, which already hold `camera_centre_xyz` per
-photograph (`exulanica/reconstruction/pose.py:196`) and are therefore the `scene_xyz` half of every
+photograph (`exulanica/reconstruction/pose.py`) and are therefore the `scene_xyz` half of every
 correspondence, plus the union of both capture sets, which the joint run recovers a second time to
 supply the `joint_xyz` half.
 
 The joint sparse model itself is **not** retained as citable geometry. It is a third frame in which
 no scene is addressed and which could be mistaken for the place's own geometry. Its digest goes in
-the receipt so the fit stays checkable, and the model stays a build intermediate, the same rule
-Phase 3C states for training intermediates.
+the receipt so the fit stays checkable, and the model stays a build intermediate, as training
+intermediates do.
 
 It cannot reuse the scene queue. `reconstruction_scene_job.scene_id` is `not null` and every
 claim, lease and idempotency path in that queue is keyed on one scene, so a pair-subject build has
 no valid row to write. Worse, routing a joint run through the `scene_pose` stage would make every
-success look like a failure: `exulanica/reconstruction/pose.py:585-586` appends "joint
+success look like a failure: `exulanica/reconstruction/pose.py` appends "joint
 reconstruction has no measured metric scale" whenever a manifest declares more than one capture set
 and carries no metric scale, and this frame is deliberately not metric. So the join is its own
 stage, and reusing `scene_pose` for it is the single most expensive mistake available here.
 
-**The queue is deferred, and that is a trade rather than an omission.** The build is a callable
-entry point taking two scenes and an injected COLMAP executor, which is exactly how the pose path
-is already structured and what makes it exercisable against the stub the reconstruction tests
-already use. What is not built is a leased, claimable `place_alignment_job` queue with its own
-attempt, lease-renewal and reclaim logic, which would be a fourth copy of a pattern this repository
-implements three times (`job`, `reconstruction_scene_job`, `purge_job`).
+**The queue is not built, and that is a trade rather than an omission.** The build is a callable
+entry point taking two scenes and an injected COLMAP executor, which is how the pose path is
+structured and what makes it exercisable against the stub the reconstruction tests use. What is not
+built is a leased, claimable `place_alignment_job` queue with its own attempt, lease-renewal and
+reclaim logic, which would be a fourth copy of a pattern this repository implements three times
+(`job`, `reconstruction_scene_job`, `purge_job`).
 
-The reason is verification, not effort. No joint reconstruction has ever run here, so a queue for it
+The reason is verification, not effort. No joint reconstruction has run here, so a queue for it
 would be scheduling machinery with no executed instance to validate against, and the failure modes
 that machinery exists to survive, a worker dying mid-COLMAP and a lease expiring during a
-45-minute job, are exactly the ones a stub cannot exercise. Building it now would trade a checkable
-system for an unchecked one. What is given up in exchange is real: until the queue exists, a joint
-run is an operator action rather than something a read of an unbuilt place can trigger, which is
-the dispatcher the roadmap wants in the same phase.
+45-minute job, are exactly the ones a stub cannot exercise. What is given up is real: a joint run is
+an operator action rather than something a read of an unbuilt place can trigger.
 
-## A place a provider documented, decided 2026-09-22
+## A place a provider documented
 
-Everything above gives a place one frame authority: its anchor scene's own recovered frame,
+The sections above give a place one frame authority: its anchor scene's own recovered frame,
 established by a joint reconstruction and never by a name. That is right for a place somebody
-photographed, and it leaves a second kind of place with no way to exist at all.
+photographed, and it leaves no way for a second kind of place to exist.
 
 An admitted external source is geography a person is entitled to bring into their world: a
 footprint extract, a tile set, a survey. No photographs stand behind it, so it has no scene, no
-recovered frame and therefore no anchor. `environment_source_admission.place_id` is nonetheless a
-foreign key to `place`, so until this decision the admission chain referenced a row that only a
-hand-written insert could produce. The three things a person is promised on the other side of it,
-bringing a permitted real place into their world, asking a grounded question about that place,
-and composing an admitted environment, were all unreachable for that one reason.
+recovered frame and therefore no anchor. `environment_source_admission.place_id` is a foreign key to
+`place`, so without a second authority the admission chain would reference a row only a
+hand-written insert could produce, and bringing a permitted real place into a world, asking a
+grounded question about that place and composing an admitted environment would all be unreachable.
 
-**Decided: a place created for an admitted source declares its frame when it is created, and the
-declaration is its frame authority.** Migration 0091 adds one append-only table,
+**Decided on 2026-09-22: a place created for an admitted source declares its frame when it is
+created, and the declaration is its frame authority.** Migration 0091 adds one append-only table,
 `place_source_frame`, with at most one row per place.
 
 ### The row, and what each part of it is for
@@ -469,8 +454,8 @@ and accepting them would record a containment claim nobody checked.
 
 A place that declared nothing is untouched by all of this. It claims no frame, so an admission
 has nothing to disagree with. That is what a bare `insert into place` produces, it stays legal,
-and an unanchored place is honest because it asserts nothing. What changed is narrower and is the
-part a person depends on: the product's own paths now always produce one of the two authorities.
+and an unanchored place is honest because it asserts nothing. The product's own paths always
+produce one of the two authorities.
 
 ### What a declared place is not
 
@@ -516,10 +501,10 @@ plane over, and a cheaper schema is not worth reintroducing it.
 ### What this does not build
 
 No browser flow admits a place. The routes exist and are exercised, and nothing in the
-application's own interface calls them, so bringing a real place into a world is still an
-operator action taken with a client. No real external dataset is admitted either: the tests
-generate a synthetic source file in the workspace inbox, and admitting a provider's actual data
-remains a separate decision about that provider's terms.
+application's own interface calls them, so bringing a real place into a world is an operator
+action taken with a client. No real external dataset is admitted either: the tests generate a
+synthetic source file in the workspace inbox, and admitting a provider's actual data is a separate
+decision about that provider's terms.
 
 ## The alignment, and what makes it refusable
 
@@ -528,7 +513,7 @@ expressed in the joint frame. The same cameras already have centres in their own
 two sets are the correspondences, and fitting a similarity between them is
 `exulanica/reconstruction/place_alignment.py`.
 
-The discipline copies `scene-placement-alignment.md` exactly, because that is the pattern this
+The discipline copies the placement rule in section 3 of `scene-reconstruction-operations.md` exactly, because that is the pattern this
 repository has already shown catches real failures:
 
 - **A held-out fold, reserved before fitting.** Every fifth correspondence by a deterministic
@@ -554,7 +539,7 @@ and about nothing physical. Any metric claim still requires the independent phys
 
 ## Forward migration
 
-The roadmap says forward migration, and here that means: adding a place never rewrites a scene.
+Adding a place never rewrites a scene.
 
 1. A `place` row is created with the scene that will anchor its frame and a name the user supplied
    or none. Creating it writes nothing to the anchor scene.
@@ -570,15 +555,16 @@ The roadmap says forward migration, and here that means: adding a place never re
 
 A scene may belong to at most one place, because two places claiming one scene would be two
 coordinate frames claiming one set of photographs. A scene may belong to none, which is the
-ordinary case and stays the ordinary case.
+ordinary case.
 
-## What Atlas does with it
+## How a place is to be shown
 
-A region that holds a place shows one capture at a time and exposes time as a dimension, not as a
-merge. The rules the display already follows carry over unchanged:
+The browser has no time-switching surface for a place. These are the requirements for one: a
+region that holds a place shows one capture at a time and exposes time as a dimension, not as a
+merge, under the display rules that already hold:
 
-- One region displays one scene, as `docs/atlas-reconstruction-inspection.md` states. Choosing a
-  time chooses which scene that is.
+- One region displays one scene, as [reconstruction inspection](atlas-reconstruction-inspection.md)
+  states. Choosing a time chooses which scene that is.
 - Each version keeps its own rung and its own status. A place does not average them, and an older
   capture that only reached rung 4 stays rung 4 when a newer one reached rung 3.
 - The display frame is the place's shared frame once alignment is accepted, so switching time does
@@ -587,25 +573,23 @@ merge. The rules the display already follows carry over unchanged:
 - Two captures never blend. There is no cross-fade that would show a surface that existed at
   neither time.
 
-## The exit, and why it is still open
+## What is exercised, and what needs real data
 
-The roadmap's exit is two consented captures of one real place, weeks apart, sharing one frame
-within a measured tolerance, with the world showing both versions in place.
-
-The repository holds one real place captured once. The bowl collection is 51 photographs of one
-occasion; the volcanic set is one occasion of a sample turned over against different backdrops,
-which already failed to yield a consistent up direction and would be a poor second capture even if
-one existed. So the exit stays open, and this note claims a design and a numeric fixture, nothing
-else.
+A place is accepted when two consented captures of one real place, weeks apart, share one frame
+within a measured tolerance and the world shows both versions in place. No retained collection has
+two such captures: the bowl collection is 51 photographs of one occasion, and the volcanic set is
+one occasion of a sample turned over against different backdrops, which failed to yield a
+consistent up direction and would be a poor second capture. This plane therefore claims a design
+and a numeric fixture, nothing else.
 
 What is implemented and exercised with fixtures:
 
 - the fitter and its refusals, measured against synthetic captures with a known ground-truth
-  transform, so the geometry and the thresholds are exercised before a card is rented;
-- the refusal paths, which are the ones a real capture pair is most likely to take.
+  transform, so the geometry and the thresholds are exercised before any real joint run;
+- the refusal paths, which are the ones a real capture pair is most likely to take;
 - the callable joint-build path, place/version/alignment persistence and the place/time World
-  Read bundle. Integration executes their database tests with scripted joint reconstruction;
-  neither a leased alignment queue nor a browser time-switching surface is implemented.
+  Read bundle, whose database tests run with scripted joint reconstruction. Neither a leased
+  alignment queue nor a browser time-switching surface is implemented.
 
 What needs real data:
 
@@ -614,13 +598,13 @@ What needs real data:
   45 minutes for 210 photographs at exhaustive matching, so a union of two 50-photograph captures
   should be budgeted as a single job rather than assumed cheap;
 - a measured tolerance, chosen from the observed residual distribution rather than declared in
-  advance. The rung-3 threshold's history (`FR-3`) is the argument: a threshold declared before the
-  measurement is an engineering guess, and this note does not pretend otherwise.
+  advance: a threshold declared before the measurement is an engineering guess.
 
-## Relationship to the rest of Phase 10
+## Reading a place
 
-The World Read API now addresses either a scene or a place and time. Its place plane and read
-contract exist; `tests/test_place_read_bundle.py` exercises version selection and preserves the
-scene address after a scene joins a place. The retained-scene read record dated 2026-09-08 serves
-the widened bundle after migration 0038. None of those results is the missing real-capture exit:
-two consented captures weeks apart, a measured joint frame, and both versions shown in the world.
+The World Read API addresses either a scene or a place and time. `tests/test_place_read_bundle.py`
+exercises version selection and preserves the scene address after a scene joins a place, and the
+place read paths answered over the retained real reconstructions on 2026-09-08
+([record](evaluation/2026-09-08-place-read-paths.json)). None of those results is the real-capture
+acceptance above: two consented captures weeks apart, a measured joint frame, and both versions
+shown in the world.

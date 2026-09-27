@@ -17,7 +17,10 @@ explicitly generated, non-citable metadata
 ([ADR-0023](0023-epistemically-typed-world-memory.md)); generated geometry bytes remain unserved
 and undrawn until a later record supersedes this one.
 
-The living specification is [product-specification.md](../product-specification.md) section 5.
+The living specification is [scene reconstruction operations](../scene-reconstruction-operations.md#5-quality-gate-and-recorded-rung), section 5, which
+replaced the product-specification.md section 5 this record first cited. Line numbers cited below
+refer to the cited documents as they stood when this record was written; atlas-visual-language.md
+was later retired, and its last text is at [revision 47f9f7d3](https://github.com/twinkling-reality/exulanica/blob/47f9f7d3/docs/atlas-visual-language.md).
 The body below keeps the alternatives, licence grounds, and the admission checklist a later
 change must meet. It is not the document a newcomer should start with.
 
@@ -36,10 +39,10 @@ change must meet. It is not the document a newcomer should start with.
   receipt may enter the artifact and read models as explicitly generated, non-citable,
   non-rung metadata. Generated geometry bytes remain unserved and unrendered until separately
   admitted.
-- Related: [product-specification.md](../product-specification.md) section 5;
+- Related: [scene reconstruction operations](../scene-reconstruction-operations.md#5-quality-gate-and-recorded-rung), section 5;
   [atlas-spatial-architecture.md](../atlas-spatial-architecture.md) section 5;
-  [atlas-visual-language.md](../atlas-visual-language.md) sections 2, 4 and 5;
-  [privacy-consent-threat-model.md](../privacy-consent-threat-model.md) 6.2(d);
+  atlas-visual-language.md sections 2, 4 and 5 (retired; [revision 47f9f7d3](https://github.com/twinkling-reality/exulanica/blob/47f9f7d3/docs/atlas-visual-language.md));
+  [privacy-consent-threat-model.md](../privacy-consent-threat-model.md) section 2;
   [license-matrix.md](../license-matrix.md);
   [reconstruction-findings.md](../reconstruction-findings.md);
   [adr/0009-the-ladder-above-rung-3.md](0009-the-ladder-above-rung-3.md).

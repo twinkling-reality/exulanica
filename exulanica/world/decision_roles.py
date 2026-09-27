@@ -3,7 +3,9 @@
 A decision role is a part of a world that changes and chooses at choice points of its own: a person
 deciding what to do next is the first. A world's owner may hand a role's choices, for one of its
 subjects or a group, to an open model the manifest offers it; with no choice nothing is asked and
-the world's own rules decide. A role is data and one adapter module, and nothing else:
+the world's own rules decide. A role's contract is data and one adapter module; hosting a role
+in a world also takes the engine, route, panel and comparison work that
+``docs/decision-roles-contract.md`` lists:
 
 *   **Its registry entry** in ``assets/catalogs/roles/decision-roles.v<N>.json``, with a licence
     and a reason like every catalog entry, states what the role decides for, the engines that host

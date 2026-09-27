@@ -1,20 +1,17 @@
 # Security floor
 
-- Status: mixed, labelled per claim. See [documentation standard](documentation-standard.md#evidence-labels) for the status convention.
-- Date: 2026-09-16.
-- Relationship to other documents: this is what the code enforces for four controls that
-  [privacy-consent-threat-model.md](privacy-consent-threat-model.md) and
-  [evaluation-methodology.md](evaluation-methodology.md) already name. Where either document
-  describes a control more strongly than this one, this one describes the code.
+This contract owns the controls the code enforces: route permissions, per-workspace tile quotas,
+the egress allowlist, model spend budgets and the database roles. Status labels follow the
+[documentation standard](documentation-standard.md#evidence-labels) and apply per claim.
+[Privacy and consent](privacy-consent-threat-model.md) names the boundaries these controls serve,
+including what a hosted request may carry (its section 4.4), and
+[evaluation-methodology.md](evaluation-methodology.md) scores some of them. Where either document
+describes a control more strongly than this one, this one describes the code.
 
-Four controls, and one rule about them. **No on-demand tile route and no lens may ship until all
-four exist**, because each of those is the first thing in the system that turns one request into
-unbounded compute or into traffic leaving the process. Before them, a bearer token reached every
-router, nothing limited egress, and row-level security was the only thing standing where a route
-permission should have been: a second boundary carrying a first boundary's load.
-
-Each section says what the control enforces, where, what it does not cover, and how it is
-configured. None of the four has a default. A setting that is absent refuses; it is never read as
+Each control stands in front of something that turns one request into unbounded compute, into
+spend, or into traffic leaving the process, so row-level security is never the only boundary
+between a request and those. Each section says what the control enforces, where, what it does not
+cover, and how it is configured. A required setting that is absent refuses; it is never read as
 permission.
 
 ## 1. Route permissions
@@ -37,7 +34,7 @@ before a database connection is opened for the route.
   an application built some other way.
 - Build-time check: `create_app` refuses to build when a mounted route has no declaration or a
   declaration names a route that is not mounted. The comparison is against
-  `exulanica.api.routes.routable_paths`, the one walk of the router tree. A route any lane adds under
+  `exulanica.api.routes.routable_paths`, the one walk of the router tree. A route added under
   `exulanica/api/routes/` therefore needs one line in `ROUTE_RULES` before any test that builds the
   application passes.
 - Laid out in `ROUTE_RULE_SECTIONS`, which `ROUTE_RULES` is assembled from: each section declares
@@ -60,11 +57,10 @@ browser session holds `ACCOUNT_OWNER_PERMISSIONS`: `admission.read`, `admission.
 membership role, not assumed: a browser session exists only for an account membership, migration
 0058 allows one role, `owner`, and `AccountRepository.session` requires it.
 `tests/test_route_permissions.py` reads 0058's check and fails when a second role appears, until
-that role is given a grant of its own. `tiles.materialise` is withheld from a browser session, and
-that is now an open decision rather than a pending event: three routes require it, so a browser
-session cannot ask for a generated world or read a tile's bytes until somebody grants it here
-deliberately. An explicit Authorization header never falls back to the
-cookie. Rejected alternative: letting a browser session inherit whatever a bearer token would hold,
+that role is given a grant of its own. Withholding `tiles.materialise` from a browser session is an
+open decision: three routes require it (section 2), so a browser session cannot ask for a generated
+world or read a tile's bytes until somebody grants it here deliberately. An explicit Authorization
+header never falls back to the cookie. Rejected alternative: letting a browser session inherit whatever a bearer token would hold,
 which has no source to inherit from.
 
 **Routes that reach a model** require `model.invoke` beside their read or write permission:
@@ -143,8 +139,8 @@ vocabulary does not load, and the API does not start.
 - It is bearer-token authorisation against an operator-configured table. It is not an account
   system and adds no expiry, rotation or revocation beyond editing the configuration.
 - A route mounted as a plain Starlette route or an ASGI mount rather than a FastAPI route does not
-  receive application-level dependencies. Today only the documentation routes are of that kind,
-  and all are declared public. A `Mount` of a non-router application is also invisible to
+  receive application-level dependencies. The documentation routes are the only ones of that
+  kind, and all are declared public. A `Mount` of a non-router application is also invisible to
   `routable_paths`, so the build-time check would not see it.
 - Permissions are per route, not per body. A route that does two things with one body grants both
   with one permission.
@@ -161,12 +157,16 @@ demand. A request to a route whose declaration requires `tiles.materialise` is c
 route runs, and refused with `429 tile_quota_exceeded` when the charge would cross the ceiling. A
 workspace with no declared quota is refused with `429 tile_quota_undeclared`.
 
-HOW MANY TILES ONE REQUEST COSTS IS THE ROUTE'S DECLARATION, NOT A CONSTANT. `authorise_route`
-charges `TILES_PER_REQUEST`, which is 1, for every such route except those listed in
-`SELF_CHARGING_TILE_ROUTES`, which charge their own and say why. `POST /world-generation/worlds`
-charges one tile per tile the specification covers, counted from the resolved extents before a
-record is made, because one request there can cover up to the 16 by 16 tiles the declared extent
-range allows and a flat charge of one would be wrong by the size of the world.
+**How many tiles one request costs is the route's declaration, not a constant.** Three routes
+require `tiles.materialise`: `GET /tiles`, `GET /tiles/{baked_tile_id}/bytes` and
+`POST /world-generation/worlds`. `authorise_route` charges `TILES_PER_REQUEST`, which is 1, for
+every such route except those listed in `SELF_CHARGING_TILE_ROUTES`, which charge their own and say
+why, and all three are listed. Listing stored tiles materialises none and charges nothing. Serving a
+tile's bytes spends one tile the first time a workspace is served that tile, in the same statement
+as the delivery row (migration 0072), and a reload is free. `POST /world-generation/worlds` charges
+one tile per tile the specification covers, counted from the resolved extents before a record is
+made, because one request there can cover up to the 16 by 16 tiles the declared extent range allows
+and a flat charge of one would be wrong by the size of the world.
 
 - Declared per workspace in `workspace_tile_quota` (migration `0062_workspace_tile_quotas.sql`),
   under `enable` and `force row level security` with `ws_isolation`. `tiles_used` only rises; a
@@ -175,7 +175,7 @@ range allows and a flat charge of one would be wrong by the size of the world.
   `exulanica/api/quotas.py`, `charge_tiles`, as the runtime role on a workspace-scoped connection.
   The permission check runs first, so a refused request charges nothing.
 - Enforced by `tests/test_workspace_tile_quotas.py` through a real request against a probe route
-  mounted for that test only. No tile route ships.
+  mounted for that test only.
 
 **Configuration.** An operator declares a ceiling with `declare_tile_quota`. There is no default
 ceiling, and raising one is deliberate.
@@ -183,8 +183,9 @@ ceiling, and raising one is deliberate.
 **What it does not cover.** OPEN.
 
 - It is a ceiling, not a rate. A window needs a clock and is the tile route's policy to declare.
-- The charge is one tile per request. A route that materialises several tiles per request must
-  declare that before it ships.
+- A route added with `tiles.materialise` is charged one tile per request unless it is listed in
+  `SELF_CHARGING_TILE_ROUTES` and charges its own count. Nothing checks that a route materialising
+  several tiles per request is listed.
 - The charge is not refunded when materialisation fails. That is pessimistic on purpose.
 
 ## 3. Egress allowlist
@@ -243,21 +244,20 @@ never retried and never failed over, and the API answers it with `502 egress_ref
 - Enforced by `tests/test_egress_allowlist.py`, which proves an unlisted host is refused with no
   socket opened, and proves the socket patch is live by letting a listed host reach it.
 
-**What it does not cover.** VERIFIED against the tree on 2026-09-16 by
-`tests/test_egress_allowlist.py::test_the_list_of_uncovered_network_modules_is_complete`, which
+**What it does not cover.** VERIFIED:
+`tests/test_egress_allowlist.py::test_every_network_module_is_either_held_to_the_allowlist_or_named_as_not`
 fails when the list below changes.
 
 This is a development and deployment safety rail, described as one, and it is not a substitute for
-the network's own limit. **A process-level allowlist is not a network-level one.** The sentence in
-the threat model that egress "is allowlisted" is true of the model transport and Google sign-in and
-of nothing else:
+the network's own limit. **A process-level allowlist is not a network-level one.** Egress is
+allowlisted for the model transport, the catalog preflight and Google sign-in, and for nothing
+else:
 
 - `exulanica/environment/nyc_open_data.py`, `exulanica/environment/owned_district.py` and
   `exulanica/evaluation/benchmark.py` open URLs with `urllib` and do not pass through it.
 - The test that keeps this list true matches `urlopen`, `httpx` and `httpx2` clients,
-  `OAuth2Client`, `requests`, `aiohttp`, `urllib3` and `socket.create_connection`. It first
-  matched `httpx` alone and missed the sign-in path, which used `httpx2`; a client library outside
-  that pattern would be missed the same way.
+  `OAuth2Client`, `requests`, `aiohttp`, `urllib3` and `socket.create_connection`. A client library
+  outside that pattern would be missed.
 - Any code that builds its own HTTP client or socket does not pass through it.
 - It checks the host name, not the address the name resolves to. A declared host whose DNS answer
   changes is reached wherever the answer points.
@@ -267,46 +267,82 @@ of nothing else:
   `tests/test_egress_allowlist.py` fails if package code passes a client at all.
 
 Threat F1 in [evaluation-methodology.md](evaluation-methodology.md) expects "egress blocked by
-allowlist; URL inert; alert". The first and last parts now hold for the model transport. Whether a
-URL in model output is rendered inert is a rendering property this control does not touch.
-An egress control at the network, which a deployment should add, is OPEN.
+allowlist; URL inert; alert". The first and last parts hold for the model transport. Whether a URL
+in model output is rendered inert is a rendering property this control does not touch. An egress
+control at the network, which a deployment should add, is OPEN.
 
-## 4. Per-lens budgets
+## 4. Model spend budgets
 
-**What it enforces.** CLOSED. A lens runs under four ceilings: `max_tokens`, `max_calls`,
-`max_wall_clock_ms` and `max_cost_usd`. Every request is reserved against all four before it is
-sent, pessimistically: the caller's `max_tokens` plus an over-estimate of the prompt, the worst-case
+**What it enforces.** CLOSED. Every model client holds a budget guard (`BudgetGuard` in
+`exulanica/models/budget.py`) that refuses a call which could take the process past
+`EXULANICA_BUDGET_USD` of spend (default 5.00) or past `EXULANICA_BUDGET_MAX_CALLS` calls (default
+2,000). The ceiling does not refill while the process runs. A call is reserved at its worst case
+before it is sent and keeps that reservation until its usage is recorded, so calls admitted at once
+never cross the ceiling together, and an attempt whose cost is unknown stays charged at its
+reservation. A refusal is a `BudgetExceededError`: the chain never retries it, and the API answers it
+with `429 budget_exceeded`. A person's decisions draw on the same guard, less the reserve their
+contract keeps for other work; once what is left fits no ask, the playback host asks nobody and the
+routine decides ([model selection](model-and-service-selection.md#what-a-persons-decisions-may-spend)).
+
+- Configured by `EXULANICA_BUDGET_USD` and `EXULANICA_BUDGET_MAX_CALLS`
+  ([deployment](deployment.md#51-the-api-process)).
+- Enforced in `BudgetGuard.reserve`, which every `ModelClient` built without an explicit guard
+  constructs. `/readyz` warns when a playback host's budget no longer fits a person's ask.
+- Enforced by `tests/test_model_budget_holds.py`.
+
+**The per-lens guard.** `LensBudgetGuard` in `exulanica/models/lens_budget.py` has the shape of
+`BudgetGuard` and plugs into `ModelClient(budget=...)`. It holds one lens to four ceilings,
+`max_tokens`, `max_calls`, `max_wall_clock_ms` and `max_cost_usd`, declared in
+`EXULANICA_LENS_BUDGETS`, a JSON object mapping a lens name to exactly those four fields. Ceilings
+are integers and the cost is a decimal string; a JSON float anywhere in the document is refused, and
+a lens with no declared budget is refused by `budget_for`. Every request is reserved against all four
+before it is sent: the caller's `max_tokens` plus an over-estimate of the prompt, the worst-case
 price, one call, and the full per-call timeout. A request that could cross any ceiling is refused
-with `LensBudgetExceeded`, which is a `BudgetExceededError`: the chain does not retry it, its message
-says never to retry it, and the API answers it with 429. A reported call replaces its reservation
-with what it cost; a request that failed without a report stays charged at its worst case.
-
-- Declared in `EXULANICA_LENS_BUDGETS`, a JSON object mapping a lens name to exactly those four
-  fields. Ceilings are integers; the cost is a decimal string. A JSON float anywhere in the document
-  is refused. A lens with no declared budget is refused by `budget_for`.
-- Enforced in `exulanica/models/lens_budget.py`, `LensBudgetGuard`, which has the shape of
-  `exulanica/models/budget.py`, `BudgetGuard`, and plugs into `ModelClient(budget=...)`. Use
-  `LensBudgetGuard.model_client`, which sets the client's timeout to the guard's per-call timeout
-  and one attempt, so the wall-clock reservation describes the client.
-- A lens record references its budget by `LensBudget.digest()`, sha256 over canonical JSON with the
-  cost as a quantised decimal string. No clock reading enters that digest, the usage document or a
-  refusal record.
-- Enforced by `tests/test_lens_budgets.py`, one refusal per axis with the other three shown inside
-  their ceilings, each through a real `ModelClient` whose transport is shown not to have been called.
+with `LensBudgetExceeded`, which is a `BudgetExceededError`. A lens record references its budget by
+`LensBudget.digest()`, sha256 over canonical JSON with the cost as a quantised decimal string, and no
+clock reading enters that digest, the usage document or a refusal record.
+`tests/test_lens_budgets.py` shows one refusal per axis, each through a real `ModelClient` whose
+transport is shown not to have been called. No command constructs this guard.
 
 **What it does not cover.** OPEN.
 
+- Both guards are in memory and per process. A restart starts from a full ceiling, and two
+  processes each have their own.
 - The wall clock bounds how long a started call runs only through a transport that enforces a
   deadline. `HttpxTransport` does: it abandons a request at its timeout however the response stalls
   ([transport](../exulanica/models/transport.py)). A transport supplied in its place is bounded only
   by what it does.
-- The guard is in memory. A durable ledger of lens spend and refusals belongs to the lens lane.
-- A process-wide guard can be passed as `process=` so a lens cannot exceed it; nothing forces a
-  caller to pass one.
+- A process-wide guard can be passed to a lens guard as `process=` so a lens cannot exceed it;
+  nothing forces a caller to pass one.
+- What the provider bills for an abandoned request is not observable from this side.
 
-## What still waits on another lane
+## 5. Database roles
 
-- OPEN. **The SELECT-only `exulanica_ro` role for lenses** waits on `exulanica/db/roles.py`, which
-  is being changed in another worktree. **No lens may run without it.** A lens that reads through
-  the write role is a lens that can write, and none of the four controls above prevents that.
+Row-level security keys every workspace table on `current_workspace()`; the roles decide what a
+connection may do at all. `exulanica-db` provisions the first four after the migrations, in one
+order, and `exulanica-seed role` provisions the fifth for the reviewer stack
+([deployment](deployment.md#8-a-seeded-deployment-for-a-reviewer)). Startup refuses a superuser, a
+BYPASSRLS role or the owner of a row-level-security table
+([deployment](deployment.md#513-runtime-row-level-security-is-checked-at-startup)).
+
+| Role | Holds | Why it is separate |
+| --- | --- | --- |
+| `exulanica_app` | Select, insert and update; no delete anywhere. Select only on the registries and control tables in `READ_ONLY_TABLES`; select and insert, never update, on `tombstone` and the append-only tables in `INSERT_ONLY_TABLES` (`exulanica/db/roles.py`) | Row-level security is inert for an owner. A runtime that could update the vocabulary could disarm the rule that stops a model writing a person's name, one that could update a tombstone could postpone or rewrite a deletion, and one that could update a bake request could move it out of the day its quota counts. `tests/test_runtime_update_grants.py` names every table it may update and why |
+| `exulanica_ro` | Select and nothing else | The Selection executor runs a plan derived from model output. It must not be able to write whatever happened upstream of it |
+| `exulanica_purge` | A cross-workspace read of the holder columns of the tables in `PURGE_CROSS_WORKSPACE_TABLES` (`capture`, `artifact`, `reconstruction_scene_member` and `person_derivative_dependency`); column-level updates of purge markers; delete on `embedding` only | Stored bytes may be shared across workspaces, so the destroy decision needs every holder. A person vector has no harmless stub, so the purger removes that row while every other table stays outside its delete authority |
+| `exulanica_accounts` | The account tables and nothing in any workspace | Sign-in state lives outside workspace scope, and the application roles cannot read it ([deployment](deployment.md#514-browser-accounts)) |
+| `exulanica_judge` | Select everywhere, insert and update on an allowlist of tables, no delete | The reviewer stack's API connects as it, so "may read, may not write a source or a deletion" is enforced by the database |
+
+Migration 0074 gives `tombstone` a trigger: every change but `purge_completed_at` is refused for
+every role, and that column moves only for the table owner, a superuser or BYPASSRLS
+administrator, or a role whose only write on the table is that column grant. The purge role's
+update is still filtered by `ws_isolation`, so it reads across workspaces and writes within one.
+
+`EXULANICA_PURGE_DATABASE_URL` is checked, not trusted. `exulanica-purge` asks the database for
+`current_user` and whether the cross-workspace policy applies to it, and refuses to destroy anything
+when it does not, naming the role.
+
+## What the floor does not provide
+
 - OPEN. A process-level sandbox exists only for the gsplat container. Nothing here adds one.
+- OPEN. An egress control at the network, and a request rate limit, are a deployment's to add.

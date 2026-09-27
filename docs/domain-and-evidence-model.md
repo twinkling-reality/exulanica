@@ -1,37 +1,49 @@
 # Domain and evidence model
 
-Status: mixed. Every claim below carries exactly one status label, and a claim that was rewritten
-against what was actually built also carries **CORRECTED**.
-Retrieval date for every VERIFIED external source: **2026-08-27**.
+Photographs are one way to build a world, and a world built from them must be able to say which
+photograph a fact came from. This contract owns that evidence layer: evidence addresses,
+provenance, identity assertions, derivative identity, deletion and tombstones, and the schema
+behind them. It is one part of the [world state architecture](world-memory-model.md), alongside
+authored state, simulation and representations; the spine's compatibility rules do not turn a
+database schema into the complete product specification.
 
-This contract owns evidence addresses, provenance, identity assertions and their schema. It is
-one part of the [world state architecture](world-memory-model.md), alongside authored state,
-simulation and representations. The spine's compatibility rules do not turn a database schema into
-the complete product specification.
+Claims carry the [evidence labels](documentation-standard.md#evidence-labels), and every VERIFIED
+external source was retrieved on 2026-08-27. The implementation is in
+[the evidence modules](../exulanica/evidence/) and [database migrations](../exulanica/migrations/).
+A recorded provider observation applies to its own input and revision; disagreements are resolved
+by tracing the affected schema, caller and evidence. Ingest accepts still photographs, which use
+the photograph form of the address (section 1.5); video, audio and synthetic creation are separate
+capabilities the address format anticipates but does not imply.
 
-[Documentation standards](documentation-standard.md#evidence-labels) define the evidence labels
-used below. The source implementation includes [the evidence modules](../exulanica/evidence/) and
-[database migrations](../exulanica/migrations/). A recorded provider observation applies to its
-own input and revision; resolve disagreements by tracing the affected schema, caller and evidence.
+## Contents
 
-The still-image implementation uses the photograph form of the evidence address described in
-section 1.5. Broader media and synthetic creation are separate capabilities, not implied by that
-address format.
-
-<details>
-<summary>Sections</summary>
-
-- [1. The evidence address](#1-the-evidence-address)
-- [2. The epistemic model](#2-the-epistemic-model)
-- [3. Occurrence versus entity](#3-occurrence-versus-entity)
-- [4. Core schema](#4-core-schema)
-- [5. Idempotency and versioning of derivatives](#5-idempotency-and-versioning-of-derivatives)
-- [6. Deletion, tombstones, and cascade](#6-deletion-tombstones-and-cascade)
+- [1. The evidence address](#1-the-evidence-address):
+  [1.1](#11-the-invariant), [1.2](#12-content-addressing), [1.3](#13-why-frame-indices-and-byte-offsets-are-unusable),
+  [1.4](#14-the-canonical-timebase), [1.5](#15-photographs-are-the-degenerate-case-and-the-interval-still-exists),
+  [1.6](#16-the-five-citation-kinds), [1.7](#17-re-anchoring-across-derivative-regeneration)
+- [2. The epistemic model](#2-the-epistemic-model):
+  [2.1](#21-four-provenance-classes), [2.2](#22-the-assertion-record),
+  [2.3](#23-confidence-without-pretending-it-is-truth), [2.4](#24-supersession-dispute-retraction),
+  [2.5](#25-how-a-citation-survives-the-model)
+- [3. Occurrence versus entity](#3-occurrence-versus-entity):
+  [3.1](#31-the-separation), [3.2](#32-the-promotion-path),
+  [3.3](#33-rejection-memory-that-survives-regeneration), [3.4](#34-merge-split-undo),
+  [3.5](#35-recomputation-triggered-by-each-operation)
+- [4. Core schema](#4-core-schema):
+  [4.1](#41-immutable-media-layer), [4.2](#42-the-spine), [4.3](#43-occurrence-entity-link),
+  [4.4](#44-embeddings-and-the-lexical-arm), [4.5](#45-row-level-security)
+- [5. Idempotency and versioning of derivatives](#5-idempotency-and-versioning-of-derivatives):
+  [5.1](#51-the-derivative-identity-key), [5.1.1](#511-store-writes-happen-after-the-commit-never-before),
+  [5.2](#52-the-producer-protocol), [5.3](#53-regeneration-is-additive),
+  [5.4](#54-this-is-a-cost-control-not-only-a-correctness-control)
+- [6. Deletion, tombstones, and cascade](#6-deletion-tombstones-and-cascade):
+  [6.1](#61-two-deletion-classes), [6.2](#62-tombstones-are-authoritative-and-monotonic),
+  [6.3](#63-the-gate-is-a-trigger-in-the-writing-transaction), [6.4](#64-the-cascade),
+  [6.5](#65-the-re-upload-trap), [6.6](#66-what-deletion-may-claim)
 - [7. The provenance ledger and Assembly Replay](#7-the-provenance-ledger-and-assembly-replay)
 - [8. The World Memory Package is a projection, not the store](#8-the-world-memory-package-is-a-projection-not-the-store)
-- [9. Where this document is not settled](#9-where-this-document-is-not-settled)
-
-</details>
+- [9. Where this document is not settled](#9-where-this-document-is-not-settled):
+  [9.1](#91-address-format-decisions), [9.2](#92-everything-else)
 
 ## 1. The evidence address
 
@@ -85,7 +97,9 @@ that "Write-once-read-many (WORM) retention policies are not supported", and it 
 and no Legal Hold. Source: <https://docs.nebius.com/object-storage/interfaces/s3-api-compatibility>
 (VERIFIED 2026-08-27). Product copy says **"append-only by policy"**, enforced by bucket versioning
 enabled at bucket creation plus a bucket policy denying `DeleteObject` and `DeleteObjectVersion` to the
-runtime service account. Never "immutable", "WORM", or "tamper-proof".
+runtime service account. Never "immutable", "WORM", or "tamper-proof". The implemented store is the
+local content-addressed store (`exulanica/store/local.py`), whose key layout an S3-compatible
+backend can serve unchanged; the bucket policy is the requirement that backend must meet.
 
 ### 1.3 Why frame indices and byte offsets are unusable
 
@@ -119,63 +133,34 @@ from the preceding keyframe. This is a pure function of the bytes and needs no s
 
    ```
    ticks(t_ns) = floor( (t_ns * time_base_den) / (time_base_num * 1_000_000_000) )
-   t_ns(ticks) = round_half_down( ticks * time_base_num * 1_000_000_000 / time_base_den )
+   t_ns(ticks) = ceil( ticks * time_base_num * 1_000_000_000 / time_base_den )
    ```
 
    Nanoseconds cannot exactly represent every 1/48000 s audio tick (20833.333... ns), which is
-   precisely why the rational anchor is stored rather than discarded. **The rounding rule is part of
-   the frozen contract** and may not change without a `span_format_version` bump (section 5.4). The
-   rule itself was never defined in this document, and the two formulas do not compose. Both are
-   corrected immediately below.
+   precisely why the rational anchor is stored rather than discarded. **The rounding rules are part
+   of the frozen contract** and may not change without a `span_format_version` bump (section 5.4).
 3. **Track zero:** `t_ns = 0` corresponds to `start_pts` as observed at ingest, recorded on the track
    row. If a file is remuxed and `start_time` shifts (edit lists do this routinely, and rotation
    metadata compounds it), the shift is detectable by comparing stored to observed `start_pts`, and the
    remuxed file is a **different blob** anyway, so existing spans are untouched.
 
-#### What `round_half_down` means
+**DECISION (spine-3b): the two conversions compose.** `ticks_from_ns` floors and `ns_from_ticks`
+takes the ceiling, toward positive infinity rather than away from zero, because the forward
+conversion floors toward negative infinity and the inverse must round the same direction
+(`exulanica/evidence/timebase.py`). So `ticks(t_ns(k)) == k` for every `k` on every timebase whose
+tick is at least one nanosecond, negative ticks included, and a citation stored in nanoseconds and
+converted back for a seek opens on its own sample. `tests/test_timebase.py::test_tick_to_ns_to_tick_is_the_identity`
+pins the round trip across 48 kHz, 44.1 kHz, 90 kHz, 1/15360, NTSC 1001/30000 and the canonical
+axis, and [ADR-0015](adr/0015-timebase-rounding.md) records the decision. `span_format_version` is 1.
 
-**DECISION (spine-3a), CORRECTED, CLOSED 2026-09-04.** Earlier versions of this document named
-`round_half_down` in the frozen formula and never defined it anywhere. The implemented meaning, in
-`exulanica/canonical.py`: round the exact rational `numerator / denominator` to the nearest integer,
-and resolve an exact tie **toward zero**. That is the standard reading of the name, the one
-`decimal.ROUND_HALF_DOWN` and Java's `RoundingMode.HALF_DOWN` take. It is computed in exact integer
-arithmetic, and `exulanica.canonical` refuses a float outright, so no float can reach a digest input
-by accident.
-
-**Ratified by [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md)**, with the negative
-exact halves that are the only place the two readings differ pinned by
-`tests/test_blob_and_canonical.py::test_round_half_down_is_ties_toward_zero`.
-
-The same ADR removed this rule from the timebase. `round_half_down` is now the rule for **quantising
-a measured value**: the region ppm grid in section 1.5 and the EXIF GPS and altitude conversions.
-Placing a tick on the nanosecond axis is a different job, described immediately below, and it has its
-own rule, `ceil_div`. Two rules with stated and disjoint purposes, not one per call site.
-
-#### The two formulas now compose
-
-**DEFECT CORRECTED 2026-09-04 (spine-3b), inside its decision window.
-See [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md).**
-
-`ns_from_ticks` used to round to nearest while `ticks_from_ns` floors, so tick to ns to tick was
-**not** the identity. At 48 kHz one tick is 20833.333... ns: tick 1 rendered as 20833 ns, and 20833
-ns floored back to tick 0. A citation stored in nanoseconds and converted back to a tick for a seek
-opened one sample early. That was a mismatch of rounding directions, not a precision limit: the
-nanosecond axis is roughly 20833 times finer than a 48 kHz tick.
-
-`ns_from_ticks` now rounds **up**, and `ticks(t_ns(k)) == k` for every `k` on every timebase whose
-tick is at least one nanosecond, negative ticks included. Ceiling toward positive infinity, not away
-from zero, because `ticks_from_ns` floors toward negative infinity and the inverse must round the
-same direction to compose. `tests/test_timebase.py::test_tick_to_ns_to_tick_is_the_identity` pins it
-across 48 kHz, 44.1 kHz, 90 kHz, 1/15360, NTSC 1001/30000 and the canonical axis.
-
-**Why this was a patch and not a `span_format_version` event.** Earlier versions of this section said
-correcting it would move `t_start_ns` and `t_end_ns` for spans derived through the conversion. The
-2026-09-04 audit established that there were none: both conversions had no callers outside the
-package's own tests, no `video` or `audio` `media_track` row had ever been written, and every span in
-existence is a photograph carrying `[0, 1)` directly, on a timebase where ceiling and nearest agree
-on every value. Not one stored digest moved. A v2 written alongside v1 would have produced two
-formats agreeing on every span that exists, so `span_format_version` stays at 1. This argument was
-available exactly once and has now been used.
+**DECISION (spine-3a): `round_half_down` quantises measured values.** In `exulanica/canonical.py` it
+rounds the exact rational `numerator / denominator` to the nearest integer and resolves an exact tie
+**toward zero**, the reading `decimal.ROUND_HALF_DOWN` and Java's `RoundingMode.HALF_DOWN` take. It
+is computed in exact integer arithmetic, and `exulanica.canonical` refuses a float outright, so no
+float can reach a digest input. It is the rule for the region ppm grid in section 1.5 and the EXIF
+GPS and altitude conversions, not for placing a tick on the nanosecond axis: two rules with stated
+and disjoint purposes. Ratified by ADR-0015 and pinned, at the negative exact halves where the
+readings differ, by `tests/test_blob_and_canonical.py::test_round_half_down_is_ties_toward_zero`.
 
 Two further refusals close the same family of failures: a timebase with a tick finer than one
 nanosecond is refused, because two ticks would share a `t_ns` and could not both round trip; and a
@@ -189,9 +174,8 @@ be the first time point that is not part of the interval." The same spec states 
 rational anchor and the fragment URI is a **rendering** of a span, not its identity.
 Source: <https://www.w3.org/TR/media-frags/> (2026-08-27).
 
-Canonical rendered form, used for permalinks and the "open at the exact moment" control.
-**CORRECTED:** the single example previously given here combined a region with no display geometry,
-and `parse_uri` refuses exactly that string, because the display space a region is normalised
+Canonical rendered form, used for permalinks and the "open at the exact moment" control. A region
+URI must carry its display space (`disp=`), because the display space a region is normalised
 against is inside `span_digest` and a URI that dropped it would parse back to a different address.
 The implemented forms are:
 
@@ -204,14 +188,14 @@ exulanica://blob/ni:///sha-256;<base64url>/img#v=1&m=frame_region&t=0,0.00000000
 
 The second is one line in use and is wrapped here for the page. `v=` and `m=` are optional on read: a
 URI carrying neither is read as span format v1 with the modality inferred from the address shape,
-which the shape rules in section 1.6 make unambiguous. The short form `.../v:0#t=12.5,18.25` printed
-in earlier drafts therefore still resolves, pinned by
+which the shape rules in section 1.6 make unambiguous. The short form `.../v:0#t=12.5,18.25`
+therefore resolves, pinned by
 `tests/test_evidence_address.py::test_the_documented_short_uri_form_still_parses`. Writers always
 emit the long form, and a region URI without `disp=` is refused, pinned by
 `::test_a_region_uri_without_its_display_space_is_refused`.
 
 **DECISION (spine-5): wall clock is a separate axis.** Media time answers "where in the file". Wall
-clock answers "when in the user's life". They are joined by `clock_anchor` rows carrying
+clock answers "when it was captured". They are joined by `clock_anchor` rows carrying
 `(track_id, t_ns, utc_instant, source, uncertainty_ms)` with `source` drawn from
 `container_creation_time | device_rtc | gps | ntp | user_stated | inferred`. Never store a single
 capture timestamp and treat it as exact: device clocks drift. Wall-clock queries are translated through
@@ -228,11 +212,12 @@ becomes live only when video arrives.
 
 ### 1.5 Photographs are the degenerate case, and the interval still exists
 
-The corpus is still photographs. A photograph has no duration, no frame rate, no PTS, and no edit list.
+Ingest accepts still photographs only. A photograph has no duration, no frame rate, no PTS, and no
+edit list.
 The temptation is obvious: give images their own address shape, `(blob_id, region)`, and leave time out.
 
 **DECISION (spine-9): a photograph is modelled as a single-sample track, and its span carries a real,
-non-empty, half-open interval from day one.**
+non-empty, half-open interval.**
 
 Concretely:
 
@@ -247,9 +232,9 @@ Concretely:
 | `modality` | `still_image`, or `frame_region` when a region refines it |
 | `region` | normalised to the unit square in **display** space, after orientation is applied, encoded as integer parts per million (see below) |
 
-**DECISION (spine-9a), CORRECTED.** "Normalized to `[0,1]`" did not say how the number is
-encoded, and that gap is load bearing: `region` is inside `span_digest`, and no two JSON writers
-agree on how to render a float. Implemented in `exulanica/evidence/region.py`: coordinates are
+**DECISION (spine-9a): the region encoding.** `region` is inside `span_digest`, and no two JSON
+writers agree on how to render a float, so the encoding is load bearing. Implemented in
+`exulanica/evidence/region.py` and ratified by [ADR-0013](adr/0013-region-encoding.md): coordinates are
 integers in parts per million of the unit square, `0 .. 1_000_000`, quantised from an exact
 `Fraction` through the one project rounding rule defined in section 1.4. One ppm of a 6000 pixel
 wide photograph is 0.006 px, far below any detector's own precision. The region digest tuple is
@@ -277,7 +262,7 @@ Rejected because it makes the address depend on a parsed optional metadata field
 wrong, or written by an editor, and because it invites the false reading that the interval means
 something about the content. For a still, it does not.
 
-**Why the interval must be in the schema on day one, stated as the actual argument:**
+**Why the interval is in the schema from the start, stated as the actual argument:**
 
 1. `modality` and the interval bounds are inputs to `span_digest`, which is a SHA-256 over the
    canonical span tuple. The digest is what the citation token in an answer packet is verified against
@@ -285,8 +270,8 @@ something about the content. For a still, it does not.
    citation token, every permalink, and every archived answer.
 2. `span_format_version` is frozen at v1 and extended **additively only**. Adding a required field to
    the address later is not additive: it is a v2 span format, written alongside v1, requiring a
-   documented and verified migration of every existing span. Adding the field now costs one integer
-   column and two zeroes per row.
+   documented and verified migration of every existing span. Carrying the field from the start costs
+   one integer column and two zeroes per row.
 3. The interval is what the interval tombstone matches on. Redacting a whole photograph is exactly the
    degenerate interval redaction `[0, 1)` covering the track, so the photograph corpus **exercises the
    interval deletion path** rather than leaving it untested until it protects something that matters.
@@ -299,67 +284,73 @@ something about the content. For a still, it does not.
 - `frame_region` becomes the dominant modality, not a refinement of a rare case. A face in a photograph
   is `still_image` interval plus `region`. The citation kinds in section 1.6 do not change shape.
 - `frame_at(t_ns)` degenerates to "the single sample". `spine-4` is satisfied trivially.
-- `audio_time` and ASR-backed `transcript_text` spans have **no source material and no platform path**
-  at MVP. They stay in the schema, unused. The reason is the same as above: their absence from the type
+- `audio_time` and ASR-backed `transcript_text` spans have **no source material and no ingest path**.
+  They stay in the schema, unused. The reason is the same as above: their absence from the type
   is not free, and their presence costs nothing.
 - The `capture` assertion class is thin for a photograph corpus: file hash, byte size, pixel dimensions,
   EXIF device model, EXIF GPS, EXIF timestamps. Everything else a photograph "says" is inference.
 
-**CLOSED 2026-09-04, ADR-0004 and [adr/0012-upright-display-space.md](adr/0012-upright-display-space.md).**
-EXIF Orientation has **eight** values, including four mirrored variants, and `media_track.rotation`
-cannot express a flip. Of the two resolutions this document offered, the second was taken:
-**pixels are normalised at ingest and the normalisation is recorded.** All eight values are
-admitted; none is refused. The consequences are enforced rather than conventional:
+**DECISION (spine-9b): pixels are normalised at ingest and the normalisation is recorded**
+([ADR-0004](adr/0004-exif-orientation-normalisation.md),
+[ADR-0012](adr/0012-upright-display-space.md)). EXIF Orientation has **eight** values, including four
+mirrored variants, and `media_track.rotation` cannot express a flip, so all eight are admitted and
+the pixels are made upright. The consequences are enforced rather than conventional:
 
 - a photograph's display space **is** its upright pixel space, so every `img` region carries
   `display.rotation = 0`, refused by `EvidenceAddress._validate_shape` and by the check constraint
   `evidence_span_image_region_is_upright` otherwise;
 - `media_track.rotation` means *clockwise degrees still to apply*, and is therefore `0` on every
-  image track. The comment in `0001_spine.sql` saying ingest refuses mirrored orientations described
-  the branch that was **not** taken and was superseded by migration `0032_upright_display_space.sql`;
+  image track (migration `0032_upright_display_space.sql`; the comment in `0001_spine.sql` about
+  refusing mirrored orientations describes the branch that was not taken);
 - the EXIF value, the applied rotation, the mirror flag and `normalised_at_ingest` live in
   `media_track.probe_json -> 'orientation'`, outside every digest. An image track that does not
   record the normalisation is refused by `media_track_image_is_upright`.
 
-No `span_digest` changed: `region` and `probe_json` were both untouched. Pinned by
-`tests/test_upright_display_space.py` and `tests/test_exif_orientation.py`.
+Pinned by `tests/test_upright_display_space.py` and `tests/test_exif_orientation.py`.
 
-**CLOSED 2026-09-04, [adr/0016-ocr-is-a-region.md](adr/0016-ocr-is-a-region.md).** Neither of the two
-options as posed. **Text read off a photograph is addressed by the pixels it was read from**: a
-`frame_region` span carrying an `ocr_text_is` assertion, which is what the ingest pipeline has always
-written. A `text_anchor` is a character range in a versioned text artifact, which audio needs because
-the media axis alone cannot locate a word; a photograph does not have that problem, and an offset
-into an OCR artifact would make the address depend on a derivative, which spine-1 forbids. A new
-`ocr_text` value would be additive and free, and would also be a second name for an address shape
-that already exists.
+**DECISION (spine-9c): text read off a photograph is addressed by the pixels it was read from**
+([ADR-0016](adr/0016-ocr-is-a-region.md)): a `frame_region` span carrying an `ocr_text_is`
+assertion. A `text_anchor` is a character range in a versioned text artifact, which audio needs
+because the media axis alone cannot locate a word; a photograph does not have that problem, and an
+offset into an OCR artifact would make the address depend on a derivative, which spine-1 forbids.
+`transcript_text` is reserved for time-anchored transcripts and is **refused on the `img` track**,
+by `EvidenceAddress._validate_shape` and by the `transcript_is_not_an_image_track` check constraint
+in `0034_ocr_is_a_region_not_a_transcript.sql`. A text-anchored OCR artifact, if one is ever needed,
+takes its own additive modality value rather than reusing this one.
 
-`transcript_text` is reserved for time-anchored transcripts and is now **refused on the `img`
-track**, by `EvidenceAddress._validate_shape` and by the `transcript_is_not_an_image_track` check
-constraint in `0034_ocr_is_a_region_not_a_transcript.sql`. No span carries it, so no digest changed.
-A text-anchored OCR artifact, if one is ever genuinely needed, takes its own additive modality value
-rather than reusing this one.
-
-**CLOSED 2026-09-04 by refusing, not by inspecting.** Whether the corpus contains motion photographs
-or bursts is still unestablished, and it no longer has to be established before ingest, because a
-container holding more than one frame is **refused** by `exulanica/ingest/decode.py`, at the
-header probe and again at the decode.
-
-The alternative was worse than it looked. Nothing checked frame count, so an animated GIF, a
-multi-frame WebP or a motion photograph would have been ingested as its **first frame**, under a
+**DECISION (spine-9d): a container holding more than one frame is refused.** An animated GIF, a
+multi-frame WebP or a motion photograph would otherwise be ingested as its first frame, under a
 `capture` whose EXIF and `pixel_size_is` describe the whole file, with every span addressed at `img`
-on a blob whose other frames nothing can cite. That is wrong evidence rather than missing evidence.
-
-The refusal names the video path rather than calling the file corrupt, because an operator told
-"unreadable" will re-export and try again. Those files carry a genuine `v:0` track with genuine PTS
-alongside the `img` track and the general video path applies to them unchanged, which is what the
-video-ingest gate in the readiness report exists to open. Pinned by
+on a blob whose other frames nothing can cite: wrong evidence rather than missing evidence. The
+shared decoder `exulanica/corpus/decode.py` refuses such a container at the header probe and again
+at the decode, and `exulanica/ingest/decode.py` is ingest's upright facade over it. The refusal names
+the video path rather than calling the file corrupt, because an operator told "unreadable" will
+re-export and try again; such files carry a genuine `v:0` track with genuine PTS, and the general
+video address applies to them unchanged once a video ingest path exists. Pinned by
 `tests/test_ingest_preconditions.py`.
+
+**HEIC and decoded source lineage.** HEIC and HEIF intake retains the exact uploaded bytes and their
+evidence address, and also records an immutable `decoded_source` PNG artifact binding the original
+SHA-256, the output SHA-256, the actual decoder inventory, the conversion options and the display
+pixel grid. The pinned decoder and its LGPL components are recorded in
+[the license matrix](license-matrix.md#11-heic-decoder-inspection-and-pin-2026-09-12). Only
+single-frame images within the common pixel limit are accepted; conversion normalizes to RGB8,
+removes metadata, discards alpha and does no ICC colour management. The source inventory and viewer
+route select that PNG as `image/png` with explicit decoded provenance, while the evidence route
+returns the camera original when current permissions allow it. A conversion receipt grants no
+detection, likeness or geometry permission. A capture needing privacy masking uses a separate JPEG
+mask whose receipt binds the normalized predecessor and its decoder receipt, and depth,
+segmentation, pose and training load those exact persisted bytes. A change to the decoder inventory
+or conversion options invalidates normalized inputs and dependent masks even when the new decoder
+produces the same PNG bytes, and queued work must be rebuilt and admitted again. No existing
+artifact is relabelled. Splat manifests carry decoded lineage separately from privacy masks and keep
+the original identity of held-out photographs, and offline readers verify the receipt and the
+selected image grid before accepting training inputs or downloaded views.
 
 ### 1.6 The five citation kinds
 
-**CORRECTED:** this section was headed "the four citation kinds" while listing five rows. There are
-five `modality` values, they are a closed set, and they are inside `span_digest`, so the count is
-not a cosmetic detail: adding a sixth is additive, re-spelling one of these five is not.
+There are five `modality` values, a closed set inside `span_digest`, so the count is not a cosmetic
+detail: adding a sixth is additive, re-spelling one of these five is not.
 
 | Kind | `modality` | Fields that constitute the address |
 | --- | --- | --- |
@@ -381,8 +372,8 @@ early. This is forced by measurement, not taste: on conversational audio roughly
 words lack a correct-within-200 ms timestamp (WhisperX word segmentation at a 200 ms collar reports
 Switchboard 93.2 percent precision / 65.4 percent recall, AMI 84.1 / 60.3;
 <https://www.isca-archive.org/interspeech_2023/bain23_interspeech.pdf>, VERIFIED 2026-08-27). The
-padding is inert for the photograph corpus and is specified now so the claim wording never has to
-change: *"we always open slightly early on purpose."*
+padding is inert for photographs and is specified so the claim wording never has to change: *"we
+always open slightly early on purpose."*
 
 ### 1.7 Re-anchoring across derivative regeneration
 
@@ -562,7 +553,7 @@ Append-only. Nothing is updated in place except `status` and `supersedes`.
 | --- | --- | --- |
 | **Supersede** | New row with `supersedes = old.assertion_id`; old row `status = 'superseded'` | A better model version or a user correction replaces an earlier claim. The old row and its spans remain resolvable, so an old answer permalink still explains itself. |
 | **Retract** | `status = 'retracted'` plus a `retraction` row recording who and why | The claim was wrong and there is no replacement. |
-| **Dispute** | A `dispute(assertion_id, opened_by, reason, opened_at, resolved_at, resolution)` row; sets `status = 'disputed'` | The assertion becomes **ineligible for answer composition** while remaining visible in the Atlas with a conflict marker. Opened by a user, or automatically by a contradiction detector: two `active` assertions with the same subject, a `functional` predicate, different objects, and overlapping `valid_time`. |
+| **Dispute** | A `dispute(assertion_id, opened_by, reason, opened_at, resolved_at, resolution)` row; sets `status = 'disputed'` | The assertion becomes **ineligible for answer composition** while remaining visible, marked as in conflict. Opened by a user, or automatically by a contradiction detector: two `active` assertions with the same subject, a `functional` predicate, different objects, and overlapping `valid_time`. |
 
 **Precedence lattice when active assertions conflict: `user > capture > inference > external`.**
 
@@ -584,7 +575,8 @@ both deterministic:
   lookup table that a buggy or compromised path could have rewritten.
 - **No uncited digits.** Generated clause text may contain no digit sequence unless it is covered by a
   `value_ref` pointing at a deterministic query result. This mechanically kills the highest-damage
-  hallucination class in a memory product: a confidently wrong count, date, or duration.
+  hallucination class in an answer about a person's photographs: a confidently wrong count, date, or
+  duration.
 
 **ASSUMPTION (A-32).** Constrained JSON decoding is reliable enough on the chosen model to emit
 schema-valid structured answers. Settled by experiment **X-4** (about 200 real questions, 24-item
@@ -613,9 +605,9 @@ thresholding verification-like scores is a widespread misconception as a solutio
 identification. Source: <https://ar5iv.labs.arxiv.org/html/1705.01567> (2026-08-27).
 
 **DECISION (id-2).** `auto_provisional` links may drive **filtering, temporary emphasis and "maybe"
-results**. They may **never** move persisted Atlas layout or support a historical factual clause.
-This is the line that lets the system surface a guess while refusing to turn one into spatial memory
-or an assertion.
+results**. They may **never** move persisted layout or support a historical factual clause. This is
+the line that lets the system surface a guess while refusing to turn one into persisted placement or
+an assertion.
 
 **DECISION (id-6): the system never proposes a real-world identity.** It proposes only "the same person
 as in these other captures". Names come solely from the account holder's own annotation. This also
@@ -626,7 +618,7 @@ defuses defamation-by-mismatch, which is a live risk at 60 percent open-set accu
 ```
 detector run
   -> occurrence (anonymous, evidence-bound, one or more spans on ONE blob)
-  -> candidate generation: ANN over entity exemplars, plus hard constraints
+  -> candidate generation: contextual signals, plus hard constraints
   -> match_proposal rows, ranked
   -> gate:
        score >= HIGH, no rejection, no constraint violation -> entity_link(auto_provisional)
@@ -636,6 +628,12 @@ detector run
      user rejects       -> identity_rejection row (3.3); suppressed under the same basis
      user says "new"    -> new entity + confirmed link
 ```
+
+The implemented proposer (`exulanica/identity/proposer.py`) ranks on context only:
+`context_place`, `context_cooccurrence` and the dormant `user_text`. Face, voice and gait have no
+producer (`exulanica/identity/signals.py`), a detector label is a hard constraint rather than a
+signal, and a unique highest-scoring match may acquire `auto_provisional` at 800 milli-units but
+never `confirmed`, which needs a human ([ADR-0018](adr/0018-contextual-provisional-links.md)).
 
 Hard constraints applied **before** ranking:
 
@@ -763,10 +761,10 @@ create index on derived_artifact using gin (dep_index);
 
 | Operation | What must be recomputed | Cost class |
 | --- | --- | --- |
-| `link_confirmed` | entity occurrence set; entity exemplar set; co-occurrence edges touching the entity; Atlas placement for affected memory regions; any `answer_cache` whose `dep_index` names the entity; calibration bin counters | small, incremental |
+| `link_confirmed` | entity occurrence set; entity exemplar set; co-occurrence edges touching the entity; persisted placement for affected regions; any `answer_cache` whose `dep_index` names the entity; calibration bin counters | small, incremental |
 | `link_rejected` | proposal suppression index only, nothing else. **Deliberately trivial**, because the user will do this often and it must never feel expensive | trivial |
 | `entities_merged` | union of both aggregates; alias redirect table; deduplicate assertions whose subject was A or B; re-run the contradiction detector over the union; invalidate every `derived_artifact` naming A or B | medium |
-| `entity_split` | recompute both new aggregates from their partitions; invalidate every `derived_artifact` and `answer_cache` naming C, because any prior answer about C may now be wrong. **Invalidated, never repaired** | medium |
+| `entity_split` | recompute both new aggregates from their partitions; invalidate every `derived_artifact` and `answer_cache` naming C, because any prior answer about C may be wrong after the split. **Invalidated, never repaired** | medium |
 | `event_undone` | the inverse of the original, plus invalidation of everything the original invalidated | same as the original |
 
 **Nothing in this table touches the evidence spine.** Spans and blobs are unaffected by identity churn.
@@ -787,14 +785,13 @@ PostgreSQL provides a multirange type for every range type, indexable by GiST an
 dated 2026-07-29**; 0.8.3 (2026-06-17) "fixed possible HNSW index corruption during vacuuming", so the
 floor is >= 0.8.6. Source: <https://github.com/pgvector/pgvector/blob/master/CHANGELOG.md> (2026-08-27).
 HNSW and IVFFlat index `vector` to at most 2,000 dimensions and `halfvec` to at most 4,000.
-Source: <https://github.com/pgvector/pgvector/blob/master/README.md> (2026-08-27). **CORRECTED:**
-the earlier conclusion drawn from that ceiling, "which is why all embeddings are `halfvec`", no
-longer holds as stated. The embedding column is `halfvec(4096)`, which is above the ceiling, so it
-carries no ANN index at all and search over it is exact. Section 4.4 records why.
+Source: <https://github.com/pgvector/pgvector/blob/master/README.md> (2026-08-27). The embedding
+column is `halfvec(4096)`, above that ceiling, so it carries no ANN index and search over it is exact;
+section 4.4 records why.
 
 ### 4.1 Immutable media layer
 
-**VERIFIED, CORRECTED.** `btree_gist` is required and was missing from this document. Core GiST
+**VERIFIED.** `btree_gist` is required. Core GiST
 ships no operator class for `bytea` or `uuid`, and three indexes in this schema lead with one of
 those: `gist (blob_sha256, t_range)` on `evidence_span`, `gist (capture_id, presence)` on
 `occurrence`, and `gist (workspace_id, valid_time)` on `assertion`. Without the extension all three
@@ -808,7 +805,7 @@ pinned by `tests/test_migration.py::test_the_extensions_the_indexes_need_are_dec
 create extension if not exists vector;   -- pgvector >= 0.8.6
 create extension if not exists pgcrypto;
 create extension if not exists pg_trgm;
-create extension if not exists btree_gist;   -- CORRECTED: required by three GiST indexes
+create extension if not exists btree_gist;   -- required by three GiST indexes
 
 create table blob (
   blob_sha256   bytea primary key,                     -- 32 bytes
@@ -848,7 +845,7 @@ create table capture (
   created_at   timestamptz not null default now(),
   deleted_at   timestamptz
 );
--- CORRECTED: partial, not a total unique constraint. A live duplicate still collapses to one
+-- partial, not a total unique constraint. A live duplicate still collapses to one
 -- capture; a deliberate re-import after a deletion gets a fresh capture_id, per del-3 in 6.5.
 create unique index capture_live_bytes_uniq
   on capture (workspace_id, blob_sha256) where deleted_at is null;
@@ -866,16 +863,12 @@ create table clock_anchor (
 );
 ```
 
-**DECISION (spine-11), CORRECTED.** This document previously declared
-`unique (workspace_id, blob_sha256)` on `capture`, commented "re-upload of identical bytes = the
-same capture". That contradicts del-3 in section 6.5, which says a deliberate re-import after a
-deletion creates a **new** `capture_id` and proceeds normally. Under a total unique constraint the
-re-import collides with the soft-deleted row and cannot proceed at all, which is precisely the
-silent blocklist del-3 exists to prevent. The implemented form is the partial unique index above,
-`where deleted_at is null`, and it satisfies both readings: duplicate live uploads still collapse to
-one capture, and a re-import after a deletion gets a fresh row. The tombstone remains keyed by
-`(workspace_id, capture_id)` and never by the hash, and `blocklist_hash` remains the separate,
-explicit opt-in for the other intent.
+**DECISION (spine-11).** Capture uniqueness is the partial unique index above,
+`where deleted_at is null`: duplicate live uploads collapse to one capture, and a deliberate re-import
+after a deletion gets a fresh `capture_id` and proceeds normally (del-3, section 6.5). A total unique
+constraint would make that re-import collide with the soft-deleted row, which is precisely the silent
+blocklist del-3 exists to prevent. The tombstone stays keyed by `(workspace_id, capture_id)` and never
+by the hash, and `blocklist_hash` is the separate, explicit opt-in for the other intent.
 
 ### 4.2 The spine
 
@@ -919,9 +912,8 @@ t_end_ns, modality, region?, text_anchor?{artifact_id, char_start, char_end, exa
 sorted, and with `hint` and `span_id` **excluded**. `hint` is excluded because it is a cache; `span_id`
 is excluded because the digest must be a function of the address, not of the row.
 
-**CORRECTED, on the encodings the tuple did not specify.** A digest is only reproducible if every
-value has one rendering, and three were left open here. As implemented in
-`exulanica/evidence/address.py`: `blob_sha256` is lowercase hex, chosen over base64url so the value is
+**The digest encodings** ([ADR-0014](adr/0014-digest-encodings.md)). A digest is only reproducible if
+every value has one rendering. As implemented in `exulanica/evidence/address.py`: `blob_sha256` is lowercase hex, chosen over base64url so the value is
 identical to what the database prints; `region` is the all-integer tuple of section 1.5; a key is
 present only when its value is present, so an absent `region` is an absent key and not a null. The
 canonical JSON is a strict subset of RFC 8785, sorted keys and no insignificant whitespace, and
@@ -930,8 +922,7 @@ floats are rejected at serialisation rather than rounded. `text_anchor` carries 
 `TextQuoteSelector` are stored on the row for re-anchoring but are **not** digest inputs, because a
 re-anchor may legitimately change them and must not change the address.
 
-The implemented table also carries check constraints this document did not list, each of which
-keeps the address shape unambiguous: `track_key` matched against `^(img|[va]:(0|[1-9][0-9]{0,3}))$`,
+The table also carries check constraints, each of which keeps the address shape unambiguous: `track_key` matched against `^(img|[va]:(0|[1-9][0-9]{0,3}))$`,
 `octet_length(span_digest) = 32`, `region_only_on_frame_region`, `still_image_is_img_track`,
 `video_time_is_video_track` and `audio_time_is_audio_track`. The exclusivity of `region` to
 `frame_region` is what lets the permalink form recover the modality from the address shape when `m=`
@@ -1008,14 +999,14 @@ create table embedding (
   ref_id           uuid not null,
   model_ref        text not null,
   pipeline_version int  not null,
-  dims             int  not null,             -- CORRECTED: the real output width, per row
-  v                halfvec(4096) not null,    -- CORRECTED: was halfvec(1024)
+  dims             int  not null,             -- the real output width, per row
+  v                halfvec(4096) not null,
   created_at       timestamptz not null default now(),
   primary key (workspace_id, embedding_id)
 ) partition by list (workspace_id);
--- Per partition, created by the workspace provisioning path. CORRECTED: there is no HNSW or
--- IVFFlat index here. 4096 dimensions is above pgvector's 4000 ceiling for halfvec, so search
--- over this column is exact.
+-- Per partition, created by the workspace provisioning path. There is no HNSW or IVFFlat
+-- index here: 4096 dimensions is above pgvector's 4000 ceiling for halfvec, so search over
+-- this column is exact.
 --   create table embedding_ws_<slug> partition of embedding for values in ('<uuid>');
 --   create index on embedding_ws_<slug> (family, ref_type, ref_id);
 
@@ -1031,41 +1022,37 @@ create index on text_chunk using gin (tsv);
 create index on text_chunk using gin (body gin_trgm_ops);
 ```
 
-**DECISION (emb-1), CORRECTED.** This document specified `halfvec(1024)`. Runtime verification
-**measured**
-`Qwen/Qwen3-Embedding-8B` returning **4096-dimensional** vectors
-([recorded provider findings](runtime-verification.md), section 7). The schema below defines the
-stored width; catalog availability requires a separate check. pgvector indexes `halfvec` to at most 4000 dimensions, so a 4096-dimension
-column cannot carry an HNSW or IVFFlat index at all. The real choice is therefore between truncating
-the model's output to fit an index and storing the real width with exact search.
+**DECISION (emb-1).** The stored width is the embedding model's real output width. Runtime
+verification **measured** `Qwen/Qwen3-Embedding-8B` returning **4096-dimensional** vectors
+([recorded provider findings](runtime-verification.md), section 7); catalog availability requires a
+separate check. pgvector indexes `halfvec` to at most 4000 dimensions, so a 4096-dimension column
+cannot carry an HNSW or IVFFlat index, and the choice is between truncating the model's output to fit
+an index and storing the real width with exact search.
 
-**Implemented: store the real width and search exactly.** At personal-library scale, thousands of
-vectors rather than millions, exact search is fast enough and strictly more correct than an
-approximate index, and it removes the overfiltering hazard described below rather than working
-around it. If scale later demands ANN, the additive path is a second column holding a
-Matryoshka-truncated and renormalised 1024-dimension prefix used for recall only, added by a later
-migration; it is not added now because the truncation behaviour of this endpoint is unverified.
-`dims` is stored per row so that a future model with a different width is a data question rather
-than a schema migration. The 1024 figure in earlier drafts was never measured against this endpoint,
-which is the general lesson: a dimension count is a property of the deployed model, not of the
-document.
+**Implemented: store the real width and search exactly.** At the scale of one account's photographs,
+thousands of vectors rather than millions, exact search is fast enough and strictly more correct than
+an approximate index, and it removes the overfiltering hazard described below rather than working
+around it. If scale ever demands ANN, the additive path is a second column holding a
+Matryoshka-truncated and renormalised 1024-dimension prefix used for recall only, added by a
+migration; it does not exist because the truncation behaviour of the endpoint is unverified. `dims`
+is stored per row, so a model with another width is a data question rather than a schema migration:
+a dimension count is a property of the deployed model, not of the document.
 
 **DECISION.** Embeddings are partitioned by list on `workspace_id`, so tenancy is a **partition prune**
 rather than a post-scan filter. This matters because pgvector documents that "with approximate indexes,
 filtering is applied after the index is scanned", and with a filter matching 10 percent of rows at
 default settings roughly 4 of 10 expected results are returned
 (<https://github.com/pgvector/pgvector/blob/master/README.md>, VERIFIED 2026-08-27).
-**CORRECTED:** with exact search there is no approximate index to overfilter, so that hazard is
-dormant and the `hnsw.iterative_scan = relaxed_order` setting applies only if the recall
-column described above is ever added. Partitioning is kept regardless, for the stronger reason: it
+With exact search there is no approximate index to overfilter, so that hazard is dormant, and the
+`hnsw.iterative_scan = relaxed_order` setting applies only if the recall column is ever added. Partitioning is kept regardless, for the stronger reason: it
 is the namespace isolation the privacy analysis requires, not a performance tactic.
 
 **DECISION.** **ANN is used for recall and ranking only, never for set membership.** "Which people are
 in this photograph" is answered relationally from confirmed `entity_link` rows, never from vector
 similarity. An approximate index may not decide a factual claim.
 
-**ASSUMPTION (A-30).** A workspace is a single user at MVP, so RLS on `workspace_id` suffices and
-partition-per-workspace is tractable. This is a product decision rather than a technical one. If
+**ASSUMPTION (A-30).** A workspace belongs to one account holder, so RLS on `workspace_id` suffices
+and partition-per-workspace is tractable. This is a product decision rather than a technical one. If
 workspaces become shared, the partition strategy and the RLS predicate both need rework.
 
 ### 4.5 Row-level security
@@ -1075,7 +1062,7 @@ alter table evidence_span enable row level security;
 alter table evidence_span force  row level security;
 create policy ws_isolation on evidence_span
   using      (workspace_id = current_workspace())
-  with check (workspace_id = current_workspace());   -- CORRECTED: with check, not using alone
+  with check (workspace_id = current_workspace());   -- with check, not using alone
 ```
 
 The implemented migration applies that pair to every workspace-scoped table in a loop, to the
@@ -1092,8 +1079,8 @@ row security system." Source: <https://www.postgresql.org/docs/18/ddl-rowsecurit
 does **not** hold `BYPASSRLS`. This is load-bearing, not hygiene: an executor connecting as the table
 owner makes every isolation policy silently inert.
 
-**DECISION (rls-2), CORRECTED.** Row-level security on its own leaves the tombstone guard **failing
-open**, and this document did not say so. The guards in section 6.3 read `tombstone`,
+**DECISION (rls-2).** Row-level security on its own leaves the tombstone guard **failing open**. The
+guards in section 6.3 read `tombstone`,
 `evidence_span` and `occurrence`, all of which carry `FORCE ROW LEVEL SECURITY`. A session that
 never set `exulanica.workspace_id` sees those tables as **empty**, so a guard looking for a covering
 tombstone finds none and permits the write. A `BYPASSRLS` role arrives at the same place from the
@@ -1123,7 +1110,7 @@ end $fn$;
 ```
 
 Triggers are bypassed by neither the owner nor `BYPASSRLS`, so asserting the context inside the
-trigger is strictly stronger than the `with check` clause on the policy: a guarded write now
+trigger is strictly stronger than the `with check` clause on the policy: a guarded write
 requires the session to have declared which workspace it is writing for, and to be writing for that
 one. `current_setting(..., true)` takes the missing-ok flag deliberately, so an unset variable yields
 NULL rather than an error, and NULL matches no row, which is what makes both the policies and the
@@ -1141,30 +1128,28 @@ and `::test_current_workspace_is_defined_before_anything_calls_it`.
 `(source_blob_sha256, stage_key, stage_version, params_digest, input_digest)`. Not `capture_id`, because
 two captures of the same bytes should share derivatives. Not wall-clock time, obviously.
 
-**CORRECTED 2026-09-03. `source_blob_sha256` is no longer `not null`, and the block below still
-says it is.** ADR-0009 D9 requires a subject for a fact about N photographs: a pose receipt, a
-splat and a placement record are not derivatives of one blob, and keying them to whichever
-member's bytes happened to land in the column would present a corridor as one photograph's
-geometry. Migration 0024 adds `artifact.scene_id`, relaxes `source_blob_sha256`, and keeps the
-guarantee with a check constraint rather than with a `not null`:
+**DECISION (idem-1b): an artifact names exactly one subject.** A pose receipt, a splat and a
+placement record are facts about N photographs, not derivatives of one blob
+([ADR-0009](adr/0009-the-ladder-above-rung-3.md) D9); keying them to whichever member's bytes landed
+in the column would present a scene as one photograph's geometry. So an artifact names either one
+source blob or one reconstruction scene (migration 0024):
 
 ```sql
 constraint an_artifact_names_one_subject check (
   (source_blob_sha256 is not null) <> (scene_id is not null))
 ```
 
-So an artifact still names exactly one subject; it is no longer always the same kind of subject.
-The identity key above is unchanged for a per-blob derivative and is not what identifies a scene
-artifact: that is `reconstruction_scene.scene_id`, a uuid5 over the sorted member capture ids,
-computed by `exulanica.evidence.scene`. The reduction over a scene INVERTS, and section 6.4 is
-where that is written down.
+The identity key above identifies a per-blob derivative. A scene artifact's subject is
+`reconstruction_scene.scene_id`, a uuid5 over the sorted member capture ids computed by
+`exulanica.evidence.scene`, and the reduction over a scene inverts, as section 6.4 records.
 
 ```sql
 create table artifact (
-  artifact_id        uuid primary key,   -- DETERMINISTIC: uuid_v5(ns, idempotency_key)
+  artifact_id        uuid primary key,   -- DETERMINISTIC: uuid_v5(ns, workspace_id || ':' || idempotency_key)
   workspace_id       uuid not null,
   kind               text not null,      -- 'ocr','caption','keyframe_index','embedding_batch', ...
-  source_blob_sha256 bytea not null references blob(blob_sha256),
+  source_blob_sha256 bytea references blob(blob_sha256),  -- exactly one of this and scene_id
+  scene_id           uuid,               -- the reconstruction scene, in the same workspace
   stage_key          text not null,
   stage_version      int  not null,
   params_digest      bytea not null,
@@ -1204,6 +1189,10 @@ Every field is **length-prefixed**. Plain concatenation of variable-length field
 `stage_key || stage_version` gives the pair `("vision", 11)` and the pair `("vision1", 1)` the same
 bytes, so two different stages compute one key, share one artifact row, and each reads the other's
 output as its own cached result. `key_format_version` is 2; version 1 was the unframed encoding.
+The artifact id is `uuid5` over the workspace id and this key (`artifact_id_for` in
+`exulanica/ingest/stages/__init__.py`), so two workspaces holding the same bytes never collide on one
+id. Rows written before the workspace entered the id keep their stored ids, and callers look up an
+existing row by the workspace-scoped idempotency key before predicting an id.
 
 `binding_digest` is the canonical-JSON digest of the stage's **run-time binding**, which is the part of
 its identity that is not declared in source. For a model-backed stage that is the resolved model
@@ -1256,7 +1245,7 @@ Stages that are legitimately nondeterministic (sampled generation, GPU reduction
 ```sql
 begin;
   insert into artifact (artifact_id, ..., idempotency_key, ...)
-  values (uuid_v5('...'::uuid, $key), ..., $key, ...)
+  values (uuid_v5('...'::uuid, $workspace || ':' || $key), ..., $key, ...)
   on conflict (workspace_id, idempotency_key) do nothing
   returning artifact_id;
   -- no row returned means another worker already produced it: read it and stop.
@@ -1294,28 +1283,26 @@ artifact row; the old row gets `superseded_by` set and is retained, so old citat
 
 ```sql
 create view artifact_current as
-  select distinct on (workspace_id, source_blob_sha256, stage_key) *
+  select distinct on (workspace_id, source_blob_sha256, scene_id, stage_key) *
     from artifact
    where superseded_by is null and purged_at is null
-   order by workspace_id, source_blob_sha256, stage_key, stage_version desc;
+   order by workspace_id, source_blob_sha256, scene_id, stage_key, stage_version desc;
 ```
 
-**CORRECTED 2026-09-03.** `distinct on` treats NULLs as equal, so once `source_blob_sha256`
-became nullable this view collapsed every scene artifact of one stage in one workspace into a
-single row. Migration 0024 adds `scene_id` to the key, in the same position in both the
-`distinct on` and the `order by`. The column list is unchanged.
+`scene_id` is in the key because `distinct on` treats NULLs as equal: without it every scene
+artifact of one stage in one workspace would collapse into a single row.
 
 ### 5.4 This is a cost control, not only a correctness control
 
 The correctness argument is the one above. The cost argument is separate and is the reason this is
-built on day one rather than added when it hurts.
+built into the first schema rather than added when it hurts.
 
 - **Re-ingesting the corpus is free unless something actually changed.** Every derivative is keyed by
   source hash plus pipeline version. Re-running the whole pipeline after a change to one stage
   regenerates that stage only. Without this key, "re-run everything" means paying for every vision call,
   every embedding and every GPU-second again, every time.
-- **Two captures of identical bytes share one set of derivatives.** Duplicate photographs are normal in a
-  personal library (exports, re-downloads, edited copies saved alongside originals). Deduplication at the
+- **Two captures of identical bytes share one set of derivatives.** Duplicate photographs are normal in
+  anyone's photographs (exports, re-downloads, edited copies saved alongside originals). Deduplication at the
   blob level removes that cost automatically.
 - **Retries are free.** At-least-once execution with exactly-once effects means a crashed worker's retry
   re-inserts nothing and re-bills nothing.
@@ -1325,11 +1312,11 @@ built on day one rather than added when it hurts.
   VM and a managed database, and neither is visible without per-stage accounting.
 
 **DECISION (mig-4): the spine is frozen at v1 and extended additively only.** `blob_sha256`,
-`track_key`, `t_start_ns`, `t_end_ns`, the half-open semantics and the nanosecond-to-tick rounding rule
-may not change. (The tick-to-nanosecond rule was corrected once, on 2026-09-04, under the narrow
-argument set out in section 1.4 and [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md):
-it had no callers, no non-image track existed, and no stored digest moved. That argument is spent.) If they ever must, it is a v2 span format written **alongside** v1, with v1 spans
-migrated by a documented, reversible, verified transform, never dropped.
+`track_key`, `t_start_ns`, `t_end_ns`, the half-open semantics and both rounding rules may not
+change; the single correction to the tick-to-nanosecond rule, made while no stored span depended on
+it, is recorded in [ADR-0015](adr/0015-timebase-rounding.md). If they ever must change, it is a v2
+span format written **alongside** v1, with v1 spans migrated by a documented, reversible, verified
+transform, never dropped.
 
 Five independent version fields, each stored on the row that uses it:
 
@@ -1365,6 +1352,7 @@ writing the old column, drop in a **later** release).
 ```sql
 create type tombstone_scope as enum
   ('capture','interval','entity','assertion','workspace');
+-- widened by `alter type ... add value`: 'scene_training' (0082) and 'caption_search' (0104)
 
 create table tombstone (
   tombstone_id       uuid primary key default uuidv7(),
@@ -1389,43 +1377,36 @@ create index on tombstone using gist (capture_id, interval_ns) where scope = 'in
 **DECISION (del-1).** Tombstones are **never deleted and never expire**. Deletion is monotonic. "Undo
 delete" is not offered; a short pre-tombstone grace period in the UI is offered instead.
 
-**ADDED 2026-09-19. A sixth scope, and it is the one that spares its own subject** (migration 0082).
-`tombstone_scope` gains `scene_training`, written by a trigger when an account holder withdraws the
-right that let a trainer read one of their photographs. The sentence it has to make true is: *a
-`scene_training` tombstone over a capture erases what was trained from that capture, and the capture
-itself survives by design.* Withdrawing permission to train is not asking for your photograph back,
-so this tombstone soft-deletes nothing, blocks no read of the capture, and enqueues only the
-artefacts `scene_training_artifact` binds to a right that was withdrawn.
+**DECISION (del-1b): two scopes spare their own subject.** A `scene_training` tombstone (migration
+0082) is written by a trigger when an account holder withdraws the right that let a trainer read one
+of their photographs ([personal-admission.md](personal-admission.md#scene-training-right)). It erases
+what was trained from that capture, and the capture survives by design: withdrawing permission to
+train is not asking for the photograph back, so the tombstone soft-deletes nothing, blocks no read of
+the capture, and enqueues only the artefacts `scene_training_artifact` binds to a withdrawn right. A
+`caption_search` tombstone (migration 0104) is written when a search right stops; it queues the
+purge of the search entries made from the photograph's descriptions, and the photograph, its
+descriptions and its other rights survive. Neither scope is matched by the capture, interval or
+workspace tests, so neither deletes anything else.
 
-An erasure that spares its subject is not new: 0030's entity tombstone already destroys a person's
-derivatives while retaining the source photographs, and records `source_capture_policy: retained`.
-And widening the enum is on the rule 0024, 0038 and 0066 each declined to widen it under, rather
-than against it: that rule is that a tombstone erases personal data and an authored change that is
-not erasure goes in its own table, and a reconstruction of somebody's home, erased because they
-withdrew the right that permitted it, is erasure of personal data.
-
-It also needs its own destroy question. `purge_releases_bytes` answers FALSE for a trained artefact
-while its capture is live, because section 6.4's scene clause says a scene artefact none of whose
-members is deleted still holds its bytes. That clause is right for every other caller and wrong for
-the one erasure whose subject stays alive, so `scene_training_withdrawal_releases_artifact` is what
-a tombstone of this scope asks instead.
+An erasure that spares its subject follows the entity tombstone of migration 0030, which destroys a
+person's derivatives while retaining the source photographs and records
+`source_capture_policy: retained`. The enum is widened only for erasure of personal data; an authored
+change that is not erasure goes in its own table, as migrations 0024, 0038 and 0066 do. A trained
+artefact needs its own destroy question, because `purge_releases_bytes` answers false for a scene
+artefact while none of its members is deleted (section 6.4), so a `scene_training` tombstone asks
+`scene_training_withdrawal_releases_artifact` instead.
 
 ### 6.3 The gate is a trigger, in the writing transaction
 
 Application-level checks are not sufficient, because retries arrive from stale workers holding
 pre-deletion state.
 
-**DECISION (del-2), CORRECTED.** The function this document previously specified **cannot run.** It
-was a single polymorphic trigger function reading `NEW.capture_id`, `NEW.entity_id`, `NEW.track_key`,
-`NEW.t_start_ns` and `NEW.t_end_ns`, attached to four tables that do not have those columns:
-`evidence_span` carries no `capture_id` and no `entity_id`, and `assertion` and `embedding` carry
-none of the five. plpgsql resolves `NEW.<field>` when the trigger executes, so the first insert into
-`evidence_span` raises `record "new" has no field "capture_id"` and every guarded write path fails.
-That is not a guard that fails open; it is a guard that never runs at all, and the failure is loud
-rather than silent only because nothing can be written while it is attached.
-
-What was implemented instead: one shared predicate over the address, a small typed trigger per table
-shape, and the workspace-context assertion of section 4.5 in front of every one of them.
+**DECISION (del-2): one shared predicate, one typed trigger per table shape.** A single polymorphic
+trigger cannot work here: plpgsql resolves `NEW.<field>` when the trigger executes, and the guarded
+tables share no address columns (`evidence_span` carries no `capture_id` or `entity_id`, and
+`assertion` and `embedding` carry none of the address fields), so such a trigger raises on the first
+insert. The guard is one shared predicate over the address, a small typed trigger per table shape,
+and the workspace-context assertion of section 4.5 in front of every one of them.
 
 ```sql
 -- Does a committed tombstone cover this address?
@@ -1474,9 +1455,9 @@ triggers, each `before insert` and `for each row`, use them:
 | `occurrence` | its `capture_id`, and every span in `span_ids` |
 | `assertion` | every span in `support_span_ids`, an entity subject named in `subject_ref`, and any workspace-scope tombstone |
 | `embedding` | the referenced span or entity, or, for an occurrence reference, that occurrence's capture and spans, and any workspace-scope tombstone |
-| `entity_link` | the entity. **Added beyond the four this document named:** without it an entity-scope tombstone has nowhere to bite, because no other guarded table carries `entity_id` in a column |
+| `entity_link` | the entity; without it an entity-scope tombstone has nowhere to bite, because no other guarded table carries `entity_id` in a column |
 
-Three properties of the implemented guard, each of which was implicit before:
+Three properties of the guard:
 
 - **Context first.** Every trigger calls `assert_workspace_context(new.workspace_id)` before it
   trusts a lookup. Without that the guard reads RLS-protected tables, sees nothing, and permits the
@@ -1492,9 +1473,8 @@ Three properties of the implemented guard, each of which was implicit before:
 
 Pinned by `tests/test_migration.py::test_the_tombstone_guard_fires_on_every_derived_write_path`,
 `::test_every_guard_asserts_the_workspace_context_before_it_trusts_a_lookup` and
-`::test_the_tombstone_guard_uses_a_fresh_snapshot`. Those are text-level checks over the migration
-file. No server has executed it here, so what is verified is that the SQL says this, not that
-PostgreSQL does it.
+`::test_the_tombstone_guard_uses_a_fresh_snapshot`, which check the migration text, and executed
+against PostgreSQL by `tests/test_epistemic_guard_postgres.py`.
 
 Because the trigger fires inside the writing transaction and reads the committed tombstone table, the
 time-of-check-to-time-of-use race is closed: a worker that checked before the tombstone committed still
@@ -1510,25 +1490,25 @@ Supporting measures:
   input is covered.
 - The object-store purge is idempotent and runs after commit, driven by a `purge_job` table, so a crashed
   purge resumes rather than being lost.
-- `answer_cache` and `evidence_packet` rows carry a GIN-indexed `span_ids` array and are deleted on
-  tombstone commit.
+- Stored Companion answers are withdrawn on tombstone commit: `companion_answer_citation` records the
+  spans each answer cited, and `tg_tombstone_withdraws_companion_memory` (migration 0043) marks every
+  stored answer whose citations the new tombstone reaches.
 
 **ASSUMPTION.** The guard actually stops a stale worker. Settled by experiment **X-7**, the tombstone
 race test: revoke consent while a job for that subject is mid-flight, force the retry policy to fire, and
-assert that no derivative row is persisted and a metric is emitted (about 2 hours). This is described in
-the experiment plan as the test most likely to find a real bug.
+assert that no derivative row is persisted and a metric is emitted (about 2 hours).
 
 ### 6.4 The cascade
 
 | Deleted thing | Soft-marked | Physically purged | Kept |
 | --- | --- | --- | --- |
-| **Capture** | capture, occurrences, assertions, spans, embeddings, text chunks, derived artifacts, answer caches | original blob bytes, all derivative bytes, all embedding rows, all text-chunk bodies | `blob` stub (hash plus `purged_at`), `pipeline_event` ledger with payloads scrubbed to hashes, the tombstone |
-| **Interval** | assertions and occurrences whose `presence` intersects the interval; artifacts overlapping it marked `needs_repair` | embeddings and text chunks derived from the interval; re-encoded clips of it | the rest of the capture; spans outside the interval |
+| **Capture** | capture, occurrences, assertions, spans, embeddings, text chunks, derived artifacts, stored answers that cite it | original blob bytes, all derivative bytes, all embedding rows, all text-chunk bodies | `blob` stub (hash plus `purged_at`), `pipeline_event` ledger with payloads scrubbed to hashes, the tombstone |
+| **Interval** | nothing (see below); delivery of anything derived from a redacted still image is refused | nothing | the capture and its derivatives |
 | **Entity** | entity, links, proposals, assertions, entity-level aggregates | person and occurrence embeddings, person-dependent point maps, and every artifact for every reconstruction scene containing the confirmed occurrence; the display-name cache is cleared | source captures and original photograph bytes, `identity_rejection` rows, the dependency and withdrawal receipts |
 | **Workspace** | everything | everything, including blobs | an audit stub |
 
-**ADDED 2026-09-16. A workspace's material bakes are in the same cascade** (migration 0066,
-`docs/texture-package.md` section 14):
+**Material bakes are in the same cascade** (migration 0066,
+[texture-package.md](texture-package.md) section 14):
 
 - **A workspace tombstone** purges every bake from the workspace's own store namespace.
 - **A capture tombstone** purges the bakes of photo-derived recipes that name the capture.
@@ -1539,8 +1519,8 @@ can exist before the personal model right does. Withdrawing a recipe a person au
 tombstone. It hides the recipe and its bake at once, and the bytes are reclaimed with the
 workspace.
 
-**CORRECTED 2026-09-04. Entity withdrawal is now a production cascade. Interval withdrawal
-remains partial.** Migration 0030 adds `person_derivative_dependency`. A confirmed identity link
+**Entity withdrawal is a full cascade; interval withdrawal is partial.** Migration 0030 adds
+`person_derivative_dependency`. A confirmed identity link
 records edges to the occurrence's point-map artifact, every reconstruction scene and job that
 contains its capture whether registration succeeded or not, every retained scene artifact,
 person and occurrence embeddings, dependent aggregate rows, and entity or scene assertions.
@@ -1564,14 +1544,13 @@ unregistered scene, every retained scene build, rung assertion, display identity
 vector leave their serving surfaces. `person_withdrawal_receipt` keeps a canonical, digest-bound,
 machine-readable summary; the exact edges and purge jobs remain the detailed evidence.
 
-*Interval scope soft-marks nothing and repairs nothing.* The same early return applies, so an
-interval redaction leaves `capture.deleted_at` null and enqueues no purge job. The artifacts the
-row above says are marked `needs_repair` are not marked: `mark_needs_repair` has exactly one
-caller, `PhotoIngestPipeline.persist_artifact`, and it is the unreproducible-bytes case rather
-than anything a tombstone reaches. The embeddings the row says are deleted are not deleted.
+*Interval scope soft-marks nothing and repairs nothing.* An interval redaction leaves
+`capture.deleted_at` null and enqueues no purge job. `mark_needs_repair` has one caller, the ingest
+pipeline's persist path for bytes that are gone and cannot be reproduced, and no tombstone reaches
+it; embeddings derived from the interval are not deleted.
 
-*A capture deletion now also reaches every scene that photograph was a member of, and the
-reduction over a scene is the INVERSE of the one over a blob.* ADR-0009 D9: a pose receipt, a
+*A capture deletion reaches every scene that photograph was a member of, and the reduction over
+a scene is the INVERSE of the one over a blob.* ADR-0009 D9: a pose receipt, a
 splat and a placement record are facts about N photographs, and "a tombstone path that reaches a
 scene artifact through any of its members" means deleting ONE of eight withdraws the receipt.
 That is the opposite of the rule for a per-capture artifact, where a photograph imported twice is
@@ -1598,7 +1577,8 @@ Three consequences that must not be softened:
 
 - **Entity deletion is not media deletion, and the UI must say so.** Deleting a person removes the name,
   the links and the person-level vectors. It does not remove them from the photographs, because that
-  would mean deleting the user's own memories. Being vague about this in the UI would be a lie.
+  would mean deleting the account holder's own photographs. Being vague about this in the UI would
+  be a lie.
 - **Aggregates must be recomputed on revocation, not row-deleted.** An exemplar set or centroid computed
   over N faces still encodes a removed face. This is a silent-retention bug and a genuine biometric
   retention issue. Settled by experiment **X-15**: delete one member of a multi-face cluster and verify
@@ -1607,10 +1587,12 @@ Three consequences that must not be softened:
   naming a person can be invalidated when that person is deleted. Without the recorded set, the name
   survives its own deletion in a caption.
 
-Derivatives overlapping a redacted interval are marked `needs_repair` and regenerated from the surviving
-intervals with a new `input_digest`, so the repaired artifact has a different identity key and cannot
-collide with the tainted one. Embeddings derived from redacted content are **deleted, not hidden**: an
-embedding of a redacted region still leaks it under inversion.
+**Requirement, not implemented for interval scope.** Derivatives overlapping a redacted interval are
+to be marked `needs_repair` and regenerated from the surviving intervals with a new `input_digest`, so
+the repaired artifact has a different identity key and cannot collide with the tainted one, and
+embeddings derived from redacted content are to be **deleted, not hidden**, because an embedding of a
+redacted region still leaks it under inversion. For a still image, the delivery refusal above is
+what protects a redacted frame.
 
 ### 6.5 The re-upload trap
 
@@ -1621,62 +1603,51 @@ the same bytes creates a **new** `capture_id` and proceeds normally. A user who 
 let this content back in" sets `blocklist_hash = true` explicitly, and only then does the guard also
 match on `blob_sha256`. Two different intents, two different mechanisms.
 
-**CORRECTED.** The schema in section 4.1 previously carried `unique (workspace_id, blob_sha256)` on
-`capture`, which contradicts this decision outright: the re-import has nowhere to land, so the user
-is silently blocked by a uniqueness error instead of by a blocklist. Two things were changed to make
-the decision real. The constraint is now the partial unique index `where deleted_at is null`, so a
-live duplicate still collapses to one capture while a re-import after a deletion gets a fresh
-`capture_id`. And the guard's capture branch releases once a live capture claims those bytes again,
-so the new capture's derivatives are not refused by the old capture's tombstone. `blocklist_hash`
-keeps blocking in both cases, which is the whole difference between the two intents.
+Two mechanisms make the decision real. Capture uniqueness is the partial unique index
+`where deleted_at is null` (section 4.1), so a live duplicate collapses to one capture while a
+re-import after a deletion gets a fresh `capture_id` instead of meeting a uniqueness error. And the
+guard's capture branch releases once a live capture claims those bytes again, so the new capture's
+derivatives are not refused by the old capture's tombstone. `blocklist_hash` keeps blocking in both
+cases, which is the whole difference between the two intents.
 
-### 6.6 The honest limits
+### 6.6 What deletion may claim
 
-These are limits of the system, not of the implementation. They must appear in the product, not only
-here.
-
-| Limit | Why it exists | What is actually promised |
-| --- | --- | --- |
-| **Object versions persist** | Nebius Object Storage supports no WORM, no Object Lock and no Legal Hold, so append-only is a policy enforced by IAM. The same versioning that protects originals from accidental loss also preserves them against erasure | **Crypto-shredding is the primary erasure mechanism**: a per-capture key wrapped by a per-person key wrapped by a per-tenant KMS key. Destroying the key makes retained versions unreadable ciphertext. Say exactly that, not "the bytes are gone" |
-| **Backups predate the deletion** | Any restore from a pre-deletion backup reintroduces deleted rows | Tombstone replay is a **mandatory, gated, tested** step in the restore runbook. A restored instance does not accept traffic until every tombstone with `effective_at` at or before the restore point has been replayed. Settled by experiment **X-12** (about 4 hours) |
-| **Provider retention** | Inference requests leave the machine. Retention is the provider's policy, not ours | Zero-data-retention must be confirmed in writing for the specific model IDs in use, committed to the repository, and **asserted at service boot with a refusal to start otherwise**. This is recorded as assumption A-8 and is unvalidated until that confirmation exists |
-| **Already-exported artifacts cannot be recalled** | A World Memory Package handed to a third party is a copy outside the system | Disclosed **at export time**, in the export dialog, not buried. Re-exporting after a deletion produces a new version with a different Merkle root, and the diff between two versions is the honest answer to "what changed" |
-| **Vector index residency** | A row deleted from a table may persist inside an ANN index until compaction | Settled by experiment **X-11**: delete an embedding, force compaction or partition rebuild, open the raw index and assert the vector id is **physically absent**, not merely filtered from results (about 3 hours). Until that passes, no maximum-residency number may be published |
+The limits deletion cannot overcome, and how the product must state them, are owned by
+[privacy-consent-threat-model.md](privacy-consent-threat-model.md) section 5.5.
 
 **DECISION.** The words "unlearning", "forgetting" and "the model has forgotten" are banned from all
 Exulanica material. The truthful phrasing is: *removed from retrieval and from future training, with every
-derived artifact recomputed from the remaining data.* Because there are no trained weights at MVP, that
-recomputation is exact by construction, which is a **stronger** claim than the approximate-unlearning
-literature can support: an audit of ten unlearning methods found that Fisher Forgetting, Hessian
+derived artifact recomputed from the remaining data.* For stages that are pure functions of their
+inputs, that recomputation is exact by construction, which is a **stronger** claim than the
+approximate-unlearning literature can support: an audit of ten unlearning methods found that Fisher Forgetting, Hessian
 Forgetting and Certified Hessian Forgetting all fail to achieve the true objective despite formal
 certifications (<https://arxiv.org/html/2606.16110v1>, VERIFIED 2026-08-27).
 
-**CORRECTED 2026-09-04, [adr/0017-exact-recomputation.md](adr/0017-exact-recomputation.md): "exact by
-construction" was scoped too widely.** It is true of the stages that are pure functions of their
-inputs. It is not true of a stage that calls a model. Sampled generation differs run to run by
-design, and a neural forward pass differs across accelerators and library versions even at
-temperature zero, so a re-run of a model stage produces a *different artifact*, not the same bytes.
+**DECISION ([ADR-0017](adr/0017-exact-recomputation.md)): exactness is scoped to pure stages.** It is
+not true of a stage that calls a model. Sampled generation differs run to run by design, and a
+neural forward pass differs across accelerators and library versions even at temperature zero, so a
+re-run of a model stage produces a *different artifact*, not the same bytes.
 
 Stages that are not exactly recomputable, and therefore excluded from that claim: `vision`,
 `depth`, `segmentation`, `scene_splat_training`, `scene_splat_delivery`, and `generated_scene`.
 `vision` and `depth` carry a `model_role`; all six have `stage_registry.deterministic=false`. The
 Gaussian stages optimize scene-specific parameters and compress their result; their presence does
-not establish reproducible GPU output. `generated_scene` is a world model's own sampled output,
+not establish reproducible GPU output. `generated_scene` is a generative model's own sampled output,
 which differs run to run by design; it carries no `model_role` because the generating model is
 supplied per generation rather than routed through the reviewed model manifest, and its identity
 travels in the generation receipt. `segmentation` runs local checkpoints whose forward pass differs
 across accelerators and library versions; it carries no `model_role` because those checkpoints are
 pinned by revision in the manifest's local section and their identity enters its input digest per
-photograph, as the person-region stage does for its detector (added 2026-09-11, see
+photograph, as the person-region stage does for its detector (see
 [scene-segments.md](scene-segments.md)).
-`StageSpec` now refuses to construct a stage that names a model role and declares itself
+`StageSpec` refuses to construct a stage that names a model role and declares itself
 deterministic, so the exclusion cannot be lost by editing a flag.
 
-**UPDATED 2026-09-05.** The historical statement that there are no trained weights does not cover
-the added Gaussian scene parameters. They are scene reconstruction artifacts, not biometric
-templates. Withdrawal invalidates their scene and removes their published bytes and private
-operational artifacts through the existing scene deletion machinery; no model-unlearning claim
-is made. See [the training/rung decision](adr/gsplat-training-and-recorded-rung.md).
+**Trained scene parameters are reconstruction artifacts.** The Gaussian parameters of a trained
+scene are not biometric templates. Withdrawal invalidates their scene and removes their published
+bytes and private operational artifacts through the scene deletion machinery, and a withdrawn scene
+training right destroys what it produced (section 6.2); no model-unlearning claim is made
+([the training and rung decision](adr/gsplat-training-and-recorded-rung.md)).
 
 What is true of a model-produced artifact under deletion is narrower and is what the product says
 instead: **it is invalidated and removed, not regenerated.** `derived_artifact.stale` is set through
@@ -1684,12 +1655,14 @@ instead: **it is invalidated and removed, not regenerated.** `derived_artifact.s
 a caption, because the caption is gone rather than rewritten.
 
 A third case is neither: `scene_pose` is declared deterministic because it fixes COLMAP's
-`random_seed`, which makes a differing pose worth an event. `exulanica/reconstruction/pycolmap_executor.py`
-records that RANSAC threading still admits variation and that the residual has not been measured, so
-the stage is **declared deterministic and unobserved to reproduce**, and only the second of
-those licenses an exact-recomputation claim.
+`random_seed`, which makes a differing pose worth an event, and it is known not to be exactly
+recomputable. MEASURED 2026-09-09 (`exulanica/reconstruction/pycolmap_executor.py`): two runs of one
+manifest over forty photographs registered the same images with byte-identical keypoints and
+descriptors, then produced different sparse models, 44,261 against 44,263 points, and recovered
+camera extents 2.3 parts in a thousand apart, because RANSAC threading admits variation. A pose
+receipt reproduces in what it concludes, not in its bytes, so no exact-recomputation claim covers it.
 
-**ASSUMPTION (A-24), NARROWED.** Deleting an exemplar and recomputing the **deterministic** closure
+**ASSUMPTION (A-24).** Deleting an exemplar and recomputing the **deterministic** closure
 yields a bit-identical state. Settled by experiment **X-8**, the deletion closure test: delete one
 exemplar, run the recompute path, build a fresh state from the remaining rows, and assert byte
 equality of exemplars, negatives, cohort membership and index (about 1 day). Any nondeterminism
@@ -1767,94 +1740,27 @@ reconstruct the DAG from the ledger alone, without reading source code. If the D
 the code, the replay lies as soon as the code changes, and it lies most convincingly about old runs.
 
 The Assembly Replay is then a straight query: `select * from pipeline_event where run_id = $1 order by
-seq`, joined to `artifact` for clickable outputs, rendered as a swimlane per stage with retries visible
-as repeated attempts. The chain is closed in both directions: every artifact in the replay opens, every
-assertion traces to its spans, every span opens at the exact source moment.
+seq`, joined to `artifact` for its outputs. `exulanica-ingest replay <run_id>` prints it for one run;
+a swimlane view per stage with retries shown as repeated attempts is the intended presentation and is
+not built. The chain is closed in both directions: every artifact in the replay resolves, every
+assertion traces to its spans, and every span opens at the exact source moment.
 
 **DECISION.** The ledger survives deletion, with payloads scrubbed to hashes (section 6.4). A ledger that
 is purged along with its subject cannot answer "what happened to my data", which is the one question a
 deletion needs the ledger to answer.
 
-**ASSUMPTION (A-29).** The ingest pipeline can emit real per-stage counters over SSE. This is load-bearing
-for the interaction design's "processing as spatial formation" beat, which degrades to a progress
-indication without it. It is a 2-hour inspection of stage boundaries and should be done early.
+**CLOSED (A-29).** The ingest pipeline emits real per-stage progress as server-sent events:
+`GET /formation/{batch_id}` (`exulanica/api/routes/formation.py`) streams each capture's stage,
+stage index, counters and message for one intake batch from the ledger, and ends when the batch
+ends.
 
 ---
 
 ## 8. The World Memory Package is a projection, not the store
 
-### 8.1 The finding
-
-**The research finding, preserved as stated: content addressing plus an append-only ledger plus a right
-to erasure is an unsatisfiable triple.** Every candidate export format that gives strong versioning and
-reproducibility gives it by making history immutable. If the package is the database, deletion becomes a
-lie.
-
-The legal backdrop, verified: GDPR does not itself define erasure, and erasure may be satisfied by
-irreversible destruction of the link between the data and the data subject. Standard guidance for
-immutable stores is to keep personal data off them entirely.
-Source: <https://arxiv.org/pdf/2210.04541> (VERIFIED 2026-08-27).
-
-### 8.2 The consequence: two zones
-
-**DECISION (wmp-1).**
-
-| | Zone 1: live store | Zone 2: World Memory Package |
-| --- | --- | --- |
-| What | PostgreSQL plus blob storage | A materialised RO-Crate produced by projecting zone 1 at an instant |
-| Mutability | Mutable. Rows are deletable | Immutable once written, content addressed, signed |
-| Raw media | Lives here, and only here | **Excluded by default**, described via fetch-style external references with digests, so a recipient can verify but not read |
-| Embeddings and identity exemplars | Live here | **Excluded by default** |
-| Append-only content | The pipeline ledger only, with payloads scrubbed to hashes on deletion | The whole package, by construction |
-| Deletion | Real and complete | Not possible. A package already exported cannot be recalled |
-
-*Rejected alternative:* make the content-addressed, append-only package **be** the live store, which is
-the design that gives the strongest reproducibility and provenance story. Rejected because it makes
-deletion impossible, and deletion is a hard requirement of this product, not a feature.
-
-*Rejected alternative:* DVC or a Git-coupled pointer system. Rejected on the same axis: erasing an
-exemplar from Git history is a history rewrite, and any clone retains it. That is exactly the wrong
-property for personal biometric-adjacent data.
-
-### 8.3 The format
-
-**DECISION (wmp-2).** RO-Crate 1.2 as the package format, published under an Exulanica profile crate, with
-a Croissant 1.0 plus RAI descriptor for the learning dataset **embedded in the same JSON-LD graph**,
-BagIt-style fetch semantics for excluded raw media, and a signed Merkle-root manifest supplying the
-versioning that RO-Crate does not provide.
-
-**VERIFIED.** RO-Crate 1.2 requires exactly one `ro-crate-metadata.json` at the crate root, is JSON-LD
-over schema.org, adds profile crates and detached crates, and is backwards compatible with 1.1. Croissant
-is at version 1.0 (published 2024-03-01), also JSON-LD over schema.org, with a RAI extension providing
-`rai:dataCollection`, `rai:dataAnnotationProtocol`, `rai:personalSensitiveInformation` and related
-consent and provenance vocabulary. **Because both are JSON-LD over schema.org, a Croissant `sc:Dataset`
-can be a node in the same graph as the RO-Crate root.** Sources:
-<https://www.researchobject.org/ro-crate/specification/1.2/structure>,
-<https://docs.mlcommons.org/croissant/docs/croissant-spec.html>,
-<https://docs.mlcommons.org/croissant/docs/croissant-rai-spec.html> (2026-08-27).
-
-**VERIFIED.** BagIt (RFC 8493) requires a payload manifest with a checksum per payload file, and
-`fetch.txt` declares payload items held **outside** the bag, which maps precisely onto "raw private media
-described but not packaged". Source: <https://www.rfc-editor.org/rfc/rfc8493.html> (2026-08-27).
-
-*Rejected alternative:* OCI image spec 1.1 artifacts, which are genuinely attractive as a distribution
-layer (`subject` plus the Referrers API is a clean way to attach an evaluation report to a package
-version). Deferred post-MVP as a transport option, not the format: it needs a registry to be worth
-anything, deletion in registries is tag-and-garbage-collect rather than erasure, and it imposes no
-schema.
-
-*Rejected alternatives, briefly:* Frictionless Data Package v2 (narrower than Croissant for ML and
-narrower than RO-Crate for provenance), LakeFS (needs a running server and S3-compatible storage),
-Delta Lake and Iceberg (need a query engine), and a hand-rolled content-addressed directory (what every
-other option degenerates to, minus interoperability; its Merkle-root idea is adopted).
-
-### 8.4 What must be said in the product
-
-- Deletion in zone 1 is real and complete, subject to the limits in section 6.6.
-- A package exported to a third party **cannot be recalled**. The export dialog says this before the
-  export runs, not after.
-- Re-exporting after a deletion produces a new version with a different Merkle root. **The diff between
-  two package versions is the honest answer to "what changed".**
+The live store holds raw media and is where deletion is real; an exported World Memory Package is
+an immutable, signed projection of it that cannot be recalled. The decision, its rationale and the
+package format are owned by [world-memory-package.md](world-memory-package.md#why-the-package-is-a-projection-not-the-store).
 
 ---
 
@@ -1862,41 +1768,31 @@ other option degenerates to, minus interoperability; its Merkle-root idea is ado
 
 Collected so nothing above has to be re-read to find the gaps.
 
-### 9.1 What blocks a v1 freeze of the address format
+### 9.1 Address-format decisions
 
-These are the items inside the address. `span_digest` is a SHA-256 over the address tuple, so every
-one of them is baked into every citation token, every permalink and every archived answer the moment
-a span is written. **Adding a new field or a new enumerated value is additive. Changing the meaning
-or the spelling of an existing one is not**: it is a v2 span format, written alongside v1, with a
-documented and verified migration of every existing span. That is the whole reason this list is kept
-separately from the general gaps below.
+These items are inside the address. `span_digest` is a SHA-256 over the address tuple, so each one is
+baked into every citation token, every permalink and every archived answer the moment a span is
+written. **Adding a field or an enumerated value is additive. Changing the meaning or the spelling of
+an existing one is not**: it is a v2 span format, written alongside v1, with a documented and
+verified migration of every existing span. Every item is decided.
 
-The corpus is small and the number of spans is near zero, which makes the pre-ingest window the cheapest
-moment these decisions will ever have. The window closes at first production ingest, and for the
-timebase item specifically at first video ingest.
-
-| Item | Status | Why it is inside the address | What settles it |
-| --- | --- | --- | --- |
-| EXIF Orientation has eight values, four of them mirrored; `media_track.rotation` allows only 0/90/180/270 | **CLOSED 2026-09-04** | `region.display` carries `rotation`, and the region is normalised against display space. A mirrored original puts every region on the wrong side of the image, permanently | Settled by ADR-0004 and [adr/0012-upright-display-space.md](adr/0012-upright-display-space.md): pixels are normalised at ingest, all eight values are admitted, `img` regions carry `display.rotation = 0`, and `media_track.rotation` means "still to apply" and is 0. Enforced by two check constraints in `0032_upright_display_space.sql`. No digest changed |
-| Whether OCR text spans reuse `modality = 'transcript_text'` or take their own value | **CLOSED 2026-09-04** | `modality` is a digest input, and re-labelling spans already issued changes their digests | Neither. [adr/0016-ocr-is-a-region.md](adr/0016-ocr-is-a-region.md): OCR text is a `frame_region` span carrying an `ocr_text_is` assertion, which is what was already written. `transcript_text` is reserved for time-anchored transcripts and refused on the `img` track. The five modality values are unchanged |
-| The tie direction of `round_half_down` | **CLOSED 2026-09-04** | It determines the quantisation of every region coordinate and every EXIF position | Ratified as ties toward zero by [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md). It no longer takes part in the timebase at all |
-| Tick to ns to tick is not the identity | **CLOSED 2026-09-04** | Both formulas produce values that go into the digest | Corrected, not carried: `ns_from_ticks` rounds up, the round trip is exact on every representable timebase, and it cost nothing because the conversion had no callers and no video or audio track had ever been written. ADR-0015, section 1.4 |
-| The region encoding: parts per million on a `[0, 1_000_000]` integer grid | **CLOSED 2026-09-04** | `region` is a digest input, and a float has no canonical rendering that two implementations agree on. Changing the grid changes every region digest | Ratified as it stands by [adr/0013-region-encoding.md](adr/0013-region-encoding.md), and now enforced by `evidence_span_region_shape` in `0033_span_digest_input_shape.sql` rather than described in a comment. Nine malformed tuples are refused by `tests/test_span_digest_input_shape.py` |
-| The digest encodings: lowercase hex for `blob_sha256`, absent keys rather than nulls, `prefix` and `suffix` excluded from `text_anchor` | **CLOSED 2026-09-04** | They are the difference between a digest that reproduces and one that does not | Ratified by [adr/0014-digest-encodings.md](adr/0014-digest-encodings.md) against a second implementation: `scripts/verify_canonical_conformance.mjs` reproduces the exact canonical bytes and digest of all seven vectors in `tests/vectors/span_digest_v1.json` outside Python. The algorithm is identified by `span_format_version`, which is itself inside the digest input |
-| Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **CLOSED 2026-09-04** | If one were ingested it would be stored as its first frame under a capture describing the whole file, and every span would address `img` on a blob whose other frames nothing can cite | Closed by refusing rather than by inspecting: `exulanica/ingest/decode.py` refuses any container holding more than one frame, at the header probe and at the decode, with a message naming the video path |
+| Item | Why it is inside the address | Decision |
+| --- | --- | --- |
+| EXIF Orientation has eight values, four of them mirrored; `media_track.rotation` allows only 0/90/180/270 | `region.display` carries `rotation`, and the region is normalised against display space, so a mirrored original would put every region on the wrong side of the image | Pixels are normalised at ingest, all eight values are admitted, `img` regions carry `display.rotation = 0`, and `media_track.rotation` means "still to apply" and is 0, enforced by two check constraints in `0032_upright_display_space.sql` ([ADR-0004](adr/0004-exif-orientation-normalisation.md), [ADR-0012](adr/0012-upright-display-space.md), section 1.5) |
+| Whether OCR text spans reuse `modality = 'transcript_text'` or take their own value | `modality` is a digest input, and re-labelling issued spans changes their digests | Neither: OCR text is a `frame_region` span carrying an `ocr_text_is` assertion, and `transcript_text` is reserved for time-anchored transcripts and refused on the `img` track ([ADR-0016](adr/0016-ocr-is-a-region.md)) |
+| The tie direction of `round_half_down` | It determines the quantisation of every region coordinate and every EXIF position | Ties toward zero; the rule quantises measured values and takes no part in the timebase ([ADR-0015](adr/0015-timebase-rounding.md)) |
+| The tick to nanosecond to tick round trip | Both conversions produce values that go into the digest | `ns_from_ticks` takes the ceiling, and the round trip is exact on every representable timebase (ADR-0015, section 1.4) |
+| The region encoding: parts per million on a `[0, 1_000_000]` integer grid | A float has no canonical rendering two implementations agree on, and changing the grid changes every region digest | Ratified by [ADR-0013](adr/0013-region-encoding.md) and enforced by `evidence_span_region_shape` in `0033_span_digest_input_shape.sql`; malformed tuples are refused, pinned by `tests/test_span_digest_input_shape.py` |
+| The digest encodings: lowercase hex for `blob_sha256`, absent keys rather than nulls, `prefix` and `suffix` excluded from `text_anchor` | They are the difference between a digest that reproduces and one that does not | Ratified by [ADR-0014](adr/0014-digest-encodings.md) against a second implementation: `scripts/verify_canonical_conformance.mjs` reproduces the exact canonical bytes and digest of all seven vectors in `tests/vectors/span_digest_v1.json` outside Python. The algorithm is identified by `span_format_version`, which is itself a digest input |
+| Motion photographs and bursts carrying a real embedded video track | One ingested as its first frame would address `img` on a blob whose other frames nothing can cite | A container holding more than one frame is refused at ingest by the shared decoder (`exulanica/corpus/decode.py`), with a message naming the video path (section 1.5) |
 
 ### 9.2 Everything else
 
 | Item | Status | What settles it |
 | --- | --- | --- |
-| EXIF Orientation has 8 values including mirrored variants; `media_track.rotation` allows only 4 | **CLOSED 2026-09-04** | Pixels are normalised at ingest and the normalisation is recorded. ADR-0004, ADR-0012, section 9.1 |
-| Whether OCR text spans reuse `modality = 'transcript_text'` or take their own modality value | **CLOSED 2026-09-04** | Neither: OCR text is a `frame_region` span with an `ocr_text_is` assertion. ADR-0016, section 9.1 |
-| Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **CLOSED 2026-09-04** | Closed by refusing a multi-frame container at ingest rather than by inspecting the corpus. Section 1.5 |
-| The tie direction of `round_half_down` | **CLOSED 2026-09-04** | Ratified as ties toward zero, ADR-0015 and section 9.1 |
-| Tick to ns to tick is not the identity under the frozen formulas | **CLOSED 2026-09-04** | Corrected inside its decision window; the round trip is now exact. ADR-0015 and section 9.1 |
-| Whether migration `0001_spine.sql` applies at all | **VERIFIED 2026-09-04** | `tests/test_migration.py::test_the_migration_actually_applies` runs against PostgreSQL 18.6 with pgvector, nothing substituted. All thirty-four migrations apply, and 1445 of 1447 tests pass with a server configured |
-| Whether exact search over `halfvec(4096)` stays fast enough as the library grows | **ASSUMPTION** | Measurement at corpus scale. The additive fallback is a truncated 1024-dimension recall column, section 4.4 |
-| Browser seek accuracy against ffmpeg PTS | ASSUMPTION A-31 | Experiment X-3. Not live for a photograph corpus; becomes live when video arrives |
+| Whether the migrations apply | **VERIFIED** | `tests/test_migration.py::test_the_migration_actually_applies` applies them against PostgreSQL 18 with pgvector, nothing substituted |
+| Whether exact search over `halfvec(4096)` stays fast enough as an account's photographs grow | **ASSUMPTION** | Measurement at corpus scale. The additive fallback is a truncated 1024-dimension recall column, section 4.4 |
+| Browser seek accuracy against ffmpeg PTS | ASSUMPTION A-31 | Experiment X-3. Not live for photographs; becomes live with a video ingest path |
 | Re-anchor rate across model versions | ASSUMPTION | Experiment X-19 |
 | Structured-answer schema conformance | ASSUMPTION A-32 | Experiment X-4 |
 | Cross-capture identity recall | ASSUMPTION A-18 | Experiment X-6. **No recall number may be published before it runs** |
@@ -1904,10 +1800,10 @@ timebase item specifically at first video ingest.
 | Calibration bin size of 30 | ASSUMPTION A-26 | Confidence-interval width on empirical p, once confirmation data exists |
 | Tombstone guard stops a stale worker | ASSUMPTION | Experiment X-7 |
 | Vector-index physical residency after delete | ASSUMPTION | Experiment X-11 |
-| Restore with tombstone replay | ASSUMPTION | Experiment X-12 |
+| Restore with tombstone replay | Offline mechanism implemented; production rehearsal **OPEN** | A declared restore replays a sealed checkpoint of every tombstone and withdrawal before it serves ([ADR-0019](adr/0019-offline-restore-tombstone-replay.md), [ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md)) |
 | Exact recomputation is bit-identical | ASSUMPTION A-24 | Experiment X-8. **The claim may not be made before it passes** |
 | Provider zero-data-retention across all endpoints in use | ASSUMPTION A-8 | Written confirmation from the provider for the specific model IDs, committed to the repository, asserted at service boot |
-| pgvector behaviour at production scale | ASSUMPTION A-27 / A-30 | Experiment X-18. Safe at demo scale regardless |
-| Workspace is one user at MVP | ASSUMPTION A-30 | A product decision, not a technical one |
-| When a biometric embedding may exist at all | **OPEN** | A risk-appetite decision, not a technical one. Three incompatible rules were proposed and the evidence does not choose between them. Owned by [privacy and consent](privacy-consent-threat-model.md#10-open-when-may-a-biometric-embedding-exist-at-all). **Identity work must not begin before it is answered** |
-| C2PA as a future device-signing option | not a dependency | The existence of the specification and the hard-binding concept are verified; exact clause numbering is unverified. Noted as future-compatible, never as an MVP dependency |
+| pgvector behaviour at production scale | ASSUMPTION A-27 / A-30 | Experiment X-18 |
+| A workspace belongs to one account holder | ASSUMPTION A-30 | A product decision, not a technical one |
+| When a biometric embedding may exist at all | **OPEN** | A risk-appetite decision, not a technical one. Three incompatible rules were proposed and the evidence does not choose between them. Owned by [privacy and consent](privacy-consent-threat-model.md#10-open-when-may-a-biometric-embedding-exist-at-all). **No face, voice or gait embedding is computed until it is answered**; identity proposals use context only (section 3.2) |
+| C2PA as a device-signing option | not a dependency | The existence of the specification and the hard-binding concept are verified; exact clause numbering is unverified. Noted as compatible, never as a dependency |
