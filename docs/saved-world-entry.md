@@ -417,6 +417,14 @@ The browser mounts the authored descriptor as a first-class region and ground. I
 a graph island, capture, evidence card, or reconstructed surface for it. Personal entries return
 `authored_scene: null`; their current graph and reconstruction limitations remain visible.
 
+A world made from photographs states no ground, so its entry returns `declared_floor`
+(`half_extent_mm`, `elevation_mm`): the square about each region's origin that its entry in the
+society ground catalog declares (`assets/catalogs/society-ground/society-ground.v1.json`,
+`floor: declared`). Every other entry returns `declared_floor: null`. The browser draws that floor
+under each region's root, including a region drawn only as photographs, as a tiled surface with a
+darker edge (`web/packages/atlas-react/src/playcanvas/declared-floor.ts`), so where people and
+objects stand is seen as a floor of its own; a photograph is never drawn standing in for ground.
+
 A bounded authored floor uses the descriptor's exact horizontal bounds and elevation, and its
 perimeter marks the supported walking area. An endless ground states no perimeter, so it has no
 rim, fascia or metre marks: its walking face is one flat surface at the authored elevation, drawn
@@ -730,3 +738,16 @@ the same reason, so a refusal can still name a distance.
 
 The general authored-object API retains its existing region ownership and transform validation; it
 enforces neither bound. This browser constraint is not a server-side spatial admission guarantee.
+
+## Made world placement boundary
+
+In a world made from photographs the browser stands a new object on the declared floor of the
+region the person stands in, at the floor's elevation, whether or not anything in that region was
+reconstructed. It refuses before asking the server when the person stands on no region's floor and
+when the spot is past the floor's edge. The small square names that region (`viewer.region_id`)
+and the server stands it on the floor the society reads
+([`exulanica/world/arrangements.py`](../exulanica/world/arrangements.py)); in a world of several
+regions a request naming none is refused as `arrangement_needs_authored_ground`
+(`tests/test_society_made_world.py`, `web/packages/app/test/objects-surface.test.ts`,
+`web/packages/app/test/arrangement.test.ts`). As on the starter, the floor's edge is a browser
+constraint for single objects, not a server-side spatial admission guarantee.

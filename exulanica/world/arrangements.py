@@ -582,6 +582,8 @@ class ArrangementRequest:
     viewer_z_mm: int
     viewer_yaw_microradians: int
     origin_role: str
+    #: The region the viewer stands in, which a world of several regions needs named.
+    viewer_region_id: str | None = None
 
 
 def _declared(reason: str) -> str:
@@ -730,18 +732,25 @@ def _crowds(item: PlacedObject, used: Sequence[Point]) -> bool:
     )
 
 
-def _read_ground(repository: WorldObjectRepository, snapshot_id: uuid.UUID) -> Any:
+def _read_ground(
+    repository: WorldObjectRepository, snapshot_id: uuid.UUID, region_id: str | None = None
+) -> Any:
     """The society's reading of the version's authored ground, or ``None`` when it has none.
 
     Read by the one reader the society runtime reads a saved world's ground by
-    (:func:`~exulanica.world.society_authored_ground.read_authored_ground`); a ground the society
-    has no rule for is no ground to stand an arrangement on.
+    (:func:`~exulanica.world.society_authored_ground.read_authored_ground`), in the region the
+    viewer stands in; a ground the society has no rule for, or a world of several regions with
+    none named, is no ground to stand an arrangement on.
     """
     from exulanica.world.society_authored_ground import read_authored_ground
 
     try:
         return read_authored_ground(
-            repository.connection, repository.workspace_id, repository.world_id, snapshot_id
+            repository.connection,
+            repository.workspace_id,
+            repository.world_id,
+            snapshot_id,
+            region_id=region_id,
         )
     except InvalidStructuralData:
         return None
@@ -804,7 +813,7 @@ def _resolve(
             "arrangement_unknown",
             f"no arrangement is published as {request.key} version {request.version}",
         )
-    ground = _read_ground(repository, row["source_snapshot_id"])
+    ground = _read_ground(repository, row["source_snapshot_id"], request.viewer_region_id)
     if ground is None:
         return frame.blocked(
             "arrangement_needs_authored_ground",

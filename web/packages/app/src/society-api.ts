@@ -29,6 +29,8 @@ export interface SocietySnapshot {
   readonly societyId: string;
   readonly versionId: string;
   readonly placeId: string;
+  /** The region the society lives in, as the server serves it; absent from a server that does not. */
+  readonly regionId?: string;
   /** How many people the society was created with, whether or not they are here now. */
   readonly populationSize: number;
   readonly currentTick: number;
@@ -319,6 +321,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
     }
     return Object.freeze({
       societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
+      ...(textValue(row['region_id']) ? { regionId: row['region_id'] } : {}),
       populationSize: row['population_size'] as number, currentTick: row['current_tick'], stateSha256: row['state_sha256'],
       state: livingPresentation(row, state), places: placesOf(row), presence: EVERYONE_HERE,
     });
@@ -382,6 +385,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
       row['input_sha256'] !== state['input_sha256'])) throw new Error('Invalid society branch or input');
   return Object.freeze({
     societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
+    ...(textValue(row['region_id']) ? { regionId: row['region_id'] } : {}),
     populationSize: row['population_size'], currentTick: row['current_tick'], stateSha256: row['state_sha256'],
     state: state as unknown as OwnedSocietyState, places: v2 ? placesOf(row) : null, presence,
   });

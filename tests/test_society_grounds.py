@@ -98,8 +98,8 @@ def test_the_builders_figures_are_the_catalogs():
         ground_builder.NAVIGATION_PROFILE,
     )
     assert society_ground_for_navigation(starter.navigation_profile) == starter
-    with pytest.raises(UnknownSocietyGround, match="atlas-world-composer"):
-        society_ground_for_composer("atlas-world-composer")
+    with pytest.raises(UnknownSocietyGround, match="a-composer-nobody-states"):
+        society_ground_for_composer("a-composer-nobody-states")
     with pytest.raises(UnknownSocietyGround, match="bounded-sidewalk-graph/v1"):
         society_ground_for_navigation("bounded-sidewalk-graph/v1")
 
@@ -131,8 +131,19 @@ def _malformed(tmp_path, change) -> None:
         (lambda entries: entries[0].update(declared_half_extent_mm=2_000), "clearance"),
         (lambda entries: entries[0].pop("population_reason"), "missing"),
         (lambda entries: entries.append(dict(entries[0], key="again")), "two grounds name"),
+        (lambda entries: entries[1].update(population=7), "state different figures"),
+        (lambda entries: entries[1].update(arrival="somewhere"), "arrival is one of"),
     ],
-    ids=["empty", "beyond-the-engine", "beyond-reach", "no-room", "no-reason", "twice"],
+    ids=[
+        "empty",
+        "beyond-the-engine",
+        "beyond-reach",
+        "no-room",
+        "no-reason",
+        "twice",
+        "one-profile-two-populations",
+        "unknown-arrival",
+    ],
 )
 def test_a_malformed_ground_catalog_is_refused(tmp_path, change, message):
     with pytest.raises(CatalogError, match=message):

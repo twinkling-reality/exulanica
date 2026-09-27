@@ -57,7 +57,11 @@ from exulanica.world.society_composition import (
     turned_point,
     validate_reviewed_affordances,
 )
-from exulanica.world.society_grounds import society_ground_for_composer
+from exulanica.world.society_grounds import (
+    SocietyGroundKind,
+    UnknownSocietyGround,
+    society_ground_for_composer,
+)
 from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_COMPOSITION,
     AUTHORED_GROUND_COMPOSITION_V2,
@@ -95,6 +99,8 @@ DECLARED_HALF_EXTENT_MM: Final = STARTER_GROUND.declared_half_extent_mm
 AUTHORED_GROUND_POPULATION: Final = STARTER_GROUND.population
 
 AreaSource = Literal["ground", "declared"]
+#: How a saved world's input names its area: this prefix and the authored region's identity.
+_PLACE_PREFIX: Final = "authored:"
 
 #: How a place's node is named: this prefix, the object's own identity and the place's index in
 #: the order ``destination_places`` fills them, so a place keeps its identity when another drops.
@@ -144,27 +150,41 @@ class SocietyGround:
     """A saved world's authored ground as a society reads it, bound to the snapshot it came from.
 
     ``ground_kind`` is what the ground module states, ``flat`` for a bounded rectangle and
-    ``endless`` for a plane with no edge. ``area`` is where the society walks.
+    ``endless`` for a plane with no edge, or ``unstated`` for a world that states no ground at all,
+    such as one made from photographs, whose people walk the plane its objects are placed on.
+    ``area`` is where the society walks. ``element_id`` is the ground's element, or None where the
+    world has no ground element.
     """
 
     world_id: str
     snapshot_id: uuid.UUID
     snapshot_sha256: str
     region_id: str
-    element_id: str
+    element_id: str | None
     module_key: str
     module_version: int
-    ground_kind: Literal["flat", "endless"]
+    ground_kind: Literal["flat", "endless", "unstated"]
     elevation_mm: int
     area: WalkableArea
-    #: Where a person arrives in this world, on the ground plane: the snapshot's own spawn.
+    #: Where a person arrives in this world, on the ground plane, by the ground's arrival rule in
+    #: the society ground catalog: the snapshot's own spawn, or the region origin.
     arrival_x_mm: int
     arrival_z_mm: int
+    #: Every region the world states. An object in another of them is in another place of the
+    #: world, which this society does not stand in; an object naming a region the world does not
+    #: state makes the input unavailable. Left out, only this ground's own region is the world's.
+    world_region_ids: tuple[str, ...] = ()
+
+    @property
+    def support_id(self) -> str:
+        """What people stand on, as the lattice's nodes and edges name it: the ground element, or,
+        where the world states none, the plane the society declares in its region."""
+        return self.element_id if self.element_id is not None else f"plane:{self.region_id}"
 
     @property
     def place_id(self) -> str:
         """The spatial identity this ground publishes as the society input's area identity."""
-        return f"authored:{self.region_id}"
+        return f"{_PLACE_PREFIX}{self.region_id}"
 
     def document(self) -> dict[str, Any]:
         """The canonical descriptor, digest included, that the input binds and replay rechecks.
@@ -264,7 +284,7 @@ def area_supports(ground: SocietyGround) -> Supports:
         for x_mm, z_mm in (a, b):
             if abs(x_mm - area.centre_x_mm) > width or abs(z_mm - area.centre_z_mm) > depth:
                 return ()
-        return (ground.element_id,)
+        return (ground.support_id,)
 
     return supports
 
@@ -282,7 +302,7 @@ def ground_navigation(ground: SocietyGround) -> dict[str, Any]:
     nodes = [
         {
             "node_id": _node_id(x_mm, z_mm),
-            "subject_id": ground.element_id,
+            "subject_id": ground.support_id,
             "position_mm": [x_mm, z_mm],
         }
         for x_mm in xs
@@ -301,7 +321,7 @@ def ground_navigation(ground: SocietyGround) -> dict[str, Any]:
                         "from_node_id": first,
                         "to_node_id": second,
                         "length_mm": LATTICE_MM,
-                        "subject_id": ground.element_id,
+                        "subject_id": ground.support_id,
                     }
                 )
     nodes.sort(key=lambda node: node["node_id"])
@@ -536,6 +556,9 @@ def _objects_one_by_one(
         reviewed = reviewed_affordances.get(obj.asset_sha256)
         transform = obj.transform
         if obj.region_id != ground.region_id:
+            if obj.region_id in ground.world_region_ids:
+                # Another place of the same world: its people are not this society's.
+                continue
             return [], [], [], f"unregistered_object_region:{obj.object_id}"
         if reviewed is None:
             return [], [], [], f"unknown_active_asset:{obj.object_id}"
@@ -589,10 +612,14 @@ def _ground_override_reason(
 ) -> str | None:
     """An override that changes the ground changes where anybody stands, so it is refused.
 
-    A saved world's snapshot has one element, its ground. An override that keeps the ground
-    exactly where the snapshot places it changes nothing the society reads. Anything else is the
-    ground itself being hidden or moved, which is not an object, and the input names it.
+    A starter's snapshot has one element, its ground. An override that keeps the ground exactly
+    where the snapshot places it changes nothing the society reads. Anything else is the ground
+    itself being hidden or moved, which is not an object, and the input names it. A world that
+    states no ground element has only elements nobody collides with (its reader refuses any other),
+    so hiding or moving one changes nothing the society reads either.
     """
+    if ground.element_id is None:
+        return None
     for override in sorted(overrides, key=lambda value: value.element_id):
         if override.element_id != ground.element_id:
             return f"unsupported_structural_override:{override.element_id}"
@@ -940,7 +967,12 @@ def _authored_ground_input(
 
 
 def read_authored_ground(
-    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    *,
+    region_id: str | None = None,
 ) -> SocietyGround | None:
     """The society's reading of one world's structural snapshot, the one place it is read.
 
@@ -967,7 +999,17 @@ def read_authored_ground(
         composer_version=row["composer_version"],
         topology=row["topology"],
         placement=row["placement"],
+        region_id=region_id,
     )
+
+
+def authored_input_region(document: Mapping[str, Any]) -> str:
+    """The region a saved world's input was composed in, from the place identity it publishes
+    (:attr:`SocietyGround.place_id`), or a refusal naming what it holds instead."""
+    place = document.get("district_id")
+    if not isinstance(place, str) or not place.startswith(_PLACE_PREFIX):
+        raise InvalidStructuralData(f"a saved world's input names no authored region: {place!r}")
+    return place[len(_PLACE_PREFIX) :]
 
 
 def authored_ground_from_snapshot(
@@ -979,14 +1021,55 @@ def authored_ground_from_snapshot(
     composer_version: int,
     topology: Mapping[str, Any],
     placement: Mapping[str, Any],
+    region_id: str | None = None,
 ) -> SocietyGround:
     """Read a saved world's ground out of its own structural snapshot, and say where to walk.
 
-    Delegates to the starter authority, which refuses any snapshot that is not exactly the
-    built-in authored starter at a supported ground module version. A bounded ground gives the
-    society the extent it states. An endless ground states none, so the society declares its own
-    area and marks it declared. A ground of any other kind is refused with
-    ``InvalidStructuralData``, never read by guessing which attributes it might have.
+    The snapshot's composer names its ground in the society ground catalog
+    (:func:`~exulanica.world.society_grounds.society_ground_for_composer`), and that ground's
+    reader reads it: the built-in starter's (:func:`_starter_ground`) or a world made from
+    photographs (:func:`_made_world_ground`). ``region_id`` is the region the society stands in,
+    which a world of several regions needs named. A composer the catalog does not state, or a
+    ground with no reader, is refused with ``InvalidStructuralData``, never read by guessing.
+    """
+    try:
+        kind = society_ground_for_composer(composer_key)
+    except UnknownSocietyGround as exc:
+        raise InvalidStructuralData(str(exc)) from exc
+    reader = _GROUND_READERS.get(kind.key)
+    if reader is None:
+        raise InvalidStructuralData(f"no reader is implemented for the society ground {kind.key!r}")
+    return reader(
+        kind,
+        world_id=world_id,
+        snapshot_id=snapshot_id,
+        snapshot_sha256=snapshot_sha256,
+        composer_key=composer_key,
+        composer_version=composer_version,
+        topology=topology,
+        placement=placement,
+        region_id=region_id,
+    )
+
+
+def _starter_ground(
+    kind: SocietyGroundKind,
+    *,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    snapshot_sha256: str,
+    composer_key: str,
+    composer_version: int,
+    topology: Mapping[str, Any],
+    placement: Mapping[str, Any],
+    region_id: str | None,
+) -> SocietyGround:
+    """The built-in starter's ground, through the starter authority.
+
+    The authority refuses any snapshot that is not exactly the built-in authored starter at a
+    supported ground module version. A bounded ground gives the society the extent it states. An
+    endless ground states none, so the society declares the catalog's area and marks it declared.
+    A ground of any other kind is refused, never read by guessing which attributes it might have.
     """
     from exulanica.world.starter import (
         AUTHORED_STARTER_ELEMENT_ID,
@@ -1002,13 +1085,23 @@ def authored_ground_from_snapshot(
         placement=placement,
     )
     region = scene.region
+    if region_id is not None and region_id != region.region_id:
+        raise InvalidStructuralData(
+            f"{region_id!r} is not this world's authored region: the starter has one"
+        )
+    if (kind.arrival, kind.floor) != ("spawn", "stated"):
+        raise InvalidStructuralData(
+            f"the starter arrives at its spawn on the ground it states, not {kind.arrival} on a "
+            f"{kind.floor} one"
+        )
     stated = region.ground
     if isinstance(stated, BoundedAuthoredGround):
-        kind: Literal["flat", "endless"] = "flat"
+        ground_kind: Literal["flat", "endless", "unstated"] = "flat"
         area = WalkableArea("ground", 0, 0, stated.half_width_mm, stated.half_depth_mm)
     elif isinstance(stated, EndlessAuthoredGround):
-        kind = "endless"
-        area = WalkableArea("declared", 0, 0, DECLARED_HALF_EXTENT_MM, DECLARED_HALF_EXTENT_MM)
+        ground_kind = "endless"
+        extent = kind.declared_half_extent_mm
+        area = WalkableArea("declared", 0, 0, extent, extent)
     else:
         raise InvalidStructuralData(
             f"a society has no rule for an authored ground of kind {type(stated).__name__}"
@@ -1021,9 +1114,112 @@ def authored_ground_from_snapshot(
         element_id=AUTHORED_STARTER_ELEMENT_ID,
         module_key=region.module.key,
         module_version=region.module.version,
-        ground_kind=kind,
+        ground_kind=ground_kind,
         elevation_mm=stated.elevation_mm,
         area=area,
         arrival_x_mm=region.spawn.x_mm,
         arrival_z_mm=region.spawn.z_mm,
+        world_region_ids=(region.region_id,),
     )
+
+
+#: The versions of the made-world composer a society reads: the one
+#: :func:`exulanica.world.composed.composed_candidate` writes (``SpatialCandidate``'s default).
+MADE_WORLD_COMPOSER_VERSIONS: Final = (1,)
+#: The height of a declared floor in its region's frame, in millimetres: the region origin's own
+#: height, where a region's objects are placed and its people walk. A world whose ground's
+#: catalog entry says its floor is declared states none, so this is declared, as its area is.
+DECLARED_FLOOR_ELEVATION_MM: Final = 0
+
+
+@dataclass(frozen=True, slots=True)
+class DeclaredFloor:
+    """The floor every region of a world that states no ground has: a square of this half extent
+    about the region origin, at this height in the region's frame. The app draws it, places
+    objects on it, and the society walks it."""
+
+    half_extent_mm: int
+    elevation_mm: int
+
+
+def declared_floor(composer_key: str) -> DeclaredFloor | None:
+    """The floor the society ground catalog declares in every region of a world made by this
+    composer, or None where the world states its own ground or the catalog states no ground."""
+    try:
+        kind = society_ground_for_composer(composer_key)
+    except UnknownSocietyGround:
+        return None
+    if kind.floor != "declared":
+        return None
+    return DeclaredFloor(kind.declared_half_extent_mm, DECLARED_FLOOR_ELEVATION_MM)
+
+
+def _made_world_ground(
+    kind: SocietyGroundKind,
+    *,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    snapshot_sha256: str,
+    composer_key: str,
+    composer_version: int,
+    topology: Mapping[str, Any],
+    placement: Mapping[str, Any],
+    region_id: str | None,
+) -> SocietyGround:
+    """One region of a world made from photographs, as the ground its society stands on.
+
+    Such a world states no ground, no spawn and no position for its regions: each photograph is
+    an element drawn with no collision. So the society stands in one region, the one it names, on
+    the plane its objects are placed on, walks the area its catalog entry declares about the
+    region origin, and a person arrives at that origin, by the entry's rule. A region the world
+    does not state, a world that names no region for its society, and an element anybody would
+    collide with are refused by name.
+    """
+    if composer_version not in MADE_WORLD_COMPOSER_VERSIONS:
+        raise InvalidStructuralData(
+            f"a made world's composer version {composer_version} is not read"
+        )
+    regions = tuple(
+        str(region["region_id"]) for region in topology.get("regions", ()) if "region_id" in region
+    )
+    if region_id is None:
+        raise InvalidStructuralData("a made world's society names the region it stands in")
+    if region_id not in regions:
+        raise InvalidStructuralData(f"the made world states no region {region_id!r}")
+    colliding = [
+        str(element.get("element_id"))
+        for element in topology.get("elements", ())
+        if (element.get("collision") or {}).get("kind") != "none"
+    ]
+    if colliding:
+        raise InvalidStructuralData(
+            f"a made world's society has no rule for an element that collides: {colliding[0]}"
+        )
+    if (kind.arrival, kind.floor) != ("region_origin", "declared"):
+        raise InvalidStructuralData(
+            f"a made world arrives at its region origin on a declared floor, not {kind.arrival} "
+            f"on a {kind.floor} one"
+        )
+    extent = kind.declared_half_extent_mm
+    return SocietyGround(
+        world_id=world_id,
+        snapshot_id=snapshot_id,
+        snapshot_sha256=snapshot_sha256,
+        region_id=region_id,
+        element_id=None,
+        module_key=composer_key,
+        module_version=composer_version,
+        ground_kind="unstated",
+        elevation_mm=DECLARED_FLOOR_ELEVATION_MM,
+        area=WalkableArea("declared", 0, 0, extent, extent),
+        arrival_x_mm=0,
+        arrival_z_mm=0,
+        world_region_ids=regions,
+    )
+
+
+#: Each ground the catalog states, read by its own reader. A ground with none is refused by name.
+_GROUND_READERS: Final = {
+    "authored_starter": _starter_ground,
+    "made_world": _made_world_ground,
+}

@@ -51,10 +51,12 @@ benches, with a market stall, a planter seat and a cafe table behind it and a la
 corner, in front of the person and facing them. The server works out where each object goes from
 where the person stands and faces, shows it before anything is written, and applies it as ordinary
 object edits, one change each, so "Take back the last change" removes them one at a time, newest
-first; nothing takes back the whole square in one step. It is refused by name, and nothing is
-written, when the world has no authored ground, when part of it would stand past the edge of the
-ground people walk on or where people arrive, or when an object already stands there or where
-people stand to use one ([`exulanica/world/arrangements.py`](../../exulanica/world/arrangements.py)).
+first; nothing takes back the whole square in one step. In a world made from photographs it
+stands on the floor declared in the region the person stands in. It is refused by name, and
+nothing is written, when the world has no authored ground or declared floor there, when part of it
+would stand past the edge of the ground people walk on or where people arrive, or when an object
+already stands there or where people stand to use one
+([`exulanica/world/arrangements.py`](../../exulanica/world/arrangements.py)).
 It brings nobody in. Measured on 2026-09-24 with the deterministic
 [`scripts/measure_furniture_use.py`](../../scripts/measure_furniture_use.py) (12 seeds, 30 simulated
 minutes, eight inhabitants on the starter ground, the square before its arrival point), inhabitants

@@ -49,6 +49,9 @@ class ViewerBody(BaseModel):
     z_mm: StrictInt = Field(ge=-_POSITION_BOUND_MM, le=_POSITION_BOUND_MM)
     #: The yaw an object placed facing the person would take, as POST .../objects states it.
     yaw_microradians: StrictInt = Field(ge=0, le=MAX_YAW_MICRORADIANS)
+    #: The region the person stands in, whose frame x_mm and z_mm are in. A world of several
+    #: regions needs it named; the starter's one region may be left out.
+    region_id: str | None = Field(default=None, min_length=1, max_length=500)
 
 
 class ArrangementPreviewBody(BaseModel):
@@ -70,6 +73,7 @@ class ArrangementPreviewBody(BaseModel):
             viewer_z_mm=self.viewer.z_mm,
             viewer_yaw_microradians=self.viewer.yaw_microradians,
             origin_role=self.origin_role,
+            viewer_region_id=self.viewer.region_id,
         )
 
 

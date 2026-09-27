@@ -872,8 +872,8 @@ def test_two_creations_in_two_workspaces_at_once_both_bring_inhabitants_in(
     make_place = SocietyRuntime.saved_world_place
     meeting = threading.Barrier(2, timeout=MEETING_SECONDS)
 
-    def then_meet(self, connection, session, version_id):
-        place = make_place(self, connection, session, version_id)
+    def then_meet(self, connection, session, version_id, region_id=None):
+        place = make_place(self, connection, session, version_id, region_id)
         with contextlib.suppress(threading.BrokenBarrierError):
             meeting.wait()
         return place

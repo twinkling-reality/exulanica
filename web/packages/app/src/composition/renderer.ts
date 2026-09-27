@@ -14,6 +14,7 @@
 import type { RenderingSubstrate } from '@exulanica/graph-client';
 import type { GraphSnapshot } from '@exulanica/graph-client';
 import { islandId as toIslandId, type AtlasScene } from '@exulanica/atlas-core';
+import { drawDeclaredFloors } from '@exulanica/atlas-react/playcanvas';
 import { worldArtProfile } from '@exulanica/presentation';
 
 import { mountAtlas } from '../atlas.js';
@@ -187,6 +188,10 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
     });
   } finally { rendererLoading.remove(); env.shell.removeAttribute('aria-busy'); }
   const atlas = state.atlas;
+  // A world that states no ground has a declared floor in every region: drawn as a floor, so a
+  // person sees what objects and people stand on. It goes with the binding's islands.
+  const declaredFloor = state.activeWorldEntry?.declaredFloor ?? null;
+  if (declaredFloor !== null) drawDeclaredFloors(atlas.binding, declaredFloor);
   // Only renderer-accepted legacy preview maps suppress the source-only region notice.
   if (env.preview) {
     for (const visual of atlas.binding.islands) {

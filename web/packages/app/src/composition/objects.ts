@@ -134,6 +134,7 @@ import {
   type ReviewedAsset,
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
+import type { DeclaredFloor } from '../world-entry-api.js';
 import type { Credentials } from '../config.js';
 
 /**
@@ -176,6 +177,9 @@ export interface DistrictObjectPlacement {
  */
 export type AuthoredObjectRegion = { readonly regionId: string } & AuthoredGround;
 
+/** The scene of a region whose only surface is its declared floor. */
+const DECLARED_FLOOR_SCENE = 'declared-floor';
+
 interface ObjectRegion {
   readonly regionId: IslandId;
   readonly placement: Island['placement'];
@@ -199,6 +203,11 @@ export interface ObjectsDependencies {
   readonly districtPlacement?: () => DistrictObjectPlacement | null;
   /** Exact source-independent region pinned by an authored starter entry. */
   readonly authoredRegion?: AuthoredObjectRegion;
+  /**
+   * The floor every region of a world that states no ground has (a world made from photographs),
+   * as its saved entry serves it: objects stand on it, in any region, reconstructed or not.
+   */
+  readonly declaredFloor?: DeclaredFloor;
   /** The write path's confirmation panel, hidden before this surface shows its own. */
   readonly hideWritePathConfirm: () => void;
   /** Injectable for tests. Production builds the real authority client. */
@@ -541,7 +550,12 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         candidate.placement.position.z - pose.position.z,
       );
       const reach = candidate.footprintRadiusLocal * candidate.placement.scale * 1.5;
-      if (distance < bestDistance && distance <= reach) {
+      // On a declared floor, standing in a region is standing on its floor, however far its
+      // photographs reach.
+      const standing = deps.declaredFloor === undefined
+        ? distance <= reach
+        : floorHolds(regionPointFromAtlas(candidate.placement, [pose.position.x, pose.position.y, pose.position.z]));
+      if (distance < bestDistance && standing) {
         bestDistance = distance;
         best = candidate;
       }
@@ -557,7 +571,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       if (!scenes.has(islandId)) scenes.set(islandId, `legacy:${islandId}`);
     }
     const reconstructed = deps.scene.islands.flatMap((island) => {
-      const sceneId = scenes.get(island.islandId);
+      const sceneId = scenes.get(island.islandId)
+        ?? (deps.declaredFloor === undefined ? undefined : DECLARED_FLOOR_SCENE);
       return sceneId === undefined ? [] : [{
         regionId: island.islandId,
         placement: island.placement,
@@ -627,6 +642,14 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
    * Both remain a browser constraint. `docs/saved-world-entry.md` says so: the general authored
    * object API validates region ownership and transforms and enforces neither bound.
    */
+  /** Whether a region-local point, in millimetres, is on its region's declared floor. */
+  function floorHolds(point: readonly [number, number, number] | readonly [number, number]): boolean {
+    const floor = deps.declaredFloor;
+    if (floor === undefined) return false;
+    const [xMm, zMm] = point.length === 3 ? [point[0], point[2]] : [point[0], point[1]];
+    return Math.abs(xMm) <= floor.halfExtentMm && Math.abs(zMm) <= floor.halfExtentMm;
+  }
+
   function authoredContains(xMm: number, zMm: number): boolean {
     const region = deps.authoredRegion;
     if (region === undefined) return false;
@@ -681,6 +704,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   ): number {
     if (sceneId === 'authored-starter') return 0;
     if (sceneId === 'authored-district') return -(currentDistrict()?.translationMm[1] ?? 0);
+    // Every region of a world made from photographs stands on its declared floor.
+    if (deps.declaredFloor !== undefined) return deps.declaredFloor.elevationMm;
     if (groundIsMeasured(sceneId)) return 0;
     return regionPointFromAtlas(
       region.placement,
@@ -787,11 +812,13 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     const region = placementRegion();
     if (region === null) {
       panel.report(
-        drawnRegions().length === 0
-          ? 'No authorized district or reconstructed ground is available to stand an '
-            + 'object on.'
-          : 'You are not standing in a region with reconstructed ground. Walk into one, then '
-            + 'place the object there.',
+        deps.declaredFloor !== undefined
+          ? 'You are not standing on a place’s floor. Walk onto one, then place the object there.'
+          : drawnRegions().length === 0
+            ? 'No authorized district or reconstructed ground is available to stand an '
+              + 'object on.'
+            : 'You are not standing in a region with reconstructed ground. Walk into one, then '
+              + 'place the object there.',
         'failure',
       );
       return;
@@ -803,6 +830,10 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
     if (region.sceneId === 'authored-starter' && !authoredContains(pose.xMm, pose.zMm)) {
       panel.report('That spot is outside this world’s authored ground. Face inward and try again.', 'failure');
+      return;
+    }
+    if (deps.declaredFloor !== undefined && !floorHolds([pose.xMm, pose.zMm])) {
+      panel.report('That spot is off this place’s floor. Face inward and try again.', 'failure');
       return;
     }
     const districtAtPlacement = region.sceneId === 'authored-district' ? currentDistrict() : null;
@@ -1028,6 +1059,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         xMm: standing.xMm,
         zMm: standing.zMm,
         yawMicroradians: standing.yawMicroradians,
+        // Named for a world of several regions, whose square stands on the floor of this one.
+        ...(deps.declaredFloor === undefined ? {} : { regionId: String(region.regionId) }),
       }),
     });
   }
@@ -1711,7 +1744,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     toggle() {
       setPanelVisible(!panel.visible());
     },
-    smallSquareOffered: () => client !== null && deps.authoredRegion !== undefined,
+    smallSquareOffered: () => client !== null && (deps.authoredRegion !== undefined || deps.declaredFloor !== undefined),
     arrangeSmallSquare(role) {
       // Open the panel first: it holds "Take back the last change", which the confirmation names.
       setPanelVisible(true);

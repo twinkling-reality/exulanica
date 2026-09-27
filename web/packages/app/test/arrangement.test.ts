@@ -201,7 +201,7 @@ const mounts: MountedObjects[] = [];
 afterEach(() => { for (const mounted of mounts.splice(0)) mounted.dispose(); });
 beforeEach(() => { document.body.replaceChildren(); });
 
-function harness(blockedReason: string | null = null, authored = true) {
+function harness(blockedReason: string | null = null, authored = true, declaredFloor = false) {
   const calls: { name: string; args: unknown[] }[] = [];
   const current = version();
   const client = {
@@ -269,6 +269,7 @@ function harness(blockedReason: string | null = null, authored = true) {
         regionId: 'region:starter', kind: 'flat', halfWidthMm: 12_000, halfDepthMm: 12_000, elevationMm: 0,
       },
     } as const : {}),
+    ...(declaredFloor ? { declaredFloor: { halfExtentMm: 12_000, elevationMm: 0 } } : {}),
     client,
     loadBytes: async () => new ArrayBuffer(784),
   });
@@ -345,8 +346,25 @@ describe('the Create panel offers the catalog’s kinds and a small square', () 
   });
 });
 
+describe('a world made from photographs takes the square on the floor of the place the person stands in', () => {
+  it('names that place, and nothing else changes in what is sent', async () => {
+    const h = harness(null, false, true);
+    await h.mounted.begin();
+    expect(h.mounted.smallSquareOffered()).toBe(true);
+    chooseRole(h, 'fictional');
+    button(h.mounted.panel.root, SQUARE_CONTROL).click();
+    await vi.waitFor(() => expect(button(h.mounted.confirm.root, 'Confirm').disabled).toBe(false));
+    expect(h.calls.find((call) => call.name === 'preview')!.args[1]).toEqual({
+      arrangement_key: 'small_square',
+      arrangement_version: 1,
+      viewer: { x_mm: 0, z_mm: 0, yaw_microradians: HALF_TURN_MICRORADIANS, region_id: String(REGION) },
+      origin_role: 'fictional',
+    });
+  });
+});
+
 describe('the welcome card asks for the Create panel’s own square', () => {
-  it('offers it only for a saved world with an authored ground', async () => {
+  it('offers it only for a saved world with a ground it states or a floor it declares', async () => {
     const h = harness();
     await h.mounted.begin();
     expect(h.mounted.smallSquareOffered()).toBe(true);

@@ -8,13 +8,18 @@ import type { SeatingLayout } from './seating.js';
 import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
 
 /**
- * The inhabitants of a saved world, drawn over its authored region.
+ * The inhabitants of a saved world, drawn over the region they live in.
  *
- * The same crowd the owned district draws, hung from the authored region's own root. That root is
- * the frame the society states every position in, east and south integer millimetres about the
- * region origin at the ground's elevation, and it is the frame the person's objects are placed in,
- * so an inhabitant resting at an object is drawn at that object. Nothing here decides where anybody
- * is: positions and paths come only from the persisted snapshot handed to `setSociety`.
+ * The same crowd the owned district draws, hung from the region's own root: the starter's authored
+ * region, or the island of a world made from photographs (`./region-society.ts`). That root is the
+ * frame the society states every position in, east and south integer millimetres about the region
+ * origin at its floor, and it is the frame the person's objects are placed in, so an inhabitant
+ * resting at an object is drawn at that object. A made world's island is turned and placed by the
+ * page's layout, and the render origin follows the visitor, so every point that comes in from the
+ * visitor's world (where they stand, the ray they pick along) is carried into the root's own frame
+ * through its world transform and the render origin the frame loop last handed over. Nothing here
+ * decides where anybody is: positions and paths come only from the persisted snapshot handed to
+ * `setSociety`.
  *
  * Nothing occludes a pick here. A saved world's ground has no buildings, and its placed objects are
  * not solid to this ray; the nearest drawn inhabitant along it is the one selected.
@@ -23,6 +28,24 @@ import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
  * saved world's flight handed to `setFlight`, in the same frame; the flock is made with the first
  * window, so a world with no flight draws nothing more than it did.
  */
+/**
+ * A point of the visitor's world (render space plus the render origin) in `root`'s own frame:
+ * moved into render space, then carried through the inverse of the root's world transform, which
+ * holds its region's placement and turn. `fromWorld` is left holding that inverse, so a direction
+ * can be carried by the same turn.
+ */
+export function visitorPointInRoot(
+  root: pc.GraphNode,
+  renderOrigin: { readonly x: number; readonly y: number; readonly z: number },
+  point: readonly [number, number, number],
+  fromWorld: pc.Mat4 = new pc.Mat4(),
+  out: pc.Vec3 = new pc.Vec3(),
+): pc.Vec3 {
+  fromWorld.copy(root.getWorldTransform()).invert();
+  out.set(point[0] - renderOrigin.x, point[1] - renderOrigin.y, point[2] - renderOrigin.z);
+  return fromWorld.transformPoint(out, out);
+}
+
 export class AuthoredRegionSociety {
   readonly root: pc.Entity;
   private readonly crowd: SocietyCrowd;
@@ -32,6 +55,11 @@ export class AuthoredRegionSociety {
   private flock: FlightFlock | null = null;
   private readonly flightAssets: { app: pc.AppBase; asset: pc.Asset }[] = [];
   private destroyed = false;
+  /** Where render space starts in the visitor's world, as the frame loop last stated it. */
+  private renderOrigin: { readonly x: number; readonly y: number; readonly z: number } = { x: 0, y: 0, z: 0 };
+  private readonly fromWorld = new pc.Mat4();
+  private readonly local = new pc.Vec3();
+  private nearbySignature = '';
 
   constructor(device: pc.GraphicsDevice, regionRoot: pc.Entity) {
     this.root = new pc.Entity('authored-region-society');
@@ -50,7 +78,44 @@ export class AuthoredRegionSociety {
     options?: CrowdTiming,
     layout: SeatingLayout | null = null,
   ): number {
-    return this.crowd.set(state, observer, options, layout).drawn;
+    return this.crowd.set(state, observer === undefined ? undefined : this.localGround(observer), options, layout).drawn;
+  }
+
+  /**
+   * One frame's steps, from the frame loop: who is near the visitor, the interpolation, and, once
+   * a second, the counts on the canvas and a `society-nearby-change` event when who is near
+   * changed. `observer` is where the visitor stands in their world; `renderOrigin` is where render
+   * space starts in it this frame.
+   */
+  step(
+    canvas: HTMLCanvasElement | null,
+    observer: readonly [number, number],
+    renderOrigin: { readonly x: number; readonly y: number; readonly z: number },
+    dt: number,
+    nowMs: number,
+    reducedMotion: boolean,
+  ): void {
+    this.renderOrigin = renderOrigin;
+    this.refreshNearby(observer);
+    this.tickSociety(reducedMotion ? Number.MAX_SAFE_INTEGER : nowMs);
+    if (canvas === null || Math.floor(nowMs / 1000) === Math.floor((nowMs - dt * 1000) / 1000)) return;
+    canvas.dataset.societyRendered = String(this.drawnInhabitantCount);
+    canvas.dataset.societyNearby = String(this.visibleInhabitantIds.length);
+    const signature = this.visibleInhabitantIds.join('|');
+    if (signature === this.nearbySignature) return;
+    this.nearbySignature = signature;
+    canvas.dispatchEvent(new Event('society-nearby-change'));
+  }
+
+  /** A point of the visitor's world in this root's frame. */
+  private localPoint(x: number, y: number, z: number): pc.Vec3 {
+    return visitorPointInRoot(this.root, this.renderOrigin, [x, y, z], this.fromWorld, this.local);
+  }
+
+  /** Where the visitor stands, on the ground of this root's frame. */
+  private localGround(observer: readonly [number, number]): [number, number] {
+    const at = this.localPoint(observer[0], this.root.getPosition().y + this.renderOrigin.y, observer[1]);
+    return [at.x, at.z];
   }
 
   /** Everyone drawn as everyone else is although their state says what they do, and why. */
@@ -154,10 +219,9 @@ export class AuthoredRegionSociety {
     }
   }
 
-  /** Re-choose who is near, from the observer's world position. */
+  /** Re-choose who is near, from the observer's position in their world. */
   refreshNearby(observer: readonly [number, number]): void {
-    const origin = this.root.getPosition();
-    this.crowd.refresh([observer[0] - origin.x, observer[1] - origin.z]);
+    this.crowd.refresh(this.localGround(observer));
   }
 
   get societyCounts(): CrowdCounts {
@@ -211,11 +275,10 @@ export class AuthoredRegionSociety {
     origin: readonly [number, number, number],
     direction: readonly [number, number, number],
   ): string | null {
-    // The crowd reports boxes in this root's frame. The root only ever translates, so the ray is
-    // carried into it by subtracting where the root is.
-    const at = this.root.getPosition();
-    this.ray.origin.set(origin[0] - at.x, origin[1] - at.y, origin[2] - at.z);
-    this.ray.direction.set(direction[0], direction[1], direction[2]);
+    // The crowd reports boxes in this root's frame, so the ray is carried into it: its origin as a
+    // point of the visitor's world, its direction by the root's inverse turn.
+    this.ray.origin.copy(this.localPoint(origin[0], origin[1], origin[2]));
+    this.fromWorld.transformVector(new pc.Vec3(direction[0], direction[1], direction[2]), this.ray.direction);
     const length = this.ray.direction.length();
     if (!(length > 0)) return null;
     this.ray.direction.mulScalar(1 / length);

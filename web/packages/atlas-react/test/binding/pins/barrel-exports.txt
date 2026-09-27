@@ -55,6 +55,7 @@ defaultSemanticsFor
 describeLook
 describeWorldKind
 designedLook
+drawDeclaredFloors
 drawLook
 endlessAuthoredNavigation
 featureAlongReticle
@@ -64,6 +65,7 @@ fetchVerifiedObjectAsset
 fixtureName
 footprintLineGeometry
 footprintRadiusOf
+hostRegionSociety
 inhabitantLook
 inhabitantRenderable
 isPresenceMarkerOnly

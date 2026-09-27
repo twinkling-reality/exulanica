@@ -736,6 +736,9 @@ async function mount(): Promise<void> {
             ...state.activeWorldEntry.authoredScene.region.ground,
           },
         }),
+    ...(state.activeWorldEntry?.declaredFloor == null
+      ? {}
+      : { declaredFloor: state.activeWorldEntry.declaredFloor }),
     showTravelStatus: (message, kind) => showTravelStatus(message, kind),
     isWorldPrimary: () => shellState.primary === 'world',
     onAuthoredEdit: (versionId) => environmentSelection.afterAuthoredEdit(versionId),

@@ -94,6 +94,16 @@ class AuthoredStarterSceneView(BaseModel):
     region: AuthoredRegionView
 
 
+class DeclaredFloorView(BaseModel):
+    """The floor every region of a world that states no ground has: a square of this half extent
+    about the region origin, at this height in the region's frame, in millimetres."""
+
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    half_extent_mm: int
+    elevation_mm: int
+
+
 class SavedWorldEntryView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -104,6 +114,8 @@ class SavedWorldEntryView(BaseModel):
     source_snapshot_id: uuid.UUID
     source_snapshot_sha256: str
     authored_scene: AuthoredStarterSceneView | None
+    #: Set for a world whose regions have the declared floor its people stand on; the app draws it.
+    declared_floor: DeclaredFloorView | None
     authored_version_id: uuid.UUID
     authored_state_sha256: str
     authored_edit_seq: int
@@ -215,12 +227,15 @@ class SavedWorldSourceAttachmentView(BaseModel):
     attached_by: uuid.UUID
     attached_at: dt.datetime
     availability: Literal["available", "unavailable"]
-    unavailable_reason: Literal[
-        "source_unavailable",
-        "authorization_expired",
-        "screening_expired",
-        "viewer_unavailable",
-    ] | None
+    unavailable_reason: (
+        Literal[
+            "source_unavailable",
+            "authorization_expired",
+            "screening_expired",
+            "viewer_unavailable",
+        ]
+        | None
+    )
     viewer_sha256: str | None
     evidence_path: str | None
 
@@ -266,6 +281,8 @@ def _view(entry: SavedWorldEntry) -> SavedWorldEntryView:
     values = {field: getattr(entry, field) for field in SavedWorldEntryView.model_fields}
     if isinstance(entry.authored_scene, AuthoredStarterScene):
         values["authored_scene"] = AuthoredStarterSceneView.model_validate(entry.authored_scene)
+    if entry.declared_floor is not None:
+        values["declared_floor"] = DeclaredFloorView.model_validate(entry.declared_floor)
     values["source_attachments"] = [
         SavedWorldSourceAttachmentView.model_validate(attachment)
         for attachment in entry.source_attachments

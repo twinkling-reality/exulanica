@@ -494,6 +494,8 @@ export class AtlasBinding {
   readonly table: AnchorTable;
   readonly emphasis: EmphasisBuffers;
   readonly islands: readonly IslandVisual[];
+  /** Every drawn region's root, point maps or none: what its objects, floor and people hang from. */
+  readonly regionRoots: ReadonlyMap<IslandId, pc.Entity>;
   readonly trainedScenes: readonly {
     readonly island: Island;
     readonly entity: pc.Entity;
@@ -732,6 +734,7 @@ export class AtlasBinding {
     this.recoveredCameras = recoveredCameras;
     this.navigationWorld = navigationWorld;
     this.field = field;
+    this.regionRoots = objectRoots;
     this.objects = new SceneObjectRuntime(app, objectRoots, {
       registerRepresentation: (object, entity) =>
         this.registerAuthoredObjectRepresentation(object, entity),
@@ -2264,22 +2267,11 @@ export class AtlasBinding {
     this.onNavigationArrive?.(transition.target);
   }
 
-  /** A saved world's inhabitants: the district's per-frame steps, for the authored region. */
+  /** A saved world's inhabitants: the district's per-frame steps, in the region they live in. */
   private updateAuthoredSociety(dt: number, nowMs: number): void {
-    const society = this.authoredSociety;
-    if (society === null) return;
-    society.refreshNearby([this.controls.state.x, this.controls.state.z]);
-    society.tickSociety(this.reducedMotion ? Number.MAX_SAFE_INTEGER : nowMs);
-    if (Math.floor(nowMs / 1000) === Math.floor((nowMs - dt * 1000) / 1000)) return;
     const canvas = this.device.canvas;
-    if (!(canvas instanceof HTMLCanvasElement)) return;
-    canvas.dataset.societyRendered = String(society.drawnInhabitantCount);
-    canvas.dataset.societyNearby = String(society.visibleInhabitantIds.length);
-    const signature = society.visibleInhabitantIds.join('|');
-    if (signature !== this.nearbySignature) {
-      this.nearbySignature = signature;
-      canvas.dispatchEvent(new Event('society-nearby-change'));
-    }
+    this.authoredSociety?.step(canvas instanceof HTMLCanvasElement ? canvas : null,
+      [this.controls.state.x, this.controls.state.z], this.renderOriginState.origin, dt, nowMs, this.reducedMotion);
   }
 
   private syncNativeCharacterFrames(dt:number,navigating=false):void{

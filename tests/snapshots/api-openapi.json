@@ -15482,6 +15482,26 @@
     ],
     "title": "DecisionBody"
    },
+   "DeclaredFloorView": {
+    "properties": {
+     "half_extent_mm": {
+      "type": "integer",
+      "title": "Half Extent Mm"
+     },
+     "elevation_mm": {
+      "type": "integer",
+      "title": "Elevation Mm"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "half_extent_mm",
+     "elevation_mm"
+    ],
+    "title": "DeclaredFloorView",
+    "description": "The floor every region of a world that states no ground has: a square of this half extent\nabout the region origin, at this height in the region's frame, in millimetres."
+   },
    "DeclaredParameterView": {
     "properties": {
      "name": {
@@ -21735,6 +21755,16 @@
        }
       ]
      },
+     "declared_floor": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeclaredFloorView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "authored_version_id": {
       "type": "string",
       "format": "uuid",
@@ -21824,6 +21854,7 @@
      "source_snapshot_id",
      "source_snapshot_sha256",
      "authored_scene",
+     "declared_floor",
      "authored_version_id",
      "authored_state_sha256",
      "authored_edit_seq",
@@ -25360,6 +25391,19 @@
       "maximum": 6283185.0,
       "minimum": 0.0,
       "title": "Yaw Microradians"
+     },
+     "region_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Region Id"
      }
     },
     "additionalProperties": false,

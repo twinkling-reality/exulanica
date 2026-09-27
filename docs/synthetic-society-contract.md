@@ -116,7 +116,9 @@ over the same ground. Two worlds start their people differently: their roles, ne
 and every later draw differ, while over the same ground the initializer's spread still starts them
 at the same nodes. A stored society keeps the seed it recorded, and replay reads that one. A response never carries a seed: a snapshot, its state and each
 event carry `seed_digest`, the SHA-256 of the seed's text, in its place, while `state_sha256` and
-`document_sha256` still name the stored bytes (`served_snapshot` and `served_events`).
+`document_sha256` still name the stored bytes (`served_snapshot` and `served_events`). A
+comparison commits each seed it runs by the same digest: one function, `seed_digest` in
+`exulanica/world/society.py`, names a seed wherever it is shown or committed.
 `tests/test_society_world_seed.py` holds two worlds starting differently, a second version starting
 the same people, an edit leaving every person as they were, and a society stored under a seed the
 page once sent keeping it and replaying.
@@ -377,6 +379,37 @@ is, because the ground module no longer always states an edge.
   of 12,000 mm half extent about the region origin, marked `source: "declared"`. The declaration
   lives only in the society's inputs. The stored world keeps its endless ground; nothing writes an
   edge into it.
+- A world made from a person's photographs (composer `atlas-world-composer`) states no ground, no
+  spawn and no position for its regions: each photograph is an element nobody collides with. Its
+  society stands in one of its regions, the one the creation names (`region_id`), on the plane at
+  height 0 in that region's frame (an object standing at another height offers no activity, as on
+  the starter), and declares the same square about the region's origin, marked
+  `source: "declared"`. A person arrives at the region origin: the rule its entry in the society
+  ground catalog states (`arrival: region_origin`), which needs nothing authored per world, where
+  the starter's entry reads the spawn its snapshot states (`arrival: spawn`). Objects in the world's
+  other regions are in another place, so they are left out of this society's input, while an object
+  naming a region the world does not state still makes the input unavailable; hiding or moving a
+  photograph changes nothing the society reads. A creation that names no region, or a region the
+  world does not state, and a world with an element somebody would collide with, are refused by
+  name (`424 unavailable_society_input`). The ground reader dispatches on the snapshot's composer
+  through the catalog, and a composer it states no ground for is refused the same way
+  (`tests/test_society_made_world.py`). The same catalog entry declares that square a floor
+  (`floor: declared`, where the starter's ground is `floor: stated`): the entry read serves it as
+  `declared_floor`, and the app draws it in every region as a surface of its own with a visible
+  edge, so a person sees what people and objects stand on and never a photograph posing as ground.
+  Objects and the small square are placed on it in the region the person stands in.
+- In the app, People nearby brings a made world's people into the region their society already
+  lives in, else the region the world opens in (`openingIsland`, the region holding most of the
+  person's placements, else the first), and hangs the crowd under that region's root, which every
+  drawn region has whether or not anything in it was reconstructed (`hostRegionSociety`), with who
+  decides for them offered as on the starter. Where this open does
+  not draw the society's region the panel says nobody can be shown, and the page never moves a
+  crowd to another region. A region's position in the world is not stored: the page lays the
+  regions out again on each open (`buildScene` with no stored placement, in
+  `web/packages/app/src/main.ts`), so a region can stand somewhere else after the world gains a
+  photograph, and its people move with it, because every position they have is in the region's
+  own frame. Flyers are read over the starter's ground only
+  (`web/packages/app/test/environment-selection-made-world.test.ts`).
 
 The declared figure keeps the lattice at 121 nodes, which holds one tick of 128 inhabitants near a
 tenth of a second, and it equals the only bounded starter ground the product has shipped, so an
@@ -392,9 +425,9 @@ about the person's world.
 - Read from the world: the region identity, the ground module version, kind and elevation, the
   bounded extent where the module states one, the element the ground belongs to, the structural
   snapshot digest, and every accepted authored object's asset, region, transform, origin and
-  removal. A snapshot that is not the built-in authored starter at a supported module version is
-  refused with the reason, and so is a ground kind the projection has no rule for, rather than
-  guessed at.
+  removal. A snapshot whose composer the society ground catalog states no ground for, a starter
+  that is not the built-in authored starter at a supported module version, and a ground kind the
+  projection has no rule for are refused with the reason rather than guessed at.
 - Declared by the ground's entry in the society ground catalog
   (`assets/catalogs/society-ground/society-ground.v1.json`, read by
   `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a

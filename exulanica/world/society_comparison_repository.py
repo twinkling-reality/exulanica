@@ -23,7 +23,6 @@ and a replay, and :meth:`SocietyComparisonRepository.runs` leaves it out.
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
@@ -36,6 +35,7 @@ from exulanica.world.society import (
     UnavailableSocietyInput,
     UnknownSociety,
     inputs_ahead,
+    seed_digest,
     society_state_sha256,
 )
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
@@ -85,11 +85,6 @@ class ComparisonConflict(ValueError):
 def run_id_for(comparison_id: uuid.UUID, arm: str, seed_digest: str) -> uuid.UUID:
     """One run per arm and seed of a comparison, so reserving it again finds the same run."""
     return uuid.uuid5(_RUN_NAMESPACE, f"{comparison_id}:{arm}:{seed_digest}")
-
-
-def seed_digest(seed: str) -> str:
-    """How a seed is committed: the SHA-256 of its text."""
-    return hashlib.sha256(seed.encode("utf-8")).hexdigest()
 
 
 def _sealed(document: dict[str, Any]) -> dict[str, Any]:

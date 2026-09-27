@@ -163,6 +163,8 @@ export {
 } from './atlas-binding.js';
 export { ownedDistrictCameraState, ownedDistrictOverviewCameraState } from './camera-views.js';
 export { openingIsland, type OpeningPlacements } from './opening-region.js';
+export { drawDeclaredFloors, type DeclaredFloorSpec, type DrawnDeclaredFloors } from './declared-floor.js';
+export { hostRegionSociety, type RegionSocietyHost } from './society/region-society.js';
 export type {
   OwnedAuthoredEnvironmentInstance,
   OwnedDistrictMetrics,

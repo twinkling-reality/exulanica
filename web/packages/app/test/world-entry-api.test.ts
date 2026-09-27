@@ -147,6 +147,22 @@ describe('saved world entry client', () => {
     });
   });
 
+  it('reads the floor a made world declares in every region, and none for a world stating its own', async () => {
+    const floor = { half_extent_mm: 12000, elevation_mm: 0 };
+    const fetch = vi.fn(async () => Response.json([
+      wire({ declared_floor: floor }),
+      wire({ entry_id: '12121212-1212-4121-8121-121212121212', declared_floor: null }),
+      wire({ entry_id: '13131313-1313-4131-8131-131313131313' }),
+    ]));
+    const entries = await new WorldEntryClient({ baseUrl: 'https://exulanica.test', token: 'private', fetch }).entries();
+    expect(entries.map((entry) => entry.declaredFloor)).toEqual([
+      { halfExtentMm: 12000, elevationMm: 0 }, null, null,
+    ]);
+    const empty = vi.fn(async () => Response.json([wire({ declared_floor: { half_extent_mm: 0, elevation_mm: 0 } })]));
+    await expect(new WorldEntryClient({ baseUrl: 'https://exulanica.test', token: 'private', fetch: empty }).entries())
+      .rejects.toThrow('declared floor with no extent');
+  });
+
   it('opens a personal-source world a caller names without reading the list', async () => {
     const paths: string[] = [];
     const fetch = vi.fn(async (input: string | URL | Request) => {

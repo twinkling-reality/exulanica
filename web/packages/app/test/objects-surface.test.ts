@@ -1043,6 +1043,46 @@ describe('an authored starter keeps additions on its declared ground', () => {
  * can still draw a position. Both remain browser constraints; the authored-object API validates
  * region ownership and transforms and enforces neither.
  */
+describe('a world made from photographs keeps additions on the floor it declares', () => {
+  const declaredFloor = { halfExtentMm: 12_000, elevationMm: 0 } as const;
+
+  it('stands an object on the floor of a place drawn only as photographs, at the floor\'s height', async () => {
+    // A floor above the region's datum, so the height is the floor's and not the visitor's feet.
+    const h = harness({ declaredFloor: { ...declaredFloor, elevationMm: 250 } });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    await place(h);
+    await verdictReady(h);
+    const previewed = h.authority.calls.find((call) => call.name === 'preview')!.args[1] as AppliedBody;
+    expect(previewed.placement.region_id).toBe(String(REGION));
+    expect(previewed.placement.transform).toMatchObject({ x_mm: 0, y_mm: 250, z_mm: -3500 });
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
+  });
+
+  it('refuses where the person stands off every floor, before asking the server anything', async () => {
+    const h = harness({ declaredFloor, standAt: [0, 1.6, -30] });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    await place(h);
+    expect(h.mounted.panel.root.textContent).toContain('You are not standing on a place’s floor.');
+    expect(h.authority.calls.filter((call) => call.name === 'preview')).toEqual([]);
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+
+  it('refuses a spot past the edge of the floor the person stands on', async () => {
+    const h = harness({ declaredFloor, standAt: [0, 1.6, -10] });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    await place(h);
+    expect(h.mounted.panel.root.textContent).toContain('That spot is off this place’s floor.');
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+});
+
 describe('an authored starter with no edge keeps additions where it can still draw them', () => {
   const endless = { regionId: 'region:starter', kind: 'endless', elevationMm: 0 } as const;
   const supportedMm = AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M * 1000;

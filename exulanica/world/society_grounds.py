@@ -2,9 +2,12 @@
 
 ``assets/catalogs/society-ground/society-ground.v<N>.json`` states, once for each kind of ground a
 saved world's society is composed over, the facts about that ground which no world states: the
-structural composer whose ground it reads, the navigation profile its route lattice is recorded
-under, the lattice spacing, the area a society declares where the ground states no edge, and how
-many people a society over it starts with, each with the reason for its figure. The society's
+structural composer whose ground it reads, where a person arrives on it (the spawn the world states,
+or by rule the origin of the region the society lives in), the navigation profile its route lattice
+is recorded under, the lattice spacing, the area a society declares where the ground states no
+edge, and how many people a society over it starts with, each with the reason for its figure. A
+navigation profile names one discretisation and one population, so two grounds that share one
+state the same figures, and the catalog refuses two that do not. The society's
 ground builder (:mod:`exulanica.world.society_authored_ground`) reads the spacing and the declared
 area, and the repository reads the population when it creates a society; nothing else states them.
 
@@ -20,7 +23,7 @@ from __future__ import annotations
 
 import functools
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -36,6 +39,8 @@ __all__ = [
     "CATALOG_DIRECTORY",
     "CATALOG_ID",
     "CATALOG_VERSION",
+    "GROUND_ARRIVALS",
+    "GROUND_FLOORS",
     "SocietyGroundKind",
     "UnknownSocietyGround",
     "load_society_grounds",
@@ -49,6 +54,12 @@ CATALOG_VERSION: Final = 1
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", CATALOG_ID)
 )
+#: Where a person arrives on a ground: the spawn its snapshot states, read from the world, or the
+#: origin of the region the society lives in, a rule for a world that states none.
+GROUND_ARRIVALS: Final = ("spawn", "region_origin")
+#: What people stand on: a ground the world's own module states, or a floor the society declares
+#: in every region of a world that states none.
+GROUND_FLOORS: Final = ("stated", "declared")
 #: A positive figure with no upper bound of its own: ``_entry_check`` bounds each figure against
 #: the others, the navigation clearance and the reviewed reach.
 _POSITIVE = integer_field(1, sys.maxsize)
@@ -67,6 +78,10 @@ class SocietyGroundKind:
     composer_key: str
     #: The navigation profile an input composed over this ground records.
     navigation_profile: str
+    #: Where a person arrives: one of :data:`GROUND_ARRIVALS`.
+    arrival: str
+    #: What people stand on: one of :data:`GROUND_FLOORS`.
+    floor: str
     #: How many people a new society over this ground starts with.
     population: int
     lattice_mm: int
@@ -74,15 +89,34 @@ class SocietyGroundKind:
     declared_half_extent_mm: int
 
 
+def _figure(values: Mapping[str, object], name: str) -> int:
+    """A figure the schema checked is a positive integer, read as one."""
+    value = values[name]
+    if type(value) is not int:
+        raise CatalogError(f"{CATALOG_ID}: {name} is an integer, got {value!r}")
+    return value
+
+
+def _choice(options: tuple[str, ...]) -> Callable[[str, object], str]:
+    """A field holding one of ``options``."""
+
+    def check(where: str, value: object) -> str:
+        if value not in options:
+            raise CatalogError(f"{where} is one of {options}, got {value!r}")
+        return str(value)
+
+    return check
+
+
 def _entry_check(where: str, values: Mapping[str, Any]) -> None:
     saved_world = society_engine(CREATES["saved_world"])
-    if not saved_world.holds(int(values["population"])):
+    if not saved_world.holds(_figure(values, "population")):
         raise CatalogError(
             f"{where}: population {values['population']} is outside what the engine a saved "
             f"world is created with holds ({saved_world.population_minimum} to "
             f"{saved_world.population_maximum})"
         )
-    lattice = int(values["lattice_mm"])
+    lattice = _figure(values, "lattice_mm")
     # Every point of a lattice cell is within half its diagonal of a node, and a person reaches an
     # object from a node only within the reviewed reach.
     if lattice**2 > 2 * REVIEWED_REACH_MM**2:
@@ -90,7 +124,7 @@ def _entry_check(where: str, values: Mapping[str, Any]) -> None:
             f"{where}: a {lattice} mm lattice leaves points farther than the reviewed reach "
             f"({REVIEWED_REACH_MM} mm) from every node"
         )
-    if int(values["declared_half_extent_mm"]) < CLEARANCE_MM + lattice:
+    if _figure(values, "declared_half_extent_mm") < CLEARANCE_MM + lattice:
         raise CatalogError(
             f"{where}: a declared area holds a lattice step inside the navigation clearance"
         )
@@ -104,6 +138,10 @@ _SCHEMAS: Final = MappingProxyType(
             (
                 ("composer_key", text_field),
                 ("navigation_profile", text_field),
+                ("arrival", _choice(GROUND_ARRIVALS)),
+                ("arrival_reason", text_field),
+                ("floor", _choice(GROUND_FLOORS)),
+                ("floor_reason", text_field),
                 ("population", _POSITIVE),
                 ("population_reason", text_field),
                 ("lattice_mm", _POSITIVE),
@@ -138,17 +176,26 @@ def load_society_grounds(
             key=entry.key,
             composer_key=str(values["composer_key"]),
             navigation_profile=str(values["navigation_profile"]),
-            population=int(values["population"]),
-            lattice_mm=int(values["lattice_mm"]),
-            declared_half_extent_mm=int(values["declared_half_extent_mm"]),
+            arrival=str(values["arrival"]),
+            floor=str(values["floor"]),
+            population=_figure(values, "population"),
+            lattice_mm=_figure(values, "lattice_mm"),
+            declared_half_extent_mm=_figure(values, "declared_half_extent_mm"),
         )
         for entry in catalog.entries
         for values in (dict(entry.values),)
     )
-    for field in ("composer_key", "navigation_profile"):
-        named = [getattr(ground, field) for ground in grounds]
-        if len(set(named)) != len(named):
-            raise CatalogError(f"{CATALOG_ID}: two grounds name the same {field}")
+    composers = [ground.composer_key for ground in grounds]
+    if len(set(composers)) != len(composers):
+        raise CatalogError(f"{CATALOG_ID}: two grounds name the same composer_key")
+    figures: dict[str, tuple[int, int, int]] = {}
+    for ground in grounds:
+        stated = (ground.population, ground.lattice_mm, ground.declared_half_extent_mm)
+        if figures.setdefault(ground.navigation_profile, stated) != stated:
+            raise CatalogError(
+                f"{CATALOG_ID}: grounds sharing navigation_profile {ground.navigation_profile} "
+                "state different figures for it"
+            )
     return grounds
 
 
@@ -167,7 +214,9 @@ def society_ground_for_composer(composer_key: str) -> SocietyGroundKind:
 
 
 def society_ground_for_navigation(navigation_profile: str) -> SocietyGroundKind:
-    """The ground an input with this navigation profile was composed over, or a refusal."""
+    """A ground an input with this navigation profile was composed over, or a refusal. Grounds
+    that share a navigation profile state the same figures for it (the loader holds them to it),
+    so any of them answers what the profile means: its population, lattice and declared area."""
     for ground in society_grounds():
         if ground.navigation_profile == navigation_profile:
             return ground

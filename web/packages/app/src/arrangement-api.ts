@@ -47,12 +47,14 @@ export function isArrangementRefusal(value: unknown): value is ArrangementRefusa
   return typeof value === 'string' && (ARRANGEMENT_REFUSALS as readonly string[]).includes(value);
 }
 
-/** Where the person stands in the world's authored region, and the yaw of their facing. */
+/** Where the person stands in a region of the world, and the yaw of their facing. */
 export interface ArrangementViewer {
   readonly xMm: number;
   readonly zMm: number;
   /** The yaw an object placed facing the person would take. */
   readonly yawMicroradians: number;
+  /** The region the position is in, which a world of several regions needs named. */
+  readonly regionId?: string;
 }
 
 export interface ArrangementRequest {
@@ -148,6 +150,7 @@ export function arrangementRequestBody(request: ArrangementRequest): Record<stri
       x_mm: Math.round(request.viewer.xMm),
       z_mm: Math.round(request.viewer.zMm),
       yaw_microradians: Math.round(request.viewer.yawMicroradians),
+      ...(request.viewer.regionId === undefined ? {} : { region_id: request.viewer.regionId }),
     },
     origin_role: request.originRole,
   };

@@ -134,6 +134,18 @@ export interface SavedWorldEntry {
   readonly previousSourceAttachments?: readonly SavedWorldPreviousSourceAttachment[];
   readonly createdAt: string;
   readonly updatedAt: string;
+  /**
+   * The floor every region of a world that states no ground has, as the server declares it: a
+   * square of this half extent about each region's origin, at this height in its frame. Null for
+   * a world that states its own ground; optional so entries built elsewhere need not name it.
+   */
+  readonly declaredFloor?: DeclaredFloor | null;
+}
+
+/** A declared floor, in millimetres, as the server serves it on a saved world's entry. */
+export interface DeclaredFloor {
+  readonly halfExtentMm: number;
+  readonly elevationMm: number;
 }
 
 /** An entry-scoped reference photograph. It is lineage, not scene topology or reconstruction. */
@@ -725,7 +737,17 @@ function parseEntry(value: unknown): SavedWorldEntry {
     previousSourceAttachments: Object.freeze(previousAttachments.map(parsePreviousAttachment)),
     createdAt: text(row['created_at'], 'created time'),
     updatedAt: text(row['updated_at'], 'updated time'),
+    declaredFloor: parseDeclaredFloor(row['declared_floor']),
   });
+}
+
+/** A world's declared floor, or null when the entry names none (a server that serves none too). */
+function parseDeclaredFloor(value: unknown): DeclaredFloor | null {
+  if (value === undefined || value === null) return null;
+  const row = record(value, 'declared floor');
+  const halfExtentMm = integer(row['half_extent_mm'], 'declared floor half extent');
+  if (halfExtentMm <= 0) throw new TypeError('The server returned a declared floor with no extent.');
+  return Object.freeze({ halfExtentMm, elevationMm: integer(row['elevation_mm'], 'declared floor height') });
 }
 
 function parseSourceAttachment(value: unknown): SavedWorldSourceAttachment {

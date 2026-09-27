@@ -155,6 +155,9 @@ class SavedWorldEntry:
     created_by: uuid.UUID
     created_at: dt.datetime
     updated_at: dt.datetime
+    #: The floor every region of a world that states no ground has, as the society ground
+    #: catalog declares it (``DeclaredFloor``); None for a world that states its own ground.
+    declared_floor: object | None = None
 
 
 class SavedWorldEntryRepository:
@@ -1320,6 +1323,7 @@ class SavedWorldEntryRepository:
         )
 
     def _entry(self, row: dict[str, object]) -> SavedWorldEntry:
+        from exulanica.world.society_authored_ground import declared_floor
         from exulanica.world.starter import authored_starter_scene
 
         source_invalidated = bool(row["source_invalidated"])
@@ -1349,6 +1353,7 @@ class SavedWorldEntryRepository:
             source_snapshot_id=row["source_snapshot_id"],
             source_snapshot_sha256=row["snapshot_sha256"],
             authored_scene=scene,
+            declared_floor=declared_floor(str(row["composer_key"])),
             authored_version_id=row["authored_version_id"],
             authored_state_sha256=row["authored_state_sha256"],
             authored_edit_seq=row["authored_edit_seq"],

@@ -1,9 +1,13 @@
 import {
   type AtlasScene,
   type DistrictSubject,
+  type IslandId,
 } from '@exulanica/atlas-core';
+import { ApiError } from '@exulanica/graph-client';
 import {
+  hostRegionSociety,
   localizeNYCFeatures,
+  openingIsland,
   NEAR_CHARACTER_BUDGET,
   NYCSemanticOverlay,
   NYC_REFERENCE_FRAME,
@@ -1703,14 +1707,40 @@ export function mountEnvironmentSelection(
     await refreshPlayback();
   }
 
-  async function attachSavedWorld(entry: NonNullable<SessionState['activeWorldEntry']>): Promise<void> {
-    const scene = entry.authoredScene!;
-    savedWorld = { worldId: entry.worldId, versionId: entry.authoredVersionId, regionId: scene.region.regionId };
+  /**
+   * The region a saved world's people live in: the starter's one authored region, or, in a world
+   * made from photographs, the region its society already lives in, else the one the world opens
+   * in (`openingIsland`, the page's own pick). A made world's crowd is hung from that region's
+   * island here (`hostRegionSociety`), as the starter's is built with its authored region. Null
+   * where the world has neither, or its region is not drawn.
+   */
+  async function societyRegion(entry: NonNullable<SessionState['activeWorldEntry']>): Promise<string | null> {
+    if (entry.authoredScene != null) return entry.authoredScene.region.regionId;
+    const binding = deps.state.atlas?.binding;
+    if (entry.declaredFloor == null || binding === undefined) return null;
+    const client = deps.societyClient ?? new SocietyClient({ ...deps.credentials, worldId: entry.worldId });
+    const stored = await client.read(entry.authoredVersionId).catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    });
+    const regionId = stored?.regionId
+      ?? openingIsland(deps.scene, deps.state.placementRegionIds ?? [])?.islandId ?? null;
+    if (regionId === null) return null;
+    return hostRegionSociety(binding, regionId as IslandId) === null ? null : regionId;
+  }
+
+  /** People nearby offered with the saved world's inhabitants panel, whether or not they can be shown. */
+  function offerInhabitantsPanel(): void {
     pointToPeopleNearby();
     root.dataset['state'] = 'ready';
     workspace.setAvailability(true);
     const heading = workspace.nearby.firstElementChild;
     if (heading) heading.after(inhabitantsPanel.root); else workspace.nearby.prepend(inhabitantsPanel.root);
+  }
+
+  async function attachSavedWorld(entry: NonNullable<SessionState['activeWorldEntry']>, regionId: string): Promise<void> {
+    savedWorld = { worldId: entry.worldId, versionId: entry.authoredVersionId, regionId };
+    offerInhabitantsPanel();
     societyModels = mountModels(savedWorld);
     inhabitantsPanel.root.after(societyModels.root);
     const atlas = deps.state.atlas?.binding;
@@ -1735,7 +1765,7 @@ export function mountEnvironmentSelection(
     phase = 'attached';
     liveSociety = createLiveSociety({
       preview: false, credentials: deps.credentials, worldId: entry.worldId,
-      versionId: entry.authoredVersionId, placeId: null, regionId: scene.region.regionId,
+      versionId: entry.authoredVersionId, placeId: null, regionId,
       // The engine a saved world's society is created with is the engine table's, which the
       // server holds it to. Opening the world never creates anything; the person asks.
       createOnConnect: false, places: true,
@@ -1744,8 +1774,9 @@ export function mountEnvironmentSelection(
     });
     await liveSociety.connect();
     if ((phase as string) === 'disposed') return;
-    savedFlight = deps.flight?.({
-      worldId: entry.worldId, versionId: entry.authoredVersionId, regionId: scene.region.regionId,
+    // Flyers are read over the starter's ground; a made world's regions host none here.
+    savedFlight = entry.authoredScene == null ? null : deps.flight?.({
+      worldId: entry.worldId, versionId: entry.authoredVersionId, regionId,
       onStatus: reflectFlight,
     }) ?? null;
     void savedFlight?.start();
@@ -1766,9 +1797,16 @@ export function mountEnvironmentSelection(
       offerLayers(kind);
     }
     const entry = deps.state.activeWorldEntry;
-    if (!deps.env.preview && entry?.authoredScene != null) {
+    if (!deps.env.preview && entry != null && (entry.authoredScene != null || entry.declaredFloor != null)) {
       try {
-        await attachSavedWorld(entry);
+        const regionId = await societyRegion(entry);
+        if ((phase as string) === 'disposed') return;
+        if (regionId === null) {
+          offerInhabitantsPanel();
+          inhabitantsPanel.unavailable('This world is not drawn here, so nobody can be shown in it.');
+          return;
+        }
+        await attachSavedWorld(entry, regionId);
       } catch (error) {
         if (phase !== 'disposed') phase = 'idle';
         inhabitantsPanel.unavailable(`Inhabitants are unavailable. ${error instanceof Error ? error.message : String(error)}`);
