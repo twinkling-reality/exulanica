@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import uuid
+from collections.abc import Container
 from copy import deepcopy
 from itertools import pairwise
 from typing import Any, Final
@@ -1014,6 +1015,218 @@ def _open_nodes(nodes: dict, adjacent: dict, crowded: frozenset[str], held: set[
     return sorted(node for node in nodes if adjacent[node] and node not in closed)
 
 
+#: How each person's need grows in a minute before anybody chooses: by one, up to the top of its
+#: scale, the figures the purposeful society was released with. The routine judges who is tired by
+#: the need after it grows, and so does a check, before the minute, of a choice made for it.
+NEED_GROWTH_PER_TICK_MILLI: Final = 1
+NEED_MAXIMUM_MILLI: Final = 1000
+
+
+def need_this_minute(person: dict) -> int:
+    """A person's need as the coming minute has it before anybody chooses."""
+    return min(NEED_MAXIMUM_MILLI, person["need_milli"] + NEED_GROWTH_PER_TICK_MILLI)
+
+
+def stand_spots(
+    graph: tuple[dict, dict, dict],
+    crowded: frozenset[str],
+    held: set[str],
+    paths: dict,
+    person: dict,
+    stand: PurposefulActivity,
+) -> list[str]:
+    """Where a person may stop to stand a while, by the routine's rule, in node order.
+
+    Open nodes (joined to the graph, clear of every place, held by nobody) that the person can
+    walk to and that lie within the stand activity's reach of where they are.
+    """
+    nodes, adjacent, _edges = graph
+    return [
+        node
+        for node in _open_nodes(nodes, adjacent, crowded, held)
+        if node in paths
+        and _squared_mm(nodes[node]["position_mm"], person["position_mm"]) <= stand.reach_mm**2
+    ]
+
+
+def drawn_stand_spot(seed: str, tick: int, person: dict, spots: list[str]) -> str:
+    """The one of ``spots`` the routine draws for this person to stand at in this minute."""
+    return spots[_draw(seed, "stand", tick, person["ordinal"], len(spots))]
+
+
+def free_to_talk(
+    person: dict,
+    routine: PurposefulRoutine,
+    graph: tuple[dict, dict, dict],
+    policies: Container[str],
+    *,
+    need: int | None = None,
+) -> bool:
+    """Whether the routine lets a person look for somebody to talk to now, or be found by them.
+
+    Nobody's policy governs them this minute, they stand on a node the graph still has, they are
+    free to choose, and they are not tired enough to want a rest first: by their need as it stands,
+    which within the minute has already grown, or by ``need``, the need a check made before the
+    minute judges them by (:func:`need_this_minute`).
+    """
+    nodes, _adjacent, edges = graph
+    return (
+        person["id"] not in policies
+        and person["location"]["edge"] is None
+        and _location_valid(person, nodes, edges)
+        and (person["goal"] is None or person["action"]["status"] == "completed")
+        and _preferred(routine, person["need_milli"] if need is None else need) is None
+    )
+
+
+def standing_to_talk(
+    person: dict,
+    routine: PurposefulRoutine,
+    graph: tuple[dict, dict, dict],
+    policies: Container[str],
+) -> bool:
+    """Whether somebody standing a while may be joined there to talk: nobody's policy governs
+    them this minute, and they stand on a node the graph still has."""
+    nodes, _adjacent, edges = graph
+    stand = routine.in_setting("open")
+    return (
+        stand is not None
+        and person["id"] not in policies
+        and person["action"]["kind"] == stand.key
+        and person["action"]["status"] == "active"
+        and person["location"]["edge"] is None
+        and _location_valid(person, nodes, edges)
+    )
+
+
+def within_talk_reach(person: dict, other: dict, talk: PurposefulActivity) -> bool:
+    """Whether two people are near enough to talk: within the talk activity's reach."""
+    return _squared_mm(person["position_mm"], other["position_mm"]) <= talk.reach_mm**2
+
+
+def _held_apart(people: list[dict], person: dict, partner: dict, taken: set[str]) -> set[str]:
+    """The nodes two people meeting to talk keep clear of: ``taken``, and wherever anybody else
+    stands or is headed to."""
+    held = set(taken)
+    for other in people:
+        if other is person or other is partner:
+            continue
+        if other["goal"] is not None and other["route"] is not None:
+            held.add(other["route"]["destination_node_id"])
+        if other["location"]["edge"] is None:
+            held.add(other["location"]["node_id"])
+    return held
+
+
+def talk_spots(
+    person: dict,
+    partner: dict,
+    people: list[dict],
+    graph: tuple[dict, dict, dict],
+    crowded: frozenset[str],
+    taken: set[str],
+    paths_of: Any,
+    talk: PurposefulActivity,
+    *,
+    standing: bool,
+) -> tuple[str, str] | None:
+    """Where ``person`` and ``partner`` stand to talk, by the routine's rule, or None.
+
+    Two open nodes that nobody else stands at or is headed to and that are not ``taken``, joined
+    by an edge of the graph, so nothing stands between them, and at most the activity's spacing
+    apart, reached by the shortest walks: a partner who is ``standing`` keeps the node they stand
+    at. ``person`` stands on a node.
+    """
+    nodes, adjacent, _edges = graph
+    spots = set(_open_nodes(nodes, adjacent, crowded, _held_apart(people, person, partner, taken)))
+    mine = paths_of(person["location"]["node_id"])
+
+    def within_spacing(a: str, b: str) -> bool:
+        return _squared_mm(nodes[a]["position_mm"], nodes[b]["position_mm"]) <= (talk.spacing_mm**2)
+
+    if standing:
+        there = partner["location"]["node_id"]
+        beside = [
+            (mine[node][0], node)
+            for node, _ in adjacent[there]
+            if node in spots and node in mine and within_spacing(node, there)
+        ]
+        return (min(beside)[1], there) if beside else None
+    theirs = paths_of(partner["location"]["node_id"])
+    pairs_of_nodes = [
+        (mine[a][0] + theirs[b][0], a, b)
+        for a in spots
+        if a in mine
+        for b, _ in adjacent[a]
+        if b in spots and b in theirs and within_spacing(a, b)
+    ]
+    if not pairs_of_nodes:
+        return None
+    _walks, here, there = min(pairs_of_nodes)
+    return here, there
+
+
+def talk_span(seed: str, tick: int, person: dict, talk: PurposefulActivity) -> int:
+    """How many minutes a talk ``person`` starts in this minute lasts, drawn by the routine."""
+    return _span(seed, "talk", tick, person["ordinal"], talk)
+
+
+def _chosen_talks(
+    people: list[dict],
+    policies: dict[str, dict[str, Any]],
+    routine: PurposefulRoutine,
+    graph: tuple[dict, dict, dict],
+    paths_of: Any,
+) -> dict[str, dict[str, Any]]:
+    """The conversations models chose for somebody before this minute, as a pairing holds them.
+
+    A model's choice to talk was checked, and its two spots promised, against the society as the
+    minute would have it (``exulanica.world.society_model_decisions``). One is kept while, in the
+    minute as it stands, the other person is still free to talk or standing by the routine's rule
+    (the two people's own policies aside), both still stand on a node from which each can walk to
+    their spot, and nobody else stands at or is headed to either: an edit and its undo within one
+    minute can move or stop somebody before anybody chooses, and a conversation that no longer
+    fits is left out, the one whose model chose it stopped by name in the minute's own choice.
+    """
+    nodes, _adjacent, edges = graph
+    people_by_id = {person["id"]: person for person in people}
+    pairs: dict[str, dict[str, Any]] = {}
+    for subject in sorted(policies):
+        policy = policies[subject]
+        if policy.get("chosen_by") != "model" or "partner_id" not in policy or subject in pairs:
+            continue
+        person = people_by_id.get(subject)
+        partner = people_by_id.get(policy["partner_id"])
+        if person is None or partner is None:
+            continue
+        spots = (policy["place_node_id"], policy["partner_node_id"])
+        held = _held_apart(people, person, partner, set())
+        others = {governed for governed in policies if governed not in (subject, partner["id"])}
+        if not (
+            free_to_talk(partner, routine, graph, others)
+            or standing_to_talk(partner, routine, graph, others)
+        ):
+            continue
+        if any(spot in held for spot in spots) or not all(
+            who["location"]["edge"] is None
+            and _location_valid(who, nodes, edges)
+            and spot in paths_of(who["location"]["node_id"])
+            for who, spot in ((person, spots[0]), (partner, spots[1]))
+        ):
+            continue
+        pairs[subject] = {
+            "partner_id": partner["id"],
+            "node_id": spots[0],
+            "duration_ticks": policy["duration_ticks"],
+        }
+        pairs[partner["id"]] = {
+            "partner_id": subject,
+            "node_id": spots[1],
+            "duration_ticks": policy["duration_ticks"],
+        }
+    return pairs
+
+
 def _talk_pairs(
     people: list[dict],
     routine: PurposefulRoutine,
@@ -1024,45 +1237,30 @@ def _talk_pairs(
     paths_of: Any,
     seed: str,
     tick: int,
+    *,
+    chosen: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Who stops to talk with whom this minute, and where each stands, before anybody chooses.
 
-    Everybody free to choose, in ordinal order, draws whether they look for somebody to talk to at
-    the talk activity's share of the routine's weight. One who does is paired with the nearest
-    person within the activity's reach who is free to choose, not tired, or standing, and not
-    paired already; the lower ordinal wins a tie, so people choosing in the same minute resolve the
-    same way on every replay. Nobody is paired twice or with themselves. Each of the two gets an
-    open node, the two joined by an edge of the graph, so nothing stands between them, and at most
-    the activity's spacing apart, reached by the shortest walks: a partner who is standing keeps
-    the node they stand at. Nobody else holds either node this minute.
+    Everybody free to choose (:func:`free_to_talk`), in ordinal order, draws whether they look
+    for somebody to talk to at the talk activity's share of the routine's weight. One who does is
+    paired with the nearest person within the activity's reach who is free to choose, or standing
+    (:func:`standing_to_talk`), and not paired already; the lower ordinal wins a tie, so people
+    choosing in the same minute resolve the same way on every replay. Nobody is paired twice or
+    with themselves. Each of the two gets an open node (:func:`talk_spots`), and nobody else holds
+    either node this minute.
+
+    ``chosen`` holds the conversations models chose before the minute (:func:`_chosen_talks`),
+    promised as a place is: they come first, nobody in one is paired again, and neither of their
+    spots, nor any other spot a policy promised, is taken by the routine's own pairs.
     """
-    nodes, adjacent, edges = graph
     weights = [(a.key, a.weight) for a in routine.activities.values() if a.weight]
-
-    def free(person: dict) -> bool:
-        return (
-            person["id"] not in policies
-            and person["location"]["edge"] is None
-            and _location_valid(person, nodes, edges)
-            and (person["goal"] is None or person["action"]["status"] == "completed")
-            and _preferred(routine, person["need_milli"]) is None
-        )
-
-    def standing(person: dict) -> bool:
-        stand = routine.in_setting("open")
-        return (
-            stand is not None
-            and person["id"] not in policies
-            and person["action"]["kind"] == stand.key
-            and person["action"]["status"] == "active"
-            and person["location"]["edge"] is None
-            and _location_valid(person, nodes, edges)
-        )
-
-    pairs: dict[str, dict[str, Any]] = {}
-    taken: set[str] = set()
+    pairs: dict[str, dict[str, Any]] = dict(chosen or {})
+    taken: set[str] = {pair["node_id"] for pair in pairs.values()} | {
+        policy["place_node_id"] for policy in policies.values() if "place_node_id" in policy
+    }
     for person in sorted(people, key=lambda held: held["ordinal"]):
-        if person["id"] in pairs or not free(person):
+        if person["id"] in pairs or not free_to_talk(person, routine, graph, policies):
             continue
         if _weighted(seed, "seek", tick, person["ordinal"], weights) != talk.key:
             continue
@@ -1071,49 +1269,29 @@ def _talk_pairs(
             for other in people
             if other is not person
             and other["id"] not in pairs
-            and (free(other) or standing(other))
-            and _squared_mm(person["position_mm"], other["position_mm"]) <= talk.reach_mm**2
+            and (
+                free_to_talk(other, routine, graph, policies)
+                or standing_to_talk(other, routine, graph, policies)
+            )
+            and within_talk_reach(person, other, talk)
         )
         if not near:
             continue
         partner = near[0][2]
-        held = set(taken)
-        for other in people:
-            if other is person or other is partner:
-                continue
-            if other["goal"] is not None and other["route"] is not None:
-                held.add(other["route"]["destination_node_id"])
-            if other["location"]["edge"] is None:
-                held.add(other["location"]["node_id"])
-        spots = set(_open_nodes(nodes, adjacent, crowded, held))
-        mine, theirs = paths_of(person["location"]["node_id"]), None
-
-        def within_spacing(a: str, b: str) -> bool:
-            return _squared_mm(nodes[a]["position_mm"], nodes[b]["position_mm"]) <= (
-                talk.spacing_mm**2
-            )
-
-        if standing(partner):
-            there = partner["location"]["node_id"]
-            beside = [
-                (mine[node][0], node)
-                for node, _ in adjacent[there]
-                if node in spots and node in mine and within_spacing(node, there)
-            ]
-            chosen = (min(beside)[1], there) if beside else None
-        else:
-            theirs = paths_of(partner["location"]["node_id"])
-            pairs_of_nodes = [
-                (mine[a][0] + theirs[b][0], a, b)
-                for a in spots
-                if a in mine
-                for b, _ in adjacent[a]
-                if b in spots and b in theirs and within_spacing(a, b)
-            ]
-            chosen = min(pairs_of_nodes)[1:] if pairs_of_nodes else None
+        chosen = talk_spots(
+            person,
+            partner,
+            people,
+            graph,
+            crowded,
+            taken,
+            paths_of,
+            talk,
+            standing=standing_to_talk(partner, routine, graph, policies),
+        )
         if chosen is None:
             continue
-        duration = _span(seed, "talk", tick, person["ordinal"], talk)
+        duration = talk_span(seed, tick, person, talk)
         pairs[person["id"]] = {
             "partner_id": partner["id"],
             "node_id": chosen[0],
@@ -1341,7 +1519,7 @@ def advance_purposeful_society(
         crowded = standing_exclusions(doc)
     # Everybody's need grows before anybody chooses; each person chooses by their own need alone.
     for person in result["inhabitants"]:
-        person["need_milli"] = min(1000, person["need_milli"] + 1)
+        person["need_milli"] = need_this_minute(person)
     unavailable = doc["unavailable_reason"] or doc["navigation"]["unavailable_reason"]
     available = doc["availability"] == "available" and not unavailable
     stand = routine.in_setting("open") if drawn else None
@@ -1380,6 +1558,13 @@ def advance_purposeful_society(
             paths_from,
             seed,
             tick,
+            chosen=_chosen_talks(
+                result["inhabitants"],
+                goal_policy or {},
+                routine,
+                (nodes, adjacent, edges),
+                paths_from,
+            ),
         )
     # Talking goes on while both people were at it when the minute began, and both still mean to.
     before = {person["id"]: person for person in state["inhabitants"]}
@@ -1463,15 +1648,31 @@ def advance_purposeful_society(
             target = None
             goal: dict[str, Any] | None = None
             destination = None
+            # The policy of a choice a model made for this person, if one did.
+            chosen = policy if policy is not None and policy.get("chosen_by") == "model" else None
             if pairing is not None and talk is not None:
                 goal = {
                     "kind": talk.key,
                     "target_id": None,
-                    "reason": "stopped_to_talk",
+                    # A model's choice for a person records its own code, never the routine's.
+                    "reason": "chosen_by_their_model"
+                    if chosen is not None and chosen.get("partner_id") == pairing["partner_id"]
+                    else "stopped_to_talk",
                     "partner_id": pairing["partner_id"],
                     "duration_ticks": pairing["duration_ticks"],
                 }
                 destination = pairing["node_id"]
+            elif chosen is not None and "partner_id" in chosen:
+                # A conversation a model chose that an edit this minute left no room for.
+                block(person, "route_invalidated", doc)
+                continue
+            elif chosen is not None and stand is not None and chosen.get("activity") == stand.key:
+                # A model's choice to stand a while, at the spot promised it before the minute.
+                if chosen["place_node_id"] not in paths or chosen["place_node_id"] in held:
+                    block(person, "route_invalidated", doc)
+                    continue
+                goal = {"kind": stand.key, "target_id": None, "reason": "chosen_by_their_model"}
+                destination = chosen["place_node_id"]
             elif drawn and policy is None:
                 # A drawn routine: somebody tired sits if there is room, and anybody else picks,
                 # by the routine's weights, among what has room for them now; then which one,
@@ -1482,15 +1683,11 @@ def advance_purposeful_society(
                 }
                 spot = None
                 if stand is not None and places_mode:
-                    spots = [
-                        node
-                        for node in _open_nodes(nodes, adjacent, crowded, held)
-                        if node in paths
-                        and _squared_mm(nodes[node]["position_mm"], person["position_mm"])
-                        <= stand.reach_mm**2
-                    ]
+                    spots = stand_spots(
+                        (nodes, adjacent, edges), crowded, held, paths, person, stand
+                    )
                     if spots:
-                        spot = spots[_draw(seed, "stand", tick, person["ordinal"], len(spots))]
+                        spot = drawn_stand_spot(seed, tick, person, spots)
                 tired = _preferred(routine, person["need_milli"])
                 if tired is not None and by_affordance.get(tired):
                     kind: str | None = tired

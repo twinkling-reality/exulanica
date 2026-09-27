@@ -926,20 +926,34 @@ this process can ask each; whether this host asks models for the world at all, a
 (`refusal`), and their latest decision; and per model the decisions asked, accepted and applied,
 why the rest were not acted on, latency and cost, over the society's latest 2,000 decisions.
 
-**The contract.** `assets/catalogs/society/society-decision-action.v1.json` and
-`society-decision-policy.v1.json` state the actions and bounds, read by
-`exulanica/world/society_decision_contract.py`. A person is at a choice point where the routine
-itself chooses for them: when they have no goal, or their action has completed. A person blocked
-on the way to a goal keeps it, as the routine keeps it for them, and is not asked. Their options
-are each enabled place they
-can reach with room for them, the nearest `options_maximum` less one, labelled by what it is and
-how far ("resting on a bench, 5 m away"), and waiting a minute, in an order shuffled by the
-society's seed, the person and the minute. The model reads a fixed instruction and that person's
-situation: tiredness, what they just did and their options, and nothing of anybody else. It
-answers through one function, `act`, forced by name, whose one argument, `action`, is an enum of
-exactly those labels, or through a strict JSON schema of the same enum. The function's name, its
-argument's and its description are fixed product values, no caller's text; the mechanism is the highest
-ranked one the manifest names as verified for the model by a recorded probe. An answer that is
+**The contract.** `assets/catalogs/society/society-decision-action.v2.json` and
+`society-decision-policy.v2.json` state the actions and bounds a new request is asked under, read
+by `exulanica/world/society_decision_contract.py`; every request records the versions it was
+asked under, and a request asked under the first versions, which offered places and waiting
+alone, is read and replayed under them. A person is at a choice point where the routine itself
+chooses for them: when they have no goal, or their action has completed. A person blocked on the
+way to a goal keeps it, as the routine keeps it for them, and is not asked. Their options are only
+what the routine itself could start for them then, by its own rules: each enabled place they can
+reach with room for them, labelled by what it is and how far ("resting on a bench, 5 m away");
+where the input's routine has people stand and talk, standing a while at an open spot within the
+routine's standing reach ("stand a while nearby"), and talking with each person the routine could
+pair them with, somebody within its talking reach who is free to choose or standing, with two open
+spots beside each other both can walk to ("talk with person 4, 6 m away", the number the other
+person's simulated name ends with and the walk to them); and waiting a minute. The model replaces
+the routine's draws and its preference that a tired person rests first, never its rules of what
+can be done. The nearest places and people are kept, `options_maximum` actions in all with
+standing and waiting, in an order shuffled by the society's seed, the person and the minute. The
+model reads a fixed instruction and that person's situation: tiredness, what they just did and
+their options. Nothing in it is a name: another person is the number their simulated name ends
+with, so no rule about a saved name can change an option. It answers through one function, `act`,
+forced by name, whose one argument, `action`, is an enum of exactly those labels, or through a
+strict JSON schema of the same enum. What four open models chose under the second version, and
+where a decision's time goes, is measured in
+[model and service selection](model-and-service-selection.md#standing-and-talking-and-where-a-decisions-time-goes). The function's name, its
+argument's and its description are fixed product values, no caller's text; the mechanism is the first
+the manifest names as verified for the model by a recorded probe, in the answering order the
+model's own entry states where a measurement gave it one (under the decision policy's second
+version), and otherwise the policy's highest ranked. An answer that is
 not an offered label is asked once more, saying so; after `answer_attempts_maximum` answers the
 routine decides that turn.
 
@@ -960,9 +974,9 @@ host has the workspace's rules judge the function's fixed description and every 
 may ask could be offered, in one pass for each chosen model. A description the rules would change,
 as a saved name one of whose parts is a word of it would, asks nobody of that model and writes
 nothing; the models route names it for each such choice (`question_changed_by_rules`). Each other
-chosen person at a choice point is offered the places the rules send as they are, leaving out any
-whose words they would change, a place a saved name happens to match; a person left no place, or
-fewer than two options, is not asked and nothing is written. It reserves a request (`exulanica.society-decision-request/v2`), commits and closes its connection,
+chosen person at a choice point is offered the options the rules send as they are, leaving out any
+whose words they would change, a place a saved name happens to match; a person left nothing but
+waiting, or fewer than two options, is not asked and nothing is written. It reserves a request (`exulanica.society-decision-request/v2`), commits and closes its connection,
 asks the models concurrently, at most `concurrent_calls_maximum` at once, and records each receipt
 (`exulanica.society-decision/v2`) in its own transaction; then that claim advances one minute, so no
 later choice point of a person a model runs passes unasked. Every ask of the minute ends by one
@@ -1003,10 +1017,26 @@ their id alone and moves nobody.
 or input it is `stale`; a person's own direct request that minute supersedes it
 (`person_asked_directly`), as a second receipt for somebody already decided does
 (`subject_already_decided`). When the chosen place can no longer be reached or used, or another
-choice or request was promised it first this minute, the receipt is `rejected` with that reason.
-Otherwise it is `applied`, as a goal policy: a chosen place is the planner's goal with the reason
-`chosen_by_their_model`, and a chosen wait keeps the person where they are for the minute, which
-the planner records as blocked with the reason `validated_model_wait`. A receipt that is not
+choice or request was promised it first this minute, the receipt is `rejected` with that reason;
+a choice to stand with no open spot left within reach is `rejected` as `no_room_to_stand`.
+Choices to talk are checked after every other choice of the minute, in decision order. The other
+person is busy (`partner_busy`) whenever anybody decided for them in that minute, their own model
+included whatever it chose and whichever receipt came first, or an earlier choice took them into
+another conversation; they must still be free to choose or standing and within reach by the
+routine's rule, judged by their tiredness as the minute will have it (`partner_not_free`
+otherwise), and two open spots beside each other must be left for the pair (`no_room_to_talk`).
+Two people whose models chose each other are both applied, to one conversation. Otherwise the receipt is `applied`, as a
+goal policy, and what it takes is promised before the minute, as a direct request's place is: a
+chosen place is the planner's goal with the reason `chosen_by_their_model`; a chosen wait keeps the
+person where they are for the minute, which the planner records as blocked with the reason
+`validated_model_wait`; a chosen stand walks the person to the spot the routine's own draw picks
+among the open ones as the minute begins, and they stand as long as the routine draws; a chosen
+conversation is paired before the routine's own pairs, at the spots and for the length the
+routine's pairing gives, the chooser's goal recording `chosen_by_their_model` and the other
+person's `stopped_to_talk`, and the routine's own pairs take neither person nor any promised
+spot. A promise that an edit and its undo inside the one minute left somebody else holding stops
+the chooser with the planner's reason `route_invalidated`, and the other person is left to their
+routine. A receipt that is not
 accepted leaves the turn to the routine and keeps its status. Every consumed receipt
 appends one `decision_applied` event after the minute's other events, naming its `request_id`,
 `decision_seq`, `decision_sha256`, disposition and reason, the model as `{provider, model_id}` and

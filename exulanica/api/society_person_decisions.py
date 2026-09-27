@@ -114,6 +114,17 @@ _NOT_OFFERED: Final = (
 )
 
 
+#: What the log says when an ask ends in an error nothing names: the error's class, and nothing
+#: of its text.
+_ASK_FAILED: Final = "A person's decision ask failed with %s; the routine decides that turn"
+
+
+def _error_class(exc: BaseException) -> str:
+    """An error's class by its module and name, which is code, never anything it carries."""
+    kind = type(exc)
+    return f"{kind.__module__}.{kind.__qualname__}"
+
+
 def _failure_reason(exc: BaseException) -> str:
     """How a failure that ended a person's call is recorded, by the error that ended it."""
     if isinstance(exc, ProviderRefused):
@@ -375,11 +386,11 @@ def ask_person(
         except (ModelError, PrivacyAdmissionError, NoHostedRequestPolicy) as exc:
             status, reason = "unavailable", _failure_reason(exc)
             break
-        except Exception:
+        except Exception as exc:
             # Any other error ends the ask as a failed call, and every attempt it paid for stays in
-            # the record rather than leaving with the exception. Never an exception's text, which
-            # may carry request bytes or a credential.
-            _LOG.error("A person's decision ask failed; the routine decides that turn")
+            # the record rather than leaving with the exception. Its class names the defect; never
+            # its text, which may carry request bytes or a credential.
+            _LOG.error(_ASK_FAILED, _error_class(exc))
             status, reason = "unavailable", "model_call_failed"
             break
         log.record(chosen.call)
@@ -664,9 +675,10 @@ class PersonDecisionHost:
             for ask, future in futures:
                 try:
                     result = future.result()
-                except Exception:
-                    # Never an exception's text, which may carry request bytes or a credential.
-                    _LOG.error("A person's decision ask failed; the routine decides that turn")
+                except Exception as exc:
+                    # Its class names the defect; never its text, which may carry request bytes
+                    # or a credential.
+                    _LOG.error(_ASK_FAILED, _error_class(exc))
                     result = _refused("model_call_failed")
                 results.append((uuid.UUID(ask.request["request_id"]), result))
         return results

@@ -140,7 +140,9 @@ def test_a_model_is_offered_to_a_chosen_role_only_with_a_verified_mechanism():
     document = _document()
     model_id = _a_chat_model(document)
     for raw in document["models"].values():
+        # An answering order names only verified mechanisms, so it goes with them.
         raw.pop("answering", None)
+        raw.pop("answering_order", None)
     bare = parse_manifest(document)
     assert bare.offered_models(Role.SOCIETY_DECISION) == ()
     with pytest.raises(ManifestError, match="not offered"):

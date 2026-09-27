@@ -273,8 +273,8 @@ class SocietyDecisionRepository:
 
         ``offer`` keeps the options that may be offered, in their order: the caller leaves out
         any the rules its ask is sent under would change. ``None`` in place of a request when the
-        person has nothing to choose this minute, no place or fewer than two options among what
-        is offered included: nothing is reserved and no model is asked. The context is refused
+        person has nothing to choose this minute, fewer than two options or nothing but waiting
+        among what is offered: nothing is reserved and no model is asked. The context is refused
         before any reservation when it is larger than the contract's bound. The caller commits and
         closes its connection before asking the model.
         """

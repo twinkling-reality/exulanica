@@ -29,6 +29,7 @@ from exulanica.world.society_decision_contract import (
 )
 from exulanica.world.society_decision_contract import (
     DECISION_REASONS,
+    FEWEST_OPTIONS,
     DecisionContract,
     DecisionOption,
     choice_options,
@@ -207,16 +208,17 @@ def person_request(
 
     Pure: the host's reservation and a comparison's run build a request here, and so does a
     comparison's replay, which rebuilds it to the byte. ``offer`` keeps the options that may be
-    offered, in their order. ``(None, "nothing_to_choose")`` when fewer than two options, or no
-    place, are left, and ``(None, "context_limit_exceeded")`` when the context is larger than the
-    contract's bound; otherwise the request and ``"in_progress"``.
+    offered, in their order. ``(None, "nothing_to_choose")`` when fewer than two options are left
+    or nothing but waiting, and ``(None, "context_limit_exceeded")`` when the context is larger
+    than the contract's bound; otherwise the request and ``"in_progress"``.
     """
     options = choice_options(state, document, subject_id, contract, seed=seed)
     if offer is not None and options:
         options = tuple(offer(options))
-    # A request offers two options at least (``validate_decision_request``): with fewer, or with
-    # no place among them, there is nothing to ask.
-    if len(options) < 2 or not any(option.kind == "target" for option in options):
+    # A request offers the fewest options a person is asked among at least
+    # (``validate_decision_request``): with fewer, or nothing among them but waiting, there is
+    # nothing to ask.
+    if len(options) < FEWEST_OPTIONS or all(option.kind == "wait" for option in options):
         return None, "nothing_to_choose"
     context = person_context(state, document, subject_id, options)
     if context_bytes(context) > contract.value("context_bytes_maximum"):
@@ -251,7 +253,7 @@ def _person_request(document: dict) -> None:
         or context.get("branch_id") != document["branch_id"]
         or context.get("tick") != document["base_tick"]
         or not isinstance(context.get("options"), list)
-        or len(context["options"]) < 2
+        or len(context["options"]) < FEWEST_OPTIONS
     ):
         raise ValueError("invalid person decision context")
     labels = [DecisionOption.from_record(option).label for option in context["options"]]

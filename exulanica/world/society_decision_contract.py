@@ -9,29 +9,40 @@ is checked:
 *   **What the person sees** is a ``exulanica.society-decision-context/v2``: the minute, how
     tired they are against the routine's own rest threshold, what they are doing and where they
     last were, and each option. Nothing in it is anybody's name, and no account holder's text:
-    an option is read from the routine catalog's words for an activity and a walking distance.
-*   **What they may do** is the action catalog's: go to a place that has room for them now, for
-    what the routine says is done there, or wait a minute. Each option is labelled by what it is,
-    never by its position, and the options are shuffled by a seed of the society, the person and
-    the minute, which the request records with the order, because the order a model reads its
-    options in moves its choice.
-*   **How the answer is asked for** is one choice among those labels, by the first mechanism in
-    the policy's order that the chosen model's manifest entry names as verified; the tool or
-    schema is built here, from the contract's catalogs, and nowhere else.
+    an option is read from the action catalog's words, the routine catalog's words for an
+    activity, a walking distance and, for somebody to talk with, the number their simulated name
+    ends with.
+*   **What they may do** is what the action catalog of the request's contract states, and only
+    what the routine itself could start for them in that minute, by the routine's own rules: go to
+    a place that has room for them, for what the routine says is done there; wait a minute; and,
+    where the contract and the input's routine both have them, stand a while at an open spot near
+    them, or stop to talk with somebody the routine could pair them with. The model replaces the
+    routine's draws and its preference that a tired person rests first, never its rules of what
+    can be done. Each option is labelled by what it is, never by its position, and the options
+    are shuffled by a seed of the society, the person and the minute, which the request records
+    with the order, because the order a model reads its options in moves its choice.
+*   **How the answer is asked for** is one choice among those labels, by the first mechanism the
+    chosen model's manifest entry names as verified: in the answering order its entry states,
+    where a measurement gave it one and the contract's version asks in it, and otherwise in the
+    policy's order. The tool or schema is built here, from the contract's catalogs, and nowhere
+    else.
 *   **How it is checked**: the answer must be one of the labels; the engine then applies it only
-    if the place is still enabled, unchanged, reachable and free when the minute runs, and
-    promises the place before the minute, as a direct request's is, so nobody choosing for
-    themselves in that minute takes it.
+    if it still holds when the minute runs (:func:`recheck_option`, :func:`recheck_talk`), and
+    promises before the minute what it takes, a place, a spot to stand at or the two spots of a
+    conversation, as a direct request's place is promised, so nobody choosing for themselves in
+    that minute takes it.
 
-What it does not do: offer standing or talking, which stay the routine's (the planner draws
-both only for a person no policy governs), or say anything about any other person.
+What it does not do: say anything about another person but the number their simulated name ends
+with and how far the walk to them is, or let a model decide for anybody but the person it runs: a
+conversation it chooses happens only with somebody nobody, their own model included, decided for
+in that minute.
 """
 
 from __future__ import annotations
 
 import random
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Container, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, Final
@@ -40,8 +51,12 @@ from exulanica.canonical import canonical_json
 from exulanica.models.choice import ChoiceRequest
 from exulanica.models.manifest import AnsweringMechanism, ModelSpec
 from exulanica.world.society_catalogs import (
-    DECISION_ACTION_KINDS,
+    DECISION_ACTION_CATALOG,
+    DECISION_ACTION_KINDS_BY_VERSION,
     DECISION_CONTRACT_VERSIONS,
+    DECISION_POLICY_ASKS_IN_A_MODELS_OWN_ORDER,
+    DECISION_POLICY_CATALOG,
+    PurposefulActivity,
     PurposefulRoutine,
     load_decision_catalogs,
 )
@@ -52,26 +67,39 @@ from exulanica.world.society_planner import (
     _graph,
     _location_valid,
     _paths,
+    drawn_stand_spot,
+    free_to_talk,
     held_nodes,
+    need_this_minute,
     routine_of,
     same_destination,
+    stand_spots,
+    standing_exclusions,
+    standing_to_talk,
+    talk_span,
+    talk_spots,
+    within_talk_reach,
 )
 
 __all__ = [
     "CHOICE_DESCRIPTION",
     "CONTEXT_PROFILE",
     "DECISION_REASONS",
+    "FEWEST_OPTIONS",
     "POLICY_KEYS",
     "PROMPT_VERSION",
     "DecisionContract",
     "DecisionOption",
+    "TalkPromise",
     "at_choice_point",
     "choice_options",
     "decision_context",
     "decision_contract",
     "decision_messages",
     "option_goal_policy",
+    "places_to_stand",
     "recheck_option",
+    "recheck_talk",
 ]
 
 CONTEXT_PROFILE: Final = "exulanica.society-decision-context/v2"
@@ -121,6 +149,15 @@ DECISION_REASONS: Final = frozenset(
         "current_position_invalidated",
         "known_target_unreachable",
         "place_taken_this_minute",
+        # When the minute consumes a choice to stand or to talk.
+        "no_room_to_stand",
+        "no_room_to_talk",
+        # The person it chose to talk with was decided for in that minute, by their own model or
+        # the world's owner, or was already stopping to talk with somebody else.
+        "partner_busy",
+        # The person it chose to talk with could not stop to talk by the routine's rule: not in the
+        # society, not free to choose or standing, or out of the talk's reach.
+        "partner_not_free",
     }
 )
 #: What the one function a model answers by is described as, in every request: product
@@ -144,9 +181,21 @@ POLICY_KEYS: Final = frozenset(
         *(f"answer_rank_{mechanism.value}" for mechanism in AnsweringMechanism),
     }
 )
-#: The placeholders an action's words may name, each filled here from the catalog and the walk.
+#: The fewest options a person is asked to choose among: waiting and one thing more. With fewer,
+#: or with nothing but waiting, nobody is asked and the routine decides.
+FEWEST_OPTIONS: Final = 2
+#: The placeholders an action's words may name, each filled here from the catalog, the walk and,
+#: for somebody to talk with, the number their simulated name ends with.
 _PLACEHOLDER: Final = re.compile(r"\{([a-z_]+)\}")
-_WORDS_FIELDS: Final = {"target": frozenset({"activity", "metres"}), "wait": frozenset()}
+_WORDS_FIELDS: Final = {
+    "target": frozenset({"activity", "metres"}),
+    "wait": frozenset(),
+    "stand": frozenset(),
+    "talk": frozenset({"number", "metres"}),
+}
+#: What every recorded option states; one to talk with also states who, as ``partner_id``, so an
+#: option of the first contract records exactly the bytes it always did.
+_OPTION_FIELDS: Final = frozenset({"label", "kind", "action", "target_id", "activity", "walk_mm"})
 #: The one instruction a model is given, product text written here and sent as written.
 INSTRUCTION: Final = (
     "You decide what one simulated person in a small world does next. The person is invented "
@@ -175,6 +224,8 @@ class DecisionContract:
     policy: Mapping[str, int]
     versions: Mapping[str, int]
     sha256: str
+    #: Whether a model is asked in its own measured answering order before the policy's.
+    asks_in_a_models_own_order: bool = False
 
     def binding(self) -> dict[str, object]:
         """What a decision request records about the contract it was asked under."""
@@ -194,8 +245,16 @@ class DecisionContract:
         return tuple(mechanism for _, mechanism in sorted(ranked))
 
     def mechanism_for(self, spec: ModelSpec) -> AnsweringMechanism | None:
-        """How ``spec`` is asked: the first accepted mechanism its manifest entry verifies."""
-        return next((m for m in self.mechanism_order if m in spec.answering), None)
+        """How ``spec`` is asked: the first accepted mechanism its manifest entry verifies, in
+        the answering order its entry states when it states one this contract accepts (a
+        measured order for that model) and this contract's version asks in it, and otherwise in
+        this contract's order."""
+        own = [
+            m
+            for m in (spec.answering_order if self.asks_in_a_models_own_order else ())
+            if m in self.mechanism_order
+        ]
+        return next((m for m in own or self.mechanism_order if m in spec.answering), None)
 
 
 def _contract(versions: Mapping[str, int] | None) -> DecisionContract:
@@ -205,8 +264,9 @@ def _contract(versions: Mapping[str, int] | None) -> DecisionContract:
             f"the decision policy states {sorted(policy)}; the contract reads {sorted(POLICY_KEYS)}"
         )
     kinds = [str(values["kind"]) for values in actions.values()]
-    if sorted(kinds) != sorted(DECISION_ACTION_KINDS):
-        raise ContractError(f"the action catalog states each of {DECISION_ACTION_KINDS} once")
+    stated = DECISION_ACTION_KINDS_BY_VERSION[chosen[DECISION_ACTION_CATALOG]]
+    if sorted(kinds) != sorted(stated):
+        raise ContractError(f"the action catalog states each of {stated} once")
     words: dict[str, str] = {}
     keys: dict[str, str] = {}
     for key, values in actions.items():
@@ -237,10 +297,23 @@ def _contract(versions: Mapping[str, int] | None) -> DecisionContract:
     ):
         if values[key] < 1:
             raise ContractError(f"{key} is at least 1")
+    if values["options_maximum"] < FEWEST_OPTIONS:
+        raise ContractError(
+            f"options_maximum is at least {FEWEST_OPTIONS}: a person is asked with waiting and "
+            "one thing more, or not at all"
+        )
     if not 0 <= values["process_reserve_percent"] < 100:
         raise ContractError("process_reserve_percent keeps part of the budget and never all of it")
+    policy_version = chosen[DECISION_POLICY_CATALOG]
+    if policy_version not in DECISION_POLICY_ASKS_IN_A_MODELS_OWN_ORDER:
+        raise ContractError(f"the decision policy v{policy_version} states no answering order rule")
     return DecisionContract(
-        words=words, action_keys=keys, policy=values, versions=chosen, sha256=digest
+        words=words,
+        action_keys=keys,
+        policy=values,
+        versions=chosen,
+        sha256=digest,
+        asks_in_a_models_own_order=DECISION_POLICY_ASKS_IN_A_MODELS_OWN_ORDER[policy_version],
     )
 
 
@@ -265,9 +338,11 @@ class DecisionOption:
     target_id: str | None
     activity: str | None
     walk_mm: int | None
+    #: Who a conversation is with, by the society's identity for them; None for any other kind.
+    partner_id: str | None = None
 
     def as_record(self) -> dict[str, Any]:
-        return {
+        record: dict[str, Any] = {
             "label": self.label,
             "kind": self.kind,
             "action": self.action,
@@ -275,11 +350,17 @@ class DecisionOption:
             "activity": self.activity,
             "walk_mm": self.walk_mm,
         }
+        if self.kind == "talk":
+            record["partner_id"] = self.partner_id
+        return record
 
     @classmethod
     def from_record(cls, record: Mapping[str, Any]) -> DecisionOption:
-        if set(record) != {"label", "kind", "action", "target_id", "activity", "walk_mm"}:
+        talk = record.get("kind") == "talk"
+        if set(record) != (_OPTION_FIELDS | {"partner_id"} if talk else _OPTION_FIELDS):
             raise ValueError("a recorded decision option states exactly its fields")
+        if talk and not (isinstance(record["partner_id"], str) and record["partner_id"]):
+            raise ValueError("a recorded conversation names who it is with")
         return cls(
             label=str(record["label"]),
             kind=str(record["kind"]),
@@ -287,6 +368,27 @@ class DecisionOption:
             target_id=record["target_id"],
             activity=record["activity"],
             walk_mm=record["walk_mm"],
+            partner_id=record["partner_id"] if talk else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TalkPromise:
+    """A conversation a model chose, held before its minute as the routine's own pairing is: who
+    it is with, where each of the two stands and how long it lasts."""
+
+    partner_id: str
+    node_id: str
+    partner_node_id: str
+    duration_ticks: int
+
+    def mirrored(self, subject_id: str) -> TalkPromise:
+        """The same conversation as the other person holds it: with ``subject_id``."""
+        return TalkPromise(
+            partner_id=subject_id,
+            node_id=self.partner_node_id,
+            partner_node_id=self.node_id,
+            duration_ticks=self.duration_ticks,
         )
 
 
@@ -323,16 +425,80 @@ def _activity_label(routine: PurposefulRoutine, target: Mapping[str, Any]) -> tu
 
 
 def _reachable(
-    state: Mapping[str, Any], document: Mapping[str, Any], person: Mapping[str, Any]
+    state: Mapping[str, Any], document: Mapping[str, Any], person: dict[str, Any]
 ) -> tuple[dict, dict, set[str], str | None]:
-    """The person's walking distances, the nodes others hold, and the node they stand at."""
+    """The person's walking distances, the nodes others hold, and the node they stand at.
+
+    ``person`` is the state's own record of them: the planner leaves out of what is held exactly
+    that record, so where they stand and are headed stays theirs, as it does in the minute.
+    """
     nodes, adjacent, edges = _graph(dict(document))
     location = person["location"]
     start = location["node_id"] if location["edge"] is None else location["edge"]["to_node_id"]
     paths = _paths(start, adjacent)
-    held = held_nodes(list(state["inhabitants"]), dict(person), graph=(nodes, edges))
+    held = held_nodes(list(state["inhabitants"]), person, graph=(nodes, edges))
     here = location["node_id"] if location["edge"] is None else None
     return nodes, paths, held, here
+
+
+def _off_place(
+    routine: PurposefulRoutine, document: Mapping[str, Any], setting: str
+) -> PurposefulActivity | None:
+    """The routine's activity at no place in ``setting`` (``open`` standing, ``pair`` talking),
+    where the input states places and the routine draws its choices, as the planner reads it."""
+    if document["profile"] not in PLACE_INPUTS or routine.choice != "drawn":
+        return None
+    return routine.in_setting(setting)
+
+
+def _paths_from(adjacent: Mapping[str, Any]) -> Any:
+    """Walking distances from a node, each start walked once."""
+    walked: dict[str, dict] = {}
+
+    def paths_of(start: str) -> dict:
+        if start not in walked:
+            walked[start] = _paths(start, dict(adjacent))
+        return walked[start]
+
+    return paths_of
+
+
+def _partners(
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    person: dict[str, Any],
+    routine: PurposefulRoutine,
+    paths: Mapping[str, Any],
+) -> list[tuple[int, dict[str, Any]]]:
+    """Everybody the routine could pair this person with to talk now, and the walk to each.
+
+    By the routine's own rules (``exulanica.world.society_planner``): somebody free to choose or
+    standing, within the talk's reach, with two open spots beside each other both can walk to. The
+    person themself stands on a node, as anybody who starts a talk does. Before the minute nobody
+    is decided for yet, so no policy is read; the minute's own are when it runs
+    (:func:`recheck_talk`).
+    """
+    talk = _off_place(routine, document, "pair")
+    if talk is None or person["location"]["edge"] is not None:
+        return []
+    graph = _graph(dict(document))
+    crowded = standing_exclusions(dict(document))
+    paths_of = _paths_from(graph[1])
+    people = list(state["inhabitants"])
+    found = []
+    for other in people:
+        if other is person or other["location"]["node_id"] not in paths:
+            continue
+        standing = standing_to_talk(other, routine, graph, ())
+        if not (standing or free_to_talk(other, routine, graph, (), need=need_this_minute(other))):
+            continue
+        if not within_talk_reach(person, other, talk):
+            continue
+        if talk_spots(
+            person, other, people, graph, crowded, set(), paths_of, talk, standing=standing
+        ):
+            found.append((paths[other["location"]["node_id"]][0], other))
+    return found
 
 
 def choice_options(
@@ -346,10 +512,14 @@ def choice_options(
     """What this person may be asked to do in the coming minute, in the order a model reads it.
 
     Empty when the planner would not let them choose, when the input cannot be walked, or when
-    there is nowhere to go: a person with only waiting left is left to the routine. Every enabled
-    place they can reach that has a free place for them, as the planner itself finds room, the
-    nearest ``options_maximum`` less one when there are more, then waiting; then shuffled by the
-    society's seed, the person and the minute.
+    there is nothing to do but wait: such a person is left to the routine. Every enabled place
+    they can reach that has a free place for them, as the planner itself finds room; where the
+    contract states them and the input's routine has them, everybody the routine could pair them
+    with to talk, and standing a while when an open spot lies within the routine's reach; the
+    nearest places and people by the walk, ``options_maximum`` in all with standing and waiting,
+    when there are more; then waiting, and the whole shuffled by the society's seed, the person
+    and the minute. Under the first contract, which states places and waiting alone, this is the
+    nearest ``options_maximum`` less one places, then waiting, as it always was.
     """
     person = _person(state, subject_id)
     if not at_choice_point(person) or not _available(document):
@@ -373,9 +543,21 @@ def choice_options(
         ):
             continue
         found.append((paths[target["node_id"]][0], target["target_id"], target))
-    found.sort(key=lambda row: (row[0], row[1]))
-    kept = found[: contract.value("options_maximum") - 1]
-    if not kept:
+    partners = (
+        _partners(state, document, person, routine, paths) if "talk" in contract.words else []
+    )
+    stand = _off_place(routine, document, "open") if "stand" in contract.words else None
+    if stand is not None and not places_to_stand(state, document, subject_id):
+        stand = None
+    # Places and people by the walk to each, a place before a person at the same walk, then by id.
+    nearest = sorted(
+        [(walk, 0, target_id, target) for walk, target_id, target in found]
+        + [(walk, 1, other["id"], other) for walk, other in partners],
+        key=lambda row: row[:3],
+    )[: contract.value("options_maximum") - 1 - (stand is not None)]
+    kept = [(walk, key, entry) for walk, kind, key, entry in nearest if kind == 0]
+    near = [(walk, entry) for walk, kind, _key, entry in nearest if kind == 1]
+    if not kept and not near and stand is None:
         return ()
     options: list[DecisionOption] = []
     labels: dict[str, int] = {}
@@ -393,6 +575,33 @@ def choice_options(
                 target_id=target_id,
                 activity=activity,
                 walk_mm=walk,
+            )
+        )
+    talk = _off_place(routine, document, "pair")
+    for walk, other in sorted(near, key=lambda row: row[1]["ordinal"]):
+        options.append(
+            DecisionOption(
+                # The number their simulated name ends with: theirs for the society's life.
+                label=contract.words["talk"].format(
+                    number=other["ordinal"] + 1, metres=round(walk / 1000)
+                ),
+                kind="talk",
+                action=contract.action_keys["talk"],
+                target_id=None,
+                activity=None if talk is None else talk.key,
+                walk_mm=walk,
+                partner_id=other["id"],
+            )
+        )
+    if stand is not None:
+        options.append(
+            DecisionOption(
+                label=contract.words["stand"],
+                kind="stand",
+                action=contract.action_keys["stand"],
+                target_id=None,
+                activity=stand.key,
+                walk_mm=None,
             )
         )
     options.append(
@@ -487,10 +696,13 @@ def recheck_option(
     option: DecisionOption,
     promised: set[str],
 ) -> tuple[str | None, str | None]:
-    """Whether a chosen option still holds this minute, and the place it is promised.
+    """Whether a chosen place, wait or stand still holds this minute, and what it is promised.
 
-    ``(None, place)`` when it holds, ``place`` being ``None`` for waiting or an input that states
-    no places; otherwise ``(reason, None)`` naming why it does not.
+    ``(None, place)`` when it holds: the place at a target, ``None`` for waiting or an input that
+    states no places, and for standing the spot the routine draws among the open ones as the
+    minute begins; otherwise ``(reason, None)`` naming why it does not. ``promised`` holds every
+    place and spot promised before this choice in the minute. A conversation is checked by
+    :func:`recheck_talk`, which also reads who else is decided for.
     """
     person = _person(state, subject_id)
     if not at_choice_point(person):
@@ -499,6 +711,10 @@ def recheck_option(
         return None, None
     if not _available(document):
         return "input_unavailable", None
+    if option.kind == "stand":
+        return _recheck_stand(state, document, person, promised)
+    if option.kind != "target":
+        raise ValueError(f"a {option.kind!r} choice is not checked here")
     current = next((t for t in document["targets"] if t["target_id"] == option.target_id), None)
     if current is None or not current["enabled"]:
         return "target_disabled_or_removed", None
@@ -515,17 +731,147 @@ def recheck_option(
     return None, place
 
 
-def option_goal_policy(option: DecisionOption, place: str | None) -> dict[str, Any]:
-    """The planner's goal policy for an applied choice: the existing seam, marked as a model's."""
+def places_to_stand(
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    subject_id: str,
+    promised: Container[str] = frozenset(),
+) -> list[str]:
+    """Where this person may stand a while in the coming minute, as the routine lists it: the
+    open nodes within its standing reach that they can walk to and nobody else stands at or is
+    headed to, the one they stand at included, less any spot ``promised`` to a choice before; in
+    node order, the list the routine's own draw picks from. Empty where the input's routine has
+    nobody stand."""
+    person = _person(state, subject_id)
+    stand = _off_place(routine_of(dict(document)), document, "open")
+    if stand is None:
+        return []
+    _nodes, paths, held, _here = _reachable(state, document, person)
+    return [
+        spot
+        for spot in stand_spots(
+            _graph(dict(document)),
+            standing_exclusions(dict(document)),
+            held,
+            dict(paths),
+            person,
+            stand,
+        )
+        if spot not in promised
+    ]
+
+
+def _recheck_stand(
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    person: dict[str, Any],
+    promised: set[str],
+) -> tuple[str | None, str | None]:
+    """Where a person who chose to stand a while stands, drawn as the routine draws it."""
+    nodes, _paths, _held, _here = _reachable(state, document, person)
+    if not _location_valid(dict(person), nodes, _graph(dict(document))[2]):
+        return "current_position_invalidated", None
+    spots = places_to_stand(state, document, person["id"], promised)
+    if not spots:
+        return "no_room_to_stand", None
+    # The minute the choice is applied in is the one after the state it was asked over.
+    return None, drawn_stand_spot(state["seed_sha256"], state["tick"] + 1, person, spots)
+
+
+def recheck_talk(
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    subject_id: str,
+    option: DecisionOption,
+    promised: set[str],
+    decided: Container[str],
+) -> TalkPromise | str:
+    """Whether a chosen conversation still holds this minute: how it is promised, or why not.
+
+    ``decided`` holds everybody the minute has decided for so far: a direct request, a model's
+    applied choice, or a conversation promised to somebody else. The other person must be free to
+    choose or standing by the routine's rule and nobody decided for, within the talk's reach, with
+    two open spots beside each other that nobody holds and nothing promised takes; the spots and
+    the talk's length are the ones the routine's own pairing would give. The promise when it
+    holds, otherwise the reason it does not.
+    """
+    person = _person(state, subject_id)
+    if not at_choice_point(person):
+        return "action_in_progress"
+    if not _available(document):
+        return "input_unavailable"
+    graph = _graph(dict(document))
+    if person["location"]["edge"] is not None or not _location_valid(
+        dict(person), graph[0], graph[2]
+    ):
+        return "current_position_invalidated"
+    routine = routine_of(dict(document))
+    talk = _off_place(routine, document, "pair")
+    people = list(state["inhabitants"])
+    partner = next((other for other in people if other["id"] == option.partner_id), None)
+    if talk is None or partner is None or partner is person:
+        return "partner_not_free"
+    if partner["id"] in decided:
+        return "partner_busy"
+    standing = standing_to_talk(partner, routine, graph, decided)
+    free = free_to_talk(partner, routine, graph, decided, need=need_this_minute(partner))
+    if not (standing or free) or not within_talk_reach(person, partner, talk):
+        return "partner_not_free"
+    spots = talk_spots(
+        person,
+        partner,
+        people,
+        graph,
+        standing_exclusions(dict(document)),
+        promised,
+        _paths_from(graph[1]),
+        talk,
+        standing=standing,
+    )
+    if spots is None:
+        return "no_room_to_talk"
+    return TalkPromise(
+        partner_id=partner["id"],
+        node_id=spots[0],
+        partner_node_id=spots[1],
+        duration_ticks=talk_span(state["seed_sha256"], state["tick"] + 1, person, talk),
+    )
+
+
+def option_goal_policy(option: DecisionOption, promise: str | TalkPromise | None) -> dict[str, Any]:
+    """The planner's goal policy for an applied choice: the existing seam, marked as a model's.
+
+    ``promise`` is what the choice's check promised it: a place or a spot to stand at, a
+    conversation, or nothing.
+    """
     if option.kind == "wait":
         return {"allowed_target_ids": [], "wait": True}
+    if option.kind == "stand" and isinstance(promise, str):
+        return {
+            "allowed_target_ids": [],
+            "activity": option.activity,
+            "place_node_id": promise,
+            "chosen_by": CHOSEN_BY_MODEL,
+        }
+    if option.kind == "talk" and isinstance(promise, TalkPromise):
+        return {
+            "allowed_target_ids": [],
+            "activity": option.activity,
+            "partner_id": promise.partner_id,
+            "place_node_id": promise.node_id,
+            "partner_node_id": promise.partner_node_id,
+            "duration_ticks": promise.duration_ticks,
+            "chosen_by": CHOSEN_BY_MODEL,
+        }
+    if option.kind != "target" or isinstance(promise, TalkPromise):
+        raise ValueError(f"no goal policy for a {option.kind!r} choice promised {promise!r}")
     policy: dict[str, Any] = {
         "allowed_target_ids": [option.target_id],
         "preferred_target_id": option.target_id,
         "chosen_by": CHOSEN_BY_MODEL,
     }
-    if place is not None:
-        policy["place_node_id"] = place
+    if promise is not None:
+        policy["place_node_id"] = promise
     return policy
 
 

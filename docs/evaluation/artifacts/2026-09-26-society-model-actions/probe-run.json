@@ -1,0 +1,2592 @@
+{
+  "calls": [
+    {
+      "attempts": [
+        {
+          "completion_tokens": 18,
+          "prompt_tokens": 415,
+          "usd": "0.00009380",
+          "usd_known": true
+        }
+      ],
+      "case": 1,
+      "chose_kind": "target",
+      "completion_tokens": 18,
+      "finish_reason": "stop",
+      "latency_ms": 1065,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 421,
+          "usd": "0.00009380",
+          "usd_known": true
+        }
+      ],
+      "case": 2,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 2186,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 18,
+          "prompt_tokens": 417,
+          "usd": "0.00009420",
+          "usd_known": true
+        }
+      ],
+      "case": 3,
+      "chose_kind": "target",
+      "completion_tokens": 18,
+      "finish_reason": "stop",
+      "latency_ms": 1104,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 445,
+          "usd": "0.00009860",
+          "usd_known": true
+        }
+      ],
+      "case": 4,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 790,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 437,
+          "usd": "0.00009760",
+          "usd_known": true
+        }
+      ],
+      "case": 5,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 606,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 446,
+          "usd": "0.00009880",
+          "usd_known": true
+        }
+      ],
+      "case": 6,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 739,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 10,
+          "prompt_tokens": 442,
+          "usd": "0.00009440",
+          "usd_known": true
+        }
+      ],
+      "case": 7,
+      "chose_kind": "wait",
+      "completion_tokens": 10,
+      "finish_reason": "stop",
+      "latency_ms": 956,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 447,
+          "usd": "0.00009900",
+          "usd_known": true
+        }
+      ],
+      "case": 8,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 659,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 460,
+          "usd": "0.00010220",
+          "usd_known": true
+        }
+      ],
+      "case": 9,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 610,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 10,
+          "prompt_tokens": 458,
+          "usd": "0.00009760",
+          "usd_known": true
+        }
+      ],
+      "case": 10,
+      "chose_kind": "wait",
+      "completion_tokens": 10,
+      "finish_reason": "stop",
+      "latency_ms": 965,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 465,
+          "usd": "0.00010320",
+          "usd_known": true
+        }
+      ],
+      "case": 11,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 750,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 478,
+          "usd": "0.00010580",
+          "usd_known": true
+        }
+      ],
+      "case": 12,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 911,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 491,
+          "usd": "0.00010780",
+          "usd_known": true
+        }
+      ],
+      "case": 13,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 739,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 492,
+          "usd": "0.00010800",
+          "usd_known": true
+        }
+      ],
+      "case": 14,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 982,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 504,
+          "usd": "0.00011040",
+          "usd_known": true
+        }
+      ],
+      "case": 15,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 1247,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 524,
+          "usd": "0.00011440",
+          "usd_known": true
+        }
+      ],
+      "case": 16,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 781,
+      "mechanism": "tool_call",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 14,
+          "prompt_tokens": 216,
+          "usd": "0.00005160",
+          "usd_known": true
+        }
+      ],
+      "case": 1,
+      "chose_kind": "target",
+      "completion_tokens": 14,
+      "finish_reason": "stop",
+      "latency_ms": 656,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 218,
+          "usd": "0.00005320",
+          "usd_known": true
+        }
+      ],
+      "case": 2,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 607,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 217,
+          "usd": "0.00005300",
+          "usd_known": true
+        }
+      ],
+      "case": 3,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 702,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 230,
+          "usd": "0.00005560",
+          "usd_known": true
+        }
+      ],
+      "case": 4,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 457,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 221,
+          "usd": "0.00005440",
+          "usd_known": true
+        }
+      ],
+      "case": 5,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 444,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 231,
+          "usd": "0.00005580",
+          "usd_known": true
+        }
+      ],
+      "case": 6,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 625,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 229,
+          "usd": "0.00005600",
+          "usd_known": true
+        }
+      ],
+      "case": 7,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 445,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 231,
+          "usd": "0.00005580",
+          "usd_known": true
+        }
+      ],
+      "case": 8,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 996,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 230,
+          "usd": "0.00005620",
+          "usd_known": true
+        }
+      ],
+      "case": 9,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 582,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 229,
+          "usd": "0.00005600",
+          "usd_known": true
+        }
+      ],
+      "case": 10,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 466,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 240,
+          "usd": "0.00005820",
+          "usd_known": true
+        }
+      ],
+      "case": 11,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 765,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 17,
+          "prompt_tokens": 239,
+          "usd": "0.00005800",
+          "usd_known": true
+        }
+      ],
+      "case": 12,
+      "chose_kind": "target",
+      "completion_tokens": 17,
+      "finish_reason": "stop",
+      "latency_ms": 1144,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 253,
+          "usd": "0.00006020",
+          "usd_known": true
+        }
+      ],
+      "case": 13,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 388,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 255,
+          "usd": "0.00006060",
+          "usd_known": true
+        }
+      ],
+      "case": 14,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 862,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 16,
+          "prompt_tokens": 252,
+          "usd": "0.00006000",
+          "usd_known": true
+        }
+      ],
+      "case": 15,
+      "chose_kind": "target",
+      "completion_tokens": 16,
+      "finish_reason": "stop",
+      "latency_ms": 511,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 10,
+          "prompt_tokens": 271,
+          "usd": "0.00006020",
+          "usd_known": true
+        }
+      ],
+      "case": 16,
+      "chose_kind": "wait",
+      "completion_tokens": 10,
+      "finish_reason": "stop",
+      "latency_ms": 683,
+      "mechanism": "json_schema",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 178,
+          "prompt_tokens": 539,
+          "usd": "0.00012530",
+          "usd_known": true
+        }
+      ],
+      "case": 1,
+      "chose_kind": "target",
+      "completion_tokens": 178,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1940,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 195,
+          "prompt_tokens": 545,
+          "usd": "0.00013090",
+          "usd_known": true
+        }
+      ],
+      "case": 2,
+      "chose_kind": "wait",
+      "completion_tokens": 195,
+      "finish_reason": "tool_calls",
+      "latency_ms": 2095,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 188,
+          "prompt_tokens": 540,
+          "usd": "0.00012824",
+          "usd_known": true
+        }
+      ],
+      "case": 3,
+      "chose_kind": "stand",
+      "completion_tokens": 188,
+      "finish_reason": "tool_calls",
+      "latency_ms": 2490,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 212,
+          "prompt_tokens": 569,
+          "usd": "0.00013902",
+          "usd_known": true
+        }
+      ],
+      "case": 4,
+      "chose_kind": "wait",
+      "completion_tokens": 212,
+      "finish_reason": "tool_calls",
+      "latency_ms": 2265,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 206,
+          "prompt_tokens": 551,
+          "usd": "0.00013482",
+          "usd_known": true
+        }
+      ],
+      "case": 5,
+      "chose_kind": "stand",
+      "completion_tokens": 206,
+      "finish_reason": "tool_calls",
+      "latency_ms": 2327,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 167,
+          "prompt_tokens": 569,
+          "usd": "0.00012642",
+          "usd_known": true
+        }
+      ],
+      "case": 6,
+      "chose_kind": "talk",
+      "completion_tokens": 167,
+      "finish_reason": "tool_calls",
+      "latency_ms": 2654,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 116,
+          "prompt_tokens": 566,
+          "usd": "0.00011172",
+          "usd_known": true
+        }
+      ],
+      "case": 7,
+      "chose_kind": "talk",
+      "completion_tokens": 116,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1612,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 133,
+          "prompt_tokens": 570,
+          "usd": "0.00011704",
+          "usd_known": true
+        }
+      ],
+      "case": 8,
+      "chose_kind": "stand",
+      "completion_tokens": 133,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1510,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 124,
+          "prompt_tokens": 572,
+          "usd": "0.00011480",
+          "usd_known": true
+        }
+      ],
+      "case": 9,
+      "chose_kind": "stand",
+      "completion_tokens": 124,
+      "finish_reason": "tool_calls",
+      "latency_ms": 3430,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 160,
+          "prompt_tokens": 572,
+          "usd": "0.00012488",
+          "usd_known": true
+        }
+      ],
+      "case": 10,
+      "chose_kind": "stand",
+      "completion_tokens": 160,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1863,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 117,
+          "prompt_tokens": 588,
+          "usd": "0.00011508",
+          "usd_known": true
+        }
+      ],
+      "case": 11,
+      "chose_kind": "talk",
+      "completion_tokens": 117,
+      "finish_reason": "tool_calls",
+      "latency_ms": 2405,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 132,
+          "prompt_tokens": 596,
+          "usd": "0.00012040",
+          "usd_known": true
+        }
+      ],
+      "case": 12,
+      "chose_kind": "target",
+      "completion_tokens": 132,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1660,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 147,
+          "prompt_tokens": 610,
+          "usd": "0.00012656",
+          "usd_known": true
+        }
+      ],
+      "case": 13,
+      "chose_kind": "target",
+      "completion_tokens": 147,
+      "finish_reason": "tool_calls",
+      "latency_ms": 2348,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 119,
+          "prompt_tokens": 611,
+          "usd": "0.00011886",
+          "usd_known": true
+        }
+      ],
+      "case": 14,
+      "chose_kind": "target",
+      "completion_tokens": 119,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1524,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 100,
+          "prompt_tokens": 624,
+          "usd": "0.00011536",
+          "usd_known": true
+        }
+      ],
+      "case": 15,
+      "chose_kind": "target",
+      "completion_tokens": 100,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1177,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 151,
+          "prompt_tokens": 635,
+          "usd": "0.00013118",
+          "usd_known": true
+        }
+      ],
+      "case": 16,
+      "chose_kind": "talk",
+      "completion_tokens": 151,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1617,
+      "mechanism": "tool_call",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 104,
+          "prompt_tokens": 201,
+          "usd": "0.00005726",
+          "usd_known": true
+        }
+      ],
+      "case": 1,
+      "chose_kind": "target",
+      "completion_tokens": 104,
+      "finish_reason": "stop",
+      "latency_ms": 1635,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 225,
+          "prompt_tokens": 203,
+          "usd": "0.00009142",
+          "usd_known": true
+        }
+      ],
+      "case": 2,
+      "chose_kind": "wait",
+      "completion_tokens": 225,
+      "finish_reason": "stop",
+      "latency_ms": 2178,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 74,
+          "prompt_tokens": 201,
+          "usd": "0.00004886",
+          "usd_known": true
+        }
+      ],
+      "case": 3,
+      "chose_kind": "stand",
+      "completion_tokens": 74,
+      "finish_reason": "stop",
+      "latency_ms": 1139,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 97,
+          "prompt_tokens": 215,
+          "usd": "0.00005726",
+          "usd_known": true
+        }
+      ],
+      "case": 4,
+      "chose_kind": "talk",
+      "completion_tokens": 97,
+      "finish_reason": "stop",
+      "latency_ms": 1115,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 102,
+          "prompt_tokens": 201,
+          "usd": "0.00005670",
+          "usd_known": true
+        }
+      ],
+      "case": 5,
+      "chose_kind": "target",
+      "completion_tokens": 102,
+      "finish_reason": "stop",
+      "latency_ms": 1412,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 107,
+          "prompt_tokens": 215,
+          "usd": "0.00006006",
+          "usd_known": true
+        }
+      ],
+      "case": 6,
+      "chose_kind": "talk",
+      "completion_tokens": 107,
+      "finish_reason": "stop",
+      "latency_ms": 1536,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 79,
+          "prompt_tokens": 214,
+          "usd": "0.00005208",
+          "usd_known": true
+        }
+      ],
+      "case": 7,
+      "chose_kind": "talk",
+      "completion_tokens": 79,
+      "finish_reason": "stop",
+      "latency_ms": 1425,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 247,
+          "prompt_tokens": 215,
+          "usd": "0.00009926",
+          "usd_known": true
+        }
+      ],
+      "case": 8,
+      "chose_kind": "target",
+      "completion_tokens": 247,
+      "finish_reason": "stop",
+      "latency_ms": 1635,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 143,
+          "prompt_tokens": 209,
+          "usd": "0.00006930",
+          "usd_known": true
+        }
+      ],
+      "case": 9,
+      "chose_kind": "target",
+      "completion_tokens": 143,
+      "finish_reason": "stop",
+      "latency_ms": 1507,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 82,
+          "prompt_tokens": 209,
+          "usd": "0.00005222",
+          "usd_known": true
+        }
+      ],
+      "case": 10,
+      "chose_kind": "stand",
+      "completion_tokens": 82,
+      "finish_reason": "stop",
+      "latency_ms": 1112,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 95,
+          "prompt_tokens": 225,
+          "usd": "0.00005810",
+          "usd_known": true
+        }
+      ],
+      "case": 11,
+      "chose_kind": "target",
+      "completion_tokens": 95,
+      "finish_reason": "stop",
+      "latency_ms": 1404,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 93,
+          "prompt_tokens": 221,
+          "usd": "0.00005698",
+          "usd_known": true
+        }
+      ],
+      "case": 12,
+      "chose_kind": "target",
+      "completion_tokens": 93,
+      "finish_reason": "stop",
+      "latency_ms": 936,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 137,
+          "prompt_tokens": 235,
+          "usd": "0.00007126",
+          "usd_known": true
+        }
+      ],
+      "case": 13,
+      "chose_kind": "target",
+      "completion_tokens": 137,
+      "finish_reason": "stop",
+      "latency_ms": 1268,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 105,
+          "prompt_tokens": 237,
+          "usd": "0.00006258",
+          "usd_known": true
+        }
+      ],
+      "case": 14,
+      "chose_kind": "talk",
+      "completion_tokens": 105,
+      "finish_reason": "stop",
+      "latency_ms": 1100,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 99,
+          "prompt_tokens": 235,
+          "usd": "0.00006062",
+          "usd_known": true
+        }
+      ],
+      "case": 15,
+      "chose_kind": "target",
+      "completion_tokens": 99,
+      "finish_reason": "stop",
+      "latency_ms": 1040,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 84,
+          "prompt_tokens": 249,
+          "usd": "0.00005838",
+          "usd_known": true
+        }
+      ],
+      "case": 16,
+      "chose_kind": "talk",
+      "completion_tokens": 84,
+      "finish_reason": "stop",
+      "latency_ms": 1006,
+      "mechanism": "json_schema",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 231,
+          "prompt_tokens": 542,
+          "usd": "0.00008796",
+          "usd_known": true
+        }
+      ],
+      "case": 1,
+      "chose_kind": "stand",
+      "completion_tokens": 231,
+      "finish_reason": "stop",
+      "latency_ms": 1882,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1135,
+          "prompt_tokens": 548,
+          "usd": "0.00030528",
+          "usd_known": true
+        }
+      ],
+      "case": 2,
+      "chose_kind": "wait",
+      "completion_tokens": 1135,
+      "finish_reason": "stop",
+      "latency_ms": 7979,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 365,
+          "prompt_tokens": 544,
+          "usd": "0.00012024",
+          "usd_known": true
+        }
+      ],
+      "case": 3,
+      "chose_kind": "target",
+      "completion_tokens": 365,
+      "finish_reason": "stop",
+      "latency_ms": 2740,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 632,
+          "prompt_tokens": 572,
+          "usd": "0.00018600",
+          "usd_known": true
+        }
+      ],
+      "case": 4,
+      "chose_kind": "wait",
+      "completion_tokens": 632,
+      "finish_reason": "stop",
+      "latency_ms": 4699,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 366,
+          "prompt_tokens": 564,
+          "usd": "0.00012168",
+          "usd_known": true
+        }
+      ],
+      "case": 5,
+      "chose_kind": "wait",
+      "completion_tokens": 366,
+      "finish_reason": "stop",
+      "latency_ms": 2540,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 465,
+          "prompt_tokens": 573,
+          "usd": "0.00014598",
+          "usd_known": true
+        }
+      ],
+      "case": 6,
+      "chose_kind": "stand",
+      "completion_tokens": 465,
+      "finish_reason": "stop",
+      "latency_ms": 3227,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 390,
+          "prompt_tokens": 569,
+          "usd": "0.00012774",
+          "usd_known": true
+        }
+      ],
+      "case": 7,
+      "chose_kind": "target",
+      "completion_tokens": 390,
+      "finish_reason": "stop",
+      "latency_ms": 2680,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 644,
+          "prompt_tokens": 574,
+          "usd": "0.00018900",
+          "usd_known": true
+        }
+      ],
+      "case": 8,
+      "chose_kind": "target",
+      "completion_tokens": 644,
+      "finish_reason": "stop",
+      "latency_ms": 4305,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 725,
+          "prompt_tokens": 587,
+          "usd": "0.00020922",
+          "usd_known": true
+        }
+      ],
+      "case": 9,
+      "chose_kind": "target",
+      "completion_tokens": 725,
+      "finish_reason": "stop",
+      "latency_ms": 5163,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1532,
+          "prompt_tokens": 585,
+          "usd": "0.00040278",
+          "usd_known": true
+        }
+      ],
+      "case": 10,
+      "chose_kind": "stand",
+      "completion_tokens": 1532,
+      "finish_reason": "stop",
+      "latency_ms": 10653,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 763,
+          "prompt_tokens": 592,
+          "usd": "0.00021864",
+          "usd_known": true
+        }
+      ],
+      "case": 11,
+      "chose_kind": "talk",
+      "completion_tokens": 763,
+      "finish_reason": "stop",
+      "latency_ms": 5375,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 278,
+          "prompt_tokens": 605,
+          "usd": "0.00010302",
+          "usd_known": true
+        }
+      ],
+      "case": 12,
+      "chose_kind": "target",
+      "completion_tokens": 278,
+      "finish_reason": "stop",
+      "latency_ms": 2234,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 624,
+          "prompt_tokens": 618,
+          "usd": "0.00018684",
+          "usd_known": true
+        }
+      ],
+      "case": 13,
+      "chose_kind": "target",
+      "completion_tokens": 624,
+      "finish_reason": "stop",
+      "latency_ms": 4717,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 536,
+          "prompt_tokens": 619,
+          "usd": "0.00016578",
+          "usd_known": true
+        }
+      ],
+      "case": 14,
+      "chose_kind": "stand",
+      "completion_tokens": 536,
+      "finish_reason": "stop",
+      "latency_ms": 3803,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1222,
+          "prompt_tokens": 631,
+          "usd": "0.00033114",
+          "usd_known": true
+        }
+      ],
+      "case": 15,
+      "chose_kind": "target",
+      "completion_tokens": 1222,
+      "finish_reason": "stop",
+      "latency_ms": 8781,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 569,
+          "prompt_tokens": 651,
+          "usd": "0.00017562",
+          "usd_known": true
+        }
+      ],
+      "case": 16,
+      "chose_kind": "stand",
+      "completion_tokens": 569,
+      "finish_reason": "stop",
+      "latency_ms": 3952,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 180,
+          "prompt_tokens": 219,
+          "usd": "0.00005634",
+          "usd_known": true
+        }
+      ],
+      "case": 1,
+      "chose_kind": "target",
+      "completion_tokens": 180,
+      "finish_reason": "stop",
+      "latency_ms": 1573,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 364,
+          "prompt_tokens": 221,
+          "usd": "0.00010062",
+          "usd_known": true
+        }
+      ],
+      "case": 2,
+      "chose_kind": "target",
+      "completion_tokens": 364,
+      "finish_reason": "stop",
+      "latency_ms": 2633,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 183,
+          "prompt_tokens": 220,
+          "usd": "0.00005712",
+          "usd_known": true
+        }
+      ],
+      "case": 3,
+      "chose_kind": "target",
+      "completion_tokens": 183,
+      "finish_reason": "stop",
+      "latency_ms": 1566,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 389,
+          "prompt_tokens": 233,
+          "usd": "0.00010734",
+          "usd_known": true
+        }
+      ],
+      "case": 4,
+      "chose_kind": "target",
+      "completion_tokens": 389,
+      "finish_reason": "stop",
+      "latency_ms": 2857,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 212,
+          "prompt_tokens": 224,
+          "usd": "0.00006432",
+          "usd_known": true
+        }
+      ],
+      "case": 5,
+      "chose_kind": "target",
+      "completion_tokens": 212,
+      "finish_reason": "stop",
+      "latency_ms": 1745,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 260,
+          "prompt_tokens": 234,
+          "usd": "0.00007644",
+          "usd_known": true
+        }
+      ],
+      "case": 6,
+      "chose_kind": "target",
+      "completion_tokens": 260,
+      "finish_reason": "stop",
+      "latency_ms": 1923,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 287,
+          "prompt_tokens": 232,
+          "usd": "0.00008280",
+          "usd_known": true
+        }
+      ],
+      "case": 7,
+      "chose_kind": "talk",
+      "completion_tokens": 287,
+      "finish_reason": "stop",
+      "latency_ms": 2403,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 266,
+          "prompt_tokens": 234,
+          "usd": "0.00007788",
+          "usd_known": true
+        }
+      ],
+      "case": 8,
+      "chose_kind": "target",
+      "completion_tokens": 266,
+      "finish_reason": "stop",
+      "latency_ms": 2034,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 234,
+          "prompt_tokens": 233,
+          "usd": "0.00007014",
+          "usd_known": true
+        }
+      ],
+      "case": 9,
+      "chose_kind": "target",
+      "completion_tokens": 234,
+      "finish_reason": "stop",
+      "latency_ms": 1853,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 96,
+          "prompt_tokens": 232,
+          "usd": "0.00003696",
+          "usd_known": true
+        }
+      ],
+      "case": 10,
+      "chose_kind": "target",
+      "completion_tokens": 96,
+      "finish_reason": "stop",
+      "latency_ms": 929,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 232,
+          "prompt_tokens": 243,
+          "usd": "0.00007026",
+          "usd_known": true
+        }
+      ],
+      "case": 11,
+      "chose_kind": "target",
+      "completion_tokens": 232,
+      "finish_reason": "stop",
+      "latency_ms": 1859,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 80,
+          "prompt_tokens": 242,
+          "usd": "0.00003372",
+          "usd_known": true
+        }
+      ],
+      "case": 12,
+      "chose_kind": "target",
+      "completion_tokens": 80,
+      "finish_reason": "stop",
+      "latency_ms": 881,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 108,
+          "prompt_tokens": 256,
+          "usd": "0.00004128",
+          "usd_known": true
+        }
+      ],
+      "case": 13,
+      "chose_kind": "target",
+      "completion_tokens": 108,
+      "finish_reason": "stop",
+      "latency_ms": 1079,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 113,
+          "prompt_tokens": 258,
+          "usd": "0.00004260",
+          "usd_known": true
+        }
+      ],
+      "case": 14,
+      "chose_kind": "target",
+      "completion_tokens": 113,
+      "finish_reason": "stop",
+      "latency_ms": 1031,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 243,
+          "prompt_tokens": 255,
+          "usd": "0.00007362",
+          "usd_known": true
+        }
+      ],
+      "case": 15,
+      "chose_kind": "target",
+      "completion_tokens": 243,
+      "finish_reason": "stop",
+      "latency_ms": 1970,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 353,
+          "prompt_tokens": 274,
+          "usd": "0.00010116",
+          "usd_known": true
+        }
+      ],
+      "case": 16,
+      "chose_kind": "target",
+      "completion_tokens": 353,
+      "finish_reason": "stop",
+      "latency_ms": 2603,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 221,
+          "prompt_tokens": 548,
+          "usd": "0.00008592",
+          "usd_known": true
+        }
+      ],
+      "case": 1,
+      "chose_kind": "stand",
+      "completion_tokens": 221,
+      "finish_reason": "tool_calls",
+      "latency_ms": 912,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 240,
+          "prompt_tokens": 554,
+          "usd": "0.00009084",
+          "usd_known": true
+        }
+      ],
+      "case": 2,
+      "chose_kind": "target",
+      "completion_tokens": 240,
+      "finish_reason": "tool_calls",
+      "latency_ms": 983,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 314,
+          "prompt_tokens": 550,
+          "usd": "0.00010836",
+          "usd_known": true
+        }
+      ],
+      "case": 3,
+      "chose_kind": "stand",
+      "completion_tokens": 314,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1473,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 296,
+          "prompt_tokens": 578,
+          "usd": "0.00010572",
+          "usd_known": true
+        }
+      ],
+      "case": 4,
+      "chose_kind": "wait",
+      "completion_tokens": 296,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1389,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 131,
+          "prompt_tokens": 570,
+          "usd": "0.00006564",
+          "usd_known": true
+        }
+      ],
+      "case": 5,
+      "chose_kind": "target",
+      "completion_tokens": 131,
+      "finish_reason": "tool_calls",
+      "latency_ms": 795,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 189,
+          "prompt_tokens": 579,
+          "usd": "0.00008010",
+          "usd_known": true
+        }
+      ],
+      "case": 6,
+      "chose_kind": "wait",
+      "completion_tokens": 189,
+      "finish_reason": "tool_calls",
+      "latency_ms": 919,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 238,
+          "prompt_tokens": 575,
+          "usd": "0.00009162",
+          "usd_known": true
+        }
+      ],
+      "case": 7,
+      "chose_kind": "target",
+      "completion_tokens": 238,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1232,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 253,
+          "prompt_tokens": 580,
+          "usd": "0.00009552",
+          "usd_known": true
+        }
+      ],
+      "case": 8,
+      "chose_kind": "target",
+      "completion_tokens": 253,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1133,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 261,
+          "prompt_tokens": 593,
+          "usd": "0.00009822",
+          "usd_known": true
+        }
+      ],
+      "case": 9,
+      "chose_kind": "target",
+      "completion_tokens": 261,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1326,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 312,
+          "prompt_tokens": 591,
+          "usd": "0.00011034",
+          "usd_known": true
+        }
+      ],
+      "case": 10,
+      "chose_kind": "target",
+      "completion_tokens": 312,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1512,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 161,
+          "prompt_tokens": 598,
+          "usd": "0.00007452",
+          "usd_known": true
+        }
+      ],
+      "case": 11,
+      "chose_kind": "target",
+      "completion_tokens": 161,
+      "finish_reason": "tool_calls",
+      "latency_ms": 805,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 439,
+          "prompt_tokens": 611,
+          "usd": "0.00014202",
+          "usd_known": true
+        }
+      ],
+      "case": 12,
+      "chose_kind": "target",
+      "completion_tokens": 439,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1876,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 169,
+          "prompt_tokens": 624,
+          "usd": "0.00007800",
+          "usd_known": true
+        }
+      ],
+      "case": 13,
+      "chose_kind": "talk",
+      "completion_tokens": 169,
+      "finish_reason": "tool_calls",
+      "latency_ms": 982,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 274,
+          "prompt_tokens": 625,
+          "usd": "0.00010326",
+          "usd_known": true
+        }
+      ],
+      "case": 14,
+      "chose_kind": "target",
+      "completion_tokens": 274,
+      "finish_reason": "tool_calls",
+      "latency_ms": 1228,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 231,
+          "prompt_tokens": 637,
+          "usd": "0.00009366",
+          "usd_known": true
+        }
+      ],
+      "case": 15,
+      "chose_kind": "target",
+      "completion_tokens": 231,
+      "finish_reason": "tool_calls",
+      "latency_ms": 962,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 193,
+          "prompt_tokens": 657,
+          "usd": "0.00008574",
+          "usd_known": true
+        }
+      ],
+      "case": 16,
+      "chose_kind": "target",
+      "completion_tokens": 193,
+      "finish_reason": "tool_calls",
+      "latency_ms": 849,
+      "mechanism": "tool_call",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 992,
+          "prompt_tokens": 219,
+          "usd": "0.00025122",
+          "usd_known": true
+        }
+      ],
+      "case": 1,
+      "chose_kind": "target",
+      "completion_tokens": 992,
+      "finish_reason": "stop",
+      "latency_ms": 3444,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1389,
+          "prompt_tokens": 221,
+          "usd": "0.00034662",
+          "usd_known": true
+        }
+      ],
+      "case": 2,
+      "chose_kind": "target",
+      "completion_tokens": 1389,
+      "finish_reason": "stop",
+      "latency_ms": 4719,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 982,
+          "prompt_tokens": 220,
+          "usd": "0.00024888",
+          "usd_known": true
+        }
+      ],
+      "case": 3,
+      "chose_kind": "wait",
+      "completion_tokens": 982,
+      "finish_reason": "stop",
+      "latency_ms": 3478,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 6,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1038,
+          "prompt_tokens": 233,
+          "usd": "0.00026310",
+          "usd_known": true
+        }
+      ],
+      "case": 4,
+      "chose_kind": "wait",
+      "completion_tokens": 1038,
+      "finish_reason": "stop",
+      "latency_ms": 3538,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1251,
+          "prompt_tokens": 224,
+          "usd": "0.00031368",
+          "usd_known": true
+        }
+      ],
+      "case": 5,
+      "chose_kind": "wait",
+      "completion_tokens": 1251,
+      "finish_reason": "stop",
+      "latency_ms": 4327,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1161,
+          "prompt_tokens": 234,
+          "usd": "0.00029268",
+          "usd_known": true
+        }
+      ],
+      "case": 6,
+      "chose_kind": "wait",
+      "completion_tokens": 1161,
+      "finish_reason": "stop",
+      "latency_ms": 3905,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1050,
+          "prompt_tokens": 232,
+          "usd": "0.00026592",
+          "usd_known": true
+        }
+      ],
+      "case": 7,
+      "chose_kind": "wait",
+      "completion_tokens": 1050,
+      "finish_reason": "stop",
+      "latency_ms": 3676,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1208,
+          "prompt_tokens": 234,
+          "usd": "0.00030396",
+          "usd_known": true
+        }
+      ],
+      "case": 8,
+      "chose_kind": "wait",
+      "completion_tokens": 1208,
+      "finish_reason": "stop",
+      "latency_ms": 4147,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 7,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1095,
+          "prompt_tokens": 233,
+          "usd": "0.00027678",
+          "usd_known": true
+        }
+      ],
+      "case": 9,
+      "chose_kind": "wait",
+      "completion_tokens": 1095,
+      "finish_reason": "stop",
+      "latency_ms": 3706,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1163,
+          "prompt_tokens": 232,
+          "usd": "0.00029304",
+          "usd_known": true
+        }
+      ],
+      "case": 10,
+      "chose_kind": "wait",
+      "completion_tokens": 1163,
+      "finish_reason": "stop",
+      "latency_ms": 3970,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 639,
+          "prompt_tokens": 243,
+          "usd": "0.00016794",
+          "usd_known": true
+        }
+      ],
+      "case": 11,
+      "chose_kind": "wait",
+      "completion_tokens": 639,
+      "finish_reason": "stop",
+      "latency_ms": 2292,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 8,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1137,
+          "prompt_tokens": 242,
+          "usd": "0.00028740",
+          "usd_known": true
+        }
+      ],
+      "case": 12,
+      "chose_kind": "target",
+      "completion_tokens": 1137,
+      "finish_reason": "stop",
+      "latency_ms": 3909,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1006,
+          "prompt_tokens": 256,
+          "usd": "0.00025680",
+          "usd_known": true
+        }
+      ],
+      "case": 13,
+      "chose_kind": "wait",
+      "completion_tokens": 1006,
+      "finish_reason": "stop",
+      "latency_ms": 3423,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1741,
+          "prompt_tokens": 258,
+          "usd": "0.00043332",
+          "usd_known": true
+        }
+      ],
+      "case": 14,
+      "chose_kind": "wait",
+      "completion_tokens": 1741,
+      "finish_reason": "stop",
+      "latency_ms": 5921,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 9,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1302,
+          "prompt_tokens": 255,
+          "usd": "0.00032778",
+          "usd_known": true
+        }
+      ],
+      "case": 15,
+      "chose_kind": "wait",
+      "completion_tokens": 1302,
+      "finish_reason": "stop",
+      "latency_ms": 4411,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 1125,
+          "prompt_tokens": 274,
+          "usd": "0.00028644",
+          "usd_known": true
+        }
+      ],
+      "case": 16,
+      "chose_kind": "wait",
+      "completion_tokens": 1125,
+      "finish_reason": "stop",
+      "latency_ms": 3803,
+      "mechanism": "json_schema",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "options": 10,
+      "outcome": "offered_action",
+      "served_model_id": "nvidia/Nemotron-3_5-Lightning"
+    }
+  ],
+  "manifest_sha256": "35d1436a2ec1b7e36f398cf717182e9803fcfd11126bd380342de31b0a5377ba",
+  "profile": "exulanica.society-model-actions-probe-run/v1",
+  "spent_usd": "0.01581188",
+  "tree": {
+    "files_sha256": {
+      "assets/catalogs/society-words/society-inhabitant-words.v1.json": "da5b8f504ad2bcf41b20a7f78d59eb86ac9452eee248f7b5f6bbb3ca9aafe073",
+      "assets/catalogs/society/society-decision-action.v2.json": "c73eaa2e038660f9399a5523ccd0bcb00a9de221c99465d0ada1eb98a27fa772",
+      "assets/catalogs/society/society-decision-policy.v2.json": "f63a5473a3fe66d997e404ec8e0e74d4ee4ca6f6beaf1a1b86009f1f8cb4d7dc",
+      "docs/evaluation/2026-09-26-society-model-actions-probe-preregistration.json": "4b201e0f53a6bd6ec667e45d7462f3b5eb10ea23a70fac8696388f0c8ee275a5",
+      "docs/evaluation/artifacts/2026-09-26-society-model-actions/contexts.json": "c60f2b5b57dd935b7685572eef137abe14bd4e85dd10301626ba4fa6eaea9571",
+      "docs/synthetic-society-contract.md": "7492bd2d1f097429bc0bb88ce2237449e78977ea67a9ec36a01eb606f7b39229",
+      "exulanica/api/society_person_decisions.py": "dfbbd87536a3a27adbf38a7a0169a08c9b7efbaa2f9c5f0d85c287cedfd88aa2",
+      "exulanica/world/society_catalogs.py": "9ede8f5b658624ddcc1eeb35131ed749efb40aaeb158861aeef23e10fdc63f7d",
+      "exulanica/world/society_decision_contract.py": "297018453e36f48209702ccbc61e036c75c0840a323c03673ce59f2969ddf90e",
+      "exulanica/world/society_decision_repository.py": "644b6b05abffbb4e0f192cfcedfbe70ab93303d1be0788b4af4ebd190ab7e7e3",
+      "exulanica/world/society_decisions.py": "bfa45c1171d3405802505a8470a70a409f14f3e80ef46a66b4d8ad4ef8acb14e",
+      "exulanica/world/society_model_decisions.py": "ee53e65cdd46194061c65ca081a64a1ff223d98e02d8d027244565690e6240bf",
+      "exulanica/world/society_planner.py": "a81f1953eed6e039eb2cd718a9a0f69f5b13e77d7d4bd587a901a5dedebb4e00",
+      "scripts/measure_society_model_actions.py": "785722def70344466f74177fe56592d45052c3dea1d3fb358069e7825fc99797",
+      "tests/test_catalog_provenance.py": "e2fdec42585ee8b0b48b2fa7aff89474e13060b9bd19591a85dcccb063b7a6f2",
+      "tests/test_society_model_actions.py": "331c5671280743fbe7eb23fa98a4a53bb8befe5647c240f7ee87d20742136bde",
+      "tests/test_society_model_actions_postgres.py": "ca194b932aca62c297cde8c51f730b1a7dee35c2b28e23b3088e7f35f1afd9ad",
+      "tests/test_society_person_decisions_postgres.py": "72a3f91748ae573e955bd35fb7f48165c432b0399cf32fb8d2f2198190d8f2ac",
+      "tests/test_society_versions_survive_upgrades.py": "2e4ae310880dfaba35631c3bada66751b50eaa6673e69630e6257d9fa35667ae",
+      "web/packages/app/src/ui/society-models.ts": "3df69818ef459ee62afca881b1ca0f96c45166e0a5a4e2a335d46c43151d4f26"
+    },
+    "head": "fbc735a447219c441306cfb0d57b0c84fc9155eb"
+  }
+}

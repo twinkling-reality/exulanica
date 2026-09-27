@@ -184,10 +184,11 @@ export function buildSocietyModels(handlers: {
   const about = el('p', {
     class: 'world-help',
     text: 'Each person follows their own routine unless you choose a model to decide for them. A '
-      + 'model is asked only when their routine would choose what to do next. It picks a place '
-      + 'with room for them to go to, or waiting where they are, and every answer is checked before '
-      + 'anyone acts on it. What it chose is kept in this world\'s history and replayed from there, '
-      + 'never asked again.',
+      + 'model is asked only when their routine would choose what to do next, and it picks among '
+      + 'what their routine would let them do then: go to a place with room for them, stand a while '
+      + 'nearby, stop to talk with someone near who is free to, or wait where they are. Every answer '
+      + 'is checked before anyone acts on it. What it chose is kept in this world\'s history and '
+      + 'replayed from there, never asked again.',
   });
   const host = el('p', { class: 'society-models-host', role: 'status' });
   const model = el('select', { 'aria-label': 'Who decides' }) as HTMLSelectElement;

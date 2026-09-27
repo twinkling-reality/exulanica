@@ -1,0 +1,129 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": [
+      "routine",
+      "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "nvidia/Nemotron-3_5-Lightning"
+    ],
+    "bound_usd": "0.20",
+    "bound_why": "the decision contract lets people's decisions spend all but process_reserve_percent of the process's ceiling, and nothing else in the run's process asks a model, so the run spends at most its bound",
+    "contract": {
+      "catalog_versions": {
+        "society-decision-action": 2,
+        "society-decision-policy": 2
+      },
+      "sha256": "ec540b58aa9cf5bd288a933f5e18e304321dd2d09039ff13ce642bdfe5102ecd"
+    },
+    "dry_run": {
+      "artifact": "docs/evaluation/artifacts/2026-09-26-society-model-actions/dry-run.json",
+      "decisions_per_arm": {
+        "Qwen/Qwen3-235B-A22B-Instruct-2507": 82,
+        "deepseek-ai/DeepSeek-V4-Flash-0731": 79,
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": 74,
+        "nvidia/Nemotron-3_5-Lightning": 76,
+        "routine": 0
+      },
+      "scripted_calls": 311,
+      "sha256": "72444917e559503bc72d08e78bb4c0d9a0f56324715f4a9f4d22b5935d14319c"
+    },
+    "earlier_measurements": [
+      "The probe (docs/evaluation/2026-09-26-society-model-actions-probe.json) asked every offered model recorded choices by both mechanisms before this was written; what its rules selected is what the tree below holds, and its calls are not read here."
+    ],
+    "harness_intervention": "each claim is made due at once, its next_due_at set a millisecond back, where a host waits its base interval",
+    "manifest_sha256": "2c1b6dc9feeb09aea65158065cd3a4625a64f5cc8923571809df3f8a3586ed2a",
+    "measured": [
+      "decisions, asked, accepted, accepted on the first answer, applied",
+      "what was offered and what was chosen, by kind (go by activity, wait, stand, talk), and what was applied, by kind",
+      "conversations started, conversations a model chose, people who joined one, stands a model chose and stands started, from the society's events",
+      "why each settled decision was not acted on, by reason",
+      "timeouts; answer time p50, p95 and longest; prompt and completion tokens; cost, and per simulated hour",
+      "person-minutes walking, using, waiting, standing and talking",
+      "each claim's wall time; claims that advanced more than one minute",
+      "the host's refusal, if any, when each arm ends",
+      "replay verified, and the billed calls made during replay"
+    ],
+    "mechanisms": {
+      "Qwen/Qwen3-235B-A22B-Instruct-2507": "tool_call",
+      "deepseek-ai/DeepSeek-V4-Flash-0731": "tool_call",
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": "json_schema",
+      "nvidia/Nemotron-3_5-Lightning": "tool_call"
+    },
+    "not_covered": [
+      "One square, one seed and one hour of simulated time per model; other worlds, seeds and longer runs are not measured.",
+      "The people are all run by one model in each arm; worlds mixing models, or mixing models with the routine, are not measured.",
+      "Whether a model's choices are better for the people than the routine's is not judged; the record states what each chose and what came of it.",
+      "Answer time is the provider's from this machine at the time of the run, not a deployment's."
+    ],
+    "played_by": "the playback worker the application builds for the workspaces it lists (Services.build_society_control_worker), one claim at a time: the claim, the host's decision phase before the minute (PersonDecisionHost.before_minute), then the minute",
+    "probe_record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+    "probe_record_sha256": "df532efede523f9270ac42c4a631fc0f7546f517daa83c22970bcd1a1dbf9303",
+    "probe_selected": {
+      "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+        "answering_order": null,
+        "attempt_bound_ms": null
+      },
+      "deepseek-ai/DeepSeek-V4-Flash-0731": {
+        "answering_order": null,
+        "attempt_bound_ms": null
+      },
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+        "answering_order": [
+          "json_schema",
+          "tool_call"
+        ],
+        "attempt_bound_ms": null
+      },
+      "nvidia/Nemotron-3_5-Lightning": {
+        "answering_order": null,
+        "attempt_bound_ms": null
+      }
+    },
+    "process_ceiling_usd": "0.400000",
+    "process_max_calls": 8000,
+    "prompt_version": "society-person-choice/v1",
+    "question": "Each open model the manifest offers deciding for the eight people of the small square for 60 simulated minutes, as a host's playback plays a world, under the decision contract's second version: what does it choose, by kind, how many conversations start, what is refused and why, how long do answers take, how many time out and what does a simulated hour cost, beside the routine alone?",
+    "record": "docs/evaluation/2026-09-26-society-model-actions.json",
+    "seed": "7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+    "ticks": 60,
+    "tree": {
+      "files_sha256": {
+        "assets/catalogs/society-words/society-inhabitant-words.v1.json": "da5b8f504ad2bcf41b20a7f78d59eb86ac9452eee248f7b5f6bbb3ca9aafe073",
+        "assets/catalogs/society/society-decision-action.v2.json": "c73eaa2e038660f9399a5523ccd0bcb00a9de221c99465d0ada1eb98a27fa772",
+        "assets/catalogs/society/society-decision-policy.v2.json": "f63a5473a3fe66d997e404ec8e0e74d4ee4ca6f6beaf1a1b86009f1f8cb4d7dc",
+        "docs/evaluation/2026-09-26-society-model-actions-probe-preregistration.json": "4b201e0f53a6bd6ec667e45d7462f3b5eb10ea23a70fac8696388f0c8ee275a5",
+        "docs/evaluation/2026-09-26-society-model-actions-probe.json": "711e529a99a79b5f0177fc51da670542c300d6004325adf6fa4f51fd5a06e4e7",
+        "docs/evaluation/artifacts/2026-09-26-society-model-actions/contexts.json": "c60f2b5b57dd935b7685572eef137abe14bd4e85dd10301626ba4fa6eaea9571",
+        "docs/evaluation/artifacts/2026-09-26-society-model-actions/dry-run.json": "72444917e559503bc72d08e78bb4c0d9a0f56324715f4a9f4d22b5935d14319c",
+        "docs/evaluation/artifacts/2026-09-26-society-model-actions/measure_society_model_actions-probe-as-run.py.txt": "785722def70344466f74177fe56592d45052c3dea1d3fb358069e7825fc99797",
+        "docs/evaluation/artifacts/2026-09-26-society-model-actions/measure_society_model_actions-probe-record-as-run.py.txt": "1b5cdcbba3f7972b62762aba366603bed9f52ab89855a2555412a1d27856dd2a",
+        "docs/evaluation/artifacts/2026-09-26-society-model-actions/probe-run.json": "cac64c44866e41c6259bbbebc65bcd73a649bd298f83dfe186bcc3a681d04c1a",
+        "docs/model-and-service-selection.md": "1e6930bf563776d8a55769e2155832da0874303732804cffe01c8699bd437e94",
+        "docs/synthetic-society-contract.md": "7492bd2d1f097429bc0bb88ce2237449e78977ea67a9ec36a01eb606f7b39229",
+        "exulanica/api/society_person_decisions.py": "dfbbd87536a3a27adbf38a7a0169a08c9b7efbaa2f9c5f0d85c287cedfd88aa2",
+        "exulanica/models/manifest.py": "26c7f704b423d54ab5ae077e9edfc126b8e5d81ae2c5cfbda809f19b1da57a3b",
+        "exulanica/models/models.manifest.json": "2c1b6dc9feeb09aea65158065cd3a4625a64f5cc8923571809df3f8a3586ed2a",
+        "exulanica/world/society_catalogs.py": "9ede8f5b658624ddcc1eeb35131ed749efb40aaeb158861aeef23e10fdc63f7d",
+        "exulanica/world/society_decision_contract.py": "a8b470058037294983c6899790ba5cf8cd573504f0abe5f8272580d0220cc3ef",
+        "exulanica/world/society_decision_repository.py": "644b6b05abffbb4e0f192cfcedfbe70ab93303d1be0788b4af4ebd190ab7e7e3",
+        "exulanica/world/society_decisions.py": "bfa45c1171d3405802505a8470a70a409f14f3e80ef46a66b4d8ad4ef8acb14e",
+        "exulanica/world/society_model_decisions.py": "ee53e65cdd46194061c65ca081a64a1ff223d98e02d8d027244565690e6240bf",
+        "exulanica/world/society_planner.py": "a81f1953eed6e039eb2cd718a9a0f69f5b13e77d7d4bd587a901a5dedebb4e00",
+        "scripts/measure_society_model_actions.py": "fa8f69a9bd598ad156b75d195fba8181fb19a0e0f5d87f05d4522fb572683381",
+        "tests/test_catalog_provenance.py": "e2fdec42585ee8b0b48b2fa7aff89474e13060b9bd19591a85dcccb063b7a6f2",
+        "tests/test_model_providers.py": "6efd1ebfcb4c12a24159e1d0d8d09debf7bac65eda871bd9de4271ab56c8dade",
+        "tests/test_society_model_actions.py": "509a08b7ad55112d12e24504850634e8a8296f369eb4a20270f2f009eee4e123",
+        "tests/test_society_model_actions_postgres.py": "ca194b932aca62c297cde8c51f730b1a7dee35c2b28e23b3088e7f35f1afd9ad",
+        "tests/test_society_person_decisions_postgres.py": "72a3f91748ae573e955bd35fb7f48165c432b0399cf32fb8d2f2198190d8f2ac",
+        "tests/test_society_versions_survive_upgrades.py": "2e4ae310880dfaba35631c3bada66751b50eaa6673e69630e6257d9fa35667ae",
+        "web/packages/app/src/ui/society-models.ts": "3df69818ef459ee62afca881b1ca0f96c45166e0a5a4e2a335d46c43151d4f26"
+      },
+      "head": "fbc735a447219c441306cfb0d57b0c84fc9155eb"
+    },
+    "world": "a starter world per arm, the small square placed where a person arrives, its people brought in with the profile exulanica-society/v2, every person chosen for the arm's model, and the world set playing at speed 1 through the control route",
+    "written_before_this_measurement_asked_any_model": true
+  },
+  "record_sha256": "4605de5fd7799baec20a8e8a03b6e72ba2505c790ca19bd4da36dfb9679ac6a7"
+}

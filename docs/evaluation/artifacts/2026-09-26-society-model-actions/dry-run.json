@@ -1,0 +1,433 @@
+{
+  "models": [
+    {
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "provider": "nebius_token_factory"
+    },
+    {
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "provider": "nebius_token_factory"
+    },
+    {
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "provider": "nebius_token_factory"
+    },
+    {
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "provider": "nebius_token_factory"
+    }
+  ],
+  "profile": "exulanica.society-model-actions-dry-run/v1",
+  "scripted_calls": 311,
+  "summaries": [
+    {
+      "accepted": 0,
+      "applied": 0,
+      "applied_by_kind": {},
+      "arm": "routine",
+      "asked": 0,
+      "billed_calls_during_replay": 0,
+      "by_reason": {},
+      "chose": {},
+      "chose_by_kind": {},
+      "claim_ms": {
+        "longest": 395,
+        "p50": 182,
+        "p95": 327
+      },
+      "claims": 60,
+      "claims_advancing_more_than_one_minute": 0,
+      "completion_tokens": 0,
+      "cost_known": true,
+      "cost_usd": "0",
+      "cost_usd_per_simulated_hour": "0.000000",
+      "decisions": 0,
+      "events": {
+        "began_standing": 9,
+        "began_talking": 16,
+        "stand_goals_a_model_chose": 0,
+        "stopped_with_route_invalidated": 0,
+        "talk_goals_a_model_chose": 0,
+        "talk_goals_joined_or_the_routines": 16
+      },
+      "first_answer_accepted": 0,
+      "host_refusal_at_the_end": null,
+      "latency_ms": {
+        "longest": null,
+        "p50": null,
+        "p95": null
+      },
+      "not_acted_on": {},
+      "offered": {},
+      "people": 8,
+      "person_minutes": {
+        "stand": 26,
+        "talk": 75,
+        "using": 310,
+        "walking": 69
+      },
+      "prompt_tokens": 0,
+      "replay_verified": true,
+      "settled": 0,
+      "timeouts": 0
+    },
+    {
+      "accepted": 82,
+      "applied": 68,
+      "applied_by_kind": {
+        "stand": 10,
+        "talk": 3,
+        "target": 43,
+        "wait": 12
+      },
+      "arm": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "asked": 82,
+      "billed_calls_during_replay": 0,
+      "by_reason": {
+        "validated_choice": 82
+      },
+      "chose": {
+        "go:rest_bench": 18,
+        "go:rest_cafe_table": 5,
+        "go:rest_seating_planter": 8,
+        "go:visit_market_stall": 4,
+        "go:visit_planter_tree": 9,
+        "stand": 10,
+        "talk": 16,
+        "wait": 12
+      },
+      "chose_by_kind": {
+        "stand": 10,
+        "talk": 16,
+        "target": 44,
+        "wait": 12
+      },
+      "claim_ms": {
+        "longest": 1454,
+        "p50": 407,
+        "p95": 902
+      },
+      "claims": 60,
+      "claims_advancing_more_than_one_minute": 0,
+      "completion_tokens": 24600,
+      "cost_known": true,
+      "cost_usd": "0.02788000",
+      "cost_usd_per_simulated_hour": "0.027880",
+      "decisions": 82,
+      "events": {
+        "began_standing": 12,
+        "began_talking": 6,
+        "stand_goals_a_model_chose": 10,
+        "stopped_with_route_invalidated": 0,
+        "talk_goals_a_model_chose": 3,
+        "talk_goals_joined_or_the_routines": 3
+      },
+      "first_answer_accepted": 82,
+      "host_refusal_at_the_end": null,
+      "latency_ms": {
+        "longest": 59,
+        "p50": 8,
+        "p95": 11
+      },
+      "not_acted_on": {
+        "partner_busy": 12,
+        "place_taken_this_minute": 1,
+        "subject_already_decided": 1
+      },
+      "offered": {
+        "stand": 82,
+        "talk": 59,
+        "target": 82,
+        "wait": 82
+      },
+      "people": 8,
+      "person_minutes": {
+        "stand": 25,
+        "talk": 28,
+        "using": 345,
+        "waiting": 12,
+        "walking": 70
+      },
+      "prompt_tokens": 65600,
+      "replay_verified": true,
+      "settled": 82,
+      "timeouts": 0
+    },
+    {
+      "accepted": 79,
+      "applied": 74,
+      "applied_by_kind": {
+        "stand": 15,
+        "talk": 2,
+        "target": 43,
+        "wait": 14
+      },
+      "arm": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "asked": 79,
+      "billed_calls_during_replay": 0,
+      "by_reason": {
+        "validated_choice": 79
+      },
+      "chose": {
+        "go:rest_bench": 15,
+        "go:rest_cafe_table": 7,
+        "go:rest_seating_planter": 5,
+        "go:visit_market_stall": 12,
+        "go:visit_planter_tree": 5,
+        "stand": 15,
+        "talk": 6,
+        "wait": 14
+      },
+      "chose_by_kind": {
+        "stand": 15,
+        "talk": 6,
+        "target": 44,
+        "wait": 14
+      },
+      "claim_ms": {
+        "longest": 1491,
+        "p50": 383,
+        "p95": 617
+      },
+      "claims": 60,
+      "claims_advancing_more_than_one_minute": 0,
+      "completion_tokens": 23700,
+      "cost_known": true,
+      "cost_usd": "0.01548400",
+      "cost_usd_per_simulated_hour": "0.015484",
+      "decisions": 79,
+      "events": {
+        "began_standing": 16,
+        "began_talking": 4,
+        "stand_goals_a_model_chose": 15,
+        "stopped_with_route_invalidated": 0,
+        "talk_goals_a_model_chose": 2,
+        "talk_goals_joined_or_the_routines": 2
+      },
+      "first_answer_accepted": 79,
+      "host_refusal_at_the_end": null,
+      "latency_ms": {
+        "longest": 33,
+        "p50": 7,
+        "p95": 11
+      },
+      "not_acted_on": {
+        "partner_busy": 4,
+        "place_taken_this_minute": 1
+      },
+      "offered": {
+        "stand": 79,
+        "talk": 50,
+        "target": 79,
+        "wait": 79
+      },
+      "people": 8,
+      "person_minutes": {
+        "stand": 39,
+        "talk": 18,
+        "using": 344,
+        "waiting": 14,
+        "walking": 65
+      },
+      "prompt_tokens": 63200,
+      "replay_verified": true,
+      "settled": 79,
+      "timeouts": 0
+    },
+    {
+      "accepted": 74,
+      "applied": 65,
+      "applied_by_kind": {
+        "stand": 15,
+        "talk": 3,
+        "target": 40,
+        "wait": 7
+      },
+      "arm": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "asked": 74,
+      "billed_calls_during_replay": 0,
+      "by_reason": {
+        "validated_choice": 74
+      },
+      "chose": {
+        "go:rest_bench": 17,
+        "go:rest_cafe_table": 3,
+        "go:rest_seating_planter": 8,
+        "go:visit_market_stall": 6,
+        "go:visit_planter_tree": 6,
+        "stand": 15,
+        "talk": 12,
+        "wait": 7
+      },
+      "chose_by_kind": {
+        "stand": 15,
+        "talk": 12,
+        "target": 40,
+        "wait": 7
+      },
+      "claim_ms": {
+        "longest": 1488,
+        "p50": 334,
+        "p95": 627
+      },
+      "claims": 60,
+      "claims_advancing_more_than_one_minute": 0,
+      "completion_tokens": 22200,
+      "cost_known": true,
+      "cost_usd": "0.00888000",
+      "cost_usd_per_simulated_hour": "0.008880",
+      "decisions": 74,
+      "events": {
+        "began_standing": 16,
+        "began_talking": 6,
+        "stand_goals_a_model_chose": 15,
+        "stopped_with_route_invalidated": 0,
+        "talk_goals_a_model_chose": 3,
+        "talk_goals_joined_or_the_routines": 3
+      },
+      "first_answer_accepted": 74,
+      "host_refusal_at_the_end": null,
+      "latency_ms": {
+        "longest": 22,
+        "p50": 9,
+        "p95": 16
+      },
+      "not_acted_on": {
+        "partner_busy": 8,
+        "subject_already_decided": 1
+      },
+      "offered": {
+        "stand": 74,
+        "talk": 53,
+        "target": 74,
+        "wait": 74
+      },
+      "people": 8,
+      "person_minutes": {
+        "stand": 30,
+        "talk": 29,
+        "using": 348,
+        "waiting": 7,
+        "walking": 66
+      },
+      "prompt_tokens": 59200,
+      "replay_verified": true,
+      "settled": 74,
+      "timeouts": 0
+    },
+    {
+      "accepted": 76,
+      "applied": 64,
+      "applied_by_kind": {
+        "stand": 9,
+        "talk": 6,
+        "target": 40,
+        "wait": 9
+      },
+      "arm": "nvidia/Nemotron-3_5-Lightning",
+      "asked": 76,
+      "billed_calls_during_replay": 0,
+      "by_reason": {
+        "validated_choice": 76
+      },
+      "chose": {
+        "go:rest_bench": 13,
+        "go:rest_cafe_table": 4,
+        "go:rest_seating_planter": 11,
+        "go:visit_market_stall": 6,
+        "go:visit_planter_tree": 6,
+        "stand": 9,
+        "talk": 18,
+        "wait": 9
+      },
+      "chose_by_kind": {
+        "stand": 9,
+        "talk": 18,
+        "target": 40,
+        "wait": 9
+      },
+      "claim_ms": {
+        "longest": 1004,
+        "p50": 282,
+        "p95": 496
+      },
+      "claims": 60,
+      "claims_advancing_more_than_one_minute": 0,
+      "completion_tokens": 22800,
+      "cost_known": true,
+      "cost_usd": "0.00912000",
+      "cost_usd_per_simulated_hour": "0.009120",
+      "decisions": 76,
+      "events": {
+        "began_standing": 10,
+        "began_talking": 12,
+        "stand_goals_a_model_chose": 9,
+        "stopped_with_route_invalidated": 0,
+        "talk_goals_a_model_chose": 6,
+        "talk_goals_joined_or_the_routines": 6
+      },
+      "first_answer_accepted": 76,
+      "host_refusal_at_the_end": null,
+      "latency_ms": {
+        "longest": 14,
+        "p50": 7,
+        "p95": 11
+      },
+      "not_acted_on": {
+        "partner_busy": 11,
+        "subject_already_decided": 1
+      },
+      "offered": {
+        "stand": 76,
+        "talk": 49,
+        "target": 76,
+        "wait": 76
+      },
+      "people": 8,
+      "person_minutes": {
+        "stand": 15,
+        "talk": 52,
+        "using": 339,
+        "waiting": 9,
+        "walking": 65
+      },
+      "prompt_tokens": 60800,
+      "replay_verified": true,
+      "settled": 76,
+      "timeouts": 0
+    }
+  ],
+  "tree": {
+    "files_sha256": {
+      "assets/catalogs/society-words/society-inhabitant-words.v1.json": "da5b8f504ad2bcf41b20a7f78d59eb86ac9452eee248f7b5f6bbb3ca9aafe073",
+      "assets/catalogs/society/society-decision-action.v2.json": "c73eaa2e038660f9399a5523ccd0bcb00a9de221c99465d0ada1eb98a27fa772",
+      "assets/catalogs/society/society-decision-policy.v2.json": "f63a5473a3fe66d997e404ec8e0e74d4ee4ca6f6beaf1a1b86009f1f8cb4d7dc",
+      "docs/evaluation/2026-09-26-society-model-actions-probe-preregistration.json": "4b201e0f53a6bd6ec667e45d7462f3b5eb10ea23a70fac8696388f0c8ee275a5",
+      "docs/evaluation/2026-09-26-society-model-actions-probe.json": "711e529a99a79b5f0177fc51da670542c300d6004325adf6fa4f51fd5a06e4e7",
+      "docs/evaluation/artifacts/2026-09-26-society-model-actions/contexts.json": "c60f2b5b57dd935b7685572eef137abe14bd4e85dd10301626ba4fa6eaea9571",
+      "docs/evaluation/artifacts/2026-09-26-society-model-actions/measure_society_model_actions-probe-as-run.py.txt": "785722def70344466f74177fe56592d45052c3dea1d3fb358069e7825fc99797",
+      "docs/evaluation/artifacts/2026-09-26-society-model-actions/measure_society_model_actions-probe-record-as-run.py.txt": "1b5cdcbba3f7972b62762aba366603bed9f52ab89855a2555412a1d27856dd2a",
+      "docs/evaluation/artifacts/2026-09-26-society-model-actions/probe-run.json": "cac64c44866e41c6259bbbebc65bcd73a649bd298f83dfe186bcc3a681d04c1a",
+      "docs/model-and-service-selection.md": "1e6930bf563776d8a55769e2155832da0874303732804cffe01c8699bd437e94",
+      "docs/synthetic-society-contract.md": "7492bd2d1f097429bc0bb88ce2237449e78977ea67a9ec36a01eb606f7b39229",
+      "exulanica/api/society_person_decisions.py": "dfbbd87536a3a27adbf38a7a0169a08c9b7efbaa2f9c5f0d85c287cedfd88aa2",
+      "exulanica/models/manifest.py": "26c7f704b423d54ab5ae077e9edfc126b8e5d81ae2c5cfbda809f19b1da57a3b",
+      "exulanica/models/models.manifest.json": "2c1b6dc9feeb09aea65158065cd3a4625a64f5cc8923571809df3f8a3586ed2a",
+      "exulanica/world/society_catalogs.py": "9ede8f5b658624ddcc1eeb35131ed749efb40aaeb158861aeef23e10fdc63f7d",
+      "exulanica/world/society_decision_contract.py": "a8b470058037294983c6899790ba5cf8cd573504f0abe5f8272580d0220cc3ef",
+      "exulanica/world/society_decision_repository.py": "644b6b05abffbb4e0f192cfcedfbe70ab93303d1be0788b4af4ebd190ab7e7e3",
+      "exulanica/world/society_decisions.py": "bfa45c1171d3405802505a8470a70a409f14f3e80ef46a66b4d8ad4ef8acb14e",
+      "exulanica/world/society_model_decisions.py": "ee53e65cdd46194061c65ca081a64a1ff223d98e02d8d027244565690e6240bf",
+      "exulanica/world/society_planner.py": "a81f1953eed6e039eb2cd718a9a0f69f5b13e77d7d4bd587a901a5dedebb4e00",
+      "scripts/measure_society_model_actions.py": "fa8f69a9bd598ad156b75d195fba8181fb19a0e0f5d87f05d4522fb572683381",
+      "tests/test_catalog_provenance.py": "e2fdec42585ee8b0b48b2fa7aff89474e13060b9bd19591a85dcccb063b7a6f2",
+      "tests/test_model_providers.py": "6efd1ebfcb4c12a24159e1d0d8d09debf7bac65eda871bd9de4271ab56c8dade",
+      "tests/test_society_model_actions.py": "509a08b7ad55112d12e24504850634e8a8296f369eb4a20270f2f009eee4e123",
+      "tests/test_society_model_actions_postgres.py": "ca194b932aca62c297cde8c51f730b1a7dee35c2b28e23b3088e7f35f1afd9ad",
+      "tests/test_society_person_decisions_postgres.py": "72a3f91748ae573e955bd35fb7f48165c432b0399cf32fb8d2f2198190d8f2ac",
+      "tests/test_society_versions_survive_upgrades.py": "2e4ae310880dfaba35631c3bada66751b50eaa6673e69630e6257d9fa35667ae",
+      "web/packages/app/src/ui/society-models.ts": "3df69818ef459ee62afca881b1ca0f96c45166e0a5a4e2a335d46c43151d4f26"
+    },
+    "head": "fbc735a447219c441306cfb0d57b0c84fc9155eb"
+  }
+}

@@ -196,6 +196,12 @@ class ModelSpec:
     answering: Mapping[AnsweringMechanism, str] = field(
         default_factory=lambda: MappingProxyType({}), hash=False
     )
+    #: The order this model is asked a choice by where a measurement found it answers better that
+    #: way than in the order a caller's contract prefers: each mechanism once, each verified in
+    #: ``answering``, with the record that measured it and why. Empty: the caller's own order.
+    answering_order: tuple[AnsweringMechanism, ...] = ()
+    answering_order_record: str | None = None
+    answering_order_reason: str | None = None
 
     def cost_usd(self, *, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Billable cost of one call, exactly.
@@ -525,6 +531,49 @@ def _answering(model_id: str, raw: Any) -> Mapping[AnsweringMechanism, str]:
     return MappingProxyType(answering)
 
 
+def _answering_order(
+    model_id: str, raw: Any, answering: Mapping[AnsweringMechanism, str]
+) -> tuple[tuple[AnsweringMechanism, ...], str | None, str | None]:
+    """A model's own answering order, its record and its reason; nothing where none is stated."""
+    if raw is None:
+        return (), None, None
+    fields = {"mechanisms", "record", "reason"}
+    if not isinstance(raw, Mapping) or set(raw) != fields:
+        raise ManifestError(
+            f"{model_id}: answering_order states exactly {sorted(fields)}: the mechanisms in the "
+            "order the model is asked by, the record that measured them and why"
+        )
+    mechanisms = raw["mechanisms"]
+    if not isinstance(mechanisms, list) or not mechanisms:
+        raise ManifestError(f"{model_id}: answering_order names at least one mechanism")
+    order: list[AnsweringMechanism] = []
+    for mechanism in mechanisms:
+        try:
+            key = AnsweringMechanism(mechanism)
+        except ValueError as exc:
+            raise ManifestError(
+                f"{model_id}: answering_order names {mechanism!r}, which is not a mechanism the "
+                "client asks by"
+            ) from exc
+        if key not in answering:
+            raise ManifestError(
+                f"{model_id}: answering_order names {mechanism!r}, which its answering does not "
+                "verify"
+            )
+        if key in order:
+            raise ManifestError(f"{model_id}: answering_order names {mechanism!r} twice")
+        order.append(key)
+    record, reason = raw["record"], raw["reason"]
+    if not isinstance(record, str) or not _RECORD_PATH.fullmatch(record):
+        raise ManifestError(
+            f"{model_id}: answering_order names the record that measured it, a docs/evaluation "
+            f"JSON path, not {record!r}"
+        )
+    if not isinstance(reason, str) or not reason.strip():
+        raise ManifestError(f"{model_id}: answering_order says why, in a sentence")
+    return tuple(order), record, reason
+
+
 def _spec_from(
     model_id: str, raw: Mapping[str, Any], providers: Mapping[str, Provider]
 ) -> ModelSpec:
@@ -546,6 +595,10 @@ def _spec_from(
     provider = _text(raw, "provider", model_id)
     if provider not in providers:
         raise ManifestError(f"{model_id}: provider {provider!r} is not declared in providers")
+    answering = _answering(model_id, raw.get("answering"))
+    order, order_record, order_reason = _answering_order(
+        model_id, raw.get("answering_order"), answering
+    )
     return ModelSpec(
         model_id=model_id,
         provider=provider,
@@ -565,7 +618,10 @@ def _spec_from(
             None if raw.get("embedding_dimensions") is None else int(raw["embedding_dimensions"])
         ),
         note=str(raw.get("note", "")),
-        answering=_answering(model_id, raw.get("answering")),
+        answering=answering,
+        answering_order=order,
+        answering_order_record=order_record,
+        answering_order_reason=order_reason,
     )
 
 

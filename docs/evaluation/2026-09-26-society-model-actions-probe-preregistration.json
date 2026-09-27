@@ -1,0 +1,259 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "asked": "each case once per mechanism per model, one call at a time, through ModelClient.choose with decision_messages, choice_request, the host's token bound for the model (answer_tokens), the contract's deadline and temperature 0; no retry",
+    "bound_usd": "0.03",
+    "cases": [
+      {
+        "context_sha256": "ed34ec4e6cc29ca1ef85b741efd3cd1f0efb838bc5c9a0273ce73191aa16f579",
+        "kinds": {
+          "stand": 1,
+          "target": 4,
+          "wait": 1
+        },
+        "options": 6,
+        "subject_id": "d0b8b025-3677-571c-8aef-76207b24f892",
+        "tick": 6
+      },
+      {
+        "context_sha256": "395ff1cd84d0a82414305fb69193b7a348e0322cc748c55463c1c3bd8f579b28",
+        "kinds": {
+          "stand": 1,
+          "target": 4,
+          "wait": 1
+        },
+        "options": 6,
+        "subject_id": "5aeb2998-a61e-5b81-a8c5-cff7d08dba46",
+        "tick": 9
+      },
+      {
+        "context_sha256": "c6053e23628a81d41928086b635a2dad00fe6838c782cc827ad23a941daa534c",
+        "kinds": {
+          "stand": 1,
+          "target": 4,
+          "wait": 1
+        },
+        "options": 6,
+        "subject_id": "d0b8b025-3677-571c-8aef-76207b24f892",
+        "tick": 14
+      },
+      {
+        "context_sha256": "b80e72dc217cce2979f2b6ad6d5244522d7da285c8cd11ff885b5751034f7591",
+        "kinds": {
+          "stand": 1,
+          "talk": 1,
+          "target": 4,
+          "wait": 1
+        },
+        "options": 7,
+        "subject_id": "6ff1a3dc-1495-595a-a214-1e6fa21d2623",
+        "tick": 3
+      },
+      {
+        "context_sha256": "9217e4fbea04132039e4eaf5756fdc33559603023427ebf5e1a3d6aa130f51a8",
+        "kinds": {
+          "stand": 1,
+          "target": 5,
+          "wait": 1
+        },
+        "options": 7,
+        "subject_id": "466299f6-dd0e-5c33-b91e-73f73e12f28f",
+        "tick": 8
+      },
+      {
+        "context_sha256": "c7881e5e28d15c8356e5ccbf7263abcea64bdd0c81a73731dc7e31c51b0a9ceb",
+        "kinds": {
+          "stand": 1,
+          "talk": 1,
+          "target": 4,
+          "wait": 1
+        },
+        "options": 7,
+        "subject_id": "d0b8b025-3677-571c-8aef-76207b24f892",
+        "tick": 16
+      },
+      {
+        "context_sha256": "c268bea906368a01601c72974b17439b9bcd9fe59e6dc27f2162bb426bdbed59",
+        "kinds": {
+          "stand": 1,
+          "talk": 1,
+          "target": 4,
+          "wait": 1
+        },
+        "options": 7,
+        "subject_id": "6ff1a3dc-1495-595a-a214-1e6fa21d2623",
+        "tick": 18
+      },
+      {
+        "context_sha256": "e9ea9a52b9af7ed7b328ae172033ed0ce70716f0e5099f9d64b45012bf1e1109",
+        "kinds": {
+          "stand": 1,
+          "target": 5,
+          "wait": 1
+        },
+        "options": 7,
+        "subject_id": "d0b8b025-3677-571c-8aef-76207b24f892",
+        "tick": 27
+      },
+      {
+        "context_sha256": "874b55286434188c2c99b08a12096e65204c642c26cd3c3862892bd5daac29e5",
+        "kinds": {
+          "stand": 1,
+          "target": 6,
+          "wait": 1
+        },
+        "options": 8,
+        "subject_id": "5aeb2998-a61e-5b81-a8c5-cff7d08dba46",
+        "tick": 0
+      },
+      {
+        "context_sha256": "61d5622d90808b2cc6c0210e4b53511829122e3a93bfefc5c7c33ffb817cdd5d",
+        "kinds": {
+          "stand": 1,
+          "target": 6,
+          "wait": 1
+        },
+        "options": 8,
+        "subject_id": "e6d0ccda-dace-570a-95ee-6a09a27d12fd",
+        "tick": 0
+      },
+      {
+        "context_sha256": "f18aca9e6b006aa59fb31583546f82110caf88b017b2e649c9d1601b26077298",
+        "kinds": {
+          "stand": 1,
+          "talk": 1,
+          "target": 5,
+          "wait": 1
+        },
+        "options": 8,
+        "subject_id": "e1e03f4f-c763-5850-9721-389b10f4f6ef",
+        "tick": 28
+      },
+      {
+        "context_sha256": "322bbfaddc1339086263efcb56bbca562e0d0846a470d21b9628b91e8b141bba",
+        "kinds": {
+          "stand": 1,
+          "talk": 1,
+          "target": 6,
+          "wait": 1
+        },
+        "options": 9,
+        "subject_id": "d0b8b025-3677-571c-8aef-76207b24f892",
+        "tick": 0
+      },
+      {
+        "context_sha256": "c7058da668d8ba7d074b66bed431a363586b21400daf4a787b51397fa72b777d",
+        "kinds": {
+          "stand": 1,
+          "talk": 1,
+          "target": 6,
+          "wait": 1
+        },
+        "options": 9,
+        "subject_id": "466299f6-dd0e-5c33-b91e-73f73e12f28f",
+        "tick": 25
+      },
+      {
+        "context_sha256": "78a9b170912e5dcd5909a57a4e5543c33e3553bb02b6ec8a9e4487b45664f2ec",
+        "kinds": {
+          "stand": 1,
+          "talk": 2,
+          "target": 5,
+          "wait": 1
+        },
+        "options": 9,
+        "subject_id": "af4288dc-381c-5de7-b7fe-76e76be00230",
+        "tick": 26
+      },
+      {
+        "context_sha256": "13294607077ca85adec60155b0b2747576d933efecd40abd7bc3e416019e08ed",
+        "kinds": {
+          "stand": 1,
+          "talk": 2,
+          "target": 6,
+          "wait": 1
+        },
+        "options": 10,
+        "subject_id": "af4288dc-381c-5de7-b7fe-76e76be00230",
+        "tick": 0
+      },
+      {
+        "context_sha256": "43b21c7ad2f4ceee2b38cbba971fe5317174844795d9e9ceff2567461fce4e7b",
+        "kinds": {
+          "stand": 1,
+          "talk": 3,
+          "target": 5,
+          "wait": 1
+        },
+        "options": 10,
+        "subject_id": "e1e03f4f-c763-5850-9721-389b10f4f6ef",
+        "tick": 17
+      }
+    ],
+    "contexts_artifact": "docs/evaluation/artifacts/2026-09-26-society-model-actions/contexts.json",
+    "contexts_sha256": "c60f2b5b57dd935b7685572eef137abe14bd4e85dd10301626ba4fa6eaea9571",
+    "contract": {
+      "catalog_versions": {
+        "society-decision-action": 2,
+        "society-decision-policy": 2
+      },
+      "sha256": "ec540b58aa9cf5bd288a933f5e18e304321dd2d09039ff13ce642bdfe5102ecd"
+    },
+    "earlier_measurements": [
+      "The decision contract's first version was probed and measured by docs/evaluation/2026-09-25-society-person-models-probe.json and docs/evaluation/2026-09-25-society-person-models.json, over places and waiting only, and compared by docs/evaluation/2026-09-26-society-model-comparison.json; none of their calls is read here."
+    ],
+    "manifest_sha256": "35d1436a2ec1b7e36f398cf717182e9803fcfd11126bd380342de31b0a5377ba",
+    "measured": [
+      "each call's answer time, prompt and completion tokens, finish, and whether it was one of the offered actions",
+      "per model and mechanism: answer time p50, p95 and longest; completion tokens median and p95; a least-squares line of answer time against completion tokens, whose intercept is the time not spent writing and whose slope is the time per written token"
+    ],
+    "mechanisms": [
+      "tool_call",
+      "json_schema"
+    ],
+    "models": [
+      "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "nvidia/Nemotron-3_5-Lightning"
+    ],
+    "not_covered": [
+      "Sixteen recorded choices of one square and one seed, asked once each by each mechanism: how often an answer varies between identical asks is not measured.",
+      "One call at a time: a host asks everybody at a choice point at once, and the answer time of calls made together is measured by the run, not here.",
+      "Answer time is the provider's from this machine at the time of the probe, not a deployment's."
+    ],
+    "prompt_version": "society-person-choice/v1",
+    "question": "Where does the time of one decision go for each open model the manifest offers a person's decisions under the decision contract's second version, provider time or the length of its answer, and does asking by a forced call of act or by a JSON schema change it?",
+    "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+    "rules": {
+      "answering_order": "A model is asked first by the mechanism other than the one the contract asks it by when, over the probe's cases, that mechanism answered with an offered action at least as often, its median completion tokens were at most 0.5 of the other's, and its 95th-percentile answer time (nearest rank) was lower. Otherwise the contract's order stands.",
+      "attempt_bound": "A stall is an answer slower than 3 times its model and mechanism's median while writing at most 1.5 times their median completion tokens, or a call that timed out for a model all of whose answered calls came within a third of the deadline. A model with at least 2 stalls over all its probe calls is given a per-attempt bound of 3 times the median answer time of the mechanism it is asked by, rounded up to a whole second, with one retry, only when two such attempts fit inside the decision deadline. Otherwise no model has one."
+    },
+    "tree": {
+      "files_sha256": {
+        "assets/catalogs/society-words/society-inhabitant-words.v1.json": "da5b8f504ad2bcf41b20a7f78d59eb86ac9452eee248f7b5f6bbb3ca9aafe073",
+        "assets/catalogs/society/society-decision-action.v2.json": "c73eaa2e038660f9399a5523ccd0bcb00a9de221c99465d0ada1eb98a27fa772",
+        "assets/catalogs/society/society-decision-policy.v2.json": "f63a5473a3fe66d997e404ec8e0e74d4ee4ca6f6beaf1a1b86009f1f8cb4d7dc",
+        "docs/evaluation/artifacts/2026-09-26-society-model-actions/contexts.json": "c60f2b5b57dd935b7685572eef137abe14bd4e85dd10301626ba4fa6eaea9571",
+        "docs/synthetic-society-contract.md": "7492bd2d1f097429bc0bb88ce2237449e78977ea67a9ec36a01eb606f7b39229",
+        "exulanica/api/society_person_decisions.py": "dfbbd87536a3a27adbf38a7a0169a08c9b7efbaa2f9c5f0d85c287cedfd88aa2",
+        "exulanica/world/society_catalogs.py": "9ede8f5b658624ddcc1eeb35131ed749efb40aaeb158861aeef23e10fdc63f7d",
+        "exulanica/world/society_decision_contract.py": "297018453e36f48209702ccbc61e036c75c0840a323c03673ce59f2969ddf90e",
+        "exulanica/world/society_decision_repository.py": "644b6b05abffbb4e0f192cfcedfbe70ab93303d1be0788b4af4ebd190ab7e7e3",
+        "exulanica/world/society_decisions.py": "bfa45c1171d3405802505a8470a70a409f14f3e80ef46a66b4d8ad4ef8acb14e",
+        "exulanica/world/society_model_decisions.py": "ee53e65cdd46194061c65ca081a64a1ff223d98e02d8d027244565690e6240bf",
+        "exulanica/world/society_planner.py": "a81f1953eed6e039eb2cd718a9a0f69f5b13e77d7d4bd587a901a5dedebb4e00",
+        "scripts/measure_society_model_actions.py": "785722def70344466f74177fe56592d45052c3dea1d3fb358069e7825fc99797",
+        "tests/test_catalog_provenance.py": "e2fdec42585ee8b0b48b2fa7aff89474e13060b9bd19591a85dcccb063b7a6f2",
+        "tests/test_society_model_actions.py": "331c5671280743fbe7eb23fa98a4a53bb8befe5647c240f7ee87d20742136bde",
+        "tests/test_society_model_actions_postgres.py": "ca194b932aca62c297cde8c51f730b1a7dee35c2b28e23b3088e7f35f1afd9ad",
+        "tests/test_society_person_decisions_postgres.py": "72a3f91748ae573e955bd35fb7f48165c432b0399cf32fb8d2f2198190d8f2ac",
+        "tests/test_society_versions_survive_upgrades.py": "2e4ae310880dfaba35631c3bada66751b50eaa6673e69630e6257d9fa35667ae",
+        "web/packages/app/src/ui/society-models.ts": "3df69818ef459ee62afca881b1ca0f96c45166e0a5a4e2a335d46c43151d4f26"
+      },
+      "head": "fbc735a447219c441306cfb0d57b0c84fc9155eb"
+    },
+    "written_before_this_measurement_asked_any_model": true
+  },
+  "record_sha256": "6b9ec678923a960201a630517ec9bf0f936800b8691a0e80721f3db1212f5ae2"
+}

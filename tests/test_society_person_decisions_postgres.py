@@ -89,12 +89,23 @@ def _offered():
     return parse_manifest(document), model_id
 
 
+#: How a conversation's label begins, read from the contract's own words, so a scripted model that
+#: means to go somewhere never takes a conversation for a place.
+_TALK_LABEL = decision_contract().words["talk"].split("{", 1)[0]
+
+
 class _Chooser(FakeTransport):
     """A scripted model that picks the first offered place to go every time it is asked."""
 
     def post_json(self, url, *, headers, payload, timeout):
         self.requests.append({"url": url, "headers": dict(headers), "payload": dict(payload)})
-        enum = payload["tools"][0]["function"]["parameters"]["properties"]["action"]["enum"]
+        enum = [
+            label
+            for label in payload["tools"][0]["function"]["parameters"]["properties"]["action"][
+                "enum"
+            ]
+            if not label.startswith(_TALK_LABEL)
+        ]
         body = chat_body("", model=payload["model"], finish_reason="tool_calls")
         body["choices"][0]["message"]["content"] = None
         body["choices"][0]["message"]["tool_calls"] = [
@@ -1069,11 +1080,11 @@ def test_a_person_whose_model_no_longer_fits_the_budget_is_asked_nothing_and_tol
 
 
 class _Changing:
-    """A workspace's rules that would replace a word wherever it stands, as a saved name's is,
+    """A workspace's rules that would replace words wherever they stand, as a saved name's is,
     keeping every text they were shown."""
 
-    def __init__(self, word: str) -> None:
-        self.word = word
+    def __init__(self, *words: str) -> None:
+        self.words = words
         self.shown: list[str] = []
         #: How many times the choice's description and labels were judged before an ask.
         self.judged = 0
@@ -1081,7 +1092,12 @@ class _Changing:
     def admit(self, request):
         self.shown.extend(request.texts)
         self.judged += request.texts[:1] == (CHOICE_DESCRIPTION,)
-        return [text.replace(self.word, "[place A]") for text in request.texts]
+        replaced = []
+        for text in request.texts:
+            for word in self.words:
+                text = text.replace(word, "[place A]")
+            replaced.append(text)
+        return replaced
 
 
 def _offered_labels(transport) -> list[str]:
@@ -1151,8 +1167,9 @@ def test_a_person_left_no_place_by_the_workspace_rules_is_asked_nothing_and_noth
         {"provider": manifest.spec(model_id).provider, "model_id": model_id},
         manifest=manifest,
     )
-    # Every place's words would change; waiting alone is no choice to ask a model for.
-    rules = _Changing(" m away")
+    # Every place's, person's and standing's words would change; waiting alone is no choice to
+    # ask a model for.
+    rules = _Changing(" m away", "stand a while")
     host = dataclasses.replace(
         _host(world, _client(manifest, transport), services, manifest),
         policy_for=lambda workspace_id: rules,

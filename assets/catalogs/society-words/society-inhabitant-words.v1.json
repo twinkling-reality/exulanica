@@ -929,6 +929,34 @@
       "code": "place_taken_this_minute",
       "words": "someone else took that place first",
       "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.no_room_to_stand",
+      "kind": "decision_reason",
+      "code": "no_room_to_stand",
+      "words": "there was no free spot near them to stand at",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.no_room_to_talk",
+      "kind": "decision_reason",
+      "code": "no_room_to_talk",
+      "words": "there was no free spot for the two of them to stand and talk",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.partner_busy",
+      "kind": "decision_reason",
+      "code": "partner_busy",
+      "words": "the person it chose to talk with was busy that minute",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.partner_not_free",
+      "kind": "decision_reason",
+      "code": "partner_not_free",
+      "words": "the person it chose to talk with could not stop to talk",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
     }
   ]
 }

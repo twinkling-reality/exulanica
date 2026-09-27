@@ -1,0 +1,235 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "bound_usd": "0.03",
+    "manifest_sha256": "35d1436a2ec1b7e36f398cf717182e9803fcfd11126bd380342de31b0a5377ba",
+    "models": {
+      "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+        "answering_order_selected": null,
+        "asked_by_the_contract": "tool_call",
+        "attempt_bound_ms_selected": null,
+        "figures": {
+          "json_schema": {
+            "asked": 16,
+            "completion_tokens": {
+              "median": "16",
+              "p95": 17
+            },
+            "fit": {
+              "intercept_ms": 740,
+              "ms_per_token": "-5.954"
+            },
+            "latency_ms": {
+              "longest": 1144,
+              "p50": 607,
+              "p95": 1144
+            },
+            "offered_action": 16,
+            "timed_out": 0
+          },
+          "tool_call": {
+            "asked": 16,
+            "completion_tokens": {
+              "median": "16",
+              "p95": 18
+            },
+            "fit": {
+              "intercept_ms": 1045,
+              "ms_per_token": "-6.488"
+            },
+            "latency_ms": {
+              "longest": 2186,
+              "p50": 790,
+              "p95": 2186
+            },
+            "offered_action": 16,
+            "timed_out": 0
+          }
+        },
+        "name": "Qwen3 235B Instruct",
+        "stalls": 0
+      },
+      "deepseek-ai/DeepSeek-V4-Flash-0731": {
+        "answering_order_selected": null,
+        "asked_by_the_contract": "tool_call",
+        "attempt_bound_ms_selected": null,
+        "figures": {
+          "json_schema": {
+            "asked": 16,
+            "completion_tokens": {
+              "median": "100.5",
+              "p95": 247
+            },
+            "fit": {
+              "intercept_ms": 811,
+              "ms_per_token": "4.523"
+            },
+            "latency_ms": {
+              "longest": 2178,
+              "p50": 1268,
+              "p95": 2178
+            },
+            "offered_action": 16,
+            "timed_out": 0
+          },
+          "tool_call": {
+            "asked": 16,
+            "completion_tokens": {
+              "median": "149",
+              "p95": 212
+            },
+            "fit": {
+              "intercept_ms": 1275,
+              "ms_per_token": "5.119"
+            },
+            "latency_ms": {
+              "longest": 3430,
+              "p50": 1940,
+              "p95": 3430
+            },
+            "offered_action": 16,
+            "timed_out": 0
+          }
+        },
+        "name": "DeepSeek V4 Flash",
+        "stalls": 0
+      },
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+        "answering_order_selected": [
+          "json_schema",
+          "tool_call"
+        ],
+        "asked_by_the_contract": "tool_call",
+        "attempt_bound_ms_selected": null,
+        "figures": {
+          "json_schema": {
+            "asked": 16,
+            "completion_tokens": {
+              "median": "233",
+              "p95": 389
+            },
+            "fit": {
+              "intercept_ms": 364,
+              "ms_per_token": "6.422"
+            },
+            "latency_ms": {
+              "longest": 2857,
+              "p50": 1853,
+              "p95": 2857
+            },
+            "offered_action": 16,
+            "timed_out": 0
+          },
+          "tool_call": {
+            "asked": 16,
+            "completion_tokens": {
+              "median": "596.5",
+              "p95": 1532
+            },
+            "fit": {
+              "intercept_ms": 146,
+              "ms_per_token": "6.910"
+            },
+            "latency_ms": {
+              "longest": 10653,
+              "p50": 3952,
+              "p95": 10653
+            },
+            "offered_action": 16,
+            "timed_out": 0
+          }
+        },
+        "name": "Nemotron 3 Nano 30B",
+        "stalls": 0
+      },
+      "nvidia/Nemotron-3_5-Lightning": {
+        "answering_order_selected": null,
+        "asked_by_the_contract": "tool_call",
+        "attempt_bound_ms_selected": null,
+        "figures": {
+          "json_schema": {
+            "asked": 16,
+            "completion_tokens": {
+              "median": "1131",
+              "p95": 1741
+            },
+            "fit": {
+              "intercept_ms": 168,
+              "ms_per_token": "3.281"
+            },
+            "latency_ms": {
+              "longest": 5921,
+              "p50": 3803,
+              "p95": 5921
+            },
+            "offered_action": 16,
+            "timed_out": 0
+          },
+          "tool_call": {
+            "asked": 16,
+            "completion_tokens": {
+              "median": "239",
+              "p95": 439
+            },
+            "fit": {
+              "intercept_ms": 194,
+              "ms_per_token": "3.895"
+            },
+            "latency_ms": {
+              "longest": 1876,
+              "p50": 983,
+              "p95": 1876
+            },
+            "offered_action": 16,
+            "timed_out": 0
+          }
+        },
+        "name": "Nemotron 3.5 Lightning",
+        "stalls": 0
+      }
+    },
+    "preregistration": "docs/evaluation/2026-09-26-society-model-actions-probe-preregistration.json",
+    "preregistration_record_sha256": "6b9ec678923a960201a630517ec9bf0f936800b8691a0e80721f3db1212f5ae2",
+    "record_written_by": {
+      "script_as_run": "docs/evaluation/artifacts/2026-09-26-society-model-actions/measure_society_model_actions-probe-record-as-run.py.txt",
+      "script_sha256": "1b5cdcbba3f7972b62762aba366603bed9f52ab89855a2555412a1d27856dd2a",
+      "why": "The probe's own step made every call and wrote the calls artifact, then refused to write this record, because the median of an even number of completion counts is not a whole number and a record holds no float. This record was written from that artifact, asking nothing, by the script with two changes: medians and slopes are written as exact decimal strings, and this step, which reads the stored calls, was added."
+    },
+    "rules": {
+      "answering_order": "A model is asked first by the mechanism other than the one the contract asks it by when, over the probe's cases, that mechanism answered with an offered action at least as often, its median completion tokens were at most 0.5 of the other's, and its 95th-percentile answer time (nearest rank) was lower. Otherwise the contract's order stands.",
+      "attempt_bound": "A stall is an answer slower than 3 times its model and mechanism's median while writing at most 1.5 times their median completion tokens, or a call that timed out for a model all of whose answered calls came within a third of the deadline. A model with at least 2 stalls over all its probe calls is given a per-attempt bound of 3 times the median answer time of the mechanism it is asked by, rounded up to a whole second, with one retry, only when two such attempts fit inside the decision deadline. Otherwise no model has one."
+    },
+    "run_artifact": "docs/evaluation/artifacts/2026-09-26-society-model-actions/probe-run.json",
+    "run_sha256": "cac64c44866e41c6259bbbebc65bcd73a649bd298f83dfe186bcc3a681d04c1a",
+    "script_as_run": "docs/evaluation/artifacts/2026-09-26-society-model-actions/measure_society_model_actions-probe-as-run.py.txt",
+    "script_sha256": "785722def70344466f74177fe56592d45052c3dea1d3fb358069e7825fc99797",
+    "spent_usd": "0.01581188",
+    "tree": {
+      "files_sha256": {
+        "assets/catalogs/society-words/society-inhabitant-words.v1.json": "da5b8f504ad2bcf41b20a7f78d59eb86ac9452eee248f7b5f6bbb3ca9aafe073",
+        "assets/catalogs/society/society-decision-action.v2.json": "c73eaa2e038660f9399a5523ccd0bcb00a9de221c99465d0ada1eb98a27fa772",
+        "assets/catalogs/society/society-decision-policy.v2.json": "f63a5473a3fe66d997e404ec8e0e74d4ee4ca6f6beaf1a1b86009f1f8cb4d7dc",
+        "docs/evaluation/2026-09-26-society-model-actions-probe-preregistration.json": "4b201e0f53a6bd6ec667e45d7462f3b5eb10ea23a70fac8696388f0c8ee275a5",
+        "docs/evaluation/artifacts/2026-09-26-society-model-actions/contexts.json": "c60f2b5b57dd935b7685572eef137abe14bd4e85dd10301626ba4fa6eaea9571",
+        "docs/synthetic-society-contract.md": "7492bd2d1f097429bc0bb88ce2237449e78977ea67a9ec36a01eb606f7b39229",
+        "exulanica/api/society_person_decisions.py": "dfbbd87536a3a27adbf38a7a0169a08c9b7efbaa2f9c5f0d85c287cedfd88aa2",
+        "exulanica/world/society_catalogs.py": "9ede8f5b658624ddcc1eeb35131ed749efb40aaeb158861aeef23e10fdc63f7d",
+        "exulanica/world/society_decision_contract.py": "297018453e36f48209702ccbc61e036c75c0840a323c03673ce59f2969ddf90e",
+        "exulanica/world/society_decision_repository.py": "644b6b05abffbb4e0f192cfcedfbe70ab93303d1be0788b4af4ebd190ab7e7e3",
+        "exulanica/world/society_decisions.py": "bfa45c1171d3405802505a8470a70a409f14f3e80ef46a66b4d8ad4ef8acb14e",
+        "exulanica/world/society_model_decisions.py": "ee53e65cdd46194061c65ca081a64a1ff223d98e02d8d027244565690e6240bf",
+        "exulanica/world/society_planner.py": "a81f1953eed6e039eb2cd718a9a0f69f5b13e77d7d4bd587a901a5dedebb4e00",
+        "scripts/measure_society_model_actions.py": "785722def70344466f74177fe56592d45052c3dea1d3fb358069e7825fc99797",
+        "tests/test_catalog_provenance.py": "e2fdec42585ee8b0b48b2fa7aff89474e13060b9bd19591a85dcccb063b7a6f2",
+        "tests/test_society_model_actions.py": "331c5671280743fbe7eb23fa98a4a53bb8befe5647c240f7ee87d20742136bde",
+        "tests/test_society_model_actions_postgres.py": "ca194b932aca62c297cde8c51f730b1a7dee35c2b28e23b3088e7f35f1afd9ad",
+        "tests/test_society_person_decisions_postgres.py": "72a3f91748ae573e955bd35fb7f48165c432b0399cf32fb8d2f2198190d8f2ac",
+        "tests/test_society_versions_survive_upgrades.py": "2e4ae310880dfaba35631c3bada66751b50eaa6673e69630e6257d9fa35667ae",
+        "web/packages/app/src/ui/society-models.ts": "3df69818ef459ee62afca881b1ca0f96c45166e0a5a4e2a335d46c43151d4f26"
+      },
+      "head": "fbc735a447219c441306cfb0d57b0c84fc9155eb"
+    },
+    "within_bound": true
+  },
+  "record_sha256": "df532efede523f9270ac42c4a631fc0f7546f517daa83c22970bcd1a1dbf9303"
+}

@@ -128,7 +128,12 @@ A model is offered to it only when its `answering` entry names a mechanism the c
 function the request forces by name (`tool_call`) or a strict JSON schema (`json_schema`), with the
 evaluation record whose probe verified that mechanism for that model; a model with neither is not
 offered. `tests/test_model_providers.py` reads each named record and holds the manifest to its
-verdicts. A chosen model has no fallback, because a choice names one model, and no manifest
+verdicts. An entry may also state an `answering_order`, the order that model is asked in where a
+measurement found it answers better that way than in the order the decision contract prefers,
+with the record that measured it and why; from the decision policy's second version the contract
+asks it by the first mechanism of that order it accepts, and every other model in the policy's
+order, while a request asked under the first version keeps the mechanism it recorded
+(`DecisionContract.mechanism_for` in `exulanica/world/society_decision_contract.py`). A chosen model has no fallback, because a choice names one model, and no manifest
 timeout: the decision contract bounds each ask at 20 seconds, inside the playback lease. The host
 asks each model with its own default token bound, never below its floor, so a reasoning model has
 room to reason before it answers.
@@ -142,7 +147,8 @@ Instruct and DeepSeek V4 Flash, and every first answer was one of the offered ac
 writes before answering depends on the mechanism: on average Nemotron 3 Nano wrote 762 completion
 tokens to a forced call and 222 to a schema, Nemotron 3.5 Lightning 282 and 1,222, DeepSeek V4
 Flash 196 and 131, and Qwen3 16 and 17. The contract asks by a forced call whenever it is verified,
-its first-ranked mechanism. The probe cost 0.006226 USD.
+its first-ranked mechanism, unless a model's entry states an order of its own. The probe cost
+0.006226 USD.
 
 The [measurement](evaluation/2026-09-25-society-person-models.json) gave each model the eight
 people of the small square for 60 simulated minutes, on the seed the browser sends first, beside
@@ -162,8 +168,9 @@ Measured: every model chose waiting more often than any one kind of place, and t
 waited, the more decisions it made. Of 480 person-minutes, the routine's people spent 69 walking,
 310 at objects, 75 talking and 26 standing, and never waited; DeepSeek's spent 347 waiting and 119
 at objects, Qwen's 40 waiting and 389 at objects. No person run by a model talked; Nemotron 3 Nano's
-people stood for 6 person-minutes, the other models' never. The contract offers places and
-waiting, not the routine's own talking and standing. Every claim advanced one minute, and half the
+people stood for 6 person-minutes, the other models' never. That contract, the decision contract's
+first version, offered places and waiting, not the routine's own talking and standing; its second
+version offers both ([below](#standing-and-talking-and-where-a-decisions-time-goes)). Every claim advanced one minute, and half the
 claims took at most 0.9 s for Qwen, 2.1 s for Lightning, 2.9 s for DeepSeek and 8.5 s for
 Nemotron 3 Nano; a claim waits for its minute's slowest ask. Every world replayed and verified with
 no billed call. The run cost at most 0.092699 USD of its 0.11 USD bound, the five calls that timed
@@ -173,6 +180,67 @@ whether a model's choices serve its people better than the routine is not judged
 Inferred, not measured: a person who waits reaches a choice point again a minute later, so a model
 that chooses waiting more is asked more often, which fits the decision counts above; the run did
 not vary waiting to test it.
+
+### Standing and talking, and where a decision's time goes
+
+Under the decision contract's second version a person may also stand a while nearby or stop to
+talk with somebody the routine could pair them with
+([society contract](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose)).
+Before measuring what models choose with it, a
+[pre-registered](evaluation/2026-09-26-society-model-actions-probe-preregistration.json) probe
+([record](evaluation/2026-09-26-society-model-actions-probe.json)) asked the four offered models
+sixteen recorded choices of the small square each, once by each mechanism and one call at a time,
+and fitted each model's answer time against the tokens it wrote. Every one of the 128 answers was
+one of the offered actions.
+
+| Model | Forced call: median tokens, answer p50 / longest | Schema: median tokens, answer p50 / longest | Time per written token |
+| --- | --- | --- | --- |
+| Qwen3 235B Instruct | 16, 790 / 2,186 ms | 16, 607 / 1,144 ms | none: it writes the same few tokens |
+| DeepSeek V4 Flash | 149, 1,940 / 3,430 ms | 100.5, 1,268 / 2,178 ms | about 4.5 to 5.1 ms |
+| Nemotron 3 Nano 30B | 596.5, 3,952 / 10,653 ms | 233, 1,853 / 2,857 ms | about 6.4 to 6.9 ms |
+| Nemotron 3.5 Lightning | 239, 983 / 1,876 ms | 1,131, 3,803 / 5,921 ms | about 3.3 to 3.9 ms |
+
+Measured: Qwen3's answer time is all provider time, since it writes about sixteen tokens either
+way; the three reasoning models' time grows with what they write, and what they write depends on
+the mechanism, in opposite directions for the two Nemotron models. By the probe's pre-registered
+rule a model is asked by the other mechanism first when it answered as often with an offered
+action, wrote at most half the median tokens and had a lower 95th-percentile answer time that way,
+which held for Nemotron 3 Nano alone, so its manifest entry states `json_schema` first. No model
+answered slower than three times its median without writing more, so the probe's second rule, a
+per-attempt bound with one retry, selected no model and none is built. The probe cost 0.01581188 USD
+of its 0.03 USD bound. Inferred, not measured: the fitted time per token treats each model's calls
+as one line; how much of a call's time is queueing at the provider is not separated from the rest.
+
+The [measurement](evaluation/2026-09-26-society-model-actions.json), under its own
+[pre-registration](evaluation/2026-09-26-society-model-actions-preregistration.json) written after
+the probe, gave each model the eight people of the small square for 60 simulated minutes on the
+seed the browser sends first, beside the routine alone, played by the playback worker as above.
+
+| Model | Decisions | Chose: go / wait / stand / talk | Not acted on | Person-minutes talking / standing | Answer p50 / p95 | Cost per simulated hour |
+| --- | --- | --- | --- | --- | --- | --- |
+| Qwen3 235B Instruct | 82 | 52 / 29 / 1 / 0 | 4: another person took the place first | 0 / 3 | 980 / 2,675 ms | 0.008179 USD |
+| DeepSeek V4 Flash | 93 | 20 / 16 / 12 / 45 | 11: the person it chose to talk with was busy | 155 / 33 | 1,782 / 2,343 ms | 0.011397 USD |
+| Nemotron 3 Nano 30B | 87 | 37 / 33 / 6 / 11 | 11: the person it chose to talk with was busy (8), another person took the place first (2), an earlier choice took them into another conversation (1) | 18 / 18 | 1,303 / 2,297 ms | 0.005614 USD |
+| Nemotron 3.5 Lightning | 138 | 31 / 71 / 18 / 18 | 10: the person it chose to talk with was busy | 60 / 38 | 1,713 / 3,841 ms | 0.014994 USD |
+
+Measured: no answer timed out in any arm, and every first answer was one of the offered actions.
+The routine's own people talked for 75 person-minutes and stood for 26; DeepSeek V4 Flash's people
+talked for 155, Qwen3's never, although a conversation was offered in 58 of its 82 decisions.
+Nemotron 3 Nano 30B, asked by the schema, answered within 2.5 s every time; under the first
+contract, asked by a forced call, 5 of its 148 answers had not come within the 20 s deadline. Every
+world replayed and verified with no billed call, and the run cost 0.0401826 USD of its 0.20 USD
+bound. Inferred, not measured: every person was run by the one model, so the other person a choice
+to talk named was usually at a choice point and asked by their own model in the same minute, which
+is why nearly every choice to talk not acted on was refused as busy; the run did not mix models
+with the routine to test it. One square, one seed and one hour per model were measured, and
+whether a model's choices serve its people better than the routine's is not judged.
+
+The measurement's tree, which its record binds, applied three rules differently from the
+[society contract](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose),
+so its counts of conversations and refusals are that tree's: it judged the other person's
+tiredness as the minute began rather than as the minute has it, it counted a person's own spot as
+taken when drawing where they stand, and a choice to talk that came first could take in somebody
+whose own model had chosen to talk with someone else.
 
 **Spend.** Two bounds apply to a person's decisions. The decision contract bounds each world: at
 most 600 asked decisions and 0.25 USD of their cost in its last hour, counted from its receipts with

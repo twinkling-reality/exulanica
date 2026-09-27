@@ -37,6 +37,7 @@
       "provider": "nebius_token_factory",
       "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
       "answering": {"json_schema": "docs/evaluation/2026-09-25-society-person-models-probe.json", "tool_call": "docs/evaluation/2026-09-25-society-person-models-probe.json"},
+      "answering_order": {"mechanisms": ["json_schema", "tool_call"], "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json", "reason": "Asked for a person's choice, this model reasons at length before it answers a forced call of act, and less before it answers a strict JSON schema: over the probe's sixteen recorded choices its median answer was 233 completion tokens by the schema and 596.5 by the call, it answered sooner by the schema at the median and at the longest, and every answer was one of the offered actions either way. Its time is spent writing, so it is asked by the schema first."},
       "input_usd_per_mtok": 0.06,
       "output_usd_per_mtok": 0.24,
       "context_window_tokens": 262144,

@@ -13,9 +13,15 @@ any model, what each receipt does to the minute, in decision order:
 *   A person a direct request moves this minute is ``superseded``: their own request comes first.
     So is a second receipt for somebody already decided this minute.
 *   An accepted choice is checked again against the minute
-    (:func:`~exulanica.world.society_decision_contract.recheck_option`), and a place is promised
-    to it before the minute, after every direct request's, so two choices, or a choice and a
-    request, never share one place. A choice that no longer holds is ``rejected`` with the reason.
+    (:func:`~exulanica.world.society_decision_contract.recheck_option`), and what it takes is
+    promised to it before the minute, after every direct request's: a place, or a spot to stand
+    at, so two choices, or a choice and a request, never share one. A choice that no longer holds
+    is ``rejected`` with the reason.
+*   A choice to talk with somebody is checked after every other choice of the minute, in
+    decision order (:func:`~exulanica.world.society_decision_contract.recheck_talk`). The other
+    person is busy whenever anybody decided for them in that minute, their own model included
+    whatever it chose and whichever receipt came first, unless it chose this same conversation:
+    two people whose models chose each other are both ``applied``, to the one conversation.
 *   Anything else is ``applied``: a goal policy the planner reads as a model's, recording the
     model's own reason code.
 
@@ -36,8 +42,10 @@ from typing import Any, Final
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
     DecisionOption,
+    TalkPromise,
     option_goal_policy,
     recheck_option,
+    recheck_talk,
 )
 from exulanica.world.society_decisions import PERSON_DECISION_PROFILE
 from exulanica.world.society_planner import input_sha256
@@ -83,7 +91,7 @@ def model_goal_policies(
     directed: Mapping[str, dict[str, Any]],
 ) -> tuple[dict[str, dict[str, Any]], tuple[DecisionDisposition, ...]]:
     """The minute's goal policies, a direct request's and each applied choice's, and what every
-    receipt did.
+    receipt did, in decision order.
 
     ``directed`` is the direct requests' policies for this minute, which are kept as they are and
     come first. ``document`` is the input the minute consumes last.
@@ -93,13 +101,18 @@ def model_goal_policies(
         policy["place_node_id"] for policy in directed.values() if "place_node_id" in policy
     }
     prior = society_state_sha256(dict(state))
+    # Everybody decided for this minute: a direct request, an applied choice, or a conversation.
     applied: set[str] = set()
     sequences = [receipt["decision_seq"] for receipt in receipts]
     if sequences != sorted(sequences) or len(set(sequences)) != len(sequences):
         raise ValueError("person decision receipts are consumed once each, in decision order")
     present = {person["id"] for person in state["inhabitants"]}
-    dispositions: list[DecisionDisposition] = []
-    for receipt in receipts:
+    settled: dict[int, tuple[str, str]] = {}
+    talks: list[tuple[int, str, DecisionOption]] = []
+    # What each person's own model chose for them this minute, applied or not: somebody it chose
+    # anything for, but a conversation with the one asking, is not free to be asked to talk.
+    own: dict[str, DecisionOption] = {}
+    for index, receipt in enumerate(receipts):
         _checked(receipt)
         subject = receipt["subject_id"]
         reason = receipt["reason"]
@@ -119,6 +132,11 @@ def model_goal_policies(
             disposition, reason = "superseded", "subject_already_decided"
         else:
             option = DecisionOption.from_record(receipt["proposal"]["option"])
+            own[subject] = option
+            if option.kind == "talk":
+                # Checked once every other choice of the minute is known.
+                talks.append((index, subject, option))
+                continue
             refused, place = recheck_option(state, document, subject, option, promised)
             if refused is not None:
                 disposition, reason = "rejected", refused
@@ -128,17 +146,49 @@ def model_goal_policies(
                 policies[subject] = option_goal_policy(option, place)
                 if place is not None:
                     promised.add(place)
-        dispositions.append(
-            DecisionDisposition(
-                decision_seq=receipt["decision_seq"],
-                request_id=receipt["request_id"],
-                subject_id=subject,
-                disposition=disposition,
-                reason=reason,
-                decision_sha256=receipt["document_sha256"],
-            )
+        settled[index] = (disposition, reason)
+    # Who an applied conversation took in, and into which: the other person and the promise.
+    taken_into: dict[str, tuple[str, TalkPromise]] = {}
+    for index, subject, option in talks:
+        reason = receipts[index]["reason"]
+        if subject in taken_into and taken_into[subject][0] == option.partner_id:
+            # Two people whose models chose each other: both applied, to the one conversation.
+            chooser, promise = taken_into[subject]
+            policies[subject] = option_goal_policy(option, promise.mirrored(chooser))
+            settled[index] = ("applied", reason)
+            continue
+        if subject in applied:
+            settled[index] = ("superseded", "subject_already_decided")
+            continue
+        # Busy: anybody the minute has decided for, and anybody whose own model chose them
+        # something other than this conversation, whichever receipt came first.
+        busy = applied | set(directed)
+        busy |= {
+            person
+            for person, chosen in own.items()
+            if person != subject and not (chosen.kind == "talk" and chosen.partner_id == subject)
+        }
+        promise = recheck_talk(state, document, subject, option, promised, busy)
+        if isinstance(promise, str):
+            settled[index] = ("rejected", promise)
+            continue
+        settled[index] = ("applied", reason)
+        applied.update((subject, promise.partner_id))
+        policies[subject] = option_goal_policy(option, promise)
+        promised.update((promise.node_id, promise.partner_node_id))
+        taken_into[promise.partner_id] = (subject, promise)
+    dispositions = tuple(
+        DecisionDisposition(
+            decision_seq=receipt["decision_seq"],
+            request_id=receipt["request_id"],
+            subject_id=receipt["subject_id"],
+            disposition=settled[index][0],
+            reason=settled[index][1],
+            decision_sha256=receipt["document_sha256"],
         )
-    return policies, tuple(dispositions)
+        for index, receipt in enumerate(receipts)
+    )
+    return policies, dispositions
 
 
 def append_decision_events(
