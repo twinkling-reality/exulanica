@@ -27,8 +27,21 @@ function readCatalog(text: string): Readonly<Record<Kind, Readonly<Record<string
   if (document.catalog_id !== 'society-inhabitant-words' || !Array.isArray(document.entries)) {
     throw new Error('not the society inhabitant words catalog');
   }
+  return readTables(document.entries);
+}
+
+/** The engines the catalog has words for, as it states them; anything else is refused on load. */
+function readProfiles(text: string): ReadonlySet<string> {
+  const { profiles } = JSON.parse(text) as { readonly profiles?: unknown };
+  if (!Array.isArray(profiles) || profiles.length === 0 || !profiles.every((profile) => typeof profile === 'string' && profile)) {
+    throw new Error('the society inhabitant words catalog names no profiles');
+  }
+  return new Set(profiles as readonly string[]);
+}
+
+function readTables(entries: readonly CatalogEntry[]): Readonly<Record<Kind, Readonly<Record<string, string>>>> {
   const tables = Object.fromEntries(KINDS.map((kind) => [kind, {} as Record<string, string>])) as Record<Kind, Record<string, string>>;
-  for (const entry of document.entries) {
+  for (const entry of entries) {
     const kind = KINDS.find((known) => known === entry.kind);
     if (kind === undefined) throw new Error(`entry ${entry.key} has an unknown kind ${entry.kind}`);
     if (entry.key !== `${kind}.${entry.code}` || !entry.words) throw new Error(`entry ${entry.key} is malformed`);
@@ -39,6 +52,17 @@ function readCatalog(text: string): Readonly<Record<Kind, Readonly<Record<string
 }
 
 const TABLES = readCatalog(catalogText);
+const PROFILES = readProfiles(catalogText);
+
+/**
+ * Whether a society's engine has words: the catalog's own `profiles`, the list the server's
+ * Companion refuses by (`society_profile_has_no_words`), so the inspector never offers words or
+ * questions the Companion would refuse. A stored society of a retired engine can share a state
+ * family with one that has words and still have none.
+ */
+export function hasInhabitantWords(profile: string | null | undefined): boolean {
+  return profile != null && PROFILES.has(profile);
+}
 
 /** One entry's words; a missing one is a defect of the catalog. */
 function words(kind: Kind, code: string): string {

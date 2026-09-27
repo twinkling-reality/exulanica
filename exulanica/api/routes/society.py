@@ -1,8 +1,10 @@
 """Authenticated lifecycle; authoritative v2 inputs come only from the configured server adapter.
 
 Every society these routes return is served by :func:`~exulanica.world.society.served_snapshot`
-and every event by :func:`~exulanica.world.society.served_events`: the seed never leaves the
-server, only its digest (``seed_digest``), whose derivation the server alone holds.
+and every event by :func:`~exulanica.world.society.served_events`: a response carries the seed's
+digest (``seed_digest``), never the seed. That is presentation, not secrecy: the seed is derived
+from the workspace and world a caller already names (``world_society_seed``), so a client that
+knows them can compute it.
 """
 
 from __future__ import annotations
@@ -17,12 +19,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.world_scope import WorldId
-from exulanica.world.society import UnavailableSocietyInput, served_events, served_snapshot
+from exulanica.world.society import (
+    SocietyLivesElsewhere,
+    UnavailableSocietyInput,
+    served_events,
+    served_snapshot,
+)
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import (
     DEFAULT_ENGINE,
     ENGINES,
     RetiredSocietyEngine,
+    creatable_engine,
     society_engine,
 )
 from exulanica.world.society_planner import SocietyStartRefused
@@ -100,6 +108,8 @@ def _call(operation: Callable[[], Any], *, invalid_status: int = 422) -> Any:
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
     except RetiredSocietyEngine as exc:
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
+    except SocietyLivesElsewhere as exc:
+        return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
     except ValueError as exc:
         return JSONResponse(
             status_code=invalid_status,
@@ -121,6 +131,12 @@ def create_society(
         # One transaction: a saved world's place, its first input and its society are made
         # together or not at all, so a refusal such as nothing reachable leaves nothing behind.
         with connection.transaction():
+            creatable_engine(body.profile)
+            # Asked again, the version's society is read back with nothing composed, and a
+            # creation naming another region is refused by name.
+            held = repo.held(version_id, profile=body.profile, region_id=body.region_id)
+            if held is not None:
+                return served_snapshot(held)
             document = None
             place_id = body.place_id
             if society_engine(body.profile).takes_inputs:

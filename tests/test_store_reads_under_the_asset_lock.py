@@ -556,9 +556,10 @@ def test_an_environment_piece_in_a_world_whose_society_takes_inputs_reads_nothin
     assert moved.status_code == 200, moved.text
     assert [i["availability"] for i in moved.json()["environment_instances"]] == ["available"]
     assert reads.under_the_lock == []
-    # The society took both edits as inputs, each naming the piece as one it does not read.
+    # Placing the piece appended an input naming it as one the society does not read; moving it
+    # changed nothing the society reads, so it appended none.
     after = _inputs(world)
-    assert len(after) == len(before) + 2
+    assert len(after) == len(before) + 1
     assert after[-1]["document"]["availability"] == "available"
     assert [p["instance_id"] for p in after[-1]["document"]["unread_placements"]] == [
         "environment:yard"

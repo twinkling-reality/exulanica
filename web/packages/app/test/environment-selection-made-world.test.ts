@@ -19,17 +19,39 @@ import { engineCreatedOver } from '../src/society-engines.js';
  */
 
 const WORLD = 'world:personal:made';
+/** One object of the made world, in the region named, titled as the person sees it. */
+const placed = (objectId: string, regionId: string, title: string) => ({
+  objectId, regionId,
+  asset: { assetKey: 'cc0.bench', title, summary: '', mediaType: 'model/gltf-binary',
+    contentSha256: 'c'.repeat(64), byteSize: 1, licenceId: 'CC0-1.0', licenceSha256: 'd'.repeat(64), availability: 'available' },
+  transform: { coordinateSpace: 'region_local', coordinateUnit: 'millimetre', xMm: 3000, yMm: 0, zMm: 5000, yawMicroradians: 0, scaleMilli: 1000 },
+  origin: { kind: 'authored', role: 'fictional' }, behaviour: null, removed: false,
+});
 const version = {
   schemaVersion: 2, versionId: 'version', worldId: WORLD, sourceSnapshotId: 'snapshot', parentVersionId: null,
-  title: 'From my photographs', origin: 'authored', styleVersionId: 'style', stateSha256: '1'.repeat(64), editSeq: 0,
+  title: 'From my photographs', origin: 'authored', styleVersionId: 'style', stateSha256: '1'.repeat(64), editSeq: 2,
   sourceInvalidated: false, createdBy: 'actor', createdAt: '2026-09-27T00:00:00Z',
-  objects: [], elementOverrides: [], environmentInstances: [], edits: [],
+  // A bench where the society lives, and a lamp post in the world's other place.
+  objects: [placed('object-here', 'region-b', 'Bench'), placed('object-there', 'region-a', 'Lamp post')],
+  elementOverrides: [], environmentInstances: [], edits: [],
 } as unknown as AlternateVersion;
 
-const society = (regionId: string): SocietySnapshot => parseSociety({
-  society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'derived-place', region_id: regionId,
+/** The places a society in region-b reads: only its own region's bench. */
+const places = {
+  input_seq: 1, input_sha256: 'b'.repeat(64), availability: 'available', unavailable_reason: null,
+  walkable_area: { source: 'declared', centre_mm: [0, 0], half_width_mm: 12000, half_depth_mm: 12000 },
+  clearance_mm: 450,
+  targets: [{ target_id: 'authored:version:object-here:rest', subject_id: 'authored:version:object-here',
+    node_id: 'ground:+00002000:+00004000', affordance: 'rest', duration_ticks: 3, origin: 'authored',
+    object_id: 'object-here', version_id: 'version', enabled: true }],
+  unavailable_affordances: [],
+};
+
+const society = (regionId: string, profile = 'exulanica-society/v2'): SocietySnapshot => parseSociety({
+  profile, society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'derived-place', region_id: regionId,
   population_size: 8, current_tick: 0, state_sha256: '0'.repeat(64), input_seq: 1, input_sha256: 'b'.repeat(64),
-  state: { profile: 'exulanica-society/v2', society_id: 'society', branch_id: 'version', tick: 0, input_seq: 1,
+  places,
+  state: { profile, society_id: 'society', branch_id: 'version', tick: 0, input_seq: 1,
     input_sha256: 'b'.repeat(64), inhabitants: Array.from({ length: 8 }, (_, i) => ({
       id: `person-${i}`, synthetic: true, position_mm: [2000 * i, 4000], display_name: `Person ${i}`, role: 'steward',
       goal: null, route: null, motion_path_mm: [[2000 * i, 4000]],
@@ -51,9 +73,12 @@ const models = () => parseSocietyModels({
   models: [], choices: [], latest: [], by_model: [], decisions_read: { counted: 0, maximum: 2000 },
 });
 
-function mount(options: { readonly stored: string | null; readonly livesIn: string }) {
+function mount(options: {
+  readonly stored: string | null; readonly livesIn: string;
+  readonly profile?: string; readonly readFails?: ApiError;
+}) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
-  let held: SocietySnapshot | null = options.stored === null ? null : society(options.stored);
+  let held: SocietySnapshot | null = options.stored === null ? null : society(options.stored, options.profile);
   // One root per drawn region; neither region holds a point map, as in a world of photographs.
   const regionRoots = new Map(['region-a', 'region-b'].map((id) => [id, { name: `island:${id}` }] as const));
   const crowd = {
@@ -73,7 +98,11 @@ function mount(options: { readonly stored: string | null; readonly livesIn: stri
     memoryLayerVisible: false, onMemoryLayerChange: null,
   };
   const societyClient = {
-    read: vi.fn(async () => { if (held === null) throw missing(); return held; }),
+    read: vi.fn(async () => {
+      if (options.readFails !== undefined) throw options.readFails;
+      if (held === null) throw missing();
+      return held;
+    }),
     create: vi.fn(async (_version: string, _place: string | null, regionId: string) => { held = society(regionId); return held; }),
     connect: vi.fn(), advance: vi.fn(), events: vi.fn(async () => []),
   };
@@ -95,10 +124,16 @@ function mount(options: { readonly stored: string | null; readonly livesIn: stri
     showStatus: vi.fn(), admissionId: null,
     worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
     societyModelsClient: modelsClient as never,
+    onAskAboutInhabitant: vi.fn(),
   });
   document.body.append(mounted.root);
   const panel = () => mounted.root.querySelector<HTMLElement>('section.world-inhabitants')!;
-  return { mounted, crowd, societyClient, modelsClient, panel };
+  const pick = (id: string) => {
+    const picker = mounted.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect nearby inhabitant"]')!;
+    picker.value = id;
+    picker.dispatchEvent(new Event('change'));
+  };
+  return { mounted, crowd, societyClient, modelsClient, panel, pick };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -127,6 +162,50 @@ describe('a world made from photographs holds inhabitants in one of its places',
     expect(panel().dataset['state']).toBe('present');
     expect(crowd.setSociety).toHaveBeenCalled();
     mounted.dispose();
+  });
+
+  it('lists and names only the objects of the place their society lives in', async () => {
+    const { mounted, panel } = mount({ stored: 'region-b', livesIn: 'region-b' });
+    await mounted.begin();
+    for (let i = 0; i < 6; i += 1) await settle();
+    expect(panel().dataset['state']).toBe('present');
+    expect(panel().textContent).toContain('Bench');
+    // The lamp post is in the world's other place: the society never reads it, so it is not listed
+    // as something they will notice.
+    expect(panel().textContent).not.toContain('Lamp post');
+    expect(panel().textContent).not.toContain('notice this after the next simulated minute');
+    mounted.dispose();
+  });
+
+  it('says why nobody can be shown when reading their society fails', async () => {
+    const { mounted, panel, societyClient } = mount({
+      stored: 'region-b', livesIn: 'region-b', readFails: new ApiError(500, 'internal_error', 'the server failed'),
+    });
+    await mounted.begin();
+    for (let i = 0; i < 4; i += 1) await settle();
+    expect(societyClient.create).not.toHaveBeenCalled();
+    expect(panel().isConnected).toBe(true);
+    expect(panel().textContent).toContain('Inhabitants are unavailable.');
+    mounted.dispose();
+  });
+
+  it('offers words and questions only for a society whose engine the words catalog has words for', async () => {
+    const asks = (root: HTMLElement) => root.querySelectorAll('button.world-inhabitants-ask').length;
+    const purposeful = mount({ stored: 'region-b', livesIn: 'region-b' });
+    await purposeful.mounted.begin();
+    for (let i = 0; i < 6; i += 1) await settle();
+    purposeful.pick('person-0');
+    expect(asks(purposeful.mounted.root)).toBe(3);
+    purposeful.mounted.dispose();
+    // A stored society of the retired engine shares the purposeful state family and has no words.
+    const retired = mount({ stored: 'region-b', livesIn: 'region-b', profile: 'exulanica-society/v3' });
+    await retired.mounted.begin();
+    for (let i = 0; i < 6; i += 1) await settle();
+    retired.pick('person-0');
+    expect(asks(retired.mounted.root)).toBe(0);
+    expect(retired.mounted.root.querySelector('.living-world-inspector .living-world-activity')?.textContent)
+      .toBe('Person 0 (simulated) waits.');
+    retired.mounted.dispose();
   });
 
   it('says nobody can be shown where the place their society lives in is not drawn', async () => {

@@ -3,7 +3,10 @@
  * kept current as the drawn minute moves, and the owner's choice sent and read back.
  *
  * It reads once per simulated minute the page draws, never more often, and never while a read is
- * already out: a minute that moves during a read is read after it. A choice is recorded by the
+ * already out: a minute that moves during a read is read after it. It reads only while it is shown:
+ * once a read says nobody here can be decided for by a model (a society whose engine takes no
+ * owner's choice, such as a district's), the section stays hidden and a new minute reads nothing;
+ * only a forced read, such as the one after a choice, asks again. A choice is recorded by the
  * server and then read back, so the section only ever says what the server holds.
  */
 
@@ -91,6 +94,8 @@ export function mountSocietyModels(options: {
     wanted = tick;
     render();
     if (tick === null || (!force && tick === readTick)) return;
+    // Hidden by what the server said: a new minute changes nothing a hidden section shows.
+    if (!force && view !== null && section.root.hidden) return;
     if (reading !== null) { again = true; return; }
     reading = read(tick);
     try { await reading; } finally { reading = null; }

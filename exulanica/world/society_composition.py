@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import math
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from copy import deepcopy
 from typing import Any, Final
 
@@ -18,7 +18,7 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.world.assets import reviewed_assets
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
 from exulanica.world.object_catalog import NO_ACTIVITY, WorldObjectKind, world_object_catalog
-from exulanica.world.objects import object_document
+from exulanica.world.objects import AuthoredObject, object_document
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_COMPOSITION,
@@ -653,15 +653,21 @@ def policy_dependency_refs(
 
 
 def object_dependency_refs(
-    version: AlternateVersion, reviewed_affordances: Mapping[str, dict[str, Any]]
+    version: AlternateVersion,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    *,
+    objects: Iterable[AuthoredObject] | None = None,
 ) -> list[dict[str, str]]:
     """Bind every authored object in the version, and the reviewed asset each active one uses.
 
     Complete authored object documents bind origin.role and transform even though the frozen
     target shape carries only origin='authored'. No personal meaning is inferred from assets.
+    ``objects`` narrows them to those a society reads, such as one region's of a world with
+    several; omitted, every object of the version is bound.
     """
     refs: list[dict[str, str]] = []
-    for obj in sorted(version.objects, key=lambda value: value.object_id):
+    chosen = version.objects if objects is None else objects
+    for obj in sorted(chosen, key=lambda value: value.object_id):
         reviewed = reviewed_affordances.get(obj.asset_sha256)
         if not obj.removed and reviewed is not None:
             refs.append(

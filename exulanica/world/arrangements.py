@@ -297,7 +297,8 @@ def lay_out(
 ) -> Layout:
     """The arrangement ahead of a person, turned to face them, its centre on the lattice.
 
-    ``spacing_mm`` is the society's lattice spacing; a caller passes ``LATTICE_MM``.
+    ``spacing_mm`` is the society's lattice spacing, the ground's own
+    (``SocietyGround.lattice_mm``).
     """
     turns = _quarter_of(viewer_yaw_microradians)
     ahead = _forward(turns)
@@ -783,7 +784,7 @@ class _Frame:
 def _resolve(
     repository: WorldObjectRepository, version_id: uuid.UUID, request: ArrangementRequest
 ) -> ArrangementPreview:
-    from exulanica.world.society_authored_ground import LATTICE_MM
+    from exulanica.world.society_authored_ground import objects_in_region
     from exulanica.world.society_planner import CLEARANCE_MM
 
     row = repository.edit_base_row(version_id)
@@ -824,7 +825,7 @@ def _resolve(
         viewer_x_mm=request.viewer_x_mm,
         viewer_z_mm=request.viewer_z_mm,
         viewer_yaw_microradians=request.viewer_yaw_microradians,
-        spacing_mm=LATTICE_MM,
+        spacing_mm=ground.lattice_mm,
     )
     anchor, turns, placed = layout.anchor, layout.quarter_turns, layout.objects
     _, radius = _standing()
@@ -856,7 +857,8 @@ def _resolve(
             )
     current = repository.version(version_id)
     used = _places_in_use(current, ground)
-    for existing in sorted(current.objects, key=lambda value: value.object_id):
+    # Only this region's objects stand in the way: another region of the world is another place.
+    for existing in objects_in_region(current, ground):
         if existing.removed:
             continue
         occupied = _occupied(existing)

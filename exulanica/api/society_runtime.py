@@ -58,6 +58,7 @@ from exulanica.world.society_authored_ground import (
     StandingPolicy,
     authored_input_region,
     build_authored_ground_society_input_v3,
+    objects_in_region,
     read_authored_ground,
 )
 from exulanica.world.society_composition import (
@@ -132,6 +133,25 @@ class _ReadFirst:
     rows: dict[str, ReviewedRow] = field(default_factory=dict)
     read: set[tuple[str, str]] = field(default_factory=set)
     locked: bool = False
+
+
+#: What a saved world's input says of the edit it follows, not of what its society reads: its
+#: place in the sequence, the version's edit cursor, and the digest over both.
+_EDIT_CURSOR_FIELDS: Final = frozenset({"input_seq", "authored_state", "document_sha256"})
+
+
+def _reads_the_same(previous: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
+    """Whether two successive inputs differ only in which edit they follow.
+
+    Such an edit changed nothing the society reads, so it appends no input: an object in another
+    region of the world, or a photograph hidden or moved. Every other field is what the society
+    reads, and any difference there is a new input.
+    """
+
+    def read(document: Mapping[str, Any]) -> dict[str, Any]:
+        return {key: value for key, value in document.items() if key not in _EDIT_CURSOR_FIELDS}
+
+    return read(previous) == read(current)
 
 
 def _reviewed_view(row: Mapping[str, Any] | None) -> ReviewedRow:
@@ -1246,7 +1266,8 @@ class SocietyRuntime:
         registry = json.loads(self._registry_bytes)
         reason = None
         try:
-            for obj in version.objects:
+            # Only the objects this society reads: another region's are another place's.
+            for obj in objects_in_region(version, ground):
                 if obj.removed:
                     continue
                 assignment = registry.get(obj.asset_sha256)
@@ -1443,6 +1464,15 @@ class SocietyRuntime:
             self._lock_assets(connection, read)
             version = self._authored_version(connection, session, binding)
             document = self._authored_compose(connection, binding, ground, version, last + 1, read)
+            previous = connection.execute(
+                "select document from world_society_input where workspace_id=%s and "
+                "society_id=%s and input_seq=%s",
+                (session.workspace_id, row["society_id"], last),
+            ).fetchone()
+            if previous is not None and _reads_the_same(previous["document"], document):
+                # The edit changed nothing this society reads, such as an object in another
+                # region of the world or a photograph hidden: its people have nothing to notice.
+                return
             SocietyRepository(
                 connection,
                 session.workspace_id,

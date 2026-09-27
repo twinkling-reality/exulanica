@@ -34,9 +34,11 @@ from exulanica.world.society_authored_ground import (
     DECLARED_FLOOR_ELEVATION_MM,
     MADE_WORLD_COMPOSER_VERSIONS,
     NAVIGATION_PROFILE,
+    _made_world_ground,
     authored_ground_from_snapshot,
     authored_input_region,
     build_authored_ground_society_input_v3,
+    ground_navigation,
 )
 from exulanica.world.society_composition import reviewed_affordance_registry
 from exulanica.world.society_grounds import society_ground_for_composer
@@ -201,6 +203,50 @@ def test_the_society_walks_its_region_and_leaves_the_worlds_other_places_out():
     assert {target["object_id"] for target in other["targets"]} == {"object:there"}
 
 
+def test_another_places_objects_are_no_dependency_and_their_assets_decide_nothing_here():
+    """Region B's objects are not bound in region A's input, and an asset no reviewed row states
+    in B leaves A's input available; the same asset in A still makes A's unavailable."""
+    ground = _read(_made_candidate(), "region-a")
+    here = _placed("object:here", "region-a", 3_000, 5_000)
+    unreviewed = dataclasses.replace(
+        _placed("object:unreviewed", "region-b", 3_000, 5_000), asset_sha256="e" * 64
+    )
+    document = _compose(ground, _version(here, unreviewed))
+    assert document["availability"] == "available", document["unavailable_reason"]
+    bound = {(ref["kind"], ref["identity"]) for ref in document["dependency_refs"]}
+    assert ("authored_object", f"{VERSION}:object:here") in bound
+    assert not any("object:unreviewed" in identity for _, identity in bound)
+    moved = dataclasses.replace(unreviewed, region_id="region-a")
+    refused = _compose(ground, _version(here, moved))
+    assert refused["unavailable_reason"] == "unknown_active_asset:object:unreviewed"
+
+
+def test_a_made_world_reads_its_own_catalog_entrys_lattice():
+    """The lattice spacing and navigation profile are the made-world entry's own, not the
+    starter's constants: an entry stating others gives a lattice of them."""
+    candidate = _made_candidate()
+    kind = dataclasses.replace(
+        society_ground_for_composer(MADE),
+        lattice_mm=4_000,
+        navigation_profile="exulanica.test-lattice/v1",
+    )
+    ground = _made_world_ground(
+        kind,
+        world_id=WORLD,
+        snapshot_id=SNAPSHOT,
+        snapshot_sha256="c" * 64,
+        composer_key=candidate.composer_key,
+        composer_version=candidate.composer_version,
+        topology=candidate.topology,
+        placement=candidate.placement,
+        region_id="region-a",
+    )
+    navigation = ground_navigation(ground)
+    assert (ground.lattice_mm, navigation["profile"]) == (4_000, "exulanica.test-lattice/v1")
+    assert {edge["length_mm"] for edge in navigation["edges"]} == {4_000}
+    assert ground.document()["lattice_mm"] == 4_000
+
+
 def test_an_object_in_a_region_the_world_does_not_state_still_makes_the_input_unavailable():
     ground = _read(_made_candidate(), "region-a")
     stray = _placed("object:stray", "region-z", 3_000, 5_000)
@@ -331,6 +377,116 @@ def test_people_live_in_one_place_of_a_made_world_and_replay(made):
     assert replay.status_code == 200, replay.text
     assert replay.json()["replay_verified"]
     assert replay.json()["state_sha256"] == after["state_sha256"]
+
+
+@pytest.mark.postgres
+def test_another_place_never_reaches_this_society_and_one_version_holds_one(made):
+    """An edit in region B appends no input to region A's society, an asset withdrawn in B leaves
+    A readable and steppable, an edit in A still reaches it, and a creation naming B is refused by
+    name with nothing composed, while one naming A reads the society back, composing nothing."""
+    api = made
+    personal.photograph(api, minute=0)
+    personal.photograph(api, minute=0, hour=15)
+    personal.group(api)
+    entry = personal.make_world(api)
+    here, there = sorted({slot["region_id"] for slot in personal.source_media(api, entry)})
+    entry = _place(api, entry, "object:bench-here", here)
+    society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
+    created = api.post(society, {"region_id": here, "profile": "exulanica-society/v2"})
+    assert created.status_code == 200, created.text
+    first = created.json()["input_seq"]
+    entry = _place(api, api.entry(entry["entry_id"]), "object:pillar-there", there, asset=PILLAR)
+    steps = society.replace("/society?", "/society/steps?")
+
+    def step() -> dict:
+        read = api.get(society).json()
+        stepped = api.post(
+            steps, {"base_tick": read["current_tick"], "base_state_sha256": read["state_sha256"]}
+        )
+        assert stepped.status_code == 200, stepped.text
+        return stepped.json()
+
+    composed = []
+    compose = api.client.app.state.society_initial_input
+    api.client.app.state.society_initial_input = lambda *args: (
+        composed.append(args) or compose(*args)
+    )
+    connection = api.repository.connection
+    licence = connection.execute(
+        "select licence_sha256 from world_reviewed_asset where asset_key=%s", (PILLAR.asset_key,)
+    ).fetchone()["licence_sha256"]
+    try:
+        connection.execute(
+            # Its licence bytes are no longer the stored ones: the asset is not whole in B.
+            "update world_reviewed_asset set licence_sha256=%s where asset_key=%s",
+            ("0" * 64, PILLAR.asset_key),
+        )
+        connection.commit()
+        read = api.get(society + "&places=true")
+        assert read.status_code == 200, read.text
+        assert [t["object_id"] for t in read.json()["places"]["targets"]] == ["object:bench-here"]
+        # The edit in B appended nothing: the minute consumes the input the society began with.
+        assert step()["input_seq"] == first
+        entry = _place(api, api.entry(entry["entry_id"]), "object:plate-here", here, x_mm=-3_000)
+        assert step()["input_seq"] == first + 1
+        # Composed while B's asset is withdrawn, A's new input is available and uses A's objects.
+        after = api.get(society + "&places=true").json()["places"]
+        assert after["availability"] == "available", after["unavailable_reason"]
+        assert sorted(t["object_id"] for t in after["targets"]) == [
+            "object:bench-here",
+            "object:plate-here",
+        ]
+        elsewhere = api.post(society, {"region_id": there, "profile": "exulanica-society/v2"})
+        assert elsewhere.status_code == 409, elsewhere.text
+        assert elsewhere.json()["code"] == "society_lives_elsewhere"
+        again = api.post(society, {"region_id": here, "profile": "exulanica-society/v2"})
+        assert again.status_code == 200, again.text
+        assert again.json()["society_id"] == created.json()["society_id"]
+        assert composed == []
+        replay = api.get(society.replace("/society?", "/society/replay?"))
+        assert replay.status_code == 200 and replay.json()["replay_verified"], replay.text
+    finally:
+        api.client.app.state.society_initial_input = compose
+        connection.execute(
+            "update world_reviewed_asset set licence_sha256=%s where asset_key=%s",
+            (licence, PILLAR.asset_key),
+        )
+        connection.commit()
+
+
+@pytest.mark.postgres
+def test_the_square_stands_in_its_region_whatever_stands_at_the_same_spot_of_another(made):
+    """An object at the spot in region B does not stand in the way of the square in region A."""
+    api = made
+    personal.photograph(api, minute=0)
+    personal.photograph(api, minute=0, hour=15)
+    personal.group(api)
+    entry = personal.make_world(api)
+    here, there = sorted({slot["region_id"] for slot in personal.source_media(api, entry)})
+    square = arrangement_catalog().by_key()["small_square"]
+    viewer = {"x_mm": 0, "z_mm": 4_000, "yaw_microradians": 3_141_593}
+    version = f"/world/versions/{entry['authored_version_id']}"
+    scope = f"?world_id={entry['world_id']}"
+
+    def preview(region: str) -> dict:
+        body = {
+            "base_state_sha256": api.version(api.entry(entry["entry_id"]))["state_sha256"],
+            "arrangement_key": square.key,
+            "arrangement_version": square.version,
+            "viewer": {**viewer, "region_id": region},
+            "origin_role": "fictional",
+        }
+        answer = api.post(version + "/arrangements/preview" + scope, body)
+        assert answer.status_code == 200, answer.text
+        return answer.json()
+
+    # Where the square would stand in B, a bench stands; in A the same spot is clear.
+    anchor = preview(there)["anchor"]
+    _place(api, entry, "object:bench-there", there, x_mm=anchor["x_mm"], z_mm=anchor["z_mm"])
+    blocked = preview(there)
+    assert blocked["blocked_reason"] == "arrangement_overlaps", blocked
+    ready = preview(here)
+    assert ready["availability"] == "ready", ready
 
 
 @pytest.mark.postgres

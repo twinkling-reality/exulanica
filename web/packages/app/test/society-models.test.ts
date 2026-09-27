@@ -172,6 +172,21 @@ describe('the mounted section', () => {
     expect(mounted.root.textContent).toContain('One person is now decided by the model you chose');
   });
 
+  it('reads nothing more at a new minute once the server says nobody here is decided for by a model', async () => {
+    const fetcher = vi.fn(async () => answer(read({ takes_model_choices: false, engine: 'exulanica-society/v4', models: [], choices: [], latest: [], by_model: [] })));
+    const client = new SocietyModelsClient({ baseUrl: 'https://example.test', token: 't', worldId: 'w', fetch: fetcher as typeof fetch });
+    const mounted = mountSocietyModels({ credentials: { baseUrl: 'https://example.test', token: 't' }, world: { worldId: 'w', versionId: 'version' }, client });
+    const people = [{ id: 'ada', name: 'Ada' }];
+    await mounted.refresh(7, people);
+    expect(mounted.root.hidden).toBe(true);
+    await mounted.refresh(8, people);
+    await mounted.refresh(9, people);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await mounted.refresh(9, people, true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    mounted.dispose();
+  });
+
   it('says why a choice was refused, in words', async () => {
     const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => (init?.method === 'POST'
       ? answer({ code: 'too_many_model_people', detail: 'the choice would run more people by models than the contract allows' }, 422)

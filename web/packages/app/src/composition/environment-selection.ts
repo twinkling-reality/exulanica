@@ -69,7 +69,7 @@ import { aboutWorld, aboutWorldLayers } from '../world-about.js';
 import '../ui/living-world-inspector.css';
 import type { CompanionSocietyContext, SimulationCitation, SocietyQuestion } from '../companion-ask-api.js';
 import { drawSimulated, type SimulatedReferences, type SocietyNames } from '../companion-simulated.js';
-import { outcomeWords, phrase } from '../society-inhabitant-words.js';
+import { hasInhabitantWords, outcomeWords, phrase } from '../society-inhabitant-words.js';
 import { ACTION_LABELS, ACTIVITY_LABELS, filled, objectActivity } from '../society-activity-words.js';
 import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
 import {
@@ -612,7 +612,10 @@ export function mountEnvironmentSelection(
     const restDrawn = onSeat ? 'Sitting on the seat at the place.' : 'Sitting on the ground in front of the place.';
     // In a person's own world the top says who this is, what they are doing and why, in words,
     // naming places by the titles of the person's objects; the recorded details stay below.
-    const words = savedWorld !== null && purposeful && society?.places
+    // Words, and questions to the Companion, only where the words catalog has words for the
+    // engine: a stored society of a retired engine shares the purposeful family and has none.
+    const worded = savedWorld !== null && purposeful && hasInhabitantWords(state.profile);
+    const words = worded && society?.places
       ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places), state.inhabitants)
       : null;
     inspector.show({
@@ -652,7 +655,7 @@ export function mountEnvironmentSelection(
       ],
     });
     if (savedWorld !== null && purposeful) {
-      addAskActions();
+      if (worded) addAskActions();
       addSavedWorldActions();
     }
     return true;
@@ -701,10 +704,15 @@ export function mountEnvironmentSelection(
     noticing = { label, minute: snapshot.currentTick + 1, noticed: false, afterInputSeq: snapshot.places.inputSeq };
   }
 
-  /** The person's objects, as the inhabitants panel names and places them. */
+  /**
+   * The person's objects in the region the society lives in, as the inhabitants panel names and
+   * places them. An object in another region of a world made from photographs is in another place:
+   * the society never reads it, so it is neither listed nor noticed.
+   */
   function savedObjects(): readonly InhabitedObject[] | null {
     if (current === null) return null;
-    return current.objects.filter((object) => !object.removed).map((object) => ({
+    const regionId = savedWorld?.regionId ?? null;
+    return current.objects.filter((object) => !object.removed && (regionId === null || object.regionId === regionId)).map((object) => ({
       objectId: object.objectId, title: object.asset.title,
       xMm: object.transform.xMm, zMm: object.transform.zMm,
     }));
@@ -1808,7 +1816,10 @@ export function mountEnvironmentSelection(
         }
         await attachSavedWorld(entry, regionId);
       } catch (error) {
-        if (phase !== 'disposed') phase = 'idle';
+        if ((phase as string) === 'disposed') return;
+        phase = 'idle';
+        // Said where the person looks for people, whether or not the panel was offered yet.
+        offerInhabitantsPanel();
         inhabitantsPanel.unavailable(`Inhabitants are unavailable. ${error instanceof Error ? error.message : String(error)}`);
       }
       return;

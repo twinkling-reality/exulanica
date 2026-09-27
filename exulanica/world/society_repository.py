@@ -14,6 +14,7 @@ from exulanica.world.society import (
     SOCIETY_POPULATION,
     SOCIETY_TICK_SECONDS,
     SocietyEvent,
+    SocietyLivesElsewhere,
     StaleSocietyState,
     UnavailableSocietyInput,
     UnknownSociety,
@@ -145,6 +146,27 @@ class SocietyRepository:
             profile=profile,
             initial_input=initial_input,
         )
+
+    def held(
+        self, version_id: uuid.UUID, *, profile: str, region_id: str | None
+    ) -> dict[str, Any] | None:
+        """This version's society where it already holds one, read back with nothing composed.
+
+        None where it holds none, so a caller composes the first input only for a society it
+        will create. Another engine is refused as :meth:`create` refuses it, and another region by
+        name (:class:`~exulanica.world.society.SocietyLivesElsewhere`); a creation that names no
+        region reads back the one there is.
+        """
+        row = self._row(version_id)
+        if row is None:
+            return None
+        if row["engine_version"] != profile:
+            raise StaleSocietyState("society profile is immutable; create another authored version")
+        if region_id is not None and row["region_id"] != region_id:
+            raise SocietyLivesElsewhere(
+                "this version's society lives in another region; one version holds one society"
+            )
+        return self.snapshot(version_id)
 
     def _create(
         self,

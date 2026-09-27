@@ -114,11 +114,15 @@ an edit is an input to the version's own society, and a new version of the world
 photographs added, starts a society again whose people draw the same roles, needs and first places
 over the same ground. Two worlds start their people differently: their roles, needs and schedules
 and every later draw differ, while over the same ground the initializer's spread still starts them
-at the same nodes. A stored society keeps the seed it recorded, and replay reads that one. A response never carries a seed: a snapshot, its state and each
-event carry `seed_digest`, the SHA-256 of the seed's text, in its place, while `state_sha256` and
-`document_sha256` still name the stored bytes (`served_snapshot` and `served_events`). A
-comparison commits each seed it runs by the same digest: one function, `seed_digest` in
-`exulanica/world/society.py`, names a seed wherever it is shown or committed.
+at the same nodes. A stored society keeps the seed it recorded, and replay reads that one. A
+response never carries a seed: a snapshot, and its state and each event where the stored document
+holds one, carry `seed_digest`, the SHA-256 of the seed's text, in its place, while `state_sha256`
+and `document_sha256` still name the stored bytes (`served_snapshot` and `served_events`); the
+first engine's state and events hold no seed, so they carry neither. Leaving the seed out is
+presentation, one form of a society on the wire, not secrecy: it is derived from identifiers the
+caller already holds, so anyone who knows them can compute it. A comparison commits each seed it
+runs by the same digest: one function, `seed_digest` in `exulanica/world/society.py`, names a seed
+wherever it is shown or committed.
 `tests/test_society_world_seed.py` holds two worlds starting differently, a second version starting
 the same people, an edit leaving every person as they were, and a society stored under a seed the
 page once sent keeping it and replaying.
@@ -387,9 +391,13 @@ is, because the ground module no longer always states an edge.
   `source: "declared"`. A person arrives at the region origin: the rule its entry in the society
   ground catalog states (`arrival: region_origin`), which needs nothing authored per world, where
   the starter's entry reads the spawn its snapshot states (`arrival: spawn`). Objects in the world's
-  other regions are in another place, so they are left out of this society's input, while an object
-  naming a region the world does not state still makes the input unavailable; hiding or moving a
-  photograph changes nothing the society reads. A creation that names no region, or a region the
+  other regions are in another place (`objects_in_region`): they are no obstacle, activity,
+  dependency or asset of this society's input, so a missing asset there leaves this region's input
+  available, and an edit to one, like hiding or moving a photograph, changes nothing the society
+  reads and appends no input. An object naming a region the world does not state still makes the
+  input unavailable. The small square and the app's People nearby read the same region: only its
+  objects stand in the square's way, and only they are listed and noticed. The lattice spacing and
+  navigation profile are the entry's own. A creation that names no region, or a region the
   world does not state, and a world with an element somebody would collide with, are refused by
   name (`424 unavailable_society_input`). The ground reader dispatches on the snapshot's composer
   through the catalog, and a composer it states no ground for is refused the same way
@@ -402,9 +410,9 @@ is, because the ground module no longer always states an edge.
   lives in, else the region the world opens in (`openingIsland`, the region holding most of the
   person's placements, else the first), and hangs the crowd under that region's root, which every
   drawn region has whether or not anything in it was reconstructed (`hostRegionSociety`), with who
-  decides for them offered as on the starter. Where this open does
-  not draw the society's region the panel says nobody can be shown, and the page never moves a
-  crowd to another region. A region's position in the world is not stored: the page lays the
+  decides for them offered as on the starter. Where this open does not draw the society's region
+  the panel says nobody can be shown, where reading the society fails it says why, and the page
+  never moves a crowd to another region. A region's position in the world is not stored: the page lays the
   regions out again on each open (`buildScene` with no stored placement, in
   `web/packages/app/src/main.ts`), so a region can stand somewhere else after the world gains a
   photograph, and its people move with it, because every position they have is in the region's
@@ -674,7 +682,12 @@ initializer that every creation and every replay passes through.
 ## Authored edits and inability to act
 
 Each relevant accepted authored edit appends a full immutable input snapshot in its transaction,
-even if several edits happen between simulation ticks. The next committed step consumes every input
+even if several edits happen between simulation ticks. An edit is relevant when the input composed
+after it differs from the last one in anything but its sequence number and the authored edit
+cursor: an edit that changes nothing the society reads appends nothing (`_reads_the_same` in
+`exulanica/api/society_runtime.py`), such as an object in another region of a made world, a
+photograph hidden, or an environment piece moved, which an input names only as a placement it does
+not read. The next committed step consumes every input
 in sequence before moving or acting. The repository checks contiguous input sequences and monotonic
 authored edit cursors; the adapter must ensure no relevant accepted edit is omitted. Equal authored
 cursors require equal delta digests; a rights-only input can retain the cursor.
@@ -831,10 +844,13 @@ is the case and since which simulated minute, and says a refusal in words.
 Existing authenticated society create/read/step/events/replay routes remain. Creation may name
 any engine the table creates with; omission keeps v1, and a retired engine is refused with
 `409 society_engine_retired` before anything is written. A creation names no seed: the server
-derives the world's own (above), and a body that names one is malformed (`422`). Step bodies
-still contain only `base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected.
-Every snapshot and event these routes return, and the society a playback step returns, carries
-`seed_digest` in place of the seed.
+derives the world's own (above), and a body that names one is malformed (`422`). A version holds
+one society: a creation for a version that already holds it reads it back with nothing composed,
+and one naming another region is refused with `409 society_lives_elsewhere`. Step bodies still
+contain only `base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected. Every
+snapshot these routes return, and the society a playback step returns, carries `seed_digest` in
+place of the seed, and so does every state and event document that holds one; the first engine's
+hold none.
 
 Every society, action, playback, decision, experiment and district route requires the world as a
 `world_id` query parameter, as every world route does, and a world the workspace does not hold
@@ -938,11 +954,11 @@ thing, where proposals were a second; `build_services` configures no provider fo
 describes the proposals a stored v3 society holds, which `GET .../society/decisions/{request_id}`
 still reads and replay still verifies (`tests/test_society_social_postgres.py`).
 
-Models are optional and never called by stepping, reading or replaying. An explicit server
-`SocietyDecisionProvider(client, role, manifest_sha256)` uses the existing `ModelClient.structured`
-boundary, a fixed prompt version and strict `GoalProposal` schema. The client cannot select a role,
-model, prompt or context. A missing provider produces a durable `provider_not_configured` receipt.
-No production model quality or learned social behavior is established by offline transport tests.
+Stepping, reading and replaying never call a model. A stored v3 receipt was made through the
+`ModelClient.structured` boundary with a fixed prompt version and a strict `GoalProposal` schema;
+the client chose no role, model, prompt or context, and a receipt made where no provider was
+configured says `provider_not_configured`. No server makes a new receipt of this kind. No
+production model quality or learned social behavior is established by offline transport tests.
 
 The bounded context profile is `exulanica.society-decision-context/v1`. It contains subject/branch,
 tick, position, `can_choose_goal`, that subject's `own_beliefs`/`own_observations`, current goal and
@@ -951,29 +967,24 @@ available target or `wait` with a null target is allowed. The validator checks t
 reachability and absence of an action in progress. Wait lasts one explicit step. A chosen goal
 uses `remembered_target_selected`; replay revalidates the stored choice without new inference.
 
-For a v3 society, `POST /world/versions/{version_id}/society/decisions` accepts exactly
-`{idempotency_key: UUID, subject_id: UUID, base_tick: integer, base_state_sha256: SHA256}`.
-`GET` at the same path plus `/{request_id}` reads the result. Both return
-`{request, decision: receipt-or-null, status: in_progress|completed}`. The idempotency key is the
-request ID. Queued authored inputs must first be consumed by an explicit step. A request does not
-advance society time, and a completed accepted receipt affects only a subsequent explicit step.
+A stored v3 request is exactly
+`{idempotency_key: UUID, subject_id: UUID, base_tick: integer, base_state_sha256: SHA256}`, and its
+idempotency key is its request ID. `GET /world/versions/{version_id}/society/decisions/{request_id}`
+returns `{request, decision: receipt-or-null, status: in_progress|completed}`. A request never
+advanced society time, and an accepted receipt affects only the explicit step that consumed it.
 
-Preparation commits an immutable reservation with profile `exulanica.society-decision-request/v1`,
-subject/branch/base tick/state digest, exact input reference, full context and its hash, configured
-role/primary model/manifest hash or null, and the request document hash. At most one request is
-reserved per subject and base tick, even with different keys. An identical retry returns its
-existing pending/completed envelope without another inference. A crash after reservation remains
-honestly pending; there is no automatic retry or fabricated success.
+Each request is an immutable reservation with profile `exulanica.society-decision-request/v1`:
+subject, branch, base tick and state digest, the exact input reference, the full context and its
+hash, the configured role, primary model and manifest hash or null, and the request document hash.
+At most one request exists per subject and base tick. A request reserved and never completed reads
+as pending; nothing retries it or records a success for it.
 
-The preparation connection closes before inference. No database transaction, workspace advisory
-lock or asset lock remains held during the provider call. Completion opens a new transaction,
-reauthorizes current inputs and all historical context dependencies, and compares the exact state
-and input again. Changed state or input yields `stale`; withdrawn dependencies yield a persisted
-`unavailable` receipt and HTTP 424 without returning the context. Semantic/schema violations yield
-`rejected`. Results store validated proposal or null plus actual successful call metadata: served
-model, role, manifest/prompt/schema/messages hashes, attempts/fallback/cache status, token usage and
-cost. Failed calls without that metadata retain the explicit failure and null provider, not an
-invented execution record. No raw reasoning or unrestricted prose is admitted.
+A receipt's status says what its completion found: `stale` where the state or input had changed,
+`unavailable` where a dependency had been withdrawn, `rejected` for a semantic or schema violation,
+and otherwise the validated proposal or null. It stores the actual call's metadata where the call
+succeeded (served model, role, manifest, prompt, schema and message hashes, attempts, fallback and
+cache status, token usage and cost) and the explicit failure with a null provider where it did not.
+No raw reasoning or unrestricted prose is stored.
 
 `world_society_decision_request` stores the immutable request. `world_society_decision` stores the
 contiguous receipt sequence, profile `exulanica.society-decision/v1`, request/hash binding, subject,

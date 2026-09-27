@@ -174,6 +174,10 @@ class SocietyGround:
     #: world, which this society does not stand in; an object naming a region the world does not
     #: state makes the input unavailable. Left out, only this ground's own region is the world's.
     world_region_ids: tuple[str, ...] = ()
+    #: The route lattice's spacing and the navigation profile it is published under, as this
+    #: ground's own entry in the society ground catalog states them; each reader passes its entry's.
+    lattice_mm: int = LATTICE_MM
+    navigation_profile: str = NAVIGATION_PROFILE
 
     @property
     def support_id(self) -> str:
@@ -205,7 +209,7 @@ class SocietyGround:
             "walkable_area": self.area.document(),
             "arrival_mm": [self.arrival_x_mm, self.arrival_z_mm],
             "clearance_mm": CLEARANCE_MM,
-            "lattice_mm": LATTICE_MM,
+            "lattice_mm": self.lattice_mm,
         }
         document["document_sha256"] = society_state_sha256(document)
         return document
@@ -249,7 +253,7 @@ class SocietyGround:
         )
 
 
-def _axis(centre_mm: int, half_extent_mm: int) -> list[int]:
+def _axis(centre_mm: int, half_extent_mm: int, lattice_mm: int) -> list[int]:
     """Lattice coordinates on one axis, inside the area and a full clearance from its edge.
 
     Coordinates are multiples of the lattice spacing about the region origin, so two areas that
@@ -259,9 +263,9 @@ def _axis(centre_mm: int, half_extent_mm: int) -> list[int]:
     high = centre_mm + (half_extent_mm - CLEARANCE_MM)
     if low > high:
         return []
-    first = -(-low // LATTICE_MM)
-    last = high // LATTICE_MM
-    return [value * LATTICE_MM for value in range(first, last + 1)]
+    first = -(-low // lattice_mm)
+    last = high // lattice_mm
+    return [value * lattice_mm for value in range(first, last + 1)]
 
 
 def _node_id(x_mm: int, z_mm: int) -> str:
@@ -297,8 +301,9 @@ def ground_navigation(ground: SocietyGround) -> dict[str, Any]:
     declared. Every activity in an authored world comes from a reviewed object on it.
     """
     area = ground.area
-    xs = _axis(area.centre_x_mm, area.half_width_mm)
-    zs = _axis(area.centre_z_mm, area.half_depth_mm)
+    spacing = ground.lattice_mm
+    xs = _axis(area.centre_x_mm, area.half_width_mm, spacing)
+    zs = _axis(area.centre_z_mm, area.half_depth_mm, spacing)
     nodes = [
         {
             "node_id": _node_id(x_mm, z_mm),
@@ -311,7 +316,7 @@ def ground_navigation(ground: SocietyGround) -> dict[str, Any]:
     edges = []
     for x_mm in xs:
         for z_mm in zs:
-            for next_x, next_z in ((x_mm + LATTICE_MM, z_mm), (x_mm, z_mm + LATTICE_MM)):
+            for next_x, next_z in ((x_mm + spacing, z_mm), (x_mm, z_mm + spacing)):
                 if next_x not in xs or next_z not in zs:
                     continue
                 first, second = _node_id(x_mm, z_mm), _node_id(next_x, next_z)
@@ -320,14 +325,14 @@ def ground_navigation(ground: SocietyGround) -> dict[str, Any]:
                         "edge_id": f"{first}|{second}",
                         "from_node_id": first,
                         "to_node_id": second,
-                        "length_mm": LATTICE_MM,
+                        "length_mm": spacing,
                         "subject_id": ground.support_id,
                     }
                 )
     nodes.sort(key=lambda node: node["node_id"])
     edges.sort(key=lambda edge: edge["edge_id"])
     return {
-        "profile": NAVIGATION_PROFILE,
+        "profile": ground.navigation_profile,
         "clearance_mm": CLEARANCE_MM,
         "walkable_area": area.document(),
         # Where a person arrives. Inhabitants never start on it or beside it; see the initializer.
@@ -530,6 +535,22 @@ def _refused_activity(
     }
 
 
+def objects_in_region(version: AlternateVersion, ground: SocietyGround) -> list[AuthoredObject]:
+    """The version's objects this society reads, in object order: every one but those in another
+    region the world states.
+
+    An object in another region of a world made from photographs is in another place of it: no
+    obstacle, activity, record, dependency or asset of this society's input, and an edit to it
+    changes nothing this society reads. An object naming a region the world does not state is kept,
+    so the input names it as unavailable (``unregistered_object_region``).
+    """
+    return [
+        obj
+        for obj in sorted(version.objects, key=lambda value: value.object_id)
+        if obj.region_id == ground.region_id or obj.region_id not in ground.world_region_ids
+    ]
+
+
 def _objects_one_by_one(
     version: AlternateVersion,
     reviewed_affordances: Mapping[str, dict[str, Any]],
@@ -550,15 +571,12 @@ def _objects_one_by_one(
     usable: list[_UsableObject] = []
     obstacles: list[Obstacle] = []
     records: list[dict[str, Any]] = []
-    for obj in sorted(version.objects, key=lambda value: value.object_id):
+    for obj in objects_in_region(version, ground):
         if obj.removed:
             continue
         reviewed = reviewed_affordances.get(obj.asset_sha256)
         transform = obj.transform
         if obj.region_id != ground.region_id:
-            if obj.region_id in ground.world_region_ids:
-                # Another place of the same world: its people are not this society's.
-                continue
             return [], [], [], f"unregistered_object_region:{obj.object_id}"
         if reviewed is None:
             return [], [], [], f"unknown_active_asset:{obj.object_id}"
@@ -906,7 +924,11 @@ def _authored_ground_input(
             reviewed_affordances=reviewed_affordances,
         )
     )
-    refs.extend(object_dependency_refs(version, reviewed_affordances))
+    refs.extend(
+        object_dependency_refs(
+            version, reviewed_affordances, objects=objects_in_region(version, ground)
+        )
+    )
 
     targets: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
@@ -1120,6 +1142,8 @@ def _starter_ground(
         arrival_x_mm=region.spawn.x_mm,
         arrival_z_mm=region.spawn.z_mm,
         world_region_ids=(region.region_id,),
+        lattice_mm=kind.lattice_mm,
+        navigation_profile=kind.navigation_profile,
     )
 
 
@@ -1215,6 +1239,8 @@ def _made_world_ground(
         arrival_x_mm=0,
         arrival_z_mm=0,
         world_region_ids=regions,
+        lattice_mm=kind.lattice_mm,
+        navigation_profile=kind.navigation_profile,
     )
 
 

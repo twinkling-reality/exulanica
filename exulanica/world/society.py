@@ -124,6 +124,16 @@ class StaleSocietyState(SocietyError):
     pass
 
 
+class SocietyLivesElsewhere(SocietyError):
+    """A version's society lives in one region, and a creation named another.
+
+    A version holds one society. Answering with the one it holds would say people were brought
+    into a region they are not in, so the creation is refused by name, before anything is composed.
+    """
+
+    code: Final = "society_lives_elsewhere"
+
+
 @dataclass(frozen=True, slots=True)
 class SocietyEvent:
     event_id: uuid.UUID
