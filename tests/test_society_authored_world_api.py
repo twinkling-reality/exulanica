@@ -111,7 +111,6 @@ def test_a_person_furnishes_their_own_world_and_somebody_rests_in_it(saved_world
         create_body = {
             "place_id": str(binding.place_id),
             "region_id": binding.region_id,
-            "seed": "7a" * 32,
             "profile": "exulanica-society/v2",
         }
         # Named in another world this workspace holds, the fixture's, the routes look there, where
@@ -220,7 +219,6 @@ def test_an_unregistered_saved_world_is_told_why_it_cannot_hold_inhabitants(
             json={
                 "place_id": str(binding.place_id),
                 "region_id": binding.region_id,
-                "seed": "7a" * 32,
                 "profile": "exulanica-society/v2",
             },
         )

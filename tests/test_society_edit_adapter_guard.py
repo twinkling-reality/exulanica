@@ -7,6 +7,7 @@ from exulanica.world.objects import Transform
 from psycopg import sql
 
 import test_society_runtime as helpers
+from retired_society_support import create_or_plant
 
 runtime_world = helpers.runtime_world
 pytestmark = pytest.mark.postgres
@@ -14,7 +15,8 @@ pytestmark = pytest.mark.postgres
 
 def create_society(w, profile):
     b = w["binding"]
-    return helpers.society(w).create(
+    return create_or_plant(
+        helpers.society(w),
         b.version_id,
         place_id=b.place_id,
         region_id=b.region_id,

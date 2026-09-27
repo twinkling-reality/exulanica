@@ -68,10 +68,10 @@ cookie. Rejected alternative: letting a browser session inherit whatever a beare
 which has no source to inherit from.
 
 **Routes that reach a model** require `model.invoke` beside their read or write permission:
-`/selection/plan`, `/selection/ask`, `/selection/appearance`, `/selection/environment` and
-`POST /world/versions/{version_id}/society/decisions`, which reaches the society decision provider
-through `request_decision` without the endpoint naming a model client. The test that finds them
-reads each endpoint's source for all three markers.
+`/selection/plan`, `/selection/ask`, `/selection/appearance` and `/selection/environment`. The test
+that finds them reads each endpoint's source for all three markers. `POST
+/world/versions/{version_id}/society/models`, the choice of the model that decides for a person,
+requires it beside `world.write` because the choice commits the world's host to asking that model.
 
 **Routes that read a photograph's admission state** require `admission.read` beside `world.write`:
 `POST /world-entries/{entry_id}/source-attachments` and `.../source-rebinds`, which resolve and pin

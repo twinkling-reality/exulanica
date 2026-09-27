@@ -105,10 +105,11 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # routine's two versions, what is recorded and said of each kind of its activity, the legacy
     # identities of the first three engines, a person's decision contract's two in two versions
     # each, and two versions each of a person's score and of the protocol and seeds a comparison
-    # of models reads), the words both the inspector and the Companion say of a simulated person
-    # and of each kind of activity, the world object catalog's three versions and its
-    # arrangements, the flight kind catalog and the local detector's vocabulary.
-    assert len(found[ENTRY_SHAPE]) == 45
+    # of models reads), the grounds a society stands on, the words both the inspector and the
+    # Companion say of a simulated person and of each kind of activity, the world object
+    # catalog's three versions and its arrangements, the flight kind catalog and the local
+    # detector's vocabulary.
+    assert len(found[ENTRY_SHAPE]) == 46
     assert len(found[CITED_SHAPE]) == 5
     assert len(found[GLYPH_SHAPE]) == 4
     # And the discovery is looking where the catalogs are: the city files are among what it found.

@@ -9,6 +9,7 @@ from exulanica.world.society_repository import SocietyRepository
 import test_world_objects_api as object_helpers
 from society_fixtures import edited, seal
 from society_living_fixtures import SEEDS, grid_input
+from society_seed_support import choose_society_seed
 
 objects_api = object_helpers.objects_api
 
@@ -35,7 +36,8 @@ def living(objects_api, repository):
     api.client.app.state.society_initial_input = lambda *_args: doc
     api.client.app.state.society_input_authorizer = lambda _conn, _session, value: authorize(value)
     route = f"/world/versions/{version_id}/society"
-    body = {"place_id": str(place), "region_id": "region-a", "seed": SEEDS[4], "profile": PROFILE}
+    body = {"place_id": str(place), "region_id": "region-a", "profile": PROFILE}
+    choose_society_seed(api.client.app, SEEDS[4])
     response = api.post(api.in_world(route), body)
     assert response.status_code == 200, response.text
     repo = SocietyRepository(

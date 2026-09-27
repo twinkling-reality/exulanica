@@ -35,7 +35,6 @@ from exulanica.world.society_decisions import (
     validate_decision_request,
 )
 from exulanica.world.society_engines import society_engine
-from exulanica.world.society_planner import PURPOSEFUL_PROFILE
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_social import decision_context, validate_proposal
 
@@ -279,7 +278,7 @@ class SocietyDecisionRepository:
         closes its connection before asking the model.
         """
         row = self._row(version_id)
-        if row["engine_version"] != PURPOSEFUL_PROFILE:
+        if not society_engine(row["engine_version"]).owner_model_choice:
             raise ValueError(f"{row['engine_version']} takes no person decisions")
         existing = self._request(row, request_id)
         with inputs_ahead(self.connection, self._context_ahead(row, existing)):

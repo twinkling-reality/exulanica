@@ -163,7 +163,7 @@ def society_models(
         ).current(version_id)
         decisions = (
             SocietyDecisionRepository(society).person_decisions(version_id, latest=DECISIONS_READ)
-            if engine.model_decisions and snapshot["profile"] == "exulanica-society/v2"
+            if engine.owner_model_choice
             else []
         )
     except UnavailableSocietyInput as exc:
@@ -209,7 +209,7 @@ def society_models(
         "profile": PROFILE,
         "society_id": str(snapshot["society_id"]),
         "engine": snapshot["profile"],
-        "takes_model_choices": snapshot["profile"] == "exulanica-society/v2",
+        "takes_model_choices": engine.owner_model_choice,
         "host_refusal": services.model_host_refusal(session.workspace_id),
         "contract": {
             **contract.binding(),

@@ -22,7 +22,7 @@ def test_legacy_authenticated_reload_cas_branch_isolation(objects_api, repositor
     version = api.version()
     route = f"/world/versions/{version['version_id']}/society"
     path, steps = api.in_world(route), api.in_world(route + "/steps")
-    response = api.post(path, {"place_id": str(place), "region_id": "region-a", "seed": "7a" * 32})
+    response = api.post(path, {"place_id": str(place), "region_id": "region-a"})
     assert response.status_code == 200, response.text
     original = response.json()
     body = {"base_tick": 0, "base_state_sha256": original["state_sha256"]}
@@ -36,9 +36,7 @@ def test_legacy_authenticated_reload_cas_branch_isolation(objects_api, repositor
     assert api.client.get(path).status_code == 401
     other_version = api.version("Other society branch")
     other_route = api.in_world(f"/world/versions/{other_version['version_id']}/society")
-    other = api.post(
-        other_route, {"place_id": str(place), "region_id": "region-a", "seed": "7a" * 32}
-    )
+    other = api.post(other_route, {"place_id": str(place), "region_id": "region-a"})
     assert other.status_code == 200, other.text
     assert other.json()["society_id"] != original["society_id"]
     assert other.json()["current_tick"] == 0
@@ -60,9 +58,7 @@ def test_replay_rejects_extra_persisted_event_even_when_state_digest_matches(
     repository.connection.commit()
     version = api.version()
     route = f"/world/versions/{version['version_id']}/society"
-    state = api.post(
-        api.in_world(route), {"place_id": str(place), "region_id": "region-a", "seed": "7a" * 32}
-    ).json()
+    state = api.post(api.in_world(route), {"place_id": str(place), "region_id": "region-a"}).json()
     state = api.post(
         api.in_world(route + "/steps"), {"base_tick": 0, "base_state_sha256": state["state_sha256"]}
     ).json()

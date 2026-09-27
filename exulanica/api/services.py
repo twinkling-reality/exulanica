@@ -71,6 +71,7 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores, tile_store
 from exulanica.world.material_recipes import MaterialRuntime
+from exulanica.world.society import world_society_seed
 from exulanica.world.society_composition import REVIEWED_REACH_MM, reviewed_affordance_registry
 from exulanica.world.society_controls import (
     BASE_TICK_INTERVAL_DIVISOR,
@@ -84,7 +85,6 @@ from exulanica.world.texture_assets import load_material_catalog
 
 if TYPE_CHECKING:
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
-    from exulanica.world.society_decisions import SocietyDecisionProvider
 
 __all__ = [
     "DATA_DIR_ENV",
@@ -183,8 +183,10 @@ class Services:
     #: The society composition and authorization adapter. ``build_services`` always configures
     #: one; district bindings and host saved-world registrations are the host's to add.
     society_runtime: SocietyRuntime | None = None
-    #: Explicit server-selected provider for bounded social choices. No automatic promotion.
-    society_decision_provider: SocietyDecisionProvider | None = None
+    #: The seed a new society in a world starts from, from the workspace and the world's id. The
+    #: server derives it (:func:`~exulanica.world.society.world_society_seed`); no request names
+    #: one. A measurement that runs chosen seeds through the routes builds its own Services.
+    society_seed: Callable[[uuid.UUID, str], str] = world_society_seed
     #: Explicit family definitions and current source authority for version-scoped appearance.
     character_appearance: CharacterAppearanceRuntime | None = None
     #: The published material catalog and each workspace's bake namespace. None when this

@@ -6,11 +6,14 @@ from copy import deepcopy
 import pytest
 from exulanica.environment.district_geometry import DistrictGeometry
 from exulanica.world.assets import reviewed_assets
+from exulanica.world.society import served_document
 from exulanica.world.society_planner import advance_purposeful_society, ordered_events_document
 from fastapi.testclient import TestClient
 from scripts.prepare_living_world_preview import PreviewScenario, _registry, assert_supported_motion
 
+import test_society_runtime as runtime_helpers
 import test_society_runtime_api as helpers
+from society_seed_support import choose_society_seed
 from test_society_runtime import BASE
 
 registered_world = helpers.runtime_world
@@ -45,6 +48,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
     object_digest = w["version"].state_sha256
 
     with TestClient(make_app()) as client:
+        choose_society_seed(client.app, seed)
         response = client.post(
             route,
             headers=owner,
@@ -52,7 +56,6 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
             json={
                 "place_id": str(binding.place_id),
                 "region_id": binding.region_id,
-                "seed": seed,
                 "profile": "exulanica-society/v2",
             },
         )
@@ -63,7 +66,11 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
         node = next(
             n for n in initial_input["navigation"]["nodes"] if n["node_id"] == scenario.node_id
         )
-        expected = deepcopy(snapshot["state"])
+        # The stored state, seed included: what the engine advances. A response serves it with
+        # the seed's digest in the seed's place.
+        expected = deepcopy(runtime_helpers.society(w).snapshot(binding.version_id)["state"])
+        assert snapshot["state"] == served_document(expected)
+        assert "seed" not in snapshot and snapshot["seed_digest"] != seed
         control = deepcopy(expected)
         controls.append(control)
         for tick in range(1, scenario.final_tick + 1):
@@ -117,7 +124,7 @@ def test_authenticated_causal_use_interruption_restore_and_fresh_services_replay
                 expected, seed, inputs[expected["input_seq"] - 1 : snapshot["input_seq"]]
             )
             expected_events.extend(ordered_events_document(events))
-            assert snapshot["state"] == expected
+            assert snapshot["state"] == served_document(expected)
             assert_supported_motion(expected, geometry)
             control, _ = advance_purposeful_society(control, seed, [initial_input])
             controls.append(control)

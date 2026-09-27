@@ -1,6 +1,6 @@
 """The society engine table is the one statement of which engines exist and what each can do.
 
-Everything that used to restate a list of engines derives it from ``society-engines.v1.json``.
+Everything that used to restate a list of engines derives it from ``society-engines.v2.json``.
 These tests hold the places that cannot derive, because they are fixed text, to the table: the
 implemented engine modules, the live schema's checks, triggers and indexes, a SQL literal in a
 file another lane is restructuring, and the browser's generated copy. Each one fails when the
@@ -20,6 +20,8 @@ from exulanica.world.society import SOCIETY_ENGINE_VERSION
 from exulanica.world.society_engines import (
     ACTION_ENGINES,
     COMPARISON_ENGINES,
+    CREATABLE_ENGINES,
+    CREATES,
     DECISION_ENGINES,
     DEFAULT_ENGINE,
     ENGINES,
@@ -27,10 +29,13 @@ from exulanica.world.society_engines import (
     EXPERIMENT_ENGINES,
     INPUT_ENGINES,
     LEGACY_ENGINES,
+    OWNER_MODEL_CHOICE_ENGINES,
     PLAYABLE_ENGINES,
     PRESENCE_ENGINES,
     SAVED_WORLD_ENGINES,
+    RetiredSocietyEngine,
     UnknownSocietyEngine,
+    creatable_engine,
     load_engine_table,
     society_engine,
 )
@@ -59,9 +64,14 @@ def test_every_engine_in_the_table_is_implemented_and_every_implementation_is_li
 def test_each_capability_is_claimed_only_by_engines_that_implement_it():
     # A capability in the table is a promise the code keeps: directed actions are v2 and v3's
     # goal-policy seam, model decisions are v2's person decisions over that same seam and v3's
-    # social policy, experiments run the living engine.
+    # stored social proposals, experiments run the living engine.
     assert ACTION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
     assert DECISION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
+    # Only v2's people take a model their world's owner chose, at the planner's choice points.
+    assert OWNER_MODEL_CHOICE_ENGINES == (PURPOSEFUL_PROFILE,)
+    # v3 is retired: its stored societies read and replay, and nothing new is made with it.
+    assert CREATABLE_ENGINES == (SOCIETY_ENGINE_VERSION, PURPOSEFUL_PROFILE, LIVING_PROFILE)
+    assert CREATES == {"district": LIVING_PROFILE, "saved_world": PURPOSEFUL_PROFILE}
     assert EXPERIMENT_ENGINES == (LIVING_PROFILE,)
     # A comparison plays the purposeful engine's genesis and minutes with person decisions.
     assert COMPARISON_ENGINES == (PURPOSEFUL_PROFILE,)
@@ -76,6 +86,11 @@ def test_each_capability_is_claimed_only_by_engines_that_implement_it():
 def test_an_engine_the_table_does_not_state_is_refused_by_name():
     with pytest.raises(UnknownSocietyEngine, match="exulanica-society/v5"):
         society_engine("exulanica-society/v5")
+    with pytest.raises(UnknownSocietyEngine, match="exulanica-society/v5"):
+        creatable_engine("exulanica-society/v5")
+    with pytest.raises(RetiredSocietyEngine, match="exulanica-society/v3 is retired"):
+        creatable_engine(SOCIAL_PROFILE)
+    assert creatable_engine(PURPOSEFUL_PROFILE).owner_model_choice
     with pytest.raises(UnknownSocietyEngine, match="None"):
         society_engine(None)
     assert society_engine(LIVING_PROFILE).holds(65_536)
@@ -91,6 +106,12 @@ def test_an_engine_the_table_does_not_state_is_refused_by_name():
         (lambda d: d["engines"][1].update(takes_inputs=False), "invalid society engine row"),
         (lambda d: d["engines"][3]["population"].update(minimum=0), "invalid society engine row"),
         (lambda d: d["engines"][2].pop("reason"), "capabilities and a reason"),
+        (lambda d: d["engines"][3].update(owner_model_choice=True), "invalid society engine row"),
+        (lambda d: d["engines"][1].update(owner_model_choice=False), "invalid society engine row"),
+        (lambda d: d.update(default_engine="exulanica-society/v3"), "retired"),
+        (lambda d: d["creates"]["saved_world"].update(engine="exulanica-society/v3"), "creates"),
+        (lambda d: d["creates"]["saved_world"].update(engine="exulanica-society/v4"), "saved"),
+        (lambda d: d["creates"].pop("district"), "creates names exactly"),
     ],
     ids=[
         "unordered",
@@ -99,6 +120,12 @@ def test_an_engine_the_table_does_not_state_is_refused_by_name():
         "actions-without-inputs",
         "empty-population",
         "no-reason",
+        "owner-choice-without-model-decisions",
+        "comparisons-without-owner-choice",
+        "retired-default",
+        "creates-a-retired-engine",
+        "saved-world-engine-off-saved-worlds",
+        "creates-no-district-engine",
     ],
 )
 def test_a_malformed_table_is_refused(tmp_path, change, message):
@@ -204,12 +231,26 @@ def test_the_population_check_states_each_engine_bounds_from_the_table(repositor
     assert stated == {e.engine: (e.population_minimum, e.population_maximum) for e in ENGINES}, body
 
 
+def test_the_first_table_is_this_one_without_its_new_columns():
+    """``society-engines.v1.json`` stays because evaluation records name it; it is held to the
+    table, so it never reads as a second statement that disagrees. Reasons are prose and may
+    differ; every capability it states is the current table's."""
+    first = json.loads(ENGINES_PATH.with_name("society-engines.v1.json").read_text("utf-8"))
+    current = json.loads(ENGINES_PATH.read_text(encoding="utf-8"))
+    assert first["profile"] == "exulanica.society-engines/v1"
+    assert first["default_engine"] == current["default_engine"]
+    added = {"creatable", "owner_model_choice"}
+    assert [{k: v for k, v in row.items() if k != "reason"} for row in first["engines"]] == [
+        {k: v for k, v in row.items() if k not in added | {"reason"}} for row in current["engines"]
+    ]
+
+
 def test_the_browser_copy_is_generated_from_the_table():
     generated = (
         ROOT / "web" / "packages" / "app" / "src" / "society-engines.generated.ts"
     ).read_text(encoding="utf-8")
     text = ENGINES_PATH.read_text(encoding="utf-8")
-    assert f"export const SOCIETY_ENGINES_V1_JSON = String.raw`{text}`;" in generated
+    assert f"export const SOCIETY_ENGINES_V2_JSON = String.raw`{text}`;" in generated
     names = " | ".join(f"'{engine.engine}'" for engine in ENGINES)
     assert f"export type SocietyEngineProfile = {names};" in generated
 

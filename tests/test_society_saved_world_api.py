@@ -131,7 +131,7 @@ def bring_inhabitants(client, world, profile=V2):
         society,
         headers=OWNER,
         params=scope,
-        json={"region_id": world["binding"].region_id, "seed": "7a" * 32, "profile": profile},
+        json={"region_id": world["binding"].region_id, "profile": profile},
     )
 
 
@@ -235,7 +235,7 @@ def test_one_request_brings_inhabitants_in_and_asking_again_changes_nothing(worl
                 society_route,
                 headers=OWNER,
                 params=elsewhere,
-                json={"region_id": world["binding"].region_id, "seed": "8b" * 32, "profile": V2},
+                json={"region_id": world["binding"].region_id, "profile": V2},
             ).status_code
             == 404
         )

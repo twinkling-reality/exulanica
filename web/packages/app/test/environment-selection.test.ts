@@ -16,6 +16,7 @@ import {
 } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import type { SocietyPlaybackControl } from '../src/society-control-api.js';
+import { parseSocietyModels } from '../src/society-models-api.js';
 
 // Only the NYC footprint renderer is replaced, so a test can see whether one was built.
 const nycOverlay = vi.hoisted(() => vi.fn());
@@ -715,7 +716,13 @@ function restRecord() {
     status:'pending',consumption:null,
   },'version');
 }
-function liveMount(preview = false, living = false, interpretation: unknown = undefined) {
+/** Who decides for a society's people, as the server serves it for the engine it runs. */
+const servedModels = (engine: string, takes: boolean) => parseSocietyModels({
+  profile: 'exulanica.society-models/v1', society_id: 'society', engine, takes_model_choices: takes, host_refusal: null,
+  contract: { versions: {}, sha256: 'c'.repeat(64), model_people_maximum: 8 },
+  models: [], choices: [], latest: [], by_model: [], decisions_read: { counted: 0, maximum: 2000 },
+});
+function liveMount(preview = false, living = false, interpretation: unknown = undefined, takesModelChoices = false) {
   const canvas = document.createElement('canvas');
   const controls = {state:{x:0,y:1.68,z:0},onInteract:null as (()=>void)|null};
   const snapshot = living ? livingSnapshot : liveSnapshot;
@@ -749,15 +756,33 @@ function liveMount(preview = false, living = false, interpretation: unknown = un
   const districtResult = {placement:{versionId:connectedVersion.versionId,regionId:'registered-region',translationMm:[0,0,0],boundsMm:[0,0,100000,100000]},baseArtifactSha256:'b'.repeat(64),interpretationArtifactSha256:'c'.repeat(64)};
   const districtClient = {read:vi.fn(async()=>districtResult)};
   const onDistrictPlacementChange=vi.fn();
+  const modelsClient = {read:vi.fn(async()=>servedModels(initialSnapshot.state.profile ?? 'exulanica-society/v4', takesModelChoices)),choose:vi.fn()};
   const environment = {catalog:vi.fn(async()=>connectedCatalog),apply:vi.fn(async()=>({kind:'recorded',version:{...connectedVersion,editSeq:1}}))};
   const worldClient = {connect:vi.fn(async()=>({assets:[],version:{...connectedVersion,edits:[{kind:'add_object',editId:'prior',undoneEditId:null}]}}))};
   const mount = mountEnvironmentSelection({env:{canvas,preview} as AppEnvironment,state:{atlas:{binding}} as unknown as SessionState,
     scene:{islands:[{islandId:'region'}]} as unknown as AtlasScene,credentials:{baseUrl:'https://api.test',token:'test'},showStatus:vi.fn(),admissionId:'admission',
     environmentClient:environment as never,worldClient:worldClient as never,societyClient:client as never,societyControlClient:societyControlClient as never,societyDistrictClient:districtClient as never,onDistrictPlacementChange,
-    createOverlay:()=>({pick:()=>null,destroy:vi.fn()})});
+    societyModelsClient:modelsClient as never,createOverlay:()=>({pick:()=>null,destroy:vi.fn()})});
   const button = (label:string)=>[...mount.root.querySelectorAll('button')].find(b=>b.textContent===label)!;
-  return {mount,client,societyControlClient,district,canvas,controls,button,environment,districtClient,districtResult,worldClient,binding,onDistrictPlacementChange};
+  return {mount,client,societyControlClient,district,canvas,controls,button,environment,districtClient,districtResult,worldClient,binding,onDistrictPlacementChange,modelsClient};
 }
+
+describe('who decides for a district\'s people',()=>{
+  it('follows the engine the server serves, not the kind of world',async()=>{
+    // The living district society takes no model choices: the section is there and stays hidden.
+    const living=liveMount(false,true,undefined,false);await living.mount.begin();
+    await vi.waitFor(()=>expect(living.modelsClient.read).toHaveBeenCalled());
+    const hidden=living.mount.root.querySelector<HTMLElement>('section.society-models');
+    expect(hidden).not.toBeNull();await vi.waitFor(()=>expect(hidden!.hidden).toBe(true));
+    living.mount.dispose();
+    // The same district whose server says its engine takes them shows who decides for them.
+    const chosen=liveMount(false,false,undefined,true);await chosen.mount.begin();
+    await vi.waitFor(()=>expect(chosen.modelsClient.read).toHaveBeenCalled());
+    const shown=chosen.mount.root.querySelector<HTMLElement>('section.society-models');
+    await vi.waitFor(()=>expect(shown!.hidden).toBe(false));
+    chosen.mount.dispose();
+  });
+});
 
 describe('persisted living world controls',()=>{
   it('renders the canonical population and advances only on explicit user action',async()=>{

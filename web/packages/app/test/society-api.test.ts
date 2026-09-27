@@ -53,6 +53,7 @@ describe('society identity and malformed data rejection', () => {
 
 import { vi } from 'vitest';
 import { SocietyClient, parseSocietyEvents } from '../src/society-api.js';
+import { engineCreatedOver } from '../src/society-engines.js';
 
 const responseRow = () => ({society_id:'society',version_id:'branch',place_id:'place',population_size:100,current_tick:4,state_sha256:'a'.repeat(64),state:{tick:4,inhabitants:Array.from({length:100},(_,i)=>({id:`person-${i}`,synthetic:true,position_mm:[i,0]}))}});
 const persistedEvent = () => ({event_id:'event',subject_id:'person-0',tick:4,event_kind:'departed',document_sha256:'b'.repeat(64),document:{synthetic:true,summary:'Departed on the simulated schedule.'}});
@@ -68,11 +69,16 @@ describe('society authenticated transport', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch.mock.calls[0]).toEqual([`https://api.test/world/versions/branch/society${IN_WORLD}`,expect.objectContaining({method:'GET',headers:{authorization:'Bearer scoped-test-token'}})]);
   });
-  it('explicitly creates v2 only after missing society and sends no authoritative geometry', async () => {
+  it('creates only after missing society, with the engine the table names for its ground, and sends no seed or geometry', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(jsonResponse({code:'unknown_society',detail:'unavailable'},404)).mockResolvedValueOnce(jsonResponse(responseRow()));
     const client = new SocietyClient({baseUrl:'https://api.test',token:'test',worldId:WORLD,fetch}); await client.connect('branch','place','region');
     const init = fetch.mock.calls[1]![1]!;
-    expect(JSON.parse(String(init.body))).toEqual({place_id:'place',region_id:'region',seed:'7a'.repeat(32),profile:'exulanica-society/v2'});
+    // A named place is a district's; the server derives the seed from the world, so none is sent.
+    expect(JSON.parse(String(init.body))).toEqual({place_id:'place',region_id:'region',profile:engineCreatedOver('district')});
+    const saved = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(jsonResponse({...responseRow(),place_id:'saved-place'}));
+    await new SocietyClient({baseUrl:'https://api.test',token:'test',worldId:WORLD,fetch:saved}).create('branch',null,'region');
+    expect(JSON.parse(String(saved.mock.calls[0]![1]!.body))).toEqual({region_id:'region',profile:engineCreatedOver('saved_world')});
+    expect([engineCreatedOver('district'), engineCreatedOver('saved_world')]).toEqual(['exulanica-society/v4', 'exulanica-society/v2']);
   });
   it.each([401,403,409,424,500])('does not create on read error %s', async status => {
     const fetch = vi.fn(async () => jsonResponse({code:'unavailable',detail:'unavailable'},status));

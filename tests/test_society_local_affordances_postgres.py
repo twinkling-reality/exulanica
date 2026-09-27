@@ -13,6 +13,7 @@ from psycopg.errors import CheckViolation
 from psycopg.types.json import Jsonb
 
 import test_society_runtime as helpers
+from retired_society_support import create_or_plant
 
 runtime_world = helpers.runtime_world
 pytestmark = pytest.mark.postgres
@@ -76,7 +77,8 @@ def test_explicit_policy_upgrade_mixed_inputs_move_undo_reload_and_exact_replay(
     b = w["binding"]
     legacy = helpers.initial(w)
     assert legacy["profile"] == "exulanica.society-input/v1"
-    state = helpers.society(w).create(
+    state = create_or_plant(
+        helpers.society(w),
         b.version_id,
         place_id=b.place_id,
         region_id=b.region_id,
@@ -128,7 +130,8 @@ def test_unreachable_activity_keeps_source_rights_and_historical_reads_gated(run
     opt_in(w)
     b = w["binding"]
     initial = helpers.initial(w)
-    state = helpers.society(w).create(
+    state = create_or_plant(
+        helpers.society(w),
         b.version_id,
         place_id=b.place_id,
         region_id=b.region_id,

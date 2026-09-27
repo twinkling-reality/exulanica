@@ -14,7 +14,7 @@ from exulanica.api.dependencies import CurrentSession, ScopedConnection
 from exulanica.api.society_control_worker import HOST_PLAYBACK_REFUSALS, host_playback_refusal
 from exulanica.api.world_scope import WorldId
 from exulanica.selection.validation import Session
-from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.society import UnavailableSocietyInput, served_snapshot
 from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS, effective_interval_ms
 from exulanica.world.worlds import require_world
@@ -202,6 +202,8 @@ def manual_step(
         return {
             **result,
             "control": with_host_playback(result["control"], request, session.workspace_id),
+            # The society is served as the society routes serve it: never its seed.
+            "society": served_snapshot(result["society"]),
         }
 
     return call(step)

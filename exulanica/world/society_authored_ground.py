@@ -12,8 +12,11 @@ bounded area of its own and says in its input that it did. Neither case writes a
 ground: the stored world keeps whatever its module states, and the declaration lives only in the
 society's inputs, where replay reproduces it.
 
-The lattice over that area is a declared discretisation, not a measurement, and the module states
-its spacing rather than deriving a walkable shape from anything the world does not say.
+The lattice over that area is a declared discretisation, not a measurement. Its spacing, the area a
+society declares where the ground states none, and how many people a society over the ground
+starts with are the ground's entry in the society ground catalog
+(:mod:`exulanica.world.society_grounds`), with their reasons; nothing here derives a walkable
+shape from anything the world does not say.
 """
 
 from __future__ import annotations
@@ -54,6 +57,7 @@ from exulanica.world.society_composition import (
     turned_point,
     validate_reviewed_affordances,
 )
+from exulanica.world.society_grounds import society_ground_for_composer
 from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_COMPOSITION,
     AUTHORED_GROUND_COMPOSITION_V2,
@@ -67,35 +71,28 @@ from exulanica.world.society_input_policy import (
 )
 from exulanica.world.society_place import ceil_distance
 from exulanica.world.society_planner import CLEARANCE_MM, input_sha256, validate_society_input
+from exulanica.world.starter import AUTHORED_STARTER_COMPOSER
 
 #: The descriptor profile. It names the ground a saved world states, the area the society walks,
 #: and the structural snapshot both were read from.
 GROUND_PROFILE: Final = "exulanica.authored-ground/v2"
-NAVIGATION_PROFILE: Final = "authored-ground-lattice/v1"
 FRAME_NAME: Final = "authored-ground-local-mm"
 
-#: The declared spacing of the route lattice, in millimetres. A flat rectangle has no paths of
-#: its own, so a route graph over it is a choice this profile makes rather than a fact the world
-#: states. Two metres keeps every point of the area within 1,415 mm of a lattice node, which is
-#: inside the reviewed object reach, and keeps a 24 m area at 121 nodes. Changing it changes
-#: every digest, so it is a versioned profile constant and not a tunable.
-LATTICE_MM: Final = 2_000
-
+#: The built-in starter's ground, as the society ground catalog states it: the one ground this
+#: module composes over. The names below are its figures, kept for their readers; each reason is
+#: the catalog entry's.
+STARTER_GROUND: Final = society_ground_for_composer(AUTHORED_STARTER_COMPOSER)
+NAVIGATION_PROFILE: Final = STARTER_GROUND.navigation_profile
+#: The spacing of the route lattice, in millimetres (``lattice_reason``).
+LATTICE_MM: Final = STARTER_GROUND.lattice_mm
 #: The half extent of the square a society declares on a ground that states no edge, centred on
-#: the region origin. It is the society's own area, never the ground's: an endless plane stays
-#: endless in the stored world. The figure keeps the lattice at 121 nodes, which is what holds one
-#: tick of 128 inhabitants near a tenth of a second, and it equals the only bounded starter ground
-#: the product has shipped, so an old and a new starter give a society the same area and the same
-#: node identities. An object placed outside it is still in the world and still drawn; the society
-#: records that activity as unreachable rather than stretching its area to meet it.
-DECLARED_HALF_EXTENT_MM: Final = 12_000
-
-#: How many inhabitants a society on a saved world's own ground starts with. The area is a square
-#: about 23 metres across with 121 places to stand, and a population sized for a district (128)
-#: would stand people on top of each other from the first minute. A handful reads as people living
-#: somewhere. The repository reads this at the moment it creates a society, so a measurement can
-#: set another value in-process; a district keeps ``SOCIETY_POPULATION``.
-AUTHORED_GROUND_POPULATION: Final = 8
+#: the region origin (``declared_area_reason``). It is the society's own area, never the ground's.
+#: An object placed outside it is still in the world and still drawn; the society records that
+#: activity as unreachable rather than stretching its area to meet it.
+DECLARED_HALF_EXTENT_MM: Final = STARTER_GROUND.declared_half_extent_mm
+#: How many inhabitants a society on the starter's ground starts with (``population_reason``); a
+#: district keeps ``SOCIETY_POPULATION``.
+AUTHORED_GROUND_POPULATION: Final = STARTER_GROUND.population
 
 AreaSource = Literal["ground", "declared"]
 

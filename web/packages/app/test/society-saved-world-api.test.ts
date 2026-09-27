@@ -50,7 +50,7 @@ describe('a saved world names itself on every society request', () => {
       .mockResolvedValueOnce(json({ events: [] }));
     const client = new SocietyClient({ baseUrl: 'https://api.test', token: 'test', fetch, worldId: WORLD });
     const read = await client.read('branch', { places: true });
-    const created = await client.create('branch', null, 'region:starter', 'exulanica-society/v2');
+    const created = await client.create('branch', null, 'region:starter');
     await client.advance(created);
     await client.events(created);
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([
@@ -59,9 +59,10 @@ describe('a saved world names itself on every society request', () => {
       `https://api.test/world/versions/branch/society/steps?${QUERY}`,
       `https://api.test/world/versions/branch/society/events?${QUERY}&limit=256`,
     ]);
-    // The server resolves a saved world's place; the request names none.
+    // The server resolves a saved world's place and derives its seed; the request names neither,
+    // and the engine is the one the engine table creates a saved world's society with.
     expect(JSON.parse(String(fetch.mock.calls[1]![1]!.body))).toEqual({
-      region_id: 'region:starter', seed: '7a'.repeat(32), profile: 'exulanica-society/v2',
+      region_id: 'region:starter', profile: 'exulanica-society/v2',
     });
     expect(read.places?.targets.map((target) => [target.objectId, target.affordance])).toEqual([['object-1', 'rest']]);
     expect(read.places?.unreachable.map((place) => [place.objectId, place.reason])).toEqual([

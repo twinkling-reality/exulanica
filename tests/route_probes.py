@@ -434,7 +434,7 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     },
     "POST /world/versions/{version_id}/society": {
         **_IN_WORLD,
-        "json": {"place_id": str(uuid.uuid4()), "region_id": "region-a", "seed": "7a" * 32},
+        "json": {"place_id": str(uuid.uuid4()), "region_id": "region-a"},
     },
     "POST /world/versions/{version_id}/society/actions": {
         **_IN_WORLD,

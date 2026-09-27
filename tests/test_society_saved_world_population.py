@@ -29,6 +29,7 @@ from exulanica.world.starter import AUTHORED_SPAWN_X_MM, AUTHORED_SPAWN_Z_MM
 import test_society_authored_ground as authored
 import test_society_authored_world_postgres as saved
 import test_society_runtime as district
+from retired_society_support import create_or_plant
 
 saved_world = saved.saved_world
 runtime_world = district.runtime_world
@@ -180,7 +181,8 @@ def test_a_district_society_under_a_hundred_is_refused_through_the_repository(
     monkeypatch.setattr(society_repository, "SOCIETY_POPULATION", 50)
     b = w["binding"]
     with pytest.raises(ValueError, match="between 100 and 512"):
-        district.society(w).create(
+        create_or_plant(
+            district.society(w),
             b.version_id,
             place_id=b.place_id,
             region_id=b.region_id,

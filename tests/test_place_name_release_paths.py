@@ -611,8 +611,8 @@ def test_a_society_decision_carries_no_place_allowed_for_the_embedding_use(insta
     services = instance.services(client)
     instance.grant()
     provider = SocietyDecisionProvider(client, Role.REASONING_CHEAP, "a" * 64)
-    # Bound as exulanica.api.society_decision_runtime binds it: the workspace's policy, releasing
-    # no place's name, on a fresh read-only session for each judgement.
+    # Bound as a society decision's runtime bound it before the proposal route was retired: the
+    # workspace's policy, releasing no place's name, on a fresh read-only session per judgement.
     bound = dataclasses.replace(
         provider,
         client=provider.client.with_policy(

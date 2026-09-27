@@ -5,11 +5,13 @@ Status: **BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL**.
 The default `exulanica-society/v1` retains seeded synthetic motion. Opt-in
 `exulanica-society/v2` adds reachable goals, routes, reviewed visit/rest actions and reactions to
 versioned authored inputs, and lets a model its world's owner chose decide for a person at the
-routine's own choice points. Opt-in `exulanica-society/v3` adds a bounded synthetic cast with
-local observations, communicated beliefs and explicitly requested, validated model proposals.
-`exulanica-society/v4`, the living society, adds catalogued routines, occupancy and a
-population sized to its place; the browser creates live societies in the owned district with it,
-and a person's own saved world gets a v2 society when the person asks for one. In a saved world
+routine's own choice points. `exulanica-society/v3` added a bounded synthetic cast with local
+observations, communicated beliefs and explicitly requested, validated model proposals; it is
+retired, so no society is created with it and its proposals are refused, while a stored one reads
+and replays as recorded. `exulanica-society/v4`, the living society, adds catalogued routines,
+occupancy and a population sized to its place. The engine table names which engine a new society
+over each kind of ground is created with: the browser creates live societies in the owned district
+with v4, and a person's own saved world gets a v2 society when the person asks for one. In a saved world
 each destination gives its occupants places of their own, an object the society cannot use
 costs only its own activity, and the person can send everyone away and bring them back. All
 profiles are fictional simulation, separate from personal evidence. They do not model real
@@ -63,8 +65,11 @@ no worker.
 Implementation:
 
 - shared identity, draws, events and digests: `exulanica/world/society.py`;
-- which engines exist and what each can do: `exulanica/world/society-engines.v1.json`, read by
+- which engines exist and what each can do: `exulanica/world/society-engines.v2.json`, read by
   `exulanica/world/society_engines.py`;
+- the grounds a society stands on, with the population, lattice and declared area of each:
+  `assets/catalogs/society-ground/society-ground.v1.json`, read by
+  `exulanica/world/society_grounds.py`;
 - sending a society's people away and bringing them back:
   `exulanica/world/society_presence.py`;
 - the frozen v1 engine and the fixed tables stored v1 to v3 histories depend on:
@@ -93,12 +98,28 @@ Implementation:
 ## Identity, branches and compatibility
 
 The v1 to v3 population is 128 over a district; their pure initializer accepts 100 to 512 there.
-A society on a saved world's own ground starts with 8 (below). V4 sizes its population to its
+A society on a saved world's own ground starts with the population its ground's entry in the
+society ground catalog states, 8 for the built-in starter (below). V4 sizes its population to its
 place (below). Each engine's bounds are stated once, in the engine table (below). The population
 is canonical state, independent of how many people a renderer draws. Inhabitant UUIDv5 identities derive from
 society identity and ordinal. The same society ID/seed/population preserves those identities across
 profiles, but a stored society's profile and seed cannot change. The society UUID derives from its
 authored version UUID with the existing `exulanica-society/v1` identity domain, including for v2 and v3.
+
+The server derives a new society's seed from its world, and no request names one
+(`world_society_seed` in `exulanica/world/society.py`): the SHA-256 of the canonical document
+`{profile: exulanica.society-seed/v1, workspace_id, world_id}`. It names the world by its identity,
+its workspace and its id, and no version, so a world's people are the same people across its edits:
+an edit is an input to the version's own society, and a new version of the world, a branch or
+photographs added, starts a society again whose people draw the same roles, needs and first places
+over the same ground. Two worlds start their people differently: their roles, needs and schedules
+and every later draw differ, while over the same ground the initializer's spread still starts them
+at the same nodes. A stored society keeps the seed it recorded, and replay reads that one. A response never carries a seed: a snapshot, its state and each
+event carry `seed_digest`, the SHA-256 of the seed's text, in its place, while `state_sha256` and
+`document_sha256` still name the stored bytes (`served_snapshot` and `served_events`).
+`tests/test_society_world_seed.py` holds two worlds starting differently, a second version starting
+the same people, an edit leaving every person as they were, and a society stored under a seed the
+page once sent keeping it and replaying.
 
 One society belongs to one workspace, world and authored version. V2/v3 `branch_id` equals that version
 UUID; the authored version supplies its user-facing name. Same-named objects in two versions remain
@@ -108,34 +129,47 @@ identity substitution, tick reset or history rewrite occurs.
 
 ## Engines and what each can do
 
-`exulanica/world/society-engines.v1.json` states which engine profiles exist and, for each,
-whether it consumes authorised inputs, whether the playback worker may play it (and the refusal it
-gives when not), whether it takes directed actions, model decisions or experiments, whether a
-comparison of the models that decide for its people may run it, whether the person whose world it
-lives in may send its people away, whether it can stand on a saved world's own ground, which state
-shape it writes and how many people it may hold, with a reason per row.
-`exulanica/world/society_engines.py` reads and checks it, and every list of engines derives from
-it: the runtime's edit hook, the repositories' dispatch and population check, the playback
-control, directed actions, decisions, experiments, the creation route's choices and default, and
-the selection query, which receives the lists as bound array parameters rather than SQL text.
-An engine the table does not state is refused by name wherever it is looked up.
+`exulanica/world/society-engines.v2.json` states which engine profiles exist and, for each,
+whether a society may still be created with it, whether it consumes authorised inputs, whether the
+playback worker may play it (and the refusal it gives when not), whether it takes directed actions,
+model decisions or experiments, whether the world's owner may choose a model that decides for one
+of its people (`owner_model_choice`), whether a comparison of the models that decide for its people
+may run it, whether the person whose world it lives in may send its people away, whether it can
+stand on a saved world's own ground, which state shape it writes and how many people it may hold,
+with a reason per row. It also states which engine a new society over each kind of ground is
+created with (`creates`: a district's and a saved world's), which the browser reads rather than
+naming an engine. `model_decisions` means the engine's history may hold validated model decisions,
+which the schema's decision triggers admit; `owner_model_choice` requires it, and a comparison
+requires `owner_model_choice`. `exulanica/world/society_engines.py` reads and checks it, and every
+list of engines derives from it: the runtime's edit hook, the repositories' dispatch and population
+check, the playback control, directed actions, decisions, the owner's model choices and the host's
+asks, experiments, the creation route's choices and default, and the selection query, which
+receives the lists as bound array parameters rather than SQL text. An engine the table does not
+state is refused by name wherever it is looked up, and a retired one is refused by name when a
+creation asks for it (`409 society_engine_retired`). The table's first shape,
+`society-engines.v1.json`, stays beside it because evaluation records name it, held to this one's
+rows by a test.
 
-| Engine | Inputs | Playback | Directed actions | Model decisions | Compared | Sent away | Saved world | Population |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `exulanica-society/v1` | no | no | no | no | no | no | no | 100 to 512 |
-| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | 1 to 512 |
-| `exulanica-society/v3` | yes | yes | yes | yes | no | no | yes | 1 to 512 |
-| `exulanica-society/v4` | yes | yes | no | no | no | no | no | 1 to 65,536 |
+| Engine | Created | Inputs | Playback | Directed actions | Model decisions | Owner chooses models | Compared | Sent away | Saved world | Population |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `exulanica-society/v1` | yes | no | no | no | no | no | no | no | no | 100 to 512 |
+| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | yes | yes | 1 to 512 |
+| `exulanica-society/v3` | no (retired) | yes | yes | yes | yes | no | no | no | yes | 1 to 512 |
+| `exulanica-society/v4` | yes | yes | yes | no | no | no | no | no | no | 1 to 65,536 |
 
 The browser reads the same file: `pnpm run society-engines:sync` writes it byte for byte, with the
 union of its profiles, into `web/packages/app/src/society-engines.generated.ts`, which
 `society-engines.ts` parses; the society client takes each snapshot's reader and population bounds
-from it. Where a copy cannot derive, it is held to the table by a test in
-`tests/test_society_engine_table.py`: every migration check, trigger and index that names an
-engine is read back from the live schema and compared with the capability it encodes, the
-population check is parsed engine by engine, no Python module outside the table may restate an
-engine list as SQL text, and the display's own profile union in atlas-react is held to the table's
-at typecheck (`web/packages/app/test/society-engines.test.ts`).
+from it, and the engine a new society is created with from `creates`. Where a copy cannot derive,
+it is held to the table by a test in `tests/test_society_engine_table.py`: every migration check,
+trigger and index that names an engine is read back from the live schema and compared with the
+capability it encodes, the population check is parsed engine by engine, no Python module outside
+the table may restate an engine list as SQL text, and the display's own profile union in
+atlas-react is held to the table's at typecheck (`web/packages/app/test/society-engines.test.ts`).
+A module that asks what an engine can do asks the table: `tests/test_society_engine_capabilities.py`
+fails any comparison of an engine's identity under `exulanica/` outside an engine's own
+implementation and the dispatch to each engine's initializer, each listed with its count and why,
+and `web/packages/app/test/society-engine-literals.test.ts` does the same for the app's source.
 
 V1 initialization and successful transitions remain byte-compatible, pinned by deterministic digest
 vectors. V1's home/work nodes are labels; its motion ignores them and has no obstacle or arrival
@@ -361,12 +395,16 @@ about the person's world.
   removal. A snapshot that is not the built-in authored starter at a supported module version is
   refused with the reason, and so is a ground kind the projection has no rule for, rather than
   guessed at.
-- Declared by the profile: the walkable area on a ground that states none, and a route lattice at
-  two metre spacing over the area, inset by the navigation clearance. A flat rectangle has no
-  paths of its own, so a graph over it is a discretisation this profile fixes, not a shape measured
-  from anything. Two metres keeps every point of the area within 1,415 mm of a node, inside the
-  reviewed object reach, and keeps a 24 m area at 121 nodes and 220 edges. The spacing and the
-  declared extent are part of the profile, so changing either changes every input digest.
+- Declared by the ground's entry in the society ground catalog
+  (`assets/catalogs/society-ground/society-ground.v1.json`, read by
+  `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a
+  route lattice at two metre spacing over the area, inset by the navigation clearance. A flat
+  rectangle has no paths of its own, so a graph over it is a discretisation the entry fixes, not a
+  shape measured from anything. Two metres keeps every point of the area within 1,415 mm of a node,
+  inside the reviewed object reach, and keeps a 24 m area at 121 nodes and 220 edges; the catalog
+  refuses a spacing that would leave a point beyond that reach. Each figure's reason is in its
+  entry. An input records the navigation profile, spacing and area it was composed with, so another
+  figure is a new entry with a new navigation profile and never changes a stored input.
 
 The authored input's `navigation` carries `walkable_area`: `source`, `centre_mm`, `half_width_mm`
 and `half_depth_mm`. Validation refuses a node that lies outside the stated area by less than the
@@ -388,10 +426,14 @@ has a walkable area and nothing to do in it, and society creation refuses by nam
 `409 no_reachable_targets` (`initial society requires reachable targets`), until the person puts
 something there.
 
-A society on a saved world's own ground starts with `AUTHORED_GROUND_POPULATION`, 8 people,
-where a district starts with 128: an area about 23 metres across with 121 places to stand would
-otherwise have people standing on top of each other from the first minute. The repository reads
-the figure when it creates a society, so a measurement can set another in-process. The authored
+A society on a saved world's own ground starts with the population its ground's catalog entry
+states, 8 people for the built-in starter, where a district starts with 128: an area about 23
+metres across with 121 places to stand would otherwise have people standing on top of each other
+from the first minute. The repository reads the entry named by the navigation profile of the input
+it creates the society over. A comparison runs the population its society recorded, and the
+comparison protocol's `population_maximum` is at least every ground's population, so every saved
+world's society can be compared (`tests/test_society_grounds.py`, which also holds the starter's
+descriptors, inputs and first half hour to the digests they had when these figures were code). The authored
 input's `navigation` states `arrival_mm`, the point a person arrives at, read from the snapshot's
 own spawn; like the walkable area it is refused as changed by a successor. Nobody starts on it or
 within 2,000 mm of it: the initializer takes the reachable nodes outside that distance in node
@@ -753,9 +795,13 @@ is the case and since which simulated minute, and says a refusal in words.
 
 ## Server integration and HTTP
 
-Existing authenticated society create/read/step/events/replay routes remain. Creation optionally
-selects `profile: exulanica-society/v2` or `exulanica-society/v3`; omission keeps v1. Step bodies still contain only
-`base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected.
+Existing authenticated society create/read/step/events/replay routes remain. Creation may name
+any engine the table creates with; omission keeps v1, and a retired engine is refused with
+`409 society_engine_retired` before anything is written. A creation names no seed: the server
+derives the world's own (above), and a body that names one is malformed (`422`). Step bodies
+still contain only `base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected.
+Every snapshot and event these routes return, and the society a playback step returns, carries
+`seed_digest` in place of the seed.
 
 Every society, action, playback, decision, experiment and district route requires the world as a
 `world_id` query parameter, as every world route does, and a world the workspace does not hold
@@ -851,6 +897,13 @@ cover the purposeful profile only and refuse a V3 society by name (`society_prof
 so it composes no V3 explanation.
 
 ## Explicit model proposals and exact replay
+
+Retired with `exulanica-society/v3`. `POST /world/versions/{version_id}/society/decisions` resolves
+the world and its society and then refuses every request with `409 society_proposals_retired`: a
+model decides for a person only as the world's owner chose (below), which is one rule for one
+thing, where proposals were a second; `build_services` configures no provider for them. What follows
+describes the proposals a stored v3 society holds, which `GET .../society/decisions/{request_id}`
+still reads and replay still verifies (`tests/test_society_social_postgres.py`).
 
 Models are optional and never called by stepping, reading or replaying. An explicit server
 `SocietyDecisionProvider(client, role, manifest_sha256)` uses the existing `ModelClient.structured`

@@ -1,29 +1,42 @@
-"""Authenticated lifecycle; authoritative v2 inputs come only from the configured server adapter."""
+"""Authenticated lifecycle; authoritative v2 inputs come only from the configured server adapter.
+
+Every society these routes return is served by :func:`~exulanica.world.society.served_snapshot`
+and every event by :func:`~exulanica.world.society.served_events`: the seed never leaves the
+server, only its digest (``seed_digest``), whose derivation the server alone holds.
+"""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
-from exulanica.api.society_decision_runtime import request_decision
 from exulanica.api.world_scope import WorldId
-from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.society import UnavailableSocietyInput, served_events, served_snapshot
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
-from exulanica.world.society_engines import DEFAULT_ENGINE, ENGINES, society_engine
+from exulanica.world.society_engines import (
+    DEFAULT_ENGINE,
+    ENGINES,
+    RetiredSocietyEngine,
+    society_engine,
+)
 from exulanica.world.society_planner import SocietyStartRefused
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["society"])
-#: The profiles a society can be created with: the engine table's, in its order.
+#: The profiles a creation may name: the engine table's, in its order. A retired one is refused
+#: by name when it is asked for, rather than read as a malformed request.
 EngineProfile = Literal[tuple(engine.engine for engine in ENGINES)]  # type: ignore[valid-type]
+#: Why a request for a model's proposal is refused: the one engine that took such requests is
+#: retired, and a model decides for a person only as the world's owner chose.
+PROPOSALS_RETIRED: Final = "society_proposals_retired"
 
 
 class CreateSocietyBody(BaseModel):
@@ -32,8 +45,8 @@ class CreateSocietyBody(BaseModel):
     #: that world's place itself, and a client never names one it did not read from the server.
     place_id: uuid.UUID | None = None
     region_id: Annotated[str, Field(min_length=1, max_length=500)]
-    seed: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-    #: Every engine the engine table states, and its default; nothing here restates the list.
+    #: Every engine the engine table states, and its default; nothing here restates the list. No
+    #: seed: the server derives the world's own (``Services.society_seed``).
     profile: EngineProfile = DEFAULT_ENGINE  # type: ignore[valid-type]
 
 
@@ -85,6 +98,8 @@ def _call(operation: Callable[[], Any], *, invalid_status: int = 422) -> Any:
     except SocietyStartRefused as exc:
         # The world as it is gives its people nowhere to be: named, so a caller acts on the code.
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
+    except RetiredSocietyEngine as exc:
+        return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
     except ValueError as exc:
         return JSONResponse(
             status_code=invalid_status,
@@ -122,14 +137,16 @@ def create_society(
                 document = provider(connection, session, version_id, place_id, body.region_id)
             elif place_id is None:
                 raise ValueError("a society without inputs needs a place_id")
-            return repo.create(
-                version_id,
-                place_id=place_id,
-                region_id=body.region_id,
-                seed=body.seed,
-                actor=session.actor,
-                profile=body.profile,
-                initial_input=document,
+            return served_snapshot(
+                repo.create(
+                    version_id,
+                    place_id=place_id,
+                    region_id=body.region_id,
+                    seed=get_services(request).society_seed(session.workspace_id, world_id),
+                    actor=session.actor,
+                    profile=body.profile,
+                    initial_input=document,
+                )
             )
 
     return _call(create)
@@ -139,23 +156,31 @@ def create_society(
 def propose_decision(
     version_id: uuid.UUID,
     body: DecisionBody,
+    connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
     world_id: WorldId,
 ) -> Any:
-    return _call(
-        lambda: request_decision(
-            request,
-            session,
-            version_id,
-            world_id=world_id,
-            request_id=body.idempotency_key,
-            subject_id=body.subject_id,
-            base_tick=body.base_tick,
-            base_state_sha256=body.base_state_sha256,
-        ),
-        invalid_status=409,
-    )
+    """Refused by name for every society: explicitly requested model proposals are retired.
+
+    They were the retired ``exulanica-society/v3`` engine's, and no host was ever configured to
+    answer them. A model decides for a person only as the world's owner chose, at the planner's
+    own choice point. The world and its society are resolved first, so a stranger learns nothing
+    from the refusal that an unknown version would not tell them; a stored request still reads.
+    """
+
+    def refuse() -> JSONResponse:
+        _repository(connection, session, request, world_id).snapshot(version_id)
+        return JSONResponse(
+            status_code=409,
+            content={
+                "code": PROPOSALS_RETIRED,
+                "detail": "a model decides for a person only as the world's owner chose",
+            },
+        )
+
+    with connection.transaction():
+        return _call(refuse, invalid_status=409)
 
 
 @router.get("/versions/{version_id}/society/decisions/{request_id}")
@@ -187,8 +212,8 @@ def society(
 ) -> Any:
     """The current state. ``places`` adds where inhabitants can go, as its consumed input says."""
     return _call(
-        lambda: _repository(connection, session, request, world_id).snapshot(
-            version_id, places=places
+        lambda: served_snapshot(
+            _repository(connection, session, request, world_id).snapshot(version_id, places=places)
         ),
         invalid_status=409,
     )
@@ -204,8 +229,10 @@ def advance_society(
     world_id: WorldId,
 ) -> Any:
     return _call(
-        lambda: _repository(connection, session, request, world_id).advance(
-            version_id, base_tick=body.base_tick, base_state_sha256=body.base_state_sha256
+        lambda: served_snapshot(
+            _repository(connection, session, request, world_id).advance(
+                version_id, base_tick=body.base_tick, base_state_sha256=body.base_state_sha256
+            )
         ),
         invalid_status=409,
     )
@@ -228,13 +255,15 @@ def change_society_presence(
 
     def change() -> Any:
         try:
-            return _repository(connection, session, request, world_id).change_presence(
-                version_id,
-                wanted=body.presence,
-                request_id=body.idempotency_key,
-                requested_by=session.actor,
-                base_tick=body.base_tick,
-                base_state_sha256=body.base_state_sha256,
+            return served_snapshot(
+                _repository(connection, session, request, world_id).change_presence(
+                    version_id,
+                    wanted=body.presence,
+                    request_id=body.idempotency_key,
+                    requested_by=session.actor,
+                    base_tick=body.base_tick,
+                    base_state_sha256=body.base_state_sha256,
+                )
             )
         except PresenceRefused as exc:
             return JSONResponse(
@@ -255,8 +284,8 @@ def society_events(
 ) -> Any:
     return _call(
         lambda: {
-            "events": _repository(connection, session, request, world_id).events(
-                version_id, limit=limit
+            "events": served_events(
+                _repository(connection, session, request, world_id).events(version_id, limit=limit)
             )
         },
         invalid_status=409,
@@ -272,6 +301,8 @@ def replay_society(
     world_id: WorldId,
 ) -> Any:
     return _call(
-        lambda: _repository(connection, session, request, world_id).replay(version_id),
+        lambda: served_snapshot(
+            _repository(connection, session, request, world_id).replay(version_id)
+        ),
         invalid_status=409,
     )

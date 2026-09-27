@@ -10,9 +10,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from exulanica.world import society_authored_ground
 from exulanica.world.society import (
-    SOCIETY_ENGINE_VERSION,
     SOCIETY_POPULATION,
     SOCIETY_TICK_SECONDS,
     SocietyEvent,
@@ -34,8 +32,10 @@ from exulanica.world.society_engines import (
     DEFAULT_ENGINE,
     INPUT_ENGINES,
     UnknownSocietyEngine,
+    creatable_engine,
     society_engine,
 )
+from exulanica.world.society_grounds import society_ground_for_navigation
 from exulanica.world.society_input_policy import is_authored_ground
 from exulanica.world.society_legacy import advance_society, initial_society
 from exulanica.world.society_living import (
@@ -130,6 +130,39 @@ class SocietyRepository:
         profile: str = DEFAULT_ENGINE,
         initial_input: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Create this version's society, or read back the one it holds with the same engine.
+
+        An engine the table does not state, or states as retired, is refused by name before
+        anything is read or written (:func:`~exulanica.world.society_engines.creatable_engine`).
+        """
+        creatable_engine(profile)
+        return self._create(
+            version_id,
+            place_id=place_id,
+            region_id=region_id,
+            seed=seed,
+            actor=actor,
+            profile=profile,
+            initial_input=initial_input,
+        )
+
+    def _create(
+        self,
+        version_id: uuid.UUID,
+        *,
+        place_id: uuid.UUID,
+        region_id: str,
+        seed: str,
+        actor: uuid.UUID,
+        profile: str,
+        initial_input: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """The write a society's creation makes, for any engine the table states.
+
+        :meth:`create` is the only caller that makes a society; a retired engine's genesis stays
+        here because it is the write a stored society of that engine was made by, which a test
+        repeats to hold such a society (``tests/retired_society_support.py``).
+        """
         with self.connection.transaction():
             self._lock()
             version = self.connection.execute(
@@ -171,10 +204,11 @@ class SocietyRepository:
                     raise ValueError(f"{profile} has no place contract for an authored ground")
                 self._validate_scope(version_id, initial_input)
                 self._authorize(initial_input)
-                # A saved world's own ground holds a handful of people; a district, its full
-                # population. Read at the moment of creation, so a measurement can set another.
+                # A saved world's own ground holds the population its entry in the society ground
+                # catalog states, found by the navigation profile its input records; a district,
+                # its full population.
                 population = (
-                    society_authored_ground.AUTHORED_GROUND_POPULATION
+                    society_ground_for_navigation(initial_input["navigation"]["profile"]).population
                     if is_authored_ground(initial_input["profile"])
                     else SOCIETY_POPULATION
                 )
@@ -196,7 +230,7 @@ class SocietyRepository:
                     raise UnknownSocietyEngine(f"no genesis is implemented for {profile}")
             population = (
                 state["population"]["size"]
-                if profile == LIVING_PROFILE
+                if engine.state_family == "living"
                 else len(state["inhabitants"])
             )
             if not engine.holds(population):
@@ -484,16 +518,17 @@ class SocietyRepository:
             if society_state_sha256(row["state"]) != row["state_sha256"]:
                 raise ValueError("stored society state digest mismatch")
             ahead.enter_context(inputs_ahead(self.connection, self.named_inputs(row)))
-            if row["engine_version"] == SOCIETY_ENGINE_VERSION:
+            engine = society_engine(row["engine_version"])
+            if engine.state_family == "legacy":
                 state, events = advance_society(row["state"], row["seed"])
-            elif row["engine_version"] == LIVING_PROFILE:
+            elif engine.state_family == "living":
                 inputs = self._pending_inputs(row)
                 self._authorize(inputs[-1])
                 routine = routine_for(row["state"])
                 state, events = advance_living_society(
                     row["state"], row["seed"], living_places(inputs, routine), routine
                 )
-            elif row["engine_version"] in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE):
+            elif engine.state_family == "purposeful":
                 inputs = self._pending_inputs(row)
                 # The latest authorized unavailable input must be able to pause the engine
                 # even when earlier dependencies are now withdrawn. Historical replay/reads
@@ -550,15 +585,15 @@ class SocietyRepository:
                     action_dispositions,
                     events,
                 )
-                if row["engine_version"] == PURPOSEFUL_PROFILE:
+                if engine.owner_model_choice:
                     events = append_decision_events(
                         row["state"], state, inputs[-1], receipts, decided, events
                     )
             else:
                 raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
             self._record(row, state, events)
-            if row["engine_version"] in INPUT_PROFILES:
-                if row["engine_version"] in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE):
+            if engine.takes_inputs:
+                if engine.model_decisions:
                     for sequence, disposition in processed:
                         self.connection.execute(
                             "insert into world_society_transition_decision("
@@ -572,7 +607,7 @@ class SocietyRepository:
                                 disposition,
                             ),
                         )
-                if row["engine_version"] != LIVING_PROFILE:
+                if engine.directed_actions:
                     action_repository.bind(
                         version_id,
                         tick=state["tick"],
@@ -784,16 +819,17 @@ class SocietyRepository:
             if row is None:
                 raise UnknownSociety("society is unavailable")
             expected_events: list[SocietyEvent] = []
-            if row["engine_version"] == SOCIETY_ENGINE_VERSION:
+            engine = society_engine(row["engine_version"])
+            if engine.state_family == "legacy":
                 state = initial_society(
                     row["society_id"], row["seed"], population=row["population_size"]
                 )
                 for _ in range(row["current_tick"]):
                     state, events = advance_society(state, row["seed"])
                     expected_events.extend(events)
-            elif row["engine_version"] == LIVING_PROFILE:
+            elif engine.state_family == "living":
                 state, expected_events = self._replay_living(row)
-            elif row["engine_version"] in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE):
+            elif engine.state_family == "purposeful":
                 documents = self._validated_inputs(row)
                 with inputs_ahead(self.connection, documents):
                     for document in documents:
@@ -818,7 +854,7 @@ class SocietyRepository:
                 # Replayed from what was stored and bound, never asked again.
                 person_decisions, person_bindings = (
                     ({d["decision_seq"]: d for d in self._decisions(row)}, self._bindings(row))
-                    if row["engine_version"] == PURPOSEFUL_PROFILE
+                    if engine.owner_model_choice
                     else ({}, {})
                 )
                 for transition in transitions:
@@ -905,7 +941,7 @@ class SocietyRepository:
                         action_dispositions,
                         events,
                     )
-                    if row["engine_version"] == PURPOSEFUL_PROFILE:
+                    if engine.owner_model_choice:
                         events = append_decision_events(
                             previous_state, state, inputs[-1], receipts, decided, events
                         )
@@ -1030,6 +1066,8 @@ class SocietyRepository:
 
     @staticmethod
     def _snapshot(row: dict[str, Any]) -> dict[str, Any]:
+        """The society as stored, seed included. A route serves it through
+        :func:`~exulanica.world.society.served_snapshot`, which never carries the seed."""
         snapshot = {
             "profile": row["engine_version"],
             "society_id": row["society_id"],

@@ -346,7 +346,6 @@ placeholder. `tests/test_companion_place_release.py` holds that a place allowed 
 reaches the composer's request and no other, that a stop holds the composer's next request back, and
 that no person's name leaves on any registered path with every place use allowed, whether the
 boundary, the call sites or both prepare the names.
-`tests/test_society_decision_place_names_postgres.py` holds the society decision.
 
 **What the boundary does not do.** It never rewrites a system message: a system message is product
 instruction, and rewriting one would put `[person A]` for every "may" in every prompt of somebody

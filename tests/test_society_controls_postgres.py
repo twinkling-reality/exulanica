@@ -15,6 +15,7 @@ from exulanica.world.society_controls import BASE_TICK_INTERVAL_MIN_MS, LeaseLos
 from psycopg.errors import CheckViolation
 
 import test_society_runtime as helpers
+from retired_society_support import create_or_plant
 from test_society_local_affordances_postgres import add_far, opt_in
 from tests_support_api import scratch_database
 
@@ -57,7 +58,8 @@ def take_claim(w, connection=None):
 
 def create(w, engine="exulanica-society/v3"):
     b = w["binding"]
-    return helpers.society(w).create(
+    return create_or_plant(
+        helpers.society(w),
         b.version_id,
         place_id=b.place_id,
         region_id=b.region_id,

@@ -35,18 +35,15 @@ from exulanica.world import UnavailableAsset, reviewed_assets
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject, ObjectOrigin, Transform
 from exulanica.world.society import (
-    RETRIES_AFTER_A_RACE,
     SocietyBytesNotRead,
     UnavailableSocietyInput,
     announced_inputs,
 )
-from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_repository import SocietyRepository
 from fastapi.testclient import TestClient
 
 import test_society_authored_world_postgres as helpers
 import test_society_saved_world_api as saved_api
-import test_society_social_postgres as social_helpers
 import test_world_arrangements as arrangements
 import test_world_environment_composition_postgres as composition
 from asset_lock_support import recorded_store_reads
@@ -72,8 +69,6 @@ from world_package_rich_world import _admit_environment
 
 saved_world = helpers.saved_world
 runtime_app = arrangements.runtime_app
-objects_api = social_helpers.objects_api
-social = social_helpers.social
 composed = composition.composed
 memory_place = composition.memory_place
 pytestmark = pytest.mark.postgres
@@ -756,89 +751,6 @@ def test_a_question_whose_society_meets_the_race_is_answered_without_the_society
     assert any(item.origin_kind == "simulated" for item in allowed.content)
     assert answered.content == left_out.content
     assert answered.total_matched == left_out.total_matched < allowed.total_matched
-
-
-def test_a_decision_whose_finish_meets_the_race_is_finished_once_more_and_keeps_its_answer(
-    social, client, transport, manifest, monkeypatch
-):
-    """Finishing is idempotent, so a race inside it is met by finishing once more.
-
-    The model was already asked and paid for; losing its answer would leave the request in
-    progress under its key for good.
-    """
-    api, _repo, _version, route, _changed, _rights, body = social
-    api.client.app.state.society_decision_provider = social_helpers.provider_for(
-        client, transport, manifest
-    )
-    authorize = api.client.app.state.society_input_authorizer
-    finishing = {"now": False, "finishes": 0, "raced": 0}
-    finish = SocietyDecisionRepository.finish
-
-    def counted(self, *args, **kwargs):
-        finishing["now"], finishing["finishes"] = True, finishing["finishes"] + 1
-        try:
-            return finish(self, *args, **kwargs)
-        finally:
-            finishing["now"] = False
-
-    def racing(connection, session, document):
-        if finishing["now"] and not finishing["raced"]:
-            finishing["raced"] += 1
-            raise SocietyBytesNotRead("the rows named bytes nobody read")
-        return authorize(connection, session, document)
-
-    monkeypatch.setattr(SocietyDecisionRepository, "finish", counted)
-    api.client.app.state.society_input_authorizer = racing
-    answered = api.post(api.in_world(route + "/decisions"), body)
-    assert answered.status_code == 200, answered.text
-    assert answered.json()["decision"]["status"] == "accepted"
-    assert finishing == {"now": False, "finishes": 2, "raced": 1}
-    assert len(transport.requests) == 1, "the model was asked once and its answer kept"
-    # The same key reads the recorded decision, not a request stuck in progress.
-    assert api.post(api.in_world(route + "/decisions"), body).json() == answered.json()
-
-
-def test_a_decision_whose_finish_meets_the_race_every_time_is_recorded_not_left_open(
-    social, client, transport, manifest, monkeypatch
-):
-    """On its last try a finish that meets the race records ``decision_sources_unavailable``:
-    what the person could see could not be read, and the key reads that decision back rather
-    than a request in progress for good."""
-    api, _repo, _version, route, _changed, _rights, body = social
-    api.client.app.state.society_decision_provider = social_helpers.provider_for(
-        client, transport, manifest
-    )
-    finishes = {"now": False, "tries": 0}
-    finish = SocietyDecisionRepository.finish
-    authorize = api.client.app.state.society_input_authorizer
-
-    def counted(self, *args, **kwargs):
-        finishes["now"], finishes["tries"] = True, finishes["tries"] + 1
-        try:
-            return finish(self, *args, **kwargs)
-        finally:
-            finishes["now"] = False
-
-    def racing(connection, session, document):
-        if finishes["now"]:
-            raise SocietyBytesNotRead("a reviewed asset changed between the read and the lock")
-        return authorize(connection, session, document)
-
-    monkeypatch.setattr(SocietyDecisionRepository, "finish", counted)
-    api.client.app.state.society_input_authorizer = racing
-    answered = api.post(api.in_world(route + "/decisions"), body)
-    assert answered.status_code == 424, answered.text
-    assert answered.json()["code"] == "unavailable_society_input"
-    assert finishes["tries"] == RETRIES_AFTER_A_RACE + 1
-    assert len(transport.requests) == 1, "the model was asked once"
-    read = api.get(api.in_world(route + "/decisions/" + body["idempotency_key"]))
-    assert read.status_code == 200, read.text
-    assert read.json()["status"] == "completed"
-    assert (read.json()["decision"]["status"], read.json()["decision"]["reason"]) == (
-        "unavailable",
-        "decision_sources_unavailable",
-    )
-    assert read.json()["decision"]["provider"] is not None, "the call made stays on the receipt"
 
 
 def test_the_selection_executor_announces_every_input_before_authorizing_the_first(memory_place):

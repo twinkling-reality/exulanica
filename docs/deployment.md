@@ -542,7 +542,7 @@ consumption bindings. The API can record `go_to` or `perform` for a current v2/v
 canonical target, then the next ordinary step applies or records a deterministic disposition.
 Recording a request neither moves a character nor starts playback. The browser offers it as one
 control on a chosen inhabitant (`web/packages/app/src/ui/society-directed-action.ts`) when the
-society's engine takes directed actions, which `exulanica/world/society-engines.v1.json` states;
+society's engine takes directed actions, which `exulanica/world/society-engines.v2.json` states;
 a living v4 society refuses the control with that reason.
 
 ### 5.1.1 The three roles, and why the purger has its own

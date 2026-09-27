@@ -44,6 +44,7 @@ from exulanica.world.starter import (
 from exulanica.world.structure_repository import WorldStructureRepository
 from exulanica.world.worlds import AUTHORED_STARTER
 
+from retired_society_support import create_or_plant
 from world_structure_fixtures import structural_candidate
 from world_support import registered_world
 
@@ -204,7 +205,8 @@ def place_object(world, asset, object_id, x_mm, z_mm):
 def create_society(world, profile="exulanica-society/v2"):
     binding = world["binding"]
     document = initial(world)
-    society = society_repository(world).create(
+    society = create_or_plant(
+        society_repository(world),
         binding.version_id,
         place_id=binding.place_id,
         region_id=binding.region_id,

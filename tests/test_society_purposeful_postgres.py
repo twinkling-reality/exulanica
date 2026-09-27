@@ -10,6 +10,7 @@ from psycopg.types.json import Jsonb
 
 import test_world_objects_api as object_helpers
 from society_fixtures import SEED, edited, seal, society_input
+from society_seed_support import choose_society_seed
 
 objects_api = object_helpers.objects_api
 
@@ -36,14 +37,10 @@ def purposeful(objects_api, repository):
     api.client.app.state.society_initial_input = lambda *_args: doc
     api.client.app.state.society_input_authorizer = lambda _conn, _session, value: authorize(value)
     route = f"/world/versions/{version_id}/society"
+    choose_society_seed(api.client.app, SEED)
     response = api.post(
         api.in_world(route),
-        {
-            "place_id": str(place),
-            "region_id": "region-a",
-            "seed": SEED,
-            "profile": "exulanica-society/v2",
-        },
+        {"place_id": str(place), "region_id": "region-a", "profile": "exulanica-society/v2"},
     )
     assert response.status_code == 200, response.text
     repo = SocietyRepository(
@@ -156,10 +153,11 @@ def test_missing_adapter_and_forged_input_json_fail_closed(objects_api, reposito
     body = {
         "place_id": str(uuid.uuid4()),
         "region_id": "region-a",
-        "seed": SEED,
         "profile": "exulanica-society/v2",
     }
     assert api.post(path, body).status_code == 424
+    # A seed is the server's to derive; a request that names one is malformed.
+    assert api.post(path, body | {"seed": SEED}).status_code == 422
     assert api.post(path, body | {"initial_input": society_input()}).status_code == 422
 
 

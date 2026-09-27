@@ -28,6 +28,7 @@ from psycopg.types.json import Jsonb
 
 import test_society_authored_world_postgres as helpers
 from conftest import scratch_role_database
+from society_seed_support import choose_society_seed
 from test_society_saved_world_api import OWNER, TOKEN, place, routes
 from tests_support_api import EVERY_PERMISSION
 
@@ -89,19 +90,24 @@ def _no_routine(monkeypatch) -> None:
     )
 
 
+#: Whose people rest where this scenario needs them to: a seed chosen for it, not a world's own.
+SCENARIO_SEED = "7a" * 32
+
+
 def _inhabited(world, client) -> dict[str, Any]:
     """Three places to rest and one to visit in front of the person, and people brought in."""
     for index, (x_mm, z_mm) in enumerate(((3_000, 5_000), (-3_000, 5_000), (0, 9_000))):
         place(client, world, f"object:plate-{index}", x_mm, z_mm)
     place(client, world, "object:pillar", 6_000, 9_000, asset="pillar")
     scope, _, society = routes(world)
+    # The scenario's seed: the one its minutes were found under, when the page sent it.
+    choose_society_seed(client.app, SCENARIO_SEED)
     created = client.post(
         society,
         headers=OWNER,
         params=scope,
         json={
             "region_id": world["binding"].region_id,
-            "seed": "7a" * 32,
             "profile": "exulanica-society/v2",
         },
     )

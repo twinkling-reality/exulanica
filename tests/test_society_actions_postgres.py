@@ -14,6 +14,7 @@ from exulanica.world.structure_repository import WorldStructureRepository
 from psycopg.errors import CheckViolation
 from psycopg.types.json import Jsonb
 
+from retired_society_support import create_or_plant
 from society_fixtures import SEED, edited, seal, society_input
 from world_structure_fixtures import structural_candidate
 from world_support import registered_world
@@ -80,7 +81,8 @@ def action_repository(world, workspace=None):
 
 def create_society(world, profile="exulanica-society/v2"):
     document = society_input(world["version"].version_id)
-    society = society_repository(world).create(
+    society = create_or_plant(
+        society_repository(world),
         world["version"].version_id,
         place_id=world["place"],
         region_id="region-a",

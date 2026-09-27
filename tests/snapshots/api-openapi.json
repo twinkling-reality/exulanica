@@ -1300,6 +1300,7 @@
      "society"
     ],
     "summary": "Propose Decision",
+    "description": "Refused by name for every society: explicitly requested model proposals are retired.\n\nThey were the retired ``exulanica-society/v3`` engine's, and no host was ever configured to\nanswer them. A model decides for a person only as the world's owner chose, at the planner's\nown choice point. The world and its society are resolved first, so a stranger learns nothing\nfrom the refusal that an unknown version would not tell them; a stored request still reads.",
     "operationId": "propose_decision_world_versions__version_id__society_decisions_post",
     "parameters": [
      {
@@ -15363,11 +15364,6 @@
       "minLength": 1,
       "title": "Region Id"
      },
-     "seed": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$",
-      "title": "Seed"
-     },
      "profile": {
       "type": "string",
       "enum": [
@@ -15383,8 +15379,7 @@
     "additionalProperties": false,
     "type": "object",
     "required": [
-     "region_id",
-     "seed"
+     "region_id"
     ],
     "title": "CreateSocietyBody"
    },

@@ -15,7 +15,7 @@
 import { isObjectActivity } from './society-activity-words.js';
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
-import { DEFAULT_SOCIETY_ENGINE, societyEngine, type SocietyEngineProfile } from './society-engines.js';
+import { DEFAULT_SOCIETY_ENGINE, engineCreatedOver, societyEngine, type SocietyEngineProfile } from './society-engines.js';
 import { openWorldPath } from './world-scope.js';
 
 /**
@@ -533,6 +533,14 @@ export function parseSocietyActionRecord(value: unknown, versionId: string): Soc
   });
 }
 
+/**
+ * The engine a new society is created with, as the engine table states it for its ground: a saved
+ * world's own when no place is named (the server resolves that place), a district's otherwise.
+ */
+export function newSocietyEngine(placeId: string | null): SocietyProfile {
+  return engineCreatedOver(placeId === null ? 'saved_world' : 'district');
+}
+
 export interface SocietyClientOptions extends TransportOptions {
   /** The open world the versions belong to; null where none is open, which sends nothing. */
   readonly worldId: string | null;
@@ -557,7 +565,7 @@ export class SocietyClient {
     versionId: string,
     placeId: string | null,
     regionId: string,
-    profile: SocietyProfile = 'exulanica-society/v2',
+    profile: SocietyProfile = newSocietyEngine(placeId),
   ): Promise<SocietySnapshot> {
     try {
       return await this.read(versionId);
@@ -570,17 +578,17 @@ export class SocietyClient {
   /**
    * Create this version's society, or read back the one already there. A null place asks the
    * server for a saved world's own, which it derives from the version; the client never makes one.
+   * The request names no seed: the server derives the world's own, so two worlds start differently.
    */
   async create(
     versionId: string,
     placeId: string | null,
     regionId: string,
-    profile: SocietyProfile = 'exulanica-society/v2',
+    profile: SocietyProfile = newSocietyEngine(placeId),
   ): Promise<SocietySnapshot> {
     return this.transport.postJson<unknown>(this.path(versionId), {
       ...(placeId === null ? {} : { place_id: placeId }),
       region_id: regionId,
-      seed: '7a'.repeat(32),
       profile,
     }).then(value => boundSnapshot(value, versionId));
   }

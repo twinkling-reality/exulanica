@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import { describe, expect, it } from 'vitest';
-import { SOCIETY_ENGINES_V1_JSON } from '../src/society-engines.generated.js';
+import { SOCIETY_ENGINES_V2_JSON } from '../src/society-engines.generated.js';
 import {
   DEFAULT_SOCIETY_ENGINE,
   SOCIETY_ENGINES,
+  engineCreatedOver,
   societyEngine,
   type SocietyEngineProfile,
 } from '../src/society-engines.js';
@@ -17,7 +18,7 @@ import { parseSociety } from '../src/society-api.js';
  * name rather than read as one it resembles.
  */
 
-const TABLE = new URL('../../../../exulanica/world/society-engines.v1.json', import.meta.url);
+const TABLE = new URL('../../../../exulanica/world/society-engines.v2.json', import.meta.url);
 
 // The display keeps its own union of profiles in atlas-react, which cannot import this package;
 // the typecheck holds it to the engine table's union, so a new engine cannot reach one and not
@@ -40,11 +41,24 @@ const purposeful = (profile: string, population: number, goal: unknown = null) =
 
 describe('the society engine table', () => {
   it('is the backend file byte for byte, and every engine it states is readable here', () => {
-    expect(SOCIETY_ENGINES_V1_JSON).toBe(readFileSync(TABLE, 'utf8'));
+    expect(SOCIETY_ENGINES_V2_JSON).toBe(readFileSync(TABLE, 'utf8'));
     const names = (JSON.parse(readFileSync(TABLE, 'utf8')) as { engines: { engine: string }[] }).engines.map((row) => row.engine);
     expect(SOCIETY_ENGINES.map((engine) => engine.engine)).toEqual(names);
     expect(names).toContain(DEFAULT_SOCIETY_ENGINE);
     expect(displayNamesEveryEngine).toBe(true);
+  });
+
+  it('reads which engine each ground is created with, and which engines an owner chooses models in', () => {
+    const table = JSON.parse(readFileSync(TABLE, 'utf8')) as {
+      creates: Record<string, { engine: string }>;
+      engines: { engine: string; creatable: boolean; owner_model_choice: boolean }[];
+    };
+    expect(engineCreatedOver('saved_world')).toBe(table.creates['saved_world']!.engine);
+    expect(engineCreatedOver('district')).toBe(table.creates['district']!.engine);
+    const saved = societyEngine(engineCreatedOver('saved_world'));
+    expect(saved.creatable && saved.savedWorld).toBe(true);
+    expect(SOCIETY_ENGINES.map((engine) => [engine.engine, engine.creatable, engine.ownerModelChoice])).toEqual(
+      table.engines.map((row) => [row.engine, row.creatable, row.owner_model_choice]));
   });
 
   it('refuses an engine it does not state, by name', () => {

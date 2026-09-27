@@ -292,7 +292,6 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         dependencies=[Depends(authorise_route)],
     )
     app.state.services = services or build_services()
-    app.state.society_decision_provider = app.state.services.society_decision_provider
     app.state.society_base_tick_interval_ms = app.state.services.society_base_tick_interval_ms
     if app.state.services.society_runtime is not None:
         runtime = app.state.services.society_runtime

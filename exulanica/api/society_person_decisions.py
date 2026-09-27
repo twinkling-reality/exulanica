@@ -1,10 +1,10 @@
 """The host's playback asking, before a purposeful society's minute, each chosen person's model.
 
-A person in a purposeful society (``exulanica-society/v2``) whose world's owner chose a model for
-them is asked of that model at the planner's own choice point, by :class:`PersonDecisionHost`:
-only in a workspace the host's environment lists, within the decision contract's bounds per world
-and hour, within the share of the process's model budget the contract lets people's decisions
-spend, and with no connection held while a model is asked.
+A person with a chosen model, in a society whose engine lets the world's owner choose one
+(``owner_model_choice`` in the engine table), is asked of that model at the planner's own choice
+point, by :class:`PersonDecisionHost`: only in a workspace the host's environment lists, within
+the decision contract's bounds per world and hour, within the share of the process's model budget
+the contract lets people's decisions spend, and with no connection held while a model is asked.
 
 What the host cannot ask it decides before reserving anything, and writes nothing: a host with no
 client or with its budget or share spent (:func:`host_refusal`), a person whose chosen model it
@@ -65,8 +65,8 @@ from exulanica.world.society_decision_contract import (
     decision_messages,
 )
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
+from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
-from exulanica.world.society_planner import PURPOSEFUL_PROFILE
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
@@ -489,7 +489,7 @@ class PersonDecisionHost:
                 input_authorizer=lambda doc: self.runtime.authorize(connection, session, doc),
             )
             row = society._row(claim.version_id)
-            if row is None or row["engine_version"] != PURPOSEFUL_PROFILE:
+            if row is None or not society_engine(row["engine_version"]).owner_model_choice:
                 return False
             choices = SocietyModelChoiceRepository(
                 connection, claim.workspace_id, world_id=claim.world_id

@@ -27,7 +27,8 @@ from exulanica.models.errors import ManifestError
 from exulanica.models.manifest import Manifest, Role
 from exulanica.world.society import UnknownSociety
 from exulanica.world.society_decision_contract import DecisionContract
-from exulanica.world.society_planner import PURPOSEFUL_PROFILE, input_sha256
+from exulanica.world.society_engines import society_engine
+from exulanica.world.society_planner import input_sha256
 
 __all__ = [
     "CHOICE_PROFILE",
@@ -166,7 +167,7 @@ class SocietyModelChoiceRepository:
                 ):
                     raise ModelChoiceRefused("choice_key_reused")
                 return {**document, "recorded_at": existing["recorded_at"]}
-            if society["engine_version"] != PURPOSEFUL_PROFILE:
+            if not society_engine(society["engine_version"]).owner_model_choice:
                 raise ModelChoiceRefused("engine_takes_no_model_choice")
             if len(chosen) != len(people):
                 raise ModelChoiceRefused("person_named_twice")

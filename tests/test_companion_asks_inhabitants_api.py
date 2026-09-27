@@ -179,7 +179,6 @@ def _inhabited(world, client) -> None:
         params=scope,
         json={
             "region_id": world["binding"].region_id,
-            "seed": "7a" * 32,
             "profile": "exulanica-society/v2",
         },
     )

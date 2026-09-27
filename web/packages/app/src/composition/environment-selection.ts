@@ -80,6 +80,7 @@ import type { AppEnvironment, SessionState } from './session-state.js';
 import { seatingLayout } from './seating-layout.js';
 import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
+import { societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 
 /** Where the development preview's real-engine society recording is served. */
@@ -585,8 +586,10 @@ export function mountEnvironmentSelection(
     place.disabled = true; modify.disabled = true; remove.disabled = true;
     invalidateProposal('Select an authored object before editing.');
     selected.textContent = 'Selected synthetic inhabitant';
-    if (state.profile === 'exulanica-society/v4') { inspectLivingInhabitant(inhabitant, state); return true; }
-    const v2 = state.profile === 'exulanica-society/v2';
+    // Which reader applies is the state's family in the engine table, never its engine's name.
+    const family = societyEngine(state.profile).stateFamily;
+    if (family === 'living') { inspectLivingInhabitant(inhabitant, state); return true; }
+    const purposeful = family === 'purposeful';
     const goal = inhabitant.goal && 'kind' in inhabitant.goal ? inhabitant.goal : null;
     const representation = crowd()?.inhabitantRepresentation(id);
     const liveInspection = liveSociety?.inspect(id);
@@ -600,12 +603,12 @@ export function mountEnvironmentSelection(
     const nativeCharacter = representation ? deps.state.atlas?.binding.nativeCharacters?.inspect(representation.subject) : null;
     // Resting is the simulation's state. A catalog person sits on the seat their place has, or on
     // the ground in front of a place with none; the abstract figure stands.
-    const resting = v2 && inhabitant.action?.kind === 'rest' && inhabitant.action.status === 'active';
+    const resting = purposeful && inhabitant.action?.kind === 'rest' && inhabitant.action.status === 'active';
     const onSeat = deps.state.atlas?.binding.authoredSociety?.inhabitantSeatAtPlace(id) === true;
     const restDrawn = onSeat ? 'Sitting on the seat at the place.' : 'Sitting on the ground in front of the place.';
     // In a person's own world the top says who this is, what they are doing and why, in words,
     // naming places by the titles of the person's objects; the recorded details stay below.
-    const words = savedWorld !== null && v2 && society?.places
+    const words = savedWorld !== null && purposeful && society?.places
       ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places), state.inhabitants)
       : null;
     inspector.show({
@@ -614,7 +617,7 @@ export function mountEnvironmentSelection(
       description: words?.what ?? 'A fictional inhabitant of this world. This is not a remembered person.',
       activity: words !== null
         ? `${words.doing} ${words.why}${citedWords?.inhabitantId === id ? ` ${citedWords.text}` : ''}`
-        : v2
+        : purposeful
           ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ` Drawn ${onSeat ? 'sitting on the seat at' : 'sitting on the ground in front of'} the place.` : ''}`
           : 'No persisted goal or action is available in this preview or legacy society.',
       details: [
@@ -626,10 +629,10 @@ export function mountEnvironmentSelection(
         ] as const : []),
         ['Plane / origin', 'Simulation · synthetic'],
         ['Visibility', crowd()?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
-        ['Current activity', v2 && inhabitant.action ? `${inhabitant.action.kind} · ${inhabitant.action.status}: ${inhabitant.action.reason}` : 'Unavailable'],
-        ['Goal / destination', v2 && goal ? (goal.target_id === null ? (goal.kind === 'make_room' ? 'Making room at a busy place' : `${goal.kind}: ${goal.reason}`) : `${goal.kind} · ${goal.target_id}: ${goal.reason}`) : 'Unavailable'],
+        ['Current activity', purposeful && inhabitant.action ? `${inhabitant.action.kind} · ${inhabitant.action.status}: ${inhabitant.action.reason}` : 'Unavailable'],
+        ['Goal / destination', purposeful && goal ? (goal.target_id === null ? (goal.kind === 'make_room' ? 'Making room at a busy place' : `${goal.kind}: ${goal.reason}`) : `${goal.kind} · ${goal.target_id}: ${goal.reason}`) : 'Unavailable'],
         ['Recorded event details', eventText || (liveSociety?.view.eventsAvailable ? 'No event references for this activity.' : 'Event documents unavailable in this view.')],
-        ['Event references', v2 ? inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references' : 'Unavailable'],
+        ['Event references', purposeful ? inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references' : 'Unavailable'],
         ['Producer', state.profile ?? 'Static preview fixture'],
         ['Authored branch', state.branch_id ?? society?.versionId ?? 'Unavailable'],
         ['Simulation tick', String(state.tick)],
@@ -641,10 +644,10 @@ export function mountEnvironmentSelection(
         ['Permitted use', 'Inspect simulation state; not historical evidence'],
         ['Shared position', `${crowd()?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position, all drawn where the simulation placed them.`],
         ...characterDisplayDetails(nativeCharacter, representation?.representationId, NEAR_CHARACTER_BUDGET),
-        ['Unavailable dependencies', v2 ? 'Personal evidence and model explanation not established by this view.' : 'Routes, goals, event history and authenticated persistence unavailable.'],
+        ['Unavailable dependencies', purposeful ? 'Personal evidence and model explanation not established by this view.' : 'Routes, goals, event history and authenticated persistence unavailable.'],
       ],
     });
-    if (savedWorld !== null && v2) {
+    if (savedWorld !== null && purposeful) {
       addAskActions();
       addSavedWorldActions();
     }
@@ -1541,6 +1544,7 @@ export function mountEnvironmentSelection(
       }
     }
     directedAction?.reflect();
+    void societyModels?.refresh(society?.currentTick ?? null, societyPeople());
     reflectNearby();
     reflectPlayback();
     atlas.invalidate();
@@ -1584,15 +1588,29 @@ export function mountEnvironmentSelection(
       }
     }
     for (const control of savedWorldActions.values()) control.reflect();
-    void societyModels?.refresh(society?.currentTick ?? null, savedWorldPeople());
+    void societyModels?.refresh(society?.currentTick ?? null, societyPeople());
     reflectNearby();
     reflectPlayback();
     atlas?.invalidate();
   }
 
-  /** A saved world's people, as People nearby names them. */
-  function savedWorldPeople(): readonly { readonly id: string; readonly name: string }[] {
+  /** The connected society's people, as People nearby names them. */
+  function societyPeople(): readonly { readonly id: string; readonly name: string }[] {
     return (society?.state.inhabitants ?? []).map((person) => ({ id: person.id, name: inhabitantLabel(person) }));
+  }
+
+  /**
+   * Who decides for the people of a connected society, in a saved world or a district alike. The
+   * section shows only where the served engine lets the world's owner choose a model for a person
+   * (`takes_model_choices`), so no kind of world is named here.
+   */
+  function mountModels(world: { readonly worldId: string; readonly versionId: string }): MountedSocietyModels {
+    return mountSocietyModels({
+      credentials: deps.credentials, world,
+      ...(deps.societyModelsClient ? { client: deps.societyModelsClient } : {}),
+      // A read that changes who decides for the inspected person says so in the open inspector.
+      onRead: () => { if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false); },
+    });
   }
 
   /**
@@ -1693,12 +1711,7 @@ export function mountEnvironmentSelection(
     workspace.setAvailability(true);
     const heading = workspace.nearby.firstElementChild;
     if (heading) heading.after(inhabitantsPanel.root); else workspace.nearby.prepend(inhabitantsPanel.root);
-    societyModels = mountSocietyModels({
-      credentials: deps.credentials, world: savedWorld,
-      ...(deps.societyModelsClient ? { client: deps.societyModelsClient } : {}),
-      // A read that changes who decides for the inspected person says so in the open inspector.
-      onRead: () => { if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false); },
-    });
+    societyModels = mountModels(savedWorld);
     inhabitantsPanel.root.after(societyModels.root);
     const atlas = deps.state.atlas?.binding;
     if (atlas?.authoredSociety == null) {
@@ -1723,9 +1736,9 @@ export function mountEnvironmentSelection(
     liveSociety = createLiveSociety({
       preview: false, credentials: deps.credentials, worldId: entry.worldId,
       versionId: entry.authoredVersionId, placeId: null, regionId: scene.region.regionId,
-      // Directed actions are a v2 foundation, and the living society has no place contract for
-      // an authored ground. Opening the world never creates anything; the person asks.
-      profile: 'exulanica-society/v2', createOnConnect: false, places: true,
+      // The engine a saved world's society is created with is the engine table's, which the
+      // server holds it to. Opening the world never creates anything; the person asks.
+      createOnConnect: false, places: true,
       ...(deps.societyClient ? { client: deps.societyClient } : {}),
       onChange: reflectSavedWorldSociety,
     });
@@ -1740,7 +1753,7 @@ export function mountEnvironmentSelection(
     if ((phase as string) === 'disposed') return;
     renderInhabitantsPanel();
     reflectNearby();
-    void societyModels.refresh(society?.currentTick ?? null, savedWorldPeople(), true);
+    void societyModels.refresh(society?.currentTick ?? null, societyPeople(), true);
     atlas.invalidate();
   }
 
@@ -1864,8 +1877,11 @@ export function mountEnvironmentSelection(
           ...(deps.societyClient ? { client: deps.societyClient } : {}),
           onChange: reflectLiveSociety,
         });
+        societyModels = mountModels({ worldId: current.worldId, versionId: current.versionId });
+        liveControls.after(societyModels.root);
         await liveSociety.connect();
         if ((phase as string) === 'disposed') return;
+        void societyModels.refresh(society?.currentTick ?? null, societyPeople(), true);
         await refreshPlayback();
         if ((phase as string) === 'disposed') return;
       } else if (atlas.ownedDistrict != null && deps.env.preview) {

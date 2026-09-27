@@ -1,6 +1,7 @@
 import { ApiError, type TransportOptions } from '@exulanica/graph-client';
 import {
   SocietyClient,
+  newSocietyEngine,
   type SocietyEvent,
   type SocietyProfile,
   type SocietySnapshot,
@@ -31,7 +32,10 @@ export interface LiveSocietyOptions {
   /** Null asks the server for a saved world's own place, which it derives from the version. */
   readonly placeId: string | null;
   readonly regionId: string;
-  /** The profile a new society is created with. The district's living society is v4. */
+  /**
+   * The profile a new society is created with. Omitted, it is the engine the engine table names
+   * for this ground (`newSocietyEngine`).
+   */
   readonly profile?: SocietyProfile;
   /**
    * Whether connecting may create the society. A saved world never gets inhabitants by being
@@ -79,7 +83,7 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
     signal: abort.signal,
     worldId: options.worldId,
   });
-  const profile = options.profile ?? 'exulanica-society/v4';
+  const profile = options.profile ?? newSocietyEngine(options.placeId);
   const createOnConnect = options.createOnConnect ?? true;
   const readOptions = { places: options.places === true };
   let disposed = false;

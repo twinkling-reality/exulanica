@@ -42,6 +42,7 @@ from exulanica.world.society import (
 )
 from exulanica.world.society_controls import LEASE_SECONDS
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
+from exulanica.world.society_engines import society_engine
 from exulanica.world.society_repository import SocietyRepository
 from fastapi.testclient import TestClient
 
@@ -49,11 +50,11 @@ import test_society_authored_world_postgres as helpers
 import test_society_person_decisions_postgres as person_decisions
 import test_society_runtime as district
 import test_society_saved_world_api as saved_api
-import test_society_social_postgres as social_helpers
 import test_society_stay_requests_api as stays
 import test_world_arrangements as arrangements
 from asset_lock_support import recorded_store_reads
 from comparison_support import SEEDS, seeded_catalogs
+from retired_society_support import plant_in_saved_world
 from tests_support_api import EVERY_PERMISSION, scratch_database
 
 pytestmark = pytest.mark.postgres
@@ -93,7 +94,12 @@ def _furnished(client, world) -> None:
 
 
 def _inhabited(client, world, profile=PURPOSEFUL) -> dict:
+    """People brought in, or for the retired social engine, planted where bringing them in put
+    them; either way the state is read back as the route serves it."""
     _furnished(client, world)
+    if not society_engine(profile).creatable:
+        plant_in_saved_world(client.app.state.services, world, profile)
+        return _state(client, world)
     brought = saved_api.bring_inhabitants(client, world, profile=profile)
     assert brought.status_code in (200, 201), brought.text
     return brought.json()
@@ -319,11 +325,10 @@ def test_the_small_square_in_an_inhabited_world_reads_nothing_under_the_lock(
 
 
 @CURRENT_GROUND
-def test_a_decision_asked_and_read_reads_nothing_under_the_lock(
-    runtime_app, monkeypatch, client, transport, manifest
-):
-    """Preparing a social decision authorizes the state's inputs, finishing it the request's
-    context and the latest input, and reading it back the same, each in one transaction."""
+def test_a_stored_decision_read_reads_nothing_under_the_lock(runtime_app, monkeypatch):
+    """Reading a stored social decision back authorizes its context and the latest input in one
+    transaction. The proposal route is retired, so the request is recorded as it recorded one
+    with no provider configured, and the read is what is left of that route."""
     world, make_app = runtime_app
     scope, _, society = saved_api.routes(world)
     with TestClient(make_app()) as http:
@@ -331,28 +336,42 @@ def test_a_decision_asked_and_read_reads_nothing_under_the_lock(
         _step(http, world)
         _remove(http, world, "object:second")
         state = _step(http, world)
-        subject = state["state"]["social"]["cast_ids"][1]
-        http.app.state.society_decision_provider = social_helpers.provider_for(
-            client, transport, manifest
-        )
-        key = str(uuid.uuid4())
+        services = http.app.state.services
+        runtime = services.society_runtime
+        session = Session(workspace_id=world["workspace"], actor=world["session"].actor)
+        version_id = world["binding"].version_id
+        request_id = uuid.uuid4()
+        with services.database.session(world["workspace"]) as connection:
+            decisions = SocietyDecisionRepository(
+                SocietyRepository(
+                    connection,
+                    world["workspace"],
+                    world_id=world["binding"].world_id,
+                    input_authorizer=lambda doc: runtime.authorize(connection, session, doc),
+                )
+            )
+            with connection.transaction():
+                decisions.prepare(
+                    version_id,
+                    request_id=request_id,
+                    subject_id=uuid.UUID(state["state"]["social"]["cast_ids"][1]),
+                    base_tick=state["current_tick"],
+                    base_state_sha256=state["state_sha256"],
+                    provider_config=None,
+                )
+            with connection.transaction():
+                decisions.finish(
+                    version_id,
+                    request_id,
+                    {"status": "unavailable", "reason": "provider_not_configured"}
+                    | {"proposal": None, "provider": None},
+                )
         reads = _reads(world, http, monkeypatch)
-        answered = http.post(
-            society + "/decisions",
-            headers=saved_api.OWNER,
-            params=scope,
-            json={
-                "idempotency_key": key,
-                "subject_id": subject,
-                "base_tick": state["current_tick"],
-                "base_state_sha256": state["state_sha256"],
-            },
+        read = http.get(
+            society + "/decisions/" + str(request_id), headers=saved_api.OWNER, params=scope
         )
-        read = http.get(society + "/decisions/" + key, headers=saved_api.OWNER, params=scope)
-    assert answered.status_code == 200, answered.text
-    assert answered.json()["decision"] is not None, "the decision was finished"
     assert read.status_code == 200, read.text
-    assert len(transport.requests) == 1
+    assert read.json()["decision"]["reason"] == "provider_not_configured"
     assert reads.under_the_lock == []
     assert _society_read_its_bytes(reads)
 
@@ -871,11 +890,7 @@ def test_two_creations_in_two_workspaces_at_once_both_bring_inhabitants_in(
                     society,
                     headers=headers,
                     params=scope,
-                    json={
-                        "region_id": world["binding"].region_id,
-                        "seed": "7a" * 32,
-                        "profile": PURPOSEFUL,
-                    },
+                    json={"region_id": world["binding"].region_id, "profile": PURPOSEFUL},
                 )
             except Exception as failed:  # the answer, whatever it is, is what the test reads
                 answers[name] = failed
@@ -910,8 +925,7 @@ def test_a_social_round_over_two_queued_inputs_reads_nothing_under_the_lock(
     control_route = society + "/control"
     with TestClient(make_app()) as client:
         saved_api.place(client, world, "object:cushion", 3_000, 5_000)
-        brought = saved_api.bring_inhabitants(client, world, profile=SOCIAL)
-        assert brought.status_code in (200, 201), brought.text
+        plant_in_saved_world(client.app.state.services, world, SOCIAL)
         saved_api.place(client, world, "object:second", -3_000, 5_000, asset="pillar")
         _remove(client, world, "object:second")
         state = _state(client, world)

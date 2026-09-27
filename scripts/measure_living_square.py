@@ -62,7 +62,7 @@ from typing import Any, Final
 ROOT: Final = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from measure_living_world_pace import Api, _database, seeds, tree  # noqa: E402
+from measure_living_world_pace import Api, _database, run_seed, seeds, tree  # noqa: E402
 
 from exulanica.canonical import canonical_json  # noqa: E402
 from exulanica.world.arrangements import arrangement_catalog  # noqa: E402
@@ -177,11 +177,12 @@ def make_square(api: Api, title: str) -> dict[str, Any]:
 
 
 def bring_in(api: Api, world: dict[str, Any], seed: str) -> None:
+    run_seed(api, seed)
     api(
         "POST",
         f"/world/versions/{world['version']}/society",
         params=world["scope"],
-        json={"region_id": world["region"], "seed": seed, "profile": ENGINE},
+        json={"region_id": world["region"], "profile": ENGINE},
     )
 
 

@@ -70,11 +70,9 @@ APP_ROLE = f"{RUNTIME_ROLE}_secfloor"
 
 
 def _unbuilt_services() -> object:
-    """Enough for ``create_app`` to build a router: it reads these three at construction and
+    """Enough for ``create_app`` to build a router: it reads these two at construction and
     nothing else until a request arrives, so the sweep needs no database."""
-    return SimpleNamespace(
-        society_decision_provider=None, society_base_tick_interval_ms=1000, society_runtime=None
-    )
+    return SimpleNamespace(society_base_tick_interval_ms=1000, society_runtime=None)
 
 
 def _application():
@@ -242,11 +240,10 @@ def test_no_route_that_changes_state_is_satisfied_by_a_read_alone():
         assert any(not p.endswith(".read") for p in rule.permissions), (method, path)
 
 
-#: What in an endpoint's own source says it can reach a model. ``request_decision`` reaches the
-#: society decision provider, which is a model, without the endpoint ever naming a model client.
-#: ``.hosted_model(`` is ``Services.hosted_model``, where every route's model client comes from,
-#: so a route calling it reaches a model whether or not it also calls ``_require_model``.
-MODEL_ROUTE_MARKERS = ("_require_model(", ".model_client", ".hosted_model(", "request_decision(")
+#: What in an endpoint's own source says it can reach a model. ``.hosted_model(`` is
+#: ``Services.hosted_model``, where every route's model client comes from, so a route calling it
+#: reaches a model whether or not it also calls ``_require_model``.
+MODEL_ROUTE_MARKERS = ("_require_model(", ".model_client", ".hosted_model(")
 
 
 def _reaches_a_model(endpoint, markers=MODEL_ROUTE_MARKERS) -> bool:
@@ -282,7 +279,6 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
         ("POST", "/selection/ask"),
         ("POST", "/selection/environment"),
         ("POST", "/selection/plan"),
-        ("POST", "/world/versions/{version_id}/society/decisions"),
     ]
     assert found <= set(SWEPT)
     for key in found:
@@ -860,19 +856,20 @@ def test_a_world_reader_cannot_change_the_world(floor, method, path):
 
 
 @pytest.mark.postgres
-def test_a_society_decision_needs_model_invoke_as_well_as_world_write(floor):
-    path = "/world/versions/{version_id}/society/decisions"
+def test_choosing_a_persons_model_needs_model_invoke_as_well_as_world_write(floor):
+    path = "/world/versions/{version_id}/society/models"
     response = floor.request("world_writer", "POST", _fill(path), json={})
     assert (response.status_code, response.json()["detail"]) == (404, _OUR_404)
     row = _refusal_rows(floor, floor.workspace_a, "world_writer")[("POST", path)]
     assert row["missing_permissions"] == ["model.invoke"]
-    # The same token reaches the action route, whose declaration it does cover: the body is then
-    # refused by the route's own validation, which proves the floor let it through.
+    # The same token reaches the retired proposal route, which commits nothing to a model and is
+    # declared a world write alone: the body is then refused by the route's own validation, which
+    # proves the floor let it through.
     passed = floor.request(
-        "world_writer", "POST", _fill("/world/versions/{version_id}/society/actions"), json={}
+        "world_writer", "POST", _fill("/world/versions/{version_id}/society/decisions"), json={}
     )
     assert passed.status_code == 422, passed.text
-    # And the owner, who holds both, reaches the decision route's validation too.
+    # And the owner, who holds both, reaches the choice route's validation too.
     assert floor.request("owner", "POST", _fill(path), json={}).status_code == 422
 
 

@@ -151,3 +151,63 @@ def society_state_sha256(state: dict[str, Any]) -> str:
 
 def event_document_sha256(event: SocietyEvent) -> str:
     return hashlib.sha256(canonical_json(event.document)).hexdigest()
+
+
+#: The profile of the document a world's society seed is the digest of.
+WORLD_SEED_PROFILE: Final = "exulanica.society-seed/v1"
+#: Where a society's states and event documents hold its seed. The name says digest, but the value
+#: is the seed itself, so a served document carries ``seed_digest`` in its place.
+SEED_FIELD: Final = "seed_sha256"
+
+
+def world_society_seed(workspace_id: uuid.UUID, world_id: str) -> str:
+    """The seed a new society in this world starts from, derived by the server, never sent to it.
+
+    The SHA-256 of a canonical document naming the world by its identity, its workspace and its
+    id, under :data:`WORLD_SEED_PROFILE`. It names no version, because a world's people should be
+    the same people across its edits: an edit is an input to the version's own society, and a new
+    version of the world (a branch, or photographs added) starts a society again, whose people
+    then draw the same roles, needs and first places as before over the same ground. It names no
+    engine, so a world's people stay its own when its society is made with a later engine. Two
+    worlds start their people differently. A stored society keeps the seed it recorded.
+    """
+    document = {
+        "profile": WORLD_SEED_PROFILE,
+        "workspace_id": str(workspace_id),
+        "world_id": world_id,
+    }
+    return hashlib.sha256(canonical_json(document)).hexdigest()
+
+
+def seed_digest(seed: str) -> str:
+    """How a seed is named wherever it is shown: the SHA-256 of its text, never the seed."""
+    return hashlib.sha256(seed.encode("utf-8")).hexdigest()
+
+
+def served_document(document: dict[str, Any]) -> dict[str, Any]:
+    """A state or event document as a response carries it: the seed replaced by its digest.
+
+    The stored document, and every digest over it, keeps the seed; only what leaves the server
+    changes. A document that holds no seed, such as the first engine's, is returned as it is.
+    """
+    if SEED_FIELD not in document:
+        return document
+    served = {key: value for key, value in document.items() if key != SEED_FIELD}
+    served["seed_digest"] = seed_digest(document[SEED_FIELD])
+    return served
+
+
+def served_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """A society snapshot as a response carries it: ``seed_digest`` in place of the seed, and its
+    state served by :func:`served_document`. ``state_sha256`` still names the stored state, the
+    one a later request names as its base; nothing the page does recomputes it."""
+    served = {key: value for key, value in snapshot.items() if key != "seed"}
+    served["seed_digest"] = seed_digest(snapshot["seed"])
+    served["state"] = served_document(snapshot["state"])
+    return served
+
+
+def served_events(events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Stored event rows as a response carries them: each document served by
+    :func:`served_document`; ``document_sha256`` still names the stored document."""
+    return [dict(event) | {"document": served_document(event["document"])} for event in events]

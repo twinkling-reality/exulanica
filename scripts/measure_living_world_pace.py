@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import dataclasses
 import datetime as dt
 import hashlib
 import io
@@ -243,6 +244,16 @@ class Api:
         return response.json()
 
 
+def run_seed(api: Api, seed: str) -> None:
+    """Start the next society this application creates from ``seed``. The route takes no seed (the
+    server derives each world's own), so a measurement over chosen seeds installs each one on the
+    services the route reads it from."""
+    app = api.http.app
+    app.state.services = dataclasses.replace(
+        app.state.services, society_seed=lambda _workspace_id, _world_id: seed
+    )
+
+
 def make_world(api: Api, objects: list[dict[str, Any]], seed: str) -> dict[str, Any]:
     entry = api("POST", "/world-entries/starter", json={"title": "Living world pace"})
     world = {
@@ -252,11 +263,12 @@ def make_world(api: Api, objects: list[dict[str, Any]], seed: str) -> dict[str, 
     }
     for placed in objects:
         place(api, world, placed)
+    run_seed(api, seed)
     api(
         "POST",
         f"/world/versions/{world['version']}/society",
         params=world["scope"],
-        json={"region_id": world["region"], "seed": seed, "profile": PURPOSEFUL_PROFILE},
+        json={"region_id": world["region"], "profile": PURPOSEFUL_PROFILE},
     )
     return world
 

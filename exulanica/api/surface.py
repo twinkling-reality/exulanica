@@ -63,15 +63,14 @@ _IMPLICIT_METHODS: Final = frozenset({"HEAD", "OPTIONS"})
 def routing_only_application() -> FastAPI:
     """The real application, built without services, for reading its routes and schema.
 
-    :func:`exulanica.api.app.create_app` reads three attributes of its services while it builds
+    :func:`exulanica.api.app.create_app` reads two attributes of its services while it builds
     the router and nothing else until a request arrives, so this application can be walked and
     can produce its OpenAPI document with no database, store or credential configured. It cannot
-    serve a request. A fourth attribute read at build time fails here loudly, by name.
+    serve a request. A third attribute read at build time fails here loudly, by name.
     """
     from exulanica.api.app import create_app
 
     services = SimpleNamespace(
-        society_decision_provider=None,
         society_base_tick_interval_ms=DEFAULT_BASE_TICK_INTERVAL_MS,
         society_runtime=None,
     )

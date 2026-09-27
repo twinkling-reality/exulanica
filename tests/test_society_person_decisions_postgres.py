@@ -388,8 +388,14 @@ def test_an_exact_retry_of_a_choice_is_answered_before_anything_else_is_checked(
     model = {"provider": manifest.spec(model_id).provider, "model_id": model_id}
     key = uuid.uuid4()
     first = _choose(services, world, people, model, manifest=manifest, key=key)
-    # Whatever would refuse a new choice now, the one already recorded is its retry's answer.
-    monkeypatch.setattr(repository, "PURPOSEFUL_PROFILE", "exulanica-society/another")
+    # Whatever would refuse a new choice now, the one already recorded is its retry's answer: here
+    # the engine table stops letting this engine's owner choose.
+    table = repository.society_engine
+    monkeypatch.setattr(
+        repository,
+        "society_engine",
+        lambda name: dataclasses.replace(table(name), owner_model_choice=False),
+    )
     assert _choose(services, world, people, model, manifest=manifest, key=key) == first
     with pytest.raises(ModelChoiceRefused) as refused:
         _choose(services, world, people, model, manifest=manifest)

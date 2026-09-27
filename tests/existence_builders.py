@@ -44,6 +44,7 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepository
 from exulanica.world.assets import reviewed_assets
 from exulanica.world.society_comparison_repository import SocietyComparisonRepository
+from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_experiments import DEVELOPMENT_SEEDS
 from exulanica.world.society_repository import SocietyRepository
 
@@ -55,6 +56,7 @@ from conftest import (
     write_photo,
     write_point_map,
 )
+from retired_society_support import plant_retired_society
 from social_society_fixtures import social_input
 from society_fixtures import SEED, society_input
 from society_living_fixtures import grid_input
@@ -70,8 +72,8 @@ TOPOLOGY = "existence-topology"
 #: The region every authored thing in the owner's world is placed in.
 REGION = "region-a"
 #: A society profile each builder asks for by name, because what a society can do depends on it:
-#: actions need v2 or v3, model decisions need v3, experiments need v4 and a comparison of
-#: models needs v2.
+#: actions and a comparison of models need v2, a stored model proposal needs v3, which is retired
+#: and so is planted as it was stored, and experiments need v4.
 PURPOSEFUL = "exulanica-society/v2"
 SOCIAL = "exulanica-society/v3"
 LIVING = "exulanica-society/v4"
@@ -209,12 +211,7 @@ def _version_with_society(owner, profile: str, document) -> dict[str, Any]:
             owner,
             "POST",
             f"/world/versions/{version_id}/society",
-            json={
-                "place_id": str(_place(owner)),
-                "region_id": REGION,
-                "seed": SEED,
-                "profile": profile,
-            },
+            json={"place_id": str(_place(owner)), "region_id": REGION, "profile": profile},
         ),
         200,
     )
@@ -588,8 +585,8 @@ def style_proposal(owner) -> str:
 
 
 def action_request(owner) -> dict[str, Any]:
-    """A user action in a social society, with the version that holds it (API)."""
-    made = _version_with_society(owner, SOCIAL, social_input)
+    """A user action in a purposeful society, with the version that holds it (API)."""
+    made = _version_with_society(owner, PURPOSEFUL, society_input)
     version_id, state = made["version_id"], made["society"]
     targets = owner.society_inputs[version_id]["targets"]
     target = next(row for row in targets if row["affordance"] == "rest")
@@ -618,32 +615,65 @@ def action_request(owner) -> dict[str, Any]:
 
 
 def decision_request(owner) -> dict[str, Any]:
-    """A model decision request in a social society, with its version (API).
+    """A stored model decision request in a social society, with its version (domain).
 
-    The application has no decision provider, so the request is recorded with the reason it
-    was not answered, which is a real request all the same.
+    The social engine and its proposal route are retired, so no request makes either one: the
+    society is planted as its creation stored it, and the request as that route recorded one with
+    no provider configured, which is how every such request was recorded. A stored one still reads.
     """
-    made = _version_with_society(owner, SOCIAL, social_input)
-    version_id, state = made["version_id"], made["society"]
-    key = str(uuid.uuid4())
-    _ok(
+    snapshot = world(owner)["snapshot_id"]
+    version = _ok(
         in_world(
             owner,
             "POST",
-            f"/world/versions/{version_id}/society/decisions",
-            json={
-                "idempotency_key": key,
-                "subject_id": state["state"]["social"]["cast_ids"][0],
-                "base_tick": state["current_tick"],
-                "base_state_sha256": state["state_sha256"],
-            },
+            "/world/versions",
+            json={"title": f"existence {SOCIAL}", "source_snapshot_id": snapshot},
         ),
-        200,
         201,
     )
+    version_id = uuid.UUID(version["version_id"])
+    document = social_input(version_id)
+    owner.society_inputs[version_id] = document
+    connection = owner.repository.connection
+    society = SocietyRepository(
+        connection, owner.workspace_id, world_id=WORLD, input_authorizer=lambda _document: None
+    )
+    state = plant_retired_society(
+        society,
+        version_id,
+        place_id=_place(owner),
+        region_id=REGION,
+        seed=SEED,
+        actor=owner.actor,
+        profile=SOCIAL,
+        initial_input=document,
+    )
+    decisions = SocietyDecisionRepository(society)
+    key = uuid.uuid4()
+    with connection.transaction():
+        decisions.prepare(
+            version_id,
+            request_id=key,
+            subject_id=uuid.UUID(state["state"]["social"]["cast_ids"][0]),
+            base_tick=state["current_tick"],
+            base_state_sha256=state["state_sha256"],
+            provider_config=None,
+        )
+    with connection.transaction():
+        decisions.finish(
+            version_id,
+            key,
+            {
+                "status": "unavailable",
+                "reason": "provider_not_configured",
+                "proposal": None,
+                "provider": None,
+            },
+        )
+    connection.commit()
     return {
         "/world/versions/{version_id}": version_id,
-        "/world/versions/{version_id}/society/decisions/{request_id}": key,
+        "/world/versions/{version_id}/society/decisions/{request_id}": str(key),
     }
 
 

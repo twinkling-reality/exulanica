@@ -90,7 +90,6 @@ def test_real_runtime_http_edit_undo_advance_reload_replay_and_scope(runtime_app
     create_body = {
         "place_id": str(binding.place_id),
         "region_id": binding.region_id,
-        "seed": "7a" * 32,
         "profile": "exulanica-society/v2",
     }
     with TestClient(make_app()) as client:
