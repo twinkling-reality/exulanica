@@ -38,12 +38,21 @@ def hook(event, args):
         read.add(path.relative_to(root).as_posix())
 sys.addaudithook(hook)
 failed = []
+absent = []
 for module in pkgutil.walk_packages([str(package)], "exulanica."):
     try:
         importlib.import_module(module.name)
+    except ModuleNotFoundError as exc:
+        # CI installs no extras, so a module that needs an optional stack cannot be imported
+        # there; its reads are checked wherever the extras are installed.
+        missing = (exc.name or "").split(".")[0]
+        if missing and missing != "exulanica":
+            absent.append(f"{module.name}: {missing}")
+        else:
+            failed.append(f"{module.name}: {type(exc).__name__}")
     except Exception as exc:
         failed.append(f"{module.name}: {type(exc).__name__}")
-print(json.dumps({"read": sorted(read), "failed": failed}))
+print(json.dumps({"read": sorted(read), "failed": failed, "absent": absent}))
 """
 
 
