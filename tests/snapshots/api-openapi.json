@@ -37,7 +37,7 @@
      "health"
     ],
     "summary": "Readiness. One query, one object-store call, no model call.",
-    "description": "Report each check separately, and return 503 when any of them fails.\n\nSeparately, because a single boolean tells an operator at 3am that something is wrong and\nnothing about which thing. The checks are the four in section 6.2, and each one's entry says\nwhat it proves rather than only whether it passed.",
+    "description": "Report each check separately, and return 503 when any of them fails.\n\nSeparately, because a single boolean tells an operator at 3am that something is wrong and\nnothing about which thing. The checks are the ones section 6.2 lists, and each one's entry says\nwhat it proves rather than only whether it passed.",
     "operationId": "readyz_readyz_get",
     "responses": {
      "200": {
