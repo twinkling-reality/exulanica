@@ -48,6 +48,7 @@ from exulanica.environment.city_context import (
 )
 from exulanica.epistemics.hosted_requests import borrowing, no_place_released
 from exulanica.models.client import ModelClient
+from exulanica.models.manifest import load_manifest
 from exulanica.selection import (
     Abstention,
     Answer,
@@ -233,6 +234,10 @@ class ModelCallView(BaseModel):
     role: str
     requested_model: str
     served_model: str | None
+    #: The names a person reads for those two (``Manifest.model_name``): what the Companion's
+    #: provenance lines say, so a model is never called by its identifier on the page.
+    requested_model_name: str
+    served_model_name: str | None
     used_fallback: bool
     #: HTTP requests issued, retries and failover included. Zero would mean the client's cache
     #: served it; the API builds its client without one, so on this route it is at least one.
@@ -735,6 +740,12 @@ def _execution(
                 role=call.role,
                 requested_model=call.requested_model,
                 served_model=call.served_model,
+                requested_model_name=load_manifest().model_name(call.requested_model),
+                served_model_name=(
+                    None
+                    if call.served_model is None
+                    else load_manifest().model_name(call.served_model)
+                ),
                 used_fallback=call.used_fallback,
                 attempts=call.attempts,
                 latency_ms=call.latency_ms,

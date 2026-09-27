@@ -13,12 +13,13 @@
  *
  * **A role is allowed only when every model it can reach is.** A role's chain can hold a primary
  * and a fallback, each with its own right, and a request to the role can reach either, so the
- * server refuses the role unless every model of the chain is covered. The state drawn here asks
- * the same question, and stopping a role ends every current right it holds over the photo.
+ * server refuses the role unless every model of the chain is covered. The state drawn here is the
+ * server's answer to that question, and stopping a role ends every current right it holds over the
+ * photo.
  */
 
 import { el, replace } from './dom.js';
-import type { ModelRightOffer, ModelRightState } from '../personal-admission-api.js';
+import type { ModelRightOffer, ModelRightState, ServedStanding } from '../personal-admission-api.js';
 
 export interface ModelRightGrants {
   readonly root: HTMLElement;
@@ -94,34 +95,25 @@ export interface RoleStanding {
 const isCurrent = (right: ModelRightState): boolean =>
   (right.state ?? (right.withdrawn ? 'ended' : 'current')) === 'current';
 
-const sameModel = (a: ModelRightState['model'], b: ModelRightState['model']): boolean =>
-  a.provider === b.provider && a.role === b.role && a.model_id === b.model_id &&
-  (a.revision ?? null) === (b.revision ?? null);
-
-const instant = (value: string): number => Date.parse(value);
-
-/** One role's standing over one photo, from every right the photo's owner granted. */
-export function standingOf(offer: ModelRightOffer, rights: readonly ModelRightState[]): RoleStanding {
-  const mine = rights.filter((right) => right.model.role === offer.role);
-  const current = mine.filter(isCurrent);
-  // For each model of the chain, the current rights that cover it at the offer's destination.
-  const covering = offer.models.map((model) => current.filter(
-    (right) => right.destination === offer.destination && sameModel(right.model, model)));
-  const covered = covering.length > 0 && covering.every((each) => each.length > 0);
-  const standing: ModelRightStanding = mine.length === 0 ? 'none'
-    : covered ? 'current'
-    : current.length > 0 ? 'partial'
-    : 'ended';
-  const ends = covering.map((each) => each.reduce(
-    (latest, right) => (instant(right.valid_until) > instant(latest) ? right.valid_until : latest),
-    each[0]?.valid_until ?? ''));
+/**
+ * One role's standing over one photo, as the server decided it (`model_right_standings` on the
+ * photo in `GET /personal-admission`, by the rule a hand-over is checked by). The page reads it and
+ * never recomputes it; the role's current rights are listed so stopping it can end each.
+ */
+export function standingOf(
+  offer: ModelRightOffer,
+  rights: readonly ModelRightState[],
+  served: readonly ServedStanding[],
+): RoleStanding {
+  const decided = served.find((each) => each.role === offer.role);
+  if (decided === undefined) throw new Error(`the server served no standing for ${offer.role}`);
   return {
     offer,
-    standing,
-    current,
-    withoutTheseWords: standing === 'current' && current.some((right) => right.notice_current === false),
-    until: covered ? ends.reduce((earliest, end) => (instant(end) < instant(earliest) ? end : earliest)) : null,
-    stopped: standing === 'ended' && mine.every((right) => right.withdrawn),
+    standing: decided.standing,
+    current: rights.filter((right) => right.model.role === offer.role && isCurrent(right)),
+    withoutTheseWords: decided.without_these_words,
+    until: decided.until,
+    stopped: decided.stopped,
   };
 }
 

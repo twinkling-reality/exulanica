@@ -127,6 +127,8 @@ interface WireAnswer {
   readonly repaired: boolean;
   readonly served_model: string | null;
   readonly planned_by: string | null;
+  readonly served_model_name: string | null;
+  readonly planned_by_name: string | null;
   readonly prompt_version: string;
   readonly latency_ms: number;
   readonly origin: string;
@@ -311,6 +313,8 @@ function answerOf(wire: WireAnswer): PersistedAnswer {
     repaired: wire.repaired === true,
     servedModel: wire.served_model,
     plannedBy: wire.planned_by,
+    servedModelName: wire.served_model_name,
+    plannedByName: wire.planned_by_name,
     promptVersion: wire.prompt_version,
     latencyMs: wire.latency_ms,
     origin: (wire.origin === 'correction' ? 'correction' : 'asked') as AnswerOrigin,
@@ -596,6 +600,8 @@ export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer
       composed: remembered.composed ?? keptBeforeItsKind(remembered),
       servedModel: remembered.servedModel,
       plannedBy: remembered.plannedBy,
+      servedModelName: remembered.servedModelName,
+      plannedByName: remembered.plannedByName,
       latencyMs: remembered.latencyMs,
       usedFallback: remembered.usedFallback,
     },

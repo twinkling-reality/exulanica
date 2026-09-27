@@ -103,6 +103,10 @@ class _Capability:
     minimum: int | None = None
     maximum: int | None = None
     choices: tuple[str, ...] = ()
+    #: Whether the settings page offers a control for it; data, so the page keeps no list.
+    shown_in_settings: bool = True
+    #: Why a capability the settings page does not offer is not offered; None when it is.
+    settings_note: str | None = None
 
 
 class InteractionPolicyRegistry:
@@ -129,6 +133,9 @@ class InteractionPolicyRegistry:
                 or isinstance(version, bool)
                 or not isinstance(version, int)
                 or version < 1
+                or not isinstance(raw.get("shown_in_settings"), bool)
+                or (raw["shown_in_settings"] == ("settings_note" in raw))
+                or ("settings_note" in raw and not str(raw["settings_note"]).strip())
             ):
                 raise RuntimeError(f"invalid interaction policy capability: {key!r}")
             capability = _Capability(
@@ -140,6 +147,8 @@ class InteractionPolicyRegistry:
                 minimum=raw.get("minimum"),
                 maximum=raw.get("maximum"),
                 choices=tuple(raw.get("choices", ())),
+                shown_in_settings=raw["shown_in_settings"],
+                settings_note=raw.get("settings_note"),
             )
             self._validate_value(capability, capability.default)
             capabilities[key] = capability
@@ -202,6 +211,8 @@ class InteractionPolicyRegistry:
                     "minimum": capability.minimum,
                     "maximum": capability.maximum,
                     "choices": list(capability.choices),
+                    "shown_in_settings": capability.shown_in_settings,
+                    "settings_note": capability.settings_note,
                 }
                 for capability in self.capabilities.values()
             ],

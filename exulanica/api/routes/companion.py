@@ -32,6 +32,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, ScopedConnection
+from exulanica.models.manifest import load_manifest
 from exulanica.world.companion_memory import (
     DEFAULT_RECENT_LIMIT,
     MAX_RECENT_LIMIT,
@@ -177,6 +178,11 @@ class AnswerView(BaseModel):
     repaired: bool
     served_model: str | None
     planned_by: str | None
+    #: The names a person reads for those two (``Manifest.model_name``), so a remembered answer's
+    #: provenance names its models as a fresh one does; an identifier the manifest no longer
+    #: declares is its own name.
+    served_model_name: str | None
+    planned_by_name: str | None
     prompt_version: str
     latency_ms: int
     origin: AnswerOrigin
@@ -353,6 +359,10 @@ def delete_answer(answer_id: Annotated[uuid.UUID, Path()], repository: WriteMemo
     return Response(status_code=204)
 
 
+def _model_name(model_id: str | None) -> str | None:
+    return None if model_id is None else load_manifest().model_name(model_id)
+
+
 def _answer_view(answer: CompanionAnswer) -> AnswerView:
     return AnswerView(
         answer_id=answer.answer_id,
@@ -364,6 +374,8 @@ def _answer_view(answer: CompanionAnswer) -> AnswerView:
         repaired=answer.repaired,
         served_model=answer.served_model,
         planned_by=answer.planned_by,
+        served_model_name=_model_name(answer.served_model),
+        planned_by_name=_model_name(answer.planned_by),
         prompt_version=answer.prompt_version,
         latency_ms=answer.latency_ms,
         origin=answer.origin,

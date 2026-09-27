@@ -15,7 +15,7 @@ from itertools import pairwise
 import pytest
 from exulanica.grammar.errors import CatalogError
 from exulanica.world.society import society_state_sha256
-from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, load_routine_model
+from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, legacy_identity, load_routine_model
 from exulanica.world.society_living import (
     LIVING_PROFILE,
     LivingPlace,
@@ -323,8 +323,10 @@ def test_legacy_tables_live_only_in_the_frozen_v1_module():
         for fabrication in ("FIRST_NAMES", "LAST_NAMES", '"home:', '"work:', "300_000", '"baker"'):
             assert fabrication not in source, (module.__name__, fabrication)
     frozen = inspect.getsource(legacy)
-    assert "exist only so stored histories replay" in " ".join(frozen.split())
-    assert legacy.LEGACY_FIRST_NAMES[0] == "Ari"
+    assert "Nothing new may use this module" in " ".join(frozen.split())
+    assert legacy_identity(legacy.SOCIETY_ENGINE_VERSION).first_names[0] == "Ari"
+    with pytest.raises(CatalogError, match="serves the profile"):
+        legacy_identity(LIVING_PROFILE)
 
 
 # Pinned under three PYTHONHASHSEED values on 2026-09-16. A change here is a new profile.

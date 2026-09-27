@@ -286,7 +286,7 @@ describe('a source-independent starter turn', () => {
       repaired: false,
       evidence: [],
       provenance: {
-        composed: 'none', servedModel: null, plannedBy: null, latencyMs: 0,
+        composed: 'none', servedModel: null, servedModelName: null, plannedBy: null, plannedByName: null, latencyMs: 0,
         usedFallback: false,
       },
       promptVersion: 'remembered-test',

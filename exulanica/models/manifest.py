@@ -59,7 +59,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
@@ -76,6 +76,7 @@ __all__ = [
     "AnsweringMechanism",
     "CatalogFormat",
     "ChosenRoleBinding",
+    "DeclaredNumber",
     "Manifest",
     "ModelSpec",
     "Provider",
@@ -96,6 +97,8 @@ _PROVIDER_KEY: Final = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 _KEY_VARIABLE: Final = re.compile(r"^(?!EXULANICA_)[A-Z][A-Z0-9_]{0,55}_API_KEY$")
 #: Where a verified mechanism's evidence lives: a record under ``docs/evaluation``.
 _RECORD_PATH: Final = re.compile(r"^docs/evaluation/[A-Za-z0-9._/-]+\.json$")
+#: A judgement a policy admits models to make, named as the policy names it.
+_JUDGEMENT: Final = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
 
 class Role(StrEnum):
@@ -202,6 +205,11 @@ class ModelSpec:
     answering_order: tuple[AnsweringMechanism, ...] = ()
     answering_order_record: str | None = None
     answering_order_reason: str | None = None
+    #: Each judgement a policy may admit this model to make, with the record of the probe that
+    #: measured it: ``sign_completeness`` is the place-proposal policy's sign judgement
+    #: (``exulanica.ingest.place_proposal``). Empty for a model admitted to judge nothing. Left
+    #: out of the hash, as ``answering`` is.
+    judging: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}), hash=False)
 
     def cost_usd(self, *, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Billable cost of one call, exactly.
@@ -254,6 +262,14 @@ class TimeoutRule:
 
 
 @dataclass(frozen=True, slots=True)
+class DeclaredNumber:
+    """A number the manifest states for a role, with the sentence saying why it is that number."""
+
+    value: int
+    basis: str
+
+
+@dataclass(frozen=True, slots=True)
 class RoleBinding:
     """A role, its primary model, the model tried when the primary is withdrawn, and its timeout."""
 
@@ -268,6 +284,13 @@ class RoleBinding:
     #: The measurement the timeout rests on, as the manifest states it: the record it was read
     #: from, the primary it measured, and the longest latency recorded for that primary.
     timeout_basis: Mapping[str, Any]
+    #: The completion ceiling this role's caller asks for, where the chain's default is too low
+    #: for it, with the reason the manifest states; ``None`` where the default serves.
+    max_tokens: DeclaredNumber | None = None
+    #: The prompt tokens one image is reserved at before a call to this role, for the budget
+    #: guard's reservation only (accounting reads the usage the provider reports); ``None`` for a
+    #: role that is sent no image.
+    image_prompt_tokens_reserved: DeclaredNumber | None = None
 
     @property
     def provider(self) -> str:
@@ -294,6 +317,14 @@ class RoleBinding:
                 f"role {self.role} declares no max_tokens floor, so it is not a chat role"
             )
         return max(floors)
+
+    def image_reservation(self, images: int) -> int:
+        """The prompt tokens ``images`` images are reserved at before a call to this role."""
+        if self.image_prompt_tokens_reserved is None:
+            raise ManifestError(
+                f"role {self.role} declares no image_prompt_tokens_reserved, so it is sent no image"
+            )
+        return self.image_prompt_tokens_reserved.value * images
 
     @property
     def default_max_tokens(self) -> int:
@@ -362,6 +393,19 @@ class Manifest:
             return self.models[model_id]
         except KeyError as exc:
             raise ManifestError(f"{model_id!r} is not declared in the manifest") from exc
+
+    def judges(self, judgement: str) -> tuple[tuple[str, str], ...]:
+        """Every model admitted to make ``judgement``, with the record that measured it, in the
+        manifest's order."""
+        return tuple(
+            (model_id, spec.judging[judgement])
+            for model_id, spec in self.models.items()
+            if judgement in spec.judging
+        )
+
+    def credential_variables(self, roles: Iterable[Role]) -> frozenset[str]:
+        """The variables the credentials of the providers serving ``roles`` are read from."""
+        return frozenset(self.provider(self[role].provider).api_key_env for role in roles)
 
     def model_name(self, model_id: str) -> str:
         """The name a person reads for a model: its description up to its first comma, or its
@@ -531,6 +575,35 @@ def _answering(model_id: str, raw: Any) -> Mapping[AnsweringMechanism, str]:
     return MappingProxyType(answering)
 
 
+def _judging(model_id: str, raw: Any) -> Mapping[str, str]:
+    if raw is None:
+        return MappingProxyType({})
+    if not isinstance(raw, Mapping) or not raw:
+        raise ManifestError(f"{model_id}: judging maps a judgement to the record that measured it")
+    for judgement, record in raw.items():
+        if not isinstance(judgement, str) or not _JUDGEMENT.fullmatch(judgement):
+            raise ManifestError(f"{model_id}: judging names {judgement!r}, not a lowercase key")
+        if not isinstance(record, str) or not _RECORD_PATH.fullmatch(record):
+            raise ManifestError(
+                f"{model_id}: judging.{judgement} names the record that measured it, a "
+                f"docs/evaluation JSON path, not {record!r}"
+            )
+    return MappingProxyType(dict(raw))
+
+
+def _declared_number(role: Role, raw: Mapping[str, Any], key: str) -> DeclaredNumber | None:
+    """A number a role states with its reason, or ``None`` where the role states none."""
+    value = raw.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or set(value) != {"value", "basis"}:
+        raise ManifestError(f"role {role}: {key} states exactly its value and its basis")
+    basis = value["basis"]
+    if not isinstance(basis, str) or not basis.strip():
+        raise ManifestError(f"role {role}: {key}.basis says why, in a sentence")
+    return DeclaredNumber(_positive_whole(value["value"], f"role {role}: {key}.value"), basis)
+
+
 def _answering_order(
     model_id: str, raw: Any, answering: Mapping[AnsweringMechanism, str]
 ) -> tuple[tuple[AnsweringMechanism, ...], str | None, str | None]:
@@ -622,6 +695,7 @@ def _spec_from(
         answering_order=order,
         answering_order_record=order_record,
         answering_order_reason=order_reason,
+        judging=_judging(model_id, raw.get("judging")),
     )
 
 
@@ -756,6 +830,10 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
             rationale=str(raw.get("rationale", "")),
             timeout_seconds=timeout_seconds,
             timeout_basis=timeout_basis,
+            max_tokens=_declared_number(role, raw, "max_tokens"),
+            image_prompt_tokens_reserved=_declared_number(
+                role, raw, "image_prompt_tokens_reserved"
+            ),
         )
     chosen = {Role(name): _chosen_role(Role(name), raw) for name, raw in raw_chosen.items()}
 

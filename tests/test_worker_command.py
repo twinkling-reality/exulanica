@@ -359,7 +359,7 @@ def test_both_worker_constructors_share_the_client_and_cover_each_model_gap(
     args = SimpleNamespace(workspace=[str(uuid.uuid4())], name="scripted", poll_seconds=2.0)
     environ = {worker_command.DATA_DIR_ENV: str(tmp_path)}
     if enabled:
-        environ[worker_command.MODEL_KEY_ENV] = "scripted-key"
+        environ.update(dict.fromkeys(worker_command.MODEL_KEY_ENVS, "scripted-key"))
     worker_command._build_worker(args, environ)
     assert clients_built == ([{"max_attempts": 1}] if enabled else [])
     assert (built["depth"], built["detector"], built["segmenter"]) == (depth, detector, segmenter)

@@ -150,12 +150,26 @@ export class PersonalAdmissionApi {
   }
 }
 
+/** One offered role's standing over one photograph, decided by the server (`role_standing`). */
+export interface ServedStanding {
+  readonly role: string;
+  readonly standing: 'none' | 'current' | 'partial' | 'ended';
+  /** While current, the end of the role's term as the server spells it; null otherwise. */
+  readonly until: string | null;
+  /** A current right was granted against other words than the offer's, or against none. */
+  readonly without_these_words: boolean;
+  /** Every right of an ended role was stopped by the person rather than run out. */
+  readonly stopped: boolean;
+}
+
 export interface PersonalStatus {
   readonly sources: readonly (PersonalSource & {
     readonly media_type: string;
     readonly authority: (PersonalAuthority & { readonly authorization_id: string; readonly purpose: string }) | null;
     /** Every right this account holder granted over the photograph, current or ended. */
     readonly model_rights?: readonly ModelRightState[];
+    /** Each offered role's standing over the photograph, as the server decided it. */
+    readonly model_right_standings?: readonly ServedStanding[];
   })[];
   readonly requests: readonly (Partial<AdmissionResult> & { readonly request_id: string; readonly operation: string })[];
   /** Every right a person may give, depth first. Absent from a server that offers none. */

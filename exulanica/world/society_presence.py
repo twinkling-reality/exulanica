@@ -36,10 +36,26 @@ Presence = Literal["away", "here"]
 PRESENCES: Final = (AWAY, HERE)
 
 
+#: Every name a presence request is refused by, stated once: the page has words for exactly these
+#: (``PRESENCE_WORDS`` in web/packages/app/src/ui/world-inhabitants.ts, held to this set by
+#: code-words-parity.test.ts), and a refusal by any other name is refused itself.
+PRESENCE_REFUSALS: Final = frozenset(
+    {
+        "a_request_is_waiting",
+        "already_here",
+        "engine_keeps_its_people",
+        "nobody_to_send_away",
+        "nowhere_to_arrive",
+    }
+)
+
+
 class PresenceRefused(ValueError):
     """A request the state cannot honour, with the name a caller can act on and why."""
 
     def __init__(self, code: str, detail: str | None = None) -> None:
+        if code not in PRESENCE_REFUSALS:
+            raise ValueError(f"{code!r} is not a presence refusal ({sorted(PRESENCE_REFUSALS)})")
         super().__init__(code if detail is None else f"{code}: {detail}")
         self.code = code
         self.detail = detail

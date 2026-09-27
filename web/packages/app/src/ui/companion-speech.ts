@@ -74,18 +74,18 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
       // Named when a planner call was recorded, unnamed when both attempts raised before any
       // result reached the recorder. Either way it does not mention a search, because there
       // wasn't one.
-      return provenance.plannedBy === null
+      return provenance.plannedByName === null
         ? say('provenance.unreadable')
-        : fill('provenance.unreadableNamed', { model: provenance.plannedBy, duration: spent });
+        : fill('provenance.unreadableNamed', { model: provenance.plannedByName, duration: spent });
 
     case 'search':
       // A model read the question and none wrote the answer. Falling through to
       // `provenance.none` here, which is what this function used to do whenever no composing
       // model was named, printed "No model was asked" over every abstention the interface
       // produced, because the browser sends no plan and the planner therefore always runs.
-      return provenance.plannedBy === null
+      return provenance.plannedByName === null
         ? say('provenance.none')
-        : fill('provenance.search', { model: provenance.plannedBy, duration: spent });
+        : fill('provenance.search', { model: provenance.plannedByName, duration: spent });
 
     case 'undrafted':
       return say('provenance.undrafted');
@@ -99,16 +99,16 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
       // names the classifier; a proposal, shown or not, is only ever credited to the model that
       // drew it.
       const model =
-        provenance.servedModel ?? (provenance.composed === 'refused' ? provenance.plannedBy : null);
+        provenance.servedModelName ?? (provenance.composed === 'refused' ? provenance.plannedByName : null);
       return model === null
         ? say('provenance.proposalNone')
         : fill(`provenance.${provenance.composed}`, { model, duration: spent });
     }
 
     case 'discarded':
-      return provenance.servedModel === null
+      return provenance.servedModelName === null
         ? fill('provenance.discardedUnnamed', { duration: spent })
-        : fill('provenance.discarded', { model: provenance.servedModel, duration: spent });
+        : fill('provenance.discarded', { model: provenance.servedModelName, duration: spent });
 
     // What became of a proposal: a person or the world decided it, and no model did. There was
     // no search either, so the line says only that.
@@ -120,8 +120,8 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
       return say('provenance.corrected');
 
     case 'model': {
-      if (provenance.servedModel === null) return say('provenance.none');
-      const values = { model: provenance.servedModel, duration: spent };
+      if (provenance.servedModelName === null) return say('provenance.none');
+      const values = { model: provenance.servedModelName, duration: spent };
       return fill(
         provenance.usedFallback ? 'provenance.modelOnFallback' : 'provenance.model',
         values,
@@ -172,13 +172,13 @@ export function failedSentence(calls: readonly ModelCall[]): string {
   const ended = [...calls].reverse().find((call) => call.outcome !== 'completed');
   const line = ended === undefined
     ? fill('provenance.failed.afterAnswers', {
-      models: [...new Set(calls.map((call) => call.servedModel ?? call.requestedModel))].join(', '),
+      models: [...new Set(calls.map((call) => call.servedModelName ?? call.requestedModelName))].join(', '),
       duration: spent,
     })
     : fill(
       // Never "was asked" of a request that was never sent.
       ended.costBasis === 'not_sent' ? 'provenance.failed.not_sent' : `provenance.failed.${ended.outcome}`,
-      { model: ended.requestedModel, duration: spent },
+      { model: ended.requestedModelName, duration: spent },
     );
   return calls.some((call) => call.costBasis === 'unknown')
     ? `${line} ${say('provenance.costUnknown')}`

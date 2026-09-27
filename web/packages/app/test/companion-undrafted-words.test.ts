@@ -39,8 +39,8 @@ const ACKNOWLEDGE = {
 /** The classifier's call, which is the only one a not-drafted outcome carries. */
 const classified = {
   role: 'structured_extraction',
-  requestedModel: CLASSIFIER,
-  servedModel: CLASSIFIER,
+  requestedModel: CLASSIFIER, requestedModelName: CLASSIFIER,
+  servedModel: CLASSIFIER, servedModelName: CLASSIFIER,
   usedFallback: false,
   attempts: 1,
   latencyMs: 1100,

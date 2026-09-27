@@ -157,6 +157,7 @@ class SocietyRepository:
                     seed,
                     minimum_population=engine.population_minimum,
                     maximum_population=engine.population_maximum,
+                    profile=profile,
                 )
             else:
                 if initial_input is None:

@@ -40,9 +40,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Final
 
 from exulanica.grammar.catalogs import (
@@ -62,6 +63,10 @@ if TYPE_CHECKING:
     from exulanica.world.object_catalog import WorldObjectCatalog
 
 __all__ = [
+    "ACTIVITY_SETTINGS",
+    "AFFORDANCE_CATALOG",
+    "AFFORDANCE_DIGESTS",
+    "AFFORDANCE_REASON_CODES",
     "COMPARISON_PROTOCOL_CATALOG",
     "COMPARISON_SEEDS_CATALOG",
     "COMPARISON_VERSIONS",
@@ -71,6 +76,8 @@ __all__ = [
     "DECISION_CONTRACT_VERSIONS",
     "DECISION_POLICY_ASKS_IN_A_MODELS_OWN_ORDER",
     "DECISION_POLICY_CATALOG",
+    "LEGACY_IDENTITY_CATALOG",
+    "LEGACY_IDENTITY_DIGESTS",
     "PERSON_SCORE_CATALOG",
     "PURPOSEFUL_CATALOG",
     "PURPOSEFUL_ROUTINE_VERSIONS",
@@ -78,14 +85,17 @@ __all__ = [
     "ROUTINE_VERSIONS",
     "UNRECORDED_ROUTINE_VERSIONS",
     "Activity",
+    "ActivityKind",
     "CapacityRule",
     "ComparisonCatalogs",
+    "LegacyIdentity",
     "Need",
     "PurposefulActivity",
     "PurposefulRoutine",
     "RoutineModel",
     "UseClass",
     "check_object_kinds",
+    "legacy_identity",
     "load_comparison_catalogs",
     "load_decision_catalogs",
     "load_purposeful_routine",
@@ -114,6 +124,23 @@ PURPOSEFUL_ROUTINE_VERSIONS: Final = {PURPOSEFUL_CATALOG: 2}
 #: The purposeful routine an input that records none is read under: every input composed before
 #: inputs recorded a routine, and every district input, keeps the rules it was recorded with.
 UNRECORDED_ROUTINE_VERSIONS: Final = {PURPOSEFUL_CATALOG: 1}
+#: What the society records of each kind of activity a purposeful routine offers: the reason codes
+#: a goal carries and the outcome a finished stay records. Each entry names the purposeful routine
+#: versions it serves, so a recorded routine always resolves the same entries; changing a code is a
+#: new version, served to a new routine version. What is said of each kind is the words catalog's
+#: (``society-words/society-activity-words``), which changes without a version of this one.
+AFFORDANCE_CATALOG: Final = "society-affordance"
+#: The digest of each published version, which the loader refuses a file to differ from: the codes
+#: in it are recorded in stored societies, and a replay must produce them unchanged.
+#: The names, roles, weather and resources the first three engine profiles give a new society:
+#: a published version is frozen by its digest, because every stored genesis of those profiles
+#: hashes its values, and each version names the profiles it serves.
+LEGACY_IDENTITY_CATALOG: Final = "society-legacy-identity"
+LEGACY_IDENTITY_DIGESTS: Final = {
+    1: "5f8c5a040fe346e7fe61b22f20e3210507f4828d6fc1c93690cb909d09aee455"
+}
+LEGACY_IDENTITY_KINDS: Final = ("profile", "role", "first_name", "last_name", "weather", "resource")
+AFFORDANCE_DIGESTS: Final = {1: "ca280468cc1051bd5f4dfadc72625c9b14be9a9fdeec840b72696349a2d0986b"}
 #: The contract a model answers under when it runs a person: what it may be asked to do, and the
 #: bounds on asking. A new decision request records these versions, and a stored one the versions
 #: it was asked under, each published beside the next, so every request replays as it was asked.
@@ -209,6 +236,32 @@ _MINUTE = integer_field(0, MINUTES_PER_DAY)
 _TICKS = integer_field(1, MINUTES_PER_DAY)
 #: A reach or a spacing on a saved world's ground, bounded as every reach is (``MAX_REACH_MM``).
 _REACH = integer_field(0, 10_000)
+
+
+def _optional_key(where: str, value: object) -> FieldValue:
+    """A lowercase key, or ``none`` where the entry has nothing of that kind."""
+    return _key(where, value)
+
+
+def _routine_versions(where: str, value: object) -> FieldValue:
+    if (
+        not isinstance(value, list)
+        or not value
+        or not all(type(v) is str and v.isdigit() and v[0] != "0" for v in value)
+        or value != sorted(set(value), key=int)
+    ):
+        raise CatalogError(f"{where} lists purposeful routine versions as ascending whole numbers")
+    return tuple(value)
+
+
+def _affordance_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    # The planner sends somebody to the nearest place of an object activity under any routine when
+    # a goal policy names no preferred target, so every object activity states that reason.
+    objects = values["setting"] == "object"
+    if objects == (values["nearest_reason"] == NO_KIND):
+        raise CatalogError(f"{where}: exactly an object activity states a nearest reason")
+    if not objects and values["needed_reason"] != NO_KIND:
+        raise CatalogError(f"{where}: only an object activity is needed")
 
 
 def _need_bounds(where: str, values: dict[str, FieldValue]) -> None:
@@ -392,6 +445,30 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         )
         for version in (1, 2)
     },
+    (LEGACY_IDENTITY_CATALOG, 1): CatalogSchema(
+        LEGACY_IDENTITY_CATALOG,
+        1,
+        (
+            ("kind", _choice(LEGACY_IDENTITY_KINDS)),
+            ("text", text_field),
+            ("milli", integer_field(0, 10**6)),
+            ("reason", text_field),
+        ),
+    ),
+    (AFFORDANCE_CATALOG, 1): CatalogSchema(
+        AFFORDANCE_CATALOG,
+        1,
+        (
+            ("setting", _choice(PURPOSEFUL_SETTINGS)),
+            ("routine_versions", _routine_versions),
+            ("drawn_reason", _key),
+            ("needed_reason", _optional_key),
+            ("nearest_reason", _optional_key),
+            ("completed_outcome", _key),
+            ("reason", text_field),
+        ),
+        entry_check=_affordance_bounds,
+    ),
     **{
         (DECISION_ACTION_CATALOG, version): CatalogSchema(
             DECISION_ACTION_CATALOG,
@@ -554,12 +631,44 @@ class PurposefulActivity:
 
 
 @dataclass(frozen=True, slots=True)
+class ActivityKind:
+    """What the society records of one kind of activity (``society-affordance``): the codes a goal
+    and a finished stay carry, which stored societies record. What is said of it is the words
+    catalog's (``society-words/society-activity-words``), which may change without a new version.
+
+    ``nearest_reason`` is stated for every activity at an object, because the planner sends
+    somebody to the nearest one under any routine when a goal policy names no preferred target,
+    and is ``None`` for an open or pair activity; ``needed_reason`` is ``None`` for a kind no need
+    prefers.
+    """
+
+    key: str
+    setting: str
+    #: The purposeful routine versions this entry serves.
+    routine_versions: tuple[int, ...]
+    drawn_reason: str
+    needed_reason: str | None
+    nearest_reason: str | None
+    completed_outcome: str
+
+
+@dataclass(frozen=True, slots=True)
 class PurposefulRoutine:
     """The activities of one purposeful routine version, looked up as the planner asks for them."""
 
     activities: Mapping[str, PurposefulActivity]
     versions: Mapping[str, int]
     sha256: str
+    #: Each kind of activity this routine offers, by affordance for an object activity and by its
+    #: own key for an open or pair one. Not part of ``sha256``: it is resolved from the version.
+    kinds: Mapping[str, ActivityKind] = field(default_factory=dict)
+
+    def kind(self, key: str) -> ActivityKind:
+        """What the society records of ``key``, or a refusal naming a kind this routine lacks."""
+        try:
+            return self.kinds[key]
+        except KeyError:
+            raise CatalogError(f"this purposeful routine offers no activity {key!r}") from None
 
     def binding(self) -> dict[str, object]:
         """What an input records about the routine it was composed under."""
@@ -797,8 +906,71 @@ def load_purposeful_routine(
             "every affordance a kind entry offers has an entry for every kind without its own"
         )
     return PurposefulRoutine(
-        activities=activities, versions=chosen, sha256=catalog_digest(catalogs)
+        activities=activities,
+        versions=chosen,
+        sha256=catalog_digest(catalogs),
+        kinds=_activity_kinds(directory, chosen[PURPOSEFUL_CATALOG], activities),
     )
+
+
+@cache
+def _published_activity_kinds(directory: Path) -> tuple[ActivityKind, ...]:
+    """Every entry of every published affordance catalog version, each version held to the digest
+    it was published with."""
+    kinds = []
+    for version, digest in sorted(AFFORDANCE_DIGESTS.items()):
+        catalog = load_catalog(
+            directory.joinpath(f"{AFFORDANCE_CATALOG}.v{version}.json"),
+            SCHEMAS[(AFFORDANCE_CATALOG, version)],
+        )
+        if catalog_digest([catalog]) != digest:
+            raise CatalogError(
+                f"{AFFORDANCE_CATALOG} v{version} is published and stored societies record its "
+                "codes: a change is a new version, never an edit to this one"
+            )
+        kinds.extend(
+            ActivityKind(
+                key,
+                str(v["setting"]),
+                tuple(int(n) for n in v["routine_versions"]),  # type: ignore[union-attr]
+                str(v["drawn_reason"]),
+                None if v["needed_reason"] == NO_KIND else str(v["needed_reason"]),
+                None if v["nearest_reason"] == NO_KIND else str(v["nearest_reason"]),
+                str(v["completed_outcome"]),
+            )
+            for key, v in _values(catalog).items()
+        )
+    return tuple(kinds)
+
+
+def _activity_kinds(
+    directory: Path, routine_version: int, activities: Mapping[str, PurposefulActivity]
+) -> dict[str, ActivityKind]:
+    """Every kind of activity one routine version offers, each resolved to exactly one entry of
+    one published affordance catalog version that names the routine version."""
+    offered = {
+        (a.affordance if a.setting == "object" else a.key): a.setting for a in activities.values()
+    }
+    found: dict[str, ActivityKind] = {}
+    for kind in _published_activity_kinds(directory):
+        if routine_version not in kind.routine_versions:
+            continue
+        if kind.key in found:
+            raise CatalogError(f"two {AFFORDANCE_CATALOG} entries serve {kind.key!r}")
+        found[kind.key] = kind
+    stated = {key: kind.setting for key, kind in found.items()}
+    if stated != offered:
+        raise CatalogError(
+            f"purposeful routine v{routine_version} offers {sorted(offered.items())}, and "
+            f"{AFFORDANCE_CATALOG} states {sorted(stated.items())} for it"
+        )
+    for activity in activities.values():
+        kind = found[activity.affordance if activity.setting == "object" else activity.key]
+        if activity.preferred_at_need and kind.needed_reason is None:
+            raise CatalogError(
+                f"{activity.key} is preferred at a need, and {kind.key} states no needed reason"
+            )
+    return found
 
 
 def load_decision_catalogs(
@@ -913,3 +1085,76 @@ def purposeful_routine(versions: Mapping[str, int] | None = None) -> PurposefulR
     return _purposeful(
         tuple(sorted((str(k), int(v)) for k, v in chosen.items())), ROUTINE_DIRECTORY
     )
+
+
+#: Every reason code a goal may carry for a kind of activity, in any published version: the
+#: planner's ``REASON_CODES`` includes them, so the browser has words for each.
+AFFORDANCE_REASON_CODES: Final = frozenset(
+    code
+    for kind in _published_activity_kinds(ROUTINE_DIRECTORY)
+    for code in (kind.drawn_reason, kind.needed_reason, kind.nearest_reason)
+    if code is not None
+)
+
+
+def _settings_by_kind(directory: Path = ROUTINE_DIRECTORY) -> dict[str, str]:
+    """Each kind of activity any published version states, by its key, with its setting: every
+    version that states a kind gives it the same setting."""
+    found: dict[str, str] = {}
+    for kind in _published_activity_kinds(directory):
+        if found.setdefault(kind.key, kind.setting) != kind.setting:
+            raise CatalogError(f"two {AFFORDANCE_CATALOG} versions set {kind.key!r} differently")
+    return found
+
+
+#: Each kind of activity by its key, with its setting: the kinds the words catalog words.
+ACTIVITY_SETTINGS: Final = MappingProxyType(_settings_by_kind())
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyIdentity:
+    """What a v1 to v3 society's genesis gives its people and its world, from one version."""
+
+    roles: tuple[str, ...]
+    first_names: tuple[str, ...]
+    last_names: tuple[str, ...]
+    weather: Mapping[str, object]
+    resources: Mapping[str, int]
+
+
+@cache
+def legacy_identity(profile: str, directory: Path = ROUTINE_DIRECTORY) -> LegacyIdentity:
+    """The identity catalog version serving ``profile``, held to its published digest, or a
+    refusal naming a profile no version serves."""
+    for version, digest in sorted(LEGACY_IDENTITY_DIGESTS.items()):
+        catalog = load_catalog(
+            directory.joinpath(f"{LEGACY_IDENTITY_CATALOG}.v{version}.json"),
+            SCHEMAS[(LEGACY_IDENTITY_CATALOG, version)],
+        )
+        if catalog_digest([catalog]) != digest:
+            raise CatalogError(
+                f"{LEGACY_IDENTITY_CATALOG} v{version} is published and stored societies hash its "
+                "values: a change is a new version, never an edit to this one"
+            )
+        entries = _values(catalog)
+
+        def of(
+            kind: str, entries: dict[str, dict[str, FieldValue]] = entries
+        ) -> list[tuple[str, dict[str, FieldValue]]]:
+            return [(key, v) for key, v in entries.items() if v["kind"] == kind]
+
+        if profile not in {str(v["text"]) for _, v in of("profile")}:
+            continue
+        (weather,) = (v for _, v in of("weather"))
+        return LegacyIdentity(
+            roles=tuple(str(v["text"]) for _, v in of("role")),
+            first_names=tuple(str(v["text"]) for _, v in of("first_name")),
+            last_names=tuple(str(v["text"]) for _, v in of("last_name")),
+            weather=MappingProxyType(
+                {"kind": str(weather["text"]), "temperature_c_milli": int(weather["milli"])}  # type: ignore[arg-type]
+            ),
+            resources=MappingProxyType(
+                {key: int(v["milli"]) for key, v in of("resource")}  # type: ignore[arg-type]
+            ),
+        )
+    raise CatalogError(f"no {LEGACY_IDENTITY_CATALOG} version serves the profile {profile!r}")

@@ -56,6 +56,11 @@ RUN uv sync --locked --no-dev --no-editable \
  && rm /usr/local/bin/uv
 COPY assets/textures/manifest.json assets/textures/catalog.json /opt/exulanica/assets/textures/
 COPY assets/textures/objects /opt/exulanica/assets/textures/objects
+# The versioned catalogs, linked to where the installed package reads them (site-packages): the
+# bake command's import reads the society's routine. `tests/test_image_ships_import_reads.py`
+# holds both lines.
+COPY assets/catalogs /opt/exulanica/assets/catalogs
+RUN ln -s /opt/exulanica/assets "$(/opt/exulanica/.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/assets"
 RUN groupadd --system --gid 10001 exulanica \
  && useradd --system --uid 10001 --gid 10001 --home-dir /opt/exulanica --no-create-home exulanica \
  && mkdir -p /var/lib/exulanica && chown exulanica:exulanica /var/lib/exulanica

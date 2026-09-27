@@ -5,8 +5,9 @@
 (``web/packages/app/test/society-words-parity.test.ts``).
 This reads the planner's own source for every code it can write: the reason a person is blocked
 for, the reason of every event it emits, every ``"reason"`` in an action or goal it builds, and
-every code a reason is assigned from. A code written anywhere else, or a code in the set the
-planner no longer writes, fails here.
+every code a reason is assigned from, with the reasons each kind of activity states in its catalog
+(``society-affordance``), which the planner reads rather than writes. A code written anywhere else,
+or a code in the set the planner no longer writes, fails here.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from exulanica.world import society_planner
+from exulanica.world.society_catalogs import AFFORDANCE_REASON_CODES
 from exulanica.world.society_input_policy import LOCAL_RECORD_REASONS
 from exulanica.world.society_planner import REASON_CODES
 
@@ -63,24 +65,16 @@ def recorded() -> set[str]:
                 )
                 if named or keyed:
                     found.update(_literals(node.value))
-        elif (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == "DRAWN_REASONS"
-            and isinstance(node.value, ast.Dict)
-        ):
-            for value in node.value.values:
-                found.update(_literals(value))
     return found
 
 
 def test_the_scan_finds_codes_the_planner_is_known_to_record():
     """A positive control: a scan that found nothing would pass the equality below vacuously."""
     found = recorded()
-    assert {"restore_need", "no_room_at_destination", "stopped_to_talk", "partner_left"} <= found
+    assert {"making_room", "no_room_at_destination", "talking", "partner_left"} <= found
 
 
 def test_the_planner_records_exactly_the_stated_reason_codes():
     local = set().union(*LOCAL_RECORD_REASONS.values())
-    assert recorded() | local == REASON_CODES
+    assert recorded() | local | AFFORDANCE_REASON_CODES == REASON_CODES
     assert local <= REASON_CODES

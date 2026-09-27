@@ -42,6 +42,30 @@ class ActionDisposition:
     reason: str
 
 
+#: Every name a directed request is refused or found stale by, stated once: the page has words for
+#: exactly these (``REFUSAL_WORDS`` in web/packages/app/src/ui/society-directed-action.ts, held to
+#: this set by code-words-parity.test.ts), and tests/test_society_action_refusals.py fails when
+#: ``_request_reason`` returns a name outside it.
+ACTION_REFUSALS: Final = frozenset(
+    {
+        "action_context_changed",
+        "canonical_target_changed",
+        "destination_full",
+        "inhabitant_action_in_progress",
+        "inhabitant_already_there",
+        "target_unreachable",
+        "unknown_inhabitant",
+    }
+)
+
+
+class UnknownAffordance(ValueError):
+    """A perform request naming an activity at an object the society's recorded routine does not
+    offer. Standing and talking happen at no object, so nobody is directed to perform them."""
+
+    code: Final = "unknown_affordance"
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
@@ -269,6 +293,11 @@ def build_action_request(
         and state.get("input_sha256") == document["document_sha256"],
         "advance queued inputs before requesting an action",
     )
+    if intent.kind == "perform" and intent.affordance not in routine_of(document).affordances:
+        raise UnknownAffordance(
+            f"the routine this society records offers no activity at an object named "
+            f"{intent.affordance!r}"
+        )
     target = _target(document, intent.target_id)
     _require(target is not None, "unknown canonical target")
     request = {

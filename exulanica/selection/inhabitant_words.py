@@ -22,8 +22,14 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica.grammar.catalogs import CatalogSchema, load_catalog, text_field
+from exulanica.world.society_catalogs import ACTIVITY_SETTINGS
+
 __all__ = [
+    "ACTIVITY_WORDS",
+    "ACTIVITY_WORDS_PATH",
     "CATALOG_PATH",
+    "ActivityWords",
     "InhabitantWords",
     "InhabitantWordsCatalog",
     "WordsCatalogRefused",
@@ -38,6 +44,53 @@ CATALOG_PATH: Final = (
     / "society-words"
     / "society-inhabitant-words.v1.json"
 )
+
+ACTIVITY_WORDS_PATH: Final = CATALOG_PATH.with_name("society-activity-words.v1.json")
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityWords:
+    """What the inspector and the Companion say of one kind of activity: the ``doing`` entries of
+    the words catalog for walking to it, being at it and having finished it."""
+
+    key: str
+    setting: str
+    heading_doing: str
+    under_way_doing: str
+    finished_doing: str
+
+
+def _activity_words(path: Path = ACTIVITY_WORDS_PATH) -> dict[str, ActivityWords]:
+    """Every kind of activity the society records, with its words, or a refusal naming a kind
+    that has none or words for a kind nothing records.
+
+    Words are not replayed, so this catalog is corrected in place; the codes stored societies
+    record stay in ``society-affordance``, whose published versions never change.
+    """
+    stages = ("heading_doing", "under_way_doing", "finished_doing")
+    page = ("verb", "verb_at_place", "direct_label", "direct_default", "marker_label")
+    schema = CatalogSchema(
+        "society-activity-words",
+        1,
+        tuple((name, text_field) for name in (*stages, *page, "reason")),
+    )
+    catalog = load_catalog(path, schema)
+    found = {}
+    for entry in catalog.entries:
+        values = dict(entry.values)
+        setting = ACTIVITY_SETTINGS.get(entry.key)
+        if setting is None:
+            raise WordsCatalogRefused(f"words for {entry.key!r}, which no activity catalog states")
+        if any((setting == "object") == (values[name] == "none") for name in page):
+            raise WordsCatalogRefused(
+                f"{entry.key}: exactly an activity at an object has page words"
+            )
+        found[entry.key] = ActivityWords(entry.key, setting, *(str(values[s]) for s in stages))
+    missing = sorted(set(ACTIVITY_SETTINGS) - set(found))
+    if missing:
+        raise WordsCatalogRefused(f"no words for the activities {missing}")
+    return found
+
 
 #: The kinds of entry the catalog holds, each read into its own table below. A kind outside these
 #: is refused rather than ignored, so an entry nothing reads cannot ship.
@@ -56,6 +109,10 @@ _KINDS: Final = (
 
 class WordsCatalogRefused(ValueError):
     """The words catalog does not have the shape its readers need."""
+
+
+#: What is said of each kind of activity, by its key (``_activity_words``).
+ACTIVITY_WORDS: Final = _activity_words()
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,26 +219,25 @@ def inhabitant_words(
         chosen = "waiting"
     elif kind == "move":
         goal_kind = goal.get("kind") if goal is not None else None
-        if goal_kind == "stand":
-            chosen = "walking_to_stand"
-        elif goal_kind == "talk":
-            chosen = "walking_to_talk"
+        heading = ACTIVITY_WORDS.get(goal_kind) if isinstance(goal_kind, str) else None
+        if heading is not None and heading.setting != "object":
+            chosen = heading.heading_doing
         elif goal_kind == "make_room" or action.get("target_id") is None:
             chosen = "walking_to_free_spot"
+        elif heading is not None:
+            chosen = heading.heading_doing
         else:
-            chosen = "walking_to_rest" if goal_kind == "rest" else "walking_to_visit"
-    elif kind in ("rest", "visit"):
-        stem = "resting" if kind == "rest" else "visiting"
-        chosen = f"finished_{stem}" if completed else stem
-    elif kind == "stand":
-        chosen = "finished_standing" if completed else "standing"
-    elif kind == "talk":
+            # A goal no kind of activity states: nothing is said of it rather than a guess.
+            chosen = "nothing_recorded"
+    elif isinstance(kind, str) and kind in ACTIVITY_WORDS:
+        activity = ACTIVITY_WORDS[kind]
         chosen = (
-            "finished_talking"
+            activity.finished_doing
             if completed
+            # Only a pair activity waits for the other person, by the planner's own code.
             else "waiting_to_talk"
             if action.get("reason") == "waiting_for_partner"
-            else "talking"
+            else activity.under_way_doing
         )
     elif completed:
         chosen = "standing_aside"
@@ -193,6 +249,10 @@ def inhabitant_words(
     # The goal says why a person set out. Once they are blocked, the action says why; so it does
     # for standing and talking, under way or over, where only the action knows whether the other
     # person is still on the way, is there, or has gone.
-    acting = status == "blocked" or kind in ("stand", "talk")
+    acting = status == "blocked" or (
+        isinstance(kind, str)
+        and kind in ACTIVITY_WORDS
+        and ACTIVITY_WORDS[kind].setting != "object"
+    )
     code = goal["reason"] if not acting and goal is not None else action.get("reason", "")
     return InhabitantWords(who, what, doing, phrase["because"].format(reason=words.reason(code)))

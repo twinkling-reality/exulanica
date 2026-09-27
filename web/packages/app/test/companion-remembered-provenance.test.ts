@@ -49,11 +49,20 @@ const WHERE = { baseUrl: 'https://exulanica.test/api', token: 'not-a-real-token'
 const CLASSIFIER = 'deepseek-ai/DeepSeek-V4-Flash-0731';
 const DRAFTER = 'Qwen/Qwen3-235B-A22B-Instruct-2507';
 const COMPOSER = 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B';
+/** The names the server serves for them (`Manifest.model_name`), which the lines print. */
+const NAMES: Readonly<Record<string, string>> = {
+  [CLASSIFIER]: 'DeepSeek V4 Flash',
+  [DRAFTER]: 'Qwen3 235B Instruct',
+  [COMPOSER]: 'Nemotron 3 Nano 30B',
+};
+const named = (id: string | null): string | null => (id === null ? null : (NAMES[id] ?? id));
 
 const call = (servedModel: string, latencyMs: number, over: Partial<ModelCall> = {}): ModelCall => ({
   role: 'structured_extraction',
   requestedModel: servedModel,
   servedModel,
+  requestedModelName: NAMES[servedModel]!,
+  servedModelName: NAMES[servedModel]!,
   usedFallback: false,
   attempts: 1,
   latencyMs,
@@ -71,6 +80,8 @@ function fresh(
   provenance: Partial<CompanionAnswer['provenance']>,
   over: Partial<CompanionAnswer> = {},
 ): CompanionAnswer {
+  const servedModel = provenance.servedModel ?? null;
+  const plannedBy = provenance.plannedBy ?? null;
   return {
     question: `a question answered as ${composed}`,
     clauses: [{ text: `What was said, as ${composed}.`, type: 'meta', citations: [] }],
@@ -81,11 +92,13 @@ function fresh(
     evidence: [],
     provenance: {
       composed,
-      servedModel: null,
-      plannedBy: null,
       latencyMs: 2400,
       usedFallback: false,
       ...provenance,
+      servedModel,
+      plannedBy,
+      servedModelName: named(servedModel),
+      plannedByName: named(plannedBy),
     },
     promptVersion: 'selection-9',
     calls: [],
@@ -137,6 +150,9 @@ function memoryServer() {
         origin: 'asked',
         supersedes: null,
         correction_note: null,
+        // The route serves each model's name beside its identifier.
+        served_model_name: named((body['served_model'] as string | null) ?? null),
+        planned_by_name: named((body['planned_by'] as string | null) ?? null),
       };
       rows.push(row);
       return new Response(JSON.stringify(row), {
@@ -164,7 +180,7 @@ function drawnLine(answer: CompanionAnswer): string {
 
 /** A row as the route serves one, kept before the kind was kept: no kind, nothing unanswered. */
 function keptBefore(over: Partial<PersistedAnswer>): PersistedAnswer {
-  return {
+  const row: Omit<PersistedAnswer, 'servedModelName' | 'plannedByName'> = {
     answerId: 'answer-old',
     askedAtMs: Date.UTC(2026, 8, 20, 9, 0, 0),
     question: 'asked before the kind was kept',
@@ -187,6 +203,7 @@ function keptBefore(over: Partial<PersistedAnswer>): PersistedAnswer {
     unansweredCostUnknown: false,
     ...over,
   };
+  return { ...row, servedModelName: named(row.servedModel), plannedByName: named(row.plannedBy) };
 }
 
 describe('the kinds of answer the page draws', () => {
@@ -230,7 +247,9 @@ describe('a remembered answer, drawn again after a reload', () => {
 
     expect(restored.calls).toEqual([]);
     expect(provenanceParagraph(restored)).toContain(say('provenance.costUnknown'));
-    expect(provenanceParagraph(restored)).toContain(`${COMPOSER}`);
+    expect(provenanceParagraph(restored)).toContain(NAMES[COMPOSER]);
+    // A model is named as a person reads it, never by its identifier.
+    expect(provenanceParagraph(restored)).not.toContain(COMPOSER);
     expect(provenanceParagraph(restored)).toContain('fallback');
   });
 
@@ -247,7 +266,7 @@ describe('a remembered answer, drawn again after a reload', () => {
         answers: [{
           answer_id: 'answer-1', asked_at: '2026-09-26T12:00:00Z', question: 'q', answer_text: 'a',
           abstained: null, deterministic: false, repaired: false, served_model: null,
-          planned_by: null, prompt_version: 'selection-9', latency_ms: 1, origin: 'asked',
+          planned_by: null, served_model_name: null, planned_by_name: null, prompt_version: 'selection-9', latency_ms: 1, origin: 'asked',
           supersedes: null, correction_note: null, citations: [], names: {},
           composed: 'answered_somehow', used_fallback: false, unanswered_attempts: 0,
           unanswered_cost_unknown: false,
@@ -323,7 +342,7 @@ describe('an answer kept before its kind was kept', () => {
     const restored = rememberedAsAnswer(keptBefore({ servedModel: COMPOSER }));
     expect(restored.provenance.usedFallback).toBe(false);
     expect(restored.unanswered).toEqual({ attempts: 0, costUnknown: false });
-    expect(drawnLine(restored)).toBe(`Answered by ${COMPOSER} in 2.4 s.`);
+    expect(drawnLine(restored)).toBe(`Answered by ${NAMES[COMPOSER]} in 2.4 s.`);
   });
 });
 

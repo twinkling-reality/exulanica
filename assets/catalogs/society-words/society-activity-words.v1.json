@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-activity-words",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "rest",
+      "heading_doing": "walking_to_rest",
+      "under_way_doing": "resting",
+      "finished_doing": "finished_resting",
+      "verb": "rest",
+      "verb_at_place": "rest at {place}",
+      "direct_label": "Rest at {place}",
+      "direct_default": "Direct selected inhabitant to rest here",
+      "marker_label": "Rest pad · {node}",
+      "reason": "Authored: what the inspector, the Companion and the page say of resting at an object: the society words entries for walking there, being there and having finished, and the page's words for directing someone to rest and for a rest place's marker.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society words; see the entry reason"
+      }
+    },
+    {
+      "key": "visit",
+      "heading_doing": "walking_to_visit",
+      "under_way_doing": "visiting",
+      "finished_doing": "finished_visiting",
+      "verb": "visit",
+      "verb_at_place": "visit {place}",
+      "direct_label": "Visit {place}",
+      "direct_default": "Direct selected inhabitant to visit here",
+      "marker_label": "Exterior visit marker",
+      "reason": "Authored: what the inspector, the Companion and the page say of visiting an object: the society words entries for walking there, being there and having finished, and the page's words for directing someone to visit and for a visit place's marker.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society words; see the entry reason"
+      }
+    },
+    {
+      "key": "stand",
+      "heading_doing": "walking_to_stand",
+      "under_way_doing": "standing",
+      "finished_doing": "finished_standing",
+      "verb": "none",
+      "verb_at_place": "none",
+      "direct_label": "none",
+      "direct_default": "none",
+      "marker_label": "none",
+      "reason": "Authored: what the inspector and the Companion say of standing a while in the open. It is at no object, so the page has no words for directing someone to it or marking it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society words; see the entry reason"
+      }
+    },
+    {
+      "key": "talk",
+      "heading_doing": "walking_to_talk",
+      "under_way_doing": "talking",
+      "finished_doing": "finished_talking",
+      "verb": "none",
+      "verb_at_place": "none",
+      "direct_label": "none",
+      "direct_default": "none",
+      "marker_label": "none",
+      "reason": "Authored: what the inspector and the Companion say of two people stopping to talk. It is at no object, so the page has no words for directing someone to it or marking it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society words; see the entry reason"
+      }
+    }
+  ]
+}

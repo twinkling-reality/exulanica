@@ -1,0 +1,399 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-legacy-identity",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "profile_v1",
+      "kind": "profile",
+      "text": "exulanica-society/v1",
+      "milli": 0,
+      "reason": "Authored: a society of engine profile v1 draws its people's names and roles, its weather and its resources from this version, as every stored society of that profile already did; its genesis digest depends on each value here.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "profile_v2",
+      "kind": "profile",
+      "text": "exulanica-society/v2",
+      "milli": 0,
+      "reason": "Authored: a society of engine profile v2 draws its people's names and roles, its weather and its resources from this version, as every stored society of that profile already did; its genesis digest depends on each value here.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "profile_v3",
+      "kind": "profile",
+      "text": "exulanica-society/v3",
+      "milli": 0,
+      "reason": "Authored: a society of engine profile v3 draws its people's names and roles, its weather and its resources from this version, as every stored society of that profile already did; its genesis digest depends on each value here.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "role_baker",
+      "kind": "role",
+      "text": "baker",
+      "milli": 0,
+      "reason": "Authored: one of the roles a v1 to v3 society assigns its people by seed, in this order; the order is part of every stored genesis digest, so a role is added only in a new version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "role_designer",
+      "kind": "role",
+      "text": "designer",
+      "milli": 0,
+      "reason": "Authored: one of the roles a v1 to v3 society assigns its people by seed, in this order; the order is part of every stored genesis digest, so a role is added only in a new version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "role_gardener",
+      "kind": "role",
+      "text": "gardener",
+      "milli": 0,
+      "reason": "Authored: one of the roles a v1 to v3 society assigns its people by seed, in this order; the order is part of every stored genesis digest, so a role is added only in a new version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "role_student",
+      "kind": "role",
+      "text": "student",
+      "milli": 0,
+      "reason": "Authored: one of the roles a v1 to v3 society assigns its people by seed, in this order; the order is part of every stored genesis digest, so a role is added only in a new version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "role_steward",
+      "kind": "role",
+      "text": "steward",
+      "milli": 0,
+      "reason": "Authored: one of the roles a v1 to v3 society assigns its people by seed, in this order; the order is part of every stored genesis digest, so a role is added only in a new version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "role_teacher",
+      "kind": "role",
+      "text": "teacher",
+      "milli": 0,
+      "reason": "Authored: one of the roles a v1 to v3 society assigns its people by seed, in this order; the order is part of every stored genesis digest, so a role is added only in a new version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_ari",
+      "kind": "first_name",
+      "text": "Ari",
+      "milli": 0,
+      "reason": "Authored: a first name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_bela",
+      "kind": "first_name",
+      "text": "Bela",
+      "milli": 0,
+      "reason": "Authored: a first name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_cleo",
+      "kind": "first_name",
+      "text": "Cleo",
+      "milli": 0,
+      "reason": "Authored: a first name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_dara",
+      "kind": "first_name",
+      "text": "Dara",
+      "milli": 0,
+      "reason": "Authored: a first name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_emi",
+      "kind": "first_name",
+      "text": "Emi",
+      "milli": 0,
+      "reason": "Authored: a first name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_faye",
+      "kind": "first_name",
+      "text": "Faye",
+      "milli": 0,
+      "reason": "Authored: a first name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_ivo",
+      "kind": "first_name",
+      "text": "Ivo",
+      "milli": 0,
+      "reason": "Authored: a first name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "first_juno",
+      "kind": "first_name",
+      "text": "Juno",
+      "milli": 0,
+      "reason": "Authored: a first name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_ash",
+      "kind": "last_name",
+      "text": "Ash",
+      "milli": 0,
+      "reason": "Authored: a last name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_bell",
+      "kind": "last_name",
+      "text": "Bell",
+      "milli": 0,
+      "reason": "Authored: a last name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_cove",
+      "kind": "last_name",
+      "text": "Cove",
+      "milli": 0,
+      "reason": "Authored: a last name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_dawn",
+      "kind": "last_name",
+      "text": "Dawn",
+      "milli": 0,
+      "reason": "Authored: a last name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_elm",
+      "kind": "last_name",
+      "text": "Elm",
+      "milli": 0,
+      "reason": "Authored: a last name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_fox",
+      "kind": "last_name",
+      "text": "Fox",
+      "milli": 0,
+      "reason": "Authored: a last name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_grove",
+      "kind": "last_name",
+      "text": "Grove",
+      "milli": 0,
+      "reason": "Authored: a last name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "last_hart",
+      "kind": "last_name",
+      "text": "Hart",
+      "milli": 0,
+      "reason": "Authored: a last name a v1 to v3 society gives its people by ordinal, in this order, invented for synthetic people and not anyone's; the order is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "weather",
+      "kind": "weather",
+      "text": "clear",
+      "milli": 19000,
+      "reason": "Authored: the fixed weather a v1 to v3 society records at genesis, clear at 19 degrees Celsius in thousandths; no rule of those engines reads it, and it is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "food_milli",
+      "kind": "resource",
+      "text": "none",
+      "milli": 820,
+      "reason": "Authored: the fixed food level a v1 to v3 society records at genesis, in thousandths; no rule of those engines reads it, and it is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    },
+    {
+      "key": "transit_milli",
+      "kind": "resource",
+      "text": "none",
+      "milli": 760,
+      "reason": "Authored: the fixed transit level a v1 to v3 society records at genesis, in thousandths; no rule of those engines reads it, and it is part of every stored genesis digest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reason"
+      }
+    }
+  ]
+}

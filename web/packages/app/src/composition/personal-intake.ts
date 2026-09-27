@@ -4,7 +4,7 @@ import { ApiError, type GraphSnapshot, type TransportOptions } from '@exulanica/
 import type { SourceMediaCatalog } from '@exulanica/atlas-react/playcanvas';
 import { PersonalAdmissionApi, DEPTH_ROLE, HUMAN_ATTESTATION,
   sha256, type PersonalSource, type PersonalAdmission,
-  type AdmissionResult, type ModelRightOffer, type ModelRightState } from '../personal-admission-api.js';
+  type AdmissionResult, type ModelRightOffer, type ModelRightState, type ServedStanding } from '../personal-admission-api.js';
 import { readOffers, standingControls, standingOf, standingText } from '../ui/model-right-controls.js';
 import { PersonReviewApi, type PersonReview } from '../person-review-api.js';
 import { listBatches, watchBatch } from '../formation.js';
@@ -142,6 +142,8 @@ export function mountPersonalIntake(deps: {
    * replaced on every reload, so a stop that the server refused never looks like it happened.
    */
   const grantedRights = new Map<string, ModelRightState[]>();
+  /** Each offered role's standing per photograph, as the server decided it on the last read. */
+  const servedStandings = new Map<string, readonly ServedStanding[]>();
   /**
    * The rights a person may give, with every word shown for them, as the server last stated them.
    * Empty until the first read and after a read that states none, so nothing can be ticked then.
@@ -287,7 +289,8 @@ export function mountPersonalIntake(deps: {
    */
   function standings(captureId: string): ReturnType<typeof standingOf>[] {
     const rights = grantedRights.get(captureId) ?? [];
-    return offers.map((offer) => standingOf(offer, rights));
+    const served = servedStandings.get(captureId) ?? [];
+    return offers.map((offer) => standingOf(offer, rights, served));
   }
   /**
    * Stop one role for one photograph: every current right it holds there, since the role's chain
@@ -665,8 +668,10 @@ export function mountPersonalIntake(deps: {
     if (disposed) return;
     journal.sources = recovered.sources.filter(s => ids.has(s.capture_id)).map(({ capture_id, sha256, bytes }) => ({ capture_id, sha256, bytes }));
     grantedRights.clear();
+    servedStandings.clear();
     for (const source of recovered.sources) {
       if ((source.model_rights ?? []).length > 0) grantedRights.set(source.capture_id, [...source.model_rights!]);
+      servedStandings.set(source.capture_id, source.model_right_standings ?? []);
     }
     // The words each right is shown with are the server's, read again on every reload. A changed
     // set takes every tick back, so nothing ticked against older words can be sent.

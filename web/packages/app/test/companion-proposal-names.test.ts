@@ -53,8 +53,9 @@ const NAMED = library([
 
 const call = (servedModel: string) => ({
   role: 'structured_extraction',
-  requestedModel: DRAFTER,
+  requestedModel: DRAFTER, requestedModelName: DRAFTER,
   servedModel,
+  servedModelName: servedModel,
   usedFallback: false,
   attempts: 1,
   latencyMs: 1200,

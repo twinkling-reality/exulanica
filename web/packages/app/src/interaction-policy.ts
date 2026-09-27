@@ -7,9 +7,17 @@
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { AtlasPreferences } from './preferences.js';
+import {
+  PREFERENCE_BINDINGS,
+  capabilityValue,
+  preferenceValue,
+  readCapabilities,
+  type InteractionCapability,
+  type InteractionValue,
+} from './interaction-settings.js';
 import { worldPath } from './world-scope.js';
 
-export type InteractionValue = boolean | number | string;
+export type { InteractionValue };
 
 interface InteractionVersionWire {
   readonly version_id: string;
@@ -48,63 +56,33 @@ export interface InteractionPolicyReview {
 
 type IdFactory = () => string;
 
+/** Each bound capability's value in these preferences, as the server is sent it. */
 const settingCapabilities = (
   preferences: AtlasPreferences,
   systemReducedMotion: boolean,
-): Readonly<Record<keyof AtlasPreferences, readonly [string, InteractionValue] | undefined>> => ({
-  version: undefined,
-  regionMinimap: undefined,
-  appearance: undefined,
-  contrast: undefined,
-  transparency: undefined,
-  worldArtProfile: undefined,
-  worldArtProfileVersion: undefined,
-  worldStyleParameters: undefined,
-  fieldOfView: ['comfort.field-of-view-degrees', preferences.fieldOfView],
-  mouseSensitivity: [
-    'comfort.look-sensitivity-milli',
-    Math.round(preferences.mouseSensitivity * 1000),
-  ],
-  vignette: ['comfort.vignette', preferences.vignette],
-  cameraBob: ['comfort.camera-bob', preferences.cameraBob],
-  turnMode: ['navigation.turn-mode', preferences.turnMode],
-  transition: [
-    'navigation.transition-style',
-    preferences.transition === 'system'
-      ? (systemReducedMotion ? 'fade' : 'motion')
-      : preferences.transition,
-  ],
-  companionInitiative: ['initiative.mode', preferences.companionInitiative],
-  companionBody: undefined,
-  companionColor: undefined,
-  companionFace: undefined,
-  companionSide: undefined,
-});
+): ReadonlyMap<string, InteractionValue> => new Map(
+  Object.entries(PREFERENCE_BINDINGS).flatMap(([key, binding]) =>
+    binding === null ? [] : [[key, capabilityValue(binding, preferences, systemReducedMotion)] as const]),
+);
 
 /** Apply a durable server policy without disturbing device-only presentation choices. */
 export function preferencesFromInteractionPolicy(
   local: AtlasPreferences,
   parameters: Readonly<Record<string, InteractionValue>>,
 ): AtlasPreferences {
-  const fieldOfView = parameters['comfort.field-of-view-degrees'];
-  const sensitivity = parameters['comfort.look-sensitivity-milli'];
-  const vignette = parameters['comfort.vignette'];
-  const cameraBob = parameters['comfort.camera-bob'];
-  const turnMode = parameters['navigation.turn-mode'];
-  const transition = parameters['navigation.transition-style'];
-  const initiative = parameters['initiative.mode'];
-  return {
-    ...local,
-    ...(typeof fieldOfView === 'number' ? { fieldOfView } : {}),
-    ...(typeof sensitivity === 'number' ? { mouseSensitivity: sensitivity / 1000 } : {}),
-    ...(vignette === 'off' || vignette === 'subtle' || vignette === 'strong' ? { vignette } : {}),
-    ...(typeof cameraBob === 'boolean' ? { cameraBob } : {}),
-    ...(turnMode === 'smooth' || turnMode === 'snap' ? { turnMode } : {}),
-    ...(transition === 'motion' || transition === 'fade' ? { transition } : {}),
-    ...(initiative === 'normal' || initiative === 'minimal' || initiative === 'off'
-      ? { companionInitiative: initiative }
-      : {}),
-  };
+  const held: Record<string, InteractionValue> = {};
+  for (const [key, binding] of Object.entries(PREFERENCE_BINDINGS)) {
+    if (binding === null || !(key in parameters)) continue;
+    // A value the registry refuses leaves the device's own preference as it is.
+    const value = preferenceValue(key, parameters[key]);
+    if (value !== undefined) held[binding.field] = value;
+  }
+  return { ...local, ...held } as AtlasPreferences;
+}
+
+/** The reviewed capabilities the server serves, which the settings page draws its controls from. */
+export async function readInteractionCatalog(options: TransportOptions): Promise<readonly InteractionCapability[]> {
+  return readCapabilities(await new Transport(options).getJson<unknown>('/world/interactions/catalog'));
 }
 
 export class InteractionPolicyClient {
@@ -134,12 +112,10 @@ export class InteractionPolicyClient {
     const next = settingCapabilities(after, systemReducedMotion);
     const capabilityPatch: Record<string, InteractionValue> = {};
     const controls: string[] = [];
-    for (const key of Object.keys(next) as (keyof AtlasPreferences)[]) {
-      const from = prior[key];
-      const to = next[key];
-      if (to === undefined || (from !== undefined && Object.is(from[1], to[1]))) continue;
-      capabilityPatch[to[0]] = to[1];
-      controls.push(key);
+    for (const [key, to] of next) {
+      if (Object.is(prior.get(key), to)) continue;
+      capabilityPatch[key] = to;
+      controls.push(PREFERENCE_BINDINGS[key]!.field);
     }
     if (controls.length === 0) return this.#sequence;
     const operation = this.#sequence.then(async () => {

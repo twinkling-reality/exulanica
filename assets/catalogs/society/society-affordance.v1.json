@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-affordance",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "rest",
+      "setting": "object",
+      "routine_versions": [
+        "1",
+        "2"
+      ],
+      "drawn_reason": "sitting_a_while",
+      "needed_reason": "needs_a_rest",
+      "nearest_reason": "restore_need",
+      "completed_outcome": "rest_completed",
+      "reason": "Authored: what the society records of resting at an object. A person who draws a rest is sitting_a_while, one whose need has reached the routine's preference needs_a_rest, and one sent to the nearest place goes to restore_need; a finished stay records rest_completed. Stored societies record these codes, so a change is a new version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica purposeful society; see the entry reason"
+      }
+    },
+    {
+      "key": "visit",
+      "setting": "object",
+      "routine_versions": [
+        "1",
+        "2"
+      ],
+      "drawn_reason": "looking_around",
+      "needed_reason": "none",
+      "nearest_reason": "visit_place",
+      "completed_outcome": "visit_completed",
+      "reason": "Authored: what the society records of visiting an object. A person who draws a visit is looking_around, and one sent to the nearest place goes to visit_place; no need makes a person visit, so it has no needed reason. A finished stay records visit_completed.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica purposeful society; see the entry reason"
+      }
+    },
+    {
+      "key": "stand",
+      "setting": "open",
+      "routine_versions": [
+        "2"
+      ],
+      "drawn_reason": "stopping_a_while",
+      "needed_reason": "none",
+      "nearest_reason": "none",
+      "completed_outcome": "stand_completed",
+      "reason": "Authored: what the society records of standing a while in the open. A person who draws it is stopping_a_while, and a finished stand records stand_completed; it is at no object, so nobody is sent to it as the nearest place.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica purposeful society; see the entry reason"
+      }
+    },
+    {
+      "key": "talk",
+      "setting": "pair",
+      "routine_versions": [
+        "2"
+      ],
+      "drawn_reason": "stopped_to_talk",
+      "needed_reason": "none",
+      "nearest_reason": "none",
+      "completed_outcome": "talk_completed",
+      "reason": "Authored: what the society records of two people stopping to talk. A person paired with someone free to is stopped_to_talk, and a finished talk records talk_completed; it is at no object, so nobody is sent to it as the nearest place.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica purposeful society; see the entry reason"
+      }
+    }
+  ]
+}

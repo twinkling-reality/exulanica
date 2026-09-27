@@ -44,6 +44,7 @@ def facts(**overrides) -> StyleStructureFacts:
     values = dict(
         intent=CompatibilityIntent.CLASSIFY,
         world_id="atlas:default",
+        starter_world=False,
         live_style_version_id=LIVE_STYLE,
         live_composed_digest=COMPOSED,
         live_composed_compatibility_key=FAMILY,
@@ -245,6 +246,22 @@ def test_non_authored_world_id_with_sourced_slots_is_not_starter_refuse():
     assert prefix_without_origin.token == "register_topology"
 
 
+def test_a_registration_with_no_stated_kind_is_refused_whatever_its_id_says():
+    """A world's kind is its registry's: an id spelled like a starter's decides nothing."""
+    for world_id in ("world:authored:example", "atlas:default"):
+        unstated = classify_structure_style_compatibility(
+            facts(
+                intent=CompatibilityIntent.REGISTER_TOPOLOGY,
+                world_id=world_id,
+                starter_world=None,
+                proposed_digest="sourced-overlay",
+                proposed_compatibility_key=FAMILY,
+                proposed_has_sourced_slots=True,
+            )
+        )
+        assert (unstated.outcome, unstated.token) == ("refuse", "world_kind_unstated")
+
+
 def test_attachments_cannot_enter_compose_and_expired_members_refuse():
     compose = classify_structure_style_compatibility(
         facts(intent=CompatibilityIntent.COMPOSE, attachments_named=True)
@@ -281,6 +298,7 @@ def test_starter_sourced_activation_and_unknown_snapshot_refuse():
         facts(
             intent=CompatibilityIntent.REGISTER_TOPOLOGY,
             world_id="world:authored:00000000-0000-0000-0000-000000000099",
+            starter_world=True,
             proposed_digest="sourced-overlay",
             proposed_compatibility_key=FAMILY,
             proposed_has_sourced_slots=True,
@@ -293,6 +311,7 @@ def test_starter_sourced_activation_and_unknown_snapshot_refuse():
         facts(
             intent=CompatibilityIntent.REGISTER_TOPOLOGY,
             world_id="world:authored:00000000-0000-0000-0000-000000000099",
+            starter_world=True,
             proposed_digest="different-starter-digest",
             proposed_compatibility_key=FAMILY,
         )

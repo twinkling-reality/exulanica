@@ -6,6 +6,7 @@
  * and missing selection surface an explicit unavailable state instead of inventing a memory.
  */
 
+import { objectActivity } from '../society-activity-words.js';
 import { ApiError } from '@exulanica/graph-client';
 import {
   type SocietyActionAffordance,
@@ -67,9 +68,19 @@ export function describeSocietyActionRecord(record: SocietyActionRecord): string
     + 'This is a synthetic society record, not personal evidence.';
 }
 
-/** Words for a refusal the server names by a code a person would not read as a reason. */
-const REFUSAL_WORDS: Readonly<Record<string, string>> = {
+/**
+ * Words for each name the server refuses a directed request by, or finds it stale by: exactly
+ * `ACTION_REFUSALS` in exulanica/world/society_actions.py, held to it by
+ * code-words-parity.test.ts.
+ */
+export const REFUSAL_WORDS: Readonly<Record<string, string>> = {
+  action_context_changed: 'The world changed since you asked. Look again, then ask again.',
+  canonical_target_changed: 'That place changed since you chose it. Choose it again.',
+  destination_full: 'Every place there is taken. Ask again when someone leaves.',
+  inhabitant_action_in_progress: 'They are in the middle of something and cannot be asked yet.',
   inhabitant_already_there: 'They are already there, using it now.',
+  target_unreachable: 'They cannot reach that place from where they are.',
+  unknown_inhabitant: 'That inhabitant is not in this world any more.',
 };
 
 export function describeSocietyActionFailure(error: unknown): string {
@@ -127,9 +138,7 @@ export function buildSocietyDirectedAction(options: {
   /** What the status says while the control is available and nothing has been asked yet. */
   readonly idleText?: string;
 }): SocietyDirectedActionControl {
-  const label = options.label ?? (options.affordance === 'rest'
-    ? 'Direct selected inhabitant to rest here'
-    : 'Direct selected inhabitant to visit here');
+  const label = options.label ?? objectActivity(options.affordance).directDefault;
   const describe = options.describeRecord ?? describeSocietyActionRecord;
   const button = el('button', { type: 'button', text: label }) as HTMLButtonElement;
   const status = el('p', {

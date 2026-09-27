@@ -163,7 +163,7 @@ export type HistoryEventType =
   | 'entities_merged'
   | 'entity_split'
   | 'event_undone'
-  | 'assertion_committed';
+  | 'entity_renamed';
 
 /**
  * One row of the immutable assertion log (5.4), rendered as History in the entity detail view.

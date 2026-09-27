@@ -56,8 +56,8 @@ const ANSWER: CompanionAnswer = {
   names: { '[place A]': PLACE },
   provenance: {
     composed: 'model',
-    servedModel: 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B',
-    plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+    servedModel: 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B', servedModelName: 'Nemotron 3 Nano 30B',
+    plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507', plannedByName: 'Qwen3 235B Instruct',
     latencyMs: 9800,
     usedFallback: false,
   },

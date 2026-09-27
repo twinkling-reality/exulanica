@@ -12,6 +12,7 @@
  * nobody can reach are the server's numbers and verdicts, never figures kept in the browser.
  */
 
+import { objectActivity } from '../society-activity-words.js';
 import type { AtlasBinding, OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyAffordance, SocietyPlaces, SocietySnapshot } from '../society-api.js';
 import {
@@ -50,13 +51,12 @@ export type PlaceStatus =
   | { readonly kind: 'not-noticed' };
 
 /** The server's reason no inhabitant uses an object, other than being out of reach, in words. */
-const UNUSABLE_WORDS: Readonly<Record<string, string>> = {
+export const UNUSABLE_WORDS: Readonly<Record<string, string>> = {
   authored_object_moves: 'Inhabitants do not use this while it moves.',
   authored_object_off_ground: 'Inhabitants cannot use this: it is not resting on the ground.',
   unsupported_active_behaviour: 'Inhabitants do not use this: they cannot tell where its movement takes it.',
 };
-const UNREACHABLE = 'authored_affordance_unreachable';
-const ACTIVITY_WORDS: Readonly<Record<SocietyAffordance, string>> = { rest: 'rest', visit: 'visit' };
+export const UNREACHABLE = 'authored_affordance_unreachable';
 
 export interface PlaceRow {
   readonly object: InhabitedObject;
@@ -110,7 +110,7 @@ export function placeRows(objects: readonly InhabitedObject[], places: SocietyPl
       // Where the input states places, only that many use it at once and each has room.
       const room = target.placeNodeIds.length === 0 ? null : target.placeNodeIds.length;
       status = { kind: 'usable', affordance: target.affordance, targetId: target.targetId, room };
-      const activity = ACTIVITY_WORDS[target.affordance];
+      const activity = objectActivity(target.affordance).verb;
       words = room === null
         ? `Inhabitants can ${activity} here.`
         : `Inhabitants can ${activity} here, ${room === 1 ? 'one' : room} at a time.`;
@@ -132,7 +132,7 @@ export function placeRows(objects: readonly InhabitedObject[], places: SocietyPl
 }
 
 /** Why the server would not send everyone away or bring them back, by the name it gave. */
-const PRESENCE_WORDS: Readonly<Record<string, string>> = {
+export const PRESENCE_WORDS: Readonly<Record<string, string>> = {
   nobody_to_send_away: 'Nobody is here to send away.',
   already_here: 'They are already here.',
   a_request_is_waiting: 'Someone was just asked to go somewhere, or a model\'s decision for someone waits for '

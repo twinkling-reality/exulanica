@@ -18,6 +18,9 @@
 !assets/textures/manifest.json
 !assets/textures/catalog.json
 !assets/textures/objects
+# The versioned catalogs the package reads, some of them when it is imported: the society's
+# routine, words and identities, and the detector's vocabulary. About 800 KiB.
+!assets/catalogs
 # The gsplat trainer recipe under deploy/gsplat is its own build; it needs only its pinned
 # requirements from this directory.
 !deploy/gsplat/requirements.txt

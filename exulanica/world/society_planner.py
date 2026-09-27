@@ -22,6 +22,7 @@ from exulanica.world.society import (
     society_state_sha256,
 )
 from exulanica.world.society_catalogs import (
+    AFFORDANCE_REASON_CODES,
     ANY_KIND,
     UNRECORDED_ROUTINE_VERSIONS,
     PurposefulActivity,
@@ -85,15 +86,14 @@ FRAME_NAMES = {
 #: Input profiles whose activities state the places their occupants stand at. A society advancing
 #: over one keeps each place to one person and keeps people waiting clear of every place.
 PLACE_INPUTS = (AUTHORED_GROUND_INPUT_V2, AUTHORED_GROUND_INPUT_V3)
-#: Why a person free to choose under a drawn routine goes where it drew, by what it drew.
-DRAWN_REASONS: Final = {"rest": "sitting_a_while", "visit": "looking_around"}
 #: Every reason code the planner records on a goal, an action or an event, stated once: the browser
 #: has words for exactly these (``REASON_WORDS`` in web/packages/app/src/ui/world-inhabitants.ts,
 #: held to this set by society-words-parity.test.ts), and tests/test_society_reason_codes.py fails
 #: when the planner records a code outside it. The last four are why an input says one object's
 #: activity cannot be used (``LOCAL_RECORD_REASONS``). An input that is unavailable as a whole is
-#: carried with its own reason as the input states it, which is not among these.
-REASON_CODES: Final = frozenset(
+#: carried with its own reason as the input states it, which is not among these. Why a person set
+#: out for a kind of activity is that kind's, stated in its catalog (``society-affordance``).
+REASON_CODES: Final = AFFORDANCE_REASON_CODES | frozenset(
     {
         "action_precondition_failed",
         "arrived_at_access_node",
@@ -103,10 +103,8 @@ REASON_CODES: Final = frozenset(
         "current_position_invalidated",
         "following_reachable_route",
         "input_unavailable",
-        "looking_around",
         "made_room",
         "making_room",
-        "needs_a_rest",
         "no_enabled_affordance",
         "no_known_reachable_affordance",
         "no_reachable_affordance",
@@ -115,19 +113,14 @@ REASON_CODES: Final = frozenset(
         "partner_left",
         "place_moved",
         "remembered_target_selected",
-        "restore_need",
         "reviewed_duration_elapsed",
         "route_invalidated",
-        "sitting_a_while",
         "standing_a_while",
         "standing_node_removed",
-        "stopped_to_talk",
-        "stopping_a_while",
         "talking",
         "target_changed",
         "target_disabled_or_removed",
         "validated_model_wait",
-        "visit_place",
         "waiting_for_partner",
         "authored_affordance_unreachable",
         "authored_object_moves",
@@ -645,6 +638,7 @@ def _newcomers(
         population=population,
         minimum_population=engine.population_minimum if authored else DISTRICT_MINIMUM_POPULATION,
         maximum_population=engine.population_maximum,
+        profile=engine_profile,
     )
     for person in state["inhabitants"]:
         node = (
@@ -1657,7 +1651,7 @@ def advance_purposeful_society(
                     # A model's choice for a person records its own code, never the routine's.
                     "reason": "chosen_by_their_model"
                     if chosen is not None and chosen.get("partner_id") == pairing["partner_id"]
-                    else "stopped_to_talk",
+                    else routine.kind(talk.key).drawn_reason,
                     "partner_id": pairing["partner_id"],
                     "duration_ticks": pairing["duration_ticks"],
                 }
@@ -1702,7 +1696,11 @@ def advance_purposeful_society(
                         options.append((stand.key, stand.weight))
                     kind = _weighted(seed, "choose", tick, person["ordinal"], options)
                 if stand is not None and kind == stand.key:
-                    goal = {"kind": stand.key, "target_id": None, "reason": "stopping_a_while"}
+                    goal = {
+                        "kind": stand.key,
+                        "target_id": None,
+                        "reason": routine.kind(stand.key).drawn_reason,
+                    }
                     destination = spot
                 elif kind is not None:
                     pool = [
@@ -1719,7 +1717,9 @@ def advance_purposeful_society(
                     goal = {
                         "kind": target["affordance"],
                         "target_id": target["target_id"],
-                        "reason": "needs_a_rest" if tired == kind else DRAWN_REASONS[kind],
+                        "reason": routine.kind(kind).needed_reason
+                        if tired == kind
+                        else routine.kind(kind).drawn_reason,
                     }
             elif candidates:
                 preferred = _preferred(routine, person["need_milli"]) or max(
@@ -1751,9 +1751,7 @@ def advance_purposeful_society(
                         else "remembered_target_selected"
                     )
                     if policy and target["target_id"] == policy.get("preferred_target_id")
-                    else "restore_need"
-                    if target["affordance"] == "rest"
-                    else "visit_place",
+                    else routine.kind(target["affordance"]).nearest_reason,
                 }
             if goal is None and standing_at is not None:
                 # Somebody who has finished at a place and has nothing else to do steps away to
@@ -1841,9 +1839,9 @@ def advance_purposeful_society(
                 person["action"]["reason"] = "reviewed_duration_elapsed"
                 if target is not None:
                     person["last_completed_target_id"] = target["target_id"]
-                    outcome = target["affordance"] + "_completed"
+                    outcome = routine.kind(target["affordance"]).completed_outcome
                 else:
-                    outcome = person["action"]["kind"] + "_completed"
+                    outcome = routine.kind(person["action"]["kind"]).completed_outcome
                 # What a stay relieves is the routine's it began under, carried with it; a stay
                 # begun under an input that records no routine carries nothing and relieves what
                 # that routine gives its affordance.

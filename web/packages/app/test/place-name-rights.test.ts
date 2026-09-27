@@ -362,7 +362,7 @@ describe('a Companion answer', () => {
       repaired: false,
       evidence: [],
       places: [PLACE],
-      provenance: { composed: 'search', servedModel: null, plannedBy: null, latencyMs: 0, usedFallback: false },
+      provenance: { composed: 'search', servedModel: null, servedModelName: null, plannedBy: null, plannedByName: null, latencyMs: 0, usedFallback: false },
       promptVersion: 'selection-5',
       calls: [],
     } as CompanionAnswer;

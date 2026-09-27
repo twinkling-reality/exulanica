@@ -65,7 +65,8 @@ import { aboutWorld, aboutWorldLayers } from '../world-about.js';
 import '../ui/living-world-inspector.css';
 import type { CompanionSocietyContext, SimulationCitation, SocietyQuestion } from '../companion-ask-api.js';
 import { drawSimulated, type SimulatedReferences, type SocietyNames } from '../companion-simulated.js';
-import { phrase } from '../society-inhabitant-words.js';
+import { outcomeWords, phrase } from '../society-inhabitant-words.js';
+import { ACTION_LABELS, ACTIVITY_LABELS, filled, objectActivity } from '../society-activity-words.js';
 import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
 import {
   OBJECT_ROLE_LABELS,
@@ -88,12 +89,11 @@ const RECORDING_SPEEDS = [
   [10, '10 times faster'],
   [60, '60 times faster'],
 ] as const;
-const ACTIVITY_LABELS: Readonly<Record<string, string>> = {
-  idle: 'waiting', move: 'walking', stroll: 'pausing on a walk', visit: 'visiting', rest: 'resting',
-  eat_at_home: 'eating at home', eat_out: 'eating out', shop: 'shopping', sleep: 'sleeping',
-  stay_home: 'at home', work: 'working',
-};
-const activityLabel = (kind: string): string => ACTIVITY_LABELS[kind] ?? kind.replaceAll('_', ' ');
+/** What became of a directed request, in the words the society's own outcome states. */
+const dispositionWords = (disposition: string): string =>
+  outcomeWords(`action_request_${disposition}`) ?? 'did not take up your request, for a reason the page has no words for';
+const activityLabel = (kind: string): string =>
+  ACTIVITY_LABELS.get(kind) ?? ACTION_LABELS[kind] ?? `an activity the page has no words for (${kind})`;
 /**
  * While a world plays on its own the page reads its playback control about every two seconds, a
  * cheap read, and reads the society only when the control says the tick moved. A pace faster than
@@ -701,16 +701,16 @@ export function mountEnvironmentSelection(
   }
 
   /** How a directed action is said in a person's own world: what happens, not its receipt. */
-  function plainRecord(place: string, affordance: 'visit' | 'rest') {
-    const verb = affordance === 'rest' ? 'rest at' : 'visit';
+  function plainRecord(place: string, affordance: string) {
+    const verb = filled(objectActivity(affordance).verbAtPlace, { place });
     return (record: SocietyActionRecord): string => {
       if (record.status === 'pending') {
-        return `Asked to ${verb} ${place}. They set off at the next simulated minute. This is simulation, not a memory.`;
+        return `Asked to ${verb}. They set off at the next simulated minute. This is simulation, not a memory.`;
       }
       const disposition = record.consumption?.disposition ?? 'unknown';
       return disposition === 'applied'
-        ? `Taken up at simulated minute ${record.consumption?.tick}: they are on their way to ${verb} ${place}.`
-        : `Not taken up at simulated minute ${record.consumption?.tick} (${disposition.replaceAll('_', ' ')}).`;
+        ? `Taken up at simulated minute ${record.consumption?.tick}: they are on their way to ${verb}.`
+        : `Not taken up at simulated minute ${record.consumption?.tick}: they ${dispositionWords(disposition)}.`;
     };
   }
 
@@ -734,7 +734,7 @@ export function mountEnvironmentSelection(
         control = buildSocietyDirectedAction({
           client, getSnapshot: () => society, getSubjectId: () => selectedInhabitant,
           targetId, affordance,
-          label: affordance === 'rest' ? `Rest at ${row.label}` : `Visit ${row.label}`,
+          label: filled(objectActivity(affordance).directLabel, { place: row.label }),
           describeRecord: plainRecord(row.label, affordance),
           idleText: 'Asks this simulated person to go there next. It is recorded as simulation, never as something that happened.',
         });
@@ -1803,7 +1803,7 @@ export function mountEnvironmentSelection(
         for (const destination of interpretation.navigation.destinations) {
           const subject = interpretation.subjects.find(s => s.subject_id === destination.subject_id);
           if (!subject) continue;
-          const button = el('button', {type: 'button', text: destination.affordance === 'rest' ? `Rest pad · ${destination.node_id}` : 'Exterior visit marker'});
+          const button = el('button', {type: 'button', text: filled(objectActivity(destination.affordance).markerLabel, { node: destination.node_id })});
           // Keep a selected inhabitant so the same destination control can issue perform.
           button.addEventListener('click', () => inspectSubject(subject, true)); destinations.append(button);
         }

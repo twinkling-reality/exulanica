@@ -74,8 +74,8 @@ function answer(over: Partial<CompanionAnswer> = {}): CompanionAnswer {
     },
     provenance: {
       composed: 'none',
-      servedModel: null,
-      plannedBy: null,
+      servedModel: null, servedModelName: null,
+      plannedBy: null, plannedByName: null,
       latencyMs: 0,
       usedFallback: false,
     },

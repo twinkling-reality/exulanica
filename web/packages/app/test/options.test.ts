@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { REGISTRY } from '../src/interaction-settings.js';
 import { DEFAULT_PREFERENCES } from '../src/preferences.js';
 import { buildOptions } from '../src/ui/options.js';
 
@@ -20,6 +21,8 @@ describe('Options', () => {
       onShowControls: vi.fn(),
     });
     document.body.append(view.root);
+    // The View settings arrive from the served catalog, which serves the registry.
+    view.showSettings([...REGISTRY.values()]);
 
     const contrast = view.root.querySelector<HTMLSelectElement>('[aria-label="Contrast"]')!;
     contrast.value = 'high';

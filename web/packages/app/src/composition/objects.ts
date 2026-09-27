@@ -136,6 +136,25 @@ import {
 import type { AppEnvironment, SessionState } from './session-state.js';
 import type { Credentials } from '../config.js';
 
+/**
+ * A world edit in words, by every edit kind the server states (`EDIT_KINDS` in
+ * exulanica/world/edit_kinds.py, held to it by edit-words-parity.test.ts), `undo` aside.
+ */
+export const EDIT_WORDS: Readonly<Record<string, string>> = {
+  add_object: 'an object you added',
+  move_object: 'a move',
+  remove_object: 'a removal',
+  set_object_behaviour: 'a change to an object’s motion',
+  suppress_element: 'a part of the world you hid',
+  transform_element: 'a part of the world you moved',
+  add_environment: 'an environment you added',
+  move_environment: 'an environment you moved',
+  remove_environment: 'an environment you removed',
+  add_point_map: 'a photograph’s points you placed',
+  move_point_map: 'a photograph’s points you moved',
+  remove_point_map: 'a photograph’s points you removed',
+};
+
 /** How far one arrow key moves an object, in millimetres. A quarter of a step. */
 const NUDGE_STEP_MM = 250;
 /** How far one bracket key turns it, in radians. */
@@ -1526,12 +1545,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   function editWords(kind: string): string {
-    return {
-      add_object: 'an object you added',
-      move_object: 'a move',
-      remove_object: 'a removal',
-      set_object_behaviour: 'a change to an object’s motion',
-    }[kind] ?? kind.replace(/_/g, ' ');
+    return EDIT_WORDS[kind] ?? 'a change the page has no words for';
   }
 
   function offsetWords(record: AuthoredObject, pose: RegionPose): string {

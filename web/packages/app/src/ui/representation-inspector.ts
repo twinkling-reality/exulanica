@@ -73,12 +73,44 @@ function swatchColour(colourBy: RepresentationIntent['colour'], key: string): st
   return dataViewKindColour(DATA_VIEW_STYLE, key) ?? null;
 }
 
+/**
+ * Each city record kind in plain words: exactly the record kinds
+ * `exulanica/grammar/grammars/city/city-shapes.v2.json` states, held to it by code-words-parity.test.ts.
+ */
+export const CITY_RECORD_WORDS: Readonly<Record<string, string>> = {
+  'city.block': 'Block',
+  'city.crossing': 'Crossing',
+  'city.curb_edge': 'Curb edge',
+  'city.district': 'District',
+  'city.entrance': 'Entrance',
+  'city.facade': 'Facade',
+  'city.ground_bay': 'Ground bay',
+  'city.interior_backing': 'Interior backing',
+  'city.junction': 'Junction',
+  'city.junction_approach': 'Junction approach',
+  'city.lane': 'Lane',
+  'city.lane_connection': 'Lane connection',
+  'city.massing': 'Massing',
+  'city.parcel': 'Parcel',
+  'city.parking_space': 'Parking space',
+  'city.premises': 'Premises',
+  'city.road_marking': 'Road marking',
+  'city.rooftop_object': 'Rooftop object',
+  'city.signal': 'Signal',
+  'city.street': 'Street',
+  'city.street_furniture': 'Street furniture',
+  'city.street_node': 'Street node',
+  'city.street_segment': 'Street segment',
+  'city.street_tree': 'Street tree',
+  'city.surface_material': 'Surface material',
+  'city.terrain': 'Terrain',
+  'city.tile': 'Tile',
+  'city.vitrine': 'Vitrine',
+};
+
 function keyWords(colourBy: RepresentationIntent['colour'], key: string): string {
   if (colourBy === 'origin') return ORIGIN_WORDS[key] ?? key;
-  // A city record kind in plain words, from the kind itself: city.street_segment is "Street segment".
-  const city = /^city\.([a-z][a-z0-9_]*)$/.exec(key)?.[1];
-  const words = city?.replaceAll('_', ' ');
-  return KIND_WORDS[key] ?? (words === undefined ? key : words.charAt(0).toUpperCase() + words.slice(1));
+  return KIND_WORDS[key] ?? CITY_RECORD_WORDS[key] ?? key;
 }
 
 function checkbox(label: string): { readonly root: HTMLLabelElement; readonly input: HTMLInputElement } {

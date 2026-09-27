@@ -29,7 +29,7 @@ const answer = (over: Partial<CompanionAnswer>): CompanionAnswer => ({
   deterministic: false,
   repaired: false,
   evidence: [],
-  provenance: { composed: 'none', servedModel: null, plannedBy: null, latencyMs: 0, usedFallback: false },
+  provenance: { composed: 'none', servedModel: null, servedModelName: null, plannedBy: null, plannedByName: null, latencyMs: 0, usedFallback: false },
   promptVersion: 'selection-9',
   calls: [],
   ...over,

@@ -61,7 +61,7 @@ from exulanica.ingest.place_proposal import (
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError
 from exulanica.models.handoff import ModelHandoff
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.messages import image_part
 from exulanica.models.policy import HostedRequestPolicy
 from exulanica.models.results import ChatResult
@@ -609,9 +609,10 @@ class VisionModel(Protocol):
 #: turning it on is a one-word change rather than a correctness question.
 _PROMPT_CACHE_VERSION: Final = f"photo-observation-v{PROMPT_VERSION}"
 
-#: Measured: 277 prompt tokens at 256px, 772 at 768px. Used only to size the budget guard's
-#: pre-call reservation, never for accounting, which reads the usage the provider reported.
-_IMAGE_TOKEN_ESTIMATE: Final = 800
+#: One photograph's prompt tokens as the manifest reserves them for the vision role, where the
+#: measurement behind the number is stated. Used only to size the budget guard's pre-call
+#: reservation, never for accounting, which reads the usage the provider reported.
+_IMAGE_TOKEN_ESTIMATE: Final = load_manifest()[Role.VISION].image_reservation(1)
 
 #: How much of a failed sign question's error message a stored observation keeps: enough for the
 #: client's own sentence naming what failed, and bounded so a provider's error body cannot grow

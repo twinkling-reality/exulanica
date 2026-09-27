@@ -31,8 +31,8 @@ from psycopg.types.json import Jsonb
 
 from exulanica.canonical import sha256_of_canonical
 from exulanica.errors import PrivacyAdmissionError
-from exulanica.ingest.model_rights import model_rights_for_capture
-from exulanica.ingest.personal_admission import model_right_offers
+from exulanica.ingest.model_rights import ModelRightRow, model_rights_for_capture
+from exulanica.ingest.personal_admission import ModelRightOffer, model_right_offers
 from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.ingest.repository import IngestRepository
 
@@ -229,6 +229,53 @@ def _granted_notices(
     return notices
 
 
+def role_standing(
+    offer: ModelRightOffer,
+    rights: Sequence[tuple[ModelRightRow, bool]],
+    notice_current: Callable[[ModelRightRow], bool],
+) -> dict[str, Any]:
+    """One offered role's standing over one source, from the rights granted over it.
+
+    ``rights`` are the source's rights with whether each is current, as
+    :func:`~exulanica.ingest.model_rights.model_rights_for_capture` reports it. The role is
+    ``current`` when every model of its hand-over is named, at the hand-over's destination, by a
+    current right, which is what :func:`~exulanica.ingest.model_rights.require_model_right` asks of
+    a hand-over; ``partial`` when some current right of the role is held but not for every model;
+    ``ended`` when the role's rights are held and none is current; ``none`` when none was granted.
+    ``until`` is, while current, the earliest over the models of the latest term covering each;
+    ``stopped`` says every right of an ended role was withdrawn rather than run out.
+    """
+    mine = [(right, current) for right, current in rights if right.identity.role == offer.role]
+    held = [right for right, current in mine if current]
+    covering = [
+        [
+            right
+            for right in held
+            if right.destination == offer.handoff.destination and right.identity == identity
+        ]
+        for identity in offer.handoff.identities
+    ]
+    covered = bool(covering) and all(covering)
+    standing = "none" if not mine else "current" if covered else "partial" if held else "ended"
+    # The right whose term ends the role: the earliest, over the models, of each model's latest.
+    ending = (
+        min(
+            (max(each, key=lambda right: right.valid_until) for each in covering),
+            key=lambda right: right.valid_until,
+        )
+        if covered
+        else None
+    )
+    return {
+        "role": offer.role,
+        "standing": standing,
+        "until": None if ending is None else ending.as_reference()["valid_until"],
+        "without_these_words": standing == "current"
+        and any(not notice_current(right) for right in held),
+        "stopped": standing == "ended" and all(right.withdrawn_at is not None for right, _ in mine),
+    }
+
+
 def admission_status(
     connection: psycopg.Connection, workspace: uuid.UUID, actor: uuid.UUID
 ) -> dict[str, Any]:
@@ -298,6 +345,20 @@ def admission_status(
                             == stated[right.identity.role],
                         }
                         for right, current in granted[row["capture_id"]]
+                    ],
+                    # Each offered role's standing over the source, decided here by the rule a
+                    # hand-over is checked by, so the page shows it and never recomputes it.
+                    "model_right_standings": [
+                        role_standing(
+                            offer,
+                            granted[row["capture_id"]],
+                            lambda right: (
+                                stated.get(right.identity.role) is not None
+                                and notices.get((right.authorization_id, right.identity.role))
+                                == stated[right.identity.role]
+                            ),
+                        )
+                        for offer in offers
                     ],
                 }
             )

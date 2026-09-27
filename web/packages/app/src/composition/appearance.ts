@@ -13,6 +13,8 @@
  * renderer is rebuilt on every mount and a held binding would be a disposed one.
  */
 
+import { readInteractionCatalog } from '../interaction-policy.js';
+import { REGISTRY as INTERACTION_REGISTRY } from '../interaction-settings.js';
 import { ApiError } from '@exulanica/graph-client';
 import {
   readSourceLight,
@@ -601,6 +603,24 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     onClose: deps.onCloseOptions,
     onShowControls: deps.onShowControls,
   });
+
+  // The View settings are drawn from the catalog the server serves. The preview has no server, so
+  // it draws them from the same registry as the page bundles it.
+  void (async (): Promise<void> => {
+    if (env.preview) {
+      optionsView.showSettings([...INTERACTION_REGISTRY.values()]);
+      return;
+    }
+    if (state.credentials === null) {
+      optionsView.settingsUnavailable('no server is connected.');
+      return;
+    }
+    try {
+      optionsView.showSettings(await readInteractionCatalog(state.credentials));
+    } catch (error) {
+      optionsView.settingsUnavailable(error instanceof Error ? error.message : 'the request failed.');
+    }
+  })();
   presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
   /**
    * Put a preview from another origin into the panel's own controls, as the person reviews it.

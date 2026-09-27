@@ -521,6 +521,8 @@ def test_source_light_upgrade_preserves_prior_receipts_and_source_slots(monkeypa
     monkeypatch.setattr(
         pg_harness, "migrations", lambda: iter(m for m in all_migrations if m.version < "0047")
     )
+    # No registry states a world's kind before 0099; this world was a personal one.
+    monkeypatch.setattr(WorldStyleRepository, "_starter_world_fact", lambda repository: False)
     with pg_harness.migrated_schema() as (_, connection):
         connection.autocommit = True
         connection.row_factory = dict_row

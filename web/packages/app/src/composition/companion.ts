@@ -647,8 +647,10 @@ function spokenAnswer(
       composed,
       // The identifier that DREW it, out of the response body. Null when no draft call
       // returned, which is the case a configuration-derived value would report wrongly.
-      servedModel: draftingModel(outcome),
+      servedModel: draftingModel(outcome)?.servedModel ?? null,
+      servedModelName: draftingModel(outcome)?.servedModelName ?? null,
       plannedBy: received[0]?.servedModel ?? null,
+      plannedByName: received[0]?.servedModelName ?? null,
       latencyMs: calls.reduce((total, call) => total + call.latencyMs, 0),
       usedFallback: calls.some((call) => call.usedFallback),
     },
@@ -705,6 +707,8 @@ function outcomeAnswer(utterance: string, outcome: WorldStyleProposalOutcome): C
       composed: 'outcome',
       servedModel: null,
       plannedBy: null,
+      servedModelName: null,
+      plannedByName: null,
       latencyMs: 0,
       usedFallback: false,
     },
@@ -724,8 +728,16 @@ function outcomeAnswer(utterance: string, outcome: WorldStyleProposalOutcome): C
  * returned nothing drew nothing. Reading the first would name the classifier, which decided what
  * the sentence was and wrote none of it.
  */
-function draftingModel(outcome: CompanionProposal): string | null {
-  if (outcome.proposal !== null) return outcome.proposal.modelId;
+function draftingModel(
+  outcome: CompanionProposal,
+): { readonly servedModel: string; readonly servedModelName: string | null } | null {
   const received = outcome.calls.filter((call) => call.outcome === 'completed');
-  return received.length > 1 ? (received.at(-1)?.servedModel ?? null) : null;
+  if (outcome.proposal !== null) {
+    const { modelId } = outcome.proposal;
+    // Its name is the one the server served on the call that drew it.
+    const drew = [...received].reverse().find((call) => call.servedModel === modelId);
+    return { servedModel: modelId, servedModelName: drew?.servedModelName ?? null };
+  }
+  const last = received.length > 1 ? received.at(-1) : undefined;
+  return last?.servedModel == null ? null : { servedModel: last.servedModel, servedModelName: last.servedModelName };
 }

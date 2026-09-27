@@ -1,0 +1,337 @@
+{
+  "schema_version": 1,
+  "catalog_id": "detector-vocabulary",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "rock",
+      "reason": "Authored: a landscape thing a person names, here because the first measured corpus is a volcanic walk. Things, never stuff: sky, ground and water are left out because depth masks them and a segment over them lifts onto no geometry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "boulder",
+      "reason": "Authored: a landscape thing a person names, here because the first measured corpus is a volcanic walk. Things, never stuff: sky, ground and water are left out because depth masks them and a segment over them lifts onto no geometry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "crater",
+      "reason": "Authored: a landscape thing a person names, here because the first measured corpus is a volcanic walk. Things, never stuff: sky, ground and water are left out because depth masks them and a segment over them lifts onto no geometry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "cliff",
+      "reason": "Authored: a landscape thing a person names, here because the first measured corpus is a volcanic walk. Things, never stuff: sky, ground and water are left out because depth masks them and a segment over them lifts onto no geometry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "tree",
+      "reason": "Authored: a landscape thing a person names, here because the first measured corpus is a volcanic walk. Things, never stuff: sky, ground and water are left out because depth masks them and a segment over them lifts onto no geometry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "bush",
+      "reason": "Authored: a landscape thing a person names, here because the first measured corpus is a volcanic walk. Things, never stuff: sky, ground and water are left out because depth masks them and a segment over them lifts onto no geometry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "flower",
+      "reason": "Authored: a landscape thing a person names, here because the first measured corpus is a volcanic walk. Things, never stuff: sky, ground and water are left out because depth masks them and a segment over them lifts onto no geometry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "sign",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "fence",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "railing",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "bench",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "table",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "chair",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "building",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "house",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "car",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "bicycle",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "boat",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "bridge",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "statue",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "lamp",
+      "reason": "Authored: a built thing people photograph in streets, squares and gardens, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "bottle",
+      "reason": "Authored: a small object people photograph on tables and in hands, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "cup",
+      "reason": "Authored: a small object people photograph on tables and in hands, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "bowl",
+      "reason": "Authored: a small object people photograph on tables and in hands, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "plate",
+      "reason": "Authored: a small object people photograph on tables and in hands, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "bag",
+      "reason": "Authored: a small object people photograph on tables and in hands, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "umbrella",
+      "reason": "Authored: a small object people photograph on tables and in hands, named so the local detector can box it when the hosted vision pass located no objects in the photograph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "dog",
+      "reason": "Authored: an animal people photograph, named as an object the detector may box. No term here names a person: the vision stage's own person filter is run over this list by tests/test_segmentation_stage.py.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "cat",
+      "reason": "Authored: an animal people photograph, named as an object the detector may box. No term here names a person: the vision stage's own person filter is run over this list by tests/test_segmentation_stage.py.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    },
+    {
+      "key": "bird",
+      "reason": "Authored: an animal people photograph, named as an object the detector may box. No term here names a person: the vision stage's own person filter is run over this list by tests/test_segmentation_stage.py.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica segmentation stage; see the entry reason"
+      }
+    }
+  ]
+}

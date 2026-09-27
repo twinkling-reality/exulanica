@@ -18520,6 +18520,21 @@
       ],
       "title": "Served Model"
      },
+     "requested_model_name": {
+      "type": "string",
+      "title": "Requested Model Name"
+     },
+     "served_model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Served Model Name"
+     },
      "used_fallback": {
       "type": "boolean",
       "title": "Used Fallback"
@@ -18607,6 +18622,8 @@
      "role",
      "requested_model",
      "served_model",
+     "requested_model_name",
+     "served_model_name",
      "used_fallback",
      "attempts",
      "latency_ms",
@@ -19166,10 +19183,8 @@
      },
      "affordance": {
       "type": "string",
-      "enum": [
-       "visit",
-       "rest"
-      ],
+      "maxLength": 1000,
+      "minLength": 1,
       "title": "Affordance"
      }
     },
@@ -25529,6 +25544,28 @@
       ],
       "title": "Planned By"
      },
+     "served_model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Served Model Name"
+     },
+     "planned_by_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Planned By Name"
+     },
      "prompt_version": {
       "type": "string",
       "title": "Prompt Version"
@@ -25613,6 +25650,8 @@
      "repaired",
      "served_model",
      "planned_by",
+     "served_model_name",
+     "planned_by_name",
      "prompt_version",
      "latency_ms",
      "origin",

@@ -21,7 +21,6 @@ import psycopg
 import pytest
 from exulanica.world import worlds
 from exulanica.world.saved_entries import SavedWorldEntryRepository
-from exulanica.world.style_structure import STARTER_WORLD_ID_PREFIX
 from exulanica.world.worlds import (
     AUTHORED_STARTER,
     PERSONAL_SOURCE,
@@ -122,11 +121,6 @@ def test_a_new_world_id_is_fresh_and_spelled_by_its_kind():
     assert new_world_id(AUTHORED_STARTER).startswith(world_kind(AUTHORED_STARTER).id_prefix)
     with pytest.raises(worlds.UnknownWorldKind):
         new_world_id("district")
-
-
-def test_the_starter_prefix_the_compatibility_check_reads_is_the_kind_s():
-    """``style_structure`` reads a starter by this prefix when no stored origin is supplied."""
-    assert world_kind(AUTHORED_STARTER).id_prefix == STARTER_WORLD_ID_PREFIX
 
 
 # -- the schema, read from the live catalog ----------------------------------------------------

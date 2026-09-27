@@ -5,15 +5,15 @@ import { provenanceSentence } from '../src/ui/companion-speech.js';
 
 const refusal: AnswerProvenance = {
   composed: 'refused',
-  servedModel: null,
-  plannedBy: null,
+  servedModel: null, servedModelName: null,
+  plannedBy: null, plannedByName: null,
   latencyMs: 1200,
   usedFallback: false,
 };
 
 describe('the provenance line under a proposal or a refusal', () => {
   it('names the classifier when a refusal came before any model drew anything', () => {
-    const line = provenanceSentence({ ...refusal, plannedBy: 'classifier-model' });
+    const line = provenanceSentence({ ...refusal, plannedBy: 'classifier/model-id', plannedByName: 'classifier-model' });
     expect(line).toContain('classifier-model');
     expect(line).not.toContain('No model was asked');
     expect(line).not.toContain('search');
@@ -28,15 +28,17 @@ describe('the provenance line under a proposal or a refusal', () => {
     const line = provenanceSentence({
       ...refusal,
       composed: 'proposed',
-      servedModel: 'drafting-model',
-      plannedBy: 'classifier-model',
+      servedModel: 'drafting-model', servedModelName: 'drafting-model',
+      plannedBy: 'classifier-model', plannedByName: 'classifier-model',
     });
     expect(line).toContain('drafting-model');
     expect(line).not.toContain('classifier-model');
   });
 
   it('never credits the classifier with drawing a change', () => {
-    const line = provenanceSentence({ ...refusal, composed: 'proposed', plannedBy: 'classifier-model' });
+    const line = provenanceSentence({
+      ...refusal, composed: 'proposed', plannedBy: 'classifier/model-id', plannedByName: 'classifier-model',
+    });
     expect(line).not.toContain('classifier-model');
   });
 });
@@ -46,8 +48,8 @@ describe('the provenance line under a change that was never shown, an outcome an
     const line = provenanceSentence({
       ...refusal,
       composed: 'unshown',
-      servedModel: 'drafting-model',
-      plannedBy: 'classifier-model',
+      servedModel: 'drafting-model', servedModelName: 'drafting-model',
+      plannedBy: 'classifier-model', plannedByName: 'classifier-model',
     });
     expect(line).toBe('drafting-model drew this change in 1.2 s. It was never shown, so nothing changed.');
     expect(line).not.toContain('Nothing is applied until you apply it');

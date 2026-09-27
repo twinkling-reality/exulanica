@@ -43,8 +43,8 @@ const ANSWER: CompanionAnswer = {
   ],
   provenance: {
     composed: 'model',
-    servedModel: 'nvidia/Nemotron-3_5-Lightning',
-    plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+    servedModel: 'nvidia/Nemotron-3_5-Lightning', servedModelName: 'Nemotron 3.5 Lightning',
+    plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507', plannedByName: 'Qwen3 235B Instruct',
     latencyMs: 12_400,
     usedFallback: false,
   },
@@ -299,7 +299,9 @@ describe('free text that turns out to be a question', () => {
     await vi.waitFor(() => expect(controller.answer()).not.toBeNull());
 
     const provenance = panel.root.querySelector('.companion-provenance')?.textContent ?? '';
-    expect(provenance).toContain('nvidia/Nemotron-3_5-Lightning');
+    // Named as a person reads it, never by its identifier.
+    expect(provenance).toContain('Nemotron 3.5 Lightning');
+    expect(provenance).not.toContain('nvidia/Nemotron-3_5-Lightning');
     expect(provenance).toContain('12.4 s');
   });
 

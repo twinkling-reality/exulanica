@@ -841,9 +841,13 @@ class ModelClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": parts})
 
-        # 772 prompt tokens was measured for a 768px image. Used only to size the budget
-        # reservation, never for accounting, which reads the reported usage.
-        estimated = 800 * len(images) if image_prompt_tokens is None else image_prompt_tokens
+        # The role's declared reservation per image, only to size the budget reservation; never
+        # accounting, which reads the reported usage.
+        estimated = (
+            self.manifest[role].image_reservation(len(images))
+            if image_prompt_tokens is None
+            else image_prompt_tokens
+        )
 
         if schema is None:
             return self.chat(

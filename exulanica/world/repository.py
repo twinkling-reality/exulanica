@@ -59,6 +59,7 @@ from exulanica.world.style_structure import (
     classify_structure_style_compatibility,
     raise_for_incompatible_structure_style,
 )
+from exulanica.world.worlds import AUTHORED_STARTER
 
 __all__ = ["WorldStyleRepository"]
 
@@ -1330,7 +1331,9 @@ class WorldStyleRepository:
         )
 
     def _starter_world_fact(self) -> bool | None:
-        """Prefer the current snapshot composer key; otherwise leave the world_id scheme."""
+        """The current snapshot's composer key where one is stored, else the world registry's
+        kind; ``None`` only for a world the registry does not hold, which the classifier refuses.
+        """
 
         snapshot = self.connection.execute(
             "select s.composer_key from world_structure_state st "
@@ -1339,10 +1342,16 @@ class WorldStyleRepository:
             "where st.workspace_id=%s and st.world_id=%s",
             (self.workspace_id, self.world_id),
         ).fetchone()
+        # The starter module builds on this one, so its composer key is read at call time.
+        from exulanica.world.starter import AUTHORED_STARTER_COMPOSER
+
         if snapshot is not None:
-            # Stored starter composer key; same value as starter.AUTHORED_STARTER_COMPOSER.
-            return snapshot["composer_key"] == "authored-starter-world"
-        return None
+            return snapshot["composer_key"] == AUTHORED_STARTER_COMPOSER
+        registered = self.connection.execute(
+            "select kind from world_identity where workspace_id=%s and world_id=%s",
+            (self.workspace_id, self.world_id),
+        ).fetchone()
+        return None if registered is None else registered["kind"] == AUTHORED_STARTER
 
     def _validate_reference_compatibility(
         self, reference: StyleReference, topology_digest: str

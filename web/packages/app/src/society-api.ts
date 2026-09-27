@@ -12,6 +12,7 @@
  * the world a request names and has no default world to fall back on.
  */
 
+import { isObjectActivity } from './society-activity-words.js';
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import { DEFAULT_SOCIETY_ENGINE, societyEngine, type SocietyEngineProfile } from './society-engines.js';
@@ -58,7 +59,8 @@ function presenceOf(state: Readonly<Record<string, unknown>>): SocietyPresence {
   return Object.freeze({ status: held['status'] as 'here' | 'away', sinceTick: held['since_tick'] as number });
 }
 
-export type SocietyAffordance = 'visit' | 'rest';
+/** An activity people do at an object, as the activity catalogs state them (`isObjectActivity`). */
+export type SocietyAffordance = string;
 
 /**
  * What a person in a purposeful society can be doing: an affordance at an object, standing a
@@ -228,7 +230,7 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
   };
 }
 
-const affordance = (value: unknown): value is SocietyAffordance => value === 'visit' || value === 'rest';
+const affordance = (value: unknown): value is SocietyAffordance => isObjectActivity(value);
 
 /** The places a read carries, bound to the input the snapshot says its state consumed. */
 function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null {
@@ -356,7 +358,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
       // standing a while at an open spot, or talking with another inhabitant for a stated time;
       // only the first names a target.
       const goal = record(inhabitant['goal']);
-      const activity = ['visit', 'rest'].includes(String(goal['kind'])) && textValue(goal['target_id']);
+      const activity = isObjectActivity(goal['kind']) && textValue(goal['target_id']);
       const spot = goal['target_id'] === null;
       const makingRoom = goal['kind'] === 'make_room' && spot;
       const standing = goal['kind'] === 'stand' && spot;
@@ -439,7 +441,7 @@ function boundSnapshot(value: unknown, versionId: string): SocietySnapshot {
 
 /** Typed user-directed action over a canonical simulation target. Not personal evidence. */
 export type SocietyActionKind = 'go_to' | 'perform';
-export type SocietyActionAffordance = 'visit' | 'rest';
+export type SocietyActionAffordance = SocietyAffordance;
 export type SocietyActionStatus = 'pending' | 'consumed';
 
 export interface SocietyActionIntent {
@@ -492,7 +494,7 @@ export function parseSocietyActionRecord(value: unknown, versionId: string): Soc
     || !textValue(intent['target_id'])
     || (kind !== 'go_to' && kind !== 'perform')
     || (kind === 'go_to' && affordance !== undefined)
-    || (kind === 'perform' && affordance !== 'visit' && affordance !== 'rest')
+    || (kind === 'perform' && !isObjectActivity(affordance))
     || !textValue(target['target_id'])
     || (row['status'] !== 'pending' && row['status'] !== 'consumed')) {
     throw new Error('Invalid society action response');
@@ -635,8 +637,8 @@ export class SocietyClient {
     const bodyIntent = intent.kind === 'perform'
       ? { kind: 'perform' as const, target_id: intent.targetId, affordance: intent.affordance }
       : { kind: 'go_to' as const, target_id: intent.targetId };
-    if (intent.kind === 'perform' && intent.affordance !== 'visit' && intent.affordance !== 'rest') {
-      return Promise.reject(new Error('perform requires a visit or rest affordance'));
+    if (intent.kind === 'perform' && !isObjectActivity(intent.affordance)) {
+      return Promise.reject(new Error('perform requires an activity people do at an object'));
     }
     return this.transport.postJson<unknown>(
       this.path(snapshot.versionId, '/actions'),

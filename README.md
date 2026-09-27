@@ -46,21 +46,25 @@ shopkeeper. Each model does what it is good at, in its own role, and the person 
 behind a role and see the difference. World models generate how a world looks; Exulanica is the
 world AI models live in.
 
-A model is a proposer, not an authority. Each role declares what the model observes and which
-actions it may take; the engine validates every proposed action before it takes effect, and every
-accepted decision is stored, so a run replays without calling a model and two runs from the same
-saved world compare fairly. Every hosted model call passes one policy boundary that enforces the
-egress allowlist, the budget and the person's rights.
+A model is a proposer, not an authority. A person in a world is the one role a model decides for:
+its decision contract declares what the model is shown and which actions it may choose, the engine
+validates every choice before it takes effect, and every accepted decision is stored, so a run
+replays without calling a model and two runs from the same saved world compare fairly. Traffic,
+animals and shopkeepers are not model roles. Every hosted model call passes one policy boundary
+that enforces the egress allowlist, the budget and the person's rights.
 
 Built: several open models serve hosted roles through that boundary (the
-[model manifest](exulanica/models/models.manifest.json)); the people in a world follow a
-deterministic planner, and a society engine version accepts validated, stored model decisions for
-them ([society contract](docs/synthetic-society-contract.md#explicit-model-proposals-and-exact-replay));
-paired runs compare one intervention against its control
-([society experiments](docs/society-experiments.md)). Not built: choosing a model for a person or a
-group, mixed-model runs shown in the application, measured results per model and a retraining
-loop. The [first milestone](docs/product-direction.md#first-milestone) is two open models running
-one town, shown side by side.
+[model manifest](exulanica/models/models.manifest.json)). The people in a saved world follow a
+deterministic planner, and the world's owner can choose an open model to decide for one person or a
+group; each choice is validated, stored and replayed without calling the model again
+([model choice](docs/synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose)).
+A comparison runs the same simulated hour once per model for one group of people, scores how they
+fared against a control run, and the application shows the runs side by side; judged comparisons
+are recorded ([comparisons of models](docs/society-experiments.md#comparisons-of-models)). Not
+built: people and models in a world made from photographs, comparisons started from the
+application, model roles other than a person, and a retraining loop. The
+[first milestone](docs/product-direction.md#first-milestone) is two open models running one town,
+shown side by side.
 
 ## The world
 
@@ -70,24 +74,24 @@ The [product roadmap](docs/product-direction.md) defines six connected parts of 
   <tr>
     <td width="50%" valign="top">
       <h3>Models run your world</h3>
-      Open models decide what the agents in your world do, each in its own role. The engine validates every decision and stores it, so a run replays exactly. The society's people accept validated model decisions; choosing a model per person or group is the first milestone.
+      Open models decide what the people in your world do. The engine validates every decision and stores it, so a run replays exactly. The world's owner chooses the model for each person or group of people; with no choice, their routine decides.
       <p><a href="docs/capabilities/simulation.md">Simulation</a> · <a href="docs/model-and-service-selection.md">Model selection</a></p>
     </td>
     <td width="50%" valign="top">
       <h3>Swap a model, see the difference</h3>
-      Run the same saved world twice and compare what happened. Paired society runs compare one intervention against its control; comparing two models side by side in the application is the first milestone.
+      Run the same saved world's hour under two models and compare what happened. A comparison scores how the people fared against a control run and shows both runs side by side in the application; it is started from a local runner, not from the application.
       <p><a href="docs/society-experiments.md">Controlled comparisons</a> · <a href="docs/product-direction.md#first-milestone">First milestone</a></p>
     </td>
   </tr>
   <tr>
     <td valign="top">
       <h3>Build your world</h3>
-      Place pieces from the catalogs by hand, make a world from photographs of a real place, or import content with its origin labelled. A town, a familiar place or a fantasy city are equally valid, and your edits persist as versions.
+      Place pieces from the catalogs by hand, make a world from photographs of a real place, or import content with its origin labelled, and your edits persist as versions. Models decide for people only in worlds started from the empty authored starter, and a world made from photographs holds no people.
       <p><a href="docs/capabilities/world-creation.md">World creation</a> · <a href="docs/capabilities/scene-reconstruction.md">Reconstruction</a></p>
     </td>
     <td valign="top">
       <h3>Give the world life</h3>
-      The people in your world follow routines, walk to the places they use and respond to what you change. Physical or fictional rules define how the world and its time behave.
+      The people in your world follow routines, walk to the places they use and respond to what you change. How the world and its time behave is its engine's; a person does not configure those rules.
       <p><a href="docs/synthetic-society-contract.md">Society contract</a> · <a href="docs/product-direction.md#configurable-world-rules">World rules</a></p>
     </td>
   </tr>
@@ -125,7 +129,7 @@ supported operations; the full product direction is broader than those component
 
 | Area | Implemented foundation | Delivery target |
 | --- | --- | --- |
-| Models in the world | Open models in hosted roles through one policy boundary; validated, stored model decisions for the society's people | A model chosen per person or group, mixed-model runs shown side by side, measured results per model and a retraining loop |
+| Models in the world | Open models in hosted roles through one policy boundary; a model chosen per person or group of a saved world's people, validated, stored and replayed; comparisons of models scored against a control and shown side by side | Comparisons started from the application, model roles other than a person, people in every kind of world and a retraining loop |
 | Persistent worlds | Authored starter worlds, saved versions, object edits and undo, appearance state, reference photographs | A complete personal-media-to-editable-world journey |
 | Inspectable data | Supported point and surface representations, subject selection, structured records and source references | Complete reusable object extraction and consistent semantic coverage across sources |
 | Companion | Conversation, selection context and reviewed appearance proposals | Shared activity, durable personal continuity and broader creation tools |

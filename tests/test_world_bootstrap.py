@@ -692,22 +692,12 @@ def test_bootstrap_ignores_other_worlds_and_historical_regions(repository, compo
     other = WorldStyleRepository(
         repository.connection, repository.workspace_id, world_id=other_world
     )
-    other.register_topology(
-        TopologyContract(
-            "other",
-            ("other-region",),
-            (
-                TopologySourceSlot(
-                    uuid.uuid4(),
-                    "other-source",
-                    "other-region",
-                    current.source_slots[0].evidence_span_id,
-                    None,
-                ),
-            ),
-            world_id=other_world,
-        )
-    )
+    # A starter holds no sourced slot (the registry states its kind), so the other world's
+    # region is its own and names no evidence. That drops what this test once also held: that
+    # bootstrap ignores another world's source slot naming the same evidence span as this one's.
+    # A workspace holds one personal-source world under policy version 1, and only such a world
+    # may hold a sourced slot, so no second world in this workspace can hold one.
+    other.register_topology(TopologyContract("other", ("other-region",), world_id=other_world))
     opened = bootstrap_world(
         repository.connection,
         workspace_id=repository.workspace_id,

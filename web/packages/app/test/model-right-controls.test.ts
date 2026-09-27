@@ -10,7 +10,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { adaptSnapshot } from '@exulanica/graph-client';
 import { mountPersonalIntake, createPersonalIntakeSession } from '../src/composition/personal-intake.js';
-import { sha256, type ModelRightOffer, type ModelRightState } from '../src/personal-admission-api.js';
+import { sha256, type ModelRightOffer, type ModelRightState, type ServedStanding } from '../src/personal-admission-api.js';
 import {
   buildModelRightGrants,
   readOffers,
@@ -49,6 +49,30 @@ const right = (role: string, modelId: string, id: string, over: Partial<ModelRig
 const UNTIL = new Date('2099-01-01T00:00:00.000000Z').toLocaleString();
 const allowed = (name: string) => `${name}: allowed until ${UNTIL}`;
 
+/**
+ * The server's standings for these rights, as a stand-in for `role_standing` (whose rule
+ * tests/test_model_right_standing.py holds): every model of a role covered at its destination by a
+ * current right is current, until the first model's latest term.
+ */
+function servedFor(offers: readonly ModelRightOffer[], rights: readonly ModelRightState[]): ServedStanding[] {
+  return offers.map((offer) => {
+    const mine = rights.filter((r) => r.model.role === offer.role);
+    const held = mine.filter((r) => r.state === 'current');
+    const covering = offer.models.map((model) => held.filter((r) => r.destination === offer.destination
+      && r.model.model_id === model.model_id && r.model.provider === model.provider));
+    const covered = covering.length > 0 && covering.every((each) => each.length > 0);
+    const standing = mine.length === 0 ? 'none' : covered ? 'current' : held.length > 0 ? 'partial' : 'ended';
+    const until = covered
+      ? covering.map((each) => each.map((r) => r.valid_until).sort().at(-1)!).sort()[0]!
+      : null;
+    return {
+      role: offer.role, standing, until,
+      without_these_words: standing === 'current' && held.some((r) => r.notice_current === false),
+      stopped: standing === 'ended' && mine.every((r) => r.withdrawn),
+    };
+  });
+}
+
 describe('the rights controls, drawn from the server offers', () => {
   it('draws one unticked control per offer with the offer notice, and returns only what is ticked', () => {
     const grants = buildModelRightGrants('Fixture group');
@@ -70,46 +94,37 @@ describe('the rights controls, drawn from the server offers', () => {
     expect(grants.root.hidden).toBe(true);
   });
 
-  it('allows a role only when every model of its chain is covered at its destination', () => {
-    expect(standingText(standingOf(VISION, []))).toBe('Fixture vision: not allowed');
-    const both = [right('vision', 'primary-vision', 'r1'), right('vision', 'fallback-vision', 'r2')];
-    expect(standingOf(VISION, both).standing).toBe('current');
-    expect(standingText(standingOf(VISION, both))).toBe(allowed('Fixture vision'));
-    const one = [both[0]!, right('vision', 'fallback-vision', 'r2', { state: 'ended', withdrawn: true })];
-    expect(standingOf(VISION, one).standing).toBe('partial');
-    expect(standingOf(VISION, one).current.map((r) => r.right_id)).toEqual(['r1']);
-    const elsewhere = both.map((r) => ({ ...r, destination: 'https://elsewhere.test' }));
-    expect(standingOf(VISION, elsewhere).standing).toBe('partial');
-    const ended = both.map((r) => ({ ...r, state: 'ended' as const, withdrawn: true }));
-    expect(standingText(standingOf(VISION, ended))).toBe('Fixture vision: stopped');
-    // Ended by its term or its authority, not by the person: it was not stopped.
-    const lapsed = both.map((r) => ({ ...r, state: 'ended' as const }));
-    expect(standingText(standingOf(VISION, lapsed))).toBe('Fixture vision: no longer allowed');
-    const unworded = [{ ...both[0]!, notice_current: false }, both[1]!];
-    expect(standingText(standingOf(VISION, unworded)))
-      .toBe(`${allowed('Fixture vision')}, without the wording shown here`);
-    // Another role's rights say nothing about this one.
-    expect(standingOf(EMBEDDING, both).standing).toBe('none');
-  });
-
-  it('states the term the server recorded: the first model of the chain whose rights run out ends the role', () => {
-    const terms = [
-      right('vision', 'primary-vision', 'r1', { valid_until: '2098-01-01T00:00:00.000000Z' }),
-      right('vision', 'primary-vision', 'r3', { valid_until: '2099-01-01T00:00:00.000000Z' }),
-      right('vision', 'fallback-vision', 'r2', { valid_until: '2097-06-01T00:00:00.000000Z' }),
+  it('draws the standing the server decided and lists the role\'s current rights to stop', () => {
+    // The rule (every model of the chain covered at its destination) is the server's
+    // (tests/test_model_right_standing.py); the page draws what it served.
+    const served = (standing: ServedStanding['standing'], over: Partial<ServedStanding> = {}): ServedStanding[] => [
+      { role: 'vision', standing, until: null, without_these_words: false, stopped: false, ...over },
     ];
-    expect(standingOf(VISION, terms).until).toBe('2097-06-01T00:00:00.000000Z');
-    expect(standingText(standingOf(VISION, terms)))
-      .toBe(`Fixture vision: allowed until ${new Date('2097-06-01T00:00:00.000000Z').toLocaleString()}`);
-    // The fallback's later grant carries the role to the primary's latest term.
-    const renewed = [...terms, right('vision', 'fallback-vision', 'r4', { valid_until: '2099-06-01T00:00:00.000000Z' })];
-    expect(standingOf(VISION, renewed).until).toBe('2099-01-01T00:00:00.000000Z');
-    expect(standingOf(VISION, [terms[0]!]).until).toBeNull();
+    expect(standingText(standingOf(VISION, [], served('none')))).toBe('Fixture vision: not allowed');
+    const both = [right('vision', 'primary-vision', 'r1'), right('vision', 'fallback-vision', 'r2')];
+    expect(standingText(standingOf(VISION, both, served('current')))).toBe('Fixture vision: allowed');
+    const one = [both[0]!, right('vision', 'fallback-vision', 'r2', { state: 'ended', withdrawn: true })];
+    const partial = standingOf(VISION, one, served('partial'));
+    expect(partial.standing).toBe('partial');
+    expect(partial.current.map((r) => r.right_id)).toEqual(['r1']);
+    expect(standingText(standingOf(VISION, [], served('ended', { stopped: true })))).toBe('Fixture vision: stopped');
+    expect(standingText(standingOf(VISION, [], served('ended')))).toBe('Fixture vision: no longer allowed');
+    expect(standingText(standingOf(VISION, both, served('current', { without_these_words: true }))))
+      .toBe('Fixture vision: allowed, without the wording shown here');
+    const until = '2097-06-01T00:00:00.000000Z';
+    expect(standingText(standingOf(VISION, both, served('current', { until }))))
+      .toBe(`Fixture vision: allowed until ${new Date(until).toLocaleString()}`);
+    // A role the server served no standing for is refused, never guessed.
+    expect(() => standingOf(EMBEDDING, both, served('current'))).toThrow(/no standing for/);
   });
 
   it('asks before stopping, in the offer words, and stops only on the confirmation', () => {
     const calls: string[] = [];
-    const standing = standingOf(VISION, [right('vision', 'primary-vision', 'r1'), right('vision', 'fallback-vision', 'r2')]);
+    const standing = standingOf(
+      VISION,
+      [right('vision', 'primary-vision', 'r1'), right('vision', 'fallback-vision', 'r2')],
+      servedFor(OFFERS, [right('vision', 'primary-vision', 'r1'), right('vision', 'fallback-vision', 'r2')]),
+    );
     const handlers = {
       locked: false,
       onAsk: () => calls.push('ask'), onStop: () => calls.push('stop'), onKeep: () => calls.push('keep'),
@@ -124,7 +139,7 @@ describe('the rights controls, drawn from the server offers', () => {
     buttons.find((b) => b.textContent === 'Keep allowing them')!.click();
     buttons.find((b) => b.textContent === VISION.stop_confirm)!.click();
     expect(calls).toEqual(['ask', 'keep', 'stop']);
-    expect(standingControls(standingOf(VISION, []), { ...handlers, confirming: false })
+    expect(standingControls(standingOf(VISION, [], servedFor(OFFERS, [])), { ...handlers, confirming: false })
       .flatMap((node) => [...node.querySelectorAll('button')])).toEqual([]);
   });
 
@@ -151,6 +166,7 @@ function drawer(options: { rights?: ModelRightState[]; refuse?: string; offersAf
         sources: [{
           capture_id: CAPTURE, sha256: await sha256(await file.arrayBuffer()), bytes: file.size,
           media_type: 'image/jpeg', authority: null, model_rights: rights,
+          model_right_standings: servedFor(offers, rights),
         }],
         requests: [],
         model_right_offers: offers,

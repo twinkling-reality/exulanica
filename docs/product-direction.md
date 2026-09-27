@@ -69,13 +69,16 @@ flight for the small birds a saved world's trees host; both are movement modules
 nothing in the application calls ([`exulanica/traffic`](../exulanica/traffic)). Objects, vehicles and
 society activities are versioned catalogs under [`assets/catalogs`](../assets/catalogs). The
 people's decisions come from a deterministic planner
-([`society_planner.py`](../exulanica/world/society_planner.py)); a society engine version with an
-opt-in model decision slot validates and stores each model proposal
-([explicit model proposals](synthetic-society-contract.md#explicit-model-proposals-and-exact-replay)).
+([`society_planner.py`](../exulanica/world/society_planner.py)) unless their world's owner chooses
+an open model for one person or a group of a saved world's people; each such choice is validated,
+stored and replayed without calling the model again
+([model choice](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose)).
 Several open models serve hosted roles through one policy boundary (the
-[model manifest](../exulanica/models/models.manifest.json)), and paired society runs compare one
-intervention against its control ([society experiments](society-experiments.md)). No model can be
-chosen for a person or a group of people, and no run in the application mixes models.
+[model manifest](../exulanica/models/models.manifest.json)). A comparison runs one group of people
+under each of two models while everybody else keeps what their owner chose, scores how the group
+fared against a control run, and shows the runs side by side in the application
+([comparisons of models](society-experiments.md#comparisons-of-models)); it is started from a local
+runner, not from the application. A person is the only role a model decides for.
 
 Other capabilities are features and ways to build a world, not the product's identity:
 
@@ -589,7 +592,10 @@ Instruct and Nemotron 3.5 Lightning on every seed, to four decimals, and slightl
 under Nemotron 3 Nano 30B, which no test told apart from their routine. Qwen answered 99.25% of the
 group's turns (99.56% in its second run), Lightning 95.77% and Nano 92.51%; none refused one, and
 the routine decided the rest, 0.75%, 0.44%, 4.23% and 7.49%
-([record](evaluation/2026-09-26-society-group-comparison.json)). The Companion, personal photographs
+([record](evaluation/2026-09-26-society-group-comparison.json)). The models made visibly different
+worlds all the same: the group spent 73.8% of its minutes resting under Qwen3 235B Instruct, and
+under Nemotron 3.5 Lightning 42.3% resting, 9.3% standing and 14.9% talking, while the score of how
+people fared did not separate them. The Companion, personal photographs
 and reconstruction are not part of this milestone.
 
 ### Saved-world foundation

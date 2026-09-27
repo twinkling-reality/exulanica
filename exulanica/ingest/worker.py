@@ -78,10 +78,10 @@ __all__ = ["MINIMUM_LEASE_SECONDS", "DerivativeWorker", "JobOutcome", "lease_sec
 _POLL_SECONDS: Final = 2.0
 
 #: The lease when there is no model call in the gap between two beats, and the floor under every
-#: computed one. It is a stated floor rather than an accident: an instance with no
-#: ``NEBIUS_API_KEY`` runs a worker with ``vision=None``, which ``Services.warnings`` describes as
-#: an ordinary configuration, and the model budget that sizes every other lease does not exist
-#: there.
+#: computed one. It is a stated floor rather than an accident: an instance without the vision
+#: provider's credential (the manifest's ``api_key_env``) runs a worker with ``vision=None``,
+#: which ``Services.warnings`` describes as an ordinary configuration, and the model budget that
+#: sizes every other lease does not exist there.
 #:
 #: Measured on this machine against a 200-photograph corpus with no vision model and no depth
 #: model, which is exactly that deployment: the largest single capture gap was 0.059 seconds, and

@@ -1,5 +1,6 @@
 /** Versioned device preferences. The authored Atlas landscape is not a theme picker. */
 
+import { isPreferenceOf } from './interaction-settings.js';
 import {
   COMPANION_BODY_VARIANTS,
   COMPANION_COLOR_VARIANTS,
@@ -97,16 +98,13 @@ const TRANSPARENCY = new Set<TransparencyPreference>(['layered', 'reduced']);
 const WORLD_ART_PROFILE = new Set(productWorldStyleReferences().map(
   (reference) => `${reference.profileId}@${reference.profileVersion}`,
 ));
-const VIGNETTE = new Set<VignettePreference>(['off', 'subtle', 'strong']);
-const TURN = new Set<TurnPreference>(['smooth', 'snap']);
-const TRANSITION = new Set<TransitionPreference>(['system', 'motion', 'fade']);
-const INITIATIVE = new Set<CompanionInitiativePreference>(['normal', 'minimal', 'off']);
+/** A stored preference the interaction registry allows for its capability, else the default. */
+const held = <T>(key: string, value: unknown, fallback: T): T =>
+  (isPreferenceOf(key, value) ? value : fallback) as T;
 const COMPANION_BODY = new Set<CompanionBodyPreference>(COMPANION_BODY_VARIANTS);
 const COMPANION_COLOR = new Set<CompanionColorPreference>(COMPANION_COLOR_VARIANTS);
 const COMPANION_FACE = new Set<CompanionFacePreference>(COMPANION_FACE_VARIANTS);
 
-const finiteIn = (value: unknown, min: number, max: number): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 
 /** Invalid or newer data falls back field by field; one bad value never bricks the menu. */
 export function normalisePreferences(value: unknown): AtlasPreferences {
@@ -151,15 +149,13 @@ export function normalisePreferences(value: unknown): AtlasPreferences {
         : {},
       worldArtProfileVersion,
     ),
-    fieldOfView: finiteIn(record['fieldOfView'], 60, 90)
-      ? record['fieldOfView']
-      : DEFAULT_PREFERENCES.fieldOfView,
-    mouseSensitivity: finiteIn(record['mouseSensitivity'], 0.5, 2)
-      ? record['mouseSensitivity']
-      : DEFAULT_PREFERENCES.mouseSensitivity,
-    vignette: VIGNETTE.has(record['vignette'] as VignettePreference)
-      ? (record['vignette'] as VignettePreference)
-      : DEFAULT_PREFERENCES.vignette,
+    // Each preference an interaction capability holds is checked against the registry's range or
+    // choices (interaction-settings.ts), never a copy of them.
+    fieldOfView: held('comfort.field-of-view-degrees', record['fieldOfView'], DEFAULT_PREFERENCES.fieldOfView),
+    mouseSensitivity: held(
+      'comfort.look-sensitivity-milli', record['mouseSensitivity'], DEFAULT_PREFERENCES.mouseSensitivity,
+    ),
+    vignette: held('comfort.vignette', record['vignette'], DEFAULT_PREFERENCES.vignette),
     cameraBob:
       typeof record['cameraBob'] === 'boolean'
         ? record['cameraBob']
@@ -168,17 +164,11 @@ export function normalisePreferences(value: unknown): AtlasPreferences {
       typeof record['regionMinimap'] === 'boolean'
         ? record['regionMinimap']
         : DEFAULT_PREFERENCES.regionMinimap,
-    turnMode: TURN.has(record['turnMode'] as TurnPreference)
-      ? (record['turnMode'] as TurnPreference)
-      : DEFAULT_PREFERENCES.turnMode,
-    transition: TRANSITION.has(record['transition'] as TransitionPreference)
+    turnMode: held('navigation.turn-mode', record['turnMode'], DEFAULT_PREFERENCES.turnMode),
+    transition: isPreferenceOf('navigation.transition-style', record['transition'])
       ? (record['transition'] as TransitionPreference)
       : DEFAULT_PREFERENCES.transition,
-    companionInitiative: INITIATIVE.has(
-      record['companionInitiative'] as CompanionInitiativePreference,
-    )
-      ? (record['companionInitiative'] as CompanionInitiativePreference)
-      : DEFAULT_PREFERENCES.companionInitiative,
+    companionInitiative: held('initiative.mode', record['companionInitiative'], DEFAULT_PREFERENCES.companionInitiative),
     companionBody: companionV3
       ? (record['companionBody'] as CompanionBodyPreference)
       : DEFAULT_PREFERENCES.companionBody,

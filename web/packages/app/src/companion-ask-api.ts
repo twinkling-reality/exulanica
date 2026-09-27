@@ -120,6 +120,9 @@ export interface ModelCall {
   readonly role: string;
   readonly requestedModel: string;
   readonly servedModel: string | null;
+  /** The names a person reads for those two, as the server serves them (`Manifest.model_name`). */
+  readonly requestedModelName: string;
+  readonly servedModelName: string | null;
   readonly usedFallback: boolean;
   readonly attempts: number | null;
   readonly latencyMs: number;
@@ -177,6 +180,9 @@ export interface AnswerProvenance {
   readonly servedModel: string | null;
   /** The identifier that turned the question into a Selection, when one was asked. */
   readonly plannedBy: string | null;
+  /** The names a person reads for those two, as the server serves them; the lines print these. */
+  readonly servedModelName: string | null;
+  readonly plannedByName: string | null;
   /** Every call this answer made, added up. What the person actually waited for. */
   readonly latencyMs: number;
   readonly usedFallback: boolean;
@@ -297,6 +303,8 @@ interface WireCall {
   readonly role: string;
   readonly requested_model: string;
   readonly served_model: string | null;
+  readonly requested_model_name: string;
+  readonly served_model_name: string | null;
   readonly used_fallback: boolean;
   readonly attempts: number | null;
   readonly latency_ms: number;
@@ -468,6 +476,8 @@ function callsOf(calls: readonly WireCall[] | undefined): ModelCall[] {
     role: call.role,
     requestedModel: call.requested_model,
     servedModel: call.served_model,
+    requestedModelName: call.requested_model_name,
+    servedModelName: call.served_model_name,
     usedFallback: call.used_fallback,
     attempts: call.attempts,
     latencyMs: call.latency_ms,
@@ -717,6 +727,8 @@ function provenanceOf(
   const composing = [...received].reverse().find((call) => call.role === COMPOSER_ROLE) ?? null;
   const planning = received.find((call) => call.role !== COMPOSER_ROLE) ?? null;
   const plannedBy = planning?.servedModel ?? null;
+  const plannedByName = planning?.servedModelName ?? null;
+  const unnamed = { servedModel: null, servedModelName: null } as const;
 
   /*
    * Checked BEFORE the empty-list branch, and the order is the whole point.
@@ -727,10 +739,12 @@ function provenanceOf(
    * is the same falsehood `search` was added to stop, one branch further down.
    */
   if (abstained === 'UNANSWERABLE_NOT_UNDERSTOOD') {
-    return { composed: 'unreadable', servedModel: null, plannedBy, latencyMs, usedFallback };
+    return { composed: 'unreadable', ...unnamed, plannedBy, plannedByName, latencyMs, usedFallback };
   }
   if (calls.length === 0) {
-    return { composed: 'none', servedModel: null, plannedBy: null, latencyMs, usedFallback };
+    return {
+      composed: 'none', ...unnamed, plannedBy: null, plannedByName: null, latencyMs, usedFallback,
+    };
   }
   if (deterministic) {
     // Asked, answered, and the answer was not supported by the evidence. `servedModel` may still
@@ -739,18 +753,22 @@ function provenanceOf(
     return {
       composed: 'discarded',
       servedModel: composing?.servedModel ?? null,
+      servedModelName: composing?.servedModelName ?? null,
       plannedBy,
+      plannedByName,
       latencyMs,
       usedFallback,
     };
   }
   if (composing === null) {
-    return { composed: 'search', servedModel: null, plannedBy, latencyMs, usedFallback };
+    return { composed: 'search', ...unnamed, plannedBy, plannedByName, latencyMs, usedFallback };
   }
   return {
     composed: 'model',
     servedModel: composing.servedModel,
+    servedModelName: composing.servedModelName,
     plannedBy,
+    plannedByName,
     latencyMs,
     usedFallback,
   };

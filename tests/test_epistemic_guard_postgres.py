@@ -25,6 +25,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 import pytest
+from exulanica.models.manifest import Role, load_manifest
 
 from pg_harness import REQUIRED_EXTENSIONS, REQUIRED_SERVER_VERSION, migrated_schema
 
@@ -128,7 +129,9 @@ def test_the_schema_under_test_is_the_one_that_ships(spine):
         "select format_type(a.atttypid, a.atttypmod) from pg_attribute a "
         "where a.attrelid = 'embedding'::regclass and a.attname = 'v'"
     ).fetchone()
-    assert column_type is not None and column_type[0] == "halfvec(4096)", column_type
+    # The width the manifest declares for the embedding role's primary, which the code reads.
+    width = load_manifest()[Role.EMBEDDING].primary.embedding_dimensions
+    assert column_type is not None and column_type[0] == f"halfvec({width})", column_type
 
     installed = {
         row[0]

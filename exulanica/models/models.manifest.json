@@ -1,9 +1,9 @@
 {
   "manifest_version": "2",
   "pipeline_version": 3,
-  "note": "The only place in this codebase where a model identifier appears. Every price, context window and use_cases list below was read from flavors[].model_id in the catalog of the model's provider on that provider's catalog_retrieved_at. Bumping any identifier here MUST bump pipeline_version, because stored caption vectors and evaluation records are keyed by it. The response cache key names the provider and the model as well, so a cached answer is never served for another model.",
+  "note": "The only place in product code where a hosted model identifier appears (tests/test_models_manifest.py scans exulanica/ and web/packages/*/src; applied migrations are frozen SQL and keep the identifiers they were written with). Every price, context window and use_cases list below was read from flavors[].model_id in the catalog of the model's provider on that provider's catalog_retrieved_at. Bumping any identifier here MUST bump pipeline_version, because stored caption vectors and evaluation records are keyed by it. The response cache key names the provider and the model as well, so a cached answer is never served for another model.",
 
-  "providers_note": "Where hosted requests go, as data. A provider states its endpoint, the one environment variable its credential is read from, and the catalog its models are checked against, read by catalog_format. Every model names its provider and no code names one. The origin a provider's requests reach is derived from base_url in the egress allowlist's own spelling, never stated a second time, and a provider whose origin the deployment's allowlist does not declare is refused by name.",
+  "providers_note": "Where hosted requests go, as data. A provider states its endpoint, the one environment variable its credential is read from, and the catalog its models are checked against, read by catalog_format. Every model names its provider and no code names one, and no code reads a credential from a variable it spells itself: callers take the variable from api_key_env (tests/test_models_manifest.py checks both). The origin a provider's requests reach is derived from base_url in the egress allowlist's own spelling, never stated a second time, and a provider whose origin the deployment's allowlist does not declare is refused by name.",
   "providers": {
     "nebius_token_factory": {
       "base_url": "https://api.tokenfactory.nebius.com/v1",
@@ -95,6 +95,7 @@
       "supports_json_schema": true,
       "catalog_type": "text2text",
       "catalog_use_cases": ["dedicated-endpoint", "text", "reasoning", "function_calling", "code", "context_and_rag", "image", "video"],
+      "judging": {"sign_completeness": "docs/evaluation/2026-09-22-sign-completeness-probe-outcome.json"},
       "catalog_license": "MiniMax-M3",
       "region_informational": "us-central1",
       "note": "Runtime-verified 2026-08-27 to accept an image_url content part and describe the image correctly, despite catalog_type reading text2text. use_cases is authoritative, type is not. Measured 277 prompt tokens at 256px and 772 at 768px."
@@ -233,6 +234,8 @@
     "round_up_to_seconds": 5
   },
 
+  "judging_note": "A model's judging map names each judgement a policy may admit it to make, with the record of the probe that measured it. The place-proposal policy admits exactly the models whose judging names sign_completeness, so moving the vision role to a model this manifest has not measured leaves place naming off until its own probe is recorded here.",
+
   "chosen_roles_note": "A chosen role has no model of its own here. The world names one, for a person or a group, among the models whose declared answering fits the caller's contract, and with no choice nothing is asked. A model answers a chosen role only by a mechanism its answering map names, each mechanism naming the record whose probe verified it; a model whose map names none is offered to no chosen role. Its calls have no fallback, because a choice names one model, and no timeout of their own: the caller bounds each call by its contract.",
   "chosen_roles": {
     "society_decision": {
@@ -255,6 +258,7 @@
         "longest_ms": 28031,
         "note": "Single composer calls on the Companion answer path. No retained record measures the Lightning fallback, which serves under this timeout when the primary is withdrawn."
       },
+      "max_tokens": {"value": 32768, "basis": "The Companion composer's ceiling, sixteen times the chain's default. The Lightning fallback reasons inline on every call and cannot be told not to: measured against the live endpoint, the plan truncated at 2048 and 4096 and conformed at 16384, and the composer conformed at 16384 on a 24-item packet and truncated at the same ceiling on an 8-item one. Its spend varies per call, so the ceiling sits well above the largest observed. A ceiling is not a spend; a low one costs a failed answer."},
       "required_use_cases": ["text", "reasoning"],
       "rationale": "Used by selection.question.compose_answer to produce cited Companion answers from validated evidence packets. The comparison in docs/evaluation/2026-09-09-companion-memory.json supports Nano latency and validator conformance on four packets; it does not establish general reasoning quality or coverage of every continuity decision. Model-unavailability errors can select Lightning. Answer validation failures receive a repair attempt and then a deterministic answer, not automatic escalation to a larger model."
     },
@@ -303,6 +307,7 @@
         "longest_ms": 11001,
         "note": "Every row bounds one vision call from above: a photograph's one or two calls in the place-proposal outcomes, or a whole ingest capture in the rehearsal. The photographs are synthetic drawings."
       },
+      "image_prompt_tokens_reserved": {"value": 800, "basis": "One image's prompt tokens, reserved before a call so the budget guard never admits a call it cannot pay for: the primary was measured at 277 prompt tokens for a 256 px image and 772 for a 768 px one, rounded up. Accounting reads the usage the provider reports, never this."},
       "required_use_cases": ["image"],
       "rationale": "One structured-extraction pass per photograph at ingest. The primary is chosen on measured behaviour: it is a third the input price of the fallback, carries 32x the context, and was runtime-verified to comprehend an image rather than merely accept the request."
     },

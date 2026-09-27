@@ -197,13 +197,13 @@ const MOTION_STATE_WORDS: Readonly<Record<PlacedObjectRow['motion'], string>> = 
   unsupported: 'motion this client cannot run',
 });
 
-const AXIS_WORDS: Readonly<Record<string, string>> = Object.freeze({
+export const AXIS_WORDS: Readonly<Record<string, string>> = Object.freeze({
   x: 'Side to side',
   y: 'Up and down',
   z: 'Forward and back',
 });
 
-const EASING_WORDS: Readonly<Record<string, string>> = Object.freeze({
+export const EASING_WORDS: Readonly<Record<string, string>> = Object.freeze({
   linear: 'An even pace',
   smooth: 'Easing in and out',
 });

@@ -14,7 +14,7 @@ from exulanica.api.dependencies import CurrentSession, ScopedConnection
 from exulanica.api.world_scope import WorldId
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_action_repository import SocietyActionRepository
-from exulanica.world.society_actions import ActionIntent
+from exulanica.world.society_actions import ActionIntent, UnknownAffordance
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/actions", tags=["society"])
@@ -28,7 +28,8 @@ class GoToIntent(BaseModel):
 
 class PerformIntent(GoToIntent):
     kind: Literal["perform"]
-    affordance: Literal["visit", "rest"]
+    #: One of the activities the society's recorded routine offers, checked against it.
+    affordance: Annotated[str, Field(min_length=1, max_length=1000)]
 
 
 class SocietyActionBody(BaseModel):
@@ -65,6 +66,8 @@ def call(operation: Callable[[], Any]) -> Any:
         return JSONResponse(
             status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
         )
+    except UnknownAffordance as exc:
+        return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
     except ValueError as exc:
         return JSONResponse(
             status_code=409, content={"code": "invalid_society_action", "detail": str(exc)}

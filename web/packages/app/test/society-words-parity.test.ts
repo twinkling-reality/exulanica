@@ -12,11 +12,26 @@ const python = (name: string): string => readFileSync(new URL(name, WORLD), 'utf
 const API_SNAPSHOT = new URL('../../../../tests/snapshots/api-openapi.json', import.meta.url);
 const SOCIETY_CATALOGS = new URL('../../../../assets/catalogs/society/', import.meta.url);
 
-/** The codes `REASON_CODES` in society_planner.py states, read from the source that states them. */
+/**
+ * The codes `REASON_CODES` in society_planner.py states, read from the source that states them:
+ * the planner's own, and the reasons each kind of activity states in its catalog
+ * (`society-affordance.v*.json`), which the planner reads rather than writes.
+ */
 function reasonCodes(): string[] {
-  const block = /^REASON_CODES: Final = frozenset\(\s*\{([^}]*)\}\s*\)$/m.exec(python('society_planner.py'));
+  const block = /^REASON_CODES: Final = AFFORDANCE_REASON_CODES \| frozenset\(\s*\{([^}]*)\}\s*\)$/m.exec(
+    python('society_planner.py'),
+  );
   expect(block, 'REASON_CODES in exulanica/world/society_planner.py').not.toBeNull();
-  return [...block![1]!.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]!);
+  const own = [...block![1]!.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]!);
+  const kinds = readdirSync(SOCIETY_CATALOGS).filter((name) => /^society-affordance\.v\d+\.json$/.test(name));
+  expect(kinds.length, 'a society-affordance catalog').toBeGreaterThanOrEqual(1);
+  const stated = kinds.flatMap((name) => {
+    const catalog = JSON.parse(readFileSync(new URL(name, SOCIETY_CATALOGS), 'utf8')) as {
+      entries: { drawn_reason: string; needed_reason: string; nearest_reason: string }[];
+    };
+    return catalog.entries.flatMap((entry) => [entry.drawn_reason, entry.needed_reason, entry.nearest_reason]);
+  });
+  return [...new Set([...own, ...stated.filter((code) => code !== 'none')])];
 }
 
 describe('the page\'s copies of society facts', () => {

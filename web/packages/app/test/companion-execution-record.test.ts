@@ -24,11 +24,16 @@ const json = (body: unknown, status = 200): Response =>
 const WHERE = { baseUrl: 'https://exulanica.test/api', token: 'not-a-real-token', worldId: null };
 const COMPOSER = 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B';
 const PLANNER = 'Qwen/Qwen3-235B-A22B-Instruct-2507';
+/** The names the server serves for them (`Manifest.model_name`), which the lines print. */
+const COMPOSER_NAME = 'Nemotron 3 Nano 30B';
+const PLANNER_NAME = 'Qwen3 235B Instruct';
 
 const wireCall = (over: Record<string, unknown> = {}) => ({
   role: 'reasoning_cheap',
   requested_model: COMPOSER,
   served_model: COMPOSER,
+  requested_model_name: COMPOSER_NAME,
+  served_model_name: COMPOSER_NAME,
   used_fallback: false,
   attempts: 1,
   latency_ms: 4000,
@@ -44,6 +49,7 @@ const wireCall = (over: Record<string, unknown> = {}) => ({
 
 const timedOut = wireCall({
   served_model: null,
+  served_model_name: null,
   served_model_unavailable: 'result_not_returned',
   latency_ms: 60_000,
   prompt_tokens: null,
@@ -70,7 +76,7 @@ const PROBLEM = {
   detail: 'the read timed out',
   execution: {
     prompt_version: 'selection-8',
-    calls: [wireCall({ role: 'structured_extraction', requested_model: PLANNER, served_model: PLANNER, latency_ms: 2000 }), timedOut],
+    calls: [wireCall({ role: 'structured_extraction', requested_model: PLANNER, served_model: PLANNER, requested_model_name: PLANNER_NAME, served_model_name: PLANNER_NAME, latency_ms: 2000 }), timedOut],
     rejections: [],
   },
 };
@@ -113,7 +119,7 @@ describe('a question that failed after paying for attempts', () => {
 
     const provenance = speech.root.querySelector('.companion-provenance')?.textContent ?? '';
     expect(provenance).toBe(
-      `${fill('provenance.failed.timed_out', { model: COMPOSER, duration: '62.0 s' })} `
+      `${fill('provenance.failed.timed_out', { model: COMPOSER_NAME, duration: '62.0 s' })} `
         + say('provenance.costUnknown'),
     );
   });
@@ -130,10 +136,10 @@ describe('a question that failed after paying for attempts', () => {
 describe('an answer whose record holds attempts that returned nothing', () => {
   it('names the composer that answered, found by role and outcome rather than position', async () => {
     const answer = await client(json(answerBody([
-      wireCall({ role: 'structured_extraction', requested_model: PLANNER, served_model: PLANNER }),
+      wireCall({ role: 'structured_extraction', requested_model: PLANNER, served_model: PLANNER, requested_model_name: PLANNER_NAME, served_model_name: PLANNER_NAME }),
       wireCall(),
       // An attempt after the one that answered, which a positional reading would name.
-      wireCall({ outcome: 'reply_refused', served_model: null, cost_basis: 'known' }),
+      wireCall({ outcome: 'reply_refused', served_model: null, served_model_name: null, cost_basis: 'known' }),
     ]))).ask('where was I?');
 
     expect(answer.provenance.composed).toBe('model');
@@ -148,7 +154,7 @@ describe('an answer whose record holds attempts that returned nothing', () => {
     speech.renderAnswer(answer);
 
     const provenance = speech.root.querySelector('.companion-provenance')?.textContent ?? '';
-    expect(provenance).toContain(fill('provenance.model', { model: COMPOSER, duration: '64.0 s' }));
+    expect(provenance).toContain(fill('provenance.model', { model: COMPOSER_NAME, duration: '64.0 s' }));
     expect(provenance).toContain(fill('provenance.unanswered', { count: '1' }));
     expect(provenance).toContain(say('provenance.costUnknown'));
   });
@@ -170,7 +176,7 @@ describe('a failure whose record holds no failed attempt, or one never sent', ()
   it('names the models that read the question before something else stopped it', () => {
     const speech = buildCompanionSpeech({ speakerName: 'Companion', names: companionNames(() => null) });
     const planner = {
-      role: 'structured_extraction', requestedModel: PLANNER, servedModel: PLANNER, usedFallback: false,
+      role: 'structured_extraction', requestedModel: PLANNER, requestedModelName: PLANNER_NAME, servedModel: PLANNER, servedModelName: PLANNER_NAME, usedFallback: false,
       attempts: 1, latencyMs: 2000, promptTokens: 400, completionTokens: 20, reasoningTokens: null,
       outcome: 'completed' as const, costBasis: 'known' as const,
     };
@@ -180,14 +186,14 @@ describe('a failure whose record holds no failed attempt, or one never sent', ()
     }));
 
     expect(speech.root.querySelector('.companion-provenance')?.textContent).toBe(
-      fill('provenance.failed.afterAnswers', { models: PLANNER, duration: '2.0 s' }),
+      fill('provenance.failed.afterAnswers', { models: PLANNER_NAME, duration: '2.0 s' }),
     );
   });
 
   it('never says a model was asked when the request was never sent', () => {
     const speech = buildCompanionSpeech({ speakerName: 'Companion', names: companionNames(() => null) });
     const unsent = {
-      role: 'reasoning_cheap', requestedModel: COMPOSER, servedModel: null, usedFallback: false,
+      role: 'reasoning_cheap', requestedModel: COMPOSER, requestedModelName: COMPOSER_NAME, servedModel: null, servedModelName: null, usedFallback: false,
       attempts: 1, latencyMs: 5, promptTokens: null, completionTokens: null, reasoningTokens: null,
       outcome: 'failed' as const, costBasis: 'not_sent' as const,
     };
@@ -197,7 +203,7 @@ describe('a failure whose record holds no failed attempt, or one never sent', ()
     }));
 
     const line = speech.root.querySelector('.companion-provenance')?.textContent ?? '';
-    expect(line).toBe(fill('provenance.failed.not_sent', { model: COMPOSER, duration: '5 ms' }));
+    expect(line).toBe(fill('provenance.failed.not_sent', { model: COMPOSER_NAME, duration: '5 ms' }));
     expect(line).not.toContain('was asked');
   });
 });

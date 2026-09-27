@@ -566,10 +566,7 @@ def _role_credentials_set(environ: Mapping[str, str]) -> bool:
     process without them serves no model and says so in ``Services.warnings``.
     """
     manifest = load_manifest()
-    variables = {
-        manifest.provider(binding.provider).api_key_env for binding in manifest.roles.values()
-    }
-    return all(environ.get(name) for name in variables)
+    return all(environ.get(name) for name in manifest.credential_variables(manifest.roles))
 
 
 def _society_runtime(store: ContentAddressedStore, environ: Mapping[str, str]) -> SocietyRuntime:

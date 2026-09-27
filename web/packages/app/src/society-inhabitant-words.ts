@@ -9,6 +9,7 @@
  */
 
 import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v1.json?raw';
+import { ACTIVITY_KINDS } from './society-activity-words.js';
 
 /** The entry kinds the catalog holds; a kind outside these is refused when the page loads. */
 const KINDS = ['reason', 'phrase', 'doing', 'outcome', 'event_reason', 'line', 'decision_reason'] as const;
@@ -61,6 +62,11 @@ export const REASON_WORDS: Readonly<Record<string, string>> = TABLES.reason;
  * society-models-words-parity.test.ts.
  */
 export const DECISION_WORDS: Readonly<Record<string, string>> = TABLES.decision_reason;
+
+/** What an outcome code a state or an event records says happened, from the words catalog. */
+export function outcomeWords(code: string): string | undefined {
+  return TABLES.outcome[code];
+}
 
 /** Why, for any code a state or an event records, or the named sentence for one with no words. */
 export function reasonWords(code: string): string {
@@ -117,27 +123,29 @@ export function inhabitantWordsFrom(
   const met = (goal?.partner_id ? partner(goal.partner_id) : null) ?? words('phrase', 'partner_unknown');
   const completed = action.status === 'completed';
   let chosen: string;
+  // What each kind of activity is called at each stage is its catalog's (society-affordance), as
+  // the server's words read it; making room, waiting and deciding are the planner's own.
+  const heading = goal?.kind === undefined ? undefined : ACTIVITY_KINDS.get(goal.kind);
+  const under = ACTIVITY_KINDS.get(action.kind);
   if (action.status === 'blocked') chosen = 'waiting';
   else if (action.kind === 'move') {
-    chosen = goal?.kind === 'stand'
-      ? 'walking_to_stand'
-      : goal?.kind === 'talk'
-        ? 'walking_to_talk'
-        : goal?.kind === 'make_room' || action.target_id == null
-          ? 'walking_to_free_spot'
-          : goal?.kind === 'rest' ? 'walking_to_rest' : 'walking_to_visit';
-  } else if (action.kind === 'rest' || action.kind === 'visit') {
-    const stem = action.kind === 'rest' ? 'resting' : 'visiting';
-    chosen = completed ? `finished_${stem}` : stem;
-  } else if (action.kind === 'stand') chosen = completed ? 'finished_standing' : 'standing';
-  else if (action.kind === 'talk') {
-    chosen = completed ? 'finished_talking' : action.reason === 'waiting_for_partner' ? 'waiting_to_talk' : 'talking';
+    chosen = heading !== undefined && heading.setting !== 'object'
+      ? heading.headingDoing
+      : goal?.kind === 'make_room' || action.target_id == null
+        ? 'walking_to_free_spot'
+        // A goal no kind of activity states: nothing is said of it rather than a guess.
+        : heading?.headingDoing ?? 'nothing_recorded';
+  } else if (under !== undefined) {
+    // Only a pair activity waits for the other person, by the planner's own code.
+    chosen = completed
+      ? under.finishedDoing
+      : action.reason === 'waiting_for_partner' ? 'waiting_to_talk' : under.underWayDoing;
   } else chosen = completed ? 'standing_aside' : 'deciding';
   const doing = fill(words('doing', chosen), { place: where(action.target_id), partner: met, still });
   // The goal says why a person set out. Once they are blocked, the action says why; so it does for
   // standing and talking, under way or over, where only the action knows whether the other person
   // is still on the way, is there, or has gone.
-  const acting = action.status === 'blocked' || action.kind === 'stand' || action.kind === 'talk';
+  const acting = action.status === 'blocked' || (under !== undefined && under.setting !== 'object');
   const code = !acting && goal !== null ? goal.reason : action.reason;
   return { who, what, doing, why: fill(words('phrase', 'because'), { reason: reasonWords(code) }) };
 }

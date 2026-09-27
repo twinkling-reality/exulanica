@@ -66,8 +66,8 @@ function answer(text: string, names?: Readonly<Record<string, string>>): Compani
     ...(names === undefined ? {} : { names }),
     provenance: {
       composed: 'model',
-      servedModel: 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B',
-      plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      servedModel: 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B', servedModelName: 'Nemotron 3 Nano 30B',
+      plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507', plannedByName: 'Qwen3 235B Instruct',
       latencyMs: 4100,
       usedFallback: false,
     },

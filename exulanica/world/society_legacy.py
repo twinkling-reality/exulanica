@@ -1,14 +1,16 @@
 """Frozen v1 encoding: the fixed tables stored v1, v2 and v3 societies were generated from.
 
-Nothing new may use this module. The names, roles, ``home:{n}``/``work:{n}`` labels, the fixed
-weather and resources blocks and the plus or minus 300 m position bound are not vocabulary or
-world facts. They are part of the byte contract of societies that already exist: v1 genesis and
-transitions, and v2 and v3 genesis through :func:`initial_society`, hash them, and
-``tests/test_society_legacy.py`` pins those digests. They exist only so stored histories replay.
-Changing any value here changes every replay. The current profile, ``exulanica-society/v4`` in
-``exulanica.world.society_living``, uses none of them: its roles, homes and workplaces come from
-the place's premises or are recorded as unavailable, and its positions always lie on the place's
-navigation graph.
+Nothing new may use this module. The names, roles, weather and resources a genesis gives are the
+legacy identity catalog's (``assets/catalogs/society/society-legacy-identity.v1.json``), chosen by
+the engine profile the society records and frozen by that version's digest. The
+``home:{n}``/``work:{n}`` labels, the schedule and need draws and the plus or minus 300 m position
+bound are the rules of this encoding and stay here. All of it is part of the byte contract of
+societies that already exist: v1 genesis and transitions, and v2 and v3 genesis through
+:func:`initial_society`, hash them, and ``tests/test_society_legacy.py`` pins those digests.
+Changing any value changes every replay, so a change is a new catalog version for a new profile.
+The current profile, ``exulanica-society/v4`` in ``exulanica.world.society_living``, uses none of
+them: its roles, homes and workplaces come from the place's premises or are recorded as
+unavailable, and its positions always lie on the place's navigation graph.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from exulanica.world.society import (
     _inhabitant_id,
     _number,
 )
+from exulanica.world.society_catalogs import legacy_identity
 from exulanica.world.society_engines import society_engine
 
 #: This genesis is the v1 engine's own, so its population bounds are v1's row of the engine
@@ -33,11 +36,6 @@ _V1: Final = society_engine(SOCIETY_ENGINE_VERSION)
 
 __all__ = ["advance_society", "initial_society"]
 
-LEGACY_ROLES: Final = ("baker", "designer", "gardener", "student", "steward", "teacher")
-LEGACY_FIRST_NAMES: Final = ("Ari", "Bela", "Cleo", "Dara", "Emi", "Faye", "Ivo", "Juno")
-LEGACY_LAST_NAMES: Final = ("Ash", "Bell", "Cove", "Dawn", "Elm", "Fox", "Grove", "Hart")
-LEGACY_WEATHER: Final = {"kind": "clear", "temperature_c_milli": 19_000}
-LEGACY_RESOURCES: Final = {"food_milli": 820, "transit_milli": 760}
 #: An authored bound on v1 wandering, recorded nowhere but here. Not a district extent.
 LEGACY_POSITION_BOUND_MM: Final = 300_000
 
@@ -49,8 +47,10 @@ def initial_society(
     population: int = SOCIETY_POPULATION,
     minimum_population: int = _V1.population_minimum,
     maximum_population: int = _V1.population_maximum,
+    profile: str = SOCIETY_ENGINE_VERSION,
 ) -> dict[str, Any]:
-    """The seeded population, held to the calling profile's own bounds from the engine table."""
+    """The seeded population, held to the calling profile's own bounds from the engine table, with
+    the names, roles, weather and resources the identity catalog gives ``profile``."""
     if (
         not isinstance(seed, str)
         or len(seed) != 64
@@ -61,8 +61,9 @@ def initial_society(
         raise ValueError(
             f"society population must be between {minimum_population} and {maximum_population}"
         )
+    given = legacy_identity(profile)
     inhabitants = []
-    first, last = LEGACY_FIRST_NAMES, LEGACY_LAST_NAMES
+    first, last, roles = given.first_names, given.last_names, given.roles
     for ordinal in range(population):
         identity = _inhabitant_id(society_id, ordinal)
         home = _number(seed, "home", ordinal) % 32
@@ -78,7 +79,7 @@ def initial_society(
                 ),
                 "synthetic": True,
                 "household": home,
-                "role": LEGACY_ROLES[_number(seed, "role", ordinal) % len(LEGACY_ROLES)],
+                "role": roles[_number(seed, "role", ordinal) % len(roles)],
                 "home_node": f"home:{home}",
                 "work_node": f"work:{work}",
                 "schedule": {
@@ -110,8 +111,8 @@ def initial_society(
         "tick_seconds": SOCIETY_TICK_SECONDS,
         "inhabitants": inhabitants,
         "relationships": relationships,
-        "weather": dict(LEGACY_WEATHER),
-        "resources": dict(LEGACY_RESOURCES),
+        "weather": dict(given.weather),
+        "resources": dict(given.resources),
     }
 
 

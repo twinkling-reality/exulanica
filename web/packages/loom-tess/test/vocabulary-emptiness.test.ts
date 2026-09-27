@@ -142,18 +142,14 @@ function vocabulary(): Set<string> {
     join(REPOSITORY_ROOT, 'assets', 'owned-world', 'flatiron', 'flatiron-owned-district.json'),
   ) as { materials: { name: string }[] };
   for (const material of district.materials) words(material.name).forEach((w) => found.add(w));
-  // The living society froze these tables in society_legacy.py, so v1 to v3 histories replay.
-  const society = readFileSync(
-    join(REPOSITORY_ROOT, 'exulanica', 'world', 'society_legacy.py'),
-    'utf8',
-  );
-  for (const tuple of ['LEGACY_ROLES', 'LEGACY_FIRST_NAMES', 'LEGACY_LAST_NAMES']) {
-    const match = new RegExp(`^${tuple}: Final = \\(([^)]*)\\)`, 'm').exec(society);
-    if (match === null) {
-      throw new Error(`society_legacy.py no longer declares ${tuple} where this test reads it`);
-    }
-    for (const literal of match[1]!.matchAll(/"([^"]+)"/g)) words(literal[1]!).forEach((w) => found.add(w));
-  }
+  // The first three society engines take their names and roles from a frozen catalog, so v1 to
+  // v3 histories replay (assets/catalogs/society/society-legacy-identity.v1.json).
+  const identity = readJson(
+    join(REPOSITORY_ROOT, 'assets', 'catalogs', 'society', 'society-legacy-identity.v1.json'),
+  ) as { entries: { kind: string; text: string }[] };
+  const named = identity.entries.filter((entry) => ['role', 'first_name', 'last_name'].includes(entry.kind));
+  if (named.length === 0) throw new Error('society-legacy-identity.v1.json names no role or person');
+  for (const entry of named) words(entry.text).forEach((w) => found.add(w));
   // JavaScript's own name for a typed array's bytes, which the lane-use catalog also uses as a key.
   for (const hostName of HOST_NAMES) found.delete(hostName);
   const schema = schemaWords();

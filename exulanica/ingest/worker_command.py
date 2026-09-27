@@ -30,7 +30,7 @@ from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.store.local import LocalContentAddressedStore
 
 __all__ = [
@@ -47,7 +47,11 @@ __all__ = [
 
 WORKSPACES_ENV: Final = env_name("WORKSPACE_IDS")
 DATA_DIR_ENV: Final = env_name("DATA_DIR")
-MODEL_KEY_ENV: Final = "NEBIUS_API_KEY"
+#: The hosted roles the worker calls: a photograph's observation and its caption vectors.
+WORKER_ROLES: Final = (Role.VISION, Role.EMBEDDING)
+#: The variables the credentials of the providers serving those roles are read from, as the
+#: manifest's ``providers[].api_key_env`` names them; a worker without every one calls no model.
+MODEL_KEY_ENVS: Final = load_manifest().credential_variables(WORKER_ROLES)
 DEPTH_MODEL_ENV: Final = env_name("DEPTH_MODEL")
 PERSON_DETECTOR_ENV: Final = env_name("PERSON_DETECTOR")
 #: Read before 2026-09-16 to choose the depth checkpoint, which the manifest now pins. Refused when
@@ -105,13 +109,15 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         AccountWorkspaceSource(account_url, database.url).verify() if account_url else None
     )
 
-    client = ModelClient(max_attempts=1) if environ.get(MODEL_KEY_ENV) else None
+    client = (
+        ModelClient(max_attempts=1) if all(environ.get(name) for name in MODEL_KEY_ENVS) else None
+    )
     vision = NebiusVisionModel(client) if client is not None else None
     depth = _build_depth(environ)
     detector = _build_detector(environ)
     segmenter = _build_segmenter(environ)
     lease_seconds = lease_seconds_for(
-        max(client.worst_case_seconds(role) for role in (Role.VISION, Role.EMBEDDING))
+        max(client.worst_case_seconds(role) for role in WORKER_ROLES)
         if client is not None
         else None
     )

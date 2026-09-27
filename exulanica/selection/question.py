@@ -53,9 +53,14 @@ import psycopg
 from exulanica.epistemics.saved_names import SavedName, saved_names
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import ModelError, StructuredOutputError, TruncatedResponseError
+from exulanica.models.errors import (
+    ManifestError,
+    ModelError,
+    StructuredOutputError,
+    TruncatedResponseError,
+)
 from exulanica.models.handoff import ModelHandoff
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.selection.answer import (
     MAX_NOTES,
     Abstention,
@@ -127,17 +132,21 @@ __all__ = [
 ]
 
 
-#: The composer's token budget, sixteen times the role's default, for a measured reason.
-#:
-#: `nvidia/Nemotron-3_5-Lightning` emits inline reasoning that cannot be switched off. The
-#: manifest's note puts that at "roughly 150 to 215 reasoning tokens on every call", measured on
-#: a trivial prompt; on this project's own schemas it is far more, and it is not stable. Measured
-#: against the live endpoint: `SelectionPlan` truncated at 2048 and at 4096 and conformed at
-#: 16384; the composer then conformed at 16384 on a 24-item packet and TRUNCATED at the same
-#: ceiling on an 8-item one. The spend varies per call, so the ceiling is set well above the
-#: largest observed rather than at it. A ceiling is not a spend: an unused one costs nothing and
-#: a low one costs a failed answer on a request somebody is waiting for.
-COMPOSER_MAX_TOKENS: Final = 32768
+def _composer_max_tokens() -> int:
+    """The ceiling the manifest declares for the composer's role, or a refusal naming it."""
+    declared = load_manifest()[Role.REASONING_CHEAP].max_tokens
+    if declared is None:
+        raise ManifestError(
+            "reasoning_cheap declares no max_tokens, which the Companion composer needs: its "
+            "chain reasons inline and truncates at the default ceiling"
+        )
+    return declared.value
+
+
+#: The composer's token budget: the ``max_tokens`` the manifest declares for ``reasoning_cheap``,
+#: where its measured reason is stated. A module name, so a measurement script can rebind it for
+#: one call (``scripts/measure_companion_memory.py``); nothing else restates the number.
+COMPOSER_MAX_TOKENS: Final = _composer_max_tokens()
 
 #: How many times the composer may be asked for one answer: one try and one repair. The loop in
 #: :func:`compose_answer` runs to it, and :data:`ANSWER_PATH_CALLS` counts it.
@@ -172,9 +181,9 @@ def answer_bound_seconds(client: ModelClient) -> float:
 #: What the three candidates did on one 24-item packet, recorded because the choice is not
 #: obvious and the numbers are the whole argument:
 #:
-#:     reasoning_cheap   nvidia/Nemotron-3_5-Lightning     80.4s   conformed
-#:     reasoning_mid     nvidia/nemotron-3-super-120b      2.8s    returned text that is not JSON
-#:     structured_extraction  Qwen/Qwen3-235B              5.6s    conformed
+#:     reasoning_cheap   Nemotron 3.5 Lightning     80.4s   conformed
+#:     reasoning_mid     Nemotron 3 Super 120B      2.8s    returned text that is not JSON
+#:     structured_extraction  Qwen3 235B Instruct   5.6s    conformed
 #:
 #: The reasoning core is fourteen times slower than the extraction model at the same job and is
 #: the only NVIDIA model on the chain that produces a schema-valid answer at all. It writes the
@@ -186,10 +195,10 @@ def answer_bound_seconds(client: ModelClient) -> float:
 #: artifact behind it this time.** ``docs/evaluation/2026-09-09-companion-question.json``, and
 #: two of the three lines above have moved:
 #:
-#:     nvidia/Nemotron-3_5-Lightning          16.7s, 21.8s   conformed
-#:     nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B   4.8s,  5.6s   conformed
-#:     nvidia/nemotron-3-super-120b-a12b       2.3s          conformed
-#:     Qwen/Qwen3-235B-A22B-Instruct-2507      1.1s,  2.5s   conformed
+#:     Nemotron 3.5 Lightning     16.7s, 21.8s   conformed
+#:     Nemotron 3 Nano 30B         4.8s,  5.6s   conformed
+#:     Nemotron 3 Super 120B       2.3s          conformed
+#:     Qwen3 235B Instruct         1.1s,  2.5s   conformed
 #:
 #: Two findings, neither of them acted on here.
 #:
@@ -200,7 +209,7 @@ def answer_bound_seconds(client: ModelClient) -> float:
 #: is a manifest change, so it is proposed in the record rather than made here, and two questions
 #: is not evidence about answer quality.
 #:
-#: And ``nemotron-3-super-120b-a12b`` conformed. The "not JSON" line above no longer reproduces
+#: And Nemotron 3 Super 120B conformed. The "not JSON" line above no longer reproduces
 #: on a full packet; on an empty one, in the same session, it answered with a top-level JSON
 #: array instead of an object. It is not reliably either, which is why nothing routes to it and
 #: why the strict local check is what makes the difference visible rather than silent.
@@ -404,7 +413,7 @@ def compose_answer(
             # This function promises it "raises nothing" and that a second failure returns the
             # deterministic answer. A model that runs out of budget mid-object was not covered,
             # so the promise held for every failure except the one the reasoning core actually
-            # produces: measured, `nvidia/Nemotron-3_5-Lightning` truncated at a 16384 ceiling on
+            # produces: measured, Nemotron 3.5 Lightning truncated at a 16384 ceiling on
             # a larger packet and the exception went all the way out of `answer_question`, past
             # the floor that exists so a question always gets an answer.
             rejections = (str(exc),)

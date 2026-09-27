@@ -6,9 +6,9 @@ structure/style identity.  Live composed digests are appearance CAS tokens.  Str
 is never the reason for compatibility.  Live typed identities may still agree when hex
 strings collide.
 
-Starter refuse uses a stored origin when the caller supplies one (``starter_world`` or the
-current snapshot composer key).  Otherwise it uses the stored starter ``world_id`` scheme
-``world:authored:``, not a heuristic over arbitrary strings.
+Starter refuse reads a stored origin the caller supplies as ``starter_world``: the current
+snapshot's composer key, else the world registry's kind.  A registration with neither is
+refused as ``world_kind_unstated``; nothing reads a world's kind from its id.
 
 ``preview_required`` is a CLASSIFY-family result.  ``REGISTER_TOPOLOGY`` does not emit it:
 family-matched digest change on a non-starter is the composer handoff.  COMPOSE tokens are
@@ -253,7 +253,10 @@ def _classify_register(
     facts: StyleStructureFacts,
     planes: tuple[str, ...],
 ) -> StructureStyleCompatibility:
-    authored_world = _is_starter_world(facts)
+    # A world's kind is its registry's, never read from its id.
+    if facts.starter_world is None:
+        return _refuse("world_kind_unstated", planes)
+    authored_world = facts.starter_world
     if authored_world and facts.proposed_has_sourced_slots:
         return _refuse("starter_sourced_activation", planes)
     if (
@@ -300,17 +303,6 @@ def _classify_bootstrap(
     if facts.named_snapshot_id is not None:
         return _result("compatible", "bootstrap_reuse", planes)
     return _result("compatible", "bootstrap_initial", planes)
-
-
-STARTER_WORLD_ID_PREFIX = "world:authored:"
-
-
-def _is_starter_world(facts: StyleStructureFacts) -> bool:
-    """Use a stored origin when supplied; otherwise the stored ``world:authored:`` scheme."""
-
-    if facts.starter_world is not None:
-        return facts.starter_world
-    return facts.world_id.startswith(STARTER_WORLD_ID_PREFIX)
 
 
 def _family_match(facts: StyleStructureFacts) -> bool:

@@ -85,6 +85,13 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
         patch.setattr(
             pg_harness, "migrations", lambda: iter(m for m in everything if m.version < _MIGRATION)
         )
+        # Before 0099 no registry held a world's kind; the data built here is as those schemas
+        # held it, where a starter was the world the starter composer committed or spelled so.
+        patch.setattr(
+            WorldStyleRepository,
+            "_starter_world_fact",
+            lambda repository: repository.world_id.startswith("world:authored:"),
+        )
         with pg_harness.migrated_schema() as (_psycopg, admin):
             scratch = admin.execute("select current_schema()").fetchone()[0]
             database = _database(scratch)

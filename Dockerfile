@@ -71,6 +71,12 @@ COPY --from=builder --chown=exulanica:exulanica /app/.venv /app/.venv
 # (deploy/material-bake/Dockerfile) because it runs Node.
 COPY assets/textures/manifest.json assets/textures/catalog.json /app/assets/textures/
 COPY assets/textures/objects /app/assets/textures/objects
+# The versioned catalogs, and a link that puts them where the installed package reads them: a
+# module finds a catalog two directories above its own file, which for this non-editable install
+# is site-packages. Several are read when the package is imported, so an image without them
+# cannot start any process. `tests/test_image_ships_import_reads.py` holds both lines.
+COPY assets/catalogs /app/assets/catalogs
+RUN ln -s /app/assets "$(/app/.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/assets"
 
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \

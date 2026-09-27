@@ -313,7 +313,7 @@ class Instance:
         args = SimpleNamespace(workspace=[str(self.workspace_id)], name="wiring", poll_seconds=2.0)
         environ = {
             worker_command.DATA_DIR_ENV: str(self.tmp_path / "worker"),
-            worker_command.MODEL_KEY_ENV: "test-key-not-real",
+            **dict.fromkeys(worker_command.MODEL_KEY_ENVS, "test-key-not-real"),
         }
         return worker_command._build_worker(args, environ)
 

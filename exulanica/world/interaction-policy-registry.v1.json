@@ -8,7 +8,8 @@
       "kind": "integer",
       "minimum": 60,
       "maximum": 90,
-      "default": 70
+      "default": 70,
+      "shown_in_settings": true
     },
     {
       "key": "comfort.look-sensitivity-milli",
@@ -17,54 +18,83 @@
       "kind": "integer",
       "minimum": 500,
       "maximum": 2000,
-      "default": 1000
+      "default": 1000,
+      "shown_in_settings": true
     },
     {
       "key": "comfort.vignette",
       "version": 1,
       "category": "comfort",
       "kind": "choice",
-      "choices": ["off", "subtle", "strong"],
-      "default": "subtle"
+      "choices": [
+        "off",
+        "subtle",
+        "strong"
+      ],
+      "default": "subtle",
+      "shown_in_settings": true
     },
     {
       "key": "comfort.camera-bob",
       "version": 1,
       "category": "comfort",
       "kind": "toggle",
-      "default": false
+      "default": false,
+      "shown_in_settings": false,
+      "settings_note": "Not offered on the settings page; the preference exists and a Companion proposal may still change it."
     },
     {
       "key": "navigation.turn-mode",
       "version": 1,
       "category": "navigation",
       "kind": "choice",
-      "choices": ["smooth", "snap"],
-      "default": "smooth"
+      "choices": [
+        "smooth",
+        "snap"
+      ],
+      "default": "smooth",
+      "shown_in_settings": false,
+      "settings_note": "Not offered on the settings page; the preference exists and a Companion proposal may still change it."
     },
     {
       "key": "navigation.transition-style",
       "version": 1,
       "category": "navigation",
       "kind": "choice",
-      "choices": ["motion", "fade"],
-      "default": "motion"
+      "choices": [
+        "motion",
+        "fade"
+      ],
+      "default": "motion",
+      "shown_in_settings": false,
+      "settings_note": "Not offered on the settings page; the preference exists and a Companion proposal may still change it."
     },
     {
       "key": "disclosure.provenance-detail",
       "version": 1,
       "category": "disclosure",
       "kind": "choice",
-      "choices": ["standard", "expanded"],
-      "default": "standard"
+      "choices": [
+        "standard",
+        "expanded"
+      ],
+      "default": "standard",
+      "shown_in_settings": false,
+      "settings_note": "No module reads its value yet, so a control for it would change nothing."
     },
     {
       "key": "initiative.mode",
       "version": 1,
       "category": "initiative",
       "kind": "choice",
-      "choices": ["normal", "minimal", "off"],
-      "default": "normal"
+      "choices": [
+        "normal",
+        "minimal",
+        "off"
+      ],
+      "default": "normal",
+      "shown_in_settings": false,
+      "settings_note": "Not offered on the settings page; the preference exists and a Companion proposal may still change it."
     }
   ]
 }

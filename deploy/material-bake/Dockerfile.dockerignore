@@ -16,3 +16,4 @@ web/packages/loom-texture/dist
 !assets/textures/manifest.json
 !assets/textures/catalog.json
 !assets/textures/objects
+!assets/catalogs

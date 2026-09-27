@@ -354,6 +354,9 @@ export interface PersistedAnswer {
    */
   readonly servedModel: string | null;
   readonly plannedBy: string | null;
+  /** The names a person reads for those two, as the server serves them (`Manifest.model_name`). */
+  readonly servedModelName: string | null;
+  readonly plannedByName: string | null;
   readonly promptVersion: string;
   readonly latencyMs: number;
   readonly origin: AnswerOrigin;

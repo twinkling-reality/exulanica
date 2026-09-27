@@ -12,7 +12,7 @@ under the same current authorization. Four rules hold on every path:
 *   **No inhabitant's name reaches a hosted request, a saved name's lookup or an answer.** An
     inhabitant is ``[inhabitant A]`` and a place they use ``[spot A]``, the maps are returned with
     the answer, and the page draws each name from its own copy of the society, marked simulated.
-    Synthetic names are drawn from a small table (``society_legacy.LEGACY_FIRST_NAMES``), so one
+    Synthetic names are drawn from a small table (the legacy identity catalog), so one
     can share a part with somebody the account holder saved; a question whose words could be
     either is refused by name rather than guessed (:data:`SocietyRefusal.SYNTHETIC_NAME_COLLISION`).
 *   **Who, doing and why need no model.** They are the inspector's own words for the state

@@ -30,7 +30,7 @@ import math
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 import psycopg
 from psycopg.pq import TransactionStatus
@@ -43,8 +43,9 @@ from exulanica.epistemics.hosted_requests import (
 )
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.client import ModelClient
+from exulanica.models.errors import ManifestError
 from exulanica.models.handoff import ModelHandoff
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.results import EmbeddingResult
 
 #: Called with every model a caption request can reach and where it goes, immediately before the
@@ -74,6 +75,19 @@ group by c.capture_id, s.span_id
 """
 
 
+#: The width of every vector the embedding role returns, as the manifest declares it for the
+#: role's primary. The ``embedding`` table's column and its CHECK hold the same width in applied
+#: SQL; ``tests/test_epistemic_guard_postgres.py`` compares the live column with the manifest.
+def _embedding_dimensions() -> int:
+    dimensions = load_manifest()[Role.EMBEDDING].primary.embedding_dimensions
+    if dimensions is None:
+        raise ManifestError("the embedding role's primary declares no embedding_dimensions")
+    return dimensions
+
+
+EMBEDDING_DIMENSIONS: Final = _embedding_dimensions()
+
+
 @dataclass(frozen=True)
 class QueryEmbedding:
     vector: tuple[float, ...]
@@ -81,8 +95,12 @@ class QueryEmbedding:
     pipeline_version: int
 
     def __post_init__(self) -> None:
-        if len(self.vector) != 4096 or not all(math.isfinite(v) for v in self.vector):
-            raise ValueError("A query embedding must contain 4096 finite dimensions")
+        if len(self.vector) != EMBEDDING_DIMENSIONS or not all(
+            math.isfinite(v) for v in self.vector
+        ):
+            raise ValueError(
+                f"A query embedding must contain {EMBEDDING_DIMENSIONS} finite dimensions"
+            )
         if not any(self.vector):
             raise ValueError("A zero vector has no cosine similarity")
 
@@ -169,7 +187,7 @@ def embed_capture(
                     connection.execute(
                         "insert into embedding (embedding_id, workspace_id, family, ref_type, "
                         "ref_id, model_ref, pipeline_version, dims, v) "
-                        "values (%s,%s,%s,'span',%s,%s,%s,4096,%s)",
+                        "values (%s,%s,%s,'span',%s,%s,%s,%s,%s)",
                         (
                             key,
                             workspace_id,
@@ -177,6 +195,7 @@ def embed_capture(
                             source["span_id"],
                             result.model_id,
                             version,
+                            EMBEDDING_DIMENSIONS,
                             vector.literal,
                         ),
                     )

@@ -58,9 +58,11 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json
+from exulanica.models.manifest import load_manifest
 
 __all__ = [
     "PLACE_PROPOSAL_POLICY",
+    "SIGN_JUDGEMENT",
     "SIGN_QUESTION",
     "SIGN_SCHEMA",
     "SIGN_SCHEMA_NAME",
@@ -178,6 +180,10 @@ SIGN_SCHEMA: Final[dict[str, Any]] = {
 # ---------------------------------------------------------------------------------------
 
 
+#: The judgement a model's ``judging`` map in the manifest names to be admitted as a sign judge.
+SIGN_JUDGEMENT: Final = "sign_completeness"
+
+
 @dataclass(frozen=True, slots=True)
 class AdmittedJudge:
     """A model whose answer to the sign question is trusted, and the record that measured it."""
@@ -197,7 +203,8 @@ class PlaceProposalPolicy:
     #: nothing by itself; an answer this table does not name is refused as unknown.
     completeness: Mapping[str, Outcome | None]
     #: Models whose sign judgement is admitted. Any other model's answer, including the vision
-    #: role's fallback when it answers, is refused by name until a measurement admits it here.
+    #: role's fallback when it answers, is refused by name until a measurement admits it in the
+    #: manifest's ``judging``.
     admitted_judges: tuple[AdmittedJudge, ...]
     word_pattern: str
     word_folding: str
@@ -265,13 +272,10 @@ PLACE_PROPOSAL_POLICY: Final = PlaceProposalPolicy(
         "partly_hidden": SIGN_PARTLY_HIDDEN,
         "no_sign": NO_SIGN_SEEN,
     },
-    admitted_judges=(
-        # 24 of 24 boards judged correctly when asked alone, the vision role's primary pinned
-        # with its fallback off.
-        AdmittedJudge(
-            model_id="MiniMaxAI/MiniMax-M3",
-            evidence="docs/evaluation/2026-09-22-sign-completeness-probe-outcome.json",
-        ),
+    # The models the manifest admits to this judgement, each with the record that measured it.
+    admitted_judges=tuple(
+        AdmittedJudge(model_id=model_id, evidence=record)
+        for model_id, record in load_manifest().judges(SIGN_JUDGEMENT)
     ),
     word_pattern=_WORD.pattern,
     word_folding="Unicode NFKC, then casefold, then apostrophes removed",

@@ -1,12 +1,13 @@
 """Manifest and preflight.
 
-The load-bearing test in this file is ``test_no_model_id_is_inlined_in_python_source``. It is the
+The load-bearing test in this file is ``test_no_model_id_is_inlined_in_product_code``. It is the
 only mechanical enforcement of invariant 7, and it is written to fail on the change that would
 break it rather than to restate that the manifest has entries.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -16,7 +17,8 @@ from exulanica.models.errors import ManifestError, PreflightError, TransportErro
 from exulanica.models.manifest import MANIFEST_PATH, Role, parse_manifest
 from exulanica.models.preflight import catalog_flavors, main, run_preflight
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "exulanica" / "models"
+REPOSITORY = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = REPOSITORY / "exulanica" / "models"
 
 
 def _catalog_entry(model_id: str, *, use_cases, price_in="0.06", price_out="0.24"):
@@ -81,21 +83,119 @@ def test_prices_are_decimal_not_float(manifest):
         assert isinstance(spec.output_usd_per_mtok, Decimal)
 
 
-def test_no_model_id_is_inlined_in_python_source(manifest):
-    """Invariant 7: identifiers live in the manifest JSON and nowhere else.
+#: The newest migration on disk when the scan was widened. Migrations up to it are applied, frozen
+#: SQL and keep the identifiers they were written with (0001 names the embedding model); every
+#: later migration is scanned like any other product file.
+FROZEN_MIGRATIONS_THROUGH = 116
 
-    This fails the moment somebody pastes an identifier into a call site, a docstring or a
-    default argument, which is the change that turns the next deprecation into a silent outage.
+
+def product_files(repository: Path) -> list[Path]:
+    """Every text file of product code: the package and the browser packages' sources, except
+    the manifest itself and the migrations applied when the scan was widened."""
+    package = repository / "exulanica"
+    roots = [package, *sorted((repository / "web" / "packages").glob("*/src"))]
+    frozen = {package / "models" / "models.manifest.json"}
+    found = []
+    for root in roots:
+        for candidate in sorted(root.rglob("*")):
+            if not candidate.is_file() or candidate in frozen or "__pycache__" in candidate.parts:
+                continue
+            if (
+                candidate.parent == package / "migrations"
+                and candidate.suffix == ".sql"
+                and int(candidate.name[:4]) <= FROZEN_MIGRATIONS_THROUGH
+            ):
+                continue
+            found.append(candidate)
+    return found
+
+
+def inlined_model_ids(files, model_ids) -> list[str]:
+    """``file contains id`` for every identifier any of ``files`` spells, in any letter case.
+
+    What it cannot see: an identifier split across string literals or built from parts, one in a
+    file that is not UTF-8 text, and anything outside the package and the browser sources
+    (scripts, tests and documents may name models; they are not product code).
     """
-    offenders: list[str] = []
-    for path in sorted(PACKAGE_ROOT.rglob("*.py")):
-        text = path.read_text(encoding="utf-8")
-        for model_id in manifest.model_ids:
-            if model_id in text:
-                offenders.append(f"{path.name} contains {model_id!r}")
-    assert offenders == [], (
-        "model identifiers must appear only in models.manifest.json:\n" + "\n".join(offenders)
+    offenders = []
+    for candidate in files:
+        try:
+            text = candidate.read_text(encoding="utf-8").casefold()
+        except UnicodeDecodeError:
+            continue
+        offenders.extend(
+            f"{candidate} contains {model_id!r}"
+            for model_id in model_ids
+            if model_id.casefold() in text
+        )
+    return offenders
+
+
+def test_no_model_id_is_inlined_in_product_code(manifest):
+    """Invariant 7: identifiers live in the manifest JSON and nowhere else in product code.
+
+    This fails the moment somebody pastes an identifier into a call site, a docstring, a default
+    argument, a data file or the browser, which is the change that turns the next deprecation
+    into a silent outage (a policy that names its model stops working when the manifest moves).
+    """
+    files = product_files(REPOSITORY)
+    # The scan reaches both halves of the product, so an empty glob cannot pass it.
+    assert REPOSITORY / "exulanica" / "ingest" / "place_proposal.py" in files
+    assert any(f.suffix == ".ts" and "web" in f.parts for f in files)
+    assert inlined_model_ids(files, manifest.model_ids) == [], (
+        "model identifiers must appear only in models.manifest.json"
     )
+
+
+def test_the_model_id_scan_finds_an_identifier_planted_in_product_code(manifest, tmp_path):
+    """Positive control: the same scan over a copy of the layout with one identifier planted."""
+    planted = tmp_path / "exulanica" / "ingest" / "place_proposal.py"
+    planted.parent.mkdir(parents=True)
+    model_id = sorted(manifest.model_ids)[0]
+    planted.write_text(f'JUDGE = "{model_id.upper()}"\n', encoding="utf-8")
+    browser = tmp_path / "web" / "packages" / "app" / "src" / "names.ts"
+    browser.parent.mkdir(parents=True)
+    browser.write_text(f"export const NAME = '{model_id}';\n", encoding="utf-8")
+    migration = tmp_path / "exulanica" / "migrations" / "0001_spine.sql"
+    migration.parent.mkdir(parents=True)
+    migration.write_text(f"-- {model_id}\n", encoding="utf-8")
+    later = migration.with_name(f"{FROZEN_MIGRATIONS_THROUGH + 1:04d}_a_later_change.sql")
+    later.write_text(f"-- {model_id}\n", encoding="utf-8")
+    offenders = inlined_model_ids(product_files(tmp_path), manifest.model_ids)
+    assert sorted(offenders) == sorted(
+        [
+            f"{planted} contains {model_id!r}",
+            f"{browser} contains {model_id!r}",
+            f"{later} contains {model_id!r}",
+        ]
+    )
+
+
+def credential_literals(source: str, variables) -> list[int]:
+    """The lines of ``source`` holding a string constant that is a credential variable."""
+    return sorted(
+        node.lineno
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Constant) and node.value in variables
+    )
+
+
+def test_no_module_reads_a_credential_from_a_variable_it_spells(manifest):
+    """Every caller takes a provider's credential variable from the manifest's ``api_key_env``
+    (``Manifest.credential_variables``); a module that spells one reads a credential the
+    manifest no longer names once the provider moves."""
+    variables = {provider.api_key_env for provider in manifest.providers.values()}
+    offenders = [
+        f"{candidate}:{line}"
+        for candidate in sorted((REPOSITORY / "exulanica").rglob("*.py"))
+        for line in credential_literals(candidate.read_text(encoding="utf-8"), variables)
+    ]
+    assert offenders == []
+    # Positive control: the same check finds the spelling this test exists to keep out.
+    variable = sorted(variables)[0]
+    assert credential_literals(f'KEY = "{variable}"\nprose = "needs {variable}"\n', variables) == [
+        1
+    ]
 
 
 def test_embedding_role_declares_no_fallback(manifest):

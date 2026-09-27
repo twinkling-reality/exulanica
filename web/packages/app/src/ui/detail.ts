@@ -19,7 +19,13 @@
  * showed only what is known, and the whole point of the fourth band is what is not.
  */
 
-import type { EntityRecord, GraphSnapshot, OccurrenceRecord } from '@exulanica/graph-client';
+import type {
+  EntityRecord,
+  GraphSnapshot,
+  HistoryEventType,
+  IndexStatus,
+  OccurrenceRecord,
+} from '@exulanica/graph-client';
 import type { BandRow, ConfirmationBand } from '@exulanica/companion-runtime';
 import type { EntityDetailView, OccurrenceCitation } from '@exulanica/world-index';
 import { DETAIL_SECTION_ORDER, buildEntityDetail } from '@exulanica/world-index';
@@ -29,6 +35,32 @@ import type { SourceMediaCatalog } from '@exulanica/atlas-react/playcanvas';
 import { say } from './copy.js';
 import { el, replace } from './dom.js';
 import { buildPlaceNameRights } from './place-name-rights.js';
+
+/** An entity's status in words, for every status the read model states (exhaustive by type). */
+const STATUS_WORDS: Readonly<Record<IndexStatus, string>> = {
+  confirmed: 'confirmed',
+  needs_review: 'needs review',
+  inferred_only: 'inferred only',
+  user_asserted: 'user asserted',
+  rejected: 'rejected',
+  merged_away: 'merged away',
+};
+
+/**
+ * A history event's kind in words, for every kind the server's `identity_event_type` enum holds
+ * (migrations 0001 and 0010), held to it by code-words-parity.test.ts.
+ */
+export const HISTORY_WORDS: Readonly<Record<HistoryEventType, string>> = {
+  entity_created: 'entity created',
+  link_confirmed: 'link confirmed',
+  link_rejected: 'link rejected',
+  link_revoked: 'link revoked',
+  entities_merged: 'entities merged',
+  entity_split: 'entity split',
+  event_undone: 'event undone',
+  entity_renamed: 'entity renamed',
+};
+
 
 export interface DetailHandlers {
   /** The user asks to say who or what a detection is. Produces a proposal, never a write. */
@@ -178,7 +210,7 @@ function sectionsOf(
           }),
           el('p', {
             class: 'detail-sub',
-            text: `${view.identity.occurrenceCount} occurrences, ${view.identity.status.replace(/_/g, ' ')}`,
+            text: `${view.identity.occurrenceCount} occurrences, ${STATUS_WORDS[view.identity.status]}`,
           }),
         ]);
       case 'provenance':
@@ -224,7 +256,7 @@ function sectionsOf(
             { class: 'history' },
             view.history.map((event) =>
               el('li', {}, [
-                el('span', { class: 'history-type', text: event.type.replace(/_/g, ' ') }),
+                el('span', { class: 'history-type', text: HISTORY_WORDS[event.type] }),
                 ' ',
                 el('time', { text: new Date(event.atMs).toISOString().slice(0, 16) }),
               ]),

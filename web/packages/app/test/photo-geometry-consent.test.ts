@@ -88,6 +88,14 @@ function fixture(rights: 'none' | 'current' | 'ended' = 'none', placed = false) 
         sources: [{
           capture_id: CAPTURE, sha256: await sha256(await file.arrayBuffer()), bytes: file.size,
           media_type: 'image/jpeg', authority: null, model_rights: modelRights(),
+          // The depth role's standing, as the server decides it from the one right above.
+          model_right_standings: [{
+            role: 'depth',
+            standing: granted,
+            until: granted === 'current' ? '2099-01-01T12:00:00.000000Z' : null,
+            without_these_words: false,
+            stopped: granted === 'ended',
+          }],
         }],
         requests: saved,
         model_right_offers: [DEPTH_OFFER],

@@ -51,8 +51,8 @@ const ANSWER: CompanionAnswer = {
   evidence: [],
   provenance: {
     composed: 'model',
-    servedModel: 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B',
-    plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+    servedModel: 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B', servedModelName: 'Nemotron 3 Nano 30B',
+    plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507', plannedByName: 'Qwen3 235B Instruct',
     latencyMs: 3200,
     usedFallback: false,
   },
@@ -73,8 +73,9 @@ const CLASSIFIER = 'deepseek-ai/DeepSeek-V4-Flash-0731';
 
 const call = (latency: number, servedModel: string = DRAFTER) => ({
   role: 'structured_extraction',
-  requestedModel: DRAFTER,
+  requestedModel: DRAFTER, requestedModelName: DRAFTER,
   servedModel,
+  servedModelName: servedModel,
   usedFallback: servedModel !== DRAFTER,
   attempts: 1,
   latencyMs: latency,
@@ -542,7 +543,7 @@ describe('a proposal the Companion speaks about only after the world style autho
     expect(spoken).toContain(REFUSAL_DETAIL);
     // Named for the change it drew, and said to have been shown nowhere.
     expect(mounted.controller.answer()?.provenance).toMatchObject({
-      composed: 'unshown', servedModel: DRAFTER,
+      composed: 'unshown', servedModel: DRAFTER, servedModelName: DRAFTER,
     });
     expect(spoken).toContain(`${DRAFTER} drew this change in 3.5 s. It was never shown`);
     // One row: the refusal is the answer, never a second answer beside one that said otherwise.

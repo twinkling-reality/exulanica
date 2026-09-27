@@ -49,6 +49,7 @@ from exulanica.grammar.grammars.city.tile import (
     TileRecord,
     tile_inputs_digest,
 )
+from exulanica.ingest.detector_vocabulary import detector_vocabulary
 from exulanica.ingest.vision import SCHEMA_VERSION, prompt_digest
 from exulanica.reconstruction.alignment import ALIGNMENT_POLICY
 from exulanica.reconstruction.place_alignment import PLACE_ALIGNMENT_POLICY
@@ -366,42 +367,9 @@ STAGES: Final[dict[str, StageSpec]] = {
             # SAM 2.1 resizes to 1024 square internally, so a larger input buys nothing but decode
             # time; the outline is in ppm of the unit square and does not depend on this size.
             "max_edge_px": 1024,
-            # Things, never stuff: sky, ground and water are not entities a person names, and a
-            # segment over the sky would lift onto no geometry at all because depth masks it.
-            # No person term, ever, which a test checks against the vision stage's own filter.
-            # Landscape features are here because the first measured corpus is a volcanic walk.
-            "detector_vocabulary": [
-                "rock",
-                "boulder",
-                "crater",
-                "cliff",
-                "tree",
-                "bush",
-                "flower",
-                "sign",
-                "fence",
-                "railing",
-                "bench",
-                "table",
-                "chair",
-                "building",
-                "house",
-                "car",
-                "bicycle",
-                "boat",
-                "bridge",
-                "statue",
-                "lamp",
-                "bottle",
-                "cup",
-                "bowl",
-                "plate",
-                "bag",
-                "umbrella",
-                "dog",
-                "cat",
-                "bird",
-            ],
+            # The versioned vocabulary, whose entries say why each word is there. The words
+            # themselves are the parameter, so a new version re-keys every mask.
+            "detector_vocabulary": list(detector_vocabulary()),
             "detector_box_threshold_millionths": 300_000,
             "detector_text_threshold_millionths": 250_000,
             "fallback_detector_threshold_millionths": 200_000,
