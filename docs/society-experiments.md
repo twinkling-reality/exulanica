@@ -171,28 +171,36 @@ loop and its replay are `exulanica/world/society_comparison.py`; the local runne
 
 **Records.** Migration 0113 appends four records, each keyed within its workspace and by a
 registered world, under forced row-level security, and never changed: a definition by the caller's
-comparison id, a run by an id derived from the comparison, its arm and its seed's digest, a
-receipt by its run and decision sequence, and an outcome by its run:
-`society_comparison` (the definition: window, phase, arms, the seeds it committed to by digest,
-the registered claim and pre-registration, and the decision contract, catalogs and scoring code it
-is run and scored under), `society_comparison_run` (one arm on one seed; it holds the seed a replay
-needs beside the digest), `society_comparison_decision` (every request and receipt a run's model
-was asked, in the host's `exulanica.society-decision/v2` form) and `society_comparison_outcome` (a
-run's one terminal fact: completed, with every minute's state digest, its events and receipts
-digests and the score's integer terms, or failed by a code from `RUN_FAILURE_CODES`). A run fails
-by name only when the host, not the model, ended its asking: a spent budget, a refused provider or
-credential, a model no longer offered or asked otherwise than the definition recorded, rules that
-would change the question, or a refused request. A run a process stopped part way, found with
-receipts and no outcome, is recorded as failed, `interrupted`, before anything is asked; running
-it again is a new comparison. Migration 0116 admits a second-version definition
-(`exulanica.society-comparison/v2`) and completed outcome beside the first, whose rows and rules it
-leaves as they were. A second-version definition records its group, where the group came from
-(everybody, people named, or one of the owner's choices by its sequence and digest) and every other
-person's decider with the owner's choice it keeps. The repository holds each to the world's own
-records before it is stored, refusing a group that is not the choice it names
-(`group_not_the_choice`) and a person outside it whose decider is not the owner's latest choice for
-them (`others_not_the_owners_choice`), and 0116's trigger refuses a completed outcome whose version
-is not its definition's.
+comparison id, a run by an id derived from the comparison, its arm and its seed's digest, a receipt
+by its run and decision sequence, and an outcome by its run: `society_comparison` (the definition:
+window, phase, arms, the seeds it committed to by digest, the registered claim and pre-registration,
+and the decision contract, catalogs and scoring code it is run and scored under),
+`society_comparison_run` (one arm on one seed; it holds the seed a replay needs beside the digest),
+`society_comparison_decision` (every request and receipt a run's model was asked, in the host's
+`exulanica.society-decision/v2` form) and `society_comparison_outcome` (a run's one terminal fact:
+completed, with every minute's state digest, its events and receipts digests and the score's integer
+terms, or failed by a code from `RUN_FAILURE_CODES`). A run fails by name only when the host, not
+the model, ended its asking: a spent budget, a refused provider or credential, a model no longer
+offered or asked otherwise than the definition recorded, rules that would change the question, or a
+refused request. A run a process stopped part way, found with receipts and no outcome, is recorded
+as failed, `interrupted`, before anything is asked; running it again is a new comparison. Migration
+0116 admits a second-version definition (`exulanica.society-comparison/v2`) and completed outcome
+beside the first, whose rows and rules it leaves as they were. A second-version definition records
+its group, where the group came from (everybody, people named, or one of the owner's choices by its
+sequence and digest) and every other person's decider with the owner's choice it keeps. The
+repository holds each to the world's own records before it is stored, refusing a group that is not
+the choice it names (`group_not_the_choice`) and a person outside it whose decider is not the
+owner's latest choice for them (`others_not_the_owners_choice`), and 0116's trigger refuses a
+completed outcome whose version is not its definition's. The mechanism a model answers a person's
+choice by changes what it chooses, not only how long it takes
+([the model actions probe](evaluation/2026-09-26-society-model-actions-probe.json) found Nemotron
+3.5 Lightning choosing to wait in 13 of 16 answers by a JSON schema and in 2 of 16 by a forced
+call), so a definition also records, for every model it names, how that model is asked: the
+mechanisms in order, the one its requests use, whose order that is (the model's own, measured and
+named by its manifest entry, or the contract's) and the record that measured a model's own. The
+runner refuses a definition that records another answering than the contract and the manifest give
+(`answering_not_the_models`), and stops a run before it asks anything when they would now ask one of
+its models otherwise (`provider_configuration_changed`).
 
 **Score.** A comparison is scored under the score version it was defined under. The second, declared
 in `assets/catalogs/society/society-person-score.v2.json` and computed exactly by
@@ -275,6 +283,30 @@ their routine, Qwen's people scored 0.0488 lower, 0.0120 of relief and 0.0368 of
 keeps how many turns were not applied, 24 of Qwen's 703, 9 of 770 in its second run and 2 of
 Lightning's 1527, not why; the run with the most, Qwen's on `held_out_3` with 11 of 81, is the only
 one whose answer time at the 95th percentile, 20,008 ms, reached the contract's 20,000 ms deadline.
+
+**Second record.** The
+[second judged comparison](evaluation/2026-09-26-society-group-comparison.json), scored under the
+second version and run once through `scripts/measure_group_comparison.py`, swapped the model
+deciding for four of the small square's eight people, the half the world's owner had chosen Qwen3
+235B Instruct for, while the other four kept their routine: Qwen as the owner chose, run twice as
+the control, Nemotron 3.5 Lightning and Nemotron 3 Nano 30B, over the twelve fresh held-out seeds.
+Its [pre-registration](evaluation/2026-09-26-society-group-comparison-preregistration.json) records
+the candidates with how each is asked, Nano by a JSON schema, the order measured for it, and the
+others by a forced call; the hours of the clock the run would start within; that DeepSeek V4 Flash
+did not join, since a development run of all four offered models showed it would leave the bound too
+little room; and that it was written before any held-out seed was run. All twelve seeds were scored.
+The verdict is no measured difference: the group's people fared the same under Qwen, its second run
+and Lightning on every seed, to the four decimals the record keeps, 1.0505 on average, so the
+primary difference and the control's are both 0.0000, and under Nano 1.0422 on average; the family's
+test rejected no model's difference from the routine. What each model answered differed: Qwen
+answered 99.25% of the group's turns (99.56% in its second run), Lightning 95.77% and Nano 92.51%.
+None refused a turn and no ask ran out of time: every turn left to the routine was an answer the
+minute could not apply, 65 of the 72 because the person a model chose to talk with was busy. The
+models also spent the hour differently: Qwen's people rested in 73.8% of their minutes and talked in
+1.0%, Lightning's rested in 42.3%, stood in 9.3% and talked in 14.9%. Under this score a model's
+choices while its people are rested neither earn nor cost, and Lightning's moved the group's score
+from Qwen's on no seed. Every run replayed from its receipts with no billed call, and the calls cost
+0.2482 USD, from 22:49 to 23:08 EDT on 2026-09-26.
 
 **Reads.** Three routes read what a comparison recorded; none asks a model or writes anything.
 

@@ -117,6 +117,22 @@ QUESTION_CHANGED: Final = "question_changed_by_rules"
 ANCHOR_FAILED: Final = "anchor_failed"
 
 
+def _recorded_answering(
+    definition: Mapping[str, Any], arm: str
+) -> dict[str, Mapping[str, Any] | None]:
+    """Each model's answering as ``definition`` records it for a run of ``arm``, by model id: the
+    arm's model and every model the owner chose for somebody outside the group. A definition
+    recorded before answering was recorded names none, and its runs are held to the mechanism
+    alone."""
+    held: dict[str, Mapping[str, Any] | None] = {}
+    deciders = [definition["arms"][arm], *definition.get("others", ())]
+    for decider in deciders:
+        config = decider.get("provider_config")
+        if config is not None and decider.get("answering") is not None:
+            held[config["model_id"]] = decider["answering"]
+    return held
+
+
 class _RunStopped(Exception):
     """A run the host cannot go on with, by the name its outcome records."""
 
@@ -290,16 +306,22 @@ class SocietyComparisonRunner:
 
     # -- definitions -------------------------------------------------------------------------
 
-    def _model(self, arm: ComparisonArm, choice_seq: int | None) -> tuple[dict, dict, ModelSpec]:
-        """A model as a definition records it: the decider, and what its requests record of how
-        it is asked and under what, as the host records it for a person whose owner chose it."""
+    def _model(
+        self, arm: ComparisonArm, choice_seq: int | None
+    ) -> tuple[dict, dict, dict, ModelSpec]:
+        """A model as a definition records it: the decider, what its requests record of how it is
+        asked and under what, as the host records it for a person whose owner chose it, and its
+        answering (the order it is asked in and whose order that is,
+        :meth:`~exulanica.world.society_decision_contract.DecisionContract.answering`), since the
+        mechanism a model answers by changes what it chooses, not only how long it takes."""
         contract = decision_contract()
         try:
             spec = self.manifest.offered(Role.SOCIETY_DECISION, arm.model_id)
         except ManifestError as exc:
             raise ValueError(f"{arm.model_id} is not offered for a person's decisions") from exc
         mechanism = contract.mechanism_for(spec)
-        if spec.provider != arm.provider or mechanism is None:
+        answering = contract.answering(spec)
+        if spec.provider != arm.provider or mechanism is None or answering is None:
             raise ValueError(f"{arm.provider}/{arm.model_id} is not askable under the contract")
         decider = {"kind": "model", "provider": spec.provider, "model_id": spec.model_id}
         config = {
@@ -312,16 +334,17 @@ class SocietyComparisonRunner:
             "contract": contract.binding(),
             "deadline_ms": contract.value("decision_deadline_ms"),
         }
-        return decider, config, spec
+        return decider, config, answering, spec
 
     def model_arm(self, arm: ComparisonArm, role: str) -> dict[str, Any]:
         """A model arm as a definition records it: the model, how it is asked and under what."""
         # No owner's choice made the group model-run: the comparison's arm did.
-        decider, config, spec = self._model(arm, None)
+        decider, config, answering, spec = self._model(arm, None)
         return {
             "role": role,
             "decider": decider,
             "provider_config": config,
+            "answering": answering,
             "description": spec.description,
         }
 
@@ -368,10 +391,11 @@ class SocietyComparisonRunner:
             choice = latest.get(subject)
             decider: dict[str, Any] = {"kind": "routine"}
             config: dict[str, Any] | None = None
+            answering: dict[str, Any] | None = None
             if choice is not None and choice["model"] is not None:
                 model = choice["model"]
                 try:
-                    decider, config, _spec = self._model(
+                    decider, config, answering, _spec = self._model(
                         ComparisonArm(model["provider"], model["model_id"]), choice["choice_seq"]
                     )
                 except ValueError as exc:
@@ -381,6 +405,7 @@ class SocietyComparisonRunner:
                     "id": subject,
                     "decider": decider,
                     "provider_config": config,
+                    "answering": answering,
                     "choice": None
                     if choice is None
                     else {
@@ -398,6 +423,7 @@ class SocietyComparisonRunner:
         comparison_id: uuid.UUID,
         body: Mapping[str, Any],
     ) -> dict[str, Any]:
+        self._answering_held(body)
         with self.database.session(self.workspace_id) as connection, connection.transaction():
             return self._repository(connection).define(
                 version_id,
@@ -406,6 +432,28 @@ class SocietyComparisonRunner:
                 created_by=self.actor,
                 catalogs=self.catalogs,
             )
+
+    def _answering_held(self, body: Mapping[str, Any]) -> None:
+        """Every model a definition names, an arm's or a person's outside the group, is recorded
+        with the answering the contract and its manifest entry give it now: a definition that
+        says otherwise could never run as it states itself (:meth:`_asking`)."""
+        contract = decision_contract()
+        for held in [*body["arms"].values(), *body["others"]]:
+            config = held.get("provider_config")
+            if config is None:
+                continue
+            try:
+                spec = self.manifest.offered(Role.SOCIETY_DECISION, config["model_id"])
+            except ManifestError as exc:
+                raise ComparisonRefused(
+                    "answering_not_the_models", f"{config['model_id']} is not offered"
+                ) from exc
+            if held.get("answering") != contract.answering(spec):
+                raise ComparisonRefused(
+                    "answering_not_the_models",
+                    f"{config['model_id']} is recorded with the order the contract and its "
+                    "manifest entry ask it in",
+                )
 
     # -- runs -------------------------------------------------------------------------------
 
@@ -497,7 +545,9 @@ class SocietyComparisonRunner:
                 raise _RunStopped(stopped)
 
         try:
-            played = play(plan, self._asking(plan), on_minute=store)
+            played = play(
+                plan, self._asking(plan, _recorded_answering(definition, arm)), on_minute=store
+            )
         except _RunStopped as stop:
             outcome = self._failed(definition, arm, digest, stop.code)
         else:
@@ -523,9 +573,14 @@ class SocietyComparisonRunner:
             statuses.append(None if outcome is None else outcome["status"])
         return tuple(statuses)
 
-    def _asking(self, plan: RunPlan) -> _Asking | _Anchor:
+    def _asking(
+        self, plan: RunPlan, recorded: Mapping[str, Mapping[str, Any] | None]
+    ) -> _Asking | _Anchor:
         """What a run asks: nobody where no model decides for anybody in it, else every model
-        that does, each checked against the manifest as the definition recorded it."""
+        that does, each checked against the manifest as the definition recorded it, its answering
+        included where the definition records one (``recorded``, by model id): a model the
+        contract and manifest would now ask in another order, or by another mechanism, is not the
+        model the definition names, and the run stops before it asks anything."""
         deciders = [
             (plan.decider, plan.provider_config),
             *((held["decider"], held["provider_config"]) for held in plan.others.values()),
@@ -543,11 +598,13 @@ class SocietyComparisonRunner:
             except ManifestError:
                 raise _RunStoppedBeforeStart("model_no_longer_offered") from None
             mechanism = plan.contract.mechanism_for(spec)
+            held = recorded.get(spec.model_id)
             if (
                 spec.provider != config["provider"]
                 or mechanism is None
                 or mechanism.value != config["mechanism"]
                 or config["prompt_version"] != PROMPT_VERSION
+                or (held is not None and plan.contract.answering(spec) != dict(held))
             ):
                 raise _RunStoppedBeforeStart("provider_configuration_changed")
             models[spec.model_id] = (spec, mechanism)

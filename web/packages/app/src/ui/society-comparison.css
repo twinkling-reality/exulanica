@@ -77,6 +77,7 @@
 .comparison-number { font-variant-numeric: tabular-nums; }
 .comparison-arm-name { display: block; font-weight: 600; }
 .comparison-arm-role { display: block; color: var(--ink-soft, #4e5d64); font-weight: 400; }
+.comparison-arm-answering { display: block; color: var(--ink-soft, #4e5d64); font-weight: 400; font-size: 0.85em; }
 .comparison-seeds td[data-status='failed'] { color: var(--comparison-differs); }
 .comparison-differences { margin: 0; padding-left: 1.1rem; font-variant-numeric: tabular-nums; }
 .comparison-choose { display: flex; flex-wrap: wrap; gap: .75rem; }

@@ -1,0 +1,197 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": [
+      "model_a",
+      "model_b",
+      "model_c",
+      "model_a_again",
+      "routine",
+      "wait"
+    ],
+    "artifacts": {
+      "docs/evaluation/artifacts/2026-09-26-society-group-comparison/design-exclusion.json": "34a4123a8f5ed725387e374f4546019848e8de052d05dcd023b3e3792e51885a",
+      "docs/evaluation/artifacts/2026-09-26-society-group-comparison/dry-run.json": "9d8c681defa3148ba819498c05d8ddb8f7c50f855e596bab17a013c98c83b6f6"
+    },
+    "bound_usd": "0.40",
+    "candidates": [
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "name": "Qwen3 235B Instruct",
+        "provider": "nebius_token_factory"
+      },
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "model_id": "nvidia/Nemotron-3_5-Lightning",
+        "name": "Nemotron 3.5 Lightning",
+        "provider": "nebius_token_factory"
+      },
+      {
+        "answering": {
+          "mechanism": "json_schema",
+          "order": [
+            "json_schema",
+            "tool_call"
+          ],
+          "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+          "source": "model"
+        },
+        "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "name": "Nemotron 3 Nano 30B",
+        "provider": "nebius_token_factory"
+      }
+    ],
+    "contract": {
+      "catalog_versions": {
+        "society-decision-action": 2,
+        "society-decision-policy": 2
+      },
+      "sha256": "ec540b58aa9cf5bd288a933f5e18e304321dd2d09039ff13ce642bdfe5102ecd"
+    },
+    "control": [
+      "model_a",
+      "model_a_again"
+    ],
+    "decision_rule": "different only when Holm's procedure over the family at the protocol's family error rejects the primary hypothesis and the primary mean's size exceeds the larger end, in size, of the control's interval; otherwise no measured difference; with fewer than the minimum scored seeds, not judged",
+    "earlier_measurements": [
+      "A design measurement on 24 seeds derived from a fixed label, none of them committed, played the small square's hour in memory with each seed's first and second half of the people by identity waiting at every choice point while the rest followed their routine, asking no model: 7 of the 48 groups had the routine spare them less than the floor of 575 per person against waiting, 3 of them nothing. This script's design step made it again on the tree this comparison measures and wrote it beside this comparison's artifacts.",
+      "The anchors and the dry run of this script on the eight development seeds, each with a scripted model behind the product's client, asked no model.",
+      "A development comparison on the acceptance slot, from 02:34:33 to 02:42:46 UTC on 2026-09-27, decided for the same group with everybody else on their routine by Qwen3 235B Instruct (run twice), Nemotron 3.5 Lightning, DeepSeek V4 Flash and Nemotron 3 Nano 30B on the first two development seeds: all 14 runs completed, the second seed was spared less than the floor and excluded, and the calls cost 0.06442178 USD, 0.0318 to 0.0326 USD a seed for the five model runs, from 0.0020 USD a run for Nano to 0.0108 for DeepSeek. Lightning and DeepSeek each reached the contract's 20 second deadline at the 95th percentile on one seed. Without DeepSeek a seed cost at most 0.0256 USD, which on twelve seeds is 0.31 USD, and with it 0.0326, or 0.39 USD against a bound of at most 0.40, so DeepSeek does not join."
+    ],
+    "expected_exclusion": "about one seed in seven (7 of 48 half-square groups in the design measurement spared less than the floor), so about two of twelve",
+    "family": [
+      [
+        "model_a",
+        "model_b"
+      ],
+      [
+        "routine",
+        "model_a"
+      ],
+      [
+        "routine",
+        "model_b"
+      ],
+      [
+        "routine",
+        "model_c"
+      ]
+    ],
+    "group": {
+      "everybody_else": "their own routine: the owner chooses nothing for them",
+      "rule": "the first half of the square's people by subject id, for whom the world's owner chooses the first candidate before the comparison is defined; the comparison's group is that choice's people"
+    },
+    "manifest_sha256": "2c1b6dc9feeb09aea65158065cd3a4625a64f5cc8923571809df3f8a3586ed2a",
+    "max_calls": 12000,
+    "minimum_scored_seeds": 2,
+    "primary": {
+      "measure": "the mean over scored held-out seeds of model_b's score minus model_a's",
+      "pair": [
+        "model_a",
+        "model_b"
+      ]
+    },
+    "protocol": {
+      "bootstrap_resamples": 10000,
+      "family_alpha_per_mille": 50,
+      "interval_per_mille": 950,
+      "need_relief_floor_per_person": 575,
+      "population_maximum": 8,
+      "runs_at_once": 2,
+      "window_ticks": 60
+    },
+    "question": "**The question.** The small square of a starter world, its eight simulated people brought in, one simulated hour. The world's owner chooses Qwen3 235B Instruct for half of them, the first half by identity, and the rest keep their own routine. With that group decided by Qwen, as the owner chose, or by Nemotron 3.5 Lightning or Nemotron 3 Nano 30B, swapped in for them, how much of the need above the routine's rest threshold are the group's people spared, as a share of what their own routine spares them against waiting (the score of ``society-person-score.v2``, how the people fared and nothing else), and is Lightning's difference from Qwen larger than the protocol lets a comparison claim? Beside each score, what each model answered: its share of the group's turns answered, refused and left to the routine, each model asked as the contract and its manifest entry ask it (Nano by a JSON schema, the order measured for it; the others by a forced call).",
+    "reliability": "reported apart and never weighed: each arm's share of the group's turns answered, refused and left to the routine, and the same per choice point of the seed's routine run; the verdict also says whether the primary pair's answered shares differ by more than the control pair's",
+    "run_window": {
+      "local": "2026-09-26T22:48:52-04:00 to 2026-09-27T01:48:52-04:00",
+      "not_after_utc": "2026-09-27T05:48:52+00:00",
+      "not_before_utc": "2026-09-27T02:48:52+00:00",
+      "why": "a provider's answer time varies within one evening (finding #44), and a turn a model does not answer by the contract's deadline is left to the routine, so the run starts within these hours and its record says when it started and ended"
+    },
+    "scoring": {
+      "catalogs": {
+        "sha256": "058550832f1cb0c0620a88f0e388e97852f0d5b1d7bbbc98e31de9267cce6e05",
+        "versions": {
+          "society-comparison-protocol": 2,
+          "society-comparison-seeds": 2,
+          "society-person-score": 2
+        }
+      },
+      "modules": {
+        "exulanica.world.society_comparison_claim": "7f3ff0152129e64c501acbf4067514d694e4eb5ef644b48b25b319f73cff000a",
+        "exulanica.world.society_comparison_verdict": "7114c1419ae89018c48a5e93035c3d89c648345c19ef59ab6fa5117bb0a0eb2e",
+        "exulanica.world.society_score": "561e6242bdb601559215e234a40e29429b9d26967a548e5bfdf166006194c010",
+        "exulanica.world.society_score_v2": "a75bc8f3dae5f61a9202acf5097224aecf807676a7260b3eba88c6e99592b110"
+      },
+      "profile": "exulanica.society-comparison-binding/v2"
+    },
+    "script": "scripts/measure_group_comparison.py",
+    "script_sha256": "0ae35da044c21a2f8ce8df078c175d2464138908a17d61f04b04f6983ba0d369",
+    "seeds": {
+      "count": 12,
+      "digests": [
+        "cf4adb0a4670442b41753372aee798795c43232748f68a92acb1a74f49dc7984",
+        "8a877325a663bbecfd1274ae5f60fd6253478735aaed7ae735e043f9c4e99636",
+        "2b28662fc5f7b4ec74b47702646bc49d9bbbb42bde870aae2ff06b4ae819c84f",
+        "08617c499e627eaf655e55be65373e66797768a2f25671e44113a2404d2a40f9",
+        "56280f7efc009e221c7e89854852d1b74b61aa7737d4a1d8b2b1fbd7f378769e",
+        "5d81aad2f024b3dc9cbf21dcc895d17738ac8e97713b03f6505bd39c513c2a77",
+        "e9a8abe76f92468340500236c52cc354d55c271d1eb71ab65a578744994f278d",
+        "c2afea1496f97e4030fc1b4d2d7aef96f1aa91f56d076ca3749c3075a13f078e",
+        "2581ec232f91f6b2e9aba0ec6348bbd8e710992854a6f15c25acb191244ef102",
+        "618375c5b8bec808ff361a00d90c9d57fed528a1cf5ccc25028e6158f138230a",
+        "f4a32610aee743791ce5e76c7d08e429c58235da2e390d01ff780087fe4fd621",
+        "c21d52dc97ec3981ca5805b6f5b183d48f33a480e13e54a7d4c28d33395a8cbb"
+      ],
+      "phase": "held_out"
+    },
+    "tree": {
+      "files_sha256": {
+        "docs/evaluation/artifacts/2026-09-26-society-group-comparison/design-exclusion.json": "34a4123a8f5ed725387e374f4546019848e8de052d05dcd023b3e3792e51885a",
+        "docs/evaluation/artifacts/2026-09-26-society-group-comparison/dry-run.json": "9d8c681defa3148ba819498c05d8ddb8f7c50f855e596bab17a013c98c83b6f6",
+        "docs/society-experiments.md": "4f8fa66b4afe5492eae82d4b84e1770bce86047f211e2202f819b94bdb3067bc",
+        "exulanica/api/society_comparison_runner.py": "b083dd394432d5f9cf61e4324bc0a80e38a832732c6b18eac95a3e98c8266e97",
+        "exulanica/orchestration/compare.py": "93190e39550d5ce1c243a37b26182fb534d7d101aff51804e07cb31e844a03dc",
+        "exulanica/world/society_comparison_repository.py": "a7d78b03c75920cb0fb38908f2e55332bf664d90fa03ae602e216d7d2388d06c",
+        "exulanica/world/society_comparison_result.py": "d4175a4e9f7e7c3aebd33811dea485c83ca4211a627daef49141d51c4c44372a",
+        "exulanica/world/society_decision_contract.py": "ac6756d3d30ddb1f64efc94d705eba44ff59e2521f6a14df061bf3414ac016dc",
+        "scripts/measure_group_comparison.py": "0ae35da044c21a2f8ce8df078c175d2464138908a17d61f04b04f6983ba0d369",
+        "tests/comparison_support.py": "9558ee50e1843f6992eabbb6069fe955e445c2e4015a2905e2a7874262d6df3c",
+        "tests/snapshots/society-comparison-documents.json": "1d86b389a9782d10b212c2c5e0d81124bbba50b1c0581c1b952e5c7bba01db04",
+        "tests/snapshots/society-group-comparison-documents.json": "8f75c7d64f5cdc0905c84ac03994d78a30eb7c2159944c74d745354410d4c9f6",
+        "tests/test_society_comparison_answering.py": "44e5ea5586c46d12225668ffe0ace1af23118e394e844607534abdd45553f018",
+        "tests/test_society_comparison_result_v2.py": "ed43e7c16325ed3967409b8491fb80240e140098f96e501440fb257363f7ef68",
+        "tests/test_society_group_comparison_postgres.py": "ae69284c241a0995510dff25c50c198f449844ae596d6aead1393bf121868dd5",
+        "web/packages/app/src/society-comparison-api.ts": "9934379d4431d96ee4bf3e5af2372d5ca4607a96ac355ac1769fb7b6eee1bc3f",
+        "web/packages/app/src/ui/society-comparison.css": "31fe456c80f4b28436a30454ad77bac71e4de59d5de13187125460d2c8858346",
+        "web/packages/app/src/ui/society-comparison.ts": "b57504a192ea419efd5f39239cac04b4c8bb2bdc2db3dea580096e8cf1ce56c9",
+        "web/packages/app/test/society-comparison-reliability.test.ts": "7aa1101aabcec5e2ba448159a4c8ad66197e3d37328b1462811e4f0a4b1925b0",
+        "web/packages/app/test/society-comparison-words-parity.test.ts": "23614a5236051b5e1fec619c0ee9c56797f8a9bd27830c04359c558a54adde27"
+      },
+      "head": "8dca7cc2ec132047c2c8ad3fe999c38c24705062"
+    },
+    "world": {
+      "society_seed_sha256": "c375ade7cc611557079be209d488289431d3a34f4f61789aa552c2b2f4932f71",
+      "starter": "the starter world with the small square placed where a person arrives"
+    },
+    "written_before_any_held_out_seed_was_run": true
+  },
+  "record_sha256": "05de5c7f9b69e75a654bbc0e5dac201ca77b83379a38d6773aea6a3efef0979b"
+}

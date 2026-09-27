@@ -244,17 +244,42 @@ class DecisionContract:
         ]
         return tuple(mechanism for _, mechanism in sorted(ranked))
 
-    def mechanism_for(self, spec: ModelSpec) -> AnsweringMechanism | None:
-        """How ``spec`` is asked: the first accepted mechanism its manifest entry verifies, in
-        the answering order its entry states when it states one this contract accepts (a
-        measured order for that model) and this contract's version asks in it, and otherwise in
-        this contract's order."""
-        own = [
+    def _own_order(self, spec: ModelSpec) -> list[AnsweringMechanism]:
+        """The accepted part of the answering order ``spec``'s entry states, where this contract's
+        version asks in a model's own order; empty otherwise."""
+        return [
             m
             for m in (spec.answering_order if self.asks_in_a_models_own_order else ())
             if m in self.mechanism_order
         ]
-        return next((m for m in own or self.mechanism_order if m in spec.answering), None)
+
+    def answering_order(self, spec: ModelSpec) -> tuple[AnsweringMechanism, ...]:
+        """The accepted mechanisms ``spec``'s manifest entry verifies, in the order it is asked
+        by: the answering order its entry states when it states one this contract accepts (a
+        measured order for that model) and this contract's version asks in it, and otherwise
+        this contract's order. Empty: this contract cannot ask it."""
+        return tuple(
+            m for m in self._own_order(spec) or self.mechanism_order if m in spec.answering
+        )
+
+    def mechanism_for(self, spec: ModelSpec) -> AnsweringMechanism | None:
+        """How ``spec`` is asked: the first of its :meth:`answering_order`."""
+        return next(iter(self.answering_order(spec)), None)
+
+    def answering(self, spec: ModelSpec) -> dict[str, object] | None:
+        """How ``spec`` is asked, as a record states it: the mechanisms in order, the one it is
+        asked by, whose order that is (``model``, measured for it, or ``contract``) and the record
+        that measured a model's own order. None: this contract cannot ask it."""
+        order = self.answering_order(spec)
+        if not order:
+            return None
+        own = bool(self._own_order(spec))
+        return {
+            "order": [mechanism.value for mechanism in order],
+            "mechanism": order[0].value,
+            "source": "model" if own else "contract",
+            "record": spec.answering_order_record if own else None,
+        }
 
 
 def _contract(versions: Mapping[str, int] | None) -> DecisionContract:

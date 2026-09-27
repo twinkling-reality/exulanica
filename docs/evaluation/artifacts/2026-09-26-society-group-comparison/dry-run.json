@@ -1,0 +1,2786 @@
+{
+  "anchors": [
+    {
+      "people": 4,
+      "routine_choice_points": 42,
+      "routine_urgency": 1308,
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d",
+      "spared": 9972,
+      "wait_urgency": 11280
+    },
+    {
+      "people": 4,
+      "routine_choice_points": 44,
+      "routine_urgency": 1893,
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7",
+      "spared": 15687,
+      "wait_urgency": 17580
+    },
+    {
+      "people": 4,
+      "routine_choice_points": 37,
+      "routine_urgency": 1160,
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80",
+      "spared": 9100,
+      "wait_urgency": 10260
+    },
+    {
+      "people": 4,
+      "routine_choice_points": 38,
+      "routine_urgency": 1161,
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca",
+      "spared": 10794,
+      "wait_urgency": 11955
+    },
+    {
+      "people": 4,
+      "routine_choice_points": 38,
+      "routine_urgency": 801,
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19",
+      "spared": 8829,
+      "wait_urgency": 9630
+    },
+    {
+      "people": 4,
+      "routine_choice_points": 43,
+      "routine_urgency": 168,
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2",
+      "spared": 1782,
+      "wait_urgency": 1950
+    },
+    {
+      "people": 4,
+      "routine_choice_points": 37,
+      "routine_urgency": 1012,
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0",
+      "spared": 12218,
+      "wait_urgency": 13230
+    },
+    {
+      "people": 4,
+      "routine_choice_points": 39,
+      "routine_urgency": 1145,
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047",
+      "spared": 7225,
+      "wait_urgency": 8370
+    }
+  ],
+  "billed_calls_during_replays": 0,
+  "calls_by_model": [
+    {
+      "asks": 628,
+      "calls": 628,
+      "completion_tokens": 188400,
+      "cost_usd": "0.21352000",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "prompt_tokens": 502400,
+      "provider": "nebius_token_factory"
+    },
+    {
+      "asks": 330,
+      "calls": 330,
+      "completion_tokens": 99000,
+      "cost_usd": "0.03960000",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "prompt_tokens": 264000,
+      "provider": "nebius_token_factory"
+    },
+    {
+      "asks": 302,
+      "calls": 302,
+      "completion_tokens": 90600,
+      "cost_usd": "0.03624000",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "prompt_tokens": 241600,
+      "provider": "nebius_token_factory"
+    }
+  ],
+  "comparison_id": "44af4d52-f698-4c28-aa22-7194b0421445",
+  "ended_utc": "2026-09-27T02:46:40+00:00",
+  "group": {
+    "people": [
+      {
+        "id": "099868e0-0e21-5a4f-8986-e4bd0b47c716",
+        "name": "Bela Ash 2"
+      },
+      {
+        "id": "0c0c3506-dd06-5267-92a4-3cd13f629c57",
+        "name": "Juno Ash 8"
+      },
+      {
+        "id": "24e9451a-6800-5cb8-b8a7-f2cada32874d",
+        "name": "Emi Ash 5"
+      },
+      {
+        "id": "6ba4977b-c6d8-5313-88d0-3d48c3a5c561",
+        "name": "Dara Ash 4"
+      }
+    ],
+    "size": 4,
+    "source": {
+      "choice_seq": 1,
+      "document_sha256": "c92edc3c60bd8ea93b19761602619ae38f6fe92740d12f38e665da6a20738bf4",
+      "kind": "owner_choice"
+    }
+  },
+  "listing": {
+    "comparisons": [
+      {
+        "arms": [
+          {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
+            "decider": {
+              "kind": "model",
+              "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+              "name": "Qwen3 235B Instruct",
+              "provider": "nebius_token_factory"
+            },
+            "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+            "key": "model_a",
+            "role": "candidate"
+          },
+          {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
+            "decider": {
+              "kind": "model",
+              "model_id": "nvidia/Nemotron-3_5-Lightning",
+              "name": "Nemotron 3.5 Lightning",
+              "provider": "nebius_token_factory"
+            },
+            "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
+            "key": "model_b",
+            "role": "candidate"
+          },
+          {
+            "answering": {
+              "mechanism": "json_schema",
+              "order": [
+                "json_schema",
+                "tool_call"
+              ],
+              "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+              "source": "model"
+            },
+            "decider": {
+              "kind": "model",
+              "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+              "name": "Nemotron 3 Nano 30B",
+              "provider": "nebius_token_factory"
+            },
+            "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
+            "key": "model_c",
+            "role": "candidate"
+          },
+          {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
+            "decider": {
+              "kind": "model",
+              "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+              "name": "Qwen3 235B Instruct",
+              "provider": "nebius_token_factory"
+            },
+            "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+            "key": "model_a_again",
+            "role": "control"
+          },
+          {
+            "answering": null,
+            "decider": {
+              "kind": "routine"
+            },
+            "description": "Their own routine",
+            "key": "routine",
+            "role": "one"
+          },
+          {
+            "answering": null,
+            "decider": {
+              "kind": "wait"
+            },
+            "description": "Waiting where they are",
+            "key": "wait",
+            "role": "zero"
+          }
+        ],
+        "comparison_id": "44af4d52-f698-4c28-aa22-7194b0421445",
+        "created_at": "2026-09-27T02:46:13.822260+00:00",
+        "group": {
+          "size": 4,
+          "source": {
+            "choice_seq": 1,
+            "document_sha256": "c92edc3c60bd8ea93b19761602619ae38f6fe92740d12f38e665da6a20738bf4",
+            "kind": "owner_choice"
+          }
+        },
+        "phase": "development",
+        "runs": 48,
+        "runs_completed": 48,
+        "runs_expected": 48,
+        "score_version": 2,
+        "seeds": 8
+      }
+    ],
+    "profile": "exulanica.society-comparisons/v2"
+  },
+  "models": [
+    {
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "provider": "nebius_token_factory"
+    },
+    {
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "provider": "nebius_token_factory"
+    },
+    {
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "provider": "nebius_token_factory"
+    }
+  ],
+  "others": [
+    {
+      "answering": null,
+      "choice": null,
+      "decider": {
+        "kind": "routine"
+      },
+      "id": "99c09928-a45d-5f61-938b-cb07e2b8f2bd",
+      "name": "Ari Ash 1"
+    },
+    {
+      "answering": null,
+      "choice": null,
+      "decider": {
+        "kind": "routine"
+      },
+      "id": "a4e14cd9-8475-5401-b0c5-6e5df0308847",
+      "name": "Faye Ash 6"
+    },
+    {
+      "answering": null,
+      "choice": null,
+      "decider": {
+        "kind": "routine"
+      },
+      "id": "ea77984c-0bb5-5140-a104-7dac440d1566",
+      "name": "Cleo Ash 3"
+    },
+    {
+      "answering": null,
+      "choice": null,
+      "decider": {
+        "kind": "routine"
+      },
+      "id": "eb28c0a5-2e26-503d-b6e7-c7fbdf07caef",
+      "name": "Ivo Ash 7"
+    }
+  ],
+  "phase": "development",
+  "process_ceiling_usd": "1000",
+  "profile": "exulanica.society-group-comparison-dry-run/v1",
+  "replay_ms": {
+    "maximum": 537,
+    "minimum": 189
+  },
+  "replays": {
+    "0097d1b3-44e8-5549-be01-8632c2767777": {
+      "arm": "routine",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19"
+    },
+    "09fc4e95-5666-56eb-92a9-09e87c80f7ff": {
+      "arm": "model_c",
+      "decisions": 35,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d"
+    },
+    "116cf316-3896-5990-a6d3-9a34e8b06a2e": {
+      "arm": "wait",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19"
+    },
+    "1320e918-469a-59ed-ab1a-dd1b1a2c607b": {
+      "arm": "wait",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047"
+    },
+    "1a8593a2-b693-5969-831a-5dc4f3fc5af2": {
+      "arm": "wait",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7"
+    },
+    "1d53d096-ebc7-59d0-ac09-e578999696df": {
+      "arm": "model_b",
+      "decisions": 42,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2"
+    },
+    "25d15045-ee7f-516a-baca-871fbdb029ab": {
+      "arm": "model_b",
+      "decisions": 38,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0"
+    },
+    "2f08c59b-aefb-5bc7-9481-c51cb0c7b5d8": {
+      "arm": "model_a",
+      "decisions": 44,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2"
+    },
+    "36b5cb26-b6fa-5904-83e2-8e5687b981b0": {
+      "arm": "model_a",
+      "decisions": 40,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047"
+    },
+    "3dc878a1-485b-57b0-87e8-7cee567c2a90": {
+      "arm": "model_a",
+      "decisions": 33,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7"
+    },
+    "40e60e95-39b1-5981-a548-7ddff8dcb287": {
+      "arm": "model_a",
+      "decisions": 40,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80"
+    },
+    "4e508cef-1b94-5904-b348-8d65809c28b3": {
+      "arm": "model_a_again",
+      "decisions": 47,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80"
+    },
+    "4f25d74e-c645-58ea-b6d6-29480e4a5d99": {
+      "arm": "wait",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2"
+    },
+    "4f73f864-76e3-5eba-b896-a4b2ea1d48cf": {
+      "arm": "model_c",
+      "decisions": 41,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047"
+    },
+    "5a5d6959-65ca-5680-9f86-768ad8fbe20f": {
+      "arm": "model_a_again",
+      "decisions": 35,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047"
+    },
+    "5a9e5732-acd9-55d9-96c0-623c921a86a4": {
+      "arm": "model_a",
+      "decisions": 33,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca"
+    },
+    "5d95563c-88d2-5c63-a9df-0d0e87cfdb55": {
+      "arm": "wait",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d"
+    },
+    "5f803bc0-bbb6-5fa7-aa24-87ea177ffb7b": {
+      "arm": "model_c",
+      "decisions": 36,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca"
+    },
+    "68169abf-770c-5eac-9d10-49e00b9a7571": {
+      "arm": "routine",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80"
+    },
+    "6c366bee-fbb7-5a44-a10e-e243904d7b4b": {
+      "arm": "routine",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0"
+    },
+    "74706922-82ff-5b0e-8c97-3e9df061bf5e": {
+      "arm": "model_a",
+      "decisions": 37,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0"
+    },
+    "77538b2c-8d9e-5dc8-960e-039eb8fcce40": {
+      "arm": "model_a_again",
+      "decisions": 35,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca"
+    },
+    "783e42df-b0fc-584a-ae49-fd5dfd3f9a2b": {
+      "arm": "model_a_again",
+      "decisions": 33,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0"
+    },
+    "7a798260-4cd3-501b-af99-ac7238844e30": {
+      "arm": "model_a_again",
+      "decisions": 41,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d"
+    },
+    "80072fa0-bbe1-5078-bd9b-b691822c2d56": {
+      "arm": "model_a",
+      "decisions": 40,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d"
+    },
+    "821aa8a5-090a-5e7b-9f5f-f3911773aa65": {
+      "arm": "model_c",
+      "decisions": 41,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0"
+    },
+    "8378577f-6557-57e4-8c31-b9ae08d2d76d": {
+      "arm": "model_c",
+      "decisions": 43,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7"
+    },
+    "88ead9df-7152-55dc-82b9-0a40df6ebec1": {
+      "arm": "model_c",
+      "decisions": 45,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80"
+    },
+    "8daef0a4-7de9-516a-8f76-a83ad7b1b606": {
+      "arm": "model_b",
+      "decisions": 40,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047"
+    },
+    "8ea2eda0-48c4-5122-a7b7-231127c52046": {
+      "arm": "model_a_again",
+      "decisions": 39,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19"
+    },
+    "8ea8ffd7-2ed6-534f-b1bc-5967ccace9db": {
+      "arm": "model_a_again",
+      "decisions": 48,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2"
+    },
+    "9078ce8a-feb1-5cb4-a27f-f220edfea7c7": {
+      "arm": "routine",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047"
+    },
+    "93ea685f-9918-5f43-84b1-d438768ef824": {
+      "arm": "model_b",
+      "decisions": 40,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80"
+    },
+    "a3a395bb-71e8-593e-b834-bbb7384517bb": {
+      "arm": "model_a_again",
+      "decisions": 41,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7"
+    },
+    "c3f0b857-2948-57ab-b1fe-915eb5bca411": {
+      "arm": "model_a",
+      "decisions": 42,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19"
+    },
+    "c415a83d-400d-51ac-977c-5cca2d03582b": {
+      "arm": "wait",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0"
+    },
+    "c4e4cd3f-58cf-5056-a9b1-0452bb3d3476": {
+      "arm": "model_c",
+      "decisions": 43,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2"
+    },
+    "cb05c30c-71ba-5876-b855-ca1a3151e960": {
+      "arm": "model_b",
+      "decisions": 40,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7"
+    },
+    "ce1d2830-01d6-5ff6-8aa0-14e146c81f10": {
+      "arm": "model_b",
+      "decisions": 33,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca"
+    },
+    "ce7b9f4f-f10f-5cd5-aabe-b5fe081535b3": {
+      "arm": "model_b",
+      "decisions": 37,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19"
+    },
+    "d0d18355-0e07-5d21-83ac-2340e07726a5": {
+      "arm": "wait",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80"
+    },
+    "d54e5a92-0c84-5328-ae03-1c75e3a2cfb5": {
+      "arm": "routine",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d"
+    },
+    "e41cab55-83b0-5cb7-9664-358b8da53395": {
+      "arm": "model_b",
+      "decisions": 32,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d"
+    },
+    "e579f5f2-7e83-5205-a0f9-ee92e703d58a": {
+      "arm": "routine",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2"
+    },
+    "e9b2a90a-bf40-53e6-89b4-8bd32495dcc8": {
+      "arm": "routine",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca"
+    },
+    "efea3ce3-980c-5d39-84b4-fb3183c40708": {
+      "arm": "routine",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7"
+    },
+    "f260058e-3e77-5c2b-b954-ba9920b4744e": {
+      "arm": "wait",
+      "decisions": 0,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca"
+    },
+    "f269cc1c-9cb9-55c4-8fb7-5d1fe3e96c0c": {
+      "arm": "model_c",
+      "decisions": 46,
+      "minutes": 61,
+      "replay_verified": true,
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19"
+    }
+  },
+  "result": {
+    "arms": [
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "name": "Qwen3 235B Instruct",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+        "key": "model_a",
+        "role": "candidate"
+      },
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "name": "Nemotron 3.5 Lightning",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
+        "key": "model_b",
+        "role": "candidate"
+      },
+      {
+        "answering": {
+          "mechanism": "json_schema",
+          "order": [
+            "json_schema",
+            "tool_call"
+          ],
+          "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+          "source": "model"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "name": "Nemotron 3 Nano 30B",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
+        "key": "model_c",
+        "role": "candidate"
+      },
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "name": "Qwen3 235B Instruct",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+        "key": "model_a_again",
+        "role": "control"
+      },
+      {
+        "answering": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "description": "Their own routine",
+        "key": "routine",
+        "role": "one"
+      },
+      {
+        "answering": null,
+        "decider": {
+          "kind": "wait"
+        },
+        "description": "Waiting where they are",
+        "key": "wait",
+        "role": "zero"
+      }
+    ],
+    "comparison_id": "44af4d52-f698-4c28-aa22-7194b0421445",
+    "control": [
+      "model_a",
+      "model_a_again"
+    ],
+    "control_bound": "0.1079",
+    "created_at": "2026-09-27T02:46:13.822260+00:00",
+    "differences": [
+      {
+        "first": "model_a",
+        "high": "0.0435",
+        "low": "-0.0265",
+        "mean": "0.0071",
+        "rejected": false,
+        "second": "model_b"
+      },
+      {
+        "first": "routine",
+        "high": "0.0145",
+        "low": "-0.0472",
+        "mean": "-0.0145",
+        "rejected": false,
+        "second": "model_a"
+      },
+      {
+        "first": "routine",
+        "high": "0.0011",
+        "low": "-0.0182",
+        "mean": "-0.0074",
+        "rejected": false,
+        "second": "model_b"
+      },
+      {
+        "first": "routine",
+        "high": "-0.0116",
+        "low": "-0.1509",
+        "mean": "-0.0684",
+        "rejected": true,
+        "second": "model_c"
+      }
+    ],
+    "group": {
+      "people": [
+        {
+          "id": "099868e0-0e21-5a4f-8986-e4bd0b47c716",
+          "name": "Bela Ash 2"
+        },
+        {
+          "id": "0c0c3506-dd06-5267-92a4-3cd13f629c57",
+          "name": "Juno Ash 8"
+        },
+        {
+          "id": "24e9451a-6800-5cb8-b8a7-f2cada32874d",
+          "name": "Emi Ash 5"
+        },
+        {
+          "id": "6ba4977b-c6d8-5313-88d0-3d48c3a5c561",
+          "name": "Dara Ash 4"
+        }
+      ],
+      "size": 4,
+      "source": {
+        "choice_seq": 1,
+        "document_sha256": "c92edc3c60bd8ea93b19761602619ae38f6fe92740d12f38e665da6a20738bf4",
+        "kind": "owner_choice"
+      }
+    },
+    "others": [
+      {
+        "answering": null,
+        "choice": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "99c09928-a45d-5f61-938b-cb07e2b8f2bd",
+        "name": "Ari Ash 1"
+      },
+      {
+        "answering": null,
+        "choice": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "a4e14cd9-8475-5401-b0c5-6e5df0308847",
+        "name": "Faye Ash 6"
+      },
+      {
+        "answering": null,
+        "choice": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "ea77984c-0bb5-5140-a104-7dac440d1566",
+        "name": "Cleo Ash 3"
+      },
+      {
+        "answering": null,
+        "choice": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "eb28c0a5-2e26-503d-b6e7-c7fbdf07caef",
+        "name": "Ivo Ash 7"
+      }
+    ],
+    "others_asked": false,
+    "phase": "development",
+    "population": 8,
+    "preregistration": null,
+    "primary": [
+      "model_a",
+      "model_b"
+    ],
+    "profile": "exulanica.society-comparison-result/v2",
+    "score_version": 2,
+    "seeds": [
+      {
+        "excluded": null,
+        "name": "development_1",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 40,
+              "cost_known": true,
+              "cost_usd": "0.01360000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 7
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 38,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "1.0270",
+                "left_to_routine": "0.0541",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9500",
+                "left_to_routine": "0.0500",
+                "refused": "0.0000"
+              },
+              "turns": 40
+            },
+            "run_id": "40e60e95-39b1-5981-a548-7ddff8dcb287",
+            "score": "0.9736",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 47,
+              "cost_known": true,
+              "cost_usd": "0.01598000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 9
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 44,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "1.1892",
+                "left_to_routine": "0.0811",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9362",
+                "left_to_routine": "0.0638",
+                "refused": "0.0000"
+              },
+              "turns": 47
+            },
+            "run_id": "4e508cef-1b94-5904-b348-8d65809c28b3",
+            "score": "0.9849",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 40,
+              "cost_known": true,
+              "cost_usd": "0.00480000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 14
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 38,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "1.0270",
+                "left_to_routine": "0.0541",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9500",
+                "left_to_routine": "0.0500",
+                "refused": "0.0000"
+              },
+              "turns": 40
+            },
+            "run_id": "93ea685f-9918-5f43-84b1-d438768ef824",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 45,
+              "cost_known": true,
+              "cost_usd": "0.00540000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 13
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 43,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "1.1622",
+                "left_to_routine": "0.0541",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9556",
+                "left_to_routine": "0.0444",
+                "refused": "0.0000"
+              },
+              "turns": 45
+            },
+            "run_id": "88ead9df-7152-55dc-82b9-0a40df6ebec1",
+            "score": "0.9736",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "68169abf-770c-5eac-9d10-49e00b9a7571",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "d0d18355-0e07-5d21-83ac-2340e07726a5",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80"
+      },
+      {
+        "excluded": null,
+        "name": "development_2",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 33,
+              "cost_known": true,
+              "cost_usd": "0.01122000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 16
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 31,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.8158",
+                "left_to_routine": "0.0526",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9394",
+                "left_to_routine": "0.0606",
+                "refused": "0.0000"
+              },
+              "turns": 33
+            },
+            "run_id": "5a9e5732-acd9-55d9-96c0-623c921a86a4",
+            "score": "1.0222",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 35,
+              "cost_known": true,
+              "cost_usd": "0.01190000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 14
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 33,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.8684",
+                "left_to_routine": "0.0526",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1,
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9429",
+                "left_to_routine": "0.0571",
+                "refused": "0.0000"
+              },
+              "turns": 35
+            },
+            "run_id": "77538b2c-8d9e-5dc8-960e-039eb8fcce40",
+            "score": "0.8027",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 33,
+              "cost_known": true,
+              "cost_usd": "0.00396000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 16
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 33,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "0.8684",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 33
+            },
+            "run_id": "ce1d2830-01d6-5ff6-8aa0-14e146c81f10",
+            "score": "1.0049",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 36,
+              "cost_known": true,
+              "cost_usd": "0.00432000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 7,
+                "p95": 12
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 35,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.9211",
+                "left_to_routine": "0.0263",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9722",
+                "left_to_routine": "0.0278",
+                "refused": "0.0000"
+              },
+              "turns": 36
+            },
+            "run_id": "5f803bc0-bbb6-5fa7-aa24-87ea177ffb7b",
+            "score": "0.9224",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "e9b2a90a-bf40-53e6-89b4-8bd32495dcc8",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "f260058e-3e77-5c2b-b954-ba9920b4744e",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca"
+      },
+      {
+        "excluded": "need_below_floor",
+        "name": "development_3",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 44,
+              "cost_known": true,
+              "cost_usd": "0.01496000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 7,
+                "p95": 22
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 43,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0233",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 43,
+              "shares": {
+                "answered": "0.9773",
+                "left_to_routine": "0.0227",
+                "refused": "0.0000"
+              },
+              "turns": 44
+            },
+            "run_id": "2f08c59b-aefb-5bc7-9481-c51cb0c7b5d8",
+            "score": null,
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 48,
+              "cost_known": true,
+              "cost_usd": "0.01632000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 17
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 41,
+              "left_to_routine": 7,
+              "not_answered": 0,
+              "not_applied": 7,
+              "per_routine_choice": {
+                "answered": "0.9535",
+                "left_to_routine": "0.1628",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 5,
+                "place_taken_this_minute": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 43,
+              "shares": {
+                "answered": "0.8542",
+                "left_to_routine": "0.1458",
+                "refused": "0.0000"
+              },
+              "turns": 48
+            },
+            "run_id": "8ea8ffd7-2ed6-534f-b1bc-5967ccace9db",
+            "score": null,
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 42,
+              "cost_known": true,
+              "cost_usd": "0.00504000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 10
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 37,
+              "left_to_routine": 5,
+              "not_answered": 0,
+              "not_applied": 5,
+              "per_routine_choice": {
+                "answered": "0.8605",
+                "left_to_routine": "0.1163",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 5
+              },
+              "refused": 0,
+              "routine_choice_points": 43,
+              "shares": {
+                "answered": "0.8810",
+                "left_to_routine": "0.1190",
+                "refused": "0.0000"
+              },
+              "turns": 42
+            },
+            "run_id": "1d53d096-ebc7-59d0-ac09-e578999696df",
+            "score": null,
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 43,
+              "cost_known": true,
+              "cost_usd": "0.00516000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 10
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 41,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.9535",
+                "left_to_routine": "0.0465",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 43,
+              "shares": {
+                "answered": "0.9535",
+                "left_to_routine": "0.0465",
+                "refused": "0.0000"
+              },
+              "turns": 43
+            },
+            "run_id": "c4e4cd3f-58cf-5056-a9b1-0452bb3d3476",
+            "score": null,
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "e579f5f2-7e83-5205-a0f9-ee92e703d58a",
+            "score": null,
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "4f25d74e-c645-58ea-b6d6-29480e4a5d99",
+            "score": null,
+            "status": "completed"
+          }
+        },
+        "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2"
+      },
+      {
+        "excluded": null,
+        "name": "development_4",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 42,
+              "cost_known": true,
+              "cost_usd": "0.01428000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 8,
+                "p95": 16
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 38,
+              "left_to_routine": 4,
+              "not_answered": 0,
+              "not_applied": 4,
+              "per_routine_choice": {
+                "answered": "1.0000",
+                "left_to_routine": "0.1053",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 4
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9048",
+                "left_to_routine": "0.0952",
+                "refused": "0.0000"
+              },
+              "turns": 42
+            },
+            "run_id": "c3f0b857-2948-57ab-b1fe-915eb5bca411",
+            "score": "1.0307",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 39,
+              "cost_known": true,
+              "cost_usd": "0.01326000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 10
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 37,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.9737",
+                "left_to_routine": "0.0526",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9487",
+                "left_to_routine": "0.0513",
+                "refused": "0.0000"
+              },
+              "turns": 39
+            },
+            "run_id": "8ea2eda0-48c4-5122-a7b7-231127c52046",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 37,
+              "cost_known": true,
+              "cost_usd": "0.00444000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 10,
+                "p95": 25
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 35,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.9211",
+                "left_to_routine": "0.0526",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9459",
+                "left_to_routine": "0.0541",
+                "refused": "0.0000"
+              },
+              "turns": 37
+            },
+            "run_id": "ce7b9f4f-f10f-5cd5-aabe-b5fe081535b3",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 46,
+              "cost_known": true,
+              "cost_usd": "0.00552000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 14
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 43,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "1.1316",
+                "left_to_routine": "0.0789",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9348",
+                "left_to_routine": "0.0652",
+                "refused": "0.0000"
+              },
+              "turns": 46
+            },
+            "run_id": "f269cc1c-9cb9-55c4-8fb7-5d1fe3e96c0c",
+            "score": "0.9373",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "0097d1b3-44e8-5549-be01-8632c2767777",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "116cf316-3896-5990-a6d3-9a34e8b06a2e",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19"
+      },
+      {
+        "excluded": null,
+        "name": "development_5",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 37,
+              "cost_known": true,
+              "cost_usd": "0.01258000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 7,
+                "p95": 17
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 37,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 37
+            },
+            "run_id": "74706922-82ff-5b0e-8c97-3e9df061bf5e",
+            "score": "0.9123",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 33,
+              "cost_known": true,
+              "cost_usd": "0.01122000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 13
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 32,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.8649",
+                "left_to_routine": "0.0270",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9697",
+                "left_to_routine": "0.0303",
+                "refused": "0.0000"
+              },
+              "turns": 33
+            },
+            "run_id": "783e42df-b0fc-584a-ae49-fd5dfd3f9a2b",
+            "score": "0.9808",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 38,
+              "cost_known": true,
+              "cost_usd": "0.00456000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 12
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 38,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.0270",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 38
+            },
+            "run_id": "25d15045-ee7f-516a-baca-871fbdb029ab",
+            "score": "0.9977",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 41,
+              "cost_known": true,
+              "cost_usd": "0.00492000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 10
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 38,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "1.0270",
+                "left_to_routine": "0.0811",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9268",
+                "left_to_routine": "0.0732",
+                "refused": "0.0000"
+              },
+              "turns": 41
+            },
+            "run_id": "821aa8a5-090a-5e7b-9f5f-f3911773aa65",
+            "score": "1.0182",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "6c366bee-fbb7-5a44-a10e-e243904d7b4b",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "c415a83d-400d-51ac-977c-5cca2d03582b",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0"
+      },
+      {
+        "excluded": null,
+        "name": "development_6",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 40,
+              "cost_known": true,
+              "cost_usd": "0.01360000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 9,
+                "p95": 13
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 40,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "0.9524",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 42,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 40
+            },
+            "run_id": "80072fa0-bbe1-5078-bd9b-b691822c2d56",
+            "score": "1.0248",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 41,
+              "cost_known": true,
+              "cost_usd": "0.01394000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 5,
+                "p95": 11
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 37,
+              "left_to_routine": 4,
+              "not_answered": 0,
+              "not_applied": 4,
+              "per_routine_choice": {
+                "answered": "0.8810",
+                "left_to_routine": "0.0952",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 4
+              },
+              "refused": 0,
+              "routine_choice_points": 42,
+              "shares": {
+                "answered": "0.9024",
+                "left_to_routine": "0.0976",
+                "refused": "0.0000"
+              },
+              "turns": 41
+            },
+            "run_id": "7a798260-4cd3-501b-af99-ac7238844e30",
+            "score": "0.9020",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 32,
+              "cost_known": true,
+              "cost_usd": "0.00384000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 14
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 31,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.7381",
+                "left_to_routine": "0.0238",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 42,
+              "shares": {
+                "answered": "0.9688",
+                "left_to_routine": "0.0312",
+                "refused": "0.0000"
+              },
+              "turns": 32
+            },
+            "run_id": "e41cab55-83b0-5cb7-9664-358b8da53395",
+            "score": "0.9637",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 35,
+              "cost_known": true,
+              "cost_usd": "0.00420000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 8,
+                "p95": 24
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 34,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.8095",
+                "left_to_routine": "0.0238",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 42,
+              "shares": {
+                "answered": "0.9714",
+                "left_to_routine": "0.0286",
+                "refused": "0.0000"
+              },
+              "turns": 35
+            },
+            "run_id": "09fc4e95-5666-56eb-92a9-09e87c80f7ff",
+            "score": "0.9682",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "d54e5a92-0c84-5328-ae03-1c75e3a2cfb5",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "5d95563c-88d2-5c63-a9df-0d0e87cfdb55",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d"
+      },
+      {
+        "excluded": null,
+        "name": "development_7",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 33,
+              "cost_known": true,
+              "cost_usd": "0.01122000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 14
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 31,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.7045",
+                "left_to_routine": "0.0455",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 44,
+              "shares": {
+                "answered": "0.9394",
+                "left_to_routine": "0.0606",
+                "refused": "0.0000"
+              },
+              "turns": 33
+            },
+            "run_id": "3dc878a1-485b-57b0-87e8-7cee567c2a90",
+            "score": "0.9914",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 41,
+              "cost_known": true,
+              "cost_usd": "0.01394000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 8,
+                "p95": 21
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 41,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "0.9318",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 44,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 41
+            },
+            "run_id": "a3a395bb-71e8-593e-b834-bbb7384517bb",
+            "score": "0.9818",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 40,
+              "cost_known": true,
+              "cost_usd": "0.00480000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 9,
+                "p95": 18
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 38,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.8636",
+                "left_to_routine": "0.0455",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 44,
+              "shares": {
+                "answered": "0.9500",
+                "left_to_routine": "0.0500",
+                "refused": "0.0000"
+              },
+              "turns": 40
+            },
+            "run_id": "cb05c30c-71ba-5876-b855-ca1a3151e960",
+            "score": "0.9818",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 43,
+              "cost_known": true,
+              "cost_usd": "0.00516000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 8,
+                "p95": 59
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 41,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.9318",
+                "left_to_routine": "0.0455",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1,
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 44,
+              "shares": {
+                "answered": "0.9535",
+                "left_to_routine": "0.0465",
+                "refused": "0.0000"
+              },
+              "turns": 43
+            },
+            "run_id": "8378577f-6557-57e4-8c31-b9ae08d2d76d",
+            "score": "0.7019",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "efea3ce3-980c-5d39-84b4-fb3183c40708",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "1a8593a2-b693-5969-831a-5dc4f3fc5af2",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7"
+      },
+      {
+        "excluded": null,
+        "name": "development_8",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 40,
+              "cost_known": true,
+              "cost_usd": "0.01360000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 11,
+                "p95": 24
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 40,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.0256",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 40
+            },
+            "run_id": "36b5cb26-b6fa-5904-83e2-8e5687b981b0",
+            "score": "0.9433",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 35,
+              "cost_known": true,
+              "cost_usd": "0.01190000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 9,
+                "p95": 38
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 34,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.8718",
+                "left_to_routine": "0.0256",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.9714",
+                "left_to_routine": "0.0286",
+                "refused": "0.0000"
+              },
+              "turns": 35
+            },
+            "run_id": "5a5d6959-65ca-5680-9f86-768ad8fbe20f",
+            "score": "1.0328",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 40,
+              "cost_known": true,
+              "cost_usd": "0.00480000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 6,
+                "p95": 12
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 39,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0256",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.9750",
+                "left_to_routine": "0.0250",
+                "refused": "0.0000"
+              },
+              "turns": 40
+            },
+            "run_id": "8daef0a4-7de9-516a-8f76-a83ad7b1b606",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 41,
+              "cost_known": true,
+              "cost_usd": "0.00492000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 8,
+                "p95": 10
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 41,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.0513",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 41
+            },
+            "run_id": "4f73f864-76e3-5eba-b896-a4b2ea1d48cf",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "9078ce8a-feb1-5cb4-a27f-f220edfea7c7",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "1320e918-469a-59ed-ab1a-dd1b1a2c607b",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047"
+      }
+    ],
+    "summaries": {
+      "model_a": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0131",
+        "held_out": {
+          "activities_per_person": "3.1562",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.5984",
+            "stand": "0.0536",
+            "talk": "0.0734",
+            "visit": "0.1172"
+          },
+          "waiting_share": "0.0219",
+          "walking_share": "0.1354"
+        },
+        "interval": {
+          "high": "1.0145",
+          "low": "0.9528"
+        },
+        "latency_ms": {
+          "p50": 7,
+          "p95": 18
+        },
+        "mean_score": "0.9855",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 298,
+          "left_to_routine": 11,
+          "not_answered": 0,
+          "not_applied": 11,
+          "per_routine_choice": {
+            "answered": "0.9371",
+            "left_to_routine": "0.0346",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "partner_busy": 11
+          },
+          "refused": 0,
+          "routine_choice_points": 318,
+          "shares": {
+            "answered": "0.9644",
+            "left_to_routine": "0.0356",
+            "refused": "0.0000"
+          },
+          "turns": 309
+        }
+      },
+      "model_a_again": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0136",
+        "held_out": {
+          "activities_per_person": "3.4375",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.5906",
+            "stand": "0.0625",
+            "talk": "0.0688",
+            "visit": "0.1167"
+          },
+          "waiting_share": "0.0271",
+          "walking_share": "0.1344"
+        },
+        "interval": {
+          "high": "1.0002",
+          "low": "0.8962"
+        },
+        "latency_ms": {
+          "p50": 6,
+          "p95": 17
+        },
+        "mean_score": "0.9550",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 299,
+          "left_to_routine": 20,
+          "not_answered": 0,
+          "not_applied": 20,
+          "per_routine_choice": {
+            "answered": "0.9403",
+            "left_to_routine": "0.0629",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "partner_busy": 17,
+            "place_taken_this_minute": 3
+          },
+          "refused": 0,
+          "routine_choice_points": 318,
+          "shares": {
+            "answered": "0.9373",
+            "left_to_routine": "0.0627",
+            "refused": "0.0000"
+          },
+          "turns": 319
+        }
+      },
+      "model_b": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0045",
+        "held_out": {
+          "activities_per_person": "3.0625",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.5958",
+            "stand": "0.0427",
+            "talk": "0.0797",
+            "visit": "0.1281"
+          },
+          "waiting_share": "0.0245",
+          "walking_share": "0.1292"
+        },
+        "interval": {
+          "high": "1.0011",
+          "low": "0.9815"
+        },
+        "latency_ms": {
+          "p50": 7,
+          "p95": 16
+        },
+        "mean_score": "0.9926",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 289,
+          "left_to_routine": 13,
+          "not_answered": 0,
+          "not_applied": 13,
+          "per_routine_choice": {
+            "answered": "0.9088",
+            "left_to_routine": "0.0409",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "partner_busy": 13
+          },
+          "refused": 0,
+          "routine_choice_points": 318,
+          "shares": {
+            "answered": "0.9570",
+            "left_to_routine": "0.0430",
+            "refused": "0.0000"
+          },
+          "turns": 302
+        }
+      },
+      "model_c": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0050",
+        "held_out": {
+          "activities_per_person": "3.4375",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.5646",
+            "stand": "0.0599",
+            "talk": "0.0938",
+            "visit": "0.1135"
+          },
+          "waiting_share": "0.0234",
+          "walking_share": "0.1448"
+        },
+        "interval": {
+          "high": "0.9884",
+          "low": "0.8481"
+        },
+        "latency_ms": {
+          "p50": 7,
+          "p95": 15
+        },
+        "mean_score": "0.9316",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 316,
+          "left_to_routine": 14,
+          "not_answered": 0,
+          "not_applied": 14,
+          "per_routine_choice": {
+            "answered": "0.9937",
+            "left_to_routine": "0.0440",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "partner_busy": 13,
+            "place_taken_this_minute": 1
+          },
+          "refused": 0,
+          "routine_choice_points": 318,
+          "shares": {
+            "answered": "0.9576",
+            "left_to_routine": "0.0424",
+            "refused": "0.0000"
+          },
+          "turns": 330
+        }
+      },
+      "routine": {
+        "cost_known": true,
+        "cost_usd_per_hour": null,
+        "held_out": {
+          "activities_per_person": "3.3125",
+          "first_answers_refused": null,
+          "minutes_by_activity": {
+            "rest": "0.4547",
+            "stand": "0.0312",
+            "talk": "0.2042",
+            "visit": "0.1661"
+          },
+          "waiting_share": "0.0000",
+          "walking_share": "0.1438"
+        },
+        "interval": {
+          "high": "1.0000",
+          "low": "1.0000"
+        },
+        "latency_ms": {
+          "p50": null,
+          "p95": null
+        },
+        "mean_score": "1.0000",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 0,
+          "left_to_routine": 0,
+          "not_answered": 0,
+          "not_applied": 0,
+          "per_routine_choice": null,
+          "reasons": {},
+          "refused": 0,
+          "routine_choice_points": null,
+          "shares": null,
+          "turns": 0
+        }
+      },
+      "wait": {
+        "cost_known": true,
+        "cost_usd_per_hour": null,
+        "held_out": {
+          "activities_per_person": "0.0000",
+          "first_answers_refused": null,
+          "minutes_by_activity": {},
+          "waiting_share": "1.0000",
+          "walking_share": "0.0000"
+        },
+        "interval": {
+          "high": "0.0000",
+          "low": "0.0000"
+        },
+        "latency_ms": {
+          "p50": null,
+          "p95": null
+        },
+        "mean_score": "0.0000",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 0,
+          "left_to_routine": 0,
+          "not_answered": 0,
+          "not_applied": 0,
+          "per_routine_choice": null,
+          "reasons": {},
+          "refused": 0,
+          "routine_choice_points": null,
+          "shares": null,
+          "turns": 0
+        }
+      }
+    },
+    "verdict": {
+      "answered_shares_differ": false,
+      "code": "not_judged",
+      "higher": null,
+      "reason": "development_seeds"
+    },
+    "window_ticks": 60
+  },
+  "runs_s": 26.6,
+  "scripted": "A scripted model behind the product's client answered every ask with an offered action drawn from a seed; the token counts and costs below are the script's, priced at the manifest's rates, and no model was asked or paid.",
+  "spent_usd": "0.28936000",
+  "started_utc": "2026-09-27T02:46:13+00:00",
+  "tree": {
+    "files_sha256": {
+      "docs/evaluation/artifacts/2026-09-26-society-group-comparison/design-exclusion.json": "34a4123a8f5ed725387e374f4546019848e8de052d05dcd023b3e3792e51885a",
+      "docs/society-experiments.md": "4f8fa66b4afe5492eae82d4b84e1770bce86047f211e2202f819b94bdb3067bc",
+      "exulanica/api/society_comparison_runner.py": "b083dd394432d5f9cf61e4324bc0a80e38a832732c6b18eac95a3e98c8266e97",
+      "exulanica/orchestration/compare.py": "93190e39550d5ce1c243a37b26182fb534d7d101aff51804e07cb31e844a03dc",
+      "exulanica/world/society_comparison_repository.py": "a7d78b03c75920cb0fb38908f2e55332bf664d90fa03ae602e216d7d2388d06c",
+      "exulanica/world/society_comparison_result.py": "d4175a4e9f7e7c3aebd33811dea485c83ca4211a627daef49141d51c4c44372a",
+      "exulanica/world/society_decision_contract.py": "ac6756d3d30ddb1f64efc94d705eba44ff59e2521f6a14df061bf3414ac016dc",
+      "scripts/measure_group_comparison.py": "0ae35da044c21a2f8ce8df078c175d2464138908a17d61f04b04f6983ba0d369",
+      "tests/comparison_support.py": "9558ee50e1843f6992eabbb6069fe955e445c2e4015a2905e2a7874262d6df3c",
+      "tests/snapshots/society-comparison-documents.json": "1d86b389a9782d10b212c2c5e0d81124bbba50b1c0581c1b952e5c7bba01db04",
+      "tests/snapshots/society-group-comparison-documents.json": "8f75c7d64f5cdc0905c84ac03994d78a30eb7c2159944c74d745354410d4c9f6",
+      "tests/test_society_comparison_answering.py": "44e5ea5586c46d12225668ffe0ace1af23118e394e844607534abdd45553f018",
+      "tests/test_society_comparison_result_v2.py": "ed43e7c16325ed3967409b8491fb80240e140098f96e501440fb257363f7ef68",
+      "tests/test_society_group_comparison_postgres.py": "ae69284c241a0995510dff25c50c198f449844ae596d6aead1393bf121868dd5",
+      "web/packages/app/src/society-comparison-api.ts": "9934379d4431d96ee4bf3e5af2372d5ca4607a96ac355ac1769fb7b6eee1bc3f",
+      "web/packages/app/src/ui/society-comparison.css": "31fe456c80f4b28436a30454ad77bac71e4de59d5de13187125460d2c8858346",
+      "web/packages/app/src/ui/society-comparison.ts": "b57504a192ea419efd5f39239cac04b4c8bb2bdc2db3dea580096e8cf1ce56c9",
+      "web/packages/app/test/society-comparison-reliability.test.ts": "7aa1101aabcec5e2ba448159a4c8ad66197e3d37328b1462811e4f0a4b1925b0",
+      "web/packages/app/test/society-comparison-words-parity.test.ts": "23614a5236051b5e1fec619c0ee9c56797f8a9bd27830c04359c558a54adde27"
+    },
+    "head": "8dca7cc2ec132047c2c8ad3fe999c38c24705062"
+  }
+}

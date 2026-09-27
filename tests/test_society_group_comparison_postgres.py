@@ -41,6 +41,7 @@ from exulanica.models.manifest import Role, load_manifest
 from exulanica.orchestration.compare import comparison_body
 from exulanica.world.society_comparison_repository import SocietyComparisonRepository
 from exulanica.world.society_comparison_result import ComparisonRefused
+from exulanica.world.society_decision_contract import decision_contract
 from fastapi.testclient import TestClient
 
 import test_society_authored_world_postgres as helpers
@@ -160,6 +161,21 @@ def test_a_group_is_the_owners_choice_and_everybody_else_keeps_theirs(app):
     )
     assert others[people[2]]["choice"]["choice_seq"] == 2
     assert all(others[p]["decider"] == {"kind": "routine"} for p in people[3:])
+    # Each model is served with how it was asked, as the contract and its manifest entry give it;
+    # the anchors and the routine with none.
+    contract = decision_contract()
+    answering = {
+        model.model_id: contract.answering(MANIFEST.offered(Role.SOCIETY_DECISION, model.model_id))
+        for model in (first, second)
+    }
+    assert {arm["key"]: arm["answering"] for arm in result["arms"]} == {
+        "routine": None,
+        "wait": None,
+        "model_a": answering[first.model_id],
+        "model_b": answering[second.model_id],
+    }
+    assert others[people[2]]["answering"] == answering[second.model_id]
+    assert all(others[p]["answering"] is None for p in people[3:])
     # Every run completed, and each arm's score is served with what its model answered.
     [seed] = result["seeds"]
     assert {run["status"] for run in seed["runs"].values()} == {"completed"}
@@ -250,7 +266,7 @@ def test_a_group_or_an_owners_choice_the_world_does_not_hold_is_refused_by_name(
             ),
         )
     forgotten = [
-        {**other, "decider": {"kind": "routine"}, "provider_config": None}
+        {**other, "decider": {"kind": "routine"}, "provider_config": None, "answering": None}
         if other["id"] == people[2]
         else other
         for other in others
@@ -314,6 +330,16 @@ def test_a_group_or_an_owners_choice_the_world_does_not_hold_is_refused_by_name(
                     runner, models, SEEDS[:1], control=False, group=group, others=changed
                 ),
             )
+    # An arm recorded as asked in its model's own measured order, which the manifest does not state
+    # for it: refused where the definition is made, before anything is stored.
+    claimed = comparison_body(runner, models, SEEDS[:1], control=False, group=group, others=others)
+    claimed["arms"]["model_a"]["answering"] = {
+        **claimed["arms"]["model_a"]["answering"],
+        "source": "model",
+        "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+    }
+    with pytest.raises(ComparisonRefused, match="answering_not_the_models"):
+        runner.define(version, comparison_id=uuid.uuid4(), body=claimed)
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)

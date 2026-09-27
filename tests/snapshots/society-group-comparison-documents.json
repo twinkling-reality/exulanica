@@ -4,6 +4,15 @@
       {
         "arms": [
           {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
             "decider": {
               "kind": "model",
               "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
@@ -15,6 +24,15 @@
             "role": "candidate"
           },
           {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
             "decider": {
               "kind": "model",
               "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
@@ -26,6 +44,7 @@
             "role": "candidate"
           },
           {
+            "answering": null,
             "decider": {
               "kind": "routine"
             },
@@ -34,6 +53,7 @@
             "role": "one"
           },
           {
+            "answering": null,
             "decider": {
               "kind": "wait"
             },
@@ -42,13 +62,13 @@
             "role": "zero"
           }
         ],
-        "comparison_id": "07857ecf-6fa6-4d4c-ab9e-793011a4a8f1",
-        "created_at": "2026-09-26T23:53:31.478019+00:00",
+        "comparison_id": "270d8cca-828e-41d8-ac23-0adfc04eaaff",
+        "created_at": "2026-09-27T02:27:24.472006+00:00",
         "group": {
           "size": 2,
           "source": {
             "choice_seq": 1,
-            "document_sha256": "48778de1fde83a00bc3ef72ded37f9ce12898a300527ef9dbaf4c86cbf566f56",
+            "document_sha256": "20d87ebb9ac11a4fde7352e39afecb923524da3e40c6e8773a413977fc171c84",
             "kind": "owner_choice"
           }
         },
@@ -65,6 +85,15 @@
   "result": {
     "arms": [
       {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
         "decider": {
           "kind": "model",
           "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
@@ -76,6 +105,15 @@
         "role": "candidate"
       },
       {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
         "decider": {
           "kind": "model",
           "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
@@ -87,6 +125,7 @@
         "role": "candidate"
       },
       {
+        "answering": null,
         "decider": {
           "kind": "routine"
         },
@@ -95,6 +134,7 @@
         "role": "one"
       },
       {
+        "answering": null,
         "decider": {
           "kind": "wait"
         },
@@ -103,34 +143,43 @@
         "role": "zero"
       }
     ],
-    "comparison_id": "07857ecf-6fa6-4d4c-ab9e-793011a4a8f1",
+    "comparison_id": "270d8cca-828e-41d8-ac23-0adfc04eaaff",
     "control": null,
     "control_bound": null,
-    "created_at": "2026-09-26T23:53:31.478019+00:00",
+    "created_at": "2026-09-27T02:27:24.472006+00:00",
     "differences": [],
     "group": {
       "people": [
         {
-          "id": "036235fb-55e3-5c1d-87a0-026e2566b041",
-          "name": "Bela Ash 2"
+          "id": "0be5b64f-7907-53dc-99c5-23b7b96428f8",
+          "name": "Ivo Ash 7"
         },
         {
-          "id": "28024172-b7e9-5b07-a3ff-5d36687c433b",
-          "name": "Dara Ash 4"
+          "id": "19e211e6-10ca-52c7-89ec-7ad22609534e",
+          "name": "Cleo Ash 3"
         }
       ],
       "size": 2,
       "source": {
         "choice_seq": 1,
-        "document_sha256": "48778de1fde83a00bc3ef72ded37f9ce12898a300527ef9dbaf4c86cbf566f56",
+        "document_sha256": "20d87ebb9ac11a4fde7352e39afecb923524da3e40c6e8773a413977fc171c84",
         "kind": "owner_choice"
       }
     },
     "others": [
       {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
         "choice": {
           "choice_seq": 2,
-          "document_sha256": "63fda96acd01736a132777490c254cb94e9539870e8e06a5d5a5f98d4a71ace6"
+          "document_sha256": "e0cfc25539935ed2f6549f548592a503431ee3e5aa2a884811d132b09f74a248"
         },
         "decider": {
           "kind": "model",
@@ -138,48 +187,53 @@
           "name": "DeepSeek V4 Flash",
           "provider": "nebius_token_factory"
         },
-        "id": "4ece1b0a-938e-568f-9e86-73f0dd159782",
-        "name": "Cleo Ash 3"
+        "id": "25ed13e2-886c-590f-aa30-1b33907521d7",
+        "name": "Bela Ash 2"
       },
       {
+        "answering": null,
         "choice": null,
         "decider": {
           "kind": "routine"
         },
-        "id": "949cf1ad-039e-521b-a341-d4a2747eca41",
-        "name": "Emi Ash 5"
+        "id": "36dede03-18f6-5a0b-8751-b147c2cca080",
+        "name": "Dara Ash 4"
       },
       {
+        "answering": null,
         "choice": null,
         "decider": {
           "kind": "routine"
         },
-        "id": "954d96aa-6c3b-5fad-890a-0e0771d98401",
+        "id": "4708f7d9-67c5-5cda-9343-4e4306d7d99e",
         "name": "Juno Ash 8"
       },
       {
+        "answering": null,
         "choice": null,
         "decider": {
           "kind": "routine"
         },
-        "id": "cb04fcb3-64df-5eaa-9c4a-7e508fc6357a",
+        "id": "83257e2b-2458-56eb-8228-c2a8dfa7bed2",
         "name": "Faye Ash 6"
       },
       {
+        "answering": null,
         "choice": null,
         "decider": {
           "kind": "routine"
         },
-        "id": "d6fd8d51-2c08-5e6f-9ad3-3164d6d9838f",
-        "name": "Ari Ash 1"
+        "id": "be7d96d9-2a5b-5ab4-9214-e513b5f722ec",
+        "name": "Emi Ash 5"
       },
       {
+        "answering": null,
         "choice": null,
         "decider": {
           "kind": "routine"
         },
-        "id": "ee2ed81e-ee07-59d0-9d9c-34b611b95922",
-        "name": "Ivo Ash 7"
+        "id": "e3ed2f68-50db-5141-9300-e2e2bca54e01",
+        "name": "Ari Ash 1"
       }
     ],
     "others_asked": true,
@@ -199,93 +253,97 @@
         "runs": {
           "model_a": {
             "calls": {
-              "asked": 21,
+              "asked": 24,
               "cost_known": true,
-              "cost_usd": "0.00294000",
+              "cost_usd": "0.00336000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 7,
-                "p95": 22
+                "p50": 4,
+                "p95": 12
               }
             },
             "failure": null,
             "others_calls": {
-              "asked": 10,
+              "asked": 11,
               "cost_known": true,
-              "cost_usd": "0.00070000",
+              "cost_usd": "0.00077000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 6,
-                "p95": 27
+                "p50": 4,
+                "p95": 14
               }
             },
             "reliability": {
-              "answered": 21,
-              "left_to_routine": 0,
+              "answered": 23,
+              "left_to_routine": 1,
               "not_answered": 0,
-              "not_applied": 0,
+              "not_applied": 1,
               "per_routine_choice": {
-                "answered": "0.8077",
-                "left_to_routine": "0.0000",
+                "answered": "0.8214",
+                "left_to_routine": "0.0357",
                 "refused": "0.0000"
               },
-              "reasons": {},
+              "reasons": {
+                "partner_busy": 1
+              },
               "refused": 0,
-              "routine_choice_points": 26,
+              "routine_choice_points": 28,
               "shares": {
-                "answered": "1.0000",
-                "left_to_routine": "0.0000",
+                "answered": "0.9583",
+                "left_to_routine": "0.0417",
                 "refused": "0.0000"
               },
-              "turns": 21
+              "turns": 24
             },
-            "run_id": "fde6a40f-5892-5755-970f-fa9474da5e26",
+            "run_id": "d9a3cbb8-07be-529a-9ef2-670993c41517",
             "score": "1.0000",
             "status": "completed"
           },
           "model_b": {
             "calls": {
-              "asked": 21,
+              "asked": 24,
               "cost_known": true,
-              "cost_usd": "0.00147000",
+              "cost_usd": "0.00168000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 7,
-                "p95": 17
+                "p50": 4,
+                "p95": 7
               }
             },
             "failure": null,
             "others_calls": {
-              "asked": 10,
+              "asked": 11,
               "cost_known": true,
-              "cost_usd": "0.00070000",
+              "cost_usd": "0.00077000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 6,
-                "p95": 12
+                "p50": 4,
+                "p95": 9
               }
             },
             "reliability": {
-              "answered": 21,
-              "left_to_routine": 0,
+              "answered": 23,
+              "left_to_routine": 1,
               "not_answered": 0,
-              "not_applied": 0,
+              "not_applied": 1,
               "per_routine_choice": {
-                "answered": "0.8077",
-                "left_to_routine": "0.0000",
+                "answered": "0.8214",
+                "left_to_routine": "0.0357",
                 "refused": "0.0000"
               },
-              "reasons": {},
+              "reasons": {
+                "partner_busy": 1
+              },
               "refused": 0,
-              "routine_choice_points": 26,
+              "routine_choice_points": 28,
               "shares": {
-                "answered": "1.0000",
-                "left_to_routine": "0.0000",
+                "answered": "0.9583",
+                "left_to_routine": "0.0417",
                 "refused": "0.0000"
               },
-              "turns": 21
+              "turns": 24
             },
-            "run_id": "2b51f34d-3839-56f2-b392-cc1b19813395",
+            "run_id": "92b26213-4490-5662-a387-6edc516324cc",
             "score": "1.0000",
             "status": "completed"
           },
@@ -293,13 +351,13 @@
             "calls": null,
             "failure": null,
             "others_calls": {
-              "asked": 10,
+              "asked": 13,
               "cost_known": true,
-              "cost_usd": "0.00070000",
+              "cost_usd": "0.00091000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 8,
-                "p95": 25
+                "p50": 6,
+                "p95": 19
               }
             },
             "reliability": {
@@ -314,7 +372,7 @@
               "shares": null,
               "turns": 0
             },
-            "run_id": "1804c086-3150-5ef0-86f9-b43882a8920c",
+            "run_id": "cba337c3-c2ed-5713-99f0-5170cfaf6e73",
             "score": "1.0000",
             "status": "completed"
           },
@@ -322,13 +380,13 @@
             "calls": null,
             "failure": null,
             "others_calls": {
-              "asked": 9,
+              "asked": 10,
               "cost_known": true,
-              "cost_usd": "0.00063000",
+              "cost_usd": "0.00070000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 5,
-                "p95": 17
+                "p50": 6,
+                "p95": 20
               }
             },
             "reliability": {
@@ -343,7 +401,7 @@
               "shares": null,
               "turns": 0
             },
-            "run_id": "893e32c5-68eb-51c1-849e-0d84776fb2a2",
+            "run_id": "d6b40df8-8f29-5fce-8590-c68ee5f5f5b2",
             "score": "0.0000",
             "status": "completed"
           }
@@ -354,86 +412,92 @@
     "summaries": {
       "model_a": {
         "cost_known": true,
-        "cost_usd_per_hour": "0.0029",
+        "cost_usd_per_hour": "0.0034",
         "held_out": {
-          "activities_per_person": "2.0000",
+          "activities_per_person": "3.0000",
           "first_answers_refused": "0.0000",
           "minutes_by_activity": {
-            "rest": "0.6917",
-            "visit": "0.1333"
+            "rest": "0.4583",
+            "talk": "0.1833",
+            "visit": "0.1750"
           },
           "waiting_share": "0.0000",
-          "walking_share": "0.1750"
+          "walking_share": "0.1833"
         },
         "interval": null,
         "latency_ms": {
-          "p50": 7,
-          "p95": 22
+          "p50": 4,
+          "p95": 12
         },
         "mean_score": "1.0000",
         "others_cost_known": true,
-        "others_cost_usd_per_hour": "0.0007",
+        "others_cost_usd_per_hour": "0.0008",
         "reliability": {
-          "answered": 21,
-          "left_to_routine": 0,
+          "answered": 23,
+          "left_to_routine": 1,
           "not_answered": 0,
-          "not_applied": 0,
+          "not_applied": 1,
           "per_routine_choice": {
-            "answered": "0.8077",
-            "left_to_routine": "0.0000",
+            "answered": "0.8214",
+            "left_to_routine": "0.0357",
             "refused": "0.0000"
           },
-          "reasons": {},
+          "reasons": {
+            "partner_busy": 1
+          },
           "refused": 0,
-          "routine_choice_points": 26,
+          "routine_choice_points": 28,
           "shares": {
-            "answered": "1.0000",
-            "left_to_routine": "0.0000",
+            "answered": "0.9583",
+            "left_to_routine": "0.0417",
             "refused": "0.0000"
           },
-          "turns": 21
+          "turns": 24
         }
       },
       "model_b": {
         "cost_known": true,
-        "cost_usd_per_hour": "0.0015",
+        "cost_usd_per_hour": "0.0017",
         "held_out": {
-          "activities_per_person": "2.0000",
+          "activities_per_person": "3.0000",
           "first_answers_refused": "0.0000",
           "minutes_by_activity": {
-            "rest": "0.6917",
-            "visit": "0.1333"
+            "rest": "0.4583",
+            "talk": "0.1833",
+            "visit": "0.1750"
           },
           "waiting_share": "0.0000",
-          "walking_share": "0.1750"
+          "walking_share": "0.1833"
         },
         "interval": null,
         "latency_ms": {
-          "p50": 7,
-          "p95": 17
+          "p50": 4,
+          "p95": 7
         },
         "mean_score": "1.0000",
         "others_cost_known": true,
-        "others_cost_usd_per_hour": "0.0007",
+        "others_cost_usd_per_hour": "0.0008",
         "reliability": {
-          "answered": 21,
-          "left_to_routine": 0,
+          "answered": 23,
+          "left_to_routine": 1,
           "not_answered": 0,
-          "not_applied": 0,
+          "not_applied": 1,
           "per_routine_choice": {
-            "answered": "0.8077",
-            "left_to_routine": "0.0000",
+            "answered": "0.8214",
+            "left_to_routine": "0.0357",
             "refused": "0.0000"
           },
-          "reasons": {},
+          "reasons": {
+            "partner_busy": 1
+          },
           "refused": 0,
-          "routine_choice_points": 26,
+          "routine_choice_points": 28,
           "shares": {
-            "answered": "1.0000",
-            "left_to_routine": "0.0000",
+            "answered": "0.9583",
+            "left_to_routine": "0.0417",
             "refused": "0.0000"
           },
-          "turns": 21
+          "turns": 24
         }
       },
       "routine": {
@@ -443,13 +507,13 @@
           "activities_per_person": "4.0000",
           "first_answers_refused": null,
           "minutes_by_activity": {
-            "rest": "0.2500",
-            "stand": "0.0500",
-            "talk": "0.4167",
-            "visit": "0.1167"
+            "rest": "0.3500",
+            "stand": "0.1167",
+            "talk": "0.1417",
+            "visit": "0.1583"
           },
           "waiting_share": "0.0000",
-          "walking_share": "0.1667"
+          "walking_share": "0.2333"
         },
         "interval": null,
         "latency_ms": {
@@ -458,7 +522,7 @@
         },
         "mean_score": "1.0000",
         "others_cost_known": true,
-        "others_cost_usd_per_hour": "0.0007",
+        "others_cost_usd_per_hour": "0.0009",
         "reliability": {
           "answered": 0,
           "left_to_routine": 0,
@@ -489,7 +553,7 @@
         },
         "mean_score": "0.0000",
         "others_cost_known": true,
-        "others_cost_usd_per_hour": "0.0006",
+        "others_cost_usd_per_hour": "0.0007",
         "reliability": {
           "answered": 0,
           "left_to_routine": 0,
@@ -534,39 +598,39 @@
     "arm": "model_b",
     "decisions": [
       {
-        "chose": "resting, 16 m away",
+        "chose": "resting, 10 m away",
         "cost_usd": "0.00007000",
         "decision_seq": 1,
         "disposition": "applied",
         "disposition_reason": "validated_choice",
-        "latency_ms": 10,
+        "latency_ms": 5,
         "reason": "validated_choice",
         "status": "accepted",
-        "subject_id": "036235fb-55e3-5c1d-87a0-026e2566b041",
-        "tick": 1
-      },
-      {
-        "chose": "resting, 16 m away",
-        "cost_usd": "0.00007000",
-        "decision_seq": 2,
-        "disposition": "applied",
-        "disposition_reason": "validated_choice",
-        "latency_ms": 9,
-        "reason": "validated_choice",
-        "status": "accepted",
-        "subject_id": "28024172-b7e9-5b07-a3ff-5d36687c433b",
+        "subject_id": "0be5b64f-7907-53dc-99c5-23b7b96428f8",
         "tick": 1
       },
       {
         "chose": "visiting, 10 m away",
         "cost_usd": "0.00007000",
+        "decision_seq": 2,
+        "disposition": "applied",
+        "disposition_reason": "validated_choice",
+        "latency_ms": 4,
+        "reason": "validated_choice",
+        "status": "accepted",
+        "subject_id": "19e211e6-10ca-52c7-89ec-7ad22609534e",
+        "tick": 1
+      },
+      {
+        "chose": "resting, 16 m away",
+        "cost_usd": "0.00007000",
         "decision_seq": 3,
         "disposition": "applied",
         "disposition_reason": "validated_choice",
-        "latency_ms": 12,
+        "latency_ms": 9,
         "reason": "validated_choice",
         "status": "accepted",
-        "subject_id": "4ece1b0a-938e-568f-9e86-73f0dd159782",
+        "subject_id": "25ed13e2-886c-590f-aa30-1b33907521d7",
         "tick": 1
       }
     ],
@@ -574,21 +638,21 @@
       {
         "kind": "goal_selected",
         "reason": "stopped_to_talk",
-        "subject_id": "d6fd8d51-2c08-5e6f-9ad3-3164d6d9838f",
+        "subject_id": "e3ed2f68-50db-5141-9300-e2e2bca54e01",
         "summary": "Ari Ash 1 (simulated): goal selected; stopped to talk.",
         "tick": 1
       },
       {
         "kind": "social_contact",
         "reason": "talking",
-        "subject_id": "d6fd8d51-2c08-5e6f-9ad3-3164d6d9838f",
+        "subject_id": "e3ed2f68-50db-5141-9300-e2e2bca54e01",
         "summary": "Ari Ash 1 (simulated): talk started; talking.",
         "tick": 1
       },
       {
         "kind": "goal_selected",
         "reason": "chosen_by_their_model",
-        "subject_id": "036235fb-55e3-5c1d-87a0-026e2566b041",
+        "subject_id": "25ed13e2-886c-590f-aa30-1b33907521d7",
         "summary": "Bela Ash 2 (simulated): goal selected; chosen by their model.",
         "tick": 1
       }
@@ -599,7 +663,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "d6fd8d51-2c08-5e6f-9ad3-3164d6d9838f",
+            "id": "e3ed2f68-50db-5141-9300-e2e2bca54e01",
             "need_milli": 618,
             "path": [
               [
@@ -615,7 +679,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "036235fb-55e3-5c1d-87a0-026e2566b041",
+            "id": "25ed13e2-886c-590f-aa30-1b33907521d7",
             "need_milli": 504,
             "path": [
               [
@@ -631,7 +695,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "4ece1b0a-938e-568f-9e86-73f0dd159782",
+            "id": "19e211e6-10ca-52c7-89ec-7ad22609534e",
             "need_milli": 581,
             "path": [
               [
@@ -647,7 +711,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "28024172-b7e9-5b07-a3ff-5d36687c433b",
+            "id": "36dede03-18f6-5a0b-8751-b147c2cca080",
             "need_milli": 771,
             "path": [
               [
@@ -663,7 +727,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "949cf1ad-039e-521b-a341-d4a2747eca41",
+            "id": "be7d96d9-2a5b-5ab4-9214-e513b5f722ec",
             "need_milli": 512,
             "path": [
               [
@@ -679,7 +743,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "cb04fcb3-64df-5eaa-9c4a-7e508fc6357a",
+            "id": "83257e2b-2458-56eb-8228-c2a8dfa7bed2",
             "need_milli": 660,
             "path": [
               [
@@ -695,7 +759,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "ee2ed81e-ee07-59d0-9d9c-34b611b95922",
+            "id": "0be5b64f-7907-53dc-99c5-23b7b96428f8",
             "need_milli": 832,
             "path": [
               [
@@ -711,7 +775,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "954d96aa-6c3b-5fad-890a-0e0771d98401",
+            "id": "4708f7d9-67c5-5cda-9343-4e4306d7d99e",
             "need_milli": 861,
             "path": [
               [
@@ -736,7 +800,7 @@
               "reason": "stopped_to_talk",
               "target_id": null
             },
-            "id": "d6fd8d51-2c08-5e6f-9ad3-3164d6d9838f",
+            "id": "e3ed2f68-50db-5141-9300-e2e2bca54e01",
             "need_milli": 619,
             "path": [
               [
@@ -754,9 +818,9 @@
             "goal": {
               "kind": "rest",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-1:rest"
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-1:rest"
             },
-            "id": "036235fb-55e3-5c1d-87a0-026e2566b041",
+            "id": "25ed13e2-886c-590f-aa30-1b33907521d7",
             "need_milli": 505,
             "path": [
               [
@@ -774,106 +838,6 @@
               [
                 0,
                 -4000
-              ],
-              [
-                0,
-                -2000
-              ],
-              [
-                0,
-                0
-              ],
-              [
-                0,
-                2000
-              ],
-              [
-                0,
-                4000
-              ],
-              [
-                -2000,
-                4000
-              ],
-              [
-                -2650,
-                4999
-              ]
-            ],
-            "reason": "arrived_at_access_node",
-            "status": "active",
-            "x": -2650,
-            "z": 4999
-          },
-          {
-            "action": "visit",
-            "goal": {
-              "kind": "visit",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:pillar:visit"
-            },
-            "id": "4ece1b0a-938e-568f-9e86-73f0dd159782",
-            "need_milli": 582,
-            "path": [
-              [
-                6000,
-                4000
-              ],
-              [
-                4000,
-                4000
-              ],
-              [
-                4000,
-                6000
-              ],
-              [
-                4000,
-                8000
-              ],
-              [
-                4000,
-                10000
-              ],
-              [
-                6000,
-                10000
-              ],
-              [
-                6001,
-                9915
-              ]
-            ],
-            "reason": "arrived_at_access_node",
-            "status": "active",
-            "x": 6001,
-            "z": 9915
-          },
-          {
-            "action": "rest",
-            "goal": {
-              "kind": "rest",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-1:rest"
-            },
-            "id": "28024172-b7e9-5b07-a3ff-5d36687c433b",
-            "need_milli": 772,
-            "path": [
-              [
-                8000,
-                -2000
-              ],
-              [
-                6000,
-                -2000
-              ],
-              [
-                4000,
-                -2000
-              ],
-              [
-                2000,
-                -2000
               ],
               [
                 0,
@@ -917,10 +881,114 @@
             "action": "visit",
             "goal": {
               "kind": "visit",
-              "reason": "looking_around",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:pillar:visit"
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:pillar:visit"
             },
-            "id": "949cf1ad-039e-521b-a341-d4a2747eca41",
+            "id": "19e211e6-10ca-52c7-89ec-7ad22609534e",
+            "need_milli": 582,
+            "path": [
+              [
+                6000,
+                4000
+              ],
+              [
+                4000,
+                4000
+              ],
+              [
+                4000,
+                6000
+              ],
+              [
+                4000,
+                8000
+              ],
+              [
+                4000,
+                10000
+              ],
+              [
+                6000,
+                10000
+              ],
+              [
+                6001,
+                9915
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 6001,
+            "z": 9915
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "needs_a_rest",
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-2:rest"
+            },
+            "id": "36dede03-18f6-5a0b-8751-b147c2cca080",
+            "need_milli": 772,
+            "path": [
+              [
+                8000,
+                -2000
+              ],
+              [
+                6000,
+                -2000
+              ],
+              [
+                4000,
+                -2000
+              ],
+              [
+                2000,
+                -2000
+              ],
+              [
+                0,
+                -2000
+              ],
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                2000
+              ],
+              [
+                0,
+                4000
+              ],
+              [
+                0,
+                6000
+              ],
+              [
+                0,
+                8000
+              ],
+              [
+                350,
+                8999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 350,
+            "z": 8999
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "looking_around",
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:pillar:visit"
+            },
+            "id": "be7d96d9-2a5b-5ab4-9214-e513b5f722ec",
             "need_milli": 513,
             "path": [
               [
@@ -988,7 +1056,7 @@
               "reason": "stopped_to_talk",
               "target_id": null
             },
-            "id": "cb04fcb3-64df-5eaa-9c4a-7e508fc6357a",
+            "id": "83257e2b-2458-56eb-8228-c2a8dfa7bed2",
             "need_milli": 661,
             "path": [
               [
@@ -1017,10 +1085,10 @@
             "action": "rest",
             "goal": {
               "kind": "rest",
-              "reason": "needs_a_rest",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-0:rest"
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-1:rest"
             },
-            "id": "ee2ed81e-ee07-59d0-9d9c-34b611b95922",
+            "id": "0be5b64f-7907-53dc-99c5-23b7b96428f8",
             "need_milli": 833,
             "path": [
               [
@@ -1036,37 +1104,25 @@
                 10000
               ],
               [
-                0,
-                10000
-              ],
-              [
-                0,
+                -2000,
                 8000
               ],
               [
-                0,
+                -2000,
                 6000
               ],
               [
-                0,
+                -2000,
                 4000
               ],
               [
-                2000,
-                4000
-              ],
-              [
-                4000,
-                4000
-              ],
-              [
-                3350,
+                -2650,
                 4999
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 3350,
+            "x": -2650,
             "z": 4999
           },
           {
@@ -1074,9 +1130,9 @@
             "goal": {
               "kind": "rest",
               "reason": "needs_a_rest",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-2:rest"
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-2:rest"
             },
-            "id": "954d96aa-6c3b-5fad-890a-0e0771d98401",
+            "id": "4708f7d9-67c5-5cda-9343-4e4306d7d99e",
             "need_milli": 862,
             "path": [
               [
@@ -1128,14 +1184,18 @@
                 8000
               ],
               [
-                350,
-                8999
+                0,
+                10000
+              ],
+              [
+                -350,
+                9001
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 350,
-            "z": 8999
+            "x": -350,
+            "z": 9001
           }
         ],
         "tick": 1
@@ -1149,7 +1209,7 @@
               "reason": "stopped_to_talk",
               "target_id": null
             },
-            "id": "d6fd8d51-2c08-5e6f-9ad3-3164d6d9838f",
+            "id": "e3ed2f68-50db-5141-9300-e2e2bca54e01",
             "need_milli": 620,
             "path": [
               [
@@ -1167,29 +1227,29 @@
             "goal": {
               "kind": "rest",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-1:rest"
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-1:rest"
             },
-            "id": "036235fb-55e3-5c1d-87a0-026e2566b041",
+            "id": "25ed13e2-886c-590f-aa30-1b33907521d7",
             "need_milli": 506,
             "path": [
               [
-                -2650,
-                4999
+                -3350,
+                5001
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": -2650,
-            "z": 4999
+            "x": -3350,
+            "z": 5001
           },
           {
             "action": "visit",
             "goal": {
               "kind": "visit",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:pillar:visit"
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:pillar:visit"
             },
-            "id": "4ece1b0a-938e-568f-9e86-73f0dd159782",
+            "id": "19e211e6-10ca-52c7-89ec-7ad22609534e",
             "need_milli": 583,
             "path": [
               [
@@ -1206,30 +1266,30 @@
             "action": "rest",
             "goal": {
               "kind": "rest",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-1:rest"
+              "reason": "needs_a_rest",
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-2:rest"
             },
-            "id": "28024172-b7e9-5b07-a3ff-5d36687c433b",
+            "id": "36dede03-18f6-5a0b-8751-b147c2cca080",
             "need_milli": 773,
             "path": [
               [
-                -3350,
-                5001
+                350,
+                8999
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": -3350,
-            "z": 5001
+            "x": 350,
+            "z": 8999
           },
           {
             "action": "visit",
             "goal": {
               "kind": "visit",
               "reason": "looking_around",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:pillar:visit"
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:pillar:visit"
             },
-            "id": "949cf1ad-039e-521b-a341-d4a2747eca41",
+            "id": "be7d96d9-2a5b-5ab4-9214-e513b5f722ec",
             "need_milli": 514,
             "path": [
               [
@@ -1249,7 +1309,7 @@
               "reason": "stopped_to_talk",
               "target_id": null
             },
-            "id": "cb04fcb3-64df-5eaa-9c4a-7e508fc6357a",
+            "id": "83257e2b-2458-56eb-8228-c2a8dfa7bed2",
             "need_milli": 662,
             "path": [
               [
@@ -1266,20 +1326,20 @@
             "action": "rest",
             "goal": {
               "kind": "rest",
-              "reason": "needs_a_rest",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-0:rest"
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-1:rest"
             },
-            "id": "ee2ed81e-ee07-59d0-9d9c-34b611b95922",
+            "id": "0be5b64f-7907-53dc-99c5-23b7b96428f8",
             "need_milli": 834,
             "path": [
               [
-                3350,
+                -2650,
                 4999
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 3350,
+            "x": -2650,
             "z": 4999
           },
           {
@@ -1287,20 +1347,20 @@
             "goal": {
               "kind": "rest",
               "reason": "needs_a_rest",
-              "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-2:rest"
+              "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-2:rest"
             },
-            "id": "954d96aa-6c3b-5fad-890a-0e0771d98401",
+            "id": "4708f7d9-67c5-5cda-9343-4e4306d7d99e",
             "need_milli": 863,
             "path": [
               [
-                350,
-                8999
+                -350,
+                9001
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 350,
-            "z": 8999
+            "x": -350,
+            "z": 9001
           }
         ],
         "tick": 2
@@ -1311,7 +1371,7 @@
         "decider": {
           "kind": "routine"
         },
-        "id": "d6fd8d51-2c08-5e6f-9ad3-3164d6d9838f",
+        "id": "e3ed2f68-50db-5141-9300-e2e2bca54e01",
         "in_group": false,
         "name": "Ari Ash 1"
       },
@@ -1322,8 +1382,8 @@
           "name": "DeepSeek V4 Flash",
           "provider": "nebius_token_factory"
         },
-        "id": "036235fb-55e3-5c1d-87a0-026e2566b041",
-        "in_group": true,
+        "id": "25ed13e2-886c-590f-aa30-1b33907521d7",
+        "in_group": false,
         "name": "Bela Ash 2"
       },
       {
@@ -1333,9 +1393,33 @@
           "name": "DeepSeek V4 Flash",
           "provider": "nebius_token_factory"
         },
-        "id": "4ece1b0a-938e-568f-9e86-73f0dd159782",
-        "in_group": false,
+        "id": "19e211e6-10ca-52c7-89ec-7ad22609534e",
+        "in_group": true,
         "name": "Cleo Ash 3"
+      },
+      {
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "36dede03-18f6-5a0b-8751-b147c2cca080",
+        "in_group": false,
+        "name": "Dara Ash 4"
+      },
+      {
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "be7d96d9-2a5b-5ab4-9214-e513b5f722ec",
+        "in_group": false,
+        "name": "Emi Ash 5"
+      },
+      {
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "83257e2b-2458-56eb-8228-c2a8dfa7bed2",
+        "in_group": false,
+        "name": "Faye Ash 6"
       },
       {
         "decider": {
@@ -1344,39 +1428,15 @@
           "name": "DeepSeek V4 Flash",
           "provider": "nebius_token_factory"
         },
-        "id": "28024172-b7e9-5b07-a3ff-5d36687c433b",
+        "id": "0be5b64f-7907-53dc-99c5-23b7b96428f8",
         "in_group": true,
-        "name": "Dara Ash 4"
-      },
-      {
-        "decider": {
-          "kind": "routine"
-        },
-        "id": "949cf1ad-039e-521b-a341-d4a2747eca41",
-        "in_group": false,
-        "name": "Emi Ash 5"
-      },
-      {
-        "decider": {
-          "kind": "routine"
-        },
-        "id": "cb04fcb3-64df-5eaa-9c4a-7e508fc6357a",
-        "in_group": false,
-        "name": "Faye Ash 6"
-      },
-      {
-        "decider": {
-          "kind": "routine"
-        },
-        "id": "ee2ed81e-ee07-59d0-9d9c-34b611b95922",
-        "in_group": false,
         "name": "Ivo Ash 7"
       },
       {
         "decider": {
           "kind": "routine"
         },
-        "id": "954d96aa-6c3b-5fad-890a-0e0771d98401",
+        "id": "4708f7d9-67c5-5cda-9343-4e4306d7d99e",
         "in_group": false,
         "name": "Juno Ash 8"
       }
@@ -1513,7 +1573,7 @@
               8999
             ]
           ],
-          "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:pillar:visit",
+          "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:pillar:visit",
           "x": 6000,
           "z": 10000
         },
@@ -1531,7 +1591,7 @@
               5001
             ]
           ],
-          "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-0:rest",
+          "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-0:rest",
           "x": 4000,
           "z": 4000
         },
@@ -1549,7 +1609,7 @@
               5001
             ]
           ],
-          "target_id": "authored:5e2c69f8-4cc6-4d1d-92c7-8db4131a1853:object:plate-1:rest",
+          "target_id": "authored:97f359d9-6205-4ace-80b6-dbe7dcf90411:object:plate-1:rest",
           "x": -2000,
           "z": 4000
         }
@@ -1557,7 +1617,7 @@
     },
     "profile": "exulanica.society-comparison-run-replay/v2",
     "replay_verified": true,
-    "run_id": "2b51f34d-3839-56f2-b392-cc1b19813395",
+    "run_id": "92b26213-4490-5662-a387-6edc516324cc",
     "seed_digest": "ef10d747dfd582f69c152750b7a36498feefcd01028cc5206b9ac0e7437db150",
     "threshold": 750
   }

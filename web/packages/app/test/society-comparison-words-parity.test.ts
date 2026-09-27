@@ -2,11 +2,19 @@
 // held here to the Python source that states the codes.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ARM_ROLES, GROUP_SOURCES, VERDICT_CODES } from '../src/society-comparison-api.js';
 import {
+  ANSWERING_MECHANISMS,
+  ANSWERING_SOURCES,
+  ARM_ROLES,
+  GROUP_SOURCES,
+  VERDICT_CODES,
+} from '../src/society-comparison-api.js';
+import {
+  ANSWERING_SOURCE_WORDS,
   EXCLUDED_WORDS,
   FAILURE_WORDS,
   GROUP_SOURCE_WORDS,
+  MECHANISM_WORDS,
   NOT_JUDGED_WORDS,
   VERDICT_WORDS,
 } from '../src/ui/society-comparison.js';
@@ -68,5 +76,21 @@ describe('the Compare view\'s words for the codes a comparison records', () => {
     expect(sources).toContain('owner_choice');
     expect([...GROUP_SOURCES]).toEqual(sources);
     expect(Object.keys(GROUP_SOURCE_WORDS).sort()).toEqual([...sources].sort());
+  });
+
+  it('reads, and has words for, exactly the ways a model is asked and whose order that is', () => {
+    const answering = stated('exulanica/world/society_comparison_result.py', 'ANSWERING_SOURCES');
+    expect(answering).toContain('model');
+    expect([...ANSWERING_SOURCES]).toEqual(answering);
+    expect(Object.keys(ANSWERING_SOURCE_WORDS).sort()).toEqual([...answering].sort());
+    // The mechanisms are the manifest's enum, one quoted value per member.
+    const manifest = python('exulanica/models/manifest.py');
+    const start = manifest.indexOf('class AnsweringMechanism(StrEnum):');
+    expect(start).toBeGreaterThan(-1);
+    const body = manifest.slice(start, start + manifest.slice(start).search(/\n\n\n/));
+    const mechanisms = [...body.matchAll(/^ {4}[A-Z_]+ = "([a-z_]+)"$/gm)].map((match) => match[1]!);
+    expect(mechanisms).toContain('json_schema');
+    expect([...ANSWERING_MECHANISMS].sort()).toEqual([...mechanisms].sort());
+    expect(Object.keys(MECHANISM_WORDS).sort()).toEqual([...mechanisms].sort());
   });
 });

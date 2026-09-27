@@ -35,6 +35,7 @@ from types import ModuleType
 from typing import Any, Final
 
 from exulanica.grammar.errors import CatalogError
+from exulanica.models.manifest import AnsweringMechanism
 from exulanica.world import (
     society_comparison_claim,
     society_comparison_verdict,
@@ -71,6 +72,7 @@ from exulanica.world.society_decisions import PERSON_PROVIDER_CONFIG
 from exulanica.world.society_planner import routine_of
 
 __all__ = [
+    "ANSWERING_SOURCES",
     "ARM_ROLES",
     "BINDING_PROFILE",
     "DECIMAL_PLACES",
@@ -224,6 +226,16 @@ def definition_version(definition: Mapping[str, Any]) -> int:
 # -- definitions --------------------------------------------------------------------------------
 
 
+#: Whose order a model is asked in: its own, measured and named by its manifest entry, or the
+#: contract's.
+ANSWERING_SOURCES: Final = (
+    "model",
+    "contract",
+)
+_ANSWERING_KEYS: Final = frozenset({"order", "mechanism", "source", "record"})
+_MECHANISMS: Final = frozenset(mechanism.value for mechanism in AnsweringMechanism)
+
+
 def _check_config(key: str, decider: Mapping[str, Any], config: Any) -> None:
     kind = decider["kind"]
     if (kind == "model") != (config is not None):
@@ -235,6 +247,32 @@ def _check_config(key: str, decider: Mapping[str, Any], config: Any) -> None:
         or (config["provider"], config["model_id"]) != (decider["provider"], decider["model_id"])
     ):
         raise ComparisonRefused("arm_provider", f"{key} records the model it asks")
+
+
+def _check_answering(key: str, config: Any, answering: Any) -> None:
+    """Exactly a model decider records its answering: the mechanisms it is asked by in order,
+    each once, the first the one its requests record, whose order that is, and the record that
+    measured a model's own order (:meth:`~exulanica.world.society_decision_contract.
+    DecisionContract.answering`)."""
+    if (config is not None) != (answering is not None):
+        raise ComparisonRefused(
+            "arm_answering", f"exactly a model decider records its answering: {key}"
+        )
+    if answering is None:
+        return
+    order = answering.get("order") if isinstance(answering, Mapping) else None
+    if (
+        not isinstance(order, list)
+        or set(answering) != _ANSWERING_KEYS
+        or not order
+        or len(set(order)) != len(order)
+        or not set(order) <= _MECHANISMS
+        or answering["mechanism"] != order[0]
+        or answering["mechanism"] != config["mechanism"]
+        or answering["source"] not in ANSWERING_SOURCES
+        or (answering["source"] == "model") != isinstance(answering["record"], str)
+    ):
+        raise ComparisonRefused("arm_answering", f"{key} records the order its model is asked in")
 
 
 def _check_group(body: Mapping[str, Any]) -> None:
@@ -258,11 +296,12 @@ def _check_group(body: Mapping[str, Any]) -> None:
     if people is None and others:
         raise ComparisonRefused("others", "a group of everyone leaves nobody outside it")
     for other in others:
-        if set(other) != {"id", "decider", "provider_config", "choice"}:
+        if set(other) != {"id", "decider", "provider_config", "choice", "answering"}:
             raise ComparisonRefused("others", "a person outside the group states their decider")
         if other["decider"]["kind"] not in OTHER_DECIDER_KINDS:
             raise ComparisonRefused("others", f"{other['id']} is decided by their owner's choice")
         _check_config(other["id"], other["decider"], other["provider_config"])
+        _check_answering(other["id"], other["provider_config"], other["answering"])
         choice = other["choice"]
         if choice is not None and set(choice) != {"choice_seq", "document_sha256"}:
             raise ComparisonRefused("others", "an owner's choice is named by sequence and digest")
@@ -325,6 +364,7 @@ def check_definition_body(body: Mapping[str, Any], catalogs: ComparisonCatalogs)
         if kind not in DECIDER_KINDS or (anchor or "model") != kind:
             raise ComparisonRefused("arm_decider", f"arm {key} is a {arm['role']} run by {kind}")
         _check_config(f"arm {key}", arm["decider"], arm["provider_config"])
+        _check_answering(f"arm {key}", arm["provider_config"], arm.get("answering"))
         if arm["role"] == "control" and not any(
             arm["decider"] == other["decider"] for other in candidates.values()
         ):
@@ -478,8 +518,15 @@ def _arm_document(
         "key": key,
         "role": arm["role"],
         "decider": _decider_document(arm["decider"], model_name),
+        "answering": _answering_document(arm.get("answering")),
         "description": arm["description"],
     }
+
+
+def _answering_document(answering: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """How a model was asked, as its definition recorded it; null for an anchor, for a routine,
+    and for a definition recorded before a model's answering was."""
+    return None if answering is None else dict(answering)
 
 
 def _group_document(definition: Mapping[str, Any]) -> dict[str, Any]:
@@ -506,6 +553,7 @@ def _others_document(
             "id": other["id"],
             "name": other["name"],
             "decider": _decider_document(other["decider"], model_name),
+            "answering": _answering_document(other.get("answering")),
             "choice": other["choice"],
         }
         for other in definition["others"]

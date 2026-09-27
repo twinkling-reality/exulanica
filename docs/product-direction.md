@@ -578,12 +578,19 @@ applied: Lightning's lead of 0.0367 is 0.0013 of relief and 0.0354 of turns, and
 between Qwen's two runs of the same hours is all turns
 ([decomposition](evaluation/2026-09-26-society-model-comparison-decomposition.json)).
 A comparison also swaps one group's model while everybody else keeps the model or routine their
-world's owner chose for them, scores only how the group fared, and serves each arm's share of
-turns its model answered, refused and left to the routine beside its score, since the routine
-decides every turn a model leaves; a judged comparison keeps everybody outside the group on their
-routine, so that its anchors ask nobody
-([comparisons of models](society-experiments.md#comparisons-of-models)).
-The Companion, personal photographs and reconstruction are not part of this milestone.
+world's owner chose for them, scores only how the group fared, and serves each arm's share of turns
+its model answered, refused and left to the routine beside its score, since the routine decides
+every turn a model leaves; a judged comparison keeps everybody outside the group on their routine,
+so that its anchors ask nobody
+([comparisons of models](society-experiments.md#comparisons-of-models)). The second judged
+comparison, which swapped the model deciding for four of the small square's eight people over twelve
+fresh held-out seeds, found no measured difference in how they fared: the same under Qwen3 235B
+Instruct and Nemotron 3.5 Lightning on every seed, to four decimals, and slightly lower on average
+under Nemotron 3 Nano 30B, which no test told apart from their routine. Qwen answered 99.25% of the
+group's turns (99.56% in its second run), Lightning 95.77% and Nano 92.51%; none refused one, and
+the routine decided the rest, 0.75%, 0.44%, 4.23% and 7.49%
+([record](evaluation/2026-09-26-society-group-comparison.json)). The Companion, personal photographs
+and reconstruction are not part of this milestone.
 
 ### Saved-world foundation
 

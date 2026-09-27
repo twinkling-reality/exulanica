@@ -14,9 +14,11 @@ import {
   type RunReplay,
 } from '../src/society-comparison-api.js';
 import {
+  answeringWords,
   buildSocietyComparisonView,
   decidedWords,
   groupWords,
+  MECHANISM_WORDS,
   OTHERS_ASKED_WORDS,
   percentText,
   reasonWords,
@@ -162,6 +164,31 @@ describe('a group and everybody else', () => {
     expect(words).toContain(`${kept.name}: ${kept.decider.kind === 'model' ? kept.decider.name : ''}`);
     expect(words).toContain('their own routine');
     expect(groupWords(read(everybody))).toBe('Each arm decides for everybody in this world.');
+  });
+
+  it('says how each model was asked beside its name, and how an outside person\'s model is', () => {
+    const result = read(grouped);
+    const view = shown(result);
+    for (const arm of result.arms) {
+      const row = view.root.querySelector(`tr[data-arm="${arm.key}"]`)!;
+      const said = row.querySelector('.comparison-arm-answering');
+      if (arm.decider.kind === 'model') {
+        // The positive control: the server recorded how this model was asked.
+        expect(arm.answering).not.toBeNull();
+        expect(said?.textContent).toBe(answeringWords(arm.answering));
+        expect(said?.textContent).toContain(MECHANISM_WORDS[arm.answering!.mechanism]);
+      } else {
+        expect(arm.answering).toBeNull();
+        expect(said).toBeNull();
+      }
+    }
+    const kept = result.others.find((other) => other.decider.kind === 'model')!;
+    expect(groupWords(result)).toContain(`asked by ${MECHANISM_WORDS[kept.answering!.mechanism]}`);
+    // A comparison that recorded no answering says nothing of it rather than guessing.
+    const unrecorded = read(grouped, (document) => {
+      for (const arm of document['arms'] as Record<string, unknown>[]) arm['answering'] = null;
+    });
+    expect(shown(unrecorded).root.querySelector('.comparison-arm-answering')).toBeNull();
   });
 
   it('says what a model outside the group means for the score, where the server says there is one', () => {

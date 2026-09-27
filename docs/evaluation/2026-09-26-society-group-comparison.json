@@ -1,0 +1,3068 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "anchors": [
+      {
+        "people": 4,
+        "routine_choice_points": 38,
+        "routine_urgency": 525,
+        "seed_digest": "08617c499e627eaf655e55be65373e66797768a2f25671e44113a2404d2a40f9",
+        "spared": 5031,
+        "wait_urgency": 5556
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 41,
+        "routine_urgency": 2024,
+        "seed_digest": "2581ec232f91f6b2e9aba0ec6348bbd8e710992854a6f15c25acb191244ef102",
+        "spared": 6886,
+        "wait_urgency": 8910
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 39,
+        "routine_urgency": 3333,
+        "seed_digest": "2b28662fc5f7b4ec74b47702646bc49d9bbbb42bde870aae2ff06b4ae819c84f",
+        "spared": 7762,
+        "wait_urgency": 11095
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 39,
+        "routine_urgency": 2677,
+        "seed_digest": "56280f7efc009e221c7e89854852d1b74b61aa7737d4a1d8b2b1fbd7f378769e",
+        "spared": 14678,
+        "wait_urgency": 17355
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 34,
+        "routine_urgency": 140,
+        "seed_digest": "5d81aad2f024b3dc9cbf21dcc895d17738ac8e97713b03f6505bd39c513c2a77",
+        "spared": 3190,
+        "wait_urgency": 3330
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 40,
+        "routine_urgency": 2489,
+        "seed_digest": "618375c5b8bec808ff361a00d90c9d57fed528a1cf5ccc25028e6158f138230a",
+        "spared": 13051,
+        "wait_urgency": 15540
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 33,
+        "routine_urgency": 6868,
+        "seed_digest": "8a877325a663bbecfd1274ae5f60fd6253478735aaed7ae735e043f9c4e99636",
+        "spared": 21842,
+        "wait_urgency": 28710
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 32,
+        "routine_urgency": 324,
+        "seed_digest": "c21d52dc97ec3981ca5805b6f5b183d48f33a480e13e54a7d4c28d33395a8cbb",
+        "spared": 5972,
+        "wait_urgency": 6296
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 37,
+        "routine_urgency": 1155,
+        "seed_digest": "c2afea1496f97e4030fc1b4d2d7aef96f1aa91f56d076ca3749c3075a13f078e",
+        "spared": 6615,
+        "wait_urgency": 7770
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 36,
+        "routine_urgency": 2486,
+        "seed_digest": "cf4adb0a4670442b41753372aee798795c43232748f68a92acb1a74f49dc7984",
+        "spared": 9364,
+        "wait_urgency": 11850
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 40,
+        "routine_urgency": 2506,
+        "seed_digest": "e9a8abe76f92468340500236c52cc354d55c271d1eb71ab65a578744994f278d",
+        "spared": 19547,
+        "wait_urgency": 22053
+      },
+      {
+        "people": 4,
+        "routine_choice_points": 32,
+        "routine_urgency": 3069,
+        "seed_digest": "f4a32610aee743791ce5e76c7d08e429c58235da2e390d01ff780087fe4fd621",
+        "spared": 20362,
+        "wait_urgency": 23431
+      }
+    ],
+    "arms": [
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "name": "Qwen3 235B Instruct",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+        "key": "model_a",
+        "role": "candidate"
+      },
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "name": "Nemotron 3.5 Lightning",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
+        "key": "model_b",
+        "role": "candidate"
+      },
+      {
+        "answering": {
+          "mechanism": "json_schema",
+          "order": [
+            "json_schema",
+            "tool_call"
+          ],
+          "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+          "source": "model"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "name": "Nemotron 3 Nano 30B",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
+        "key": "model_c",
+        "role": "candidate"
+      },
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "name": "Qwen3 235B Instruct",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+        "key": "model_a_again",
+        "role": "control"
+      },
+      {
+        "answering": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "description": "Their own routine",
+        "key": "routine",
+        "role": "one"
+      },
+      {
+        "answering": null,
+        "decider": {
+          "kind": "wait"
+        },
+        "description": "Waiting where they are",
+        "key": "wait",
+        "role": "zero"
+      }
+    ],
+    "billed_calls_during_replays": 0,
+    "bound_usd": "0.40",
+    "calls_by_model": [
+      {
+        "asks": 1349,
+        "calls": 1349,
+        "completion_tokens": 17311,
+        "cost_usd": "0.13432940",
+        "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "prompt_tokens": 619714,
+        "provider": "nebius_token_factory"
+      },
+      {
+        "asks": 387,
+        "calls": 387,
+        "completion_tokens": 87725,
+        "cost_usd": "0.02656416",
+        "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "prompt_tokens": 91836,
+        "provider": "nebius_token_factory"
+      },
+      {
+        "asks": 828,
+        "calls": 828,
+        "completion_tokens": 239270,
+        "cost_usd": "0.08731848",
+        "model_id": "nvidia/Nemotron-3_5-Lightning",
+        "prompt_tokens": 498228,
+        "provider": "nebius_token_factory"
+      }
+    ],
+    "control_bound": "0.0000",
+    "differences": [
+      {
+        "first": "model_a",
+        "high": "0.0000",
+        "low": "0.0000",
+        "mean": "0.0000",
+        "rejected": false,
+        "second": "model_b"
+      },
+      {
+        "first": "routine",
+        "high": "0.1106",
+        "low": "0.0027",
+        "mean": "0.0505",
+        "rejected": false,
+        "second": "model_a"
+      },
+      {
+        "first": "routine",
+        "high": "0.1106",
+        "low": "0.0027",
+        "mean": "0.0505",
+        "rejected": false,
+        "second": "model_b"
+      },
+      {
+        "first": "routine",
+        "high": "0.1064",
+        "low": "-0.0128",
+        "mean": "0.0422",
+        "rejected": false,
+        "second": "model_c"
+      }
+    ],
+    "earlier_measurements": [
+      "A design measurement on 24 seeds derived from a fixed label, none of them committed, played the small square's hour in memory with each seed's first and second half of the people by identity waiting at every choice point while the rest followed their routine, asking no model: 7 of the 48 groups had the routine spare them less than the floor of 575 per person against waiting, 3 of them nothing. This script's design step made it again on the tree this comparison measures and wrote it beside this comparison's artifacts.",
+      "The anchors and the dry run of this script on the eight development seeds, each with a scripted model behind the product's client, asked no model.",
+      "A development comparison on the acceptance slot, from 02:34:33 to 02:42:46 UTC on 2026-09-27, decided for the same group with everybody else on their routine by Qwen3 235B Instruct (run twice), Nemotron 3.5 Lightning, DeepSeek V4 Flash and Nemotron 3 Nano 30B on the first two development seeds: all 14 runs completed, the second seed was spared less than the floor and excluded, and the calls cost 0.06442178 USD, 0.0318 to 0.0326 USD a seed for the five model runs, from 0.0020 USD a run for Nano to 0.0108 for DeepSeek. Lightning and DeepSeek each reached the contract's 20 second deadline at the 95th percentile on one seed. Without DeepSeek a seed cost at most 0.0256 USD, which on twelve seeds is 0.31 USD, and with it 0.0326, or 0.39 USD against a bound of at most 0.40, so DeepSeek does not join."
+    ],
+    "ended_utc": "2026-09-27T03:08:20+00:00",
+    "every_run_replayed": true,
+    "group": {
+      "people": [
+        {
+          "id": "045a904a-cfd4-54f7-9a71-b4a3a6b121e0",
+          "name": "Ari Ash 1"
+        },
+        {
+          "id": "2bc3c690-fa02-57fa-902e-b09a0b066f3d",
+          "name": "Cleo Ash 3"
+        },
+        {
+          "id": "45c8353d-3dee-595a-8430-6a7a1c33366d",
+          "name": "Faye Ash 6"
+        },
+        {
+          "id": "58461e6b-7b24-520d-9124-9d29b32895b9",
+          "name": "Bela Ash 2"
+        }
+      ],
+      "size": 4,
+      "source": {
+        "choice_seq": 1,
+        "document_sha256": "711036c8754b50da84f124dd29516acd73d4bcdedd3f788f2e9eae0fbeebffec",
+        "kind": "owner_choice"
+      }
+    },
+    "others": [
+      {
+        "answering": null,
+        "choice": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "9bb7c21f-4175-55d3-a9f6-03f6ab8dd19d",
+        "name": "Dara Ash 4"
+      },
+      {
+        "answering": null,
+        "choice": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "ad5adf93-91ea-57f2-9fae-5f5ab89f3632",
+        "name": "Juno Ash 8"
+      },
+      {
+        "answering": null,
+        "choice": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "c5d15889-4a57-55b4-8614-981b241cbf9e",
+        "name": "Emi Ash 5"
+      },
+      {
+        "answering": null,
+        "choice": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "id": "d155e74e-46a3-514f-a5c1-523c9ea94530",
+        "name": "Ivo Ash 7"
+      }
+    ],
+    "preregistration": "docs/evaluation/2026-09-26-society-group-comparison-preregistration.json",
+    "preregistration_record_sha256": "05de5c7f9b69e75a654bbc0e5dac201ca77b83379a38d6773aea6a3efef0979b",
+    "run_artifact": "docs/evaluation/artifacts/2026-09-26-society-group-comparison/run.json",
+    "run_sha256": "19eff66b8e94b11ee83c6b475e83587af071e68427c24f5b1a3e6406f8de030c",
+    "run_window": {
+      "local": "2026-09-26T22:48:52-04:00 to 2026-09-27T01:48:52-04:00",
+      "not_after_utc": "2026-09-27T05:48:52+00:00",
+      "not_before_utc": "2026-09-27T02:48:52+00:00",
+      "why": "a provider's answer time varies within one evening (finding #44), and a turn a model does not answer by the contract's deadline is left to the routine, so the run starts within these hours and its record says when it started and ended"
+    },
+    "scored_seeds": 12,
+    "script_as_run": "docs/evaluation/artifacts/2026-09-26-society-group-comparison/measure_group_comparison-run-as-run.py.txt",
+    "script_sha256": "0ae35da044c21a2f8ce8df078c175d2464138908a17d61f04b04f6983ba0d369",
+    "seeds": [
+      {
+        "excluded": null,
+        "name": "held_out_1",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 73,
+              "cost_known": true,
+              "cost_usd": "0.00706500",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 643,
+                "p95": 991
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 73,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "2.0278",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 36,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 73
+            },
+            "run_id": "a5957773-4900-5cb9-b7e3-13bfdd7a6595",
+            "score": "1.0952",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 72,
+              "cost_known": true,
+              "cost_usd": "0.00696720",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 628,
+                "p95": 1017
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 72,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "2.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 36,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 72
+            },
+            "run_id": "e633d53f-b500-5067-a3e7-248cc6f96bae",
+            "score": "1.0952",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 66,
+              "cost_known": true,
+              "cost_usd": "0.00672030",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1299,
+                "p95": 3584
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 60,
+              "left_to_routine": 6,
+              "not_answered": 0,
+              "not_applied": 6,
+              "per_routine_choice": {
+                "answered": "1.6667",
+                "left_to_routine": "0.1667",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 6
+              },
+              "refused": 0,
+              "routine_choice_points": 36,
+              "shares": {
+                "answered": "0.9091",
+                "left_to_routine": "0.0909",
+                "refused": "0.0000"
+              },
+              "turns": 66
+            },
+            "run_id": "0b55809e-b8c3-506d-9a24-4424ad0e936f",
+            "score": "1.0952",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 29,
+              "cost_known": true,
+              "cost_usd": "0.00201372",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1723,
+                "p95": 3643
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 28,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.7778",
+                "left_to_routine": "0.0278",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 36,
+              "shares": {
+                "answered": "0.9655",
+                "left_to_routine": "0.0345",
+                "refused": "0.0000"
+              },
+              "turns": 29
+            },
+            "run_id": "8a8b6f0e-7dec-5c3f-b737-abaffebf5003",
+            "score": "1.1004",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "10fc8e80-04db-57cb-bc5c-3f8aedbb8249",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "844aeaaf-8c27-5d0f-ab1f-2f662e2bf49d",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "cf4adb0a4670442b41753372aee798795c43232748f68a92acb1a74f49dc7984"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_2",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 46,
+              "cost_known": true,
+              "cost_usd": "0.00458560",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 763,
+                "p95": 1113
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 45,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.3636",
+                "left_to_routine": "0.0303",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 33,
+              "shares": {
+                "answered": "0.9783",
+                "left_to_routine": "0.0217",
+                "refused": "0.0000"
+              },
+              "turns": 46
+            },
+            "run_id": "10ebc07a-4bc8-59a6-aa58-7e0217fe0e84",
+            "score": "1.1391",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 70,
+              "cost_known": true,
+              "cost_usd": "0.00699340",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 608,
+                "p95": 854
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 70,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "2.1212",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 33,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 70
+            },
+            "run_id": "9e9e7e4a-51b7-59e8-b9d7-44a860f8b497",
+            "score": "1.1391",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 80,
+              "cost_known": true,
+              "cost_usd": "0.00847038",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1535,
+                "p95": 2324
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 79,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "2.3939",
+                "left_to_routine": "0.0303",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 33,
+              "shares": {
+                "answered": "0.9875",
+                "left_to_routine": "0.0125",
+                "refused": "0.0000"
+              },
+              "turns": 80
+            },
+            "run_id": "416ad009-72a5-5b60-9ad3-e719c8837c56",
+            "score": "1.1391",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 33,
+              "cost_known": true,
+              "cost_usd": "0.00240186",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1974,
+                "p95": 3062
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 30,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "0.9091",
+                "left_to_routine": "0.0909",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 33,
+              "shares": {
+                "answered": "0.9091",
+                "left_to_routine": "0.0909",
+                "refused": "0.0000"
+              },
+              "turns": 33
+            },
+            "run_id": "b5805d76-5f67-5005-9ea9-93a6ef9bc379",
+            "score": "1.1391",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "6210ce02-0867-5e11-8489-c5a8362388e6",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "527ee3b7-c5a3-5076-a499-911857c53ebd",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "8a877325a663bbecfd1274ae5f60fd6253478735aaed7ae735e043f9c4e99636"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_3",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 73,
+              "cost_known": true,
+              "cost_usd": "0.00757740",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 536,
+                "p95": 1043
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 72,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.8462",
+                "left_to_routine": "0.0256",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.9863",
+                "left_to_routine": "0.0137",
+                "refused": "0.0000"
+              },
+              "turns": 73
+            },
+            "run_id": "7e3ac778-b232-52b1-8569-5c2d489fc244",
+            "score": "1.3185",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 50,
+              "cost_known": true,
+              "cost_usd": "0.00503780",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 535,
+                "p95": 978
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 49,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.2564",
+                "left_to_routine": "0.0256",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.9800",
+                "left_to_routine": "0.0200",
+                "refused": "0.0000"
+              },
+              "turns": 50
+            },
+            "run_id": "041f9cbf-2044-5cf2-809b-8a01692e48ba",
+            "score": "1.3185",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 64,
+              "cost_known": true,
+              "cost_usd": "0.00682776",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1382,
+                "p95": 2333
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 63,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.6154",
+                "left_to_routine": "0.0256",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.9844",
+                "left_to_routine": "0.0156",
+                "refused": "0.0000"
+              },
+              "turns": 64
+            },
+            "run_id": "288ef609-825f-527e-953c-9e528c537c09",
+            "score": "1.3185",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 29,
+              "cost_known": true,
+              "cost_usd": "0.00201786",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1882,
+                "p95": 2829
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 26,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "0.6667",
+                "left_to_routine": "0.0769",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.8966",
+                "left_to_routine": "0.1034",
+                "refused": "0.0000"
+              },
+              "turns": 29
+            },
+            "run_id": "19aa7843-328e-56b7-b3c4-20ce98a50db9",
+            "score": "1.3185",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "c0c6d837-e0c5-5e28-bf1f-0111853a4b1d",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "a2ead309-cef1-5b8d-b3a5-f968de2e7d9d",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "2b28662fc5f7b4ec74b47702646bc49d9bbbb42bde870aae2ff06b4ae819c84f"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_4",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 74,
+              "cost_known": true,
+              "cost_usd": "0.00735100",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 699,
+                "p95": 1022
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 74,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.9474",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 74
+            },
+            "run_id": "4c2d837e-7b05-5736-8b70-41455170c882",
+            "score": "1.0038",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 58,
+              "cost_known": true,
+              "cost_usd": "0.00571500",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 687,
+                "p95": 1174
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 58,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.5263",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 58
+            },
+            "run_id": "c19aa021-a5d3-5aca-a51e-1c5b9c479fd1",
+            "score": "1.0038",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 45,
+              "cost_known": true,
+              "cost_usd": "0.00485022",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1349,
+                "p95": 1882
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 43,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "1.1316",
+                "left_to_routine": "0.0526",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9556",
+                "left_to_routine": "0.0444",
+                "refused": "0.0000"
+              },
+              "turns": 45
+            },
+            "run_id": "b9ffbf6d-6049-5e85-9cd4-aab230d90bb9",
+            "score": "1.0038",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 28,
+              "cost_known": true,
+              "cost_usd": "0.00176946",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1669,
+                "p95": 2523
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 27,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.7105",
+                "left_to_routine": "0.0263",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 38,
+              "shares": {
+                "answered": "0.9643",
+                "left_to_routine": "0.0357",
+                "refused": "0.0000"
+              },
+              "turns": 28
+            },
+            "run_id": "ed66eb8a-ef0d-5942-bb5e-b9220cdbc626",
+            "score": "0.9968",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "5ebb0cf6-3b55-59e0-ba5a-fb967c5b142e",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "857d1d83-e895-5520-91c7-b76069e0deb4",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "08617c499e627eaf655e55be65373e66797768a2f25671e44113a2404d2a40f9"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_5",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 40,
+              "cost_known": true,
+              "cost_usd": "0.00394340",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 734,
+                "p95": 1151
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 40,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.0256",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 40
+            },
+            "run_id": "593e3d45-bb43-58b8-95e1-ffc494a4e914",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 37,
+              "cost_known": true,
+              "cost_usd": "0.00369980",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 746,
+                "p95": 1174
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 36,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.9231",
+                "left_to_routine": "0.0256",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.9730",
+                "left_to_routine": "0.0270",
+                "refused": "0.0000"
+              },
+              "turns": 37
+            },
+            "run_id": "e94afd28-1780-549f-b1c9-dc6856669f40",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 57,
+              "cost_known": true,
+              "cost_usd": "0.00610098",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1346,
+                "p95": 2025
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 54,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "1.3846",
+                "left_to_routine": "0.0769",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.9474",
+                "left_to_routine": "0.0526",
+                "refused": "0.0000"
+              },
+              "turns": 57
+            },
+            "run_id": "022e1875-b397-5864-a0c0-a4019941bc94",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 27,
+              "cost_known": true,
+              "cost_usd": "0.00174096",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1465,
+                "p95": 2715
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 24,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "0.6154",
+                "left_to_routine": "0.0769",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2,
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 39,
+              "shares": {
+                "answered": "0.8889",
+                "left_to_routine": "0.1111",
+                "refused": "0.0000"
+              },
+              "turns": 27
+            },
+            "run_id": "ad5a3c18-aa47-505e-ad4a-30439966b433",
+            "score": "0.9405",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "c6d0f4ee-78bb-5f6f-a228-109e67bd0314",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "aa2216f3-d81f-56b9-b827-bc9fda8915d2",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "56280f7efc009e221c7e89854852d1b74b61aa7737d4a1d8b2b1fbd7f378769e"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_6",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 99,
+              "cost_known": true,
+              "cost_usd": "0.01014840",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 697,
+                "p95": 1209
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 99,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "2.9118",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 34,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 99
+            },
+            "run_id": "e3e27e34-fef8-572c-8971-c93609bec214",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 62,
+              "cost_known": true,
+              "cost_usd": "0.00613300",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 713,
+                "p95": 1234
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 62,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.8235",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 34,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 62
+            },
+            "run_id": "dc3b4557-2931-54d4-af9a-ac550c8f0e42",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 85,
+              "cost_known": true,
+              "cost_usd": "0.00882984",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1641,
+                "p95": 2703
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 82,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "2.4118",
+                "left_to_routine": "0.0882",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 34,
+              "shares": {
+                "answered": "0.9647",
+                "left_to_routine": "0.0353",
+                "refused": "0.0000"
+              },
+              "turns": 85
+            },
+            "run_id": "f2c2d809-323c-52f1-a64f-114e096cdfc5",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 45,
+              "cost_known": true,
+              "cost_usd": "0.00322554",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1721,
+                "p95": 3808
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 41,
+              "left_to_routine": 4,
+              "not_answered": 0,
+              "not_applied": 4,
+              "per_routine_choice": {
+                "answered": "1.2059",
+                "left_to_routine": "0.1176",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 4
+              },
+              "refused": 0,
+              "routine_choice_points": 34,
+              "shares": {
+                "answered": "0.9111",
+                "left_to_routine": "0.0889",
+                "refused": "0.0000"
+              },
+              "turns": 45
+            },
+            "run_id": "1700a3e9-b28c-5e55-ba3f-b0d078478c1c",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "8d8ecac7-f788-5273-be0b-d076ed4605b9",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "d5e3c9ee-b194-5633-b768-8062c8c9fef9",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "5d81aad2f024b3dc9cbf21dcc895d17738ac8e97713b03f6505bd39c513c2a77"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_7",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 45,
+              "cost_known": true,
+              "cost_usd": "0.00447360",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 764,
+                "p95": 1031
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 45,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.1250",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 40,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 45
+            },
+            "run_id": "a26df880-6ed3-5ab9-8e39-66414e64b8f3",
+            "score": "0.9800",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 60,
+              "cost_known": true,
+              "cost_usd": "0.00599700",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 704,
+                "p95": 1117
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 60,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.5000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 40,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 60
+            },
+            "run_id": "08a9a8e2-560b-5e71-8e10-eee77af51068",
+            "score": "0.9800",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 42,
+              "cost_known": true,
+              "cost_usd": "0.00463530",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1443,
+                "p95": 4039
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 39,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "0.9750",
+                "left_to_routine": "0.0750",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 40,
+              "shares": {
+                "answered": "0.9286",
+                "left_to_routine": "0.0714",
+                "refused": "0.0000"
+              },
+              "turns": 42
+            },
+            "run_id": "28c09607-22e4-5efb-acd4-868edeb1aea3",
+            "score": "0.9800",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 36,
+              "cost_known": true,
+              "cost_usd": "0.00251178",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1840,
+                "p95": 2884
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 36,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "0.9000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 40,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 36
+            },
+            "run_id": "8987c3b8-d550-58b3-9573-ab13a26e85f5",
+            "score": "0.9658",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "51bb3789-0f05-52c9-b1c1-baa729ecc499",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "c9f93b20-86d4-5d9b-866a-efd456871add",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "e9a8abe76f92468340500236c52cc354d55c271d1eb71ab65a578744994f278d"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_8",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 58,
+              "cost_known": true,
+              "cost_usd": "0.00577700",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 697,
+                "p95": 1279
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 56,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "1.5135",
+                "left_to_routine": "0.0541",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9655",
+                "left_to_routine": "0.0345",
+                "refused": "0.0000"
+              },
+              "turns": 58
+            },
+            "run_id": "d08f3da9-3686-59a0-aa3b-46ee073e50fc",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 66,
+              "cost_known": true,
+              "cost_usd": "0.00655440",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 620,
+                "p95": 1041
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 65,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.7568",
+                "left_to_routine": "0.0270",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9848",
+                "left_to_routine": "0.0152",
+                "refused": "0.0000"
+              },
+              "turns": 66
+            },
+            "run_id": "6ced9fef-81c9-578f-b686-1884cc10f9c4",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 69,
+              "cost_known": true,
+              "cost_usd": "0.00729468",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1415,
+                "p95": 2187
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 68,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.8378",
+                "left_to_routine": "0.0270",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.9855",
+                "left_to_routine": "0.0145",
+                "refused": "0.0000"
+              },
+              "turns": 69
+            },
+            "run_id": "600b0543-8945-5006-b655-df47973fc858",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 30,
+              "cost_known": true,
+              "cost_usd": "0.00197850",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1663,
+                "p95": 4173
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 26,
+              "left_to_routine": 4,
+              "not_answered": 0,
+              "not_applied": 4,
+              "per_routine_choice": {
+                "answered": "0.7027",
+                "left_to_routine": "0.1081",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3,
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 37,
+              "shares": {
+                "answered": "0.8667",
+                "left_to_routine": "0.1333",
+                "refused": "0.0000"
+              },
+              "turns": 30
+            },
+            "run_id": "20b96f4e-b0f5-525e-aad4-8111bc2678d9",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "b7a3a5a4-c397-5b02-9916-b917143a80ec",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "bb6bda59-331d-5d86-9a47-ced820479dfb",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "c2afea1496f97e4030fc1b4d2d7aef96f1aa91f56d076ca3749c3075a13f078e"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_9",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 30,
+              "cost_known": true,
+              "cost_usd": "0.00307560",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 658,
+                "p95": 1271
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 29,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "0.7073",
+                "left_to_routine": "0.0244",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 41,
+              "shares": {
+                "answered": "0.9667",
+                "left_to_routine": "0.0333",
+                "refused": "0.0000"
+              },
+              "turns": 30
+            },
+            "run_id": "4a4d3330-cc72-5827-b57c-17a92f8fca8e",
+            "score": "1.1146",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 30,
+              "cost_known": true,
+              "cost_usd": "0.00299720",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 683,
+                "p95": 2150
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 30,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "0.7317",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 41,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 30
+            },
+            "run_id": "5d5030ef-5be3-5946-a28b-b4d2fb68a85b",
+            "score": "1.1146",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 82,
+              "cost_known": true,
+              "cost_usd": "0.00863376",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 3347,
+                "p95": 5256
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 77,
+              "left_to_routine": 5,
+              "not_answered": 0,
+              "not_applied": 5,
+              "per_routine_choice": {
+                "answered": "1.8780",
+                "left_to_routine": "0.1220",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 5
+              },
+              "refused": 0,
+              "routine_choice_points": 41,
+              "shares": {
+                "answered": "0.9390",
+                "left_to_routine": "0.0610",
+                "refused": "0.0000"
+              },
+              "turns": 82
+            },
+            "run_id": "0a026d73-80fe-5e81-86b1-7a2c5975d5c3",
+            "score": "1.1146",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 34,
+              "cost_known": true,
+              "cost_usd": "0.00241956",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1970,
+                "p95": 3508
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 31,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "0.7561",
+                "left_to_routine": "0.0732",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2,
+                "place_taken_this_minute": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 41,
+              "shares": {
+                "answered": "0.9118",
+                "left_to_routine": "0.0882",
+                "refused": "0.0000"
+              },
+              "turns": 34
+            },
+            "run_id": "c618bc3e-ec15-51e2-9ba3-89719075c9c0",
+            "score": "1.1146",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "c711a855-353c-53d7-9ff2-bbca2296814b",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "0967b0c8-d580-5dee-82f6-55ab8f94814c",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "2581ec232f91f6b2e9aba0ec6348bbd8e710992854a6f15c25acb191244ef102"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_10",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 52,
+              "cost_known": true,
+              "cost_usd": "0.00524700",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 642,
+                "p95": 1353
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 52,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.3000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 40,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 52
+            },
+            "run_id": "7efabb1c-da51-516b-a67f-8fa7da2c4d01",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 52,
+              "cost_known": true,
+              "cost_usd": "0.00524700",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 495,
+                "p95": 916
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 52,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.3000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 40,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 52
+            },
+            "run_id": "8fc294d2-4d8b-5319-843a-c7d3e72d4620",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 89,
+              "cost_known": true,
+              "cost_usd": "0.00928608",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 3632,
+                "p95": 6027
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 86,
+              "left_to_routine": 3,
+              "not_answered": 0,
+              "not_applied": 3,
+              "per_routine_choice": {
+                "answered": "2.1500",
+                "left_to_routine": "0.0750",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 3
+              },
+              "refused": 0,
+              "routine_choice_points": 40,
+              "shares": {
+                "answered": "0.9663",
+                "left_to_routine": "0.0337",
+                "refused": "0.0000"
+              },
+              "turns": 89
+            },
+            "run_id": "8c31e365-203b-5cf6-babc-43c636eab421",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 32,
+              "cost_known": true,
+              "cost_usd": "0.00224016",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1792,
+                "p95": 4057
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 28,
+              "left_to_routine": 4,
+              "not_answered": 0,
+              "not_applied": 4,
+              "per_routine_choice": {
+                "answered": "0.7000",
+                "left_to_routine": "0.1000",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 4
+              },
+              "refused": 0,
+              "routine_choice_points": 40,
+              "shares": {
+                "answered": "0.8750",
+                "left_to_routine": "0.1250",
+                "refused": "0.0000"
+              },
+              "turns": 32
+            },
+            "run_id": "e6f70ad8-5399-55f3-8297-b17196001a43",
+            "score": "1.0337",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "f1c59df0-37f7-5694-9210-e8d2a1831901",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "7c0610b6-b127-5af5-a73c-863c6dffb0d6",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "618375c5b8bec808ff361a00d90c9d57fed528a1cf5ccc25028e6158f138230a"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_11",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 37,
+              "cost_known": true,
+              "cost_usd": "0.00362520",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 662,
+                "p95": 1074
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 37,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.1562",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 32,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 37
+            },
+            "run_id": "addbb7c7-9d4c-5953-ad38-2366381084ee",
+            "score": "0.9661",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 57,
+              "cost_known": true,
+              "cost_usd": "0.00547160",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 616,
+                "p95": 963
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 57,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.7812",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 32,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 57
+            },
+            "run_id": "9dce5cb3-a636-5e74-8365-90fc1cca7cad",
+            "score": "0.9661",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 64,
+              "cost_known": true,
+              "cost_usd": "0.00660138",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 2060,
+                "p95": 4619
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 59,
+              "left_to_routine": 5,
+              "not_answered": 0,
+              "not_applied": 5,
+              "per_routine_choice": {
+                "answered": "1.8438",
+                "left_to_routine": "0.1562",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 5
+              },
+              "refused": 0,
+              "routine_choice_points": 32,
+              "shares": {
+                "answered": "0.9219",
+                "left_to_routine": "0.0781",
+                "refused": "0.0000"
+              },
+              "turns": 64
+            },
+            "run_id": "994ee4a8-2994-5987-8e06-979eff2b3b4b",
+            "score": "0.9661",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 30,
+              "cost_known": true,
+              "cost_usd": "0.00199362",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1720,
+                "p95": 4493
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 28,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "0.8750",
+                "left_to_routine": "0.0625",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 32,
+              "shares": {
+                "answered": "0.9333",
+                "left_to_routine": "0.0667",
+                "refused": "0.0000"
+              },
+              "turns": 30
+            },
+            "run_id": "7526e637-459e-5e7f-9451-50e20a55a489",
+            "score": "0.9052",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "7b2ffe71-e709-567b-a7a3-b7d9f94eb8c4",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "68eaff7e-aa57-5b05-bde3-7f9c69acdcbc",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "f4a32610aee743791ce5e76c7d08e429c58235da2e390d01ff780087fe4fd621"
+      },
+      {
+        "excluded": null,
+        "name": "held_out_12",
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 40,
+              "cost_known": true,
+              "cost_usd": "0.00400800",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 670,
+                "p95": 1143
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 40,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "1.2500",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 32,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 40
+            },
+            "run_id": "123567de-1844-5832-a821-175bdc8313ae",
+            "score": "0.9889",
+            "status": "completed"
+          },
+          "model_a_again": {
+            "calls": {
+              "asked": 68,
+              "cost_known": true,
+              "cost_usd": "0.00663880",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 639,
+                "p95": 1045
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 68,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": {
+                "answered": "2.1250",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": 32,
+              "shares": {
+                "answered": "1.0000",
+                "left_to_routine": "0.0000",
+                "refused": "0.0000"
+              },
+              "turns": 68
+            },
+            "run_id": "7f9359b2-adb3-58b7-936c-734149cfa4f4",
+            "score": "0.9889",
+            "status": "completed"
+          },
+          "model_b": {
+            "calls": {
+              "asked": 85,
+              "cost_known": true,
+              "cost_usd": "0.00906780",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1318,
+                "p95": 1948
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 83,
+              "left_to_routine": 2,
+              "not_answered": 0,
+              "not_applied": 2,
+              "per_routine_choice": {
+                "answered": "2.5938",
+                "left_to_routine": "0.0625",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 2
+              },
+              "refused": 0,
+              "routine_choice_points": 32,
+              "shares": {
+                "answered": "0.9765",
+                "left_to_routine": "0.0235",
+                "refused": "0.0000"
+              },
+              "turns": 85
+            },
+            "run_id": "2bf1e4cc-dfa4-5061-987e-0b75e219cd9d",
+            "score": "0.9889",
+            "status": "completed"
+          },
+          "model_c": {
+            "calls": {
+              "asked": 34,
+              "cost_known": true,
+              "cost_usd": "0.00225114",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 1575,
+                "p95": 2480
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 33,
+              "left_to_routine": 1,
+              "not_answered": 0,
+              "not_applied": 1,
+              "per_routine_choice": {
+                "answered": "1.0312",
+                "left_to_routine": "0.0312",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "partner_busy": 1
+              },
+              "refused": 0,
+              "routine_choice_points": 32,
+              "shares": {
+                "answered": "0.9706",
+                "left_to_routine": "0.0294",
+                "refused": "0.0000"
+              },
+              "turns": 34
+            },
+            "run_id": "55dc5116-6b29-53c0-a68d-8f9edc41260c",
+            "score": "0.9923",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "380f941c-8c53-5357-b859-9290fe797eeb",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "f4f8a470-ab0e-5540-9497-51a5cd2b3379",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "c21d52dc97ec3981ca5805b6f5b183d48f33a480e13e54a7d4c28d33395a8cbb"
+      }
+    ],
+    "spent_usd": "0.24821204",
+    "started_utc": "2026-09-27T02:49:08+00:00",
+    "summaries": {
+      "model_a": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0056",
+        "held_out": {
+          "activities_per_person": "1.5000",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.7378",
+            "stand": "0.0069",
+            "talk": "0.0101",
+            "visit": "0.0146"
+          },
+          "waiting_share": "0.1306",
+          "walking_share": "0.1000"
+        },
+        "interval": {
+          "high": "1.1119",
+          "low": "1.0018"
+        },
+        "latency_ms": {
+          "p50": 671,
+          "p95": 1136
+        },
+        "mean_score": "1.0505",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 662,
+          "left_to_routine": 5,
+          "not_answered": 0,
+          "not_applied": 5,
+          "per_routine_choice": {
+            "answered": "1.5011",
+            "left_to_routine": "0.0113",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "partner_busy": 3,
+            "place_taken_this_minute": 2
+          },
+          "refused": 0,
+          "routine_choice_points": 441,
+          "shares": {
+            "answered": "0.9925",
+            "left_to_routine": "0.0075",
+            "refused": "0.0000"
+          },
+          "turns": 667
+        }
+      },
+      "model_a_again": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0056",
+        "held_out": {
+          "activities_per_person": "1.4167",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.7417",
+            "stand": "0.0087",
+            "talk": "0.0045",
+            "visit": "0.0087"
+          },
+          "waiting_share": "0.1368",
+          "walking_share": "0.0997"
+        },
+        "interval": {
+          "high": "1.1115",
+          "low": "1.0028"
+        },
+        "latency_ms": {
+          "p50": 642,
+          "p95": 1061
+        },
+        "mean_score": "1.0505",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 679,
+          "left_to_routine": 3,
+          "not_answered": 0,
+          "not_applied": 3,
+          "per_routine_choice": {
+            "answered": "1.5397",
+            "left_to_routine": "0.0068",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "partner_busy": 1,
+            "place_taken_this_minute": 2
+          },
+          "refused": 0,
+          "routine_choice_points": 441,
+          "shares": {
+            "answered": "0.9956",
+            "left_to_routine": "0.0044",
+            "refused": "0.0000"
+          },
+          "turns": 682
+        }
+      },
+      "model_b": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0073",
+        "held_out": {
+          "activities_per_person": "3.3333",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.4226",
+            "stand": "0.0931",
+            "talk": "0.1486",
+            "visit": "0.0622"
+          },
+          "waiting_share": "0.1500",
+          "walking_share": "0.1236"
+        },
+        "interval": {
+          "high": "1.1123",
+          "low": "1.0029"
+        },
+        "latency_ms": {
+          "p50": 1595,
+          "p95": 4619
+        },
+        "mean_score": "1.0505",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 793,
+          "left_to_routine": 35,
+          "not_answered": 0,
+          "not_applied": 35,
+          "per_routine_choice": {
+            "answered": "1.7982",
+            "left_to_routine": "0.0794",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "partner_busy": 35
+          },
+          "refused": 0,
+          "routine_choice_points": 441,
+          "shares": {
+            "answered": "0.9577",
+            "left_to_routine": "0.0423",
+            "refused": "0.0000"
+          },
+          "turns": 828
+        }
+      },
+      "model_c": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0022",
+        "held_out": {
+          "activities_per_person": "1.8958",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.7906",
+            "stand": "0.0108",
+            "talk": "0.0594",
+            "visit": "0.0087"
+          },
+          "waiting_share": "0.0226",
+          "walking_share": "0.1080"
+        },
+        "interval": {
+          "high": "1.1075",
+          "low": "0.9875"
+        },
+        "latency_ms": {
+          "p50": 1758,
+          "p95": 3213
+        },
+        "mean_score": "1.0422",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 358,
+          "left_to_routine": 29,
+          "not_answered": 0,
+          "not_applied": 29,
+          "per_routine_choice": {
+            "answered": "0.8118",
+            "left_to_routine": "0.0658",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "partner_busy": 26,
+            "place_taken_this_minute": 3
+          },
+          "refused": 0,
+          "routine_choice_points": 441,
+          "shares": {
+            "answered": "0.9251",
+            "left_to_routine": "0.0749",
+            "refused": "0.0000"
+          },
+          "turns": 387
+        }
+      },
+      "routine": {
+        "cost_known": true,
+        "cost_usd_per_hour": null,
+        "held_out": {
+          "activities_per_person": "3.3750",
+          "first_answers_refused": null,
+          "minutes_by_activity": {
+            "rest": "0.5021",
+            "stand": "0.0389",
+            "talk": "0.1517",
+            "visit": "0.1660"
+          },
+          "waiting_share": "0.0000",
+          "walking_share": "0.1413"
+        },
+        "interval": {
+          "high": "1.0000",
+          "low": "1.0000"
+        },
+        "latency_ms": {
+          "p50": null,
+          "p95": null
+        },
+        "mean_score": "1.0000",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 0,
+          "left_to_routine": 0,
+          "not_answered": 0,
+          "not_applied": 0,
+          "per_routine_choice": null,
+          "reasons": {},
+          "refused": 0,
+          "routine_choice_points": null,
+          "shares": null,
+          "turns": 0
+        }
+      },
+      "wait": {
+        "cost_known": true,
+        "cost_usd_per_hour": null,
+        "held_out": {
+          "activities_per_person": "0.0000",
+          "first_answers_refused": null,
+          "minutes_by_activity": {},
+          "waiting_share": "1.0000",
+          "walking_share": "0.0000"
+        },
+        "interval": {
+          "high": "0.0000",
+          "low": "0.0000"
+        },
+        "latency_ms": {
+          "p50": null,
+          "p95": null
+        },
+        "mean_score": "0.0000",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 0,
+          "left_to_routine": 0,
+          "not_answered": 0,
+          "not_applied": 0,
+          "per_routine_choice": null,
+          "reasons": {},
+          "refused": 0,
+          "routine_choice_points": null,
+          "shares": null,
+          "turns": 0
+        }
+      }
+    },
+    "tree": {
+      "files_sha256": {
+        "docs/evaluation/2026-09-26-society-group-comparison-preregistration.json": "11fbc9698555e62db5bab930ba2ddcaa9e726de6fef469010f67336cd4bbbd40",
+        "docs/evaluation/artifacts/2026-09-26-society-group-comparison/design-exclusion.json": "34a4123a8f5ed725387e374f4546019848e8de052d05dcd023b3e3792e51885a",
+        "docs/evaluation/artifacts/2026-09-26-society-group-comparison/dry-run.json": "9d8c681defa3148ba819498c05d8ddb8f7c50f855e596bab17a013c98c83b6f6",
+        "docs/society-experiments.md": "4f8fa66b4afe5492eae82d4b84e1770bce86047f211e2202f819b94bdb3067bc",
+        "exulanica/api/society_comparison_runner.py": "b083dd394432d5f9cf61e4324bc0a80e38a832732c6b18eac95a3e98c8266e97",
+        "exulanica/orchestration/compare.py": "93190e39550d5ce1c243a37b26182fb534d7d101aff51804e07cb31e844a03dc",
+        "exulanica/world/society_comparison_repository.py": "a7d78b03c75920cb0fb38908f2e55332bf664d90fa03ae602e216d7d2388d06c",
+        "exulanica/world/society_comparison_result.py": "d4175a4e9f7e7c3aebd33811dea485c83ca4211a627daef49141d51c4c44372a",
+        "exulanica/world/society_decision_contract.py": "ac6756d3d30ddb1f64efc94d705eba44ff59e2521f6a14df061bf3414ac016dc",
+        "scripts/measure_group_comparison.py": "0ae35da044c21a2f8ce8df078c175d2464138908a17d61f04b04f6983ba0d369",
+        "tests/comparison_support.py": "9558ee50e1843f6992eabbb6069fe955e445c2e4015a2905e2a7874262d6df3c",
+        "tests/snapshots/society-comparison-documents.json": "1d86b389a9782d10b212c2c5e0d81124bbba50b1c0581c1b952e5c7bba01db04",
+        "tests/snapshots/society-group-comparison-documents.json": "8f75c7d64f5cdc0905c84ac03994d78a30eb7c2159944c74d745354410d4c9f6",
+        "tests/test_society_comparison_answering.py": "44e5ea5586c46d12225668ffe0ace1af23118e394e844607534abdd45553f018",
+        "tests/test_society_comparison_result_v2.py": "ed43e7c16325ed3967409b8491fb80240e140098f96e501440fb257363f7ef68",
+        "tests/test_society_group_comparison_postgres.py": "ae69284c241a0995510dff25c50c198f449844ae596d6aead1393bf121868dd5",
+        "web/packages/app/src/society-comparison-api.ts": "9934379d4431d96ee4bf3e5af2372d5ca4607a96ac355ac1769fb7b6eee1bc3f",
+        "web/packages/app/src/ui/society-comparison.css": "31fe456c80f4b28436a30454ad77bac71e4de59d5de13187125460d2c8858346",
+        "web/packages/app/src/ui/society-comparison.ts": "b57504a192ea419efd5f39239cac04b4c8bb2bdc2db3dea580096e8cf1ce56c9",
+        "web/packages/app/test/society-comparison-reliability.test.ts": "7aa1101aabcec5e2ba448159a4c8ad66197e3d37328b1462811e4f0a4b1925b0",
+        "web/packages/app/test/society-comparison-words-parity.test.ts": "23614a5236051b5e1fec619c0ee9c56797f8a9bd27830c04359c558a54adde27"
+      },
+      "head": "8dca7cc2ec132047c2c8ad3fe999c38c24705062"
+    },
+    "verdict": {
+      "answered_shares_differ": true,
+      "code": "no_measured_difference",
+      "higher": null,
+      "reason": null
+    },
+    "within_bound": true
+  },
+  "record_sha256": "b626c7015ed377dd7c6d7068da7ba5ca6c509d319a1b0fea704ce56be9f6e2f7"
+}

@@ -4,6 +4,15 @@
       {
         "arms": [
           {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
             "decider": {
               "kind": "model",
               "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
@@ -15,6 +24,15 @@
             "role": "candidate"
           },
           {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
             "decider": {
               "kind": "model",
               "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
@@ -26,6 +44,7 @@
             "role": "candidate"
           },
           {
+            "answering": null,
             "decider": {
               "kind": "routine"
             },
@@ -34,6 +53,7 @@
             "role": "one"
           },
           {
+            "answering": null,
             "decider": {
               "kind": "wait"
             },
@@ -42,8 +62,8 @@
             "role": "zero"
           }
         ],
-        "comparison_id": "bc521c27-8b03-41d1-95db-c0d079a8477a",
-        "created_at": "2026-09-26T23:53:24.593403+00:00",
+        "comparison_id": "783f6966-276e-4868-9250-7fde8cffbcf0",
+        "created_at": "2026-09-27T02:27:18.804211+00:00",
         "group": {
           "size": 8,
           "source": {
@@ -63,6 +83,15 @@
   "result": {
     "arms": [
       {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
         "decider": {
           "kind": "model",
           "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
@@ -74,6 +103,15 @@
         "role": "candidate"
       },
       {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
         "decider": {
           "kind": "model",
           "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
@@ -85,6 +123,7 @@
         "role": "candidate"
       },
       {
+        "answering": null,
         "decider": {
           "kind": "routine"
         },
@@ -93,6 +132,7 @@
         "role": "one"
       },
       {
+        "answering": null,
         "decider": {
           "kind": "wait"
         },
@@ -101,10 +141,10 @@
         "role": "zero"
       }
     ],
-    "comparison_id": "bc521c27-8b03-41d1-95db-c0d079a8477a",
+    "comparison_id": "783f6966-276e-4868-9250-7fde8cffbcf0",
     "control": null,
     "control_bound": null,
-    "created_at": "2026-09-26T23:53:24.593403+00:00",
+    "created_at": "2026-09-27T02:27:18.804211+00:00",
     "differences": [
       {
         "first": "model_a",
@@ -134,36 +174,36 @@
     "group": {
       "people": [
         {
-          "id": "082f602f-3b24-54c3-a1ca-9eac55f369f6",
-          "name": "Ari Ash 1"
-        },
-        {
-          "id": "0b643f91-a134-54a3-81f2-5df1dbb51a68",
+          "id": "1d2d7548-cceb-54e8-b523-471b4e6ff394",
           "name": "Juno Ash 8"
         },
         {
-          "id": "31a7944d-2e87-5998-a0b7-e8f2253c18b5",
-          "name": "Dara Ash 4"
+          "id": "2f10eeb9-5d30-5bd3-8db1-a50789ad84b0",
+          "name": "Cleo Ash 3"
         },
         {
-          "id": "3de2ed28-0a0e-59a9-823a-e92ff02dc9c1",
-          "name": "Emi Ash 5"
+          "id": "a2c686b6-0d52-5807-9111-e6083a78432a",
+          "name": "Ari Ash 1"
         },
         {
-          "id": "4ce3b0cb-2cb0-52ed-ac7d-bfc85324bfad",
+          "id": "b34c2303-4385-5ff3-ab59-2c0faf1262a6",
           "name": "Faye Ash 6"
         },
         {
-          "id": "807a79b6-8e62-52ef-b383-8a7b923edb2c",
-          "name": "Bela Ash 2"
-        },
-        {
-          "id": "9d86edef-409e-5eea-9c17-cdcbbf364136",
+          "id": "c90da842-e51e-5b5d-85f4-b5d79229c639",
           "name": "Ivo Ash 7"
         },
         {
-          "id": "fde747bb-4c53-5505-a8f4-08e8f1bc26d6",
-          "name": "Cleo Ash 3"
+          "id": "d27b9988-97e8-5772-bd1e-f7b21f7b79bd",
+          "name": "Dara Ash 4"
+        },
+        {
+          "id": "fa5b0968-952a-5663-ab6c-1af72b6dc906",
+          "name": "Bela Ash 2"
+        },
+        {
+          "id": "fb05c95d-5c94-5e57-8066-582058620c2f",
+          "name": "Emi Ash 5"
         }
       ],
       "size": 8,
@@ -189,79 +229,81 @@
         "runs": {
           "model_a": {
             "calls": {
-              "asked": 93,
+              "asked": 97,
               "cost_known": true,
-              "cost_usd": "0.01302000",
+              "cost_usd": "0.01358000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 7,
-                "p95": 36
+                "p50": 5,
+                "p95": 9
               }
             },
             "failure": null,
             "others_calls": null,
             "reliability": {
-              "answered": 73,
-              "left_to_routine": 20,
+              "answered": 71,
+              "left_to_routine": 26,
               "not_answered": 0,
-              "not_applied": 20,
+              "not_applied": 26,
               "per_routine_choice": {
-                "answered": "0.7374",
-                "left_to_routine": "0.2020",
+                "answered": "0.7172",
+                "left_to_routine": "0.2626",
                 "refused": "0.0000"
               },
               "reasons": {
-                "place_taken_this_minute": 20
+                "partner_busy": 24,
+                "place_taken_this_minute": 2
               },
               "refused": 0,
               "routine_choice_points": 99,
               "shares": {
-                "answered": "0.7849",
-                "left_to_routine": "0.2151",
+                "answered": "0.7320",
+                "left_to_routine": "0.2680",
                 "refused": "0.0000"
               },
-              "turns": 93
+              "turns": 97
             },
-            "run_id": "6bb43d1f-0335-525e-9e00-f01640d4f041",
+            "run_id": "a38dc489-03d8-5072-9b4b-e8c091d52226",
             "score": "1.0000",
             "status": "completed"
           },
           "model_b": {
             "calls": {
-              "asked": 93,
+              "asked": 97,
               "cost_known": true,
-              "cost_usd": "0.00651000",
+              "cost_usd": "0.00679000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 7,
-                "p95": 12
+                "p50": 5,
+                "p95": 13
               }
             },
             "failure": null,
             "others_calls": null,
             "reliability": {
-              "answered": 73,
-              "left_to_routine": 20,
+              "answered": 71,
+              "left_to_routine": 26,
               "not_answered": 0,
-              "not_applied": 20,
+              "not_applied": 26,
               "per_routine_choice": {
-                "answered": "0.7374",
-                "left_to_routine": "0.2020",
+                "answered": "0.7172",
+                "left_to_routine": "0.2626",
                 "refused": "0.0000"
               },
               "reasons": {
-                "place_taken_this_minute": 20
+                "partner_busy": 24,
+                "place_taken_this_minute": 2
               },
               "refused": 0,
               "routine_choice_points": 99,
               "shares": {
-                "answered": "0.7849",
-                "left_to_routine": "0.2151",
+                "answered": "0.7320",
+                "left_to_routine": "0.2680",
                 "refused": "0.0000"
               },
-              "turns": 93
+              "turns": 97
             },
-            "run_id": "500ce620-4b6d-59dc-b098-9de7660aafa0",
+            "run_id": "0567519e-0b4d-50cd-90f0-9d412d87691a",
             "score": "1.0000",
             "status": "completed"
           },
@@ -281,7 +323,7 @@
               "shares": null,
               "turns": 0
             },
-            "run_id": "35f5ff13-c190-55aa-a6fe-46151e75409d",
+            "run_id": "1894ca24-c7cf-562b-8165-e0f5c5e2c0e3",
             "score": "1.0000",
             "status": "completed"
           },
@@ -301,7 +343,7 @@
               "shares": null,
               "turns": 0
             },
-            "run_id": "6ac6bc54-7c4a-547a-862c-cd399bd82726",
+            "run_id": "f538ed30-8e60-5fc4-902f-b51487bfe6f3",
             "score": "0.0000",
             "status": "completed"
           }
@@ -314,79 +356,81 @@
         "runs": {
           "model_a": {
             "calls": {
-              "asked": 81,
+              "asked": 94,
               "cost_known": true,
-              "cost_usd": "0.01134000",
+              "cost_usd": "0.01316000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 8,
-                "p95": 13
+                "p50": 5,
+                "p95": 9
               }
             },
             "failure": null,
             "others_calls": null,
             "reliability": {
-              "answered": 68,
-              "left_to_routine": 13,
+              "answered": 67,
+              "left_to_routine": 27,
               "not_answered": 0,
-              "not_applied": 13,
+              "not_applied": 27,
               "per_routine_choice": {
-                "answered": "0.6869",
-                "left_to_routine": "0.1313",
+                "answered": "0.6768",
+                "left_to_routine": "0.2727",
                 "refused": "0.0000"
               },
               "reasons": {
-                "place_taken_this_minute": 13
+                "partner_busy": 25,
+                "place_taken_this_minute": 2
               },
               "refused": 0,
               "routine_choice_points": 99,
               "shares": {
-                "answered": "0.8395",
-                "left_to_routine": "0.1605",
+                "answered": "0.7128",
+                "left_to_routine": "0.2872",
                 "refused": "0.0000"
               },
-              "turns": 81
+              "turns": 94
             },
-            "run_id": "759c155d-77d3-57b8-a4cc-6d3c2497f66a",
+            "run_id": "c8ad6ab7-6dc0-516c-b363-47eab77cf3f3",
             "score": "1.0000",
             "status": "completed"
           },
           "model_b": {
             "calls": {
-              "asked": 81,
+              "asked": 94,
               "cost_known": true,
-              "cost_usd": "0.00567000",
+              "cost_usd": "0.00658000",
               "first_answers_refused": 0,
               "latency_ms": {
-                "p50": 9,
-                "p95": 25
+                "p50": 6,
+                "p95": 27
               }
             },
             "failure": null,
             "others_calls": null,
             "reliability": {
-              "answered": 68,
-              "left_to_routine": 13,
+              "answered": 67,
+              "left_to_routine": 27,
               "not_answered": 0,
-              "not_applied": 13,
+              "not_applied": 27,
               "per_routine_choice": {
-                "answered": "0.6869",
-                "left_to_routine": "0.1313",
+                "answered": "0.6768",
+                "left_to_routine": "0.2727",
                 "refused": "0.0000"
               },
               "reasons": {
-                "place_taken_this_minute": 13
+                "partner_busy": 25,
+                "place_taken_this_minute": 2
               },
               "refused": 0,
               "routine_choice_points": 99,
               "shares": {
-                "answered": "0.8395",
-                "left_to_routine": "0.1605",
+                "answered": "0.7128",
+                "left_to_routine": "0.2872",
                 "refused": "0.0000"
               },
-              "turns": 81
+              "turns": 94
             },
-            "run_id": "d30fc410-e581-557d-9ba8-b9b76ddee3a5",
+            "run_id": "d873aa42-a3af-554e-af10-ab3fd41bebb9",
             "score": "1.0000",
             "status": "completed"
           },
@@ -406,7 +450,7 @@
               "shares": null,
               "turns": 0
             },
-            "run_id": "58f03bf0-bad3-52bb-9a1a-6e0409c1ec40",
+            "run_id": "345a0098-736d-552e-bd89-2f770b1216af",
             "score": "1.0000",
             "status": "completed"
           },
@@ -426,7 +470,7 @@
               "shares": null,
               "turns": 0
             },
-            "run_id": "4ac76f34-a5b0-50f6-9f09-1ef57cc5e951",
+            "run_id": "be4570e6-6ba7-51b9-b0c7-476ed8dc30bc",
             "score": "0.0000",
             "status": "completed"
           }
@@ -437,100 +481,102 @@
     "summaries": {
       "model_a": {
         "cost_known": true,
-        "cost_usd_per_hour": "0.0122",
+        "cost_usd_per_hour": "0.0134",
         "held_out": {
-          "activities_per_person": "3.2500",
+          "activities_per_person": "3.3125",
           "first_answers_refused": "0.0000",
           "minutes_by_activity": {
-            "rest": "0.5521",
-            "stand": "0.0542",
-            "talk": "0.0354",
-            "visit": "0.1573"
+            "rest": "0.5021",
+            "stand": "0.0125",
+            "talk": "0.1542",
+            "visit": "0.1417"
           },
           "waiting_share": "0.0000",
-          "walking_share": "0.2010"
+          "walking_share": "0.1896"
         },
         "interval": {
           "high": "1.0000",
           "low": "1.0000"
         },
         "latency_ms": {
-          "p50": 7,
-          "p95": 29
+          "p50": 5,
+          "p95": 9
         },
         "mean_score": "1.0000",
         "others_cost_known": true,
         "others_cost_usd_per_hour": null,
         "reliability": {
-          "answered": 141,
-          "left_to_routine": 33,
+          "answered": 138,
+          "left_to_routine": 53,
           "not_answered": 0,
-          "not_applied": 33,
+          "not_applied": 53,
           "per_routine_choice": {
-            "answered": "0.7121",
-            "left_to_routine": "0.1667",
+            "answered": "0.6970",
+            "left_to_routine": "0.2677",
             "refused": "0.0000"
           },
           "reasons": {
-            "place_taken_this_minute": 33
+            "partner_busy": 49,
+            "place_taken_this_minute": 4
           },
           "refused": 0,
           "routine_choice_points": 198,
           "shares": {
-            "answered": "0.8103",
-            "left_to_routine": "0.1897",
+            "answered": "0.7225",
+            "left_to_routine": "0.2775",
             "refused": "0.0000"
           },
-          "turns": 174
+          "turns": 191
         }
       },
       "model_b": {
         "cost_known": true,
-        "cost_usd_per_hour": "0.0061",
+        "cost_usd_per_hour": "0.0067",
         "held_out": {
-          "activities_per_person": "3.2500",
+          "activities_per_person": "3.3125",
           "first_answers_refused": "0.0000",
           "minutes_by_activity": {
-            "rest": "0.5521",
-            "stand": "0.0542",
-            "talk": "0.0354",
-            "visit": "0.1573"
+            "rest": "0.5021",
+            "stand": "0.0125",
+            "talk": "0.1542",
+            "visit": "0.1417"
           },
           "waiting_share": "0.0000",
-          "walking_share": "0.2010"
+          "walking_share": "0.1896"
         },
         "interval": {
           "high": "1.0000",
           "low": "1.0000"
         },
         "latency_ms": {
-          "p50": 8,
-          "p95": 19
+          "p50": 5,
+          "p95": 14
         },
         "mean_score": "1.0000",
         "others_cost_known": true,
         "others_cost_usd_per_hour": null,
         "reliability": {
-          "answered": 141,
-          "left_to_routine": 33,
+          "answered": 138,
+          "left_to_routine": 53,
           "not_answered": 0,
-          "not_applied": 33,
+          "not_applied": 53,
           "per_routine_choice": {
-            "answered": "0.7121",
-            "left_to_routine": "0.1667",
+            "answered": "0.6970",
+            "left_to_routine": "0.2677",
             "refused": "0.0000"
           },
           "reasons": {
-            "place_taken_this_minute": 33
+            "partner_busy": 49,
+            "place_taken_this_minute": 4
           },
           "refused": 0,
           "routine_choice_points": 198,
           "shares": {
-            "answered": "0.8103",
-            "left_to_routine": "0.1897",
+            "answered": "0.7225",
+            "left_to_routine": "0.2775",
             "refused": "0.0000"
           },
-          "turns": 174
+          "turns": 191
         }
       },
       "routine": {
@@ -637,31 +683,31 @@
     "arm": "model_a",
     "decisions": [
       {
-        "chose": "resting, 8 m away",
+        "chose": "resting, 22 m away",
         "cost_usd": "0.00014000",
         "decision_seq": 1,
-        "disposition": "applied",
-        "disposition_reason": "validated_choice",
-        "latency_ms": 8,
-        "reason": "validated_choice",
-        "status": "accepted",
-        "subject_id": "082f602f-3b24-54c3-a1ca-9eac55f369f6",
-        "tick": 1
-      },
-      {
-        "chose": "resting, 22 m away (2)",
-        "cost_usd": "0.00014000",
-        "decision_seq": 2,
         "disposition": "applied",
         "disposition_reason": "validated_choice",
         "latency_ms": 7,
         "reason": "validated_choice",
         "status": "accepted",
-        "subject_id": "0b643f91-a134-54a3-81f2-5df1dbb51a68",
+        "subject_id": "1d2d7548-cceb-54e8-b523-471b4e6ff394",
         "tick": 1
       },
       {
-        "chose": "resting, 18 m away",
+        "chose": "talk with person 1, 10 m away",
+        "cost_usd": "0.00014000",
+        "decision_seq": 2,
+        "disposition": "rejected",
+        "disposition_reason": "partner_busy",
+        "latency_ms": 6,
+        "reason": "validated_choice",
+        "status": "accepted",
+        "subject_id": "2f10eeb9-5d30-5bd3-8db1-a50789ad84b0",
+        "tick": 1
+      },
+      {
+        "chose": "resting, 6 m away",
         "cost_usd": "0.00014000",
         "decision_seq": 3,
         "disposition": "applied",
@@ -669,7 +715,7 @@
         "latency_ms": 7,
         "reason": "validated_choice",
         "status": "accepted",
-        "subject_id": "31a7944d-2e87-5998-a0b7-e8f2253c18b5",
+        "subject_id": "a2c686b6-0d52-5807-9111-e6083a78432a",
         "tick": 1
       }
     ],
@@ -677,22 +723,22 @@
       {
         "kind": "goal_selected",
         "reason": "chosen_by_their_model",
-        "subject_id": "082f602f-3b24-54c3-a1ca-9eac55f369f6",
+        "subject_id": "a2c686b6-0d52-5807-9111-e6083a78432a",
         "summary": "Ari Ash 1 (simulated): goal selected; chosen by their model.",
         "tick": 1
       },
       {
         "kind": "route_progressed",
         "reason": "arrived_at_access_node",
-        "subject_id": "082f602f-3b24-54c3-a1ca-9eac55f369f6",
+        "subject_id": "a2c686b6-0d52-5807-9111-e6083a78432a",
         "summary": "Ari Ash 1 (simulated): action started; arrived at access node.",
         "tick": 1
       },
       {
         "kind": "goal_selected",
-        "reason": "looking_around",
-        "subject_id": "807a79b6-8e62-52ef-b383-8a7b923edb2c",
-        "summary": "Bela Ash 2 (simulated): goal selected; looking around.",
+        "reason": "chosen_by_their_model",
+        "subject_id": "fa5b0968-952a-5663-ab6c-1af72b6dc906",
+        "summary": "Bela Ash 2 (simulated): goal selected; chosen by their model.",
         "tick": 1
       }
     ],
@@ -702,7 +748,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "082f602f-3b24-54c3-a1ca-9eac55f369f6",
+            "id": "a2c686b6-0d52-5807-9111-e6083a78432a",
             "need_milli": 618,
             "path": [
               [
@@ -718,7 +764,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "807a79b6-8e62-52ef-b383-8a7b923edb2c",
+            "id": "fa5b0968-952a-5663-ab6c-1af72b6dc906",
             "need_milli": 504,
             "path": [
               [
@@ -734,7 +780,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "fde747bb-4c53-5505-a8f4-08e8f1bc26d6",
+            "id": "2f10eeb9-5d30-5bd3-8db1-a50789ad84b0",
             "need_milli": 581,
             "path": [
               [
@@ -750,7 +796,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "31a7944d-2e87-5998-a0b7-e8f2253c18b5",
+            "id": "d27b9988-97e8-5772-bd1e-f7b21f7b79bd",
             "need_milli": 771,
             "path": [
               [
@@ -766,7 +812,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "3de2ed28-0a0e-59a9-823a-e92ff02dc9c1",
+            "id": "fb05c95d-5c94-5e57-8066-582058620c2f",
             "need_milli": 512,
             "path": [
               [
@@ -782,7 +828,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "4ce3b0cb-2cb0-52ed-ac7d-bfc85324bfad",
+            "id": "b34c2303-4385-5ff3-ab59-2c0faf1262a6",
             "need_milli": 660,
             "path": [
               [
@@ -798,7 +844,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "9d86edef-409e-5eea-9c17-cdcbbf364136",
+            "id": "c90da842-e51e-5b5d-85f4-b5d79229c639",
             "need_milli": 832,
             "path": [
               [
@@ -814,7 +860,7 @@
           {
             "action": "idle",
             "goal": null,
-            "id": "0b643f91-a134-54a3-81f2-5df1dbb51a68",
+            "id": "1d2d7548-cceb-54e8-b523-471b4e6ff394",
             "need_milli": 861,
             "path": [
               [
@@ -837,9 +883,9 @@
             "goal": {
               "kind": "rest",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-0:rest"
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-1:rest"
             },
-            "id": "082f602f-3b24-54c3-a1ca-9eac55f369f6",
+            "id": "a2c686b6-0d52-5807-9111-e6083a78432a",
             "need_milli": 619,
             "path": [
               [
@@ -855,31 +901,27 @@
                 4000
               ],
               [
-                2000,
+                -2000,
                 4000
               ],
               [
-                4000,
-                4000
-              ],
-              [
-                3350,
+                -2650,
                 4999
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 3350,
+            "x": -2650,
             "z": 4999
           },
           {
             "action": "visit",
             "goal": {
               "kind": "visit",
-              "reason": "looking_around",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:pillar:visit"
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:pillar:visit"
             },
-            "id": "807a79b6-8e62-52ef-b383-8a7b923edb2c",
+            "id": "fa5b0968-952a-5663-ab6c-1af72b6dc906",
             "need_milli": 505,
             "path": [
               [
@@ -941,13 +983,13 @@
             "z": 9001
           },
           {
-            "action": "rest",
+            "action": "visit",
             "goal": {
-              "kind": "rest",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-0:rest"
+              "kind": "visit",
+              "reason": "looking_around",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:pillar:visit"
             },
-            "id": "fde747bb-4c53-5505-a8f4-08e8f1bc26d6",
+            "id": "2f10eeb9-5d30-5bd3-8db1-a50789ad84b0",
             "need_milli": 582,
             "path": [
               [
@@ -955,35 +997,31 @@
                 4000
               ],
               [
-                4000,
-                4000
-              ],
-              [
-                2000,
-                4000
-              ],
-              [
-                2000,
+                6000,
                 6000
               ],
               [
-                2650,
-                5001
+                6000,
+                8000
+              ],
+              [
+                5999,
+                8085
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 2650,
-            "z": 5001
+            "x": 5999,
+            "z": 8085
           },
           {
             "action": "rest",
             "goal": {
               "kind": "rest",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-2:rest"
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-1:rest"
             },
-            "id": "31a7944d-2e87-5998-a0b7-e8f2253c18b5",
+            "id": "d27b9988-97e8-5772-bd1e-f7b21f7b79bd",
             "need_milli": 772,
             "path": [
               [
@@ -1023,140 +1061,8 @@
                 6000
               ],
               [
-                0,
-                8000
-              ],
-              [
-                0,
-                10000
-              ],
-              [
-                -350,
-                9001
-              ]
-            ],
-            "reason": "arrived_at_access_node",
-            "status": "active",
-            "x": -350,
-            "z": 9001
-          },
-          {
-            "action": "visit",
-            "goal": {
-              "kind": "visit",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:pillar:visit"
-            },
-            "id": "3de2ed28-0a0e-59a9-823a-e92ff02dc9c1",
-            "need_milli": 513,
-            "path": [
-              [
-                10000,
-                -8000
-              ],
-              [
-                8000,
-                -8000
-              ],
-              [
-                8000,
-                -6000
-              ],
-              [
-                8000,
-                -4000
-              ],
-              [
-                8000,
-                -2000
-              ],
-              [
-                8000,
-                0
-              ],
-              [
-                8000,
-                2000
-              ],
-              [
-                8000,
-                4000
-              ],
-              [
-                8000,
-                6000
-              ],
-              [
-                8000,
-                8000
-              ],
-              [
-                8000,
-                10000
-              ],
-              [
-                6000,
-                10000
-              ],
-              [
-                6001,
-                9915
-              ]
-            ],
-            "reason": "arrived_at_access_node",
-            "status": "active",
-            "x": 6001,
-            "z": 9915
-          },
-          {
-            "action": "rest",
-            "goal": {
-              "kind": "rest",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-1:rest"
-            },
-            "id": "4ce3b0cb-2cb0-52ed-ac7d-bfc85324bfad",
-            "need_milli": 661,
-            "path": [
-              [
-                -4000,
-                4000
-              ],
-              [
                 -2000,
-                4000
-              ],
-              [
-                -2650,
-                4999
-              ]
-            ],
-            "reason": "arrived_at_access_node",
-            "status": "active",
-            "x": -2650,
-            "z": 4999
-          },
-          {
-            "action": "rest",
-            "goal": {
-              "kind": "rest",
-              "reason": "needs_a_rest",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-1:rest"
-            },
-            "id": "9d86edef-409e-5eea-9c17-cdcbbf364136",
-            "need_milli": 833,
-            "path": [
-              [
-                -6000,
-                10000
-              ],
-              [
-                -4000,
-                10000
-              ],
-              [
-                -4000,
-                8000
+                6000
               ],
               [
                 -4000,
@@ -1177,9 +1083,189 @@
             "goal": {
               "kind": "rest",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-2:rest"
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-2:rest"
             },
-            "id": "0b643f91-a134-54a3-81f2-5df1dbb51a68",
+            "id": "fb05c95d-5c94-5e57-8066-582058620c2f",
+            "need_milli": 513,
+            "path": [
+              [
+                10000,
+                -8000
+              ],
+              [
+                8000,
+                -8000
+              ],
+              [
+                6000,
+                -8000
+              ],
+              [
+                4000,
+                -8000
+              ],
+              [
+                2000,
+                -8000
+              ],
+              [
+                0,
+                -8000
+              ],
+              [
+                0,
+                -6000
+              ],
+              [
+                0,
+                -4000
+              ],
+              [
+                0,
+                -2000
+              ],
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                2000
+              ],
+              [
+                0,
+                4000
+              ],
+              [
+                0,
+                6000
+              ],
+              [
+                0,
+                8000
+              ],
+              [
+                350,
+                8999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 350,
+            "z": 8999
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:pillar:visit"
+            },
+            "id": "b34c2303-4385-5ff3-ab59-2c0faf1262a6",
+            "need_milli": 661,
+            "path": [
+              [
+                -4000,
+                4000
+              ],
+              [
+                -2000,
+                4000
+              ],
+              [
+                0,
+                4000
+              ],
+              [
+                0,
+                6000
+              ],
+              [
+                0,
+                8000
+              ],
+              [
+                0,
+                10000
+              ],
+              [
+                2000,
+                10000
+              ],
+              [
+                4000,
+                10000
+              ],
+              [
+                6000,
+                10000
+              ],
+              [
+                6001,
+                9915
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 6001,
+            "z": 9915
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "needs_a_rest",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-0:rest"
+            },
+            "id": "c90da842-e51e-5b5d-85f4-b5d79229c639",
+            "need_milli": 833,
+            "path": [
+              [
+                -6000,
+                10000
+              ],
+              [
+                -4000,
+                10000
+              ],
+              [
+                -2000,
+                10000
+              ],
+              [
+                0,
+                10000
+              ],
+              [
+                0,
+                8000
+              ],
+              [
+                0,
+                6000
+              ],
+              [
+                2000,
+                6000
+              ],
+              [
+                2650,
+                5001
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 2650,
+            "z": 5001
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-0:rest"
+            },
+            "id": "1d2d7548-cceb-54e8-b523-471b4e6ff394",
             "need_milli": 862,
             "path": [
               [
@@ -1223,22 +1309,22 @@
                 4000
               ],
               [
-                0,
-                6000
+                2000,
+                4000
               ],
               [
-                0,
-                8000
+                4000,
+                4000
               ],
               [
-                350,
-                8999
+                3350,
+                4999
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 350,
-            "z": 8999
+            "x": 3350,
+            "z": 4999
           }
         ],
         "tick": 1
@@ -1250,29 +1336,29 @@
             "goal": {
               "kind": "rest",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-0:rest"
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-1:rest"
             },
-            "id": "082f602f-3b24-54c3-a1ca-9eac55f369f6",
+            "id": "a2c686b6-0d52-5807-9111-e6083a78432a",
             "need_milli": 620,
             "path": [
               [
-                3350,
+                -2650,
                 4999
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 3350,
+            "x": -2650,
             "z": 4999
           },
           {
             "action": "visit",
             "goal": {
               "kind": "visit",
-              "reason": "looking_around",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:pillar:visit"
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:pillar:visit"
             },
-            "id": "807a79b6-8e62-52ef-b383-8a7b923edb2c",
+            "id": "fa5b0968-952a-5663-ab6c-1af72b6dc906",
             "need_milli": 486,
             "path": [
               [
@@ -1286,94 +1372,34 @@
             "z": 9001
           },
           {
-            "action": "rest",
-            "goal": {
-              "kind": "rest",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-0:rest"
-            },
-            "id": "fde747bb-4c53-5505-a8f4-08e8f1bc26d6",
-            "need_milli": 583,
-            "path": [
-              [
-                2650,
-                5001
-              ]
-            ],
-            "reason": "arrived_at_access_node",
-            "status": "active",
-            "x": 2650,
-            "z": 5001
-          },
-          {
-            "action": "rest",
-            "goal": {
-              "kind": "rest",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-2:rest"
-            },
-            "id": "31a7944d-2e87-5998-a0b7-e8f2253c18b5",
-            "need_milli": 773,
-            "path": [
-              [
-                -350,
-                9001
-              ]
-            ],
-            "reason": "arrived_at_access_node",
-            "status": "active",
-            "x": -350,
-            "z": 9001
-          },
-          {
             "action": "visit",
             "goal": {
               "kind": "visit",
-              "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:pillar:visit"
+              "reason": "looking_around",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:pillar:visit"
             },
-            "id": "3de2ed28-0a0e-59a9-823a-e92ff02dc9c1",
-            "need_milli": 514,
+            "id": "2f10eeb9-5d30-5bd3-8db1-a50789ad84b0",
+            "need_milli": 583,
             "path": [
               [
-                6001,
-                9915
+                5999,
+                8085
               ]
             ],
             "reason": "arrived_at_access_node",
             "status": "active",
-            "x": 6001,
-            "z": 9915
+            "x": 5999,
+            "z": 8085
           },
           {
             "action": "rest",
             "goal": {
               "kind": "rest",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-1:rest"
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-1:rest"
             },
-            "id": "4ce3b0cb-2cb0-52ed-ac7d-bfc85324bfad",
-            "need_milli": 662,
-            "path": [
-              [
-                -2650,
-                4999
-              ]
-            ],
-            "reason": "arrived_at_access_node",
-            "status": "active",
-            "x": -2650,
-            "z": 4999
-          },
-          {
-            "action": "rest",
-            "goal": {
-              "kind": "rest",
-              "reason": "needs_a_rest",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-1:rest"
-            },
-            "id": "9d86edef-409e-5eea-9c17-cdcbbf364136",
-            "need_milli": 834,
+            "id": "d27b9988-97e8-5772-bd1e-f7b21f7b79bd",
+            "need_milli": 773,
             "path": [
               [
                 -3350,
@@ -1390,10 +1416,10 @@
             "goal": {
               "kind": "rest",
               "reason": "chosen_by_their_model",
-              "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-2:rest"
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-2:rest"
             },
-            "id": "0b643f91-a134-54a3-81f2-5df1dbb51a68",
-            "need_milli": 863,
+            "id": "fb05c95d-5c94-5e57-8066-582058620c2f",
+            "need_milli": 514,
             "path": [
               [
                 350,
@@ -1404,6 +1430,66 @@
             "status": "active",
             "x": 350,
             "z": 8999
+          },
+          {
+            "action": "visit",
+            "goal": {
+              "kind": "visit",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:pillar:visit"
+            },
+            "id": "b34c2303-4385-5ff3-ab59-2c0faf1262a6",
+            "need_milli": 662,
+            "path": [
+              [
+                6001,
+                9915
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 6001,
+            "z": 9915
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "needs_a_rest",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-0:rest"
+            },
+            "id": "c90da842-e51e-5b5d-85f4-b5d79229c639",
+            "need_milli": 834,
+            "path": [
+              [
+                2650,
+                5001
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 2650,
+            "z": 5001
+          },
+          {
+            "action": "rest",
+            "goal": {
+              "kind": "rest",
+              "reason": "chosen_by_their_model",
+              "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-0:rest"
+            },
+            "id": "1d2d7548-cceb-54e8-b523-471b4e6ff394",
+            "need_milli": 863,
+            "path": [
+              [
+                3350,
+                4999
+              ]
+            ],
+            "reason": "arrived_at_access_node",
+            "status": "active",
+            "x": 3350,
+            "z": 4999
           }
         ],
         "tick": 2
@@ -1417,7 +1503,7 @@
           "name": "Qwen3 235B Instruct",
           "provider": "nebius_token_factory"
         },
-        "id": "082f602f-3b24-54c3-a1ca-9eac55f369f6",
+        "id": "a2c686b6-0d52-5807-9111-e6083a78432a",
         "in_group": true,
         "name": "Ari Ash 1"
       },
@@ -1428,7 +1514,7 @@
           "name": "Qwen3 235B Instruct",
           "provider": "nebius_token_factory"
         },
-        "id": "807a79b6-8e62-52ef-b383-8a7b923edb2c",
+        "id": "fa5b0968-952a-5663-ab6c-1af72b6dc906",
         "in_group": true,
         "name": "Bela Ash 2"
       },
@@ -1439,7 +1525,7 @@
           "name": "Qwen3 235B Instruct",
           "provider": "nebius_token_factory"
         },
-        "id": "fde747bb-4c53-5505-a8f4-08e8f1bc26d6",
+        "id": "2f10eeb9-5d30-5bd3-8db1-a50789ad84b0",
         "in_group": true,
         "name": "Cleo Ash 3"
       },
@@ -1450,7 +1536,7 @@
           "name": "Qwen3 235B Instruct",
           "provider": "nebius_token_factory"
         },
-        "id": "31a7944d-2e87-5998-a0b7-e8f2253c18b5",
+        "id": "d27b9988-97e8-5772-bd1e-f7b21f7b79bd",
         "in_group": true,
         "name": "Dara Ash 4"
       },
@@ -1461,7 +1547,7 @@
           "name": "Qwen3 235B Instruct",
           "provider": "nebius_token_factory"
         },
-        "id": "3de2ed28-0a0e-59a9-823a-e92ff02dc9c1",
+        "id": "fb05c95d-5c94-5e57-8066-582058620c2f",
         "in_group": true,
         "name": "Emi Ash 5"
       },
@@ -1472,7 +1558,7 @@
           "name": "Qwen3 235B Instruct",
           "provider": "nebius_token_factory"
         },
-        "id": "4ce3b0cb-2cb0-52ed-ac7d-bfc85324bfad",
+        "id": "b34c2303-4385-5ff3-ab59-2c0faf1262a6",
         "in_group": true,
         "name": "Faye Ash 6"
       },
@@ -1483,7 +1569,7 @@
           "name": "Qwen3 235B Instruct",
           "provider": "nebius_token_factory"
         },
-        "id": "9d86edef-409e-5eea-9c17-cdcbbf364136",
+        "id": "c90da842-e51e-5b5d-85f4-b5d79229c639",
         "in_group": true,
         "name": "Ivo Ash 7"
       },
@@ -1494,7 +1580,7 @@
           "name": "Qwen3 235B Instruct",
           "provider": "nebius_token_factory"
         },
-        "id": "0b643f91-a134-54a3-81f2-5df1dbb51a68",
+        "id": "1d2d7548-cceb-54e8-b523-471b4e6ff394",
         "in_group": true,
         "name": "Juno Ash 8"
       }
@@ -1631,7 +1717,7 @@
               8999
             ]
           ],
-          "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:pillar:visit",
+          "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:pillar:visit",
           "x": 6000,
           "z": 10000
         },
@@ -1649,7 +1735,7 @@
               5001
             ]
           ],
-          "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-0:rest",
+          "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-0:rest",
           "x": 4000,
           "z": 4000
         },
@@ -1667,7 +1753,7 @@
               5001
             ]
           ],
-          "target_id": "authored:b6fc7671-f34c-4ddf-b033-cfebc42ffff7:object:plate-1:rest",
+          "target_id": "authored:0a90cd78-677e-454f-b061-3ab92aa0803e:object:plate-1:rest",
           "x": -2000,
           "z": 4000
         }
@@ -1675,7 +1761,7 @@
     },
     "profile": "exulanica.society-comparison-run-replay/v2",
     "replay_verified": true,
-    "run_id": "6bb43d1f-0335-525e-9e00-f01640d4f041",
+    "run_id": "a38dc489-03d8-5072-9b4b-e8c091d52226",
     "seed_digest": "ef10d747dfd582f69c152750b7a36498feefcd01028cc5206b9ac0e7437db150",
     "threshold": 750
   }

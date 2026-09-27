@@ -12,13 +12,16 @@
  */
 
 import type {
+  Answering,
+  AnsweringMechanism,
+  AnsweringSource,
   ArmRole,
   ComparisonArm,
   ComparisonListing,
   ComparisonResult,
   ComparisonSeed,
-  Decider,
   GroupSourceKind,
+  OtherPerson,
   Reliability,
   RunDecision,
   RunReplay,
@@ -195,9 +198,29 @@ export function verdictDetail(result: ComparisonResult): string {
   }
 }
 
+/** Each mechanism a model is asked by, in words. */
+export const MECHANISM_WORDS: Readonly<Record<AnsweringMechanism, string>> = {
+  tool_call: 'a forced call',
+  json_schema: 'a JSON schema',
+};
+
+/** Whose order a model is asked in, in words. */
+export const ANSWERING_SOURCE_WORDS: Readonly<Record<AnsweringSource, string>> = {
+  model: 'the order measured for this model',
+  contract: 'the contract\'s order',
+};
+
+/** How a model was asked, in words; empty where nothing records it. */
+export function answeringWords(answering: Answering | null): string {
+  return answering === null ? ''
+    : `Asked by ${MECHANISM_WORDS[answering.mechanism]}, ${ANSWERING_SOURCE_WORDS[answering.source]}.`;
+}
+
 /** Who decides for somebody outside the group in every arm, in words. */
-function otherDeciderWords(decider: Decider): string {
-  return decider.kind === 'model' ? `${decider.name}, the model you chose for them` : 'their own routine';
+function otherDeciderWords(other: OtherPerson): string {
+  if (other.decider.kind !== 'model') return 'their own routine';
+  const asked = other.answering === null ? '' : `, asked by ${MECHANISM_WORDS[other.answering.mechanism]}`;
+  return `${other.decider.name}, the model you chose for them${asked}`;
 }
 
 /** Who a comparison compares: its group, and what decides for everybody else in every arm. */
@@ -206,7 +229,7 @@ export function groupWords(result: ComparisonResult): string {
   const who = people === null || result.group.source.kind === 'everyone'
     ? 'everybody in this world'
     : `${people.map((person) => person.name).join(', ')} (${GROUP_SOURCE_WORDS[result.group.source.kind]})`;
-  const others = result.others.map((other) => `${other.name}: ${otherDeciderWords(other.decider)}`);
+  const others = result.others.map((other) => `${other.name}: ${otherDeciderWords(other)}`);
   return `Each arm decides for ${who}.${others.length === 0 ? ''
     : ` Everybody else keeps the same decider in every arm: ${others.join('; ')}.`}${
     result.othersAsked ? ` ${OTHERS_ASKED_WORDS}` : ''}`;
@@ -304,6 +327,8 @@ function armsTable(result: ComparisonResult): HTMLElement {
       el('th', { scope: 'row' }, [
         el('span', { class: 'comparison-arm-name', text: armName(arm), title: arm.description }),
         el('span', { class: 'comparison-arm-role', text: ROLE_WORDS[arm.role] }),
+        ...(arm.answering === null ? []
+          : [el('span', { class: 'comparison-arm-answering', text: answeringWords(arm.answering) })]),
       ]),
       el('td', { class: 'comparison-number', text: scoreText(summary?.meanScore ?? null) }),
       el('td', {

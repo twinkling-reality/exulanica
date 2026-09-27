@@ -101,12 +101,14 @@ def comparison_body(
             "role": "one",
             "decider": {"kind": "routine"},
             "provider_config": None,
+            "answering": None,
             "description": "Their own routine",
         },
         WAIT_ARM: {
             "role": "zero",
             "decider": {"kind": "wait"},
             "provider_config": None,
+            "answering": None,
             "description": "Waiting where they are",
         },
     }

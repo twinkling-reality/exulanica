@@ -77,6 +77,7 @@ def model_arm(role: str) -> dict[str, Any]:
             "contract": contract.binding(),
             "deadline_ms": contract.value("decision_deadline_ms"),
         },
+        "answering": contract.answering(spec),
         "description": spec.description,
     }
 
@@ -94,12 +95,14 @@ def development_body(catalogs: ComparisonCatalogs) -> dict[str, Any]:
                 "role": "one",
                 "decider": {"kind": "routine"},
                 "provider_config": None,
+                "answering": None,
                 "description": "Their own routine",
             },
             "wait": {
                 "role": "zero",
                 "decider": {"kind": "wait"},
                 "provider_config": None,
+                "answering": None,
                 "description": "Waiting where they are",
             },
             "model_a": model_arm("candidate"),

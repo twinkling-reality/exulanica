@@ -414,6 +414,7 @@ def _group_body(phase: str, catalogs, *, outside_model: bool):
             if outside_model
             else None,
             "choice": {"choice_seq": 1, "document_sha256": "d" * 64} if outside_model else None,
+            "answering": arm["answering"] if outside_model else None,
         }
     ]
     if phase == "held_out":

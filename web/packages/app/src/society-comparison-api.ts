@@ -32,10 +32,31 @@ export type VerdictCode = typeof VERDICT_CODES[number];
 
 export type Phase = 'development' | 'held_out';
 
+/** How a model is asked for a person's choice, by the server's code for each mechanism. */
+export const ANSWERING_MECHANISMS = ['tool_call', 'json_schema'] as const;
+export type AnsweringMechanism = typeof ANSWERING_MECHANISMS[number];
+/** Whose order a model is asked in: its own, measured for it, or the contract's. */
+export const ANSWERING_SOURCES = ['model', 'contract'] as const;
+export type AnsweringSource = typeof ANSWERING_SOURCES[number];
+
+/**
+ * How a model was asked, as its comparison recorded it: the mechanisms in order, the one it was
+ * asked by, whose order that is and the record that measured a model's own. The mechanism changes
+ * what a model chooses, so it is part of what the model is in a comparison.
+ */
+export interface Answering {
+  readonly order: readonly AnsweringMechanism[];
+  readonly mechanism: AnsweringMechanism;
+  readonly source: AnsweringSource;
+  readonly record: string | null;
+}
+
 export interface ComparisonArm {
   readonly key: string;
   readonly role: ArmRole;
   readonly decider: Decider;
+  /** How its model was asked; null for an anchor, and for a comparison that did not record it. */
+  readonly answering: Answering | null;
   /** The arm in plain words: the model's description as the manifest stated it when it ran. */
   readonly description: string;
 }
@@ -74,6 +95,8 @@ export interface ComparisonGroup {
 /** Somebody outside the group, and what decides for them in every arm: their owner's choice. */
 export interface OtherPerson extends NamedPerson {
   readonly decider: Decider;
+  /** How their owner's model was asked; null for their routine. */
+  readonly answering: Answering | null;
   readonly choice: OwnerChoice | null;
 }
 
@@ -347,12 +370,25 @@ function namedPerson(value: unknown): NamedPerson {
   return { id: text(held['id']), name: text(held['name']) };
 }
 
+const mechanism = oneOf<AnsweringMechanism>(ANSWERING_MECHANISMS);
+
+function answering(value: unknown): Answering {
+  const held = object(value);
+  return {
+    order: list(held['order']).map(mechanism),
+    mechanism: mechanism(held['mechanism']),
+    source: oneOf<AnsweringSource>(ANSWERING_SOURCES)(held['source']),
+    record: maybe(held['record'], text),
+  };
+}
+
 function arm(value: unknown): ComparisonArm {
   const held = object(value);
   return {
     key: text(held['key']),
     role: oneOf<ArmRole>(ARM_ROLES)(held['role']),
     decider: decider(held['decider']),
+    answering: maybe(held['answering'], answering),
     description: text(held['description']),
   };
 }
@@ -482,6 +518,7 @@ export function parseComparison(value: unknown): ComparisonResult {
       return {
         ...namedPerson(held),
         decider: decider(held['decider']),
+        answering: maybe(held['answering'], answering),
         choice: maybe(held['choice'], ownerChoice),
       };
     }),

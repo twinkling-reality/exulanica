@@ -31,6 +31,7 @@ from typing import Any, Final
 import psycopg
 from psycopg.types.json import Jsonb
 
+from exulanica.canonical import canonical_json
 from exulanica.world.society import (
     UnavailableSocietyInput,
     UnknownSociety,
@@ -132,6 +133,17 @@ def _held_asking(
     if len(manifests) > 1 or any(len(found) > 1 for found in mechanisms.values()):
         raise ComparisonRefused(
             "asking_not_the_definitions", "every model is asked under one manifest, one way"
+        )
+    # One answering per model too: the order it is asked in is part of what the model is here.
+    answerings: dict[str, set[str]] = {}
+    for held in [*body["arms"].values(), *others]:
+        if held["provider_config"] is not None:
+            answerings.setdefault(held["provider_config"]["model_id"], set()).add(
+                canonical_json(held.get("answering")).decode()
+            )
+    if any(len(found) > 1 for found in answerings.values()):
+        raise ComparisonRefused(
+            "asking_not_the_definitions", "every model is asked in one order, wherever it decides"
         )
 
 
