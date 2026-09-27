@@ -7,14 +7,15 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**103 documents** in the public catalog.
+**91 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
+- [Agents and simulation](#simulation)
 - [World state and creation](#world-state)
-- [Sources, perception and evidence](#perception)
+- [Generated and admitted environments](#environments)
 - [Interaction and Companion](#interaction)
-- [Simulation and generated environments](#simulation)
+- [Photographs, reconstruction and evidence](#perception)
 - [Runtime, security and model selection](#operations)
 - [Verification and evidence](#verification)
 - [Historical context](#history)
@@ -28,11 +29,10 @@ Begin here for scope, system boundaries and contributor workflow.
 
 | Document | Role | Owns |
 | --- | --- | --- |
-| [Product roadmap](product-direction.md) | overview | Product scope, delivery order and acceptance gates |
-| [Architecture overview](architecture-overview.md) | overview | System responsibilities, boundaries and source-code entry points |
-| [Development setup and operations](development-setup.md) | guide | Installation, local services and focused verification |
+| [Product direction](product-direction.md) | overview | Product scope, delivery order, milestone status and acceptance gates |
+| [Architecture overview](architecture-overview.md) | overview | System shape, backend layers, source-code entry points and language adoption |
+| [Development setup and operations](development-setup.md) | guide | Installation, test and API servers, workers and focused verification |
 | [Documentation standard](documentation-standard.md) | standard | Documentation ownership, lifecycle and review rubric |
-| [World state architecture](world-memory-model.md) | contract | World-state planes, identity, representations and research claims |
 
 <a id="capabilities"></a>
 
@@ -42,12 +42,27 @@ Choose a feature or integrate as an external developer.
 
 | Document | Role | Owns |
 | --- | --- | --- |
-| [World creation](capabilities/world-creation.md) | guide | Creation experience and its supported boundaries |
-| [Scene reconstruction](capabilities/scene-reconstruction.md) | guide | Photographs-to-scene experience, one way to build a world, and its coverage limits |
-| [Companion](capabilities/companion.md) | guide | Companion role, tools and continuity requirements |
-| [Simulation runtime](capabilities/simulation.md) | guide | Simulation uses and supported behavior boundaries |
-| [World API](capabilities/world-api.md) | guide | Authenticated developer operations and version-safe edits |
+| [People and models in a world](capabilities/simulation.md) | guide | A world's people, the models that decide for them, comparisons and movement |
+| [World creation](capabilities/world-creation.md) | guide | Creating and furnishing a world, and its supported boundaries |
+| [Scene reconstruction](capabilities/scene-reconstruction.md) | guide | Making a world from photographs and what reconstruction recovers |
+| [Companion](capabilities/companion.md) | guide | What the Companion does and what it is meant to become |
+| [World API](capabilities/world-api.md) | guide | Authenticated routes for world state, people and models, with version-safe edits |
 | [Developer client](capabilities/developer-client.md) | guide | Independent Python client setup and demonstrated workflow |
+
+<a id="simulation"></a>
+
+## Agents and simulation
+
+How a world's people live, how open models decide for them, how runs are compared and how things move.
+
+| Document | Role | Owns |
+| --- | --- | --- |
+| [Synthetic society contract](synthetic-society-contract.md) | contract | Society engines, inputs, identity, persistence, playback, directed actions and replay |
+| [Decision roles and model decisions](decision-roles-contract.md) | contract | Decision roles, the owner's model choice, the person's decision contract, host asking and spend bounds, dispositions and replay |
+| [Society experiments](society-experiments.md) | contract | Comparisons of the models that decide for a world's people, and intervention experiments over a living society |
+| [Movement modules contract](movement-modules-contract.md) | contract | Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads |
+| [Character representation and movement](character-representation-contract.md) | contract | Character appearance, rigging, subject bindings, movement and how a society's people are drawn |
+| [Traffic simulation](traffic-contract.md) | contract | Traffic simulation inputs, state transitions and invariants; nothing calls it |
 
 <a id="world-state"></a>
 
@@ -57,93 +72,77 @@ Read the contract for the state or operation being changed.
 
 | Document | Role | Owns |
 | --- | --- | --- |
-| [Unified world composition and retrieval](world-composition-contract.md) | contract | Relationships between personal sources, imports and authored content |
-| [Saved world entry](saved-world-entry.md) | contract | Owned starter creation, saved-world reopening and photo references |
-| [Authored world versions and created objects](world-objects-contract.md) | contract | Authored objects, alternate versions, edit registry, undo and concurrency |
-| [Durable spatial world authority](spatial-world-authority.md) | contract | Durable spatial topology and publication authority |
+| [World state architecture](world-memory-model.md) | contract | World-state planes, identity and representation principles |
+| [Saved world entry](saved-world-entry.md) | contract | World registry and count policy, starter and made-world creation, saved-world reopening and reference photographs |
+| [Authored world versions and created objects](world-objects-contract.md) | contract | Authored versions, objects, arrangements, environment placements, edit log, undo and concurrency |
+| [Unified world composition and retrieval](world-composition-contract.md) | contract | Composition preview and apply, unified place retrieval, and composition of imports, personal and authored content |
+| [World version authorities](world-version-authorities.md) | contract | Versioned structure, appearance and comfort-settings authorities |
 | [One place across captures and time](place-identity.md) | contract | Place identity, coordinate frames and cross-capture alignment |
 | [World Memory Package v1](world-memory-package.md) | contract | Portable package profiles, integrity, projections and permissions |
-| [World variation and segments](world-variation-and-segments.md) | reference | Relationship between subject identity, variation and representation |
-| [Representation decisions](representation-decisions.md) | reference | Coordinate and projection decisions, limits and revision conditions |
 
-<a id="perception"></a>
+<a id="environments"></a>
 
-## Sources, perception and evidence
+## Generated and admitted environments
 
-Trace source rights and observations through reconstruction and serving.
+Generation vocabulary, generated streets and tiles, textures and lettering, and admitted city data. Generated tiles and the owned district appear in the development preview; texture sets also dress shipped world objects.
 
 | Document | Role | Owns |
 | --- | --- | --- |
-| [Domain and evidence model](domain-and-evidence-model.md) | contract | Evidence addresses, provenance, identity assertions and schema |
-| [Personal admission and re-screening](personal-admission.md) | contract | Personal-source admission, model rights and re-screening |
-| [Person regions, masking and presentation consent](person-presentation-consent.md) | contract | Person-region masking and presentation rights |
-| [Shared screening currency](screening-currency.md) | contract | Screening dependency identity and transaction ordering |
-| [Asset-read currency](asset-read-currency.md) | contract | Authorization and lineage currency when serving asset bytes |
-| [World Read recipient evidence](world-read-recipient-evidence.md) | contract | Evidence projection for a receiving client |
-| [World Read posed image bytes](world-read-posed-views.md) | contract | Authorized posed-image delivery and projection |
-| [Capture overlap and recovery state](capture-overlap-and-recovery-state.md) | contract | Capture coverage verdicts and recovery-state representation |
-| [Production reconstruction scenes](scene-reconstruction-operations.md) | guide | Reconstruction processing and durable artifact flow |
-| [Scene segments](scene-segments.md) | contract | Source-addressed regions and lifted scene segments |
-| [Correspondence-based point-map placement](scene-placement-alignment.md) | contract | Correspondence-based point-map placement and refusal |
-| [Reconstruction quality gate](reconstruction-quality-gate.md) | contract | Reconstruction quality validation and recorded rung |
-| [Per-scene gsplat jobs](gsplat-scene-jobs.md) | contract | Scene-training input identity, checkpoints and evaluation |
-| [Durable scene training and publication](scene-splat-publication.md) | contract | Durable training queue and scene publication |
-| [Retained photographic references, 2026-09-05](retained-reference-workflow.md) | guide | Reusing retained source collections and reconstruction artifacts |
+| [The generator system: `exulanica.grammar`](grammar-package.md) | contract | Generator contract, seeds, city stages and the catalog envelope every data catalog uses |
+| [The generated corridor: one street, from a seed](generated-corridor-street.md) | reference | Generated corridor structure and reproduction |
+| [Generated tile runtime](generated-tile-runtime.md) | contract | Generated-tile loading, rendering and navigation in the development preview |
+| [Generated-world representation decisions](representation-decisions.md) | reference | Generated-world representation decisions, supports and limits |
+| [Texture package](texture-package.md) | contract | Texture sets, recipes, storage and publication; sets dress world objects and tiles |
+| [Lettering](lettering.md) | contract | Glyph catalogs, layout and lettering geometry; nothing draws a letter |
+| [Generated appearance](generated-appearance.md) | reference | Research on model-made textures over exact structure |
+| [Owned district and source admission](owned-district-and-admission.md) | contract | External environment admission and the development-preview district |
 
 <a id="interaction"></a>
 
 ## Interaction and Companion
 
-Follow user controls, model proposals and browser representations.
+Follow user controls, the browser world runtime, the Companion and appearance changes.
 
 | Document | Role | Owns |
 | --- | --- | --- |
-| [Interaction and spatial model](interaction-model.md) | contract | Interaction semantics, navigation and selection design |
+| [Interaction and spatial model](interaction-model.md) | contract | The Atlas browser runtime's interaction, navigation, Companion encounter and proposal confirmation |
 | [Companion questions, memory and proposals](companion-question.md) | contract | Grounded question, conversation and appearance-proposal path |
-| [Reviewed interaction-policy authority](interaction-policy-backend.md) | contract | Reviewed interaction-policy capabilities and mutations |
-| [Atlas frontend integration](atlas-frontend-integration.md) | contract | Frontend authority boundaries and review lifecycle |
-| [Atlas spatial architecture](atlas-spatial-architecture.md) | contract | Spatial grammar and navigation of the Atlas, the presentation of a person's photograph library |
-| [Atlas visual language: Aeroheart](atlas-visual-language.md) | reference | Visual language for a person's photographs and memories in a world |
-| [Atlas reconstruction inspection](atlas-reconstruction-inspection.md) | contract | Scene inspection, source selection and representation views |
-| [Atlas world customization contract](atlas-world-customization-contract.md) | contract | Protected topology and appearance customization lifecycle |
-| [Adaptive world backend](world-style-backend.md) | contract | Appearance registry, proposals and persisted style authority |
-| [Physical residency and renderer hardening](physical-streaming-runtime.md) | contract | Physical residency, measured detail selection and context recovery |
+| [Atlas world customization contract](atlas-world-customization-contract.md) | contract | Browser appearance customization, protected values and review lifecycle |
+| [Atlas reconstruction inspection](atlas-reconstruction-inspection.md) | contract | Reconstructed geometry delivery, display frame and inspection |
+| [Atlas spatial architecture](atlas-spatial-architecture.md) | contract | Atlas region layout, navigation, grounds and residency |
 
-<a id="simulation"></a>
+<a id="perception"></a>
 
-## Simulation and generated environments
+## Photographs, reconstruction and evidence
 
-Follow generation, canonical simulation and derived rendering separately.
+One way to build a world: source rights, people in photographs, evidence serving and reconstruction.
 
 | Document | Role | Owns |
 | --- | --- | --- |
-| [Synthetic society contract](synthetic-society-contract.md) | contract | Synthetic identity, state, actions, composition and replay |
-| [Movement modules contract](movement-modules-contract.md) | contract | Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads |
-| [Society experiments](society-experiments.md) | contract | Experiment definitions, attempts, interventions and results |
-| [Character representation and movement](character-representation-contract.md) | contract | Character appearance, rigging, subject bindings and movement |
-| [The generator system: `exulanica.grammar`](grammar-package.md) | contract | Generation vocabulary, seeds, stages and validation |
-| [Owned district and source admission](owned-district-and-admission.md) | contract | External environment admission and source interpretation |
-| [The generated corridor: one street, from a seed](generated-corridor-street.md) | reference | Generated corridor structure and reproduction |
-| [Generated tile runtime](generated-tile-runtime.md) | contract | Generated-tile loading, rendering and navigation |
-| [Corridor and navigation artifacts](corridor-navigation-artifacts.md) | reference | Relationship between render and navigation artifacts |
-| [Generated appearance](generated-appearance.md) | contract | Model-generated appearance candidates and publication boundaries |
-| [Texture package](texture-package.md) | contract | Texture containers, recipes, storage and deterministic publication |
-| [Lettering](lettering.md) | contract | Glyph catalogs, layout and lettering geometry |
-| [Traffic simulation](traffic-contract.md) | contract | Traffic inputs, state transitions and simulation invariants |
+| [Domain and evidence model](domain-and-evidence-model.md) | contract | Evidence addresses, provenance, identity links, tombstones and the evidence schema |
+| [Personal admission and model rights](personal-admission.md) | contract | Personal admission, model rights and the scene training right |
+| [Person regions, masking and presentation consent](person-presentation-consent.md) | contract | Person regions, masking, screening currency and presentation consent |
+| [Serving photographs and geometry under current permission](asset-read-currency.md) | contract | Serving photographs, masks and geometry under current permission, and World Read evidence |
+| [Capture overlap and recovery state](capture-overlap-and-recovery-state.md) | contract | Capture coverage verdicts and recovery-state records |
+| [Reconstruction scenes](scene-reconstruction-operations.md) | contract | Reconstruction scene pipeline: selection, pose, placement, quality gate, projection, delivery and deletion |
+| [Scene training](gsplat-scene-jobs.md) | contract | Scene training: request, trainer, evaluation, masked inputs and trained delivery |
+| [Scene segments](scene-segments.md) | contract | Source-addressed regions and lifted scene segments |
+| [Retained reference collections](retained-reference-workflow.md) | guide | Reusing retained source collections and reconstruction artifacts |
 
 <a id="operations"></a>
 
 ## Runtime, security and model selection
 
-Configure services and maintain permission, resource and provider boundaries.
+Configure services and keep permission, resource and provider boundaries.
 
 | Document | Role | Owns |
 | --- | --- | --- |
-| [Deployment](deployment.md) | guide | API, account, worker and deployment configuration |
-| [Derivative worker operations](derivative-worker-operations.md) | guide | Derivative worker execution, progress, shutdown and recovery |
-| [Security floor](security-floor.md) | contract | Route permissions, quotas and outbound access |
-| [Privacy, consent, deletion, and threat model](privacy-consent-threat-model.md) | contract | Consent, deletion, threat boundaries and privacy claims |
-| [Model and service selection](model-and-service-selection.md) | reference | Implemented model roles, selection evidence and candidate comparisons |
+| [Deployment](deployment.md) | guide | Processes, per-process settings, health, catalog preflight, reviewer stack, backups and recovery |
+| [Local database](local-database.md) | guide | A personal install's durable PostgreSQL database: create, back up, verify, restore, upgrade, adopt, require passwords |
+| [Derivative worker operations](derivative-worker-operations.md) | guide | Running the photograph derivative worker: delivery, stages, progress, shutdown and recovery |
+| [Security floor](security-floor.md) | contract | Route permissions, tile quotas, egress, model spend budgets and database roles |
+| [Privacy, consent, deletion, and threat model](privacy-consent-threat-model.md) | contract | Processing, consent and rights records, the hosted-request boundary, deletion and restore, disclosure, injection and misuse |
+| [Model and service selection](model-and-service-selection.md) | reference | Model roles, models offered for decisions, selection evidence, judged comparisons and candidates |
 | [License matrix](license-matrix.md) | reference | Model, dependency and asset license decisions |
 
 <a id="verification"></a>
@@ -154,29 +153,28 @@ Define acceptance methods and locate bounded execution evidence.
 
 | Document | Role | Owns |
 | --- | --- | --- |
-| [Evaluation methodology](evaluation-methodology.md) | reference | Evaluation tasks, metrics and evidence requirements |
-| [Evaluation corpus contract](evaluation-corpus-contract.md) | contract | Evaluation input discovery, split access and source boundaries |
-| [Evaluation harness: clean replay and run archives](evaluation-harness.md) | guide | Clean replay, run archives and result collection |
-| [Visual gate targets](visual-gate-targets.md) | contract | Visual-gate artifacts, metrics and target bindings |
-| [Visual gate rubric: readsAsInhabitedStreet](visual-gate-rubric.md) | contract | Human visual judgement procedure and evidence rules |
-| [A second stated walk of the corridor street, from the tile's western edge](visual-gate-corridor-walk.md) | reference | Recorded corridor walk framing and target coverage |
-| [Should the visual gate accept a third way of proving who a page is?](visual-gate-third-authentication-condition.md) | reference | Browser identity condition rationale and limits |
-| [Demonstration integrity](demo-integrity.md) | guide | Demonstration disclosure, failure handling and rehearsal |
+| [Evaluation methodology](evaluation-methodology.md) | reference | How the project measures, where each evaluation lives, and the photograph and Companion metrics |
+| [Evaluation corpus contract](evaluation-corpus-contract.md) | contract | Evaluation bundles, split access, clean replay and run archives for exulanica-eval |
+| [Visual gate targets](visual-gate-targets.md) | contract | Visual-gate targets, authentication conditions, record bindings, halts and key limits |
+| [Visual gate rubric: readsAsInhabitedStreet](visual-gate-rubric.md) | contract | Human visual judgement procedure and evidence rules; a frozen input bound by digest |
+| [A second stated walk of the corridor street, from the tile's western edge](visual-gate-corridor-walk.md) | reference | Recorded corridor walk framing and target coverage; a frozen input bound by digest |
+| [Demonstration integrity](demo-integrity.md) | guide | Demonstration disclosure, seeded reset, failures, checklist and the rehearsal |
 
 <a id="history"></a>
 
 ## Historical context
 
-Research and run findings retain their original scope; they do not override living contracts.
+Research and run findings retain their original scope; they do not override living contracts. Short notes keep paths that immutable records name.
 
 | Document | Role | Owns |
 | --- | --- | --- |
 | [Engineering archive: world memory foundations](frontier-roadmap.md) | archive | Historical engineering sequence and its successor contracts |
 | [Product research and constraints](product-specification.md) | archive | Product research provenance and successor constraints |
 | [Demonstration audit archive](demo-runbook.md) | archive | Demonstration readiness audit and successor operating guides |
-| [Provider runtime findings](runtime-verification.md) | archive | Recorded provider behavior for the measured model revisions |
-| [Platform findings: Nebius Token Factory, Nebius AI Cloud, NVIDIA models and Tavily](platform-findings.md) | archive | Recorded infrastructure and provider findings |
-| [Reconstruction findings](reconstruction-findings.md) | archive | Recorded reconstruction experiments and their limitations |
+| [Provider runtime findings](runtime-verification.md) | archive | Recorded provider behavior for measured model revisions and the operating rules it produced |
+| [Reconstruction findings](reconstruction-findings.md) | archive | Recorded reconstruction measurements and their limitations |
+| [Correspondence-based point-map placement](scene-placement-alignment.md) | archive | Successor pointer for placement |
+| [Durable scene training and publication](scene-splat-publication.md) | archive | Successor pointer for training publication |
 
 <a id="decisions"></a>
 
