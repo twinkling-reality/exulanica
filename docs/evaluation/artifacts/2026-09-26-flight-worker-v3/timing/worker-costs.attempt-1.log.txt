@@ -1,0 +1,2 @@
+{"profile": "exulanica.flight-worker/v1/costs", "load_1min_before_milli": 9219, "spawn_wall_us": {"values": [236097, 246564, 263615, 280485, 303154], "median": 263615, "max": 303154}, "cold_episode_wall_us": {"eight_trees": {"flyers": 24, "values": [456361, 861997, 878503, 920187, 963727], "median": 878503, "max": 963727}, "cluttered": {"flyers": 24, "values": [866617, 875415, 958831, 1071957, 1097714], "median": 958831, "max": 1097714}}, "seconds": 15.3}
+gate: exit 0 pre idle 72

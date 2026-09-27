@@ -17,7 +17,14 @@ import type {
  * along the body while it perches. When the page's clock passes the last served step, every
  * flyer holds that step and the count of such frames rises, rather than anything being guessed.
  *
- * The clock is the page's own: the first window handed in starts it at that window's first step.
+ * A flyer the window names late at an episode's last step is not drawn moving into the next
+ * episode's first step, where it starts at home: that move is not a flight and may cross anything.
+ * It holds where the late step left it until the next step is due, then stands at home.
+ *
+ * The clock is the flight's shared one: the first window handed in starts the page's copy at the
+ * step the server's clock was at when it answered (`clockStep`), and a later window sets it again
+ * when the two have drifted apart, so every page shows a world's birds in the same places at the
+ * same moment.
  * Windows the clock has passed are let go as new ones arrive. Under reduced motion every flyer
  * stands still at the step the clock had reached when the latest window arrived, as the crowd
  * shows each person where a minute left them. The flock asks for frames only while some flyer is
@@ -39,6 +46,12 @@ const FOLD_DEGREES = 80;
 const PITCH_LIMIT_DEGREES = 60;
 /** Below this horizontal speed, in millimetres a second, a flyer keeps the heading it had. */
 const HEADING_SPEED_MM_S = 50;
+/**
+ * How far, in steps, the page's clock may be from the served one before it is set again. The served
+ * step is whole, up to one step behind the moment it was read, and the answer takes a little while
+ * to arrive, so two steps is agreement; a page that slept, whose own clock stopped, is far beyond.
+ */
+const CLOCK_DRIFT_STEPS = 2;
 /** Windows kept behind the clock, in steps, so the step a frame interpolates from is still held. */
 const BEHIND_STEPS = 2;
 
@@ -60,6 +73,10 @@ interface Sample {
   readonly flap: boolean;
 }
 
+function lateKey(step: number, flyerId: string): string {
+  return `${step}:${flyerId}`;
+}
+
 const yAxis = new pc.Vec3(0, 1, 0);
 const xAxis = new pc.Vec3(1, 0, 0);
 const zAxis = new pc.Vec3(0, 0, 1);
@@ -70,8 +87,11 @@ export class FlightFlock {
   readonly root: pc.Entity;
   private readonly kinds = new Map<string, { look: FlightKindLook; parts: FlightPartFactory }>();
   private readonly drawn = new Map<string, Drawn>();
-  /** Each held window by its first step, with its flyers' rows by identity. */
-  private readonly windows = new Map<number, { window: FlightWindow; rows: Map<string, FlightSamples> }>();
+  /** Each held window by its first step, with its flyers' rows by identity and who it names late. */
+  private readonly windows = new Map<
+    number,
+    { window: FlightWindow; rows: Map<string, FlightSamples>; late: Set<string> }
+  >();
   private inputSha256: string | null = null;
   private stepMs = 0;
   private groundMm = 0;
@@ -105,8 +125,10 @@ export class FlightFlock {
   }
 
   /**
-   * Hand in a served window. The first starts the page's clock at `nowMs`; a window of another
-   * flight (a new input digest) replaces everything held, clock included.
+   * Hand in a served window. The first starts the page's clock at the window's `clockStep` at
+   * `nowMs`; a window of another flight (a new input digest) replaces everything held, clock
+   * included. Every later window re-adopts the served clock when the page's has drifted from it by
+   * more than `CLOCK_DRIFT_STEPS`, as after a sleep that stopped the page's own clock.
    */
   setWindow(window: FlightWindow, nowMs: number): void {
     if (this.destroyed) return;
@@ -116,11 +138,18 @@ export class FlightFlock {
       this.stepMs = window.stepMs;
       this.groundMm = window.groundMm;
       this.startMs = nowMs;
-      this.startStep = window.fromStep;
+      this.startStep = window.clockStep;
+    } else {
+      const page = this.stepAt(nowMs);
+      if (page !== null && Math.abs(page - window.clockStep) > CLOCK_DRIFT_STEPS) {
+        this.startMs = nowMs;
+        this.startStep = window.clockStep;
+      }
     }
     this.windows.set(window.fromStep, {
       window,
       rows: new Map(window.flyers.map((row) => [row.flyerId, row])),
+      late: new Set(window.lateHome.map((late) => lateKey(late.step, late.flyerId))),
     });
     const at = this.stepAt(nowMs);
     if (at === null) return;
@@ -209,7 +238,8 @@ export class FlightFlock {
       for (const samples of window.flyers) {
         seen.add(samples.flyerId);
         const from = this.sample(samples.flyerId, whole);
-        const to = this.sample(samples.flyerId, whole + 1) ?? from;
+        // A late flyer is not drawn crossing into the next episode: it holds, then stands at home.
+        const to = this.late(samples.flyerId, whole) ? from : this.sample(samples.flyerId, whole + 1) ?? from;
         if (from === null || to === null) continue;
         this.pose(samples, from, to, fraction, elapsed);
       }
@@ -244,6 +274,14 @@ export class FlightFlock {
     for (const [from, { window }] of this.windows) {
       if (from + window.steps <= before) this.windows.delete(from);
     }
+  }
+
+  /** Whether a held window names the flyer late at the step. */
+  private late(flyerId: string, step: number): boolean {
+    for (const { late } of this.windows.values()) {
+      if (late.has(lateKey(step, flyerId))) return true;
+    }
+    return false;
   }
 
   /** One flyer's served step, from whichever held window covers it, or null. */

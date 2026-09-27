@@ -1,0 +1,370 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "answers": {
+   "path": "docs/evaluation/2026-09-26-flight-worker.json",
+   "record_sha256": "ee0ce934068fb2b024011fbba695a13c14edc1ba8491aedb9d3b8515fc3ec258"
+  },
+  "artifact_notes": {
+   "scripts/write_record_e.py.txt": "this record's writer",
+   "timing/gates.jsonl": "a timing run's output or the gate's",
+   "timing/idle-20260926T222012-27600.jsonl": "a timing run's output or the gate's",
+   "timing/idle-20260926T222111-33724.jsonl": "a timing run's output or the gate's",
+   "timing/request-blocking-after.attempt-1.log.txt": "a timing run's console",
+   "timing/request-blocking-after.json": "a timing run's output or the gate's",
+   "timing/setup-trees-after.json": "a timing run's output or the gate's",
+   "timing/setup-trees-after.log.txt": "a timing run's console",
+   "timing/worker-costs.attempt-1.log.txt": "a timing run's console",
+   "timing/worker-costs.json": "a timing run's output or the gate's"
+  },
+  "bound_artifacts": {
+   "scripts/write_record_e.py.txt": {
+    "byte_size": 8466,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/scripts/write_record_e.py.txt",
+    "sha256": "da0dfc91e3a73ca2051f1c0c41608c1584af43572441cac835415ecf40cb2168"
+   },
+   "timing/gates.jsonl": {
+    "byte_size": 779,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/gates.jsonl",
+    "sha256": "a856fd001c6ef0416754d49116c477754fe55fdfb2639770ebecf73e3ad1256b"
+   },
+   "timing/idle-20260926T222012-27600.jsonl": {
+    "byte_size": 336,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/idle-20260926T222012-27600.jsonl",
+    "sha256": "74308b9766f802006c7dd203df2f3cfff949d4aad5dce9ed5760298843093e7f"
+   },
+   "timing/idle-20260926T222111-33724.jsonl": {
+    "byte_size": 148,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/idle-20260926T222111-33724.jsonl",
+    "sha256": "ea5ec190448a10053fa0e05787159043099b07134ccf7dbb8bbb2faa23beab1e"
+   },
+   "timing/request-blocking-after.attempt-1.log.txt": {
+    "byte_size": 136,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/request-blocking-after.attempt-1.log.txt",
+    "sha256": "745a69d0392f8c164682dbe0dfabc556ad09881478606eae7f37fac82e7151e9"
+   },
+   "timing/request-blocking-after.json": {
+    "byte_size": 2562,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/request-blocking-after.json",
+    "sha256": "6696827d39ca705deece4deab4db8845ceabac4b9a9dcee7cc0e098085e6566b"
+   },
+   "timing/setup-trees-after.json": {
+    "byte_size": 240,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/setup-trees-after.json",
+    "sha256": "8da7618cbc6a565bf16efad1f46203f9cd57c69b76de9c1294ac45d8dd3d4e60"
+   },
+   "timing/setup-trees-after.log.txt": {
+    "byte_size": 0,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/setup-trees-after.log.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   },
+   "timing/worker-costs.attempt-1.log.txt": {
+    "byte_size": 495,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/worker-costs.attempt-1.log.txt",
+    "sha256": "83a6c950e54e2b0b7b7c7fed11138655674e62a7ce8196716addd2184c4e7a7f"
+   },
+   "timing/worker-costs.json": {
+    "byte_size": 1144,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/worker-costs.json",
+    "sha256": "2c7bd91bb6f6258c4688210f9ee988b1f371bf532833d80ffbf581630d275882"
+   }
+  },
+  "changes_since_the_first_registration": [
+   "The route encodes its answer one flyer to an encoder call, so no call holds the server's interpreter lock for more than one flyer's samples.",
+   "The measuring script keeps the flight's answer as bytes while the health requests beside the read are timed and parses it after: the first registration's copy parsed about 480 KB of JSON in the same process that timed the health requests, holding that process's interpreter lock as the answer arrived, which a development diagnostic found after that record was judged. Its outcome stands."
+  ],
+  "execution": {
+   "machine": "Apple M5 Max, 18 cores, 64 GB, macOS 26.7",
+   "python": "CPython 3.11.6",
+   "timing": "the driver inside quiet-slot then gpu-slot; every run behind the idle gate: at least 70 percent idle over 10 s before it, discarded below 50 percent mean idle during it"
+  },
+  "first_timed_run_at": "2026-09-26T22:20:30-0400",
+  "judged": [
+   {
+    "id": "health-beside-a-cold-read",
+    "measured": {
+     "flight_reads_answered": 5,
+     "limit_us": 25000,
+     "runs": 5,
+     "slowest_health_beside_each_cold_read_us": [
+      7944,
+      30920,
+      2713,
+      3107,
+      4825
+     ]
+    },
+    "outcome": "failed",
+    "rule": "On this lane's release server (a production build on slot 3 with a new synthetic workspace, the small square and seven more trees, 24 flyers), inside quiet-slot then gpu-slot behind the idle gate, in each of five runs, each after an edit so the flight read is cold, the slowest GET /healthz answer beside the cold flight read takes at most 25000 us."
+   }
+  ],
+  "limits": [
+   "The request blocking runs time GET /healthz beside one flight read over the loopback; a page's own requests were not timed.",
+   "The after arm reads at the shared clock and its worker computes one whole episode, and queues the next; the before arm, in the first registration, read the window from the step before an episode ends on main's page clock.",
+   "One machine, shared with other work: every run passed the idle gate."
+  ],
+  "preregistration": {
+   "path": "docs/evaluation/2026-09-26-flight-worker-v2-preregistration.json",
+   "record_sha256": "1b0707896787b5fdd4f73787aac64243e86446e7153d891e6132eecb8f36cc09"
+  },
+  "profile": "exulanica.flight-worker/v2",
+  "question": "With the flight's answer encoded one flyer to an encoder call, does the server leave its other requests unslowed while a cold flight read is computed, by the rule the first flight worker registration judged?",
+  "release_build": {
+   "index_html_sha256": "f01e9e54216a1ec75c4c0cf844acff294225ec8bdb5db82d2ee5089d3df55185",
+   "mode": "production",
+   "served_index_is_the_build": true,
+   "tree": {
+    "branch": "lane/0923-movement3",
+    "changed_paths": "74",
+    "diff_head_bytes": "147057",
+    "diff_head_sha256": "8f92e8017678350d3bfa64a07df154393df2a48b7ad4f06cf16b209e7381ad11",
+    "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+    "status_sha256": "e9a1f8e5792bfe7da8c910cea87ea63a18091250e2b09b5f02f7a5ac9d1d3089"
+   },
+   "vite": "vite/6.4.3 darwin-arm64 node-v24.15.0"
+  },
+  "reported": {
+   "request-blocking-after": {
+    "arm": "after",
+    "idle_during_mean_tenths_percent": 672,
+    "interval_ms": 20,
+    "load_1min_before_milli": 9593,
+    "profile": "exulanica.flight-worker/v1/request-blocking",
+    "runs": [
+     {
+      "flight_status": 200,
+      "flight_us": 598613,
+      "flyers": 24,
+      "from_step": 17904756723,
+      "health_alone": {
+       "count": 50,
+       "max_us": 3340,
+       "p50_us": 1808,
+       "p95_us": 2744
+      },
+      "health_beside_the_flight": {
+       "count": 25,
+       "max_us": 7944,
+       "p50_us": 1318,
+       "p95_us": 3296
+      },
+      "input_sha256": "7d659b97246a4657ae7884ea6c59652dde0e2683e535b764c90b006dd272bb25",
+      "same_window_again": {
+       "status": 200,
+       "us": 16877
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 597596,
+      "flyers": 24,
+      "from_step": 17904756742,
+      "health_alone": {
+       "count": 50,
+       "max_us": 4353,
+       "p50_us": 1632,
+       "p95_us": 2666
+      },
+      "health_beside_the_flight": {
+       "count": 24,
+       "max_us": 30920,
+       "p50_us": 1205,
+       "p95_us": 4433
+      },
+      "input_sha256": "293af6598e7a4b8a0220aa4a801aa0f2f553e19ebd03d423f2e41bb398e5d559",
+      "same_window_again": {
+       "status": 200,
+       "us": 15107
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 578759,
+      "flyers": 24,
+      "from_step": 17904756761,
+      "health_alone": {
+       "count": 50,
+       "max_us": 3821,
+       "p50_us": 1239,
+       "p95_us": 2186
+      },
+      "health_beside_the_flight": {
+       "count": 24,
+       "max_us": 2713,
+       "p50_us": 1271,
+       "p95_us": 1956
+      },
+      "input_sha256": "c6b43ae14c01b1ba7cf93c98ebba520efcbfc3e3355ead54546b084838a7b745",
+      "same_window_again": {
+       "status": 200,
+       "us": 16944
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 564274,
+      "flyers": 24,
+      "from_step": 17904756780,
+      "health_alone": {
+       "count": 50,
+       "max_us": 2877,
+       "p50_us": 1615,
+       "p95_us": 2042
+      },
+      "health_beside_the_flight": {
+       "count": 24,
+       "max_us": 3107,
+       "p50_us": 1220,
+       "p95_us": 2143
+      },
+      "input_sha256": "6ebb986e7687c0782f7e576f2b131d2d742da84310243bfc2ace33dd88f404cb",
+      "same_window_again": {
+       "status": 200,
+       "us": 14518
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 580526,
+      "flyers": 24,
+      "from_step": 17904756798,
+      "health_alone": {
+       "count": 50,
+       "max_us": 4014,
+       "p50_us": 1272,
+       "p95_us": 3236
+      },
+      "health_beside_the_flight": {
+       "count": 24,
+       "max_us": 4825,
+       "p50_us": 1278,
+       "p95_us": 3147
+      },
+      "input_sha256": "568030a32d4ef2f6de50b7a338642c9bf87049b02a0951e403880d87599f6fe1",
+      "same_window_again": {
+       "status": 200,
+       "us": 14438
+      }
+     }
+    ]
+   },
+   "request-blocking-before": {
+    "in": "docs/evaluation/2026-09-26-flight-worker.json",
+    "record_sha256": "ee0ce934068fb2b024011fbba695a13c14edc1ba8491aedb9d3b8515fc3ec258",
+    "what": "main's release server at 465f2909, measured once for both registrations"
+   },
+   "worker-costs": {
+    "capped_search": {
+     "bounded_process_us": {
+      "max": 23161,
+      "median": 12541,
+      "values": [
+       12259,
+       12273,
+       12276,
+       12379,
+       12381,
+       12430,
+       12480,
+       12507,
+       12514,
+       12522,
+       12541,
+       12559,
+       12579,
+       12690,
+       12766,
+       13002,
+       13084,
+       13381,
+       13462,
+       23161
+      ]
+     },
+     "grid_cells": 259584,
+     "route_cells": 4096,
+     "route_searches": 3,
+     "unbounded_process_us": {
+      "max": 390245,
+      "median": 387064,
+      "values": [
+       383818,
+       387033,
+       387064,
+       388929,
+       390245
+      ]
+     }
+    },
+    "cold_episode_wall_us": {
+     "cluttered": {
+      "flyers": 24,
+      "max": 1322255,
+      "median": 1182782,
+      "values": [
+       931535,
+       1164575,
+       1182782,
+       1249996,
+       1322255
+      ]
+     },
+     "eight_trees": {
+      "flyers": 24,
+      "max": 1326233,
+      "median": 1203119,
+      "values": [
+       686030,
+       1148033,
+       1203119,
+       1255742,
+       1326233
+      ]
+     }
+    },
+    "load_1min_before_milli": 14382,
+    "milliseconds": 17700,
+    "profile": "exulanica.flight-worker/v1/costs",
+    "spawn_wall_us": {
+     "max": 278795,
+     "median": 269633,
+     "values": [
+      267408,
+      267751,
+      269633,
+      269639,
+      278795
+     ]
+    }
+   }
+  },
+  "scripts": {
+   "gate.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/gate.py.txt",
+    "sha256": "9bac3b50d4fd7fcb8939d9d5e83238144cff1dfebb9b6027d4f49fd7da961d65"
+   },
+   "measure_flight_frames.mjs.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/measure_flight_frames.mjs.txt",
+    "sha256": "b92d08639c096ceb9a89fac7fb4bff6809df70b02b192edcc282c0c799ca7dd4"
+   },
+   "measure_request_blocking.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/measure_request_blocking.py.txt",
+    "sha256": "7a4426aebc1a9f7d3b55b98c0f644cff8dc0e62cf30f2bbe944a389d030215a6"
+   },
+   "measure_worker_costs.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/measure_worker_costs.py.txt",
+    "sha256": "343b95aaca2dc0fe279519e462bbde8ebe3305983703486ff5305b5dc7bab690"
+   },
+   "run_timing_d.sh.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/run_timing_d.sh.txt",
+    "sha256": "f16faaf1ad0682ffec2dff66663e67fea824136c73b45c25b119711dc2bcf814"
+   }
+  },
+  "tree": {
+   "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+   "tracked_diff_sha256": "8f92e8017678350d3bfa64a07df154393df2a48b7ad4f06cf16b209e7381ad11"
+  },
+  "verdict": "FAILED. Five timed runs on the release server."
+ },
+ "record_sha256": "8e69f12bd2e19f1dc97645890905c4a3d71c8940193643a8f9bb5376a0d261bb"
+}

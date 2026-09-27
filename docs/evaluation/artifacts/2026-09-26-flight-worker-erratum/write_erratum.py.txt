@@ -1,0 +1,122 @@
+"""Write the erratum to the three flight worker records: what they say that their scripts did not do.
+
+    uv run python .exulanica/lane-movement3/evidence/write_erratum.py
+
+Binds each record by path and digest, and reads every timed run's idle samples from the files those
+records bind, with the gate's ledger naming which run each samples file belongs to. Nothing typed.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.evaluation.visual_gate import digest_bound  # noqa: E402
+
+NAME = "2026-09-26-flight-worker-erratum"
+RECORD = ROOT / "docs" / "evaluation" / f"{NAME}.json"
+ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / NAME
+RECORDS = ("2026-09-26-flight-worker", "2026-09-26-flight-worker-v2", "2026-09-26-flight-worker-v3")
+DISCARD_BELOW_PERCENT = 50
+HERE = Path(__file__).resolve()
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def main() -> None:
+    if RECORD.exists() or ARTIFACTS.exists():
+        raise SystemExit(f"{RECORD.name} or its artifacts exist; a record is written once")
+    corrected = []
+    runs: list[dict[str, Any]] = []
+    for name in RECORDS:
+        path = ROOT / "docs" / "evaluation" / f"{name}.json"
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        record = envelope["record"]
+        assert envelope["record_sha256"] == _sha(canonical_json(record)), name
+        corrected.append(
+            {
+                "path": f"docs/evaluation/{name}.json",
+                "record_sha256": envelope["record_sha256"],
+                "says": record["execution"]["timing"],
+            }
+        )
+        bound = record["bound_artifacts"]
+        ledger_path = ROOT / bound["timing/gates.jsonl"]["path"]
+        for line in ledger_path.read_text(encoding="utf-8").splitlines():
+            entry = json.loads(line)
+            samples_name = entry.get("samples")
+            if samples_name is None:
+                continue
+            samples_path = ROOT / bound[f"timing/{samples_name}"]["path"]
+            idle = [json.loads(row)["idle"] for row in samples_path.read_text().splitlines() if row]
+            runs.append(
+                {
+                    "record": f"docs/evaluation/{name}.json",
+                    "run": entry["command"].split(" --")[0],
+                    "at": entry["at"],
+                    "exit": entry["exit"],
+                    "samples": len(idle),
+                    "mean_idle_tenths_percent": round(10 * sum(idle) / len(idle)),
+                }
+            )
+    means = [run["mean_idle_tenths_percent"] for run in runs]
+    below = [run for run in runs if run["mean_idle_tenths_percent"] < 10 * DISCARD_BELOW_PERCENT]
+    record = {
+        "profile": "exulanica.flight-worker/erratum",
+        "corrects": corrected,
+        "errata": [
+            {
+                "what": (
+                    "Each record's execution says every timed run was discarded below 50 percent "
+                    "mean idle during it. The gate records idle samples during a run and leaves the "
+                    "discarding to the command it runs, and neither bound timing script "
+                    "(measure_request_blocking.py, measure_worker_costs.py) discards anything: the "
+                    "rule was not implemented."
+                ),
+                "found": (
+                    f"No timed run fell below it: {len(runs)} runs across the three records, mean "
+                    f"idle {min(means) / 10:g} to {max(means) / 10:g} percent, "
+                    f"{len(below)} below {DISCARD_BELOW_PERCENT}. No outcome changes."
+                ),
+            },
+            {
+                "what": (
+                    "Record 2026-09-26-flight-worker-v3.json calls the 30.9 ms pause both earlier "
+                    "records met the full garbage collection it names. That is inferred, not "
+                    "measured per run: the two pauses agree to 6 microseconds, main's release server "
+                    "showed a 31.2 ms health answer with no flight read beside it, and the run with "
+                    "the freeze met none. The 33 to 36 ms a full collection took is a development "
+                    "measurement, named among the earlier measurements of its pre-registration and "
+                    "bound by no record."
+                ),
+                "found": "No outcome changes: no judged rule rests on the cause of the pause.",
+            },
+        ],
+        "runs": runs,
+    }
+    ARTIFACTS.mkdir(parents=True)
+    writer = HERE.read_bytes()
+    (ARTIFACTS / "write_erratum.py.txt").write_bytes(writer)
+    record["bound_artifacts"] = {
+        "scripts/write_erratum.py.txt": {
+            "path": f"docs/evaluation/artifacts/{NAME}/write_erratum.py.txt",
+            "byte_size": len(writer),
+            "sha256": _sha(writer),
+        }
+    }
+    envelope = digest_bound(record)
+    RECORD.write_bytes(json.dumps(envelope, indent=1, sort_keys=True).encode() + b"\n")
+    print(RECORD.relative_to(ROOT), envelope["record_sha256"], record["errata"][0]["found"])
+
+
+if __name__ == "__main__":
+    main()

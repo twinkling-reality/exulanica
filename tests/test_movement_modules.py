@@ -113,7 +113,7 @@ def _mutated(change):
         (lambda d: d["modules"][0].update(refusal="not_needed"), "no refusal"),
         (lambda d: d["modules"][1].update(refusal=None), "no refusal"),
         (lambda d: d["modules"][0]["space"].update(kind="water"), "space states its kind"),
-        (lambda d: d["modules"][0]["clock"].update(kind="wall"), "clock states its kind"),
+        (lambda d: d["modules"][0]["clock"].update(kind="sundial"), "clock states its kind"),
         (lambda d: d["modules"][0].pop("output"), "states exactly"),
         (lambda d: d["modules"][0]["parameters"].reverse(), "in name order"),
         (

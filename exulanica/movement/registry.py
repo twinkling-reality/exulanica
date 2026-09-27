@@ -54,7 +54,7 @@ ROADS: Final = "exulanica-movement/roads/v1"
 Status = Literal["built", "not_connected"]
 _STATUSES: Final = ("built", "not_connected")
 _SPACES: Final = ("air-volume", "ground-lattice", "road-graph")
-_CLOCKS: Final = ("host", "page", "society")
+_CLOCKS: Final = ("host", "society", "wall")
 _ROW_KEYS: Final = frozenset(
     {"agents", "clock", "module", "output", "parameters", "reason", "refusal", "space", "status"}
 )
@@ -76,6 +76,10 @@ class MovementModuleNotConnected(MovementError):
         super().__init__(f"movement module {module!r} is not connected: {refusal}")
         self.module = module
         self.code = refusal
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        # Raised in the flight's worker process, it reaches the server as itself.
+        return (type(self), (self.module, self.code))
 
 
 class UnknownParameter(MovementError):

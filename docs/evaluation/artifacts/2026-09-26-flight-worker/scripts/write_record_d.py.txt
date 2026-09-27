@@ -1,0 +1,305 @@
+"""Write the flight worker record: the judged run on held-out seeds, and the timing it registered.
+
+    uv run python .exulanica/lane-movement3/evidence/write_record_d.py --runs DIR \
+        --after-state STATE_JSON --before-state STATE_JSON
+
+DIR holds the judged run (``judged-bounds.json`` with its console and times), the digests of the
+code as it ran (``as-run.sha256``) and ``timing/``: each arm's request blocking run, the worker's
+costs, the gate's ledger and idle samples, each arm's world setup and the drivers' consoles. The
+state files are the launcher's for each arm, read for the tree and build they ran. Every outcome is
+computed from the files; nothing is typed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.evaluation.visual_gate import digest_bound  # noqa: E402
+
+NAME = "2026-09-26-flight-worker"
+RECORD = ROOT / "docs" / "evaluation" / f"{NAME}.json"
+ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / NAME
+PREREGISTRATION = ROOT / "docs" / "evaluation" / f"{NAME}-preregistration.json"
+HERE = Path(__file__).resolve()
+HOME_RULES = ("not_home_at_episode_end", "late_home_misreported")
+BEFORE_HARNESS = (
+    "docs/evaluation/artifacts/2026-09-25-flight-bounds-v2-preregistration/measure_flight_frames.mjs.txt"
+)
+
+
+def _forbidden() -> tuple[str, ...]:
+    """Text no bound file may hold, each fragment built here so this file's own copy holds none."""
+    home = Path.home()
+    slash = "/"
+    return (
+        str(home),
+        home.name,
+        slash + "Users" + slash,
+        slash + "private" + slash,
+        slash + "var" + slash + "folders",
+        "Bearer" + " ",
+        "api" + "-token",
+        chr(0x2014),
+    )
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _git(*arguments: str) -> bytes:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *arguments], capture_output=True, check=True
+    ).stdout
+
+
+class Binder:
+    def __init__(self) -> None:
+        self.bound: dict[str, dict[str, Any]] = {}
+        self.notes: dict[str, str] = {}
+
+    def bind(self, name: str, data: bytes, note: str) -> None:
+        text = data.decode("utf-8")
+        found = [fragment for fragment in _forbidden() if fragment in text]
+        if found:
+            raise SystemExit(f"{name} holds text no record may bind ({len(found)} kind(s))")
+        target = ARTIFACTS / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        self.bound[name] = {
+            "path": f"docs/evaluation/artifacts/{NAME}/{name}",
+            "byte_size": len(data),
+            "sha256": _sha(data),
+        }
+        self.notes[name] = note
+
+
+def _build(state: dict[str, Any]) -> dict[str, Any]:
+    app = state["app"]
+    return {
+        "tree": state["tree"],
+        "mode": app["mode"],
+        "vite": app["build"]["vite"],
+        "index_html_sha256": app["build"]["index_html_sha256"],
+        "served_index_is_the_build": app["served_index_is_the_build"],
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--runs", required=True)
+    parser.add_argument("--after-state", required=True)
+    parser.add_argument("--before-state", required=True)
+    arguments = parser.parse_args()
+    runs = Path(arguments.runs).resolve()
+    timing = runs / "timing"
+    if RECORD.exists() or ARTIFACTS.exists():
+        raise SystemExit(f"{RECORD.name} or its artifacts exist; a record is written once")
+    envelope = json.loads(PREREGISTRATION.read_text(encoding="utf-8"))
+    pre = envelope["record"]
+    assert envelope["record_sha256"] == _sha(canonical_json(pre)), "the pre-registration moved"
+    scripts = {}
+    for entry in pre["artifacts"]["files"]:
+        scripts[Path(entry["path"]).name] = {"path": entry["path"], "sha256": entry["sha256"]}
+        assert _sha((ROOT / entry["path"]).read_bytes()) == entry["sha256"], entry["path"]
+    as_ran = {}
+    for line in (runs / "as-run.sha256").read_text().splitlines():
+        digest, name = line.split(maxsplit=1)
+        as_ran[name] = digest
+    assert as_ran["scripts/measure_flight_bounds.py"] == scripts["measure_flight_bounds.py.txt"]["sha256"]
+    here_now = {name: _sha((ROOT / name).read_bytes()) for name in as_ran}
+    changed_since = sorted(name for name, digest in as_ran.items() if here_now[name] != digest)
+
+    run = json.loads((runs / "judged-bounds.json").read_text(encoding="utf-8"))
+    console = (runs / "run.log.txt").read_text(encoding="utf-8")
+    assert console.strip().splitlines()[-1] == "exit 0", "the judged run did not exit 0"
+    assert run["seeds"]["values"] == pre["seeds"]["judged"], "not the registered seeds"
+    assert pre["written_at"] < run["started_at"], "the run began before its registration"
+
+    found: dict[str, Any] = {}
+    no_violation: dict[str, Any] = {}
+    home: dict[str, Any] = {}
+    replay: dict[str, int] = {}
+    for name, world in run["worlds"].items():
+        rules: Counter[str] = Counter()
+        for row in world["runs"]:
+            rules.update(row["violations_by_rule"])
+        late = sum(row["late_home"] for row in world["runs"])
+        ends = sum(row["episode_ends"] for row in world["runs"])
+        home[name] = [late, ends, rules.get("late_home_misreported", 0)]
+        no_violation[name] = {rule: n for rule, n in sorted(rules.items()) if rule not in HOME_RULES}
+        replay[name] = sum(row["replay_mismatches"] for row in world["runs"])
+        found[name] = {
+            "seeds": len(world["runs"]),
+            "flyers": world["flyers"],
+            "started_at": world["started_at"],
+            "finished_at": world["finished_at"],
+            "violations_by_rule": dict(sorted(rules.items())),
+            "not_home_at_an_episode_end": late,
+            "episode_ends": ends,
+            "segments_checked": sum(row["segments"] for row in world["runs"]),
+            "guard_interventions": sum(row["guard_interventions"] for row in world["runs"]),
+            "worker_windows_unequal_to_in_process": replay[name],
+            "windows_compared": sum(
+                run["minutes"] * 60_000 // (100 * run["window_steps"]) for _ in world["runs"]
+            ),
+            "route_searches": sum(row["route_searches"] for row in world["runs"]),
+            "route_searches_without_route": sum(
+                row["route_searches_without_route"] for row in world["runs"]
+            ),
+            "route_searches_most_by_one_flyer_in_an_episode": max(
+                row["route_searches_most_by_one_flyer_in_an_episode"] for row in world["runs"]
+            ),
+            "route_queue_entries_most_taken_by_one_search": max(
+                row["route_queue_entries_most_taken_by_one_search"] for row in world["runs"]
+            ),
+        }
+
+    after = json.loads((timing / "request-blocking-after.json").read_text(encoding="utf-8"))
+    before = json.loads((timing / "request-blocking-before.json").read_text(encoding="utf-8"))
+    costs = json.loads((timing / "worker-costs.json").read_text(encoding="utf-8"))
+    # The one float the costs file holds is its run's length in seconds; a digest takes integers.
+    costs["milliseconds"] = round(costs.pop("seconds") * 1000)
+    limit = next(row for row in pre["judged"] if row["id"] == "health-beside-a-cold-read")["limit_us"]
+    slowest_after = [row["health_beside_the_flight"]["max_us"] for row in after["runs"]]
+    cold_after = [row["flight_status"] == 200 for row in after["runs"]]
+    judged = [
+        {
+            "id": "no-violation",
+            "rule": next(row["rule"] for row in pre["judged"] if row["id"] == "no-violation"),
+            "measured": no_violation,
+            "outcome": "passed" if not any(no_violation.values()) else "failed",
+        },
+        {
+            "id": "every-flyer-home",
+            "rule": next(row["rule"] for row in pre["judged"] if row["id"] == "every-flyer-home"),
+            "measured": home,
+            "outcome": "passed"
+            if all(late == 0 and misreported == 0 for late, _ends, misreported in home.values())
+            else "failed",
+        },
+        {
+            "id": "worker-equals-in-process",
+            "rule": next(
+                row["rule"] for row in pre["judged"] if row["id"] == "worker-equals-in-process"
+            ),
+            "measured": replay,
+            "outcome": "passed" if not any(replay.values()) else "failed",
+        },
+        {
+            "id": "health-beside-a-cold-read",
+            "rule": next(
+                row["rule"] for row in pre["judged"] if row["id"] == "health-beside-a-cold-read"
+            ),
+            "measured": {
+                "slowest_health_beside_each_cold_read_us": slowest_after,
+                "limit_us": limit,
+                "runs": len(after["runs"]),
+                "flight_reads_answered": sum(cold_after),
+            },
+            "outcome": "passed"
+            if len(after["runs"]) == 5 and all(cold_after) and max(slowest_after) <= limit
+            else "failed",
+        },
+    ]
+    verdict = "PASSED" if all(row["outcome"] == "passed" for row in judged) else "FAILED"
+
+    binder = Binder()
+    binder.bind("runs/judged-bounds.json", (runs / "judged-bounds.json").read_bytes(), "the judged run")
+    binder.bind("runs/run.log.txt", console.encode(), "the judged run's console and exit")
+    binder.bind("runs/as-run.sha256", (runs / "as-run.sha256").read_bytes(),
+                "the digests of the measuring script and the flight's code as the judged run began")
+    for path in sorted(timing.iterdir()):
+        if path.suffix == ".json" or path.name.endswith(".jsonl"):
+            binder.bind(f"timing/{path.name}", path.read_bytes(), "a timing run's output or the gate's")
+        elif path.suffix == ".log":
+            binder.bind(f"timing/{path.name}.txt", path.read_bytes(), "a timing run's console")
+    binder.bind("scripts/write_record_d.py.txt", HERE.read_bytes(), "this record's writer")
+    after_state = json.loads(Path(arguments.after_state).read_text(encoding="utf-8"))
+    before_state = json.loads(Path(arguments.before_state).read_text(encoding="utf-8"))
+    diff = _git("diff", "HEAD", "--binary")
+    record = {
+        "profile": "exulanica.flight-worker/v1",
+        "question": pre["question"],
+        "preregistration": {
+            "path": f"docs/evaluation/{PREREGISTRATION.name}",
+            "record_sha256": envelope["record_sha256"],
+        },
+        "scripts": scripts,
+        "judged_run": {"started_at": run["started_at"], "finished_at": run["finished_at"]},
+        "judged": judged,
+        "verdict": (
+            f"{verdict}. Over 12 held-out seeds and 30 simulated minutes in each of 4 worlds, and "
+            "5 timed runs on the release server."
+        ),
+        "found": found,
+        "reported": {
+            "request-blocking-after": after,
+            "request-blocking-before": before,
+            "worker-costs": costs,
+        },
+        "release_builds": {"after": _build(after_state), "before": _build(before_state)},
+        "before_arm_setup": {
+            "harness": (
+                "record B's pre-registered copy of the setup harness, run as it is, whose flight "
+                "read asks for step 0 as main's page clock allows"
+            ),
+            "path": BEFORE_HARNESS,
+            "sha256": _sha((ROOT / BEFORE_HARNESS).read_bytes()),
+        },
+        "attempts": (
+            "Each arm's driver takes the slots once and tries each run at most three times behind "
+            "the gate. The after arm's first driver was refused three times at the worker's costs "
+            "(the machine 0 to 45 percent idle) and stopped; the second ran the costs on its third "
+            "attempt and the request blocking on its second. The before arm's driver ran on its "
+            "first attempt. Every attempt is a line of the gate's ledger, and every attempt's "
+            "console is bound."
+        ),
+        "execution": {
+            "machine": "Apple M5 Max, 18 cores, 64 GB, macOS 26.7",
+            "python": "CPython 3.11.6",
+            "timing": (
+                "each arm's driver inside quiet-slot then gpu-slot; every run behind the idle gate: "
+                "at least 70 percent idle over 10 s before it, discarded below 50 percent mean "
+                "idle during it"
+            ),
+        },
+        "limits": [
+            "The request blocking runs time GET /healthz beside one flight read over the loopback; "
+            "a page's own requests were not timed.",
+            "The before arm reads the window from the step before an episode ends on a page "
+            "clock, the most a window computes there; the after arm reads at the shared clock and "
+            "its worker computes one whole episode, and queues the next.",
+            "The worker's costs and a capped search are one machine's; the capped search is process "
+            "time, the spawn and the cold episodes wall time.",
+            "Frame time was not measured again: the renderer's changes are a lookup per flyer and "
+            "the clock it starts at, and record B's frame measurement stands.",
+            "One machine.",
+        ],
+        "tree": {
+            "head": _git("rev-parse", "HEAD").decode().strip(),
+            "tracked_diff_sha256_at_registration": pre["tree"]["tracked_diff_sha256"],
+            "tracked_diff_sha256_at_this_record": _sha(diff),
+            "code_changed_since_the_judged_run_began": changed_since,
+        },
+        "bound_artifacts": binder.bound,
+        "artifact_notes": binder.notes,
+    }
+    envelope_out = digest_bound(record)
+    RECORD.write_bytes(json.dumps(envelope_out, indent=1, sort_keys=True).encode() + b"\n")
+    print(RECORD.relative_to(ROOT), envelope_out["record_sha256"], verdict)
+
+
+if __name__ == "__main__":
+    main()

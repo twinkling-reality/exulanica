@@ -1,0 +1,717 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "artifact_notes": {
+   "runs/as-run.sha256": "the digests of the measuring script and the flight's code as the judged run began",
+   "runs/judged-bounds.json": "the judged run",
+   "runs/run.log.txt": "the judged run's console and exit",
+   "scripts/write_record_d.py.txt": "this record's writer",
+   "timing/driver-1-worker-costs.attempt-1.log.txt": "a timing run's console",
+   "timing/driver-1-worker-costs.attempt-2.log.txt": "a timing run's console",
+   "timing/driver-1-worker-costs.attempt-3.log.txt": "a timing run's console",
+   "timing/driver-2-worker-costs.attempt-1.log.txt": "a timing run's console",
+   "timing/driver-2-worker-costs.attempt-2.log.txt": "a timing run's console",
+   "timing/driver-2-worker-costs.attempt-3.log.txt": "a timing run's console",
+   "timing/gates.jsonl": "a timing run's output or the gate's",
+   "timing/idle-20260926T193852-81396.jsonl": "a timing run's output or the gate's",
+   "timing/idle-20260926T194429-52100.jsonl": "a timing run's output or the gate's",
+   "timing/idle-20260926T201133-11318.jsonl": "a timing run's output or the gate's",
+   "timing/request-blocking-after.attempt-1.log.txt": "a timing run's console",
+   "timing/request-blocking-after.attempt-2.log.txt": "a timing run's console",
+   "timing/request-blocking-after.json": "a timing run's output or the gate's",
+   "timing/request-blocking-before.attempt-1.log.txt": "a timing run's console",
+   "timing/request-blocking-before.json": "a timing run's output or the gate's",
+   "timing/setup-trees-after.json": "a timing run's output or the gate's",
+   "timing/setup-trees-after.log.txt": "a timing run's console",
+   "timing/setup-trees-before.json": "a timing run's output or the gate's",
+   "timing/setup-trees-before.log.txt": "a timing run's console",
+   "timing/worker-costs.json": "a timing run's output or the gate's"
+  },
+  "attempts": "Each arm's driver takes the slots once and tries each run at most three times behind the gate. The after arm's first driver was refused three times at the worker's costs (the machine 0 to 45 percent idle) and stopped; the second ran the costs on its third attempt and the request blocking on its second. The before arm's driver ran on its first attempt. Every attempt is a line of the gate's ledger, and every attempt's console is bound.",
+  "before_arm_setup": {
+   "harness": "record B's pre-registered copy of the setup harness, run as it is, whose flight read asks for step 0 as main's page clock allows",
+   "path": "docs/evaluation/artifacts/2026-09-25-flight-bounds-v2-preregistration/measure_flight_frames.mjs.txt",
+   "sha256": "b93390545515e9aa1fa6d9f49a095158bd709e18529f5377a0b90743b2525817"
+  },
+  "bound_artifacts": {
+   "runs/as-run.sha256": {
+    "byte_size": 796,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/runs/as-run.sha256",
+    "sha256": "68e1449cec788024a9cdf7f5500503d9924e594eb3a2f00ef8ce3cb73c07e65e"
+   },
+   "runs/judged-bounds.json": {
+    "byte_size": 35638,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/runs/judged-bounds.json",
+    "sha256": "f00910b0715abe6a6e7d04148910b8c2e3633988119d1a1ed3d38c23163e7117"
+   },
+   "runs/run.log.txt": {
+    "byte_size": 7,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/runs/run.log.txt",
+    "sha256": "28d3b9e880a77975493dc7e359144c0295a4f694cfe0af4f928c22307bc5c320"
+   },
+   "scripts/write_record_d.py.txt": {
+    "byte_size": 14081,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/scripts/write_record_d.py.txt",
+    "sha256": "83172e53a4439c5380d766287a6468b5e9cc4aab6d7e6701264b7b47751e72d3"
+   },
+   "timing/driver-1-worker-costs.attempt-1.log.txt": {
+    "byte_size": 23,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-1-worker-costs.attempt-1.log.txt",
+    "sha256": "fd4bcd825982ac0e3d395ca76b5e10263b05a91360d2bc5406af7100626f7ddb"
+   },
+   "timing/driver-1-worker-costs.attempt-2.log.txt": {
+    "byte_size": 22,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-1-worker-costs.attempt-2.log.txt",
+    "sha256": "4ea9e8b38aac34ef88621155e798fd16eee76f1c968817caad5d6f4504ba069c"
+   },
+   "timing/driver-1-worker-costs.attempt-3.log.txt": {
+    "byte_size": 22,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-1-worker-costs.attempt-3.log.txt",
+    "sha256": "4ea9e8b38aac34ef88621155e798fd16eee76f1c968817caad5d6f4504ba069c"
+   },
+   "timing/driver-2-worker-costs.attempt-1.log.txt": {
+    "byte_size": 23,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-2-worker-costs.attempt-1.log.txt",
+    "sha256": "e12bc4d2db5a75226059622dabf7ee2e95996bb933f1bc0cf8f456c4cd446527"
+   },
+   "timing/driver-2-worker-costs.attempt-2.log.txt": {
+    "byte_size": 22,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-2-worker-costs.attempt-2.log.txt",
+    "sha256": "a1214647227a0b65e632e1cba74f56cc71a14d09b0d8de8846480aa7af42a83f"
+   },
+   "timing/driver-2-worker-costs.attempt-3.log.txt": {
+    "byte_size": 483,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-2-worker-costs.attempt-3.log.txt",
+    "sha256": "c9994f3a45b8b8fd650ba082535706643dae4fd7a35ea802932cc98814ca0972"
+   },
+   "timing/gates.jsonl": {
+    "byte_size": 2846,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/gates.jsonl",
+    "sha256": "be7e61a020801c8df8fce5a9bb378953fa6f4ef2dfbf7cc691fc9acecded6de8"
+   },
+   "timing/idle-20260926T193852-81396.jsonl": {
+    "byte_size": 264,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/idle-20260926T193852-81396.jsonl",
+    "sha256": "9781c9a9182e05a7681fb3651df5f9ac514afc54f6a5f4c03f9234fef997c6b8"
+   },
+   "timing/idle-20260926T194429-52100.jsonl": {
+    "byte_size": 184,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/idle-20260926T194429-52100.jsonl",
+    "sha256": "fbab580c1d43cbb4c909f3fcea9b8af0512595e8ca2fa4e770ebe8d6d6aa9de9"
+   },
+   "timing/idle-20260926T201133-11318.jsonl": {
+    "byte_size": 225,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/idle-20260926T201133-11318.jsonl",
+    "sha256": "dec89322e03ec88745356ebf9b12690611a8326579c042cc90b99ada128a90cd"
+   },
+   "timing/request-blocking-after.attempt-1.log.txt": {
+    "byte_size": 23,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-after.attempt-1.log.txt",
+    "sha256": "8d4cae327ef4ae0034757ec15e70e0d4694d166a267e93b0cf9a2d7f12af1f9c"
+   },
+   "timing/request-blocking-after.attempt-2.log.txt": {
+    "byte_size": 136,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-after.attempt-2.log.txt",
+    "sha256": "d46a6c9ce2cf2b416bb9e67a9d86f397bcd2ee8783b0f45efd850d09dcc4d4af"
+   },
+   "timing/request-blocking-after.json": {
+    "byte_size": 2563,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-after.json",
+    "sha256": "4300f45fdc6c3a2a721f58dc01ae59e5e3b2798e3e0812cb8a49451c6d451b4b"
+   },
+   "timing/request-blocking-before.attempt-1.log.txt": {
+    "byte_size": 150,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-before.attempt-1.log.txt",
+    "sha256": "9a720604dd3daa12e57a77d6e136c677f6f498e97f67f7a49e89974ad392e0c5"
+   },
+   "timing/request-blocking-before.json": {
+    "byte_size": 2558,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-before.json",
+    "sha256": "51c4b990617c937a5c528ffc4e6983f227a93646e314595c83e6edda1fd09580"
+   },
+   "timing/setup-trees-after.json": {
+    "byte_size": 240,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/setup-trees-after.json",
+    "sha256": "6af71bc3975855416aa5c249bf21d03a58f5c2bd98f6183c7ffa43a742433181"
+   },
+   "timing/setup-trees-after.log.txt": {
+    "byte_size": 0,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/setup-trees-after.log.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   },
+   "timing/setup-trees-before.json": {
+    "byte_size": 240,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/setup-trees-before.json",
+    "sha256": "c8bf16e65abb15182575746bca959b018a3fa69f9e90e24fd127034bd8671708"
+   },
+   "timing/setup-trees-before.log.txt": {
+    "byte_size": 0,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/setup-trees-before.log.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   },
+   "timing/worker-costs.json": {
+    "byte_size": 1132,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/worker-costs.json",
+    "sha256": "f0b1c88d64f8c46d2dcfcce95accc64f428b6ad0a35712198e99bf113edee201"
+   }
+  },
+  "execution": {
+   "machine": "Apple M5 Max, 18 cores, 64 GB, macOS 26.7",
+   "python": "CPython 3.11.6",
+   "timing": "each arm's driver inside quiet-slot then gpu-slot; every run behind the idle gate: at least 70 percent idle over 10 s before it, discarded below 50 percent mean idle during it"
+  },
+  "found": {
+   "cluttered": {
+    "episode_ends": 1728,
+    "finished_at": "2026-09-26T23:13:23+00:00",
+    "flyers": 24,
+    "guard_interventions": 1842,
+    "not_home_at_an_episode_end": 0,
+    "route_queue_entries_most_taken_by_one_search": 93,
+    "route_searches": 1713,
+    "route_searches_most_by_one_flyer_in_an_episode": 2,
+    "route_searches_without_route": 0,
+    "seeds": 12,
+    "segments_checked": 5183712,
+    "started_at": "2026-09-26T23:11:05+00:00",
+    "violations_by_rule": {},
+    "windows_compared": 360,
+    "worker_windows_unequal_to_in_process": 0
+   },
+   "crowded_crowns": {
+    "episode_ends": 864,
+    "finished_at": "2026-09-26T23:11:05+00:00",
+    "flyers": 12,
+    "guard_interventions": 46927,
+    "not_home_at_an_episode_end": 0,
+    "route_queue_entries_most_taken_by_one_search": 81,
+    "route_searches": 843,
+    "route_searches_most_by_one_flyer_in_an_episode": 2,
+    "route_searches_without_route": 0,
+    "seeds": 12,
+    "segments_checked": 2591856,
+    "started_at": "2026-09-26T23:08:59+00:00",
+    "violations_by_rule": {},
+    "windows_compared": 360,
+    "worker_windows_unequal_to_in_process": 0
+   },
+   "eight_trees": {
+    "episode_ends": 1728,
+    "finished_at": "2026-09-26T23:08:59+00:00",
+    "flyers": 24,
+    "guard_interventions": 1306,
+    "not_home_at_an_episode_end": 0,
+    "route_queue_entries_most_taken_by_one_search": 73,
+    "route_searches": 1709,
+    "route_searches_most_by_one_flyer_in_an_episode": 1,
+    "route_searches_without_route": 0,
+    "seeds": 12,
+    "segments_checked": 5183712,
+    "started_at": "2026-09-26T23:06:47+00:00",
+    "violations_by_rule": {},
+    "windows_compared": 360,
+    "worker_windows_unequal_to_in_process": 0
+   },
+   "small_square": {
+    "episode_ends": 216,
+    "finished_at": "2026-09-26T23:06:47+00:00",
+    "flyers": 3,
+    "guard_interventions": 32,
+    "not_home_at_an_episode_end": 0,
+    "route_queue_entries_most_taken_by_one_search": 48,
+    "route_searches": 197,
+    "route_searches_most_by_one_flyer_in_an_episode": 1,
+    "route_searches_without_route": 0,
+    "seeds": 12,
+    "segments_checked": 647964,
+    "started_at": "2026-09-26T23:06:32+00:00",
+    "violations_by_rule": {},
+    "windows_compared": 360,
+    "worker_windows_unequal_to_in_process": 0
+   }
+  },
+  "judged": [
+   {
+    "id": "no-violation",
+    "measured": {
+     "cluttered": {},
+     "crowded_crowns": {},
+     "eight_trees": {},
+     "small_square": {}
+    },
+    "outcome": "passed",
+    "rule": "In every world and judged seed the independent checker names no violation of any rule: every flyer's home a declared perch; no flying position outside the volume or the kind's band; no landing, take-off or perch off a declared perch's column, and no perching flyer off its perch's point; no move longer than the kind's top speed allows in a step, the move into every episode and between windows included; no point of any move in a solid cell of the checker's own grid, other than its perch object's own while it moves along that perch's column; no move bringing a body, a box as wide as its kind's span, into a part of any object other than that; no perch holding two flyers; every episode's first step with every flyer perching at home."
+   },
+   {
+    "id": "every-flyer-home",
+    "measured": {
+     "cluttered": [
+      0,
+      1728,
+      0
+     ],
+     "crowded_crowns": [
+      0,
+      864,
+      0
+     ],
+     "eight_trees": [
+      0,
+      1728,
+      0
+     ],
+     "small_square": [
+      0,
+      216,
+      0
+     ]
+    },
+    "outcome": "passed",
+    "rule": "At every episode's last step every flyer is perching at its home perch, in every world and judged seed, and every window names exactly the flyers the checker finds not home."
+   },
+   {
+    "id": "worker-equals-in-process",
+    "measured": {
+     "cluttered": 0,
+     "crowded_crowns": 0,
+     "eight_trees": 0,
+     "small_square": 0
+    },
+    "outcome": "passed",
+    "rule": "Every window the server's worker process serves (a spawned process computing whole episodes) has the digest of the window cut from the same episodes computed in the measuring process, in every world and judged seed."
+   },
+   {
+    "id": "health-beside-a-cold-read",
+    "measured": {
+     "flight_reads_answered": 5,
+     "limit_us": 25000,
+     "runs": 5,
+     "slowest_health_beside_each_cold_read_us": [
+      2775,
+      30914,
+      2203,
+      4300,
+      2227
+     ]
+    },
+    "outcome": "failed",
+    "rule": "On this lane's release server (a production build on slot 3 with a new synthetic workspace, the small square and seven more trees, 24 flyers), inside quiet-slot then gpu-slot behind the idle gate, in each of five runs, each after an edit so the flight read is cold, the slowest GET /healthz answer beside the cold flight read takes at most 25000 us."
+   }
+  ],
+  "judged_run": {
+   "finished_at": "2026-09-26T23:13:23+00:00",
+   "started_at": "2026-09-26T23:06:30+00:00"
+  },
+  "limits": [
+   "The request blocking runs time GET /healthz beside one flight read over the loopback; a page's own requests were not timed.",
+   "The before arm reads the window from the step before an episode ends on a page clock, the most a window computes there; the after arm reads at the shared clock and its worker computes one whole episode, and queues the next.",
+   "The worker's costs and a capped search are one machine's; the capped search is process time, the spawn and the cold episodes wall time.",
+   "Frame time was not measured again: the renderer's changes are a lookup per flyer and the clock it starts at, and record B's frame measurement stands.",
+   "One machine."
+  ],
+  "preregistration": {
+   "path": "docs/evaluation/2026-09-26-flight-worker-preregistration.json",
+   "record_sha256": "2441917a59acd2bbb0a08077c9a6b2357ff9a724d803ef59d2b9cc17f5c6510b"
+  },
+  "profile": "exulanica.flight-worker/v1",
+  "question": "With the flight's episodes computed by a worker process off the request path on the shared clock, searches for a route home bounded, and a checker that places every part and perch on its own, does the flight keep every flyer clear of every part and in its bounds, bring every flyer home at every episode's end, serve from the worker exactly the windows this process computes, and leave the server's other requests unslowed while a cold flight read is computed?",
+  "release_builds": {
+   "after": {
+    "index_html_sha256": "f01e9e54216a1ec75c4c0cf844acff294225ec8bdb5db82d2ee5089d3df55185",
+    "mode": "production",
+    "served_index_is_the_build": true,
+    "tree": {
+     "branch": "lane/0923-movement3",
+     "changed_paths": "41",
+     "diff_head_bytes": "127093",
+     "diff_head_sha256": "ae624eadbe7897b0c0a5fbe40be8c915b7f55f245c110c99862a760cd2eb62e3",
+     "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+     "status_sha256": "a66103673aa08addc3c5898742abbc5261399211accb1be658fd4efbb792f2f1"
+    },
+    "vite": "vite/6.4.3 darwin-arm64 node-v24.15.0"
+   },
+   "before": {
+    "index_html_sha256": "479a63833c649e9b92ea70d15a0844774c6dae4b7eacb148f4d75e290499c68f",
+    "mode": "production",
+    "served_index_is_the_build": true,
+    "tree": {
+     "branch": "lane/0923-movement3base",
+     "changed_paths": "0",
+     "diff_head_bytes": "0",
+     "diff_head_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+     "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "vite": "vite/6.4.3 darwin-arm64 node-v24.15.0"
+   }
+  },
+  "reported": {
+   "request-blocking-after": {
+    "arm": "after",
+    "idle_during_mean_tenths_percent": 774,
+    "interval_ms": 20,
+    "load_1min_before_milli": 11035,
+    "profile": "exulanica.flight-worker/v1/request-blocking",
+    "runs": [
+     {
+      "flight_status": 200,
+      "flight_us": 921247,
+      "flyers": 24,
+      "from_step": 17904662706,
+      "health_alone": {
+       "count": 50,
+       "max_us": 3824,
+       "p50_us": 1405,
+       "p95_us": 2505
+      },
+      "health_beside_the_flight": {
+       "count": 37,
+       "max_us": 2775,
+       "p50_us": 1050,
+       "p95_us": 1675
+      },
+      "input_sha256": "b92c9707f05c429572f0681d7699daa45ea338d452f7966e6a3b2ea57eff9a75",
+      "same_window_again": {
+       "status": 200,
+       "us": 15754
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 963007,
+      "flyers": 24,
+      "from_step": 17904662728,
+      "health_alone": {
+       "count": 50,
+       "max_us": 1797,
+       "p50_us": 1255,
+       "p95_us": 1706
+      },
+      "health_beside_the_flight": {
+       "count": 38,
+       "max_us": 30914,
+       "p50_us": 1208,
+       "p95_us": 3739
+      },
+      "input_sha256": "19dbe9193bafd7b84641567439db5a3e37fd9ec1130cfb39255ae7b412191373",
+      "same_window_again": {
+       "status": 200,
+       "us": 14943
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 933205,
+      "flyers": 24,
+      "from_step": 17904662751,
+      "health_alone": {
+       "count": 50,
+       "max_us": 1836,
+       "p50_us": 1312,
+       "p95_us": 1714
+      },
+      "health_beside_the_flight": {
+       "count": 38,
+       "max_us": 2203,
+       "p50_us": 1229,
+       "p95_us": 1876
+      },
+      "input_sha256": "7c4d0770ac3a35a8cfe6d184c1bf4b6ad01d46fdcd32a7d4520b4968a4690079",
+      "same_window_again": {
+       "status": 200,
+       "us": 14254
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 907602,
+      "flyers": 24,
+      "from_step": 17904662773,
+      "health_alone": {
+       "count": 50,
+       "max_us": 1706,
+       "p50_us": 1213,
+       "p95_us": 1584
+      },
+      "health_beside_the_flight": {
+       "count": 37,
+       "max_us": 4300,
+       "p50_us": 1171,
+       "p95_us": 1999
+      },
+      "input_sha256": "d55a7c32d2066a82e5e99bea88f3b681729a4da3fffa95fb2c55a783ea20bc92",
+      "same_window_again": {
+       "status": 200,
+       "us": 13366
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 903084,
+      "flyers": 24,
+      "from_step": 17904662795,
+      "health_alone": {
+       "count": 50,
+       "max_us": 4316,
+       "p50_us": 1359,
+       "p95_us": 2572
+      },
+      "health_beside_the_flight": {
+       "count": 37,
+       "max_us": 2227,
+       "p50_us": 1189,
+       "p95_us": 1645
+      },
+      "input_sha256": "156990912c26abaee265797c655e87d2904c8d1fa0f72fc3c09a6215e4a7c789",
+      "same_window_again": {
+       "status": 200,
+       "us": 13627
+      }
+     }
+    ]
+   },
+   "request-blocking-before": {
+    "arm": "before",
+    "idle_during_mean_tenths_percent": 593,
+    "interval_ms": 20,
+    "load_1min_before_milli": 8649,
+    "profile": "exulanica.flight-worker/v1/request-blocking",
+    "runs": [
+     {
+      "flight_status": 200,
+      "flight_us": 639933,
+      "flyers": 24,
+      "from_step": 2999,
+      "health_alone": {
+       "count": 50,
+       "max_us": 2576,
+       "p50_us": 1061,
+       "p95_us": 2243
+      },
+      "health_beside_the_flight": {
+       "count": 5,
+       "max_us": 178610,
+       "p50_us": 105321,
+       "p95_us": 178610
+      },
+      "input_sha256": "8876cee6e7f8eb169b8d95aac970eecfbda7b7bed85dbc3fd60322ec38bdc9df",
+      "same_window_again": {
+       "status": 200,
+       "us": 878995
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 604953,
+      "flyers": 24,
+      "from_step": 2999,
+      "health_alone": {
+       "count": 50,
+       "max_us": 7933,
+       "p50_us": 1828,
+       "p95_us": 3403
+      },
+      "health_beside_the_flight": {
+       "count": 4,
+       "max_us": 191118,
+       "p50_us": 133651,
+       "p95_us": 191118
+      },
+      "input_sha256": "a416d762e0c5cf7fafe2150e59dbaa32bf37b35d351a41b3962fe42b0cf03d90",
+      "same_window_again": {
+       "status": 200,
+       "us": 613543
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 627441,
+      "flyers": 24,
+      "from_step": 2999,
+      "health_alone": {
+       "count": 50,
+       "max_us": 21329,
+       "p50_us": 1215,
+       "p95_us": 2892
+      },
+      "health_beside_the_flight": {
+       "count": 5,
+       "max_us": 184433,
+       "p50_us": 160720,
+       "p95_us": 184433
+      },
+      "input_sha256": "6161926a6427606b9c684d88c07f7b432b3dbc9b8efc0426f8f9388e7c3718b2",
+      "same_window_again": {
+       "status": 200,
+       "us": 577328
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 572614,
+      "flyers": 24,
+      "from_step": 2999,
+      "health_alone": {
+       "count": 50,
+       "max_us": 31175,
+       "p50_us": 1288,
+       "p95_us": 3138
+      },
+      "health_beside_the_flight": {
+       "count": 4,
+       "max_us": 196368,
+       "p50_us": 120268,
+       "p95_us": 196368
+      },
+      "input_sha256": "ca1c4e49b6a3c5e8b8f37fb317702cec342f74834f1fcc0eb0b5d2ca82791021",
+      "same_window_again": {
+       "status": 200,
+       "us": 549965
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 549344,
+      "flyers": 24,
+      "from_step": 2999,
+      "health_alone": {
+       "count": 50,
+       "max_us": 7104,
+       "p50_us": 932,
+       "p95_us": 2528
+      },
+      "health_beside_the_flight": {
+       "count": 5,
+       "max_us": 136264,
+       "p50_us": 125197,
+       "p95_us": 136264
+      },
+      "input_sha256": "a43b3fdd1a919866fb6c2a9f1436e85dab813e92620a2446a3dbe44d87452204",
+      "same_window_again": {
+       "status": 200,
+       "us": 542771
+      }
+     }
+    ]
+   },
+   "worker-costs": {
+    "capped_search": {
+     "bounded_process_us": {
+      "max": 24804,
+      "median": 13834,
+      "values": [
+       13017,
+       13074,
+       13091,
+       13190,
+       13250,
+       13477,
+       13490,
+       13568,
+       13657,
+       13796,
+       13834,
+       13922,
+       13944,
+       13992,
+       13998,
+       14030,
+       14259,
+       14682,
+       15402,
+       24804
+      ]
+     },
+     "grid_cells": 259584,
+     "route_cells": 4096,
+     "route_searches": 3,
+     "unbounded_process_us": {
+      "max": 530711,
+      "median": 487195,
+      "values": [
+       458125,
+       469047,
+       487195,
+       516496,
+       530711
+      ]
+     }
+    },
+    "cold_episode_wall_us": {
+     "cluttered": {
+      "flyers": 24,
+      "max": 998643,
+      "median": 938033,
+      "values": [
+       859267,
+       870981,
+       938033,
+       955369,
+       998643
+      ]
+     },
+     "eight_trees": {
+      "flyers": 24,
+      "max": 920870,
+      "median": 893618,
+      "values": [
+       469866,
+       876494,
+       893618,
+       914715,
+       920870
+      ]
+     }
+    },
+    "load_1min_before_milli": 19003,
+    "milliseconds": 15600,
+    "profile": "exulanica.flight-worker/v1/costs",
+    "spawn_wall_us": {
+     "max": 375822,
+     "median": 272900,
+     "values": [
+      254048,
+      254243,
+      272900,
+      314692,
+      375822
+     ]
+    }
+   }
+  },
+  "scripts": {
+   "gate.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/gate.py.txt",
+    "sha256": "9bac3b50d4fd7fcb8939d9d5e83238144cff1dfebb9b6027d4f49fd7da961d65"
+   },
+   "measure_flight_bounds.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_flight_bounds.py.txt",
+    "sha256": "599c68892e9ee600cf21ce50ff1f9ad303c11aa2634807d71a1cd3ba177f7ca3"
+   },
+   "measure_flight_frames.mjs.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_flight_frames.mjs.txt",
+    "sha256": "b92d08639c096ceb9a89fac7fb4bff6809df70b02b192edcc282c0c799ca7dd4"
+   },
+   "measure_request_blocking.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_request_blocking.py.txt",
+    "sha256": "2e9283ca729edca9e0d98937e543aa2fbd66d6d57a4c311b28e81efeaa9d7f28"
+   },
+   "measure_worker_costs.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_worker_costs.py.txt",
+    "sha256": "343b95aaca2dc0fe279519e462bbde8ebe3305983703486ff5305b5dc7bab690"
+   },
+   "run_timing_d.sh.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/run_timing_d.sh.txt",
+    "sha256": "f16faaf1ad0682ffec2dff66663e67fea824136c73b45c25b119711dc2bcf814"
+   }
+  },
+  "tree": {
+   "code_changed_since_the_judged_run_began": [],
+   "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+   "tracked_diff_sha256_at_registration": "ae624eadbe7897b0c0a5fbe40be8c915b7f55f245c110c99862a760cd2eb62e3",
+   "tracked_diff_sha256_at_this_record": "3b2ae1dbcd6b7c3ab59d8f4f09b81f210d2e66b4695edf1ff693018fe2ca4720"
+  },
+  "verdict": "FAILED. Over 12 held-out seeds and 30 simulated minutes in each of 4 worlds, and 5 timed runs on the release server."
+ },
+ "record_sha256": "ee0ce934068fb2b024011fbba695a13c14edc1ba8491aedb9d3b8515fc3ec258"
+}

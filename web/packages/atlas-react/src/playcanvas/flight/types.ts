@@ -21,10 +21,24 @@ export interface FlightSamples {
   readonly flap: readonly number[];
 }
 
+/**
+ * A flyer the server found not perching at home at an episode's last step: the next step is the
+ * next episode's first, where every flyer starts at home, so the move between them is never drawn.
+ */
+export interface FlightLate {
+  readonly step: number;
+  readonly flyerId: string;
+}
+
 /** A window of consecutive steps of one flight, as the route serves it. */
 export interface FlightWindow {
   /** The digest of everything the flight was computed from; a new one is a new flight. */
   readonly inputSha256: string;
+  /**
+   * Where the flight's shared clock was when the server answered: step n is the nth `stepMs`
+   * since the Unix epoch. A page's clock starts here.
+   */
+  readonly clockStep: number;
   /** The elevation of the ground the positions stand over, in millimetres. */
   readonly groundMm: number;
   readonly stepMs: number;
@@ -32,6 +46,8 @@ export interface FlightWindow {
   readonly steps: number;
   readonly states: readonly FlightState[];
   readonly flyers: readonly FlightSamples[];
+  /** The flyers not home when an episode in this window ended, each at that episode's last step. */
+  readonly lateHome: readonly FlightLate[];
 }
 
 /** How a flying kind is drawn: where its wings join its body and how it banks and beats them. */

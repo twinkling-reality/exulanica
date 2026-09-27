@@ -1,0 +1,99 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "bound_artifacts": {
+   "scripts/write_erratum.py.txt": {
+    "byte_size": 5314,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-erratum/write_erratum.py.txt",
+    "sha256": "d929cf22323b4b7e1c2ff33bc8c8d2fe035ee5de24b4c2e0f6b3d30d1d60a6fc"
+   }
+  },
+  "corrects": [
+   {
+    "path": "docs/evaluation/2026-09-26-flight-worker.json",
+    "record_sha256": "ee0ce934068fb2b024011fbba695a13c14edc1ba8491aedb9d3b8515fc3ec258",
+    "says": "each arm's driver inside quiet-slot then gpu-slot; every run behind the idle gate: at least 70 percent idle over 10 s before it, discarded below 50 percent mean idle during it"
+   },
+   {
+    "path": "docs/evaluation/2026-09-26-flight-worker-v2.json",
+    "record_sha256": "8e69f12bd2e19f1dc97645890905c4a3d71c8940193643a8f9bb5376a0d261bb",
+    "says": "the driver inside quiet-slot then gpu-slot; every run behind the idle gate: at least 70 percent idle over 10 s before it, discarded below 50 percent mean idle during it"
+   },
+   {
+    "path": "docs/evaluation/2026-09-26-flight-worker-v3.json",
+    "record_sha256": "119be8a0ac2f6210b2dfcf8e3de0b4d1c77640ff1e66f632c33b10afa042ef7c",
+    "says": "the driver inside quiet-slot then gpu-slot; every run behind the idle gate: at least 70 percent idle over 10 s before it, discarded below 50 percent mean idle during it"
+   }
+  ],
+  "errata": [
+   {
+    "found": "No timed run fell below it: 7 runs across the three records, mean idle 59.3 to 77.4 percent, 0 below 50. No outcome changes.",
+    "what": "Each record's execution says every timed run was discarded below 50 percent mean idle during it. The gate records idle samples during a run and leaves the discarding to the command it runs, and neither bound timing script (measure_request_blocking.py, measure_worker_costs.py) discards anything: the rule was not implemented."
+   },
+   {
+    "found": "No outcome changes: no judged rule rests on the cause of the pause.",
+    "what": "Record 2026-09-26-flight-worker-v3.json calls the 30.9 ms pause both earlier records met the full garbage collection it names. That is inferred, not measured per run: the two pauses agree to 6 microseconds, main's release server showed a 31.2 ms health answer with no flight read beside it, and the run with the freeze met none. The 33 to 36 ms a full collection took is a development measurement, named among the earlier measurements of its pre-registration and bound by no record."
+   }
+  ],
+  "profile": "exulanica.flight-worker/erratum",
+  "runs": [
+   {
+    "at": "2026-09-26T19:39:08-0400",
+    "exit": 0,
+    "mean_idle_tenths_percent": 616,
+    "record": "docs/evaluation/2026-09-26-flight-worker.json",
+    "run": "uv run python measure_worker_costs.py",
+    "samples": 7
+   },
+   {
+    "at": "2026-09-26T19:44:40-0400",
+    "exit": 0,
+    "mean_idle_tenths_percent": 774,
+    "record": "docs/evaluation/2026-09-26-flight-worker.json",
+    "run": "python3 measure_request_blocking.py",
+    "samples": 5
+   },
+   {
+    "at": "2026-09-26T20:11:46-0400",
+    "exit": 0,
+    "mean_idle_tenths_percent": 593,
+    "record": "docs/evaluation/2026-09-26-flight-worker.json",
+    "run": "python3 measure_request_blocking.py",
+    "samples": 6
+   },
+   {
+    "at": "2026-09-26T22:20:30-0400",
+    "exit": 0,
+    "mean_idle_tenths_percent": 628,
+    "record": "docs/evaluation/2026-09-26-flight-worker-v2.json",
+    "run": "uv run python measure_worker_costs.py",
+    "samples": 9
+   },
+   {
+    "at": "2026-09-26T22:21:20-0400",
+    "exit": 0,
+    "mean_idle_tenths_percent": 672,
+    "record": "docs/evaluation/2026-09-26-flight-worker-v2.json",
+    "run": "python3 measure_request_blocking.py",
+    "samples": 4
+   },
+   {
+    "at": "2026-09-26T22:37:57-0400",
+    "exit": 0,
+    "mean_idle_tenths_percent": 667,
+    "record": "docs/evaluation/2026-09-26-flight-worker-v3.json",
+    "run": "uv run python measure_worker_costs.py",
+    "samples": 7
+   },
+   {
+    "at": "2026-09-26T22:38:17-0400",
+    "exit": 0,
+    "mean_idle_tenths_percent": 652,
+    "record": "docs/evaluation/2026-09-26-flight-worker-v3.json",
+    "run": "python3 measure_request_blocking.py",
+    "samples": 4
+   }
+  ]
+ },
+ "record_sha256": "567a89153b3210f46e8091ff1f974b55c3a047141c5aa1d75757596394471244"
+}

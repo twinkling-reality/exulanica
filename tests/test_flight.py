@@ -1,14 +1,12 @@
 """Flight: bounds and solids over every seed run, choices refused by name, exact replay.
 
-The worlds are composed as the flight route composes them (``flight_support``). The checker
-(``exulanica.movement.flight_checks``) reads only what a renderer is handed, and asks the exact
-question the step's guard answers conservatively; its positive controls come first, so a check that
-could pass by finding nothing is shown to find something.
+The worlds are composed as the flight route composes them (``flight_support``). The independent
+checker (``exulanica.world.flight_checks``) reads only what a renderer is handed and derives the
+world it checks on its own; its positive controls are in ``tests/test_flight_checks.py``.
 """
 
 from __future__ import annotations
 
-import copy
 import dataclasses
 import hashlib
 import itertools
@@ -17,7 +15,7 @@ import threading
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.movement import flight as flight_module
-from exulanica.movement.air import _solid_bounds, build_occupancy, segment_meets_cell
+from exulanica.movement.air import build_occupancy
 from exulanica.movement.fixed import ONE, ceil_div, turn
 from exulanica.movement.flight import (
     FLIGHT_MODULE,
@@ -30,7 +28,6 @@ from exulanica.movement.flight import (
     state_at,
     validate_choice,
 )
-from exulanica.movement.flight_checks import check_window
 from exulanica.movement.registry import MovementModuleNotConnected
 from exulanica.world import flight_input as composer
 from exulanica.world.flight_input import cached_input, served_window
@@ -38,7 +35,7 @@ from scripts.measure_flight_bounds import _placed, compose
 
 from flight_support import (
     DEVELOPMENT_SEEDS,
-    check_windows,
+    check,
     cluttered_flight,
     crowded_flight,
     seeded,
@@ -60,9 +57,6 @@ def _digest(value) -> str:
     return hashlib.sha256(canonical_json(value)).hexdigest()
 
 
-# -- the checker finds what is there ----------------------------------------------------------
-
-
 def _solid_centre(flight):
     """The centre of some solid cell that is no perch's own, and the cell."""
     own = {cell for perch in flight.perches for c in perch.columns.values() for cell in c.own_cells}
@@ -77,169 +71,12 @@ def _solid_centre(flight):
     raise AssertionError("the world has no solid cell")
 
 
-def _flying_sample(window):
-    """The first flyer and step at which it is flying, and not at a window edge."""
-    flying = window["states"].index("flying")
-    for row in window["flyers"]:
-        for index in range(1, len(row["state"]) - 1):
-            if row["state"][index] == flying and row["state"][index + 1] == flying:
-                return row, index
-    raise AssertionError("nobody flies in this window")
-
-
-def test_the_checker_finds_a_flyer_placed_in_a_solid_cell():
-    """Positive control: a served position moved into a crown is found, with the rule named."""
-    flight = square_flight()
-    window = flight_window(flight, 0, WINDOW)
-    assert check_window(flight, window).violations == []
-    planted = copy.deepcopy(window)
-    row, index = _flying_sample(planted)
-    centre, _cell = _solid_centre(flight)
-    row["position_mm"][3 * index : 3 * index + 3] = centre
-    rules = {v["rule"] for v in check_window(flight, planted).violations}
-    assert "entered_solid_cell" in rules
-
-
-def test_the_checker_finds_a_jump_and_a_flyer_out_of_its_band():
-    flight = square_flight()
-    planted = copy.deepcopy(flight_window(flight, 0, WINDOW))
-    row, index = _flying_sample(planted)
-    x, _y, z = row["position_mm"][3 * index : 3 * index + 3]
-    row["position_mm"][3 * index : 3 * index + 3] = [x, flight.volume.ground_mm + 1_000, z]
-    rules = {v["rule"] for v in check_window(flight, planted).violations}
-    assert {"out_of_bounds", "moved_too_far"} <= rules
-
-
-def test_the_exact_segment_test_keeps_a_cell_half_open():
-    flight = square_flight()
-    volume = flight.volume
-    cell = (10, 10, 10)
-    low, high = volume.cell_bounds(cell)
-    inside = [(a + b) // 2 for a, b in zip(low, high, strict=True)]
-    beside = [high[0] + 10, inside[1], inside[2]]
-    # A segment ending exactly on the cell's low face touches it; one ending on its high face
-    # does not, because the face belongs to the next cell.
-    assert segment_meets_cell(volume, [low[0] - 100, inside[1], inside[2]], low, cell)
-    assert not segment_meets_cell(volume, beside, [high[0], inside[1], inside[2]], cell)
-    assert segment_meets_cell(volume, beside, inside, cell)
-    # Crossing the cell's high edge diagonally touches only the edge's points, which belong to
-    # the neighbouring cells, so the segment never lies in this one.
-    assert not segment_meets_cell(
-        volume,
-        [high[0] - 100, high[1] + 100, inside[2]],
-        [high[0] + 100, high[1] - 100, inside[2]],
-        cell,
-    )
-
-
-def test_the_move_that_joins_two_windows_is_checked_too():
-    """A window's first step ends the move from the last window's last step; only a join sees it."""
-    flight = seeded(square_flight(), DEVELOPMENT_SEEDS[0])
-    windows = copy.deepcopy(_episode(flight)[:2])
-    assert check_windows(flight, windows).violations == []
-    first = windows[1]["from_step"]
-    windows[1]["flyers"][0]["position_mm"][0] += 5_000
-
-    def too_far(check):
-        return {v["step"] for v in check.violations if v["rule"] == "moved_too_far"}
-
-    assert first not in too_far(check_window(flight, windows[1]))
-    assert first in too_far(check_window(flight, windows[1], before=windows[0]))
-    assert first in too_far(check_windows(flight, windows))
-
-
 def _last_window_of_episode(flight):
     """The window holding episode 0's last step, and the next episode's first window."""
     return flight_window(flight, EPISODE - WINDOW, WINDOW), flight_window(flight, EPISODE, WINDOW)
 
 
-def test_the_checker_finds_a_flyer_not_home_when_its_episode_ends():
-    """Positive control: a flyer moved off its perch at an episode's last step is named late, the
-    window is named for not saying so, and its jump home into the next episode is a move."""
-    flight = seeded(square_flight(), DEVELOPMENT_SEEDS[1])
-    last, following = _last_window_of_episode(flight)
-    assert check_windows(flight, [last, following]).violations == []
-    planted = copy.deepcopy(last)
-    row = planted["flyers"][0]
-    end = 3 * (WINDOW - 1)
-    home = list(row["position_mm"][end : end + 3])
-    # Two metres to the side of home and a metre up, flying: its way home crosses the crown.
-    row["position_mm"][end : end + 3] = [home[0] + 2_000, home[1] + 1_000, home[2]]
-    row["state"][WINDOW - 1] = planted["states"].index("flying")
-    alone = check_window(flight, planted)
-    assert alone.late_home == 1
-    rules = {v["rule"] for v in alone.violations}
-    assert {"not_home_at_episode_end", "late_home_misreported"} <= rules
-    into = {v["rule"] for v in check_window(flight, following, before=planted).violations}
-    assert {"moved_too_far", "entered_solid_cell"} <= into
-
-
-def test_the_checker_derives_a_perch_s_own_cells_from_its_object():
-    """Positive control: a column whose own cells were forged to include another object's cells
-    still lets no landing through them, because the checker reads the cells from the parts."""
-    flight = seeded(square_flight(), DEVELOPMENT_SEEDS[2])
-    windows = _episode(flight)[:1]
-    lamp_solid = next(s for s in flight.solids if "lamp" in s.object_id)
-    low, high = _solid_bounds(lamp_solid)
-    lamp_cell = flight.volume.cell_of(
-        ((low[0] + high[0]) // 2, high[1] - 1, (low[2] + high[2]) // 2)
-    )
-    above = (lamp_cell[0], lamp_cell[1] + 1, lamp_cell[2])
-    assert flight.occupancy.is_solid(lamp_cell)
-    # A flyer standing over the lamp's cell, as if on a perch of the square's tree whose column
-    # the forged input says runs through it.
-    home = flight.perch_index[flight.flyers[0].home_perch_id]
-    column = home.columns[flight.flyers[0].kind]
-    bottom = flight.volume.cell_bounds(lamp_cell)[0]
-    forged_column = dataclasses.replace(
-        column,
-        approach_mm=(bottom[0] + 250, bottom[1] + 1_250, bottom[2] + 250),
-        own_cells=(*column.own_cells, lamp_cell, above),
-    )
-    forged_home = dataclasses.replace(
-        home,
-        point_mm=(bottom[0] + 250, bottom[1] + 250, bottom[2] + 250),
-        columns={flight.flyers[0].kind: forged_column},
-    )
-    forged = dataclasses.replace(
-        flight,
-        perches=tuple(forged_home if p.perch_id == home.perch_id else p for p in flight.perches),
-    )
-    planted = copy.deepcopy(windows[0])
-    row = planted["flyers"][0]
-    landing = planted["states"].index("landing")
-    for index, height in enumerate((1_250, 750, 250)):
-        row["position_mm"][3 * index : 3 * index + 3] = [
-            bottom[0] + 250,
-            bottom[1] + height,
-            bottom[2] + 250,
-        ]
-        row["state"][index] = landing
-    entered = {
-        violation["step"]
-        for violation in check_window(forged, planted).violations
-        if violation["rule"] == "entered_solid_cell"
-    }
-    # The move into the lamp's own cell, not the teleport back to the tree after it.
-    assert planted["from_step"] + 2 in entered
-
-
-def test_the_checker_finds_a_body_touching_a_part():
-    """Positive control: a flying flyer a hand's width from a crown's side, its point clear of
-    every part but its body not, is found."""
-    flight = square_flight()
-    window = copy.deepcopy(flight_window(flight, 0, WINDOW))
-    crown = max(
-        (s for s in flight.solids if "tree" in s.object_id), key=lambda s: _solid_bounds(s)[1][1]
-    )
-    low, high = _solid_bounds(crown)
-    half = ceil_div(flight.kinds[flight.flyers[0].kind].body_span_mm, 2)
-    point = [high[0] + half // 2, (low[1] + high[1]) // 2, (low[2] + high[2]) // 2]
-    row, index = _flying_sample(window)
-    row["position_mm"][3 * index : 3 * index + 3] = point
-    row["position_mm"][3 * index + 3 : 3 * index + 6] = point
-    rules = {v["rule"] for v in check_window(flight, window).violations}
-    assert "body_meets_solid" in rules
+# -- the checker's own controls are in tests/test_flight_checks.py --------------------------
 
 
 # -- bounds and solids over every seed run ------------------------------------------------------
@@ -249,16 +86,16 @@ def test_the_checker_finds_a_body_touching_a_part():
 def test_no_flyer_leaves_its_bounds_or_enters_a_solid_cell_in_the_small_square(index):
     flight = seeded(square_flight(), DEVELOPMENT_SEEDS[index])
     assert len(flight.flyers) == 3
-    check = check_windows(flight, _episode(flight))
-    assert (check.violations, check.late_home) == ([], 0)
-    assert set(check.states) == set(flight_module.STATES), "every state is reached, or it is thin"
+    found = check("small_square", flight, _episode(flight))
+    assert (found.violations, found.late_home) == ([], 0)
+    assert set(found.states) == set(flight_module.STATES), "every state is reached, or it is thin"
 
 
 def test_no_flyer_leaves_its_bounds_or_enters_a_solid_cell_among_eight_trees():
     flight = seeded(trees_flight(), DEVELOPMENT_SEEDS[3])
     assert len(flight.flyers) == FLIGHT_MODULE.value("max_flyers")
-    check = check_windows(flight, _episode(flight))
-    assert (check.violations, check.late_home) == ([], 0)
+    found = check("eight_trees", flight, _episode(flight))
+    assert (found.violations, found.late_home) == ([], 0)
 
 
 def test_every_flyer_is_home_when_every_episode_ends_among_crowded_crowns():
@@ -268,16 +105,16 @@ def test_every_flyer_is_home_when_every_episode_ends_among_crowded_crowns():
         windows = [
             flight_window(flight, start, WINDOW) for start in range(0, 2 * EPISODE + 1, WINDOW)
         ]
-        check = check_windows(flight, windows)
-        assert check.episode_ends == 2 * len(flight.flyers)
-        assert (check.late_home, check.violations) == (0, [])
+        found = check("crowded_crowns", flight, windows)
+        assert found.episode_ends == 2 * len(flight.flyers)
+        assert (found.late_home, found.violations) == (0, [])
 
 
 def test_the_cluttered_world_starts_24_birds_and_keeps_them_clear():
     flight = seeded(cluttered_flight(), DEVELOPMENT_SEEDS[8])
     assert len(flight.flyers) == FLIGHT_MODULE.value("max_flyers") and not flight.unplaced
-    check = check_windows(flight, [*_episode(flight), flight_window(flight, EPISODE, WINDOW)])
-    assert (check.late_home, check.violations) == (0, [])
+    found = check("cluttered", flight, [*_episode(flight), flight_window(flight, EPISODE, WINDOW)])
+    assert (found.late_home, found.violations) == (0, [])
 
 
 def test_a_flyer_whose_home_is_just_under_the_band_s_top_gets_home():
@@ -326,9 +163,9 @@ def test_a_route_home_runs_over_free_cells_of_the_band():
     assert all(first <= cell[1] <= last for cell in cells[1:-1])
 
     flight = seeded(crowded_flight(), DEVELOPMENT_SEEDS[7])
-    check = check_windows(flight, _episode(flight))
-    assert (check.violations, check.late_home) == ([], 0)
-    assert check.guard_holds > 0, "the crowns never came in a flyer's way, so this tests nothing"
+    found = check("crowded_crowns", flight, _episode(flight))
+    assert (found.violations, found.late_home) == ([], 0)
+    assert found.guard_holds > 0, "the crowns never came in a flyer's way, so this tests nothing"
 
 
 def test_the_guard_keeps_a_flyer_out_whatever_steering_proposes(monkeypatch):
@@ -342,9 +179,9 @@ def test_the_guard_keeps_a_flyer_out_whatever_steering_proposes(monkeypatch):
         return flight_module.scale_to(offset, kind.max_speed_mm_s), False
 
     monkeypatch.setattr(flight_module, "_desired", into_the_crown)
-    check = check_windows(flight, _episode(flight)[:3])
-    assert check.violations == []
-    assert check.guard_holds > 0, "steering pointed into a solid and the guard never had to act"
+    found = check("small_square", flight, _episode(flight)[:3])
+    assert found.violations == []
+    assert found.guard_holds > 0, "steering pointed into a solid and the guard never had to act"
 
 
 # -- episodes ------------------------------------------------------------------------------------
@@ -390,11 +227,12 @@ def test_a_flight_replays_exactly():
     assert _digest(first) == SQUARE_EPISODE_SHA256
 
 
-def test_a_window_resumed_from_the_last_one_is_the_window_computed_cold():
+def test_a_served_window_is_the_window_computed_cold():
+    """The route's windows, cut from episodes the server's worker process computes."""
     flight = seeded(square_flight(), DEVELOPMENT_SEEDS[6])
-    resumed = [served_window(flight, start, WINDOW) for start in range(0, 2 * WINDOW, WINDOW)]
+    served = [served_window(flight, start, WINDOW) for start in range(0, 2 * WINDOW, WINDOW)]
     cold = [flight_window(flight, start, WINDOW) for start in range(0, 2 * WINDOW, WINDOW)]
-    assert resumed == cold
+    assert served == cold
 
 
 @pytest.mark.parametrize(
@@ -403,9 +241,8 @@ def test_a_window_resumed_from_the_last_one_is_the_window_computed_cold():
         (0, WINDOW + 1, "flight_window_too_long"),
         (0, 0, "flight_window_too_long"),
         (-1, 10, "flight_step_out_of_range"),
-        (FLIGHT_MODULE.value("max_from_step") + 1, 10, "flight_step_out_of_range"),
     ],
-    ids=["too_many_steps", "no_steps", "before_the_start", "past_the_last_step"],
+    ids=["too_many_steps", "no_steps", "before_the_start"],
 )
 def test_a_window_beyond_the_module_bounds_is_refused_by_name(from_step, steps, code):
     with pytest.raises(FlightRefused) as refused:
@@ -413,9 +250,26 @@ def test_a_window_beyond_the_module_bounds_is_refused_by_name(from_step, steps, 
     assert refused.value.code == code
 
 
+#: A moment of shared real time, in milliseconds since the Unix epoch: 2026-09-26 18:00 UTC.
+NOW_MS = 1_790_445_600_000
+
+
+def test_the_flight_clock_is_the_step_of_shared_real_time_and_bounds_a_window_by_its_reach():
+    clock = flight_module.clock_step(NOW_MS)
+    assert clock == NOW_MS // FLIGHT_MODULE.step_ms
+    assert flight_module.clock_step(NOW_MS + FLIGHT_MODULE.step_ms - 1) == clock
+    reach = FLIGHT_MODULE.value("clock_reach_steps")
+    for from_step in (clock - reach, clock, clock + reach):
+        flight_module.check_clock(from_step, clock)
+    for from_step in (clock - reach - 1, clock + reach + 1, float(clock)):
+        with pytest.raises(FlightRefused) as refused:
+            flight_module.check_clock(from_step, clock)
+        assert refused.value.code == "flight_step_out_of_range"
+
+
 def test_served_windows_are_shared_safely_between_request_threads():
-    """Many threads asking for windows at once never break the shared resume states, and every
-    window they are served is the one computed cold."""
+    """Many threads asking the server's worker for windows at once are each served the window
+    computed cold."""
     flight = seeded(square_flight(), DEVELOPMENT_SEEDS[5])
     cold = {start: flight_window(flight, start, WINDOW) for start in range(0, 4 * WINDOW, WINDOW)}
     failures: list[BaseException] = []
@@ -550,9 +404,10 @@ def test_the_flight_row_is_a_switch_asked_where_a_flight_is_made_or_served(monke
 
 
 @pytest.mark.parametrize("before_the_last", [0, 1], ids=["last_step", "step_before_the_last"])
-def test_the_latest_steps_cost_no_more_than_one_episode(monkeypatch, before_the_last):
-    """A request at the largest steps a page may ask for computes from its own episode's
-    genesis: the steps it advances are the step's place in its episode, never more."""
+def test_a_step_of_shared_real_time_costs_no_more_than_one_episode(monkeypatch, before_the_last):
+    """A request at a step of shared real time, the last of an episode or the one before it,
+    computes from its own episode's genesis: the steps it advances are the step's place in its
+    episode, never more."""
     calls = []
     original = flight_module.advance_flight
 
@@ -561,7 +416,7 @@ def test_the_latest_steps_cost_no_more_than_one_episode(monkeypatch, before_the_
         return original(flight_input, state)
 
     monkeypatch.setattr(flight_module, "advance_flight", counted)
-    step = FLIGHT_MODULE.value("max_from_step") - before_the_last
+    step = (flight_module.clock_step(NOW_MS) // EPISODE + 1) * EPISODE - 1 - before_the_last
     flight_window(square_flight(), step, 1)
     assert len(calls) == step % EPISODE < EPISODE
 

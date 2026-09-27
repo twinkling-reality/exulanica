@@ -1,0 +1,163 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "artifacts": {
+   "directory": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration",
+   "files": [
+    {
+     "byte_size": 20163,
+     "is": "the script that will measure bounds, bodies, homecoming, the worker's windows against this process's and the searches for a route home, as it will run; copy it to a .py name to run it",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_flight_bounds.py.txt",
+     "sha256": "599c68892e9ee600cf21ce50ff1f9ad303c11aa2634807d71a1cd3ba177f7ca3"
+    },
+    {
+     "byte_size": 7237,
+     "is": "the measurement of what one cold flight read does to the health requests beside it",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_request_blocking.py.txt",
+     "sha256": "2e9283ca729edca9e0d98937e543aa2fbd66d6d57a4c311b28e81efeaa9d7f28"
+    },
+    {
+     "byte_size": 5146,
+     "is": "the measurement of the worker's spawn, its cold episodes and a capped search",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_worker_costs.py.txt",
+     "sha256": "343b95aaca2dc0fe279519e462bbde8ebe3305983703486ff5305b5dc7bab690"
+    },
+    {
+     "byte_size": 2889,
+     "is": "the idle gate every timed run passes through",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/gate.py.txt",
+     "sha256": "9bac3b50d4fd7fcb8939d9d5e83238144cff1dfebb9b6027d4f49fd7da961d65"
+    },
+    {
+     "byte_size": 1761,
+     "is": "the driver that will run each arm's timing",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/run_timing_d.sh.txt",
+     "sha256": "f16faaf1ad0682ffec2dff66663e67fea824136c73b45c25b119711dc2bcf814"
+    },
+    {
+     "byte_size": 16096,
+     "is": "the setup of the after arm's world through the page's routes (the square and seven more trees, 24 flyers); its flight read names no step, as the shared clock asks",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_flight_frames.mjs.txt",
+     "sha256": "b92d08639c096ceb9a89fac7fb4bff6809df70b02b192edcc282c0c799ca7dd4"
+    }
+   ]
+  },
+  "earlier_measurements": [
+   {
+    "what": "development probes, in process, not in quiet-slot, on the development seeds or none: one whole episode's process time in the four worlds; FastAPI's jsonable_encoder and json.dumps on one 24-flyer minute; searches for a route home per flyer and episode and the cells each settled over 12 development seeds and 30 minutes in the four worlds; one search that finds no route on the largest grid, bounded and unbounded",
+    "why": "to choose the design and the two search bounds' values"
+   },
+   {
+    "what": "the flight tests on the development seeds, among them windows cut from episodes against windows computed cold, a real worker process killed, and a planted placement error",
+    "why": "to build and test the change"
+   },
+   {
+    "what": "the request blocking measurement on this lane's release server on slot 3: one run refused by the idle gate (63 percent idle), one run that stopped on a float used as a list index before writing anything, and one development run of three with no gate on a busy machine (one-minute load about 13): cold flight reads of 537 to 590 ms, the slowest health answer beside each 2.6 to 9.4 ms, the same window again about 16 ms",
+    "why": "to check the harness and choose the judged threshold"
+   },
+   {
+    "what": "record B's judged-2 seeds, spent before this registration, run again with windows from the worker and judged by the independent checker, for the record that re-judges record B",
+    "why": "record B's judged run used a checker that placed parts with the flight's own code"
+   }
+  ],
+  "judged": [
+   {
+    "id": "no-violation",
+    "rule": "In every world and judged seed the independent checker names no violation of any rule: every flyer's home a declared perch; no flying position outside the volume or the kind's band; no landing, take-off or perch off a declared perch's column, and no perching flyer off its perch's point; no move longer than the kind's top speed allows in a step, the move into every episode and between windows included; no point of any move in a solid cell of the checker's own grid, other than its perch object's own while it moves along that perch's column; no move bringing a body, a box as wide as its kind's span, into a part of any object other than that; no perch holding two flyers; every episode's first step with every flyer perching at home."
+   },
+   {
+    "id": "every-flyer-home",
+    "rule": "At every episode's last step every flyer is perching at its home perch, in every world and judged seed, and every window names exactly the flyers the checker finds not home."
+   },
+   {
+    "id": "worker-equals-in-process",
+    "rule": "Every window the server's worker process serves (a spawned process computing whole episodes) has the digest of the window cut from the same episodes computed in the measuring process, in every world and judged seed."
+   },
+   {
+    "id": "health-beside-a-cold-read",
+    "limit_us": 25000,
+    "rule": "On this lane's release server (a production build on slot 3 with a new synthetic workspace, the small square and seven more trees, 24 flyers), inside quiet-slot then gpu-slot behind the idle gate, in each of five runs, each after an edit so the flight read is cold, the slowest GET /healthz answer beside the cold flight read takes at most 25000 us."
+   }
+  ],
+  "module": {
+   "clock_reach_steps": 3000,
+   "episode_steps": 3000,
+   "id": "exulanica-movement/flight/v1",
+   "max_flyers": 24,
+   "route_cells": 4096,
+   "route_searches": 3,
+   "step_ms": 100
+  },
+  "profile": "exulanica.flight-worker/v1/preregistration",
+  "question": "With the flight's episodes computed by a worker process off the request path on the shared clock, searches for a route home bounded, and a checker that places every part and perch on its own, does the flight keep every flyer clear of every part and in its bounds, bring every flyer home at every episode's end, serve from the worker exactly the windows this process computes, and leave the server's other requests unslowed while a cold flight read is computed?",
+  "reported": [
+   {
+    "id": "request-blocking-before",
+    "what": "The same five runs on main's release server at 465f2909, whose flight computes on the request's thread, the read asking for the window from the step before an episode ends. No target."
+   },
+   {
+    "id": "same-window-again",
+    "what": "Each run's second read of the window it just read, as a page reading ahead finds it. No target."
+   },
+   {
+    "id": "worker-costs",
+    "what": "Inside quiet-slot then gpu-slot behind the idle gate, in this checkout: the worker's spawn to its first answer, a cold episode of eight trees and of the cluttered square (24 flyers each) through a running worker, and one search for a route home that finds none on the largest grid the module admits, bounded and unbounded. No target."
+   },
+   {
+    "id": "route-searches",
+    "what": "Per run, the searches for a route home, those that found none, the most one flyer made in an episode and the most queue entries one search took (at least the cells it settled). No target: the bounds hold by construction, and this says whether they bound anything in these worlds."
+   },
+   {
+    "id": "guard-interventions",
+    "what": "Per world, the steps the guard refused. No target."
+   }
+  ],
+  "run": {
+   "checker": "exulanica.world.flight_checks.check_windows over each run's windows in order, the world derived by exulanica.world.flight_checks.checked_world from the same placed objects",
+   "command": "uv run python scripts/measure_flight_bounds.py --seeds judged-3 --minutes 30 --worker --out FILE",
+   "minutes_per_seed": 30,
+   "window_steps": 600
+  },
+  "seeds": {
+   "held_out": "No run of any kind has used these seeds before this registration; the judged and judged-2 seeds are spent, and development used exulanica.flight/v1/development/<i>.",
+   "judged": [
+    "c310568c41d4477b0d50787f64c64342d8562b7bf4425d5a00407ac15a052a87",
+    "1e34e0f3f829b3384998d250931defc4891caaa0d5b9a88ac533e2c62da44920",
+    "65bdd2d366812f9c05f61d330c328e2953047a3427a8cc18c07714c847e3977b",
+    "827014cbd874ce6da9d426fa2fcaf329feffda11a4facf23c7fe56c70a66e957",
+    "3be583942f5ca8c6db307777b1bb623094ae7ad99256053d2db56427bb6ede52",
+    "ebbae7ff403cf7c1cbc55aa7b4c355966439b88c3eeda5715113ca0aaec69be3",
+    "0c6cc7033c41f6db2f09caf3cd35cb3658df203f26dad0c9dd77c2aaa9f5322f",
+    "45270d5bf293585499ffd43860bf2aa41fb4278125358e3c28951c3f5e6df3bb",
+    "b53219acc9db9976256ed7b252c406de970fd3697a2b80e8367860f0653a03ff",
+    "248e1fde6457a22eaf7802f8cc837bd79be3be0761eab0a59bae1769b18b7526",
+    "c31fdaadb0bedb932fea5a22ffbbbe640714f4d0dff5d7f7bf5b1f366ad5e083",
+    "b36fe8950b8648b1f6a72dbdd0cd94e3fcaa7530388c92bc6eafe81ca80649e4"
+   ],
+   "judged_rule": "sha256 of exulanica.flight/v1/judged-3/<i>, i from 0 to 11"
+  },
+  "tree": {
+   "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+   "tracked_diff_bytes": 127093,
+   "tracked_diff_sha256": "ae624eadbe7897b0c0a5fbe40be8c915b7f55f245c110c99862a760cd2eb62e3",
+   "untracked": [
+    "docs/evaluation/2026-09-26-flight-independent-check.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/as-run.sha256",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/runs/judged-2-worker.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/runs/run.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/flight_checks.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/measure_flight_bounds.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/write_record_c.py.txt",
+    "exulanica/movement/flight_episodes.py",
+    "exulanica/world/flight_checks.py",
+    "exulanica/world/flight_worker.py",
+    "tests/test_flight_checks.py",
+    "tests/test_flight_search_bounds.py",
+    "tests/test_flight_worker.py"
+   ]
+  },
+  "written_at": "2026-09-26T23:06:23+00:00",
+  "written_before_any_judged_run": true
+ },
+ "record_sha256": "2441917a59acd2bbb0a08077c9a6b2357ff9a724d803ef59d2b9cc17f5c6510b"
+}

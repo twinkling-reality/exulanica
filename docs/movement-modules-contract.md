@@ -39,7 +39,7 @@ order. A row states:
 | `module` | The identity, `exulanica-movement/<kind>/v<N>` |
 | `space` | What it moves in: `ground-lattice`, `road-graph` or `air-volume`, with the input profiles it reads |
 | `agents` | The catalog its agents come from, and which of its kinds, or all |
-| `clock` | Its step length and whose clock it is: the society's persisted tick, a host's, or a page's |
+| `clock` | Its step length and whose clock it is: the society's persisted tick, a host's, or shared real time (`wall`) |
 | `parameters` | Integer bounds, a unit and a reason for each figure; with a `value` where the module uses one figure for every agent, without one where each kind states its own |
 | `output` | The profile a renderer reads |
 | `status` | `built`, or `not_connected` with the `refusal` a caller receives |
@@ -182,7 +182,15 @@ it sets off, the Manhattan distance its estimate and ties broken toward the way 
 and then by cell, so the same state finds the same route on any machine. It aims at the furthest of
 its next few waypoints it can fly straight to, slows as it nears it so it enters that cell rather
 than circling it, and, held by the guard for ten steps in a row, finds its way again from where it
-is. The guard still has the last word on every move.
+is. The guard still has the last word on every move. Its searches are bounded: a flyer searches
+at most `route_searches` (3) times an episode, and one search settles at most `route_cells` (4,096)
+cells, else it ends with no route. Without a route a flyer steers for its home's approach point as
+the rest of its flight does, and one not home when its episode ends is named. Over twelve
+development seeds in the four measured worlds no flyer searched more than twice in an episode and
+no search settled more than 119 cells, so the bounds change no flight there. Unbounded, a flyer the
+guard held again and again searched up to 61 times in one homing minute
+(`tests/test_flight_search_bounds.py`), and a search that finds no route on the largest grid the
+module admits settles every free cell of its band first.
 
 ### Choices and episodes
 
@@ -197,9 +205,10 @@ perch, and in the episode's last minute (`homing_steps`) goes home by its route 
 at an episode's first step is a function of the input and the episode alone, so the state at any
 step is at most one episode of steps from a known one, and the next episode begins where the last
 one ends. A flyer not perching at home at an episode's last step is named in the `late_home` of
-every window that holds that step, never moved quietly. The next episode still starts it at home,
-one move a page would draw across whatever lies between, so the independent checker holds every
-flyer home at every episode's end and checks the move into every episode as any other.
+every window that holds that step, never moved quietly. The next episode still starts it at home.
+The page never draws that move, which may cross anything: the flyer holds where its late step left
+it until the next step is due, then stands at home. The independent checker holds every flyer home
+at every episode's end and checks the move into every episode as any other.
 
 ### Serving and drawing
 
@@ -208,44 +217,86 @@ flyer home at every episode's end and checks the move into every episode as any 
 the society reads it ([`flight_input.py`](../exulanica/world/flight_input.py)) and answers
 `exulanica.flight-window/v1`: per flyer and step, flat integer arrays of position, velocity, signed
 turning acceleration (positive to the left), state code, wingbeat and guard refusal; the ground's
-elevation; the kinds with their body and wing registry rows and how they bank and beat; and
-`unplaced`. A window is 1 to `max_steps_per_request` (600) steps from a step no later than
-`max_from_step` (864,000, a day of page time); beyond either the route answers 422
-`flight_window_too_long` or `flight_step_out_of_range` before it composes anything. A world the
-flight cannot place answers 409 `flight_unavailable` naming the object (an asset with no catalog
-recipe, a behaviour with no rule, a transform no writer produces or another region), a world too
-large 409 `flight_world_too_large`, and a switched-off flight row 409 with its refusal. The input is
-composed once for each version state, source snapshot, reviewed registry and catalogs and kept in
-process, the 16 most recent; a window resumes from the state the previous window ended on, the 64
-most recent; both are shared between request threads under one lock, and neither is computed under
-it. A cold window computes from its episode's genesis. The route computes in Python, which holds the
-interpreter's lock while it does, so while a cold window computes the other requests the same
-server answers wait their turns for that lock. On the release server, beside a cold window of 24
-flyers from the step before an episode ends (484 to 521 ms over the whole request, five runs), the
-slowest health answer in each run took 146 to 222 ms, against at most 9 ms alone. Those runs were
-made by hand at a one-minute load of 5.4, from a copy of the pre-registered measurement with one line
-fixed ([record](evaluation/2026-09-25-flight-bounds-v2.json), its departures).
+elevation; the kinds with their body and wing registry rows and how they bank and beat; `unplaced`;
+and `clock_step`, the flight's clock as the server answered. A window is 1 to
+`max_steps_per_request` (600) steps from a step no more than `clock_reach_steps` (3,000, one
+episode) from the flight's clock either way; a read that names no `from_step` starts at the clock's
+step. Beyond either the route answers 422 `flight_window_too_long` or `flight_step_out_of_range`
+before it composes anything. A world the flight cannot place answers 409 `flight_unavailable`
+naming the object (an asset with no catalog recipe, a behaviour with no rule, a transform no writer
+produces or another region), a world too large 409 `flight_world_too_large`, and a switched-off
+flight row 409 with its refusal.
 
-Nothing is stored. The clock is the page's: the first window a page reads starts its flight at step
-0, so two pages opened at different times show the same flight from its beginning. The page reads
-the next window while less than 30 seconds of served steps are left, and after an edit draws the
-world's new flight from its own first step
-([`saved-world-flight.ts`](../web/packages/app/src/composition/saved-world-flight.ts)). A refusal the
-server keeps giving for the world as it stands (a 409 or a 422) or an answer the page cannot read
-stops the reading until the world is edited, and the inhabitants panel says why in one line of words.
-Any other failure, among them a lapsed sign-in the page's session renews (401), too many requests
-(429) and a server failure (5xx), is tried again after 5 s, then twice as long each time, up to a
-minute; closing the world aborts a read in flight. The page also states the flight on its canvas for
-tools: `data-flight-state` (`starting`, `flying`, `retrying` or `refused`), `data-flight-flyers`,
-`data-flight-unplaced`, `data-flight-undrawn` and `data-flight-failure`.
+The input is composed once for each version state, source snapshot, reviewed registry and catalogs
+and kept in process, the 16 most recent, shared between request threads under one lock and never
+composed under it. No step is computed on a request's thread: Python runs one thread at a time, so
+a flight computed there would make every other request the server answers wait. One worker process
+([`flight_worker.py`](../exulanica/world/flight_worker.py)), started by a server's first flight
+read (the standard library's process pool, spawned, importing the movement package and nothing of
+the server), computes whole episodes from their genesis and hands them back packed as 32-bit
+integers ([`flight_episodes.py`](../exulanica/movement/flight_episodes.py)); it rebuilds each input
+from a plain wire form and refuses one whose digest differs from the server's, and ends itself when
+the server's process is gone, however that ended. Episodes wait for it in the server, not in the
+pool, which is handed one at a time: an episode a read waits for goes before one asked for ahead of
+need, the one asked for first before a later one, and at most `QUEUE_LIMIT` (8) wait. Work ahead of
+need is not queued past that bound, and a read's episode pushes out the oldest of it or, with none
+to push out, is refused. A read names its version's edit sequence, and a later one for the same
+world version supersedes every earlier input of it: episodes of a superseded input still waiting
+are dropped and the reads waiting on them refused, its kept episodes are let go, and one being
+computed as it was superseded goes to whoever waits for it and is not kept. The server keeps the 8
+most recently used episodes by input digest and episode, and asks for the next episode ahead of need
+whenever it serves a window, so a page reading ahead waits only on its first read. Kept episodes are
+computed bytes keyed by content and grant nothing: every read still reads its world through the
+database first. A request's own work is its window, cut from at most two packed episodes and encoded
+by the standard library's JSON encoder one flyer to a call. A read has one deadline, 30 s after it
+began, however many episodes it spans; a read whose episodes are not done by then, or whose worker
+dies, is refused as 503 `flight_worker_unavailable`, which the page tries again, and the next read
+starts another worker. The server's lifespan stops the worker. The server's lifespan also collects
+what startup made and freezes it: a full garbage collection walks every tracked object, holding the
+interpreter's lock, so no request moves while it runs, and a frozen object is never walked again.
+Over about 172,000 objects once the application is imported a full collection took 33 to 36 ms in
+a development measurement, named among the earlier measurements of the
+[third timing registration](evaluation/2026-09-26-flight-worker-v3-preregistration.json).
+Measured on the release server with 24 flyers
+([record](evaluation/2026-09-26-flight-worker-v3.json)): beside a cold flight read (0.58 to 0.62 s,
+the worker computing an episode), the slowest health answer in each of five runs took 2.9 to 7.7 ms,
+and reading the same window again took 15.6 to 19.0 ms. On main's release server, where the flight
+computed on the request's thread, the same measurement found 136 to 197 ms beside cold reads of
+0.55 to 0.64 s ([record](evaluation/2026-09-26-flight-worker.json)). The worker spawns in 0.24 to
+0.38 s at a server's first flight read and computes a cold 24-flyer episode in 0.46 to 1.33 s. With
+the freeze, the API process's resident memory 10 s after startup was 184,464 to 203,056 KiB, and
+189,008 to 203,392 KiB without it, three starts each.
+
+Nothing is stored. The flight keeps shared real time: step n is the nth 100 ms since the Unix epoch,
+and birds keep flying at normal speed while the people are paused or sped up. Every page showing a
+world shows its birds in the same places at the same moment, and one computation of an episode serves
+them all. The page's first read names no step, and its copy of the clock starts where the answer
+says the server's was; every later answer sets it again when the two differ by more than two steps,
+as after a sleep that stopped the page's own clock. It reads the next window while less than 30
+seconds of served steps are left, from where the served steps end or, when its clock has passed
+them, as in a page left in the background, from the clock; a read the server refuses as too far from
+its clock (`flight_step_out_of_range`) is read again from the clock rather than taken as a refusal
+([`saved-world-flight.ts`](../web/packages/app/src/composition/saved-world-flight.ts)). An edit made
+on the page aborts a read in flight and draws none of the old flight, whose birds may cross what the
+edit put in their way, and reads the edited world's flight at once; an answer from before the edit
+is never drawn. A refusal the server keeps giving for the world as it stands (a 409, or another 422)
+or an answer the page cannot read stops the reading until the world is edited, and the inhabitants
+panel says why in one line of words. Any other failure, among them a lapsed sign-in the page's
+session renews (401), too many requests (429) and a server failure (5xx), is tried again after 5 s,
+then twice as long each time, up to a minute; closing the world aborts a read in flight. The page
+also states the flight on its canvas for tools: `data-flight-state` (`starting`, `flying`,
+`retrying` or `refused`), `data-flight-flyers`, `data-flight-unplaced`, `data-flight-undrawn` and
+`data-flight-failure`.
 
 [`flock.ts`](../web/packages/atlas-react/src/playcanvas/flight/flock.ts), owned by the saved world's
 region society, draws each flyer from the served steps only: its position along the segment between
 two consecutive steps, its heading from its served velocity, its bank from its served turning
 (`atan(turning / g)`, at most its kind's `max_bank_mrad`), its pitch from its served climb, its wings
 beating while a step says it flaps, gliding in a shallow V while it does not and swept back along its
-body while it perches. It runs no steering. When the page's clock passes the last served step every
-flyer holds that step and the frame is counted. Windows the clock has passed are let go as new ones
+body while it perches. It runs no steering. A flyer a window names late is not drawn moving into the
+next episode: it holds where its late step left it until the next step is due, then stands at home.
+When the page's clock passes the last served step every flyer holds that step and the frame is
+counted. Windows the clock has passed are let go as new ones
 arrive. Under reduced motion every flyer stands still at the step the clock had reached when the
 latest window arrived, as the crowd shows each person where a minute left them. The flock asks the
 page for frames only while some flyer is off its perch at the clock's step. A kind whose parts are
@@ -272,12 +323,14 @@ out: one of `allowed_choices`, a free perch its kind can use or wandering. A mod
 proposal, held to `validate_choice` exactly as the seeded chooser's is, the way the society holds a
 person's proposed goal to its own validation; a refused proposal would leave the choice to the seeded
 chooser, with the reason kept. No model chooses for a flyer: choices a model makes have to be
-recorded to replay, which needs a persisted flight run advanced by a host, and a clock shared between
-viewers arrives with it.
+recorded to replay, which needs a persisted flight run advanced by a host. Viewers share the
+flight's clock because its choices are drawn from its seed; a model's choices would have to be
+recorded before viewers could share them.
 
 ## What movement modules do not do
 
-- Flight is not stored and has no clock shared between viewers or with the society's minute.
+- Flight is not stored. Its clock is shared real time, not the society's minute: birds keep flying
+  at normal speed while the people are paused or sped up.
 - Flyers do not avoid each other; two can pass through the same point in the air. A perch holds one
   flyer at a time.
 - Flyers do not see people. They keep above the society's walker capsule by their band, and every
@@ -294,13 +347,14 @@ viewers arrives with it.
 | Registry, dispatch | `exulanica/movement/registry.py`, `steps.py`, `movement-modules.v1.json` | `tests/test_movement_modules.py` |
 | Walking | `exulanica/movement/walking.py` | `tests/test_movement_modules.py`, the society replay pins above, `tests/test_society_living_crossings_unchanged.py` |
 | Air, grid, perches | `exulanica/movement/air.py`, `fixed.py` | `tests/test_flight.py` |
-| Flight step, choices, episodes | `exulanica/movement/flight.py` | `tests/test_flight.py` |
-| Independent check | `exulanica/movement/flight_checks.py` | `tests/test_flight.py` (with planted violations, and the moves that join one window to the next) |
+| Flight step, choices, episodes, search bounds | `exulanica/movement/flight.py` | `tests/test_flight.py`, `tests/test_flight_search_bounds.py` |
+| Episodes and their worker | `exulanica/movement/flight_episodes.py`, `exulanica/world/flight_worker.py` | `tests/test_flight_worker.py` (a real worker process, killed), `tests/test_world_flight_api.py` |
+| Independent check | `exulanica/world/flight_checks.py` | `tests/test_flight_checks.py` (positive controls, the moves that join one window to the next, a placement error planted in the flight's composer, the rule that it imports nothing of the flight, and the two placements' parity) |
 | Flight kinds, assets | `exulanica/world/flight_kinds.py`, migration 0114 | `tests/test_flight_kinds.py`, `tests/test_reviewed_asset_placeability.py` |
 | Perches and hosts | `exulanica/world/object_catalog.py`, `world-object.v3.json` | `tests/test_world_object_perches.py` |
 | Composition, route | `exulanica/world/flight_input.py`, `exulanica/api/routes/world_flight.py` | `tests/test_world_flight_api.py` |
 | Page and renderer | `web/packages/app/src/flight-api.ts`, `composition/saved-world-flight.ts`, `web/packages/atlas-react/src/playcanvas/flight/` | `flight-api.test.ts`, `saved-world-flight.test.ts`, `environment-selection-flight.test.ts`, `flight-flock.test.ts`, `authored-society-flight-assets.test.ts` |
-| Measurement | `scripts/measure_flight_bounds.py` | `tests/test_flight_bounds_record.py` |
+| Measurement | `scripts/measure_flight_bounds.py` | `tests/test_flight_bounds_record.py`, `tests/test_flight_worker_record.py` |
 
 The first flight bounds registration
 ([pre-registration](evaluation/2026-09-25-flight-bounds-preregistration.json),
@@ -325,10 +379,46 @@ microseconds of main-thread work at the 95th percentile. Its request cost is pro
 flight module alone, the median of five in one run that began at a one-minute load of 8.3: composing
 the air took 3.6 ms for the eight trees and 9.6 ms for the cluttered square; a cold window from the
 step before an episode ends 518 and 549 ms; a cold window from an episode's first step 93 and 95 ms;
-a window resumed from the one before 102 and 92 ms. Only cold windows were judged; a page reads
-resumed ones, which tests hold equal to the cold.
+a window resumed from the one before 102 and 92 ms. Only cold windows were judged.
 
-The checker is independent of the steering and the guard, not of where parts are placed. Its body
-rule and its own-cells rule bound each part with `air._solid_bounds`, the function that also marks
-the grid the flight steps in, and `entered_solid_cell` reads that grid itself. A catalog part placed
-wrongly would be wrong in both, and neither record could see it.
+Those two records' checker was independent of the steering and the guard, not of where parts are
+placed: it bounded each part with `air._solid_bounds`, the function that also marks the grid the
+flight steps in, and read that grid itself, so a catalog part placed wrongly would have been wrong in
+both. The independent checker ([`flight_checks.py`](../exulanica/world/flight_checks.py)) derives
+everything it checks on its own, from the catalogs and the placed objects: each part's box is the
+extent of the triangles the renderer draws for it, turned by the object's yaw with the checker's own
+trigonometry, scaled, placed and rounded outward; each perch is the catalog's point placed the same
+way, a perching flyer compared with it within the millimetre the flight rounds to; its grid and cell
+lookup are its own; each kind's figures are read from the flight kind catalog's file. It imports
+nothing of the flight's air, arithmetic, step, episodes or composer, which a test holds. With the
+flight's composer made to ignore each object's yaw, the flight composes, flies and agrees with
+itself, and the checker names birds at home on perches no tree declares
+(`tests/test_flight_checks.py`). Judged again by it, record B's twelve seeds show no violation and
+every flyer home at every episode's end, and this flight, served from its worker process, serves
+exactly the windows record B judged in all 48 runs
+([record](evaluation/2026-09-26-flight-independent-check.json)). Record B's seeds were spent, so that
+is a re-judgment, not a held-out test.
+
+The flight worker registration
+([pre-registration](evaluation/2026-09-26-flight-worker-preregistration.json),
+[record](evaluation/2026-09-26-flight-worker.json)) judged the flight served from its worker on 12
+seeds no run had used before it, 30 simulated minutes each in the same four worlds. The independent
+checker named no violation, every flyer was home at every episode's end, and every window the
+worker served equalled the one computed in the measuring process. No flyer searched for its route
+home more than twice in an episode and no search took more than 93 entries off its queue, so the
+search bounds changed no flight there. It failed its timing rule: beside a cold read of 24 flyers,
+the slowest health answer took 2.2 to 4.3 ms in four runs and 30.9 ms in one, over the rule's
+25 ms. Its measuring script parsed each answer in the process that timed the health requests, as
+the answer arrived; a second registration with that fixed and the answer encoded one flyer to an
+encoder call ([pre-registration](evaluation/2026-09-26-flight-worker-v2-preregistration.json),
+[record](evaluation/2026-09-26-flight-worker-v2.json)) failed the same way, 2.7 to 8.0 ms in four
+runs and 30.9 ms in one. That pause is inferred, not measured per run, to be the server's full
+garbage collection: the two runs' pauses agree to 6 microseconds, main's release server showed a
+31.2 ms health answer with no flight read beside it, and the third registration
+([pre-registration](evaluation/2026-09-26-flight-worker-v3-preregistration.json),
+[record](evaluation/2026-09-26-flight-worker-v3.json)), with what startup made frozen, passed: 2.9 to
+7.7 ms in all five runs. The search bounds' cost was timed beside it: bounded, a search that finds no
+route on the largest grid the module admits ends in 12 to 22 ms; unbounded it took 424 to 444 ms.
+All three timing records say a run was discarded below 50 percent mean idle; their scripts discarded
+nothing, and no run fell below it: seven runs, 59.3 to 77.4 percent mean idle
+([erratum](evaluation/2026-09-26-flight-worker-erratum.json)).

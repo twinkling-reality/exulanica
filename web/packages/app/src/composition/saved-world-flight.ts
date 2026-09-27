@@ -1,16 +1,29 @@
 /**
- * Keep a saved world's flight drawn: read its windows ahead of the page's clock and hand them to
+ * Keep a saved world's flight drawn: read its windows ahead of the flight's clock and hand them to
  * the renderer, which draws them and computes nothing.
  *
- * The first window starts the flight's page clock at step 0 (`FlightFlock`). While the world is
- * open, a window is read whenever less than `AHEAD_MS` of served steps is left ahead of the clock,
- * and each kind's reviewed body and wing are fetched once, digest-verified, before its flyers are
- * drawn. A window whose input digest differs from the one being drawn is a changed world, an edit
- * made since the last window, and its flight is drawn from its own first step again.
+ * The flight keeps shared real time. The first read names no step: the server answers from its
+ * clock's step and says where its clock was, and the page's copy of the clock starts there
+ * (`FlightFlock`), so every page shows a world's birds in the same places at the same moment. While
+ * the world is open, a window is read whenever less than `AHEAD_MS` of served steps is left ahead
+ * of the clock, from where the served steps end, or from the clock when it has passed them (a page
+ * left in the background); each kind's reviewed body and wing are fetched once, digest-verified,
+ * before its flyers are drawn. A window whose input digest differs from the one being drawn is a
+ * changed world, and its flight is drawn from the clock again.
+ *
+ * The page's clock follows the served one: every window it reads sets the page's clock again when
+ * the two have drifted apart, and a read the server refuses as too far from its clock
+ * (`flight_step_out_of_range`), as after a sleep that stopped the page's own clock, is read again
+ * from the clock rather than taken as a refusal.
+ *
+ * An edit made on this page restarts the flight at once: a read in flight is aborted, and an answer
+ * that arrives from before the edit is never drawn; the flyers are not drawn until the edited
+ * world's first window arrives, because the old flight may cross whatever the edit put in its way.
  *
  * A kind whose parts are not in storage is named in the status and not drawn; nothing stands in
  * for it. A refusal the server will keep giving for this world as it stands (a 409: too many flyers,
- * a world it cannot place or too large to fly over; a 422: a window it will not serve) or an answer
+ * a world it cannot place or too large to fly over; a 422: a window it will not serve, other than
+ * one too far from the flight's clock, which is read again from the clock) or an answer
  * this client cannot read stops the reading until the world is edited, and the status names it in
  * words a person reads. Any other failure, among them a lapsed sign-in the page's session renews
  * (401), too many requests (429) and a server failure (5xx), is tried again later and later, up to
@@ -65,7 +78,7 @@ const REFUSAL_WORDS: Readonly<Record<string, string>> = {
   invalid_flight_kind: 'a kind of flyer is not stated correctly in its catalog',
   invalid_flight_input: "the server could not put this world's flight together",
   flight_state_mismatch: "the server could not put this world's flight together",
-  flight_step_out_of_range: 'this page has shown a whole day of flight; open the world again to start it over',
+  flight_step_out_of_range: "this page asked for flight too far from the present moment; open the world again",
   flight_window_too_long: 'this page asked for more flight at once than the server serves',
 };
 
@@ -97,7 +110,7 @@ export interface SavedWorldFlight {
   start(): Promise<void>;
   /** Read the next window if one is due. Called on the poll, and by a test directly. */
   poll(): Promise<void>;
-  /** The world was edited: draw its flight from its own first step again. */
+  /** The world was edited: abort any read, draw none of the old flight, read the new one now. */
   restart(): Promise<void>;
   stop(): void;
   readonly status: SavedWorldFlightStatus;
@@ -116,8 +129,10 @@ export function createSavedWorldFlight(deps: SavedWorldFlightDeps): SavedWorldFl
   /** The step length of the flight being drawn, in milliseconds, from its latest window. */
   let stepMs = 0;
   let timer: ReturnType<typeof globalThis.setInterval> | null = null;
-  let reading = false;
-  let restartWanted = false;
+  /** Counts the edits this page has made; a read begun before the latest one is stale. */
+  let epoch = 0;
+  /** The read in flight, the edit count it began under, and what aborts it. */
+  let inFlight: { readonly epoch: number; readonly abort: AbortController } | null = null;
   let stopped = false;
   /** Set by a refusal the server will keep giving: nothing is read again until an edit. */
   let refused = false;
@@ -196,20 +211,34 @@ export function createSavedWorldFlight(deps: SavedWorldFlightDeps): SavedWorldFl
     }
   }
 
-  async function read(fromStep: number): Promise<void> {
-    const answer = await client.window(deps.versionId, fromStep, WINDOW_STEPS);
-    if (stopped) return;
+  /** Whether a read is not to be drawn: the page stopped, or an edit came after the read began. */
+  function stale(mine: { readonly epoch: number }): boolean {
+    return stopped || mine.epoch !== epoch;
+  }
+
+  async function read(fromStep: number | null, mine: { readonly epoch: number; readonly abort: AbortController }): Promise<void> {
+    let answer: FlightRead;
+    try {
+      answer = await client.window(deps.versionId, fromStep, WINDOW_STEPS, mine.abort.signal);
+    } catch (error) {
+      // A step too far from the flight's clock: the page's own clock stopped, as in a sleep, while
+      // the shared one did not. Read from the clock; the answer sets the page's clock again.
+      if (fromStep === null || !(error instanceof ApiError) || error.code !== 'flight_step_out_of_range') throw error;
+      await read(null, mine);
+      return;
+    }
+    if (stale(mine)) return;
     const society = deps.binding()?.authoredSociety ?? null;
     if (society === null) return;
-    if (drawing !== null && answer.window.inputSha256 !== drawing && fromStep !== 0) {
-      // The world changed since the last window: draw its new flight from its own first step.
+    if (drawing !== null && answer.window.inputSha256 !== drawing && fromStep !== null) {
+      // The world changed since the last window: draw its new flight from the clock.
       drawing = null;
       society.clearFlight();
-      await read(0);
+      await read(null, mine);
       return;
     }
     await load(answer);
-    if (stopped) return;
+    if (stale(mine)) return;
     society.setFlight(answer.window, now());
     drawing = answer.window.inputSha256;
     stepMs = answer.window.stepMs;
@@ -219,26 +248,22 @@ export function createSavedWorldFlight(deps: SavedWorldFlightDeps): SavedWorldFl
   }
 
   async function poll(): Promise<void> {
-    if (stopped || reading) return;
+    if (stopped || (inFlight !== null && inFlight.epoch === epoch)) return;
     const society = deps.binding()?.authoredSociety ?? null;
     if (society === null) return;
-    if (restartWanted) {
-      restartWanted = false;
-      refused = false;
-      backoffMs = 0;
-      drawing = null;
-      society.clearFlight();
-    }
     if (refused || now() < retryAtMs) return;
     const next = society.flightNextStep;
     const at = society.flightStepAt(now());
     // A window is due when less than AHEAD_MS of served steps is left ahead of the clock.
     if (drawing !== null && next !== null && at !== null && (next - at) * stepMs >= AHEAD_MS) return;
-    reading = true;
+    // From where the served steps end, unless the clock has passed them: then from the clock.
+    const from = drawing === null || next === null || at === null || next < Math.floor(at) ? null : next;
+    const mine = { epoch, abort: new AbortController() };
+    inFlight = mine;
     try {
-      await read(drawing === null || next === null ? 0 : next);
+      await read(from, mine);
     } catch (error) {
-      if (!stopped) {
+      if (!stale(mine)) {
         const message = error instanceof ApiError ? error.code : error instanceof Error ? error.message : String(error);
         if (lasting(error)) {
           refused = true;
@@ -250,7 +275,7 @@ export function createSavedWorldFlight(deps: SavedWorldFlightDeps): SavedWorldFl
         }
       }
     } finally {
-      reading = false;
+      if (inFlight === mine) inFlight = null;
     }
   }
 
@@ -261,11 +286,21 @@ export function createSavedWorldFlight(deps: SavedWorldFlightDeps): SavedWorldFl
     },
     poll,
     async restart(): Promise<void> {
-      restartWanted = true;
+      // Whatever was being read describes the world before the edit: abort it, draw nothing of
+      // the old flight, and read the edited world's flight from the clock now.
+      epoch += 1;
+      inFlight?.abort.abort();
+      inFlight = null;
+      refused = false;
+      backoffMs = 0;
+      retryAtMs = 0;
+      drawing = null;
+      deps.binding()?.authoredSociety?.clearFlight();
       await poll();
     },
     stop(): void {
       stopped = true;
+      inFlight?.abort.abort();
       abort.abort();
       if (timer !== null) clearTimer(timer);
       timer = null;

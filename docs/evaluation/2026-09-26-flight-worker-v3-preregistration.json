@@ -1,0 +1,158 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "answers": {
+   "path": "docs/evaluation/2026-09-26-flight-worker-v2.json",
+   "record_sha256": "8e69f12bd2e19f1dc97645890905c4a3d71c8940193643a8f9bb5376a0d261bb"
+  },
+  "artifacts": {
+   "directory": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration",
+   "files": [
+    {
+     "byte_size": 7561,
+     "is": "the measurement of what one cold flight read does to the health requests beside it",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/measure_request_blocking.py.txt",
+     "sha256": "7a4426aebc1a9f7d3b55b98c0f644cff8dc0e62cf30f2bbe944a389d030215a6"
+    },
+    {
+     "byte_size": 5146,
+     "is": "the measurement of the worker's spawn, its cold episodes and a capped search",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/measure_worker_costs.py.txt",
+     "sha256": "343b95aaca2dc0fe279519e462bbde8ebe3305983703486ff5305b5dc7bab690"
+    },
+    {
+     "byte_size": 2889,
+     "is": "the idle gate every timed run passes through",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/gate.py.txt",
+     "sha256": "9bac3b50d4fd7fcb8939d9d5e83238144cff1dfebb9b6027d4f49fd7da961d65"
+    },
+    {
+     "byte_size": 1761,
+     "is": "the driver that will run each arm's timing",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/run_timing_d.sh.txt",
+     "sha256": "f16faaf1ad0682ffec2dff66663e67fea824136c73b45c25b119711dc2bcf814"
+    },
+    {
+     "byte_size": 16096,
+     "is": "the setup of the after arm's world through the page's routes (the square and seven more trees, 24 flyers); its flight read names no step, as the shared clock asks",
+     "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/measure_flight_frames.mjs.txt",
+     "sha256": "b92d08639c096ceb9a89fac7fb4bff6809df70b02b192edcc282c0c799ca7dd4"
+    }
+   ]
+  },
+  "earlier_measurements": [
+   {
+    "what": "the first two flight worker registrations, judged: docs/evaluation/2026-09-26-flight-worker.json and docs/evaluation/2026-09-26-flight-worker-v2.json, each FAILED on this rule by one of five runs at 30.9 ms",
+    "why": "this registration asks their timing question again"
+   },
+   {
+    "what": "development measurements: GET /healthz every 2 ms for 60 s on this lane's release server with no flight read (16,888 answers, p99 3.0 ms, maximum 21.2 ms); a full garbage collection in a process that imports the API, 33 to 36 ms over about 172,000 tracked objects, and about 0 ms after they are frozen",
+    "why": "to find the 30.9 ms pause both records met"
+   },
+   {
+    "what": "the API process's resident memory 10 s after startup on this lane's release server, as ps reports it, three starts without the freeze (189,008 to 203,392 KiB) and three with it (184,464 to 203,056 KiB)",
+    "why": "to state what the freeze costs"
+   }
+  ],
+  "judged": [
+   {
+    "id": "health-beside-a-cold-read",
+    "limit_us": 25000,
+    "rule": "On this lane's release server (a production build on slot 3 with a new synthetic workspace, the small square and seven more trees, 24 flyers), inside quiet-slot then gpu-slot behind the idle gate, in each of five runs, each after an edit so the flight read is cold, the slowest GET /healthz answer beside the cold flight read takes at most 25000 us."
+   }
+  ],
+  "profile": "exulanica.flight-worker/v3/preregistration",
+  "question": "With what the server's startup made collected once and frozen, so a full garbage collection no longer walks it, does the server leave its other requests unslowed while a cold flight read is computed, by the rule the first two flight worker registrations judged?",
+  "reported": [
+   {
+    "id": "same-window-again",
+    "what": "Each run's second read of the window it just read, as a page reading ahead finds it. No target."
+   },
+   {
+    "id": "worker-costs",
+    "what": "The worker's spawn, cold episodes and a capped search, as the first registration measured them. No target."
+   },
+   {
+    "id": "request-blocking-before",
+    "what": "Not run again: the first registration's before arm, on main's release server, is the comparison."
+   },
+   {
+    "id": "startup-memory",
+    "what": "The API process's resident memory 10 s after startup, three starts each without and with the freeze, measured before this registration and bound by the record."
+   }
+  ],
+  "tree": {
+   "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+   "tracked_diff_bytes": 148653,
+   "tracked_diff_sha256": "3aa04116a676c522cb6f10f61df426f08bcf157a4e0ede89fba4dc867adb2b9d",
+   "untracked": [
+    "docs/evaluation/2026-09-26-flight-independent-check.json",
+    "docs/evaluation/2026-09-26-flight-worker-preregistration.json",
+    "docs/evaluation/2026-09-26-flight-worker-v2-preregistration.json",
+    "docs/evaluation/2026-09-26-flight-worker-v2.json",
+    "docs/evaluation/2026-09-26-flight-worker.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/as-run.sha256",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/runs/judged-2-worker.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/runs/run.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/flight_checks.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/measure_flight_bounds.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/write_record_c.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/gate.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_flight_bounds.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_flight_frames.mjs.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_request_blocking.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/measure_worker_costs.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-preregistration/run_timing_d.sh.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/gate.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/measure_flight_frames.mjs.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/measure_request_blocking.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/measure_worker_costs.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2-preregistration/run_timing_d.sh.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/scripts/write_record_e.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/gates.jsonl",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/idle-20260926T222012-27600.jsonl",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/idle-20260926T222111-33724.jsonl",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/request-blocking-after.attempt-1.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/request-blocking-after.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/setup-trees-after.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/setup-trees-after.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/worker-costs.attempt-1.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker-v2/timing/worker-costs.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/runs/as-run.sha256",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/runs/judged-bounds.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/runs/run.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/scripts/write_record_d.py.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-1-worker-costs.attempt-1.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-1-worker-costs.attempt-2.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-1-worker-costs.attempt-3.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-2-worker-costs.attempt-1.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-2-worker-costs.attempt-2.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/driver-2-worker-costs.attempt-3.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/gates.jsonl",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/idle-20260926T193852-81396.jsonl",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/idle-20260926T194429-52100.jsonl",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/idle-20260926T201133-11318.jsonl",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-after.attempt-1.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-after.attempt-2.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-after.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-before.attempt-1.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/request-blocking-before.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/setup-trees-after.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/setup-trees-after.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/setup-trees-before.json",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/setup-trees-before.log.txt",
+    "docs/evaluation/artifacts/2026-09-26-flight-worker/timing/worker-costs.json",
+    "exulanica/movement/flight_episodes.py",
+    "exulanica/world/flight_checks.py",
+    "exulanica/world/flight_worker.py",
+    "tests/test_flight_checks.py",
+    "tests/test_flight_search_bounds.py",
+    "tests/test_flight_worker.py",
+    "tests/test_flight_worker_record.py"
+   ]
+  },
+  "written_at": "2026-09-27T02:35:08+00:00",
+  "written_before_any_judged_run": true
+ },
+ "record_sha256": "71aab24e99db86c4627770cb362949e25a3867ecbc74ce8d21fed7b1012f277e"
+}

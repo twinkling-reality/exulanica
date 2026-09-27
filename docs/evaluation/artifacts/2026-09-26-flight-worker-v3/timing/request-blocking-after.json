@@ -1,0 +1,124 @@
+{
+ "profile": "exulanica.flight-worker/v1/request-blocking",
+ "arm": "after",
+ "interval_ms": 20,
+ "load_1min_before_milli": 7545,
+ "idle_during_mean_tenths_percent": 652,
+ "runs": [
+  {
+   "flight_status": 200,
+   "flight_us": 605246,
+   "from_step": 17904766891,
+   "flyers": 24,
+   "input_sha256": "7b474eea1eaaca398c68d1cfb466728de2ceaed77ec10688d0eb15f0204a7c30",
+   "same_window_again": {
+    "status": 200,
+    "us": 18931
+   },
+   "health_alone": {
+    "count": 50,
+    "p50_us": 1656,
+    "p95_us": 2108,
+    "max_us": 2303
+   },
+   "health_beside_the_flight": {
+    "count": 26,
+    "p50_us": 1608,
+    "p95_us": 2439,
+    "max_us": 2915
+   }
+  },
+  {
+   "flight_status": 200,
+   "flight_us": 589043,
+   "from_step": 17904766910,
+   "flyers": 24,
+   "input_sha256": "154836bdbf9f06344998dec1a30b45687e3c94e965376605c251c6f45aaddb2f",
+   "same_window_again": {
+    "status": 200,
+    "us": 17464
+   },
+   "health_alone": {
+    "count": 50,
+    "p50_us": 1666,
+    "p95_us": 2484,
+    "max_us": 2757
+   },
+   "health_beside_the_flight": {
+    "count": 25,
+    "p50_us": 1559,
+    "p95_us": 2249,
+    "max_us": 3770
+   }
+  },
+  {
+   "flight_status": 200,
+   "flight_us": 582838,
+   "from_step": 17904766929,
+   "flyers": 24,
+   "input_sha256": "887de55fea8470c31cbe9ea66cd05081396e7edf79ea79f80153bc643ea8a431",
+   "same_window_again": {
+    "status": 200,
+    "us": 16724
+   },
+   "health_alone": {
+    "count": 50,
+    "p50_us": 1527,
+    "p95_us": 2133,
+    "max_us": 2382
+   },
+   "health_beside_the_flight": {
+    "count": 24,
+    "p50_us": 1509,
+    "p95_us": 3009,
+    "max_us": 7696
+   }
+  },
+  {
+   "flight_status": 200,
+   "flight_us": 615416,
+   "from_step": 17904766948,
+   "flyers": 24,
+   "input_sha256": "50a921b4fb6883676c25f3195b3c84bf34cc4024c94de895f324f280450e1ac4",
+   "same_window_again": {
+    "status": 200,
+    "us": 17071
+   },
+   "health_alone": {
+    "count": 50,
+    "p50_us": 1574,
+    "p95_us": 2094,
+    "max_us": 2403
+   },
+   "health_beside_the_flight": {
+    "count": 26,
+    "p50_us": 1930,
+    "p95_us": 3058,
+    "max_us": 3248
+   }
+  },
+  {
+   "flight_status": 200,
+   "flight_us": 598106,
+   "from_step": 17904766967,
+   "flyers": 24,
+   "input_sha256": "61760897f3f2459c03f892d89e2c06451f68008a1161599b3a53c56b42ccf268",
+   "same_window_again": {
+    "status": 200,
+    "us": 15603
+   },
+   "health_alone": {
+    "count": 50,
+    "p50_us": 1739,
+    "p95_us": 2026,
+    "max_us": 2129
+   },
+   "health_beside_the_flight": {
+    "count": 25,
+    "p50_us": 1870,
+    "p95_us": 2352,
+    "max_us": 2983
+   }
+  }
+ ]
+}

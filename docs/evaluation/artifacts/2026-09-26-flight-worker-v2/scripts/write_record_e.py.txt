@@ -1,0 +1,195 @@
+"""Write the second flight worker timing record: the health rule on the per-flyer encoding build.
+
+    uv run python .exulanica/lane-movement3/evidence/write_record_e.py --runs DIR --after-state FILE
+
+DIR holds ``timing/``: the request blocking run, the worker's costs, the gate's ledger and idle
+samples, the world's setup and each attempt's console. The state file is the launcher's, read for
+the tree and build that ran. Every outcome is computed from the files; nothing is typed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.evaluation.visual_gate import digest_bound  # noqa: E402
+
+NAME = "2026-09-26-flight-worker-v2"
+RECORD = ROOT / "docs" / "evaluation" / f"{NAME}.json"
+ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / NAME
+PREREGISTRATION = ROOT / "docs" / "evaluation" / f"{NAME}-preregistration.json"
+FIRST = ROOT / "docs" / "evaluation" / "2026-09-26-flight-worker.json"
+HERE = Path(__file__).resolve()
+
+
+def _forbidden() -> tuple[str, ...]:
+    """Text no bound file may hold, each fragment built here so this file's own copy holds none."""
+    home = Path.home()
+    slash = "/"
+    return (
+        str(home),
+        home.name,
+        slash + "Users" + slash,
+        slash + "private" + slash,
+        slash + "var" + slash + "folders",
+        "Bearer" + " ",
+        "api" + "-token",
+        chr(0x2014),
+    )
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _git(*arguments: str) -> bytes:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *arguments], capture_output=True, check=True
+    ).stdout
+
+
+class Binder:
+    def __init__(self) -> None:
+        self.bound: dict[str, dict[str, Any]] = {}
+        self.notes: dict[str, str] = {}
+
+    def bind(self, name: str, data: bytes, note: str) -> None:
+        text = data.decode("utf-8")
+        found = [fragment for fragment in _forbidden() if fragment in text]
+        if found:
+            raise SystemExit(f"{name} holds text no record may bind ({len(found)} kind(s))")
+        target = ARTIFACTS / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        self.bound[name] = {
+            "path": f"docs/evaluation/artifacts/{NAME}/{name}",
+            "byte_size": len(data),
+            "sha256": _sha(data),
+        }
+        self.notes[name] = note
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--runs", required=True)
+    parser.add_argument("--after-state", required=True)
+    arguments = parser.parse_args()
+    timing = Path(arguments.runs).resolve() / "timing"
+    if RECORD.exists() or ARTIFACTS.exists():
+        raise SystemExit(f"{RECORD.name} or its artifacts exist; a record is written once")
+    envelope = json.loads(PREREGISTRATION.read_text(encoding="utf-8"))
+    pre = envelope["record"]
+    assert envelope["record_sha256"] == _sha(canonical_json(pre)), "the pre-registration moved"
+    scripts = {}
+    for entry in pre["artifacts"]["files"]:
+        scripts[Path(entry["path"]).name] = {"path": entry["path"], "sha256": entry["sha256"]}
+        assert _sha((ROOT / entry["path"]).read_bytes()) == entry["sha256"], entry["path"]
+    after = json.loads((timing / "request-blocking-after.json").read_text(encoding="utf-8"))
+    costs = json.loads((timing / "worker-costs.json").read_text(encoding="utf-8"))
+    costs["milliseconds"] = round(costs.pop("seconds") * 1000)
+    ledger = [json.loads(line) for line in (timing / "gates.jsonl").read_text().splitlines()]
+    first_run = min(row["at"] for row in ledger if "at" in row)
+    [rule] = pre["judged"]
+    limit = rule["limit_us"]
+    slowest = [row["health_beside_the_flight"]["max_us"] for row in after["runs"]]
+    answered = [row["flight_status"] == 200 for row in after["runs"]]
+    judged = [
+        {
+            "id": rule["id"],
+            "rule": rule["rule"],
+            "measured": {
+                "slowest_health_beside_each_cold_read_us": slowest,
+                "limit_us": limit,
+                "runs": len(after["runs"]),
+                "flight_reads_answered": sum(answered),
+            },
+            "outcome": "passed"
+            if len(after["runs"]) == 5 and all(answered) and max(slowest) <= limit
+            else "failed",
+        }
+    ]
+    verdict = "PASSED" if judged[0]["outcome"] == "passed" else "FAILED"
+    binder = Binder()
+    for path in sorted(timing.iterdir()):
+        if path.suffix == ".json" or path.name.endswith(".jsonl"):
+            binder.bind(f"timing/{path.name}", path.read_bytes(), "a timing run's output or the gate's")
+        elif path.suffix == ".log":
+            binder.bind(f"timing/{path.name}.txt", path.read_bytes(), "a timing run's console")
+    binder.bind("scripts/write_record_e.py.txt", HERE.read_bytes(), "this record's writer")
+    state = json.loads(Path(arguments.after_state).read_text(encoding="utf-8"))
+    first = json.loads(FIRST.read_text(encoding="utf-8"))
+    diff = _git("diff", "HEAD", "--binary")
+    record = {
+        "profile": "exulanica.flight-worker/v2",
+        "question": pre["question"],
+        "preregistration": {
+            "path": f"docs/evaluation/{PREREGISTRATION.name}",
+            "record_sha256": envelope["record_sha256"],
+        },
+        "answers": pre["answers"],
+        "scripts": scripts,
+        "first_timed_run_at": first_run,
+        "judged": judged,
+        "verdict": f"{verdict}. Five timed runs on the release server.",
+        "reported": {
+            "request-blocking-after": after,
+            "worker-costs": costs,
+            "request-blocking-before": {
+                "in": f"docs/evaluation/{FIRST.name}",
+                "record_sha256": first["record_sha256"],
+                "what": "main's release server at 465f2909, measured once for both registrations",
+            },
+        },
+        "release_build": {
+            "tree": state["tree"],
+            "mode": state["app"]["mode"],
+            "vite": state["app"]["build"]["vite"],
+            "index_html_sha256": state["app"]["build"]["index_html_sha256"],
+            "served_index_is_the_build": state["app"]["served_index_is_the_build"],
+        },
+        "changes_since_the_first_registration": [
+            "The route encodes its answer one flyer to an encoder call, so no call holds the "
+            "server's interpreter lock for more than one flyer's samples.",
+            "The measuring script keeps the flight's answer as bytes while the health requests "
+            "beside the read are timed and parses it after: the first registration's copy parsed "
+            "about 480 KB of JSON in the same process that timed the health requests, holding that "
+            "process's interpreter lock as the answer arrived, which a development diagnostic "
+            "found after that record was judged. Its outcome stands.",
+        ],
+        "execution": {
+            "machine": "Apple M5 Max, 18 cores, 64 GB, macOS 26.7",
+            "python": "CPython 3.11.6",
+            "timing": (
+                "the driver inside quiet-slot then gpu-slot; every run behind the idle gate: at "
+                "least 70 percent idle over 10 s before it, discarded below 50 percent mean idle "
+                "during it"
+            ),
+        },
+        "limits": [
+            "The request blocking runs time GET /healthz beside one flight read over the loopback; "
+            "a page's own requests were not timed.",
+            "The after arm reads at the shared clock and its worker computes one whole episode, "
+            "and queues the next; the before arm, in the first registration, read the window from "
+            "the step before an episode ends on main's page clock.",
+            "One machine, shared with other work: every run passed the idle gate.",
+        ],
+        "tree": {"head": _git("rev-parse", "HEAD").decode().strip(), "tracked_diff_sha256": _sha(diff)},
+        "bound_artifacts": binder.bound,
+        "artifact_notes": binder.notes,
+    }
+    out = digest_bound(record)
+    RECORD.write_bytes(json.dumps(out, indent=1, sort_keys=True).encode() + b"\n")
+    print(RECORD.relative_to(ROOT), out["record_sha256"], verdict)
+
+
+if __name__ == "__main__":
+    main()

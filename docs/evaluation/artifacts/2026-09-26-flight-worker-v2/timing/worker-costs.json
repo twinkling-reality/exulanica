@@ -1,0 +1,84 @@
+{
+ "profile": "exulanica.flight-worker/v1/costs",
+ "load_1min_before_milli": 14382,
+ "spawn_wall_us": {
+  "values": [
+   267408,
+   267751,
+   269633,
+   269639,
+   278795
+  ],
+  "median": 269633,
+  "max": 278795
+ },
+ "cold_episode_wall_us": {
+  "eight_trees": {
+   "flyers": 24,
+   "values": [
+    686030,
+    1148033,
+    1203119,
+    1255742,
+    1326233
+   ],
+   "median": 1203119,
+   "max": 1326233
+  },
+  "cluttered": {
+   "flyers": 24,
+   "values": [
+    931535,
+    1164575,
+    1182782,
+    1249996,
+    1322255
+   ],
+   "median": 1182782,
+   "max": 1322255
+  }
+ },
+ "capped_search": {
+  "grid_cells": 259584,
+  "route_cells": 4096,
+  "route_searches": 3,
+  "bounded_process_us": {
+   "values": [
+    12259,
+    12273,
+    12276,
+    12379,
+    12381,
+    12430,
+    12480,
+    12507,
+    12514,
+    12522,
+    12541,
+    12559,
+    12579,
+    12690,
+    12766,
+    13002,
+    13084,
+    13381,
+    13462,
+    23161
+   ],
+   "median": 12541,
+   "max": 23161
+  },
+  "unbounded_process_us": {
+   "values": [
+    383818,
+    387033,
+    387064,
+    388929,
+    390245
+   ],
+   "median": 387064,
+   "max": 390245
+  }
+ },
+ "seconds": 17.7
+}

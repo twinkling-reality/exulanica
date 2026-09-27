@@ -1,0 +1,207 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "answers": {
+   "path": "docs/evaluation/2026-09-25-flight-bounds-v2.json",
+   "record_sha256": "fe64414225227ad6266efb3f5321e08c53ad3ddd6323c5df3bccb7cf14260675"
+  },
+  "artifact_notes": {
+   "as-run.sha256": "the digests of the script, the checker and the flight's code as it ran",
+   "runs/judged-2-worker.json": "the run: record B's seeds, windows from the worker, the independent checker",
+   "runs/run.log.txt": "the run's console and exit",
+   "scripts/flight_checks.py.txt": "the independent checker as it ran",
+   "scripts/measure_flight_bounds.py.txt": "the measuring script as it ran",
+   "scripts/write_record_c.py.txt": "this record's writer"
+  },
+  "bound_artifacts": {
+   "as-run.sha256": {
+    "byte_size": 496,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-independent-check/as-run.sha256",
+    "sha256": "3c99387912053d81d04d1ae09435a075ab73157b9c76f472a0295450b2b2094e"
+   },
+   "runs/judged-2-worker.json": {
+    "byte_size": 35639,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-independent-check/runs/judged-2-worker.json",
+    "sha256": "713bdb92a979503b58c3bacc96de446c4f85f6eb5ebcf794c481ca3e2705e381"
+   },
+   "runs/run.log.txt": {
+    "byte_size": 7,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-independent-check/runs/run.log.txt",
+    "sha256": "28d3b9e880a77975493dc7e359144c0295a4f694cfe0af4f928c22307bc5c320"
+   },
+   "scripts/flight_checks.py.txt": {
+    "byte_size": 24970,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/flight_checks.py.txt",
+    "sha256": "bf8ff1b197ce7b5ad8288e7cc6a8c4da203c4bd19db7dd25b3a00382bf59ea13"
+   },
+   "scripts/measure_flight_bounds.py.txt": {
+    "byte_size": 20163,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/measure_flight_bounds.py.txt",
+    "sha256": "599c68892e9ee600cf21ce50ff1f9ad303c11aa2634807d71a1cd3ba177f7ca3"
+   },
+   "scripts/write_record_c.py.txt": {
+    "byte_size": 10845,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-independent-check/scripts/write_record_c.py.txt",
+    "sha256": "bf34da953896b0054eed2801c9a0c6c60020a443da60d9bbcc4e3067803c4a83"
+   }
+  },
+  "found": {
+   "cluttered": {
+    "episode_ends": 1728,
+    "finished_at": "2026-09-26T23:03:10+00:00",
+    "guard_interventions": 1974,
+    "not_home_at_an_episode_end": 0,
+    "route_queue_entries_most_taken_by_one_search": 108,
+    "route_searches": 1704,
+    "route_searches_most_by_one_flyer_in_an_episode": 2,
+    "route_searches_without_route": 0,
+    "seeds": 12,
+    "segments_checked": 5183712,
+    "started_at": "2026-09-26T23:00:52+00:00",
+    "violations_by_rule": {},
+    "windows_equal_to_record_b": 12,
+    "worker_windows_unequal_to_in_process": 0
+   },
+   "crowded_crowns": {
+    "episode_ends": 864,
+    "finished_at": "2026-09-26T23:00:52+00:00",
+    "guard_interventions": 48230,
+    "not_home_at_an_episode_end": 0,
+    "route_queue_entries_most_taken_by_one_search": 84,
+    "route_searches": 840,
+    "route_searches_most_by_one_flyer_in_an_episode": 1,
+    "route_searches_without_route": 0,
+    "seeds": 12,
+    "segments_checked": 2591856,
+    "started_at": "2026-09-26T22:58:46+00:00",
+    "violations_by_rule": {},
+    "windows_equal_to_record_b": 12,
+    "worker_windows_unequal_to_in_process": 0
+   },
+   "eight_trees": {
+    "episode_ends": 1728,
+    "finished_at": "2026-09-26T22:58:46+00:00",
+    "guard_interventions": 1241,
+    "not_home_at_an_episode_end": 0,
+    "route_queue_entries_most_taken_by_one_search": 74,
+    "route_searches": 1701,
+    "route_searches_most_by_one_flyer_in_an_episode": 1,
+    "route_searches_without_route": 0,
+    "seeds": 12,
+    "segments_checked": 5183712,
+    "started_at": "2026-09-26T22:57:08+00:00",
+    "violations_by_rule": {},
+    "windows_equal_to_record_b": 12,
+    "worker_windows_unequal_to_in_process": 0
+   },
+   "small_square": {
+    "episode_ends": 216,
+    "finished_at": "2026-09-26T22:57:08+00:00",
+    "guard_interventions": 62,
+    "not_home_at_an_episode_end": 0,
+    "route_queue_entries_most_taken_by_one_search": 48,
+    "route_searches": 198,
+    "route_searches_most_by_one_flyer_in_an_episode": 2,
+    "route_searches_without_route": 0,
+    "seeds": 12,
+    "segments_checked": 647964,
+    "started_at": "2026-09-26T22:56:55+00:00",
+    "violations_by_rule": {},
+    "windows_equal_to_record_b": 12,
+    "worker_windows_unequal_to_in_process": 0
+   }
+  },
+  "judged": [
+   {
+    "id": "no-violation",
+    "measured": {
+     "cluttered": {},
+     "crowded_crowns": {},
+     "eight_trees": {},
+     "small_square": {}
+    },
+    "outcome": "passed",
+    "rule": "Record B's rule, judged again by the independent checker: in every world and record B seed no violation of any rule other than homecoming."
+   },
+   {
+    "id": "every-flyer-home",
+    "measured": {
+     "cluttered": [
+      0,
+      1728,
+      0
+     ],
+     "crowded_crowns": [
+      0,
+      864,
+      0
+     ],
+     "eight_trees": [
+      0,
+      1728,
+      0
+     ],
+     "small_square": [
+      0,
+      216,
+      0
+     ]
+    },
+    "outcome": "passed",
+    "rule": "Record B's rule, judged again by the independent checker: every flyer home at every episode's last step, and every window naming exactly the flyers not home."
+   },
+   {
+    "id": "record-b-windows",
+    "measured": {
+     "equal_to_record_b": {
+      "cluttered": [
+       12,
+       12
+      ],
+      "crowded_crowns": [
+       12,
+       12
+      ],
+      "eight_trees": [
+       12,
+       12
+      ],
+      "small_square": [
+       12,
+       12
+      ]
+     },
+     "worker_unequal_to_in_process": {
+      "cluttered": 0,
+      "crowded_crowns": 0,
+      "eight_trees": 0,
+      "small_square": 0
+     }
+    },
+    "outcome": "passed",
+    "rule": "Every run's windows, served by this lane's worker process, have the digest record B's run recorded for the same world and seed, and each equals the window this process cut from the same episodes."
+   }
+  ],
+  "limits": [
+   "The checker takes the volume's bounds from the ground by the flight contract's rule and the module's cell size from the movement table; an error in either is shared.",
+   "A perch point is compared within a millimetre, the rounding the flight serves.",
+   "Queue entries taken by a search count every entry it took off its queue, stale ones included, so they are at least the cells it settled."
+  ],
+  "not_preregistered": "Record B's seeds are spent, so this is a re-judgment, not a held-out test; the flight worker registration judges fresh seeds.",
+  "profile": "exulanica.flight-checker/v1/rejudgment",
+  "question": "Judged again by a checker that places every part and perch on its own, from the catalogs and the placed objects, do record B's judged seeds still show every flyer clear of every part, in its bounds and home at every episode's end, and does this lane's flight, served from its worker process, serve exactly the windows record B judged?",
+  "run": {
+   "command": "uv run python scripts/measure_flight_bounds.py --seeds judged-2 --minutes 30 --worker --out FILE",
+   "finished_at": "2026-09-26T23:03:10Z",
+   "started_at": "2026-09-26T22:56:53Z"
+  },
+  "tree": {
+   "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+   "tracked_diff_bytes": 127093,
+   "tracked_diff_sha256": "ae624eadbe7897b0c0a5fbe40be8c915b7f55f245c110c99862a760cd2eb62e3"
+  },
+  "verdict": "PASSED. Record B's twelve seeds in its four worlds, 30 simulated minutes a seed.",
+  "why": "Record B's checker bounded each part with the flight's own air._solid_bounds and read the flight's own grid, so a part the flight placed wrongly would have been wrong in both. Its outcome stands; this judges the same seeds with a checker that shares none of the flight's placement."
+ },
+ "record_sha256": "34e272f37133fd49448b8bcfabc26e26edc84c1c5ebc522ff1f843962b228cce"
+}

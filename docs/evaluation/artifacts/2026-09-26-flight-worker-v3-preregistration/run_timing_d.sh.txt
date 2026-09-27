@@ -1,0 +1,46 @@
+#!/bin/bash
+# Lane V3 (movement3), flight worker registration: one arm's timing runs, each through the idle
+# gate. Run it inside quiet-slot then gpu-slot, so it holds both slots once:
+#
+#   quiet-slot gpu-slot bash run_timing_d.sh ARM CHECKOUT STATE_JSON SETUP_JSON OUT_DIR
+#
+# ARM is after (this lane's release server on the slot) or before (main's, at the commit the
+# pre-registration names). CHECKOUT is the checkout whose server runs.
+# 1. after only: the worker's costs in that checkout (spawn, cold episodes, capped search);
+# 2. what one cold flight read does to health requests beside it, five runs, on that server.
+# A run the gate refuses is tried again, at most three times; every attempt is a line in the
+# gate's ledger. A run refused three times stops the driver, so the slots are not held while the
+# machine stays busy.
+set -u
+here="$(cd "$(dirname "$0")" && pwd)"
+arm="$1"
+checkout="$2"
+state="$3"
+setup="$4"
+out="$5"
+mkdir -p "$out"
+ledger="$out/gates.jsonl"
+
+gated() {
+  local name="$1"
+  shift
+  local attempt=1
+  local code=0
+  while [ "$attempt" -le 3 ]; do
+    python3 "$here/gate.py" --ledger "$ledger" -- "$@" > "$out/$name.attempt-$attempt.log" 2>&1
+    code=$?
+    echo "$(date +%H:%M:%S) $name attempt $attempt exit $code"
+    [ "$code" -ne 75 ] && return "$code"
+    attempt=$((attempt + 1))
+  done
+  echo "$(date +%H:%M:%S) stopping: $name was refused three times"
+  exit 75
+}
+
+cd "$checkout" || exit 2
+if [ "$arm" = "after" ]; then
+  gated worker-costs uv run python "$here/measure_worker_costs.py" --out "$out/worker-costs.json"
+fi
+gated "request-blocking-$arm" python3 "$here/measure_request_blocking.py" --state "$state" \
+  --setup "$setup" --arm "$arm" --out "$out/request-blocking-$arm.json"
+echo "$(date +%H:%M:%S) done"

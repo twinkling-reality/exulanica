@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   FLIGHT_MODULE,
@@ -34,6 +34,7 @@ function answer(overrides: Record<string, unknown> = {}): Record<string, unknown
     step_ms: 100,
     episode_steps: 3000,
     from_step: 0,
+    clock_step: 1,
     steps: 2,
     states: [...FLIGHT_STATES],
     flyers: [{
@@ -97,6 +98,15 @@ describe('parseFlightRead', () => {
     expect(read.unplaced).toEqual([
       { objectId: 'tree-2', kind: 'small_bird', count: 3, reason: 'home_perch_unusable' },
     ]);
+    expect(read.window.clockStep).toBe(1);
+  });
+
+  it('reads the flyers the server names late, and refuses one named outside the window', () => {
+    const late = parseFlightRead(answer({ late_home: [{ step: 1, flyer_id: 'bird-1' }] }));
+    expect(late.window.lateHome).toEqual([{ step: 1, flyerId: 'bird-1' }]);
+    expect(late.lateHome).toBe(1);
+    expect(() => parseFlightRead(answer({ late_home: [{ step: 2, flyer_id: 'bird-1' }] })))
+      .toThrow('outside its window');
   });
 
   it.each([
@@ -104,6 +114,7 @@ describe('parseFlightRead', () => {
     ['a module it does not draw', { module: 'exulanica-movement/roads/v1' }, 'movement module'],
     ['states in another order', { states: ['flying', 'perching', 'taking_off', 'landing'] }, 'flight states'],
     ['a step count its samples do not fill', { steps: 3 }, 'flyer states'],
+    ['no reading of the shared clock', { clock_step: null }, 'clock step'],
   ])('refuses %s by name', (_what, overrides, message) => {
     expect(() => parseFlightRead(answer(overrides))).toThrow(FlightContractError);
     expect(() => parseFlightRead(answer(overrides))).toThrow(message);
@@ -132,5 +143,44 @@ describe('FlightClient', () => {
     expect(url.pathname).toBe('/world/versions/version-1/flight');
     expect(Object.fromEntries(url.searchParams)).toEqual({ world_id: 'world-1', from_step: '0', steps: '2' });
     await expect(client.window('version-2', 0, 2)).rejects.toThrow('another version or step');
+    // A read that names no step asks the server for the window at its clock.
+    await client.window('version-1', null, 2);
+    expect(Object.fromEntries(new URL(asked[2]!).searchParams)).toEqual({ world_id: 'world-1', steps: '2' });
+  });
+
+  it('stops listening to the client\'s signal when each read settles', async () => {
+    const fetch = async () => new Response(JSON.stringify(answer()), { status: 200, headers: { 'content-type': 'application/json' } });
+    const everything = new AbortController();
+    const added = vi.spyOn(everything.signal, 'addEventListener');
+    const removed = vi.spyOn(everything.signal, 'removeEventListener');
+    const client = new FlightClient({ baseUrl: 'http://api.test', token: 't', worldId: 'world-1', fetch, signal: everything.signal });
+    await client.window('version-1', 0, 2, new AbortController().signal);
+    await expect(client.window('version-2', 0, 2, new AbortController().signal)).rejects.toThrow('another version');
+    expect(added).toHaveBeenCalledTimes(2);
+    expect(removed.mock.calls.map((call) => call[1])).toEqual(added.mock.calls.map((call) => call[1]));
+  });
+
+  it('aborts a read in flight by its own signal, and every read in flight by the client\'s', async () => {
+    const seen: AbortSignal[] = [];
+    // A fetch that answers only when its signal aborts, as a read still in flight.
+    const fetch = (_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      const signal = init!.signal!;
+      seen.push(signal);
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+    const everything = new AbortController();
+    const client = new FlightClient({
+      baseUrl: 'http://api.test', token: 't', worldId: 'world-1', fetch, signal: everything.signal,
+    });
+    const one = new AbortController();
+    const first = client.window('version-1', 0, 2, one.signal);
+    const second = client.window('version-1', 0, 2, new AbortController().signal);
+    await Promise.resolve();
+    one.abort();
+    await expect(first).rejects.toBeDefined();
+    expect([seen[0]?.aborted, seen[1]?.aborted]).toEqual([true, false]);
+    everything.abort();
+    await expect(second).rejects.toBeDefined();
+    expect(seen[1]?.aborted).toBe(true);
   });
 });

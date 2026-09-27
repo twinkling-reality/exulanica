@@ -29,18 +29,20 @@ A flight is derived, never stored: the same version gives the same input and the
 Every flyer's identity derives from its world, its host object, its kind and its place among that
 object's flyers, so the same bird lives in the same tree from one version to the next. Composed
 inputs are kept in process by everything they are made from, so a page reading minute after minute
-composes its world's air once; the windows' resume states and the inputs are shared between
-request threads under a lock.
+composes its world's air once, and shared between request threads under a lock. Windows are cut
+from whole episodes a worker process computes (:mod:`exulanica.world.flight_worker`), never on
+a request's thread.
 """
 
 from __future__ import annotations
 
 import hashlib
 import threading
+import time
 import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
-from typing import Any, Final
+from typing import Any, Final, NamedTuple
 
 from exulanica.movement.air import (
     AirVolume,
@@ -58,15 +60,13 @@ from exulanica.movement.flight import (
     FlightInput,
     FlightRefused,
     Flyer,
-    advance_flight,
-    check_request,
+    clock_step,
     flight_input,
-    state_at,
-    window_from,
 )
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
 from exulanica.world.flight_kinds import FlightKindCatalog, flight_kind_catalog
+from exulanica.world.flight_worker import FlightEpisodes
 from exulanica.world.object_catalog import (
     MarkerRecipe,
     WorldObjectCatalog,
@@ -78,7 +78,11 @@ from exulanica.world.society_authored_ground import SocietyGround, read_authored
 
 __all__ = [
     "FLIGHT_NAMESPACE",
+    "SavedFlight",
+    "close_flight_worker",
     "compose_flight_input",
+    "flight_clock",
+    "flight_episodes",
     "saved_world_flight",
     "served_window",
 ]
@@ -320,13 +324,10 @@ def compose_flight_input(
 #: Composed inputs by everything they are made from, most recently used last.
 _INPUT_LIMIT: Final = 16
 _inputs: OrderedDict[tuple[Any, ...], FlightInput] = OrderedDict()
-#: The state each recent window ended on, by input digest and step, so a page asking for the
-#: next minute costs that minute and not the episode before it. Bounded, in process, and exact:
-#: a state here is the one :func:`state_at` would compute.
-_RESUME_LIMIT: Final = 64
-_resume: OrderedDict[tuple[str, int], dict[str, Any]] = OrderedDict()
-#: Request threads share both caches; each is read and written under this lock, never computed in.
+#: Request threads share the inputs; they are read and written under this lock, never composed in.
 _lock = threading.Lock()
+#: This server's episodes and the worker process computing them, which starts at the first read.
+_episodes = FlightEpisodes()
 
 
 def cached_input(key: tuple[Any, ...], compose: Callable[[], FlightInput]) -> FlightInput:
@@ -345,13 +346,22 @@ def cached_input(key: tuple[Any, ...], compose: Callable[[], FlightInput]) -> Fl
     return made
 
 
+class SavedFlight(NamedTuple):
+    """A saved world version's flight input, and the version's edit sequence it was composed at:
+    a later sequence's input replaces this one."""
+
+    flight: FlightInput
+    generation: int
+
+
 def saved_world_flight(
     repository: WorldObjectRepository,
     version_id: uuid.UUID,
     asset_keys: Mapping[str, str],
-) -> FlightInput:
+) -> SavedFlight:
     """The flight over a saved world version the repository's world holds, read as the society
-    reads it: the version, then the ground its source snapshot states.
+    reads it: the version, then the ground its source snapshot states, with the version's edit
+    sequence.
 
     The input is composed once for each version state, snapshot, registry and catalogs, and kept.
     An unknown version is ``UnknownWorldResource``; a ground the society has no rule for, or an
@@ -387,23 +397,38 @@ def saved_world_flight(
             world_id=repository.world_id, version=version, ground=ground, asset_keys=asset_keys
         )
 
-    return cached_input(key, compose)
+    return SavedFlight(cached_input(key, compose), version.edit_seq)
 
 
-def served_window(flight: FlightInput, from_step: int, steps: int) -> dict[str, Any]:
-    """:func:`exulanica.movement.flight.flight_window`, resuming from where a recent window ended.
+def _now_ms() -> int:
+    """This server's clock: milliseconds since the Unix epoch."""
+    return time.time_ns() // 1_000_000
 
-    A cold request computes from its episode's genesis, at most one episode of steps.
+
+def flight_clock() -> int:
+    """The flight's shared clock read now: the step every page showing a world is at."""
+    return clock_step(_now_ms())
+
+
+def flight_episodes() -> FlightEpisodes:
+    """This server's episodes and their worker."""
+    return _episodes
+
+
+def served_window(
+    flight: FlightInput, from_step: int, steps: int, *, generation: int | None = None
+) -> dict[str, Any]:
+    """:func:`exulanica.movement.flight.flight_window`'s window, cut from episodes the worker
+    process computes; the request's thread computes no step.
+
+    ``generation`` is the edit sequence of the version the input was composed from, so an input an
+    edit has replaced stops being computed (:meth:`FlightEpisodes.window`). Raises
+    :class:`exulanica.world.flight_worker.FlightWorkerUnavailable` when the worker has stopped or
+    does not finish in time.
     """
-    check_request(from_step, steps)
-    with _lock:
-        start = _resume.pop((flight.sha256, from_step), None)
-    if start is None:
-        start = state_at(flight, from_step)
-    window, last = window_from(flight, start, steps)
-    following = advance_flight(flight, last)
-    with _lock:
-        _resume[(flight.sha256, following["step"])] = following
-        while len(_resume) > _RESUME_LIMIT:
-            _resume.popitem(last=False)
-    return window
+    return _episodes.window(flight, from_step, steps, generation=generation)
+
+
+def close_flight_worker() -> None:
+    """Stop the worker process; the server's lifespan calls this as it ends."""
+    _episodes.close()

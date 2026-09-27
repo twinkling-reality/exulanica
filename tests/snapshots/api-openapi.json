@@ -10644,8 +10644,14 @@
       "in": "query",
       "required": false,
       "schema": {
-       "type": "integer",
-       "default": 0,
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
        "title": "From Step"
       }
      },

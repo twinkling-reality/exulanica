@@ -1,0 +1,17 @@
+{
+ "label": "without-freeze",
+ "starts": [
+  {
+   "api_rss_kib": 203392,
+   "tree": "8f92e8017678350d3bfa64a07df154393df2a48b7ad4f06cf16b209e7381ad11"
+  },
+  {
+   "api_rss_kib": 189008,
+   "tree": "8f92e8017678350d3bfa64a07df154393df2a48b7ad4f06cf16b209e7381ad11"
+  },
+  {
+   "api_rss_kib": 192336,
+   "tree": "8f92e8017678350d3bfa64a07df154393df2a48b7ad4f06cf16b209e7381ad11"
+  }
+ ]
+}

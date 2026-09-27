@@ -49,15 +49,23 @@ function flyer(id: string, steps: readonly Step[]): FlightSamples {
   };
 }
 
-function window(fromStep: number, flyers: readonly FlightSamples[], digest = 'a'.repeat(64)): FlightWindow {
+function window(
+  fromStep: number,
+  flyers: readonly FlightSamples[],
+  digest = 'a'.repeat(64),
+  lateHome: FlightWindow['lateHome'] = [],
+  clockStep = fromStep,
+): FlightWindow {
   return {
     inputSha256: digest,
+    clockStep,
     groundMm: 0,
     stepMs: 100,
     fromStep,
     steps: flyers[0] ? flyers[0].state.length : 0,
     states: STATES,
     flyers,
+    lateHome,
   };
 }
 
@@ -209,6 +217,91 @@ describe('FlightFlock across windows, under reduced motion and at rest', () => {
     // Past the last served step the flock holds still.
     clock = 10_000;
     expect(flock.animating).toBe(false);
+  });
+});
+
+describe('FlightFlock on the shared clock', () => {
+  // A window from step 100 that the server answered when its clock was at step 103: the page's
+  // copy of the clock starts at 103, where every other page showing the world is.
+  const steps: Step[] = Array.from({ length: 10 }, (_, index) => ({ p: [index * 100, 6_500, 0] as const }));
+
+  it('starts where the server\'s clock was when it answered, not at the window\'s first step', () => {
+    const { root } = setup();
+    const flock = new FlightFlock(root, () => 1_000);
+    flock.setKind(LOOK, parts);
+    flock.setWindow(window(100, [flyer('bird', steps)], 'a'.repeat(64), [], 103), 1_000);
+    expect(flock.stepAt(1_000)).toBe(103);
+    expect(flock.stepAt(1_250)).toBe(105.5);
+    flock.update(1_000);
+    const [bird] = flock.root.children as pc.Entity[];
+    expect(position(bird!)).toEqual([300, 6_500, 0]);
+  });
+
+  it('sets its clock again from a later window when the page\'s drifted, as after a sleep', () => {
+    const { root } = setup();
+    const flock = new FlightFlock(root, () => 0);
+    flock.setKind(LOOK, parts);
+    flock.setWindow(window(100, [flyer('bird', steps)], 'a'.repeat(64), [], 100), 0);
+    // A step off is the served step's rounding: the page keeps its own clock.
+    flock.setWindow(window(110, [flyer('bird', steps)], 'a'.repeat(64), [], 101), 0);
+    expect(flock.stepAt(0)).toBe(100);
+    // Ten minutes asleep: the page's clock stopped at 1 s, the served one went on.
+    flock.setWindow(window(6_110, [flyer('bird', steps)], 'a'.repeat(64), [], 6_110), 1_000);
+    expect(flock.stepAt(1_000)).toBe(6_110);
+    expect(flock.stepAt(1_500)).toBe(6_115);
+  });
+
+  it('under reduced motion stands every flyer still at the step the shared clock had reached', () => {
+    const { root } = setup();
+    const flock = new FlightFlock(root, () => 1_000);
+    flock.setKind(LOOK, parts);
+    flock.setWindow(window(100, [flyer('bird', steps)], 'a'.repeat(64), [], 103), 1_000);
+    flock.update(Number.MAX_SAFE_INTEGER);
+    const [bird] = flock.root.children as pc.Entity[];
+    expect(position(bird!)).toEqual([300, 6_500, 0]);
+    expect(flock.animating).toBe(false);
+  });
+});
+
+describe('FlightFlock and a flyer late home', () => {
+  // Step 2999 is an episode's last step and 3000 the next episode's first, where every flyer starts
+  // perching at home. A flyer not home at 2999 is named late there; the move to 3000 is no flight.
+  const away: Step = { p: [4_000, 6_500, 0] };
+  const home: Step = { p: [0, 5_650, -4_000], state: PERCHING };
+
+  function drawnAt(late: boolean, nowMs: number): number[] {
+    const { root } = setup();
+    const flock = new FlightFlock(root, () => nowMs);
+    flock.setKind(LOOK, parts);
+    const named = late ? [{ step: 2_999, flyerId: 'bird' }] : [];
+    flock.setWindow(window(2_999, [flyer('bird', [away])], 'a'.repeat(64), named), 0);
+    flock.setWindow(window(3_000, [flyer('bird', [home])]), 0);
+    flock.update(nowMs);
+    const [bird] = flock.root.children as pc.Entity[];
+    return position(bird!);
+  }
+
+  it('holds a flyer named late where its last step left it, then stands it at home', () => {
+    expect(drawnAt(true, 0)).toEqual([4_000, 6_500, 0]);
+    expect(drawnAt(true, 50)).toEqual([4_000, 6_500, 0]);
+    expect(drawnAt(true, 99)).toEqual([4_000, 6_500, 0]);
+    expect(drawnAt(true, 100)).toEqual([0, 5_650, -4_000]);
+  });
+
+  it('draws the same move along its segment when nobody names the flyer late', () => {
+    // The control: the same two samples are interpolated, so the hold above is the late rule's.
+    expect(drawnAt(false, 50)).toEqual([2_000, 6_075, -2_000]);
+  });
+
+  it('holds a late flyer under reduced motion too, at the step the clock had reached', () => {
+    const { root } = setup();
+    const flock = new FlightFlock(root, () => 50);
+    flock.setKind(LOOK, parts);
+    flock.setWindow(window(2_999, [flyer('bird', [away])], 'a'.repeat(64), [{ step: 2_999, flyerId: 'bird' }]), 0);
+    flock.setWindow(window(3_000, [flyer('bird', [home])]), 50);
+    flock.update(Number.MAX_SAFE_INTEGER);
+    const [bird] = flock.root.children as pc.Entity[];
+    expect(position(bird!)).toEqual([4_000, 6_500, 0]);
   });
 });
 

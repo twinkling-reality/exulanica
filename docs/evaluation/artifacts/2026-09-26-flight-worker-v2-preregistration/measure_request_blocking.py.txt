@@ -1,0 +1,182 @@
+"""What one cold flight read does to the requests beside it, on a running server.
+
+    python3 measure_request_blocking.py --state RUN_DIR/state.json --setup SETUP_JSON \
+        --arm before|after --out FILE [--runs 5]
+
+Before each run it places one more bench in the world through the route a person's composition
+takes, so the world's flight input is new and nothing of its flight is computed yet: every flight
+read measured is cold. Then it asks the server for GET /healthz every 20 ms, first alone (50
+answers) and then while one flight read is being answered, and records how long each health answer
+took and how long the flight read took over the whole request.
+
+``before`` is a server whose flight has a page clock (up to lane V2): the read asks for the window
+from the step before an episode ends, the most a window computes there (2,999 steps to reach it and
+600 more). ``after`` is a server whose flight keeps the shared clock (lane V3): the read names no
+step, so it starts at the clock, and the server's worker computes that whole episode (3,000 steps).
+Right after each cold read the same window is read again and timed, as a page reading ahead finds it.
+The thread reading the flight keeps its answer as bytes and parses it only after the health requests
+beside it are done, so this process's own interpreter lock never delays them.
+
+The token is read from the launcher's token file and sent only to the local server; it is never
+printed or written. Every location comes from the arguments or the launcher's state file.
+"""
+
+import argparse
+import json
+import os
+import threading
+import time
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+INTERVAL_S = 0.020
+ALONE = 50
+#: A page clock's worst window starts at the step before an episode ends.
+EPISODE = 3000
+WINDOW = 600
+FACING_THE_CENTRE = 3_141_593
+
+
+def _request(url, token, method="GET", body=None):
+    started = time.perf_counter()
+    data = None if body is None else json.dumps(body).encode()
+    headers = {"Authorization": " ".join(("Bearer", token))}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(request, timeout=120) as response:
+        payload = response.read()
+        status = response.status
+    return status, round((time.perf_counter() - started) * 1_000_000), payload
+
+
+def _quantile(values, q):
+    ordered = sorted(values)
+    if not ordered:
+        return None
+    return ordered[min(len(ordered) - 1, max(0, int(-(-len(ordered) * q // 1)) - 1))]
+
+
+def _summary(values):
+    return {
+        "count": len(values),
+        "p50_us": _quantile(values, 0.5),
+        "p95_us": _quantile(values, 0.95),
+        "max_us": max(values) if values else None,
+    }
+
+
+def _idle_mean():
+    samples = os.environ.get("LANE_IDLE_SAMPLES")
+    if not samples or not Path(samples).exists():
+        return None
+    rows = [json.loads(line) for line in Path(samples).read_text().splitlines() if line.strip()]
+    return round(10 * sum(row["idle"] for row in rows) / len(rows)) if rows else None
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--state", required=True)
+    parser.add_argument("--setup", required=True)
+    parser.add_argument("--arm", required=True, choices=("before", "after"))
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--runs", type=int, default=5)
+    arguments = parser.parse_args()
+    state = json.loads(Path(arguments.state).read_text())
+    setup = json.loads(Path(arguments.setup).read_text())
+    token = Path(state["token_file"]).read_text().strip()
+    base = f"http://127.0.0.1:{state['ports']['api']}"
+    health = base + "/healthz"
+    scope = urllib.parse.urlencode({"world_id": setup["world_id"]})
+    version = f"{base}/world/versions/{setup['version_id']}"
+    load_before = os.getloadavg()[0]
+
+    def entry():
+        listed = json.loads(_request(base + "/world-entries", token)[2])
+        found = next(row for row in listed if row["world_id"] == setup["world_id"])
+        return {
+            "entry_id": found["entry_id"],
+            "base_revision": found["revision"],
+            "authored_state_sha256": found["current_authored_state_sha256"],
+            "authored_edit_seq": found["current_authored_edit_seq"],
+        }
+
+    def place_bench(index):
+        current = json.loads(_request(f"{version}?{scope}", token)[2])
+        body = {
+            "source": {"kind": "reviewed_asset", "asset_key": "cc0.bench"},
+            "placement": {
+                "subject_id": f"blocking-bench-{arguments.arm}-{index}-{time.time_ns()}",
+                "region_id": "region:starter",
+                "transform": {
+                    "x_mm": -10_000 + 2_500 * index,
+                    "y_mm": 0,
+                    "z_mm": 9_000,
+                    "yaw_microradians": FACING_THE_CENTRE,
+                    "scale_milli": 1000,
+                },
+                "origin_role": "fictional",
+                "behaviour": None,
+            },
+            "base_state_sha256": current["state_sha256"],
+            "saved_entry": entry(),
+        }
+        status, _us, _ = _request(f"{version}/compositions/apply?{scope}", token, "POST", body)
+        if status >= 300:
+            raise SystemExit(f"placing a bench answered {status}")
+
+    runs = []
+    for index in range(arguments.runs):
+        place_bench(index)
+        alone = []
+        for _ in range(ALONE):
+            alone.append(_request(health, token)[1])
+            time.sleep(INTERVAL_S)
+        if arguments.arm == "before":
+            query = f"{scope}&from_step={EPISODE - 1}&steps={WINDOW}"
+        else:
+            query = f"{scope}&steps={WINDOW}"
+        answer = {}
+
+        def fly(url=f"{version}/flight?{query}", answer=answer):
+            # Only the bytes here: parsing them in this process would hold its interpreter lock
+            # while the health requests beside the read are being timed.
+            answer["status"], answer["us"], answer["payload"] = _request(url, token)
+
+        thread = threading.Thread(target=fly)
+        beside = []
+        thread.start()
+        while thread.is_alive():
+            beside.append(_request(health, token)[1])
+            time.sleep(INTERVAL_S)
+        thread.join()
+        read = json.loads(answer["payload"])
+        again_query = f"{scope}&from_step={read['from_step']}&steps={WINDOW}"
+        again_status, again_us, _ = _request(f"{version}/flight?{again_query}", token)
+        runs.append(
+            {
+                "flight_status": answer["status"],
+                "flight_us": answer["us"],
+                "from_step": read["from_step"],
+                "flyers": len(read["flyers"]),
+                "input_sha256": read["input_sha256"],
+                "same_window_again": {"status": again_status, "us": again_us},
+                "health_alone": _summary(alone),
+                "health_beside_the_flight": _summary(beside),
+            }
+        )
+        print(json.dumps([answer["us"], runs[-1]["health_beside_the_flight"]["max_us"], again_us]))
+    record = {
+        "profile": "exulanica.flight-worker/v1/request-blocking",
+        "arm": arguments.arm,
+        "interval_ms": round(INTERVAL_S * 1000),
+        "load_1min_before_milli": round(load_before * 1000),
+        "idle_during_mean_tenths_percent": _idle_mean(),
+        "runs": runs,
+    }
+    Path(arguments.out).write_text(json.dumps(record, indent=1))
+
+
+if __name__ == "__main__":
+    main()

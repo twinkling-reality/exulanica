@@ -2,9 +2,11 @@
  * A saved world's flight, read: `GET /world/versions/{version_id}/flight`.
  *
  * The server composes the flight from the world version and computes each window of steps with the
- * flight movement module (`exulanica/movement/flight.py`); nothing here computes a step. Every
- * answer is read strictly: a profile, a module or a state this client does not know is refused by
- * name rather than drawn as something else, and every sample is a whole number.
+ * flight movement module (`exulanica/movement/flight.py`); nothing here computes a step. The flight
+ * keeps shared real time: a read that names no first step starts at the server's clock, and every
+ * answer says where that clock was (`clock_step`). Every answer is read strictly: a profile, a
+ * module or a state this client does not know is refused by name rather than drawn as something
+ * else, and every sample is a whole number.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -162,17 +164,28 @@ export function parseFlightRead(value: unknown): FlightRead {
   if (!Array.isArray(unplacedValue) || !Array.isArray(lateValue)) {
     throw new FlightContractError('unplaced or late_home is not a list');
   }
+  const fromStep = whole(row['from_step'], 'first step');
+  const lateHome = lateValue.map((item) => {
+    const late = record(item, 'late flyer');
+    const step = whole(late['step'], 'late step');
+    if (step < fromStep || step >= fromStep + steps) {
+      throw new FlightContractError('a late flyer is named at a step outside its window');
+    }
+    return Object.freeze({ step, flyerId: text(late['flyer_id'], 'late flyer id') });
+  });
   return Object.freeze({
     worldId: text(row['world_id'], 'world id'),
     versionId: text(row['version_id'], 'version id'),
     window: Object.freeze({
       inputSha256: text(row['input_sha256'], 'flight input digest'),
+      clockStep: whole(row['clock_step'], 'clock step'),
       groundMm: whole(row['ground_mm'], 'ground'),
       stepMs: whole(row['step_ms'], 'step'),
-      fromStep: whole(row['from_step'], 'first step'),
+      fromStep,
       steps,
       states: FLIGHT_STATES,
       flyers: Object.freeze(flyers),
+      lateHome: Object.freeze(lateHome),
     }),
     kinds: Object.freeze(kinds),
     unplaced: Object.freeze(unplacedValue.map((item) => {
@@ -184,7 +197,7 @@ export function parseFlightRead(value: unknown): FlightRead {
         reason: text(unplaced['reason'], 'unplaced reason'),
       });
     })),
-    lateHome: lateValue.length,
+    lateHome: lateHome.length,
   });
 }
 
@@ -193,26 +206,65 @@ export interface FlightClientOptions extends TransportOptions {
   readonly worldId: string | null;
 }
 
+/**
+ * A signal that aborts when either given one does, and `release`, which stops listening to them: a
+ * read calls it when it settles, so a long-lived signal gathers no listener per read.
+ */
+function either(
+  first: AbortSignal | undefined,
+  second: AbortSignal | undefined,
+): { readonly signal: AbortSignal | undefined; readonly release: () => void } {
+  if (first === undefined || second === undefined) return { signal: first ?? second, release: () => undefined };
+  const both = new AbortController();
+  const listening: [AbortSignal, () => void][] = [];
+  for (const signal of [first, second]) {
+    if (signal.aborted) {
+      both.abort(signal.reason);
+      continue;
+    }
+    const listener = (): void => both.abort(signal.reason);
+    signal.addEventListener('abort', listener, { once: true });
+    listening.push([signal, listener]);
+  }
+  return {
+    signal: both.signal,
+    release: () => {
+      for (const [signal, listener] of listening) signal.removeEventListener('abort', listener);
+    },
+  };
+}
+
 /** Reads windows of a saved world version's flight. */
 export class FlightClient {
-  private readonly transport: Transport;
-  private readonly worldId: string | null;
+  private readonly options: FlightClientOptions;
 
   constructor(options: FlightClientOptions) {
-    this.transport = new Transport(options);
-    this.worldId = options.worldId;
+    this.options = options;
   }
 
-  async window(versionId: string, fromStep: number, steps: number): Promise<FlightRead> {
+  /**
+   * The window of `steps` steps from `fromStep`, or from the server's clock when it is null.
+   * `signal` aborts this one read; the client's own signal aborts every read.
+   */
+  async window(versionId: string, fromStep: number | null, steps: number, signal?: AbortSignal): Promise<FlightRead> {
     const path = openWorldPath(
       `/world/versions/${encodeURIComponent(versionId)}/flight`,
-      this.worldId,
+      this.options.worldId,
       'flight to read',
     );
-    const read = parseFlightRead(
-      await this.transport.getJson<unknown>(path, { from_step: String(fromStep), steps: String(steps) }),
+    const combined = either(this.options.signal, signal);
+    const transport = new Transport(
+      combined.signal === undefined ? this.options : { ...this.options, signal: combined.signal },
     );
-    if (read.versionId !== versionId || read.window.fromStep !== fromStep) {
+    const query: Record<string, string> = { steps: String(steps) };
+    if (fromStep !== null) query['from_step'] = String(fromStep);
+    let read: FlightRead;
+    try {
+      read = parseFlightRead(await transport.getJson<unknown>(path, query));
+    } finally {
+      combined.release();
+    }
+    if (read.versionId !== versionId || (fromStep !== null && read.window.fromStep !== fromStep)) {
       throw new FlightContractError('the flight answered for another version or step');
     }
     return read;

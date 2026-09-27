@@ -3,7 +3,9 @@
 The worlds are the flight bounds measurement's own (``scripts/measure_flight_bounds.py``): the small
 square before a starter world's arrival point, eight planter trees, and the crowded crowns. Each
 flight is composed by :func:`exulanica.world.flight_input.compose_flight_input`, the function the
-route calls, from the reviewed assets' own digests.
+route calls, from the reviewed assets' own digests. :func:`check` judges a flight's windows with the
+independent checker (:mod:`exulanica.world.flight_checks`), which derives the same world on its own
+from its placed objects.
 """
 
 from __future__ import annotations
@@ -11,14 +13,23 @@ from __future__ import annotations
 from functools import cache
 
 from exulanica.movement.flight import FlightInput
-from exulanica.movement.flight_checks import check_windows
-from scripts.measure_flight_bounds import compose, seeded, seeds, square_objects
+from exulanica.world.flight_checks import CheckedWorld, FlightCheck, check_windows
+from scripts.measure_flight_bounds import (
+    checked,
+    compose,
+    homes,
+    seeded,
+    seeds,
+    square_objects,
+)
 
 __all__ = [
     "DEVELOPMENT_SEEDS",
-    "check_windows",
+    "check",
+    "checked_world_of",
     "cluttered_flight",
     "crowded_flight",
+    "homes",
     "seeded",
     "square_flight",
     "square_objects",
@@ -52,3 +63,14 @@ def crowded_flight() -> FlightInput:
 def cluttered_flight() -> FlightInput:
     """The small square, seven more trees and twenty other objects: 24 birds among 36 objects."""
     return compose("cluttered")
+
+
+@cache
+def checked_world_of(name: str) -> CheckedWorld:
+    """The named world as the independent checker derives it from its placed objects."""
+    return checked(name)
+
+
+def check(name: str, flight: FlightInput, windows) -> FlightCheck:
+    """A run of the named world's windows, judged by the independent checker."""
+    return check_windows(checked_world_of(name), homes(flight), windows)

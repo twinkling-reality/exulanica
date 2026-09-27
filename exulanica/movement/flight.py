@@ -25,7 +25,9 @@ stands, with a named reason when it does not (``perch_not_declared`` and the res
 **Episodes bound the cost of any step.** Every flyer starts an episode perching at its home perch
 and spends the episode's last minute going home and landing. Going home, a flyer follows the
 shortest route over free cells of its band from where it is to its home's approach point, found
-once when it sets off and again whenever the guard has held it for a while. The state at an
+once when it sets off and again whenever the guard has held it for a while, at most
+``route_searches`` searches an episode, each settling at most ``route_cells`` cells; without a
+route it steers for its home's approach point. The state at an
 episode's first step is its genesis, a function of the input and the episode alone, so the state at
 any step is at most one episode of steps from a known one. A flyer not home at its episode's last
 step is named in every window that holds that step, never moved quietly; the next episode starts
@@ -81,7 +83,9 @@ __all__ = [
     "FlightRefused",
     "Flyer",
     "advance_flight",
+    "check_clock",
     "check_request",
+    "clock_step",
     "flight_window",
     "genesis",
     "state_at",
@@ -106,7 +110,9 @@ _WANDER_DISTANCE: Final = FLIGHT_MODULE.value("wander_distance_mm")
 _WANDER_RADIUS: Final = FLIGHT_MODULE.value("wander_radius_mm")
 _WANDER_JITTER: Final = FLIGHT_MODULE.value("wander_jitter_mm")
 _MAX_STEPS: Final = FLIGHT_MODULE.value("max_steps_per_request")
-_MAX_FROM: Final = FLIGHT_MODULE.value("max_from_step")
+_CLOCK_REACH: Final = FLIGHT_MODULE.value("clock_reach_steps")
+_ROUTE_SEARCHES: Final = FLIGHT_MODULE.value("route_searches")
+_ROUTE_CELLS: Final = FLIGHT_MODULE.value("route_cells")
 _MS_PER_S: Final = 1000
 #: The fraction of the lookahead each avoidance probe advances: four probes a lookahead, so at the
 #: module's fastest speed probes land at most 500 mm apart, one cell, and none skips a cell.
@@ -145,6 +151,10 @@ class FlightRefused(ValueError):
         super().__init__(detail)
         self.code = code
         self.detail = detail
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        # A refusal raised in the worker process reaches the server as itself, code and all.
+        return (type(self), (self.code, self.detail))
 
 
 @dataclass(frozen=True, slots=True)
@@ -421,6 +431,8 @@ def _perched(flight: FlightInput, flyer: Flyer, perch_id: str, timer: int) -> di
         #: Going home: the centres of the cells still ahead on its route, or [] with none found.
         "route": None,
         "stuck_steps": 0,
+        #: Searches for a route home this episode, at most ``route_searches``.
+        "searches": 0,
     }
 
 
@@ -692,7 +704,8 @@ def _route(
     the kind's band that share a face, or None where there is no such way.
 
     A* over the grid, the Manhattan distance its estimate, ties broken toward the longer way
-    already travelled and then by cell, so the same state finds the same route anywhere.
+    already travelled and then by cell, so the same state finds the same route anywhere. A search
+    that settles ``route_cells`` cells without reaching the goal ends there, with no route.
     """
     volume = flight.volume
     occupancy = flight.occupancy
@@ -708,11 +721,15 @@ def _route(
     queue: list[tuple[int, int, Cell]] = [(estimate(begin), 0, begin)]
     cost = {begin: 0}
     came: dict[Cell, Cell] = {}
+    settled = 0
     while queue:
         _, negative, cell = heapq.heappop(queue)
         travelled = -negative
         if travelled != cost[cell]:
             continue
+        settled += 1
+        if settled > _ROUTE_CELLS:
+            return None
         if cell == end:
             path = []
             while cell != begin:
@@ -896,7 +913,13 @@ def _fly(
     if goal is not None and goal["kind"] == "perch":
         column = flight.column(goal["perch_id"], flyer.kind)
         if _homing(step) and flyer_state.get("route") is None:
-            flyer_state["route"] = _route(flight, kind, position, column.approach_mm) or []
+            # A flyer searches at most route_searches times an episode; past that, or with no
+            # route found, it steers for its home's approach point as the rest of its flight does.
+            found = None
+            if flyer_state["searches"] < _ROUTE_SEARCHES:
+                flyer_state["searches"] += 1
+                found = _route(flight, kind, position, column.approach_mm)
+            flyer_state["route"] = found or []
         remaining = length(sub(column.approach_mm, position))
         reachable = max(_per_step(length(velocity)), _per_step(kind.landing_rate_mm_s))
         if (
@@ -1060,15 +1083,30 @@ _STATE_CODES: Final = {state: index for index, state in enumerate(STATES)}
 
 def check_request(from_step: object, steps: object) -> None:
     """Refuse, by name, a window beyond the module's bounds: at most ``max_steps_per_request``
-    steps, starting no later than ``max_from_step``."""
+    steps, from a step that is not negative."""
     if type(steps) is not int or not 1 <= steps <= _MAX_STEPS:
         raise FlightRefused(
             "flight_window_too_long", f"a window is 1 to {_MAX_STEPS} steps, got {steps!r}"
         )
-    if type(from_step) is not int or not 0 <= from_step <= _MAX_FROM:
+    if type(from_step) is not int or from_step < 0:
+        raise FlightRefused(
+            "flight_step_out_of_range", f"a window starts at a step from 0, got {from_step!r}"
+        )
+
+
+def clock_step(now_ms: int) -> int:
+    """The flight's clock at ``now_ms`` milliseconds since the Unix epoch: step n is the nth
+    step of the module's length since then, so every reader of a flight shares one clock."""
+    return now_ms // _STEP_MS
+
+
+def check_clock(from_step: object, clock: int) -> None:
+    """Refuse, by name, a window starting more than ``clock_reach_steps`` from the clock's step."""
+    if type(from_step) is not int or abs(from_step - clock) > _CLOCK_REACH:
         raise FlightRefused(
             "flight_step_out_of_range",
-            f"a window starts at a step from 0 to {_MAX_FROM}, got {from_step!r}",
+            f"a window starts within {_CLOCK_REACH} steps of the flight's clock, at step {clock}, "
+            f"got {from_step!r}",
         )
 
 

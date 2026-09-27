@@ -1,0 +1,43 @@
+"""The API process's resident memory after startup, on this checkout's release server, three starts.
+
+    python3 measure_startup_rss.py --worktree PATH --slot 3 --label NAME --out FILE
+
+Each start brings the release server up through the acceptance launcher (a new synthetic
+workspace), waits 10 s after it answers, reads the API process's resident set size with ps, and
+takes the server down. Nothing else reads the server meanwhile beyond the launcher's own checks.
+"""
+import argparse, json, subprocess, sys, time
+from pathlib import Path
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--worktree", required=True)
+    parser.add_argument("--slot", default="3")
+    parser.add_argument("--label", required=True)
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--starts", type=int, default=3)
+    arguments = parser.parse_args()
+    launcher = Path(arguments.worktree) / "scripts" / "acceptance" / "launch.py"
+    rows = []
+    for _ in range(arguments.starts):
+        subprocess.run([sys.executable, str(launcher), "down", "--worktree", arguments.worktree],
+                       capture_output=True)
+        up = subprocess.run([sys.executable, str(launcher), "up", "--worktree", arguments.worktree,
+                             "--slot", arguments.slot, "--production"], capture_output=True, text=True)
+        if up.returncode != 0:
+            raise SystemExit(up.stdout[-2000:] + up.stderr[-2000:])
+        printed = up.stdout[up.stdout.index("{"):up.stdout.rindex("}") + 1]
+        run_dir = Path(json.loads(printed)["run_dir"])
+        state = json.loads((run_dir.parent / "state.json").read_text())
+        pid = state.get("pids", {}).get("api")
+        time.sleep(10)
+        rss_kib = int(subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True,
+                                     text=True).stdout.strip())
+        rows.append({"api_rss_kib": rss_kib, "tree": state.get("tree", {}).get("diff_head_sha256")})
+        print(arguments.label, rss_kib, flush=True)
+    Path(arguments.out).write_text(json.dumps({"label": arguments.label, "starts": rows}, indent=1))
+
+
+if __name__ == "__main__":
+    main()

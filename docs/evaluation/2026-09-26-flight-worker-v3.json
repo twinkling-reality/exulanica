@@ -1,0 +1,400 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "answers": {
+   "path": "docs/evaluation/2026-09-26-flight-worker-v2.json",
+   "record_sha256": "8e69f12bd2e19f1dc97645890905c4a3d71c8940193643a8f9bb5376a0d261bb"
+  },
+  "artifact_notes": {
+   "memory/rss-with-freeze.json": "the API process's resident memory after startup",
+   "memory/rss-without-freeze.json": "the API process's resident memory after startup",
+   "scripts/measure_startup_rss.py.txt": "the startup memory measurement",
+   "scripts/write_record_f.py.txt": "this record's writer",
+   "timing/gates.jsonl": "a timing run's output or the gate's",
+   "timing/idle-20260926T223742-1536.jsonl": "a timing run's output or the gate's",
+   "timing/idle-20260926T223807-1729.jsonl": "a timing run's output or the gate's",
+   "timing/request-blocking-after.attempt-1.log.txt": "a timing run's console",
+   "timing/request-blocking-after.json": "a timing run's output or the gate's",
+   "timing/setup-trees-after.json": "a timing run's output or the gate's",
+   "timing/setup-trees-after.log.txt": "a timing run's console",
+   "timing/worker-costs.attempt-1.log.txt": "a timing run's console",
+   "timing/worker-costs.json": "a timing run's output or the gate's"
+  },
+  "bound_artifacts": {
+   "memory/rss-with-freeze.json": {
+    "byte_size": 382,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/memory/rss-with-freeze.json",
+    "sha256": "e819b3f7381dff95999293c040fe0a2444ea5195f59e9118dfa59244365c2bef"
+   },
+   "memory/rss-without-freeze.json": {
+    "byte_size": 385,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/memory/rss-without-freeze.json",
+    "sha256": "968eb35902d51d012179303ea87e41ab485546e55168d7611a46cbd06a28afa8"
+   },
+   "scripts/measure_startup_rss.py.txt": {
+    "byte_size": 2192,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/scripts/measure_startup_rss.py.txt",
+    "sha256": "6794e3db526172e72806c9a6b748af0546752de5c261e719b1797cca0c2237fb"
+   },
+   "scripts/write_record_f.py.txt": {
+    "byte_size": 8947,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/scripts/write_record_f.py.txt",
+    "sha256": "04965ede2f1942bd442dfd421d91ae23f84d8c2b8bea11a331bec30ef557a465"
+   },
+   "timing/gates.jsonl": {
+    "byte_size": 748,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/gates.jsonl",
+    "sha256": "4e1d1a6d3a2bfca9a2a1ddc8f14386f6c75239aff0551a66277dde2228bf06dc"
+   },
+   "timing/idle-20260926T223742-1536.jsonl": {
+    "byte_size": 261,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/idle-20260926T223742-1536.jsonl",
+    "sha256": "f3657798140ae7a1a95ea584947b600d797bfc38d09b85779ac06e7d8fbec6b3"
+   },
+   "timing/idle-20260926T223807-1729.jsonl": {
+    "byte_size": 149,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/idle-20260926T223807-1729.jsonl",
+    "sha256": "a50876076dedf68c673bbe813c06d82819acdda71736af659520ca5e635f88fd"
+   },
+   "timing/request-blocking-after.attempt-1.log.txt": {
+    "byte_size": 135,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/request-blocking-after.attempt-1.log.txt",
+    "sha256": "85b3719ff7499a3d2b8b7084f1a2a60780897945f77345c6b7021800d57f1796"
+   },
+   "timing/request-blocking-after.json": {
+    "byte_size": 2561,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/request-blocking-after.json",
+    "sha256": "8d6450a0c5e766434512edd94a5a267a2b848b9d7f1976fbf38e570f38864cda"
+   },
+   "timing/setup-trees-after.json": {
+    "byte_size": 240,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/setup-trees-after.json",
+    "sha256": "c99ff897fea9e77d900f58b04b19e84b8664756406c2b3377748e67d814d1e2e"
+   },
+   "timing/setup-trees-after.log.txt": {
+    "byte_size": 0,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/setup-trees-after.log.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   },
+   "timing/worker-costs.attempt-1.log.txt": {
+    "byte_size": 485,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/worker-costs.attempt-1.log.txt",
+    "sha256": "d58f31bcbbaa35b381d09414dbf417587f83a26f57dd55406d8ca8d9b74dd6a5"
+   },
+   "timing/worker-costs.json": {
+    "byte_size": 1134,
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3/timing/worker-costs.json",
+    "sha256": "9c3eee7483056b843ddddf200346148b8b4d269656c4d16b52b621ea494ec95f"
+   }
+  },
+  "changes_since_the_second_registration": [
+   "The server's lifespan collects what startup made once and freezes it, and unfreezes it when the server stops; collection stays automatic for everything made later. A full collection over about 172,000 startup objects took 33 to 36 ms in development, the pause both earlier registrations met at 30.9 ms."
+  ],
+  "execution": {
+   "machine": "Apple M5 Max, 18 cores, 64 GB, macOS 26.7",
+   "python": "CPython 3.11.6",
+   "timing": "the driver inside quiet-slot then gpu-slot; every run behind the idle gate: at least 70 percent idle over 10 s before it, discarded below 50 percent mean idle during it"
+  },
+  "first_timed_run_at": "2026-09-26T22:37:57-0400",
+  "judged": [
+   {
+    "id": "health-beside-a-cold-read",
+    "measured": {
+     "flight_reads_answered": 5,
+     "limit_us": 25000,
+     "runs": 5,
+     "slowest_health_beside_each_cold_read_us": [
+      2915,
+      3770,
+      7696,
+      3248,
+      2983
+     ]
+    },
+    "outcome": "passed",
+    "rule": "On this lane's release server (a production build on slot 3 with a new synthetic workspace, the small square and seven more trees, 24 flyers), inside quiet-slot then gpu-slot behind the idle gate, in each of five runs, each after an edit so the flight read is cold, the slowest GET /healthz answer beside the cold flight read takes at most 25000 us."
+   }
+  ],
+  "limits": [
+   "The request blocking runs time GET /healthz beside one flight read over the loopback; a page's own requests were not timed.",
+   "The after arm reads at the shared clock and its worker computes one whole episode, and queues the next; the before arm, in the first registration, read the window from the step before an episode ends on main's page clock.",
+   "One machine, shared with other work: every run passed the idle gate."
+  ],
+  "preregistration": {
+   "path": "docs/evaluation/2026-09-26-flight-worker-v3-preregistration.json",
+   "record_sha256": "71aab24e99db86c4627770cb362949e25a3867ecbc74ce8d21fed7b1012f277e"
+  },
+  "profile": "exulanica.flight-worker/v3",
+  "question": "With what the server's startup made collected once and frozen, so a full garbage collection no longer walks it, does the server leave its other requests unslowed while a cold flight read is computed, by the rule the first two flight worker registrations judged?",
+  "release_build": {
+   "index_html_sha256": "f01e9e54216a1ec75c4c0cf844acff294225ec8bdb5db82d2ee5089d3df55185",
+   "mode": "production",
+   "served_index_is_the_build": true,
+   "tree": {
+    "branch": "lane/0923-movement3",
+    "changed_paths": "91",
+    "diff_head_bytes": "148653",
+    "diff_head_sha256": "3aa04116a676c522cb6f10f61df426f08bcf157a4e0ede89fba4dc867adb2b9d",
+    "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+    "status_sha256": "bf120d769e5b9cfa54b98a143e57fb7650db44a0536dbb6e622244708ea622c1"
+   },
+   "vite": "vite/6.4.3 darwin-arm64 node-v24.15.0"
+  },
+  "reported": {
+   "request-blocking-after": {
+    "arm": "after",
+    "idle_during_mean_tenths_percent": 652,
+    "interval_ms": 20,
+    "load_1min_before_milli": 7545,
+    "profile": "exulanica.flight-worker/v1/request-blocking",
+    "runs": [
+     {
+      "flight_status": 200,
+      "flight_us": 605246,
+      "flyers": 24,
+      "from_step": 17904766891,
+      "health_alone": {
+       "count": 50,
+       "max_us": 2303,
+       "p50_us": 1656,
+       "p95_us": 2108
+      },
+      "health_beside_the_flight": {
+       "count": 26,
+       "max_us": 2915,
+       "p50_us": 1608,
+       "p95_us": 2439
+      },
+      "input_sha256": "7b474eea1eaaca398c68d1cfb466728de2ceaed77ec10688d0eb15f0204a7c30",
+      "same_window_again": {
+       "status": 200,
+       "us": 18931
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 589043,
+      "flyers": 24,
+      "from_step": 17904766910,
+      "health_alone": {
+       "count": 50,
+       "max_us": 2757,
+       "p50_us": 1666,
+       "p95_us": 2484
+      },
+      "health_beside_the_flight": {
+       "count": 25,
+       "max_us": 3770,
+       "p50_us": 1559,
+       "p95_us": 2249
+      },
+      "input_sha256": "154836bdbf9f06344998dec1a30b45687e3c94e965376605c251c6f45aaddb2f",
+      "same_window_again": {
+       "status": 200,
+       "us": 17464
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 582838,
+      "flyers": 24,
+      "from_step": 17904766929,
+      "health_alone": {
+       "count": 50,
+       "max_us": 2382,
+       "p50_us": 1527,
+       "p95_us": 2133
+      },
+      "health_beside_the_flight": {
+       "count": 24,
+       "max_us": 7696,
+       "p50_us": 1509,
+       "p95_us": 3009
+      },
+      "input_sha256": "887de55fea8470c31cbe9ea66cd05081396e7edf79ea79f80153bc643ea8a431",
+      "same_window_again": {
+       "status": 200,
+       "us": 16724
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 615416,
+      "flyers": 24,
+      "from_step": 17904766948,
+      "health_alone": {
+       "count": 50,
+       "max_us": 2403,
+       "p50_us": 1574,
+       "p95_us": 2094
+      },
+      "health_beside_the_flight": {
+       "count": 26,
+       "max_us": 3248,
+       "p50_us": 1930,
+       "p95_us": 3058
+      },
+      "input_sha256": "50a921b4fb6883676c25f3195b3c84bf34cc4024c94de895f324f280450e1ac4",
+      "same_window_again": {
+       "status": 200,
+       "us": 17071
+      }
+     },
+     {
+      "flight_status": 200,
+      "flight_us": 598106,
+      "flyers": 24,
+      "from_step": 17904766967,
+      "health_alone": {
+       "count": 50,
+       "max_us": 2129,
+       "p50_us": 1739,
+       "p95_us": 2026
+      },
+      "health_beside_the_flight": {
+       "count": 25,
+       "max_us": 2983,
+       "p50_us": 1870,
+       "p95_us": 2352
+      },
+      "input_sha256": "61760897f3f2459c03f892d89e2c06451f68008a1161599b3a53c56b42ccf268",
+      "same_window_again": {
+       "status": 200,
+       "us": 15603
+      }
+     }
+    ]
+   },
+   "request-blocking-before": {
+    "in": "docs/evaluation/2026-09-26-flight-worker.json",
+    "record_sha256": "ee0ce934068fb2b024011fbba695a13c14edc1ba8491aedb9d3b8515fc3ec258",
+    "what": "main's release server at 465f2909, measured once for both registrations"
+   },
+   "worker-costs": {
+    "capped_search": {
+     "bounded_process_us": {
+      "max": 21262,
+      "median": 13583,
+      "values": [
+       12296,
+       12604,
+       12606,
+       12668,
+       12805,
+       12816,
+       12923,
+       13084,
+       13125,
+       13369,
+       13583,
+       13693,
+       13715,
+       13790,
+       14115,
+       14503,
+       15268,
+       15351,
+       15550,
+       21262
+      ]
+     },
+     "grid_cells": 259584,
+     "route_cells": 4096,
+     "route_searches": 3,
+     "unbounded_process_us": {
+      "max": 443522,
+      "median": 436928,
+      "values": [
+       424402,
+       436424,
+       436928,
+       442830,
+       443522
+      ]
+     }
+    },
+    "cold_episode_wall_us": {
+     "cluttered": {
+      "flyers": 24,
+      "max": 1097714,
+      "median": 958831,
+      "values": [
+       866617,
+       875415,
+       958831,
+       1071957,
+       1097714
+      ]
+     },
+     "eight_trees": {
+      "flyers": 24,
+      "max": 963727,
+      "median": 878503,
+      "values": [
+       456361,
+       861997,
+       878503,
+       920187,
+       963727
+      ]
+     }
+    },
+    "load_1min_before_milli": 9219,
+    "milliseconds": 15300,
+    "profile": "exulanica.flight-worker/v1/costs",
+    "spawn_wall_us": {
+     "max": 303154,
+     "median": 263615,
+     "values": [
+      236097,
+      246564,
+      263615,
+      280485,
+      303154
+     ]
+    }
+   }
+  },
+  "scripts": {
+   "gate.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/gate.py.txt",
+    "sha256": "9bac3b50d4fd7fcb8939d9d5e83238144cff1dfebb9b6027d4f49fd7da961d65"
+   },
+   "measure_flight_frames.mjs.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/measure_flight_frames.mjs.txt",
+    "sha256": "b92d08639c096ceb9a89fac7fb4bff6809df70b02b192edcc282c0c799ca7dd4"
+   },
+   "measure_request_blocking.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/measure_request_blocking.py.txt",
+    "sha256": "7a4426aebc1a9f7d3b55b98c0f644cff8dc0e62cf30f2bbe944a389d030215a6"
+   },
+   "measure_worker_costs.py.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/measure_worker_costs.py.txt",
+    "sha256": "343b95aaca2dc0fe279519e462bbde8ebe3305983703486ff5305b5dc7bab690"
+   },
+   "run_timing_d.sh.txt": {
+    "path": "docs/evaluation/artifacts/2026-09-26-flight-worker-v3-preregistration/run_timing_d.sh.txt",
+    "sha256": "f16faaf1ad0682ffec2dff66663e67fea824136c73b45c25b119711dc2bcf814"
+   }
+  },
+  "startup_memory_kib": {
+   "what": "the API process's resident set size 10 s after startup, as ps reports it, three starts each",
+   "with-freeze": [
+    203056,
+    184464,
+    198896
+   ],
+   "without-freeze": [
+    203392,
+    189008,
+    192336
+   ]
+  },
+  "tree": {
+   "head": "465f290909875546f392bcd07b3943a5c91b4fcb",
+   "tracked_diff_sha256": "3aa04116a676c522cb6f10f61df426f08bcf157a4e0ede89fba4dc867adb2b9d"
+  },
+  "verdict": "PASSED. Five timed runs on the release server."
+ },
+ "record_sha256": "119be8a0ac2f6210b2dfcf8e3de0b4d1c77640ff1e66f632c33b10afa042ef7c"
+}

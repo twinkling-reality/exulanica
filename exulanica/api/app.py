@@ -45,6 +45,7 @@ dependency this instance will not reach rather than one that failed.
 from __future__ import annotations
 
 import asyncio
+import gc
 import threading
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
@@ -156,6 +157,7 @@ from exulanica.world import (
     WorldNotConfigured,
     seed_reviewed_assets,
 )
+from exulanica.world.flight_input import close_flight_worker
 from exulanica.world.society import SocietyBytesNotRead
 
 __all__ = ["create_app"]
@@ -249,13 +251,26 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         if society_thread is not None:
             society_thread.start()
+        # What startup made lives as long as the server. A full garbage collection walks every
+        # tracked object and holds the interpreter's lock while it does, so no request the server is
+        # answering moves: over about 172,000 objects once the application is imported, 33 to 36 ms
+        # in a development measurement, named among the earlier measurements of
+        # docs/evaluation/2026-09-26-flight-worker-v3-preregistration.json. The 30.9 ms pauses two
+        # timing records met are inferred to be such collections; the record timed with this freeze
+        # met none (docs/evaluation/2026-09-26-flight-worker-v3.json). Collected once and frozen,
+        # those objects are never walked again; collection stays automatic for everything later.
+        gc.collect()
+        gc.freeze()
         yield
     finally:
+        gc.unfreeze()
         society_stop.set()
         if society_thread is not None:
             await asyncio.to_thread(society_thread.join)
         if worker is not None:
             worker.stop()
+        # The flight's worker process starts at the first flight read; it stops with the server.
+        await asyncio.to_thread(close_flight_worker)
 
 
 def create_app(services: Services | None = None, *, verify: bool = True) -> FastAPI:

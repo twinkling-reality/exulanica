@@ -1,0 +1,243 @@
+"""Write the record that re-judges record B's seeds with the independent flight checker.
+
+    uv run python .exulanica/lane-movement3/evidence/write_record_c.py --runs DIR
+
+DIR holds the run (``judged-2-worker.json``), its console, when it started and finished, and the
+as-run copies of the measuring script and the checker with their digests. Every outcome is computed
+from those files and from record B's own bound run, never typed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from exulanica.evaluation.visual_gate import digest_bound  # noqa: E402
+
+NAME = "2026-09-26-flight-independent-check"
+RECORD = ROOT / "docs" / "evaluation" / f"{NAME}.json"
+ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / NAME
+RECORD_B = ROOT / "docs" / "evaluation" / "2026-09-25-flight-bounds-v2.json"
+HERE = Path(__file__).resolve()
+HOME_RULES = ("not_home_at_episode_end", "late_home_misreported")
+
+
+def _forbidden() -> tuple[str, ...]:
+    """Text no bound file may hold, each fragment built here so this file's own copy holds none."""
+    home = Path.home()
+    slash = "/"
+    return (
+        str(home),
+        home.name,
+        slash + "Users" + slash,
+        slash + "private" + slash,
+        slash + "var" + slash + "folders",
+        "Bearer" + " ",
+        "api" + "-token",
+        chr(0x2014),
+    )
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _git(*arguments: str) -> bytes:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *arguments], capture_output=True, check=True
+    ).stdout
+
+
+class Binder:
+    def __init__(self) -> None:
+        self.bound: dict[str, dict[str, Any]] = {}
+        self.notes: dict[str, str] = {}
+
+    def bind(self, name: str, data: bytes, note: str) -> None:
+        text = data.decode("utf-8")
+        found = [fragment for fragment in _forbidden() if fragment in text]
+        if found:
+            raise SystemExit(f"{name} holds text no record may bind ({len(found)} kind(s))")
+        target = ARTIFACTS / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        self.bound[name] = {
+            "path": f"docs/evaluation/artifacts/{NAME}/{name}",
+            "byte_size": len(data),
+            "sha256": _sha(data),
+        }
+        self.notes[name] = note
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--runs", required=True)
+    arguments = parser.parse_args()
+    runs = Path(arguments.runs).resolve()
+    if RECORD.exists() or ARTIFACTS.exists():
+        raise SystemExit(f"{RECORD.name} or its artifacts exist; a record is written once")
+    run = json.loads((runs / "judged-2-worker.json").read_text(encoding="utf-8"))
+    console = (runs / "run.log.txt").read_text(encoding="utf-8")
+    if console.strip().splitlines()[-1] != "exit 0":
+        raise SystemExit("the run did not finish with exit 0")
+    envelope_b = json.loads(RECORD_B.read_text(encoding="utf-8"))
+    record_b = envelope_b["record"]
+    run_b_path = ROOT / record_b["bound_artifacts"]["runs/judged-bounds.json"]["path"]
+    run_b = json.loads(run_b_path.read_text(encoding="utf-8"))
+    assert run["seeds"] == run_b["seeds"], "not record B's seeds"
+    assert run["minutes"] == run_b["minutes"] and run["window_steps"] == run_b["window_steps"]
+
+    found: dict[str, Any] = {}
+    no_violation: dict[str, Any] = {}
+    home: dict[str, Any] = {}
+    same_windows: dict[str, Any] = {}
+    replay: dict[str, int] = {}
+    for name, world in run["worlds"].items():
+        rules: Counter[str] = Counter()
+        for row in world["runs"]:
+            rules.update(row["violations_by_rule"])
+        b_runs = {row["seed"]: row for row in run_b["worlds"][name]["runs"]}
+        equal = sum(
+            row["windows_sha256"] == b_runs[row["seed"]]["windows_sha256"] for row in world["runs"]
+        )
+        same_windows[name] = [equal, len(world["runs"])]
+        late = sum(row["late_home"] for row in world["runs"])
+        ends = sum(row["episode_ends"] for row in world["runs"])
+        misreported = rules.get("late_home_misreported", 0)
+        home[name] = [late, ends, misreported]
+        no_violation[name] = {rule: n for rule, n in sorted(rules.items()) if rule not in HOME_RULES}
+        replay[name] = sum(row["replay_mismatches"] for row in world["runs"])
+        found[name] = {
+            "seeds": len(world["runs"]),
+            "started_at": world["started_at"],
+            "finished_at": world["finished_at"],
+            "violations_by_rule": dict(sorted(rules.items())),
+            "not_home_at_an_episode_end": late,
+            "episode_ends": ends,
+            "segments_checked": sum(row["segments"] for row in world["runs"]),
+            "guard_interventions": sum(row["guard_interventions"] for row in world["runs"]),
+            "windows_equal_to_record_b": equal,
+            "worker_windows_unequal_to_in_process": replay[name],
+            "route_searches": sum(row["route_searches"] for row in world["runs"]),
+            "route_searches_without_route": sum(
+                row["route_searches_without_route"] for row in world["runs"]
+            ),
+            "route_searches_most_by_one_flyer_in_an_episode": max(
+                row["route_searches_most_by_one_flyer_in_an_episode"] for row in world["runs"]
+            ),
+            "route_queue_entries_most_taken_by_one_search": max(
+                row["route_queue_entries_most_taken_by_one_search"] for row in world["runs"]
+            ),
+        }
+    judged = [
+        {
+            "id": "no-violation",
+            "rule": (
+                "Record B's rule, judged again by the independent checker: in every world and "
+                "record B seed no violation of any rule other than homecoming."
+            ),
+            "measured": no_violation,
+            "outcome": "passed" if not any(no_violation.values()) else "failed",
+        },
+        {
+            "id": "every-flyer-home",
+            "rule": (
+                "Record B's rule, judged again by the independent checker: every flyer home at "
+                "every episode's last step, and every window naming exactly the flyers not home."
+            ),
+            "measured": home,
+            "outcome": "passed"
+            if all(late == 0 and misreported == 0 for late, _ends, misreported in home.values())
+            else "failed",
+        },
+        {
+            "id": "record-b-windows",
+            "rule": (
+                "Every run's windows, served by this lane's worker process, have the digest record "
+                "B's run recorded for the same world and seed, and each equals the window this "
+                "process cut from the same episodes."
+            ),
+            "measured": {"equal_to_record_b": same_windows, "worker_unequal_to_in_process": replay},
+            "outcome": "passed"
+            if all(equal == total for equal, total in same_windows.values())
+            and not any(replay.values())
+            else "failed",
+        },
+    ]
+    verdict = "PASSED" if all(row["outcome"] == "passed" for row in judged) else "FAILED"
+
+    binder = Binder()
+    binder.bind("runs/judged-2-worker.json", (runs / "judged-2-worker.json").read_bytes(),
+                "the run: record B's seeds, windows from the worker, the independent checker")
+    binder.bind("runs/run.log.txt", console.encode(), "the run's console and exit")
+    for name, note in (
+        ("measure_flight_bounds.py.txt", "the measuring script as it ran"),
+        ("flight_checks.py.txt", "the independent checker as it ran"),
+        ("as-run.sha256", "the digests of the script, the checker and the flight's code as it ran"),
+    ):
+        binder.bind(f"scripts/{name}" if name.endswith(".txt") else name,
+                    (runs / name).read_bytes(), note)
+    binder.bind("scripts/write_record_c.py.txt", HERE.read_bytes(), "this record's writer")
+    diff = _git("diff", "HEAD", "--binary")
+    record = {
+        "profile": "exulanica.flight-checker/v1/rejudgment",
+        "question": (
+            "Judged again by a checker that places every part and perch on its own, from the "
+            "catalogs and the placed objects, do record B's judged seeds still show every flyer "
+            "clear of every part, in its bounds and home at every episode's end, and does this "
+            "lane's flight, served from its worker process, serve exactly the windows record B "
+            "judged?"
+        ),
+        "answers": {"path": f"docs/evaluation/{RECORD_B.name}", "record_sha256": envelope_b["record_sha256"]},
+        "why": (
+            "Record B's checker bounded each part with the flight's own air._solid_bounds and read "
+            "the flight's own grid, so a part the flight placed wrongly would have been wrong in "
+            "both. Its outcome stands; this judges the same seeds with a checker that shares none "
+            "of the flight's placement."
+        ),
+        "not_preregistered": (
+            "Record B's seeds are spent, so this is a re-judgment, not a held-out test; the flight "
+            "worker registration judges fresh seeds."
+        ),
+        "run": {
+            "command": (
+                "uv run python scripts/measure_flight_bounds.py --seeds judged-2 --minutes 30 "
+                "--worker --out FILE"
+            ),
+            "started_at": (runs / "started.txt").read_text().strip(),
+            "finished_at": (runs / "finished.txt").read_text().strip(),
+        },
+        "judged": judged,
+        "found": found,
+        "verdict": f"{verdict}. Record B's twelve seeds in its four worlds, 30 simulated minutes a seed.",
+        "limits": [
+            "The checker takes the volume's bounds from the ground by the flight contract's rule "
+            "and the module's cell size from the movement table; an error in either is shared.",
+            "A perch point is compared within a millimetre, the rounding the flight serves.",
+            "Queue entries taken by a search count every entry it took off its queue, stale ones "
+            "included, so they are at least the cells it settled.",
+        ],
+        "tree": {
+            "head": _git("rev-parse", "HEAD").decode().strip(),
+            "tracked_diff_bytes": len(diff),
+            "tracked_diff_sha256": _sha(diff),
+        },
+        "bound_artifacts": binder.bound,
+        "artifact_notes": binder.notes,
+    }
+    envelope = digest_bound(record)
+    RECORD.write_bytes(json.dumps(envelope, indent=1, sort_keys=True).encode() + b"\n")
+    print(RECORD.relative_to(ROOT), envelope["record_sha256"], verdict)
+
+
+if __name__ == "__main__":
+    main()

@@ -50,6 +50,7 @@ __all__ = [
     "Placement",
     "Solid",
     "build_occupancy",
+    "occupancy_from_cells",
     "placed_point",
     "segment_meets_cell",
     "swept_cells",
@@ -372,14 +373,31 @@ def build_occupancy(
                     index = (ix * ny + iy) * nz + iz
                     cells[index] = 1
                     owners.setdefault(index, set()).add(solid.object_id)
-    header = canonical_json({"volume": volume.document(), "clearance_mm": clearance_mm})
-    digest = hashlib.sha256(header + b"\n" + bytes(cells)).hexdigest()
     return Occupancy(
         volume,
         bytes(cells),
-        digest,
+        _occupancy_sha256(volume, clearance_mm, bytes(cells)),
         clearance_mm,
         MappingProxyType({index: frozenset(ids) for index, ids in owners.items()}),
+    )
+
+
+def _occupancy_sha256(volume: AirVolume, clearance_mm: int, cells: bytes) -> str:
+    header = canonical_json({"volume": volume.document(), "clearance_mm": clearance_mm})
+    return hashlib.sha256(header + b"\n" + cells).hexdigest()
+
+
+def occupancy_from_cells(volume: AirVolume, cells: bytes, *, clearance_mm: int) -> Occupancy:
+    """A grid from its cells as :func:`build_occupancy` marked them, with its digest recomputed.
+
+    The objects behind each cell are not kept: they decide which perches are usable, which is
+    settled before a grid is handed on, and the flight's step reads only the cells.
+    """
+    nx, ny, nz = volume.shape
+    if len(cells) != nx * ny * nz or bytes(cells).translate(None, b"\x00\x01"):
+        raise ValueError("a grid holds one byte, 0 or 1, for each of its volume's cells")
+    return Occupancy(
+        volume, bytes(cells), _occupancy_sha256(volume, clearance_mm, cells), clearance_mm
     )
 
 

@@ -1,0 +1,131 @@
+"""What the flight worker and the bounded searches cost, measured on this machine.
+
+    uv run python measure_worker_costs.py --out FILE [--repeats 5]
+
+- **spawn**: wall time from a new episode cache to the answer of its first question, which starts
+  the worker process (spawned, importing the movement package) and asks it who it is;
+- **cold episode**: wall time of a window read through a worker already running, for an input it
+  has never seen, in the two measured worlds with 24 flyers (each repeat a new seed, so a new input);
+  the worker computes the episode whole and hands it back packed;
+- **capped search**: process time of one search for a route home that finds none on the largest
+  grid the flight module admits (a goal sealed inside a box of parts), which the search bound ends
+  after ``route_cells`` settled cells, and of the same search unbounded, for comparison.
+
+Writes JSON; nothing else. No database, no network, no store.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+from dataclasses import replace
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tests"))
+
+from exulanica.movement import flight as flight_module  # noqa: E402
+from exulanica.movement.air import AirVolume, PartBox, Placement, Solid, build_occupancy  # noqa: E402
+from exulanica.movement.flight import FLIGHT_MODULE  # noqa: E402
+from exulanica.world.flight_worker import FlightEpisodes  # noqa: E402
+from scripts.measure_flight_bounds import compose, seeded, seeds  # noqa: E402
+
+WINDOW = FLIGHT_MODULE.value("max_steps_per_request")
+EPISODE = FLIGHT_MODULE.value("episode_steps")
+
+
+def _summary(values):
+    ordered = sorted(values)
+    return {"values": ordered, "median": ordered[len(ordered) // 2], "max": ordered[-1]}
+
+
+def spawn(repeats):
+    walls = []
+    for _ in range(repeats):
+        started = time.perf_counter()
+        episodes = FlightEpisodes()
+        episodes.report()
+        walls.append(round((time.perf_counter() - started) * 1_000_000))
+        episodes.close()
+    return _summary(walls)
+
+
+def cold_episodes(repeats):
+    out = {}
+    episodes = FlightEpisodes()
+    episodes.report()
+    try:
+        for name in ("eight_trees", "cluttered"):
+            base = compose(name)
+            walls = []
+            for index in range(repeats):
+                flight = seeded(base, seeds("development")[index])
+                started = time.perf_counter()
+                episodes.window(flight, 0, WINDOW)
+                walls.append(round((time.perf_counter() - started) * 1_000_000))
+            out[name] = {"flyers": len(base.flyers), **_summary(walls)}
+    finally:
+        episodes.close()
+    return out
+
+
+def capped_search(repeats):
+    half = 26_000
+    volume = AirVolume("declared", -half, half, -half, half, 0, 12_000, 500)
+    at = Placement(20_250, 5_000, 20_250, 0, 1000)
+    walls = (
+        PartBox(-1_500, 1_500, -1_500, 1_500, 0, 400),
+        PartBox(-1_500, 1_500, -1_500, 1_500, 2_200, 2_600),
+        PartBox(-1_500, -1_100, -1_500, 1_500, 0, 2_600),
+        PartBox(1_100, 1_500, -1_500, 1_500, 0, 2_600),
+        PartBox(-1_500, 1_500, -1_500, -1_100, 0, 2_600),
+        PartBox(-1_500, 1_500, 1_100, 1_500, 0, 2_600),
+    )
+    occupancy = build_occupancy(volume, [Solid("box", w, at) for w in walls], clearance_mm=140)
+    flight = replace(compose("small_square"), volume=volume, occupancy=occupancy)
+    kind = next(iter(flight.kinds.values()))
+    far, goal = (-20_000, 6_250, -20_000), (20_250, 6_250, 20_250)
+
+    def timed():
+        started = time.process_time()
+        assert flight_module._route(flight, kind, far, goal) is None
+        return round((time.process_time() - started) * 1_000_000)
+
+    bounded = [timed() for _ in range(repeats)]
+    cells = FLIGHT_MODULE.value("route_cells")
+    flight_module._ROUTE_CELLS = volume.shape[0] * volume.shape[1] * volume.shape[2]
+    try:
+        unbounded = [timed() for _ in range(max(1, repeats // 4))]
+    finally:
+        flight_module._ROUTE_CELLS = cells
+    return {
+        "grid_cells": volume.shape[0] * volume.shape[1] * volume.shape[2],
+        "route_cells": cells,
+        "route_searches": FLIGHT_MODULE.value("route_searches"),
+        "bounded_process_us": _summary(bounded),
+        "unbounded_process_us": _summary(unbounded),
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--repeats", type=int, default=5)
+    arguments = parser.parse_args()
+    started = time.time()
+    result = {
+        "profile": "exulanica.flight-worker/v1/costs",
+        "load_1min_before_milli": round(os.getloadavg()[0] * 1000),
+        "spawn_wall_us": spawn(arguments.repeats),
+        "cold_episode_wall_us": cold_episodes(arguments.repeats),
+        "capped_search": capped_search(4 * arguments.repeats),
+        "seconds": round(time.time() - started, 1),
+    }
+    Path(arguments.out).write_text(json.dumps(result, indent=1))
+    print(json.dumps({k: v for k, v in result.items() if k != "capped_search"})[:600])
+
+
+if __name__ == "__main__":
+    main()
