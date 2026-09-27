@@ -11,8 +11,10 @@ group, of a model the manifest offers a person's decisions or of their own routi
 choice is world data: append-only, with who made it; this host asking the model is the host's own
 business, stated in the read, never a reason to refuse the choice.
 
-Neither route asks a model. The host's playback asks, before a minute, for a workspace its
-environment lists (``exulanica.api.society_person_decisions``).
+Both serve the decision role that decides for a society's people, as the role registry states it
+(:mod:`exulanica.world.decision_roles`): its offered models, its contract and its receipts. Neither
+route asks a model. The host's playback asks, before a minute, for a workspace its environment
+lists (``exulanica.api.decision_host``).
 """
 
 from __future__ import annotations
@@ -26,13 +28,13 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from exulanica.api.decision_host import HOST_REFUSALS
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
-from exulanica.api.society_person_decisions import HOST_REFUSALS
 from exulanica.api.world_scope import WorldId
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import load_manifest
 from exulanica.models.usage import usd_string
+from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society import UnavailableSocietyInput
-from exulanica.world.society_decision_contract import decision_contract
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import (
@@ -52,6 +54,26 @@ PROFILE: Final = "exulanica.society-models/v1"
 DECISIONS_READ: Final = 2000
 #: A refusal the route answers with 409 rather than 422: the society or the key, not the body.
 _CONFLICTS: Final = frozenset({"engine_takes_no_model_choice", "choice_key_reused"})
+#: What the People panel shows: a society's people, so these routes serve the role that decides
+#: for them, as its registry entry names what it decides for.
+SUBJECT: Final = "person"
+
+
+def _people_role() -> DecisionRole:
+    """The one registered role deciding for a society's people, or a refusal by name, which both
+    routes answer as a named problem (:func:`_role_refused`)."""
+    found = [role for role in decision_roles() if role.subject == SUBJECT]
+    if len(found) != 1:
+        raise RoleRefused(
+            "role_not_registered", f"the registry states {len(found)} roles deciding for people"
+        )
+    return found[0]
+
+
+def _role_refused(exc: RoleRefused) -> JSONResponse:
+    """A registry that states no one role deciding for people: this server takes no choice of a
+    model for anybody's people, said by name as an engine that takes none is (409)."""
+    return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
 
 
 class ChosenModel(BaseModel):
@@ -156,13 +178,16 @@ def society_models(
 ) -> Any:
     try:
         society = _society(connection, session, request, world_id)
+        role = _people_role()
         snapshot = society.snapshot(version_id)
         engine = society_engine(snapshot["profile"])
         choices = SocietyModelChoiceRepository(
             connection, session.workspace_id, world_id=world_id
-        ).current(version_id)
+        ).current(version_id, role)
         decisions = (
-            SocietyDecisionRepository(society).person_decisions(version_id, latest=DECISIONS_READ)
+            SocietyDecisionRepository(society).role_decisions(
+                role, version_id, latest=DECISIONS_READ
+            )
             if engine.owner_model_choice
             else []
         )
@@ -170,8 +195,10 @@ def society_models(
         return JSONResponse(
             status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
         )
+    except RoleRefused as exc:
+        return _role_refused(exc)
     manifest = load_manifest()
-    contract = decision_contract()
+    contract = role.contract()
     services = get_services(request)
     refusals: dict[tuple[str, str], str | None] = {}
 
@@ -179,11 +206,11 @@ def society_models(
         """Each chosen model's refusal, judged once for however many people it runs."""
         key = (model["provider"], model["model_id"])
         if key not in refusals:
-            refusals[key] = services.choice_refusal(model, connection, session.workspace_id)
+            refusals[key] = services.choice_refusal(role, model, connection, session.workspace_id)
         return refusals[key]
 
     models = []
-    for spec in manifest.offered_models(Role.SOCIETY_DECISION):
+    for spec in manifest.offered_models(role.chosen):
         mechanism = contract.mechanism_for(spec)
         if mechanism is None:
             continue
@@ -210,10 +237,10 @@ def society_models(
         "society_id": str(snapshot["society_id"]),
         "engine": snapshot["profile"],
         "takes_model_choices": engine.owner_model_choice,
-        "host_refusal": services.model_host_refusal(session.workspace_id),
+        "host_refusal": services.model_host_refusal(session.workspace_id, role),
         "contract": {
             **contract.binding(),
-            "model_people_maximum": contract.value("model_people_maximum"),
+            "model_people_maximum": contract.value(role.subjects_bound),
         },
         "models": models,
         # Each choice with why its model is not asked here, when it is not: the page says the
@@ -272,14 +299,19 @@ def choose_society_model(
     require_world(connection, session.workspace_id, world_id)
     repository = SocietyModelChoiceRepository(connection, session.workspace_id, world_id=world_id)
     try:
+        role = _people_role()
+    except RoleRefused as exc:
+        return _role_refused(exc)
+    try:
         return repository.record_choice(
             version_id,
+            role,
             request_id=body.idempotency_key,
-            people=[str(person) for person in body.people],
+            subjects=[str(person) for person in body.people],
             model=None if body.model is None else body.model.model_dump(),
             chosen_by=session.actor,
             manifest=load_manifest(),
-            contract=decision_contract(),
+            contract=role.contract(),
         )
     except ModelChoiceRefused as exc:
         return JSONResponse(

@@ -200,8 +200,9 @@ def _replay_vision(args: argparse.Namespace, bundle: CorpusBundle, stream: Any) 
     from exulanica.models.cache import FileResponseCache
     from exulanica.models.client import ModelClient
     from exulanica.models.preflight import run_preflight
+    from exulanica.world.decision_roles import decision_roles
 
-    preflight = run_preflight()
+    preflight = run_preflight(chosen=decision_roles().chosen)
     if not preflight.ok:
         failures = "; ".join(str(issue) for issue in preflight.failures)
         raise ReplayError(f"model preflight failed before replay: {failures}")
@@ -248,7 +249,8 @@ def _cmd_run(args: argparse.Namespace, stream: Any) -> int:
     if truth.synthetic:
         try:
             questions = (
-                GoldQuestions.read(args.questions, truth) if getattr(args, "questions", None)
+                GoldQuestions.read(args.questions, truth)
+                if getattr(args, "questions", None)
                 else derive_questions(truth)
             )
         except (OSError, ValueError) as exc:

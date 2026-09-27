@@ -20,7 +20,7 @@ import './society-models.css';
 
 /**
  * Why this host asks no model for this world's people, by `HOST_REFUSALS` in
- * `society_person_decisions.py`: the section and the inspector each say it in a sentence.
+ * `decision_host.py`: the section and the inspector each say it in a sentence.
  */
 export const HOST_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   models_not_run_here: 'this server does not ask models for this world\'s people',
@@ -31,7 +31,7 @@ export const HOST_REFUSAL_WORDS: Readonly<Record<string, string>> = {
 
 /**
  * Why a person's chosen model is not asked here while this host asks others, by `MODEL_REFUSALS`
- * in `society_person_decisions.py`.
+ * in `decision_host.py`.
  */
 export const MODEL_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   model_no_longer_offered: 'the model you chose is no longer offered for decisions',

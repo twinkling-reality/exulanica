@@ -630,7 +630,8 @@ Companion's routes and the API's derivative worker; the standalone derivative wo
 caption pass the same one
 ([`exulanica/ingest/worker_command.py`](../exulanica/ingest/worker_command.py)). A society decision
 releases no place's name: `Services.request_policy` requires the release to be named, and the
-society runtime names `no_place_released`. The vision stage's policy releases no place's name,
+rules the decision host and a comparison attach to every ask (`Services.person_decision_policy`)
+name `no_place_released`. The vision stage's policy releases no place's name,
 because no vision use is offered
 ([`exulanica/ingest/hosted_policy.py`](../exulanica/ingest/hosted_policy.py)).
 `tests/test_place_name_release_paths.py` holds this wiring at the transport. How every other saved

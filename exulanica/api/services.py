@@ -43,14 +43,14 @@ import psycopg
 from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
 from exulanica.api.composer_rights import photograph_text_right
-from exulanica.api.society_comparison_runner import SocietyComparisonRunner
-from exulanica.api.society_control_worker import SocietyControlWorker
-from exulanica.api.society_person_decisions import (
-    PersonDecisionHost,
+from exulanica.api.decision_host import (
+    DecisionHost,
     host_refusal,
     model_refusal,
     question_refusal,
 )
+from exulanica.api.society_comparison_runner import SocietyComparisonRunner
+from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.session import DATABASE_URL_ENV, Database
@@ -70,6 +70,7 @@ from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores, tile_store
+from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society import world_society_seed
 from exulanica.world.society_composition import REVIEWED_REACH_MM, reviewed_affordance_registry
@@ -80,7 +81,6 @@ from exulanica.world.society_controls import (
     DEFAULT_BASE_TICK_INTERVAL_MS,
     validate_settings,
 )
-from exulanica.world.society_decision_contract import decision_contract
 from exulanica.world.texture_assets import load_material_catalog
 
 if TYPE_CHECKING:
@@ -257,16 +257,17 @@ class Services:
             )
         )
 
-    def person_decision_host(self) -> PersonDecisionHost | None:
-        """What asks a purposeful society's chosen models before a minute, or None without one.
+    def decision_host(self) -> DecisionHost | None:
+        """What asks the models a society's owner chose before a minute, for every role its engine
+        hosts, or None without a society runtime.
 
         Only the workspaces this host's environment lists are asked for; a workspace account
         discovery adds is played by its routine alone. Each ask carries the workspace's rules,
-        with no place's name released: a person's decision is not a use a place-name right offers.
+        with no place's name released: a role's decision is not a use a place-name right offers.
         """
         if self.society_runtime is None:
             return None
-        return PersonDecisionHost(
+        return DecisionHost(
             database=self.database,
             runtime=self.society_runtime,
             client=self.model_client,
@@ -277,7 +278,7 @@ class Services:
         )
 
     def person_decision_policy(self, workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
-        """The rules a person's decision is asked under, by the host and by a comparison alike:
+        """The rules any role's decision is asked under, by the host and by a comparison alike:
         the workspace's own, with no place's name released."""
         return self.request_policy(
             workspace_id,
@@ -304,16 +305,17 @@ class Services:
             actor=actor,
         )
 
-    def model_host_refusal(self, workspace_id: uuid.UUID) -> str | None:
-        """Why this host asks no model for a workspace's people, or None when it asks them.
+    def model_host_refusal(self, workspace_id: uuid.UUID, role: DecisionRole) -> str | None:
+        """Why this host asks no model for a workspace's subjects of ``role``, or None when it
+        asks them.
 
-        The facts :meth:`person_decision_host` acts on: the workspaces the environment lists, the
-        process's client, and what is left of its budget and of the share people's decisions may
-        spend. A code from ``HOST_REFUSALS``.
+        The facts :meth:`decision_host` acts on: the workspaces the environment lists, the
+        process's client, and what is left of its budget and of the share the role's decisions
+        may spend. A code from ``HOST_REFUSALS``.
         """
         if workspace_id not in self.society_control_workspaces:
             return "models_not_run_here"
-        return host_refusal(self.model_client, load_manifest(), decision_contract())
+        return host_refusal(role, self.model_client, load_manifest(), role.contract())
 
     def provider_refusal(self, provider: str) -> str | None:
         """Why this process asks no model a provider serves, or None when it may ask them."""
@@ -322,17 +324,22 @@ class Services:
         return self.model_client.refusals.get(provider)
 
     def choice_refusal(
-        self, model: Mapping[str, str], connection: psycopg.Connection, workspace_id: uuid.UUID
+        self,
+        role: DecisionRole,
+        model: Mapping[str, str],
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
     ) -> str | None:
-        """Why a person's chosen model is not asked here, or None: a code from MODEL_REFUSALS.
+        """Why a subject's chosen model is not asked here, or None: a code from MODEL_REFUSALS.
 
         The question is judged by the workspace's rules as the host judges it, on ``connection``,
         which the caller lends idle.
         """
-        refusal = model_refusal(self.model_client, load_manifest(), decision_contract(), model)
+        refusal = model_refusal(role, self.model_client, load_manifest(), role.contract(), model)
         if refusal is not None or self.model_client is None:
             return refusal
         return question_refusal(
+            role,
             self.model_client.with_policy(
                 self.request_policy(
                     workspace_id, borrowing(connection), released_places=no_place_released
@@ -358,9 +365,7 @@ class Services:
                 else None
             ),
             base_tick_interval_ms=self.society_base_tick_interval_ms,
-            before_minute=(
-                None if (host := self.person_decision_host()) is None else host.before_minute
-            ),
+            before_minute=(None if (host := self.decision_host()) is None else host.before_minute),
         )
 
     @property
@@ -382,7 +387,19 @@ class Services:
             # Said only where a playback host asks models for people, which is only for the
             # workspaces the environment lists: one enabled by account discovery alone asks nobody.
             spent = (
-                host_refusal(self.model_client, load_manifest(), decision_contract())
+                next(
+                    (
+                        refused
+                        for role in decision_roles()
+                        if (
+                            refused := host_refusal(
+                                role, self.model_client, load_manifest(), role.contract()
+                            )
+                        )
+                        is not None
+                    ),
+                    None,
+                )
                 if self.society_control_workspaces
                 else None
             )

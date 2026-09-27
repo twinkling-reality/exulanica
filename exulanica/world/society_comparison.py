@@ -25,10 +25,12 @@ arm: the model their world's owner chose, asked the same way, or their routine. 
 only in who decides for the group.
 
 The minutes run back to back: nothing waits for a playback interval, and a minute waits only for
-its slowest answer. Asking is not done here. :func:`play` takes an :class:`Asking` port; the
-host's runner asks models through it, and :func:`replay` answers from what a run stored, with no
-client at all, then holds every rebuilt request and receipt to the stored bytes and every minute's
-state to its recorded digest. A replay that differs anywhere is refused by name
+its slowest answer. They are the one minute loop every decision role runs by
+(:func:`~exulanica.world.role_decisions.play_minutes`), under the person role, with each arm's
+deciders as the loop's own hooks. Asking is not done here. :func:`play` takes an :class:`Asking`
+port; the host's runner asks models through it, and :func:`replay` answers from what a run stored,
+with no client at all, then holds every rebuilt request and receipt to the stored bytes and every
+minute's state to its recorded digest. A replay that differs anywhere is refused by name
 (:class:`ReplayMismatch`), never shown.
 
 Nothing here reads or writes a database or the live society: a run is its own, and the world it
@@ -41,22 +43,22 @@ import uuid
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Final, Protocol
+from typing import Any, Final
 
+from exulanica.world.role_decisions import (
+    Asking,
+    PlayedMinutes,
+    ReplayMismatch,
+    play_minutes,
+    replay_minutes,
+)
 from exulanica.world.society import SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
     DecisionContract,
     DecisionOption,
-    at_choice_point,
-    choice_options,
     option_goal_policy,
+    person_role,
 )
-from exulanica.world.society_decisions import (
-    person_request,
-    receipt_for,
-    validate_decision_receipt,
-)
-from exulanica.world.society_model_decisions import append_decision_events, model_goal_policies
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,
@@ -84,34 +86,6 @@ DECIDER_KINDS: Final = ("routine", "wait", "model")
 OTHER_DECIDER_KINDS: Final = ("routine", "model")
 #: The routine's decider, for a person nobody chose a model for.
 ROUTINE: Final = {"kind": "routine"}
-
-
-class ReplayMismatch(ValueError):
-    """A stored run does not replay to what it recorded."""
-
-    code: Final = "run_replay_mismatch"
-
-    def __init__(self, detail: str, *, minute: int | None = None) -> None:
-        where = "" if minute is None else f" at minute {minute}"
-        super().__init__(f"run_replay_mismatch{where}: {detail}")
-        self.minute = minute
-
-
-class Asking(Protocol):
-    """What a run asks of the world outside it, minute by minute."""
-
-    def offerable(
-        self, tick: int, due: Mapping[str, Sequence[DecisionOption]]
-    ) -> Mapping[str, frozenset[str]]:
-        """For each person due at ``tick``, with the options they have, the labels that may be
-        offered to them. Asked once a minute, for every person due in it, whichever model decides
-        for them."""
-        ...
-
-    def answers(self, requests: Sequence[dict[str, Any]]) -> Sequence[dict[str, Any]]:
-        """One result per request, in the same order: ``{status, reason, proposal, provider}``,
-        as a receipt records it."""
-        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,11 +209,58 @@ def _wait_policy(contract: DecisionContract) -> dict[str, Any]:
     )
 
 
-def _only(labels: frozenset[str]) -> Callable[[Sequence[DecisionOption]], list[DecisionOption]]:
-    def offered(options: Sequence[DecisionOption]) -> list[DecisionOption]:
-        return [option for option in options if option.label in labels]
+def _minutes(
+    plan: RunPlan,
+    asking: Asking,
+    *,
+    start: dict[str, Any],
+    on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None]
+    | None = None,
+) -> PlayedMinutes:
+    """``plan``'s minutes, by the one loop every role runs by: the arm's model asked for its
+    people, its waiting anchor as the seam each minute begins from, the routine for the rest."""
+    role = person_role()
+    waiting = _wait_policy(plan.contract)
 
-    return offered
+    def config_for(subject: str) -> Mapping[str, Any] | None:
+        decider, config = plan.decider_for(subject)
+        return config if decider["kind"] == "model" else None
+
+    def seam(_state: Mapping[str, Any], due: Sequence[str]) -> dict[str, dict[str, Any]]:
+        return {
+            subject: dict(waiting)
+            for subject in due
+            if plan.decider_for(subject)[0]["kind"] == "wait"
+        }
+
+    return play_minutes(
+        [role],
+        role,
+        start=start,
+        sources=plan.inputs,
+        seed=plan.seed,
+        ticks=plan.ticks,
+        step=lambda state, seed, consumed, policies: advance_purposeful_society(
+            dict(state), seed, [dict(document) for document in consumed], goal_policy=policies
+        ),
+        config_for=config_for,
+        request_id_for=lambda subject, tick: request_id(plan.run_id, subject, tick),
+        asking=asking,
+        seam=seam,
+        contract=plan.contract,
+        on_minute=on_minute,
+    )
+
+
+def _run(start: dict[str, Any], minutes: PlayedMinutes) -> PlayedRun:
+    return PlayedRun(
+        start=start,
+        states=minutes.states,
+        events=minutes.events,
+        requests=minutes.requests,
+        receipts=minutes.receipts,
+        choice_points=minutes.choice_points,
+    )
 
 
 def play(
@@ -254,107 +275,10 @@ def play(
     ``on_minute(tick, requests, receipts)`` is called after each minute's answers are receipted
     and before the minute advances, so a caller can store what it paid for as it goes.
     """
-    state = genesis(plan)
-    played = PlayedRun(start=state)
-    if plan.group is not None and not plan.group <= {p["id"] for p in state["inhabitants"]}:
+    start = genesis(plan)
+    if plan.group is not None and not plan.group <= {p["id"] for p in start["inhabitants"]}:
         raise ValueError("group_person_not_in_run: every person of a group is one of the run's")
-    latest = plan.inputs[-1]
-    waiting = _wait_policy(plan.contract)
-    sequence = 0
-    for minute in range(1, plan.ticks + 1):
-        consumed = list(plan.inputs) if minute == 1 else [latest]
-        people = sorted(
-            (person for person in state["inhabitants"] if at_choice_point(person)),
-            key=lambda person: person["id"],
-        )
-        played.choice_points.update(person["id"] for person in people)
-        directed: dict[str, dict[str, Any]] = {}
-        requests: list[dict[str, Any]] = []
-        due: dict[str, Sequence[DecisionOption]] = {}
-        configs: dict[str, Mapping[str, Any] | None] = {}
-        for person in people:
-            decider, config = plan.decider_for(person["id"])
-            if decider["kind"] == "wait":
-                directed[person["id"]] = dict(waiting)
-            elif decider["kind"] == "model":
-                options = choice_options(state, latest, person["id"], plan.contract, seed=plan.seed)
-                if options:
-                    due[person["id"]] = options
-                    configs[person["id"]] = config
-        kept = asking.offerable(state["tick"], due) if due else {}
-        for subject in sorted(due):
-            request, _status = person_request(
-                state,
-                latest,
-                subject,
-                request_id=request_id(plan.run_id, subject, state["tick"]),
-                contract=plan.contract,
-                seed=plan.seed,
-                provider_config=dict(configs[subject] or {}),
-                offer=_only(kept.get(subject, frozenset())),
-            )
-            if request is not None:
-                requests.append(request)
-        results = list(asking.answers(requests)) if requests else []
-        if len(results) != len(requests):
-            raise ValueError("every request of a minute gets exactly one result")
-        receipts = []
-        for request, result in zip(requests, results, strict=True):
-            sequence += 1
-            receipt = receipt_for(request, sequence, dict(result))
-            validate_decision_receipt(receipt, request)
-            receipts.append(receipt)
-        if on_minute is not None:
-            on_minute(state["tick"] + 1, requests, receipts)
-        policies, decided = model_goal_policies(state, latest, receipts, directed)
-        after, events = advance_purposeful_society(state, plan.seed, consumed, goal_policy=policies)
-        events = append_decision_events(state, after, latest, receipts, decided, events)
-        played.states.append(after)
-        played.events.extend(events)
-        played.requests.extend(requests)
-        played.receipts.extend(receipts)
-        state = after
-    return played
-
-
-@dataclass(frozen=True, slots=True)
-class _Stored:
-    """Answers from what a run stored: the options each stored request offered, and its receipt."""
-
-    requests: Mapping[tuple[str, int], dict[str, Any]]
-    receipts: Mapping[str, dict[str, Any]]
-    used: set[str]
-
-    def offerable(
-        self, tick: int, due: Mapping[str, Sequence[DecisionOption]]
-    ) -> dict[str, frozenset[str]]:
-        # A person the run asked was offered exactly the options their stored request records;
-        # one it did not ask was offered too few, and is offered none again.
-        return {
-            subject: frozenset(
-                option["label"]
-                for option in self.requests.get((subject, tick), {"context": {"options": []}})[
-                    "context"
-                ]["options"]
-            )
-            for subject in due
-        }
-
-    def answers(self, requests: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-        results = []
-        for request in requests:
-            minute = request["base_tick"] + 1
-            stored = self.requests.get((request["subject_id"], request["base_tick"]))
-            receipt = self.receipts.get(request["request_id"])
-            if stored is None or receipt is None:
-                raise ReplayMismatch("a rebuilt request has no stored answer", minute=minute)
-            if stored != request or receipt["request_sha256"] != request["document_sha256"]:
-                raise ReplayMismatch("a rebuilt request is not the one stored", minute=minute)
-            self.used.add(request["request_id"])
-            results.append(
-                {key: receipt[key] for key in ("status", "reason", "proposal", "provider")}
-            )
-        return results
+    return _run(start, _minutes(plan, asking, start=start, on_minute=on_minute))
 
 
 def replay(
@@ -371,21 +295,10 @@ def replay(
     not the stored one, a receipt that is not rebuilt to the same bytes, a stored receipt no minute
     asks for, or a minute that ends in another state: each is a :class:`ReplayMismatch`.
     """
-    requests = {(str(r["subject_id"]), int(r["base_tick"])): dict(r) for r, _ in stored}
-    receipts = {str(receipt["request_id"]): dict(receipt) for _, receipt in stored}
-    if len(requests) != len(stored) or len(receipts) != len(stored):
-        raise ReplayMismatch("a person is asked twice in one minute, or a request answered twice")
-    answering = _Stored(requests, receipts, set())
-    played = play(plan, answering)
-    if len(played.states) != len(minute_digests):
-        raise ReplayMismatch("the run recorded another number of minutes")
-    for minute, (found, recorded) in enumerate(
-        zip(played.minute_digests, minute_digests, strict=True), 1
-    ):
-        if found != recorded:
-            raise ReplayMismatch("the minute ends in another state", minute=minute)
-    if [dict(receipt) for _, receipt in stored] != played.receipts:
-        raise ReplayMismatch("a stored receipt is not the one its request rebuilds")
-    if answering.used != set(receipts):
-        raise ReplayMismatch("a stored receipt answers no request the run asks")
-    return played
+    start = genesis(plan)
+    minutes = replay_minutes(
+        stored,
+        minute_digests=minute_digests,
+        play=lambda asking: _minutes(plan, asking, start=start),
+    )
+    return _run(start, minutes)

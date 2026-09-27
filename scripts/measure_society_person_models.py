@@ -40,7 +40,7 @@ browser's own seed, for ``TICKS`` simulated minutes. In a model's arm every pers
 that model through the owner's own route, and the world is set playing through the control route.
 Every minute is a claim of the playback worker the application builds for the workspaces it lists
 (``Services.build_society_control_worker``): the claim, the host's decision phase before the
-minute (``PersonDecisionHost.before_minute``), then the minute. The one thing the harness does that
+minute (``DecisionHost.before_minute``), then the minute. The one thing the harness does that
 a host does not is make each claim due at once, rather than wait the host's base interval. Then
 the models route's read, every receipt, and a replay of the whole history with the process's
 billed calls counted before and after.
@@ -680,11 +680,11 @@ def summarise(arm: Mapping[str, Any]) -> dict[str, Any]:
 
 def _offered(manifest: Any, contract: Any) -> list[Any]:
     """The models the manifest offers a person's decisions that the contract can ask, in order."""
-    from exulanica.models.manifest import Role
+    from exulanica.world.society_decision_contract import person_role
 
     return [
         spec
-        for spec in manifest.offered_models(Role.SOCIETY_DECISION)
+        for spec in manifest.offered_models(person_role().chosen)
         if contract.mechanism_for(spec) is not None
     ]
 
@@ -844,7 +844,7 @@ def preregister() -> None:
             "played_by": (
                 "the playback worker the application builds for the workspaces it lists "
                 "(Services.build_society_control_worker), one claim at a time: the claim, the "
-                "host's decision phase before the minute (PersonDecisionHost.before_minute), "
+                "host's decision phase before the minute (DecisionHost.before_minute), "
                 "then the minute"
             ),
             "harness_intervention": (
@@ -935,13 +935,14 @@ def probe(as_run: bytes) -> None:
         TransportError,
         TruncatedResponseError,
     )
-    from exulanica.models.manifest import AnsweringMechanism, Role, load_manifest
+    from exulanica.models.manifest import AnsweringMechanism, load_manifest
     from exulanica.models.policy import BenchmarkInputs
     from exulanica.world.society_decision_contract import (
         PROMPT_VERSION,
         choice_request,
         decision_contract,
         decision_messages,
+        person_role,
     )
 
     # The tree, before anything is asked.
@@ -978,7 +979,7 @@ def probe(as_run: bytes) -> None:
                 started = time.monotonic()
                 try:
                     chosen = sender.choose(
-                        Role.SOCIETY_DECISION,
+                        person_role().chosen,
                         model_id,
                         decision_messages(case, mechanism),
                         choice_request(case),

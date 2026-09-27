@@ -24,13 +24,13 @@ from decimal import Decimal
 
 import psycopg
 import pytest
+from exulanica.api.decision_host import world_hour
 from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
 from exulanica.api.society_control_worker import SocietyControlWorker
-from exulanica.api.society_person_decisions import world_hour
 from exulanica.api.society_runtime import NOT_ANNOUNCED, SocietyRuntime, _ReadFirst
 from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.env import env_get
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import load_manifest
 from exulanica.orchestration.compare import comparison_body
 from exulanica.selection.validation import Session
 from exulanica.store.local import LocalContentAddressedStore
@@ -41,6 +41,7 @@ from exulanica.world.society import (
     inputs_ahead,
 )
 from exulanica.world.society_controls import LEASE_SECONDS
+from exulanica.world.society_decision_contract import person_role
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_repository import SocietyRepository
@@ -54,7 +55,7 @@ import test_society_stay_requests_api as stays
 import test_world_arrangements as arrangements
 from asset_lock_support import recorded_store_reads
 from comparison_support import SEEDS, seeded_catalogs
-from retired_society_support import plant_in_saved_world
+from retired_society_support import plant_in_saved_world, plant_retired_decision
 from tests_support_api import EVERY_PERMISSION, scratch_database
 
 pytestmark = pytest.mark.postgres
@@ -220,7 +221,7 @@ def test_a_comparison_run_planned_over_two_inputs_reads_nothing_under_the_lock(
         )
         models = [
             ComparisonArm(spec.provider, spec.model_id)
-            for spec in manifest.offered_models(Role.SOCIETY_DECISION)[:2]
+            for spec in manifest.offered_models(person_role().chosen)[:2]
         ]
         comparison_id = uuid.uuid4()
         runner.define(
@@ -327,7 +328,7 @@ def test_the_small_square_in_an_inhabited_world_reads_nothing_under_the_lock(
 @CURRENT_GROUND
 def test_a_stored_decision_read_reads_nothing_under_the_lock(runtime_app, monkeypatch):
     """Reading a stored social decision back authorizes its context and the latest input in one
-    transaction. The proposal route is retired, so the request is recorded as it recorded one
+    transaction. The proposal route is retired, so the request is planted as it recorded one
     with no provider configured, and the read is what is left of that route."""
     world, make_app = runtime_app
     scope, _, society = saved_api.routes(world)
@@ -351,19 +352,12 @@ def test_a_stored_decision_read_reads_nothing_under_the_lock(runtime_app, monkey
                 )
             )
             with connection.transaction():
-                decisions.prepare(
+                plant_retired_decision(
+                    decisions,
                     version_id,
                     request_id=request_id,
-                    subject_id=uuid.UUID(state["state"]["social"]["cast_ids"][1]),
-                    base_tick=state["current_tick"],
-                    base_state_sha256=state["state_sha256"],
-                    provider_config=None,
-                )
-            with connection.transaction():
-                decisions.finish(
-                    version_id,
-                    request_id,
-                    {"status": "unavailable", "reason": "provider_not_configured"}
+                    subject_id=state["state"]["social"]["cast_ids"][1],
+                    result={"status": "unavailable", "reason": "provider_not_configured"}
                     | {"proposal": None, "provider": None},
                 )
         reads = _reads(world, http, monkeypatch)
@@ -381,8 +375,21 @@ def test_a_decision_finished_after_an_edit_reads_nothing_under_the_lock(runtime_
     """The world changed while the model was asked: the latest input names an asset the request's
     input does not, and the finish authorizes both in one transaction."""
     world, make_app = runtime_app
+    role = person_role()
+    contract = role.contract()
+    spec = load_manifest().offered_models(role.chosen)[0]
+    config = {
+        "provider": spec.provider,
+        "model_id": spec.model_id,
+        "mechanism": "tool_call",
+        "choice_seq": 1,
+        "manifest_sha256": "a" * 64,
+        "prompt_version": role.prompt_version,
+        "contract": contract.binding(),
+        "deadline_ms": contract.value("decision_deadline_ms"),
+    }
     with TestClient(make_app()) as http:
-        _inhabited(http, world, SOCIAL)
+        _inhabited(http, world)
         _step(http, world)
         _remove(http, world, "object:second")
         state = _step(http, world)
@@ -390,7 +397,6 @@ def test_a_decision_finished_after_an_edit_reads_nothing_under_the_lock(runtime_
         runtime = services.society_runtime
         session = Session(workspace_id=world["workspace"], actor=world["session"].actor)
         version_id = world["binding"].version_id
-        request_id = uuid.uuid4()
 
         def decisions(connection):
             return SocietyDecisionRepository(
@@ -402,26 +408,45 @@ def test_a_decision_finished_after_an_edit_reads_nothing_under_the_lock(runtime_
                 )
             )
 
-        with services.database.session(world["workspace"]) as connection:
-            with connection.transaction():
-                _, fresh = decisions(connection).prepare(
-                    version_id,
-                    request_id=request_id,
-                    subject_id=uuid.UUID(state["state"]["social"]["cast_ids"][1]),
-                    base_tick=state["current_tick"],
-                    base_state_sha256=state["state_sha256"],
-                    provider_config=None,
-                )
-            assert fresh
-            saved_api.place(http, world, "object:again", -3_000, 5_000, asset="pillar")
-            reads = _reads(world, http, monkeypatch)
-            with connection.transaction():
-                finished = decisions(connection).finish(
-                    version_id,
-                    request_id,
-                    {"status": "unavailable", "reason": "provider_not_configured"}
-                    | {"proposal": None, "provider": None},
-                )
+        def reserved(state) -> uuid.UUID | None:
+            """The request of the first person at a choice point this minute, or None."""
+            with services.database.session(world["workspace"]) as connection:
+                for person in state["state"]["inhabitants"]:
+                    request_id = uuid.uuid4()
+                    with connection.transaction():
+                        made, _ = decisions(connection).prepare_role(
+                            role,
+                            version_id,
+                            request_id=request_id,
+                            subject_id=uuid.UUID(person["id"]),
+                            base_tick=state["current_tick"],
+                            base_state_sha256=state["state_sha256"],
+                            contract=contract,
+                            provider_config=config,
+                        )
+                    if made["request"] is not None:
+                        return request_id
+            return None
+
+        for _ in range(30):
+            request_id = reserved(state)
+            if request_id is not None:
+                break
+            state = _step(http, world)
+        else:
+            raise AssertionError("nobody reached a choice point in thirty minutes")
+        saved_api.place(http, world, "object:again", -3_000, 5_000, asset="pillar")
+        reads = _reads(world, http, monkeypatch)
+        with (
+            services.database.session(world["workspace"]) as connection,
+            connection.transaction(),
+        ):
+            finished = decisions(connection).finish(
+                version_id,
+                request_id,
+                {"status": "unavailable", "reason": "model_unavailable"}
+                | {"proposal": None, "provider": None},
+            )
     assert finished["decision"]["reason"] == "decision_context_changed", "the edit was seen"
     assert reads.under_the_lock == []
     assert _society_read_its_bytes(reads)
@@ -525,7 +550,9 @@ def test_every_chosen_persons_answer_is_recorded_when_its_finish_meets_the_race_
     # The calls that were made stay on the receipts, so the world's hourly bounds count them.
     assert all(r["provider"] is not None and r["provider"]["model_id"] for r in receipts)
     with services.database.session(world["workspace"]) as connection:
-        asked, spent = world_hour(connection, world["workspace"], world["binding"].world_id)
+        asked, spent = world_hour(
+            connection, world["workspace"], world["binding"].world_id, person_role()
+        )
     assert asked == len(receipts)
     assert spent == sum(Decimal(str(r["provider"]["cost_usd"])) for r in receipts)
     with services.database.session(world["workspace"]) as connection:

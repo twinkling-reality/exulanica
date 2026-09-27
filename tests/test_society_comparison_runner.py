@@ -20,9 +20,13 @@ from exulanica.api.society_comparison_runner import (
 from exulanica.api.society_person_decisions import ask_bound_usd, model_refusal
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import load_manifest
 from exulanica.models.usage import CallUsage
-from exulanica.world.society_decision_contract import DecisionOption, decision_contract
+from exulanica.world.society_decision_contract import (
+    DecisionOption,
+    decision_contract,
+    person_role,
+)
 
 from comparison_support import model_arm
 from model_fakes import FakeTransport, RecordingPolicy
@@ -30,7 +34,7 @@ from model_fakes import FakeTransport, RecordingPolicy
 MANIFEST = load_manifest()
 CONTRACT = decision_contract()
 ARM = model_arm("candidate")
-SPEC = MANIFEST.offered(Role.SOCIETY_DECISION, ARM["decider"]["model_id"])
+SPEC = MANIFEST.offered(person_role().chosen, ARM["decider"]["model_id"])
 DUE = {
     "someone": (
         DecisionOption("resting on a bench, 5 m away", "target", "go", "t", "rest", 5000),
@@ -42,7 +46,7 @@ DUE = {
 def _spend(budget: BudgetGuard, usd: Decimal) -> None:
     budget.record(
         CallUsage(
-            role=Role.SOCIETY_DECISION,
+            role=person_role().chosen.role,
             model_id=SPEC.model_id,
             provider=SPEC.provider,
             prompt_tokens=0,

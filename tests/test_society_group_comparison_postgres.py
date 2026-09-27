@@ -37,11 +37,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import load_manifest
 from exulanica.orchestration.compare import comparison_body
 from exulanica.world.society_comparison_repository import SocietyComparisonRepository
 from exulanica.world.society_comparison_result import ComparisonRefused
-from exulanica.world.society_decision_contract import decision_contract
+from exulanica.world.society_decision_contract import decision_contract, person_role
 from fastapi.testclient import TestClient
 
 import test_society_authored_world_postgres as helpers
@@ -165,7 +165,7 @@ def test_a_group_is_the_owners_choice_and_everybody_else_keeps_theirs(app):
     # the anchors and the routine with none.
     contract = decision_contract()
     answering = {
-        model.model_id: contract.answering(MANIFEST.offered(Role.SOCIETY_DECISION, model.model_id))
+        model.model_id: contract.answering(MANIFEST.offered(person_role().chosen, model.model_id))
         for model in (first, second)
     }
     assert {arm["key"]: arm["answering"] for arm in result["arms"]} == {
@@ -464,7 +464,7 @@ def test_a_group_comparison_over_two_inputs_reads_nothing_under_the_lock(
                     runner,
                     [
                         compared.ComparisonArm(spec.provider, spec.model_id)
-                        for spec in MANIFEST.offered_models(Role.SOCIETY_DECISION)[:1]
+                        for spec in MANIFEST.offered_models(person_role().chosen)[:1]
                     ],
                     SEEDS[:1],
                     control=False,

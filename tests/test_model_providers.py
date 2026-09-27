@@ -21,15 +21,21 @@ from exulanica.models.handoff import ModelHandoff, egress_origin
 from exulanica.models.manifest import (
     MANIFEST_PATH,
     AnsweringMechanism,
+    ChosenRoleBinding,
     Role,
     load_manifest,
     parse_manifest,
 )
+from exulanica.world.decision_roles import decision_roles
 
 from model_fakes import FakeTransport
 
 #: The probe record the shipped manifest names; the parser checks only a record path's shape.
 PROBE_RECORD = "docs/evaluation/2026-09-25-society-person-models-probe.json"
+#: A role a world chooses a model for, as the decision role registry would pass one down.
+CHOSEN = ChosenRoleBinding(
+    role="example_choice", required_use_cases=("text",), rationale="A role these tests declare."
+)
 
 
 def _document() -> dict:
@@ -116,23 +122,24 @@ def test_a_provider_states_exactly_its_fields():
 
 
 def test_a_role_both_bound_and_chosen_is_refused():
-    document = _document()
-    document["chosen_roles"]["vision"] = {"required_use_cases": ["text"], "rationale": "twice"}
-    with pytest.raises(ManifestError, match="never both"):
-        parse_manifest(document)
+    with pytest.raises(ManifestError, match="binds to a model"):
+        ChosenRoleBinding(role=Role.VISION.value, required_use_cases=("text",), rationale="twice")
+    # The positive control: a key the manifest binds nothing to is a chosen role's.
+    assert CHOSEN.role == "example_choice"
 
 
 def test_a_chosen_role_has_no_model_of_its_own(manifest):
-    with pytest.raises(ManifestError, match="chosen by the world"):
-        manifest[Role.SOCIETY_DECISION]
-    with pytest.raises(ManifestError, match="not chosen by a world"):
-        manifest.chosen(Role.VISION)
+    with pytest.raises(ManifestError, match="offered"):
+        manifest[CHOSEN.role]
 
 
-def test_a_chosen_role_states_no_primary_or_timeout():
+def test_the_manifest_states_no_chosen_role():
+    """A role a world chooses a model for is the decision role registry's to declare, once: a
+    manifest that states one is refused by name, and the shipped one states none."""
+    assert "chosen_roles" not in _document()
     document = _document()
-    document["chosen_roles"]["society_decision"]["timeout_seconds"] = 20
-    with pytest.raises(ManifestError, match="caller bounds its calls"):
+    document["chosen_roles"] = {"example_choice": {"required_use_cases": ["text"]}}
+    with pytest.raises(ManifestError, match="decision role registry"):
         parse_manifest(document)
 
 
@@ -144,17 +151,17 @@ def test_a_model_is_offered_to_a_chosen_role_only_with_a_verified_mechanism():
         raw.pop("answering", None)
         raw.pop("answering_order", None)
     bare = parse_manifest(document)
-    assert bare.offered_models(Role.SOCIETY_DECISION) == ()
+    assert bare.offered_models(CHOSEN) == ()
     with pytest.raises(ManifestError, match="not offered"):
-        bare.offered(Role.SOCIETY_DECISION, model_id)
+        bare.offered(CHOSEN, model_id)
 
     document["models"][model_id]["answering"] = {"tool_call": PROBE_RECORD}
     verified = parse_manifest(document)
-    spec = verified.offered(Role.SOCIETY_DECISION, model_id)
+    spec = verified.offered(CHOSEN, model_id)
     assert spec.answering == {AnsweringMechanism.TOOL_CALL: PROBE_RECORD}
-    assert [s.model_id for s in verified.offered_models(Role.SOCIETY_DECISION)] == [model_id]
+    assert [s.model_id for s in verified.offered_models(CHOSEN)] == [model_id]
     assert model_id in verified.referenced_model_ids()
-    handoff = ModelHandoff.chosen(verified, Role.SOCIETY_DECISION, model_id)
+    handoff = ModelHandoff.chosen(verified, CHOSEN, model_id)
     assert [identity.model_id for identity in handoff.identities] == [model_id]
     assert handoff.destination == verified.provider(spec.provider).origin
 
@@ -163,9 +170,13 @@ def test_a_verified_model_without_the_roles_use_cases_is_not_offered():
     document = _document()
     model_id = _a_chat_model(document)
     document["models"][model_id]["answering"] = {"json_schema": PROBE_RECORD}
-    document["chosen_roles"]["society_decision"]["required_use_cases"] = ["a_use_case_nobody_has"]
     manifest = parse_manifest(document)
-    assert manifest.offered_models(Role.SOCIETY_DECISION) == ()
+    needing = ChosenRoleBinding(
+        role="example_choice", required_use_cases=("a_use_case_nobody_has",), rationale="A test."
+    )
+    assert manifest.offered_models(needing) == ()
+    # The positive control: the same model is offered to a role needing only text.
+    assert model_id in {spec.model_id for spec in manifest.offered_models(CHOSEN)}
 
 
 @pytest.mark.parametrize(
@@ -192,9 +203,10 @@ def test_every_verified_mechanism_names_a_probe_record_whose_verdict_verified_it
     probe did not verify, or a record the tree does not hold, fails here.
     """
     manifest = load_manifest()
-    offered = manifest.offered_models(Role.SOCIETY_DECISION)
-    # A positive control: the probe verified some model, so the loop below reads real verdicts.
-    assert offered, "no model is offered to a person's decisions"
+    # A positive control: every registered role is offered a model the probe verified, so the loop
+    # below reads real verdicts.
+    for role in decision_roles():
+        assert manifest.offered_models(role.chosen), f"no model is offered to {role.key}"
     root = MANIFEST_PATH.parents[2]
     for spec in manifest.models.values():
         for mechanism, record_path in spec.answering.items():

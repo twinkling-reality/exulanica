@@ -31,13 +31,14 @@ import pytest
 from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.orchestration.compare import comparison_body
 from exulanica.world.society_comparison_repository import (
     ComparisonConflict,
     SocietyComparisonRepository,
 )
+from exulanica.world.society_decision_contract import person_role
 
 import test_society_stay_requests_api as stays
 from comparison_support import SEEDS, seeded_catalogs
@@ -94,7 +95,7 @@ def _runner(world, services, transport, *, client=True) -> SocietyComparisonRunn
 
 
 def _models() -> list[ComparisonArm]:
-    offered = load_manifest().offered_models(Role.SOCIETY_DECISION)
+    offered = load_manifest().offered_models(person_role().chosen)
     return [ComparisonArm(spec.provider, spec.model_id) for spec in offered[:2]]
 
 

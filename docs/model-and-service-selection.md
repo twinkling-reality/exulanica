@@ -25,7 +25,7 @@ Provider availability and prices must be checked again before an execution campa
 | Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. A pre-registered held-out comparison kept Nano against Super and Ultra: neither cleared the margin on hard grounded questions ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). |
 | Request classification, search planning and appearance drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request` and `draft_appearance` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
 | Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. On synthetic held-out photographs M3 omitted and misplaced fewer objects than MiniCPM, which also reported people who were not there ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). Synthetic drawings do not establish accuracy on real photographs. |
-| A person's decisions in a world | The open model the world's owner chose for that person, among those the manifest offers the `society_decision` role; none unless chosen | `exulanica/api/society_person_decisions.py` asks through `ModelClient.choose` before a minute of play, and the planner takes only a validated answer ([below](#providers-chosen-roles-and-a-persons-decisions)). Each offered model's mechanism was verified by a pre-registered probe ([record](evaluation/2026-09-25-society-person-models-probe.json)); the measurement compares what four models decide ([record](evaluation/2026-09-25-society-person-models.json)). |
+| A person's decisions in a world | The open model the world's owner chose for that person, among those the manifest offers the person's decision role (`society_decision`, declared by the decision role registry); none unless chosen | `exulanica/api/decision_host.py` asks through `ModelClient.choose` before a minute of play, and the planner takes only a validated answer ([below](#providers-chosen-roles-and-a-persons-decisions)). Each offered model's mechanism was verified by a pre-registered probe ([record](evaluation/2026-09-25-society-person-models-probe.json)); the measurement compares what four models decide ([record](evaluation/2026-09-25-society-person-models.json)). |
 | Caption/text semantic retrieval | Nebius Token Factory: Qwen3-Embedding-8B, 4096 dimensions | `exulanica/epistemics/caption_embeddings.py` and `exulanica/selection/embeddings.py`; lexical and cosine retrieval, not direct image embeddings. No model fallback is configured for embeddings. |
 | Object boxes | Grounding DINO Tiny; OWLv2 Base Patch16 Ensemble fallback | `exulanica/ingest/stages/segmentation.py`; local inference when hosted observations lack suitable boxes. |
 | Object masks | SAM 2.1 Hiera Tiny | Same segmentation module; masks are distinct from human identity confirmation, source rights and placement into recovered shared coordinates. |
@@ -40,10 +40,10 @@ Google OIDC account resolution, deterministic society stepping and playback, typ
 society actions, reviewed-asset admission, scene-surface candidate extraction, scene-run preflight,
 character appearance history, native character playback and the representation inspector are
 deterministic application/runtime paths. They do not invoke a model merely because a model client is
-configured. Two paths let a model decide for a simulated person: an explicitly requested v3
-society decision, and a purposeful society's person whose world's owner chose a model, asked by
-the host's playback before a minute. Both are validated against the offered choice and replayed
-from stored receipts rather than recalled during stepping.
+configured. One path lets a model decide for a simulated person: a purposeful society's person
+whose world's owner chose a model, asked by the host's playback before a minute. It is validated
+against the offered choice and replayed from stored receipts rather than recalled during stepping,
+as are the explicitly requested proposals a v3 society stored before that engine was retired.
 
 Nemotron Super and Ultra are configured roles but have no production caller in the reviewed
 Python code. Fallback in the hosted client is provider-error handling, not a quality escalation
@@ -121,22 +121,31 @@ provider's egress origin is derived from its endpoint rather than written twice
 ([security floor](security-floor.md#3-egress-allowlist)). Nebius Token Factory is the one provider
 declared.
 
-A role in `chosen_roles` has no model of its own: the world names one. `society_decision` is the
-first, a person in a purposeful society deciding what to do next
-([society contract](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose)).
-A model is offered to it only when its `answering` entry names a mechanism the client asks by, a
-function the request forces by name (`tool_call`) or a strict JSON schema (`json_schema`), with the
-evaluation record whose probe verified that mechanism for that model; a model with neither is not
-offered. `tests/test_model_providers.py` reads each named record and holds the manifest to its
-verdicts. An entry may also state an `answering_order`, the order that model is asked in where a
+A role whose model a world chooses has no entry in the manifest. The decision role registry
+declares each such role as data
+([society contract](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose)),
+with the use cases a model must declare to be offered it, and passes those requirements to the
+model layer as a `ChosenRoleBinding`; the manifest's `Role` names only the roles call sites bind to
+a model, and nothing in `exulanica/models` names a chosen role (`tests/test_decision_roles.py`
+scans it). A person in a purposeful society deciding what to do next, `society_decision`, is the
+first. A model is offered to a role only when its catalog use cases hold the role's and its
+`answering` entry names a mechanism the client asks by, a function the request forces by name
+(`tool_call`) or a strict JSON schema (`json_schema`), with the evaluation record whose probe
+verified that mechanism for that model; a model with neither is offered to no role.
+`tests/test_model_providers.py` reads each named record and holds the manifest to its verdicts. An
+entry may also state an `answering_order`, the order that model is asked in where a
 measurement found it answers better that way than in the order the decision contract prefers,
 with the record that measured it and why; from the decision policy's second version the contract
 asks it by the first mechanism of that order it accepts, and every other model in the policy's
 order, while a request asked under the first version keeps the mechanism it recorded
-(`DecisionContract.mechanism_for` in `exulanica/world/society_decision_contract.py`). A chosen model has no fallback, because a choice names one model, and no manifest
-timeout: the decision contract bounds each ask at 20 seconds, inside the playback lease. The host
-asks each model with its own default token bound, never below its floor, so a reasoning model has
-room to reason before it answers.
+(`DecisionContract.mechanism_for` in `exulanica/world/decision_roles.py`). A chosen model has no
+fallback, because a choice names one model, and no manifest timeout: its role's contract bounds each
+ask, the person's at 20 seconds, inside the playback lease. The host asks each model with its own
+default token bound, never below its floor, so a reasoning model has room to reason before it
+answers. The preflight checks every model verified to answer a choice, since a role may be offered
+it; the deployment's `exulanica-preflight` command (`exulanica/orchestration/catalog_preflight.py`)
+and the ingestion, orchestration and evaluation commands give it the registry's roles, so a model a
+role is offered is held to that role's use cases.
 
 Four open models were probed on six recorded choices each, once by each mechanism
 ([probe record](evaluation/2026-09-25-society-person-models-probe.json)), under one

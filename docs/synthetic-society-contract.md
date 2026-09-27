@@ -43,14 +43,14 @@ residents, infer demographic facts or demonstrate general social intelligence.
 
 ## Connection to the world
 
-The society is the product's core: the people in a world are its agents, and the two model paths
-below are how an open model decides what one of them does: a person a world's owner chose a model
-for, in a purposeful society, and the explicit proposal path of the social society. Inhabitants
-interact with permitted places and authored objects through declared affordances. What a person
-brings into and changes in their world changes what its people do. Inhabitants never impersonate
-remembered people. The Companion explains what a person is doing and why from their recorded goal
-and action, the places they use and the events that explain them, cited as simulation and kept apart
-from personal evidence ([Companion
+The society is the product's core: the people in a world are its agents, and the model path below
+is how an open model decides what one of them does: a person a world's owner chose a model for, in
+a purposeful society. The social society's explicit proposals are retired; those it stored still
+read and replay. Inhabitants interact with permitted places and authored objects through declared
+affordances. What a person brings into and changes in their world changes what its people do.
+Inhabitants never impersonate remembered people. The Companion explains what a person is doing and
+why from their recorded goal and action, the places they use and the events that explain them, cited
+as simulation and kept apart from personal evidence ([Companion
 questions](companion-question.md#questions-about-a-worlds-people)).
 
 The pure engine and PostgreSQL lifecycle have synthetic fixture coverage. The connected
@@ -148,13 +148,15 @@ naming an engine. `model_decisions` means the engine's history may hold validate
 which the schema's decision triggers admit; `owner_model_choice` requires it, and a comparison
 requires `owner_model_choice`. `exulanica/world/society_engines.py` reads and checks it, and every
 list of engines derives from it: the runtime's edit hook, the repositories' dispatch and population
-check, the playback control, directed actions, decisions, the owner's model choices and the host's
-asks, experiments, the creation route's choices and default, and the selection query, which
-receives the lists as bound array parameters rather than SQL text. An engine the table does not
-state is refused by name wherever it is looked up, and a retired one is refused by name when a
-creation asks for it (`409 society_engine_retired`). The table's first shape,
-`society-engines.v1.json`, stays beside it because evaluation records name it, held to this one's
-rows by a test.
+check, the playback control, directed actions, decisions, experiments, the creation route's choices
+and default, and the selection query, which receives the lists as bound array parameters rather
+than SQL text. The one other statement of engines is the decision role registry's, which names the
+engines that host each role and so where the owner's model choices are recorded and the host asks;
+`tests/test_decision_roles.py` holds them equal to the engines whose `owner_model_choice` the table
+states. An engine the table does not state is refused by name wherever it is looked up, and a
+retired one is refused by name when a creation asks for it (`409 society_engine_retired`). The
+table's first shape, `society-engines.v1.json`, stays beside it because evaluation records name it,
+held to this one's rows by a test.
 
 | Engine | Created | Inputs | Playback | Directed actions | Model decisions | Owner chooses models | Compared | Sent away | Saved world | Population |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1005,15 +1007,40 @@ the routine's own choice points come from that model, validated, whenever the ho
 from the routine whenever it does not. Stored v2 histories have no decision rows and replay
 unchanged.
 
+**Roles as data.** The person is the first decision role (`exulanica/world/decision_roles.py`): a
+kind of thing in a world that changes and chooses at choice points of its own, whose choices a
+world's owner may hand to an open model. Each role is one entry in the registry catalog
+`assets/catalogs/roles/decision-roles.v1.json`, which states what it decides for, the engines whose
+minutes consume its receipts (those whose owner may choose a model, `owner_model_choice` in the
+engine table), the use cases a model must declare to be offered it, its action and policy catalogs
+with the versions a new request records, the profiles of its request, receipt, choice and context
+documents, its prompt version and prompt texts, and the name of its adapter module in
+`exulanica/world/roles/`. The adapter is the only code a role has of its own: which of its subjects
+are at a choice point, their options, what a model reads, and how the engine checks again and
+applies a validated choice. Everything else is one path for every role: requests, receipts and their
+checks (`exulanica/world/role_decisions.py`), the ask, its bounds and the host's decision phase
+(`exulanica/api/decision_host.py`), and the decision tables, which admit any role's documents by the
+shape of their profile (migration 0117) while the registry decides which profiles are read. A role
+declared in test data alone, a traffic signal at a junction, runs through the minute loop, the one
+hosted ask and the stored replay (`play_minutes`, `ask` and `replay_minutes`) with a scripted model,
+and replays with no call (`tests/test_decision_roles.py`); no society engine hosts it, so the host,
+the repositories and a society's step are not run for it. The person's key, `society_decision`, is
+the name every stored call record carries. No role but the person is registered: the People panel
+and the comparisons serve the person alone, one subject is decided for by one role at a time, and
+the host's decision phase is built for one role, reserving every role's requests as one unit asked
+again together after a race and asking the roles one after another.
+
 **Choosing.** `POST /world/versions/{version_id}/society/models` records one choice,
 `{idempotency_key, people: [subject_id, ...], model: {provider, model_id} | null}`, where null is
 their own routine. It requires `world.write` and `model.invoke`, which in a browser only the
 workspace's owner holds. Choices are appended in order to `world_society_model_choice`
 (migration 0110), each naming who made it, and are never changed; a person's model is the latest
 choice naming them. A choice names people of this society and a model the manifest offers the
-`society_decision` role and the decision contract can ask, or it is refused by name
+person's role, by the use cases its registry entry names, and its contract can ask, or it is
+refused by name
 (`CHOICE_REFUSALS` in `exulanica/world/society_model_choice_repository.py`): 422 for what the body
-names, 409 for a society whose engine takes no choice or a key reused for another choice. A
+names, 409 for a society whose engine takes no choice or a key reused for another choice. Both
+routes answer 409 `role_not_registered` where the registry states no role deciding for people. A
 choice naming one person twice is refused (`person_named_twice`), and an exact retry of a key is
 answered with the choice it recorded before anything else is checked, so it still returns after
 its model stops being offered. At most `model_people_maximum` people are run by models at once.
@@ -1024,9 +1051,11 @@ this process can ask each; whether this host asks models for the world at all, a
 why the rest were not acted on, latency and cost, over the society's latest 2,000 decisions.
 
 **The contract.** `assets/catalogs/society/society-decision-action.v2.json` and
-`society-decision-policy.v2.json` state the actions and bounds a new request is asked under, read
-by `exulanica/world/society_decision_contract.py`; every request records the versions it was
-asked under, and a request asked under the first versions, which offered places and waiting
+`society-decision-policy.v2.json` state the actions and bounds a new request is asked under; the
+person's registry entry names them and the versions a new request records, and
+`exulanica/world/society_decision_contract.py` holds the person's own rules for what they offer and
+how a choice is checked again; every request records the versions it was asked under, and a
+request asked under the first versions, which offered places and waiting
 alone, is read and replayed under them. A person is at a choice point where the routine itself
 chooses for them: when they have no goal, or their action has completed. A person blocked on the
 way to a goal keeps it, as the routine keeps it for them, and is not asked. Their options are only
@@ -1055,8 +1084,8 @@ not an offered label is asked once more, saying so; after `answer_attempts_maxim
 routine decides that turn.
 
 **The host.** Before each minute of a playing purposeful society in a workspace its environment
-lists, the playback worker's claim runs the host's decision phase
-(`exulanica/api/society_person_decisions.py`). It first closes, with the reason
+lists, the playback worker's claim runs the host's decision phase (`exulanica/api/decision_host.py`,
+the one path every role is asked by). It first closes, with the reason
 `unanswered_in_its_minute`, any request an earlier host reserved in the last few minutes and never
 answered, one that stopped between the two; that request's minute has already run with the routine
 deciding. An older one stays as it is: nothing replays or waits on a request without a receipt. What

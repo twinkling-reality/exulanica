@@ -236,7 +236,7 @@ class ModelChain:
         payload: Mapping[str, Any],
         spec: ModelSpec,
         *,
-        role: Role,
+        role: Role | str,
         prompt_chars: int,
         extra_prompt_tokens: int,
         max_tokens: int,
@@ -291,7 +291,7 @@ class ModelChain:
 
     def _record_failure(
         self,
-        role: Role,
+        role: Role | str,
         spec: ModelSpec,
         exc: Exception,
         reserved: Decimal,
@@ -372,7 +372,7 @@ class ModelChain:
 
     def walk_one(
         self,
-        role: Role,
+        role: Role | str,
         spec: ModelSpec,
         path: str,
         payload: Mapping[str, Any],

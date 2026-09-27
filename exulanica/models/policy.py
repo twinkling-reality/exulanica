@@ -102,7 +102,7 @@ class HostedRequestRefused(PrivacyAdmissionError):
 class HostedRequest:
     """One request about to leave for a hosted model, as a policy judges it."""
 
-    role: Role
+    role: Role | str
     handoff: ModelHandoff
     texts: tuple[str, ...]
     instructions: tuple[str, ...]

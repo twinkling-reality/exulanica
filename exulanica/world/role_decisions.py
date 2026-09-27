@@ -1,0 +1,606 @@
+"""One decision path for every role: requests, receipts, their checks and the minute loop.
+
+Whatever a role decides for, the path is the same, parameterised by the role's registry entry and
+adapter (:mod:`exulanica.world.decision_roles`):
+
+*   **A request** is sealed over the subject's options in one state and input: the options the
+    adapter reads from the engine's state, those the ask may send (``offer``), and the observation
+    the adapter builds from them, bounded by the contract's ``context_bytes_maximum``. Fewer than
+    :data:`~exulanica.world.decision_roles.FEWEST_OPTIONS` options, or nothing but the role's idle
+    action, asks nothing. The request records the role's own profile, so its bytes say which role
+    asked and a stored request of any role is read by the role that wrote it.
+*   **A receipt** records the answer, bound to its request: one of the options it offered, exactly,
+    or none with a reason the role records, and the call in the stated fields.
+*   **What a minute does with receipts** is each hosted role's adapter's to say, in turn over the
+    engine's seam (:func:`apply_receipts`), and every receipt it consumed appends its events.
+*   **A run of minutes** asks through an :class:`Asking` port, and :func:`replay_minutes` answers
+    from what a run stored, with no client at all, holding every rebuilt request and receipt to
+    the stored bytes and every minute's state to its recorded digest.
+
+The model is asked elsewhere, through one hosted call path (:mod:`exulanica.api.decision_host`).
+Nothing here reads or writes a database.
+"""
+
+from __future__ import annotations
+
+import json
+import uuid
+from collections import Counter
+from collections.abc import Callable, Container, Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any, Final, Protocol
+
+from exulanica.canonical import canonical_json
+from exulanica.models.manifest import AnsweringMechanism
+from exulanica.world.decision_roles import (
+    FEWEST_OPTIONS,
+    DecisionContract,
+    DecisionRole,
+    RoleOption,
+)
+from exulanica.world.society import society_state_sha256
+from exulanica.world.society_planner import input_sha256
+
+__all__ = [
+    "ANSWER_BY",
+    "PROVIDER_CONFIG",
+    "PROVIDER_RECORD",
+    "RECEIPT_STATUSES",
+    "REQUEST_FIELDS",
+    "Asking",
+    "DecisionDisposition",
+    "PlayedMinutes",
+    "ReplayMismatch",
+    "append_role_events",
+    "apply_receipts",
+    "check_envelope",
+    "check_role_request",
+    "check_role_result",
+    "context_bytes",
+    "play_minutes",
+    "replay_minutes",
+    "role_receipt",
+    "role_request",
+    "seal",
+    "sealed_receipt",
+    "validate_role_receipt",
+    "validate_role_request",
+    "written_messages",
+]
+
+#: Every field a decision request states, whatever its profile.
+REQUEST_FIELDS: Final = frozenset(
+    {
+        "profile",
+        "request_id",
+        "subject_id",
+        "branch_id",
+        "base_tick",
+        "base_state_sha256",
+        "input_seq",
+        "input_sha256",
+        "context",
+        "context_sha256",
+        "provider_config",
+        "document_sha256",
+    }
+)
+#: The request fields a receipt restates, so it is bound to the state and input it was asked over.
+_BOUND_FIELDS: Final = (
+    "subject_id",
+    "branch_id",
+    "base_tick",
+    "base_state_sha256",
+    "input_seq",
+    "input_sha256",
+    "context_sha256",
+)
+#: How a receipt may end: an answer, a refusal, no answer, or an answer over another state.
+RECEIPT_STATUSES: Final = ("accepted", "rejected", "unavailable", "stale")
+#: The most a request's canonical JSON may hold, and a receipt's result.
+_REQUEST_BYTES: Final = 70_000
+_RESULT_BYTES: Final = 16_000
+#: What a request records about the model it asked: which, how, under which contract.
+PROVIDER_CONFIG: Final = frozenset(
+    {
+        "provider",
+        "model_id",
+        "mechanism",
+        "choice_seq",
+        "manifest_sha256",
+        "prompt_version",
+        "contract",
+        "deadline_ms",
+    }
+)
+#: What a receipt records about the call: the model, how it was asked, every attempt it paid for
+#: in the execution record's words, what it cost and how long it took.
+PROVIDER_RECORD: Final = frozenset(
+    {
+        "provider",
+        "model_id",
+        "served_model_id",
+        "mechanism",
+        "prompt_version",
+        "messages_sha256",
+        "answers_asked",
+        "calls",
+        "prompt_tokens",
+        "completion_tokens",
+        "cost_usd",
+        "cost_known",
+        "latency_ms",
+    }
+)
+#: How a model is told to answer, by the mechanism it is asked by: fixed product text naming the
+#: fixed function and argument every choice is asked by (``exulanica.models.choice``).
+ANSWER_BY: Final = {
+    AnsweringMechanism.TOOL_CALL: "Choose one by calling act.",
+    AnsweringMechanism.JSON_SCHEMA: 'Answer with a JSON object whose "action" is one of them.',
+}
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionDisposition:
+    """What one receipt did to one minute, and why."""
+
+    decision_seq: int
+    request_id: str
+    subject_id: str
+    disposition: str
+    reason: str
+    decision_sha256: str
+
+
+class ReplayMismatch(ValueError):
+    """A stored run does not replay to what it recorded."""
+
+    code: Final = "run_replay_mismatch"
+
+    def __init__(self, detail: str, *, minute: int | None = None) -> None:
+        where = "" if minute is None else f" at minute {minute}"
+        super().__init__(f"run_replay_mismatch{where}: {detail}")
+        self.minute = minute
+
+
+def seal(document: dict) -> dict:
+    document["document_sha256"] = input_sha256(document)
+    return document
+
+
+def context_bytes(context: Mapping[str, Any]) -> int:
+    return len(canonical_json(dict(context)))
+
+
+def check_envelope(document: Mapping[str, Any], profiles: Container[str]) -> None:
+    """A sealed request of one of ``profiles``: exactly its fields, its digests its own, bounded."""
+    if (
+        set(document) != REQUEST_FIELDS
+        or document["profile"] not in profiles
+        or input_sha256(dict(document)) != document["document_sha256"]
+        or society_state_sha256(document["context"]) != document["context_sha256"]
+        or len(canonical_json(dict(document))) > _REQUEST_BYTES
+    ):
+        raise ValueError("invalid recorded decision request")
+
+
+def sealed_receipt(
+    profile: str, request: Mapping[str, Any], sequence: int, result: Mapping[str, Any]
+) -> dict:
+    """A receipt of ``profile`` for ``request``: its answer, bound to what it was asked over."""
+    return seal(
+        {
+            "profile": profile,
+            "decision_seq": sequence,
+            "request_id": request["request_id"],
+            "request_sha256": request["document_sha256"],
+            **{key: request[key] for key in _BOUND_FIELDS},
+            **{key: result[key] for key in ("status", "reason", "proposal", "provider")},
+        }
+    )
+
+
+def validate_role_request(role: DecisionRole, document: Mapping[str, Any]) -> None:
+    """A stored or rebuilt request of ``role``, held to the envelope and the role's own parts."""
+    check_envelope(document, (role.request_profile,))
+    check_role_request(role, document)
+
+
+def role_receipt(
+    role: DecisionRole, request: Mapping[str, Any], sequence: int, result: Mapping[str, Any]
+) -> dict:
+    validate_role_request(role, request)
+    return sealed_receipt(role.receipt_profile, request, sequence, result)
+
+
+def validate_role_receipt(
+    role: DecisionRole, document: Mapping[str, Any], request: Mapping[str, Any]
+) -> None:
+    """A receipt of ``role`` for ``request``: a stated status, one of the options it offered or
+    none for a reason the role records, and exactly the receipt its request and result make."""
+    result = {key: document[key] for key in ("status", "reason", "proposal", "provider")}
+    if result["status"] not in RECEIPT_STATUSES:
+        raise ValueError("invalid decision status")
+    check_role_result(role, result, request)
+    if dict(document) != role_receipt(role, request, document["decision_seq"], result):
+        raise ValueError("decision receipt request binding mismatch")
+    # Provider metadata stays serializable and bounded without admitting arbitrary output.
+    if len(json.dumps(result)) > _RESULT_BYTES:
+        raise ValueError("decision result exceeds bound")
+
+
+def written_messages(
+    role: DecisionRole,
+    situation: Sequence[str],
+    context: Mapping[str, Any],
+    mechanism: AnsweringMechanism,
+) -> list[dict[str, str]]:
+    """The role's instruction, then the subject's situation, their options and how to answer."""
+    lines = [
+        *situation,
+        "What you can do now:",
+        *(f"- {option['label']}" for option in context["options"]),
+        ANSWER_BY[mechanism],
+    ]
+    return [
+        {"role": "system", "content": role.instruction},
+        {"role": "user", "content": "\n".join(lines)},
+    ]
+
+
+def role_request(
+    role: DecisionRole,
+    state: Mapping[str, Any],
+    source: Mapping[str, Any],
+    subject_id: str,
+    *,
+    request_id: uuid.UUID,
+    contract: DecisionContract,
+    seed: str,
+    provider_config: Mapping[str, Any],
+    offer: Callable[[Sequence[RoleOption]], Sequence[RoleOption]] | None = None,
+) -> tuple[dict | None, str]:
+    """A subject's sealed request over the options they have in ``state``, asked over ``source``.
+
+    Pure: the host's reservation and a run of minutes build a request here, and so does a replay,
+    which rebuilds it to the byte. ``offer`` keeps the options that may be offered, in their
+    order. ``(None, "nothing_to_choose")`` when fewer than the fewest options are left or nothing
+    but the role's idle action, and ``(None, "context_limit_exceeded")`` when the observation is
+    larger than the contract's bound; otherwise the request and ``"in_progress"``.
+    """
+    options = role.adapter.options(role, state, source, subject_id, contract, seed=seed)
+    if offer is not None and options:
+        options = tuple(offer(options))
+    if len(options) < FEWEST_OPTIONS or all(
+        option.kind == role.adapter.IDLE_KIND for option in options
+    ):
+        return None, "nothing_to_choose"
+    context = role.adapter.context(role, state, source, subject_id, options)
+    if context_bytes(context) > contract.value("context_bytes_maximum"):
+        return None, "context_limit_exceeded"
+    request = seal(
+        {
+            "profile": role.request_profile,
+            "request_id": str(request_id),
+            "subject_id": subject_id,
+            "branch_id": state["branch_id"],
+            "base_tick": state["tick"],
+            "base_state_sha256": society_state_sha256(dict(state)),
+            "input_seq": source["input_seq"],
+            "input_sha256": source["document_sha256"],
+            "context": context,
+            "context_sha256": society_state_sha256(context),
+            "provider_config": dict(provider_config),
+        }
+    )
+    validate_role_request(role, request)
+    return request, "in_progress"
+
+
+def check_role_request(role: DecisionRole, document: Mapping[str, Any]) -> None:
+    """The role's parts of a request: its observation, its options and the model it asked."""
+    context = document["context"]
+    config = document["provider_config"]
+    if (
+        not isinstance(context, dict)
+        or context.get("profile") != role.context_profile
+        or context.get("subject_id") != document["subject_id"]
+        or context.get("branch_id") != document["branch_id"]
+        or context.get("tick") != document["base_tick"]
+        or not isinstance(context.get("options"), list)
+        or len(context["options"]) < FEWEST_OPTIONS
+    ):
+        raise ValueError(f"invalid {role.key} decision context")
+    labels = [role.adapter.option_from_record(option).label for option in context["options"]]
+    if len(set(labels)) != len(labels):
+        raise ValueError(f"a {role.key} decision offers each label once")
+    if not isinstance(config, dict) or set(config) != PROVIDER_CONFIG:
+        raise ValueError(f"a {role.key} decision request names the model it asked, and how")
+
+
+def check_role_result(
+    role: DecisionRole, result: Mapping[str, Any], request: Mapping[str, Any]
+) -> None:
+    """An answer names one of the options its request offered, exactly, or none, for a reason the
+    role records; and the call in the stated fields."""
+    if result["reason"] not in role.reasons:
+        raise ValueError(f"a {role.key} decision records no reason {result['reason']!r}")
+    proposal = result["proposal"]
+    if proposal is not None:
+        offered = request["context"]["options"]
+        if (
+            set(proposal) != {"label", "option"}
+            or proposal["option"] not in offered
+            or proposal["label"] != proposal["option"]["label"]
+        ):
+            raise ValueError(f"a {role.key} decision proposes one of the options it offered")
+    if (result["status"] == "accepted") != (proposal is not None):
+        raise ValueError(f"exactly an accepted {role.key} decision carries a proposal")
+    provider = result["provider"]
+    if provider is not None and (
+        not isinstance(provider, dict) or set(provider) != PROVIDER_RECORD
+    ):
+        raise ValueError(f"a {role.key} decision records its call in the stated fields")
+
+
+def _by_role(
+    roles: Sequence[DecisionRole], receipts: Sequence[Mapping[str, Any]]
+) -> dict[str, list[Mapping[str, Any]]]:
+    grouped: dict[str, list[Mapping[str, Any]]] = {role.key: [] for role in roles}
+    by_profile = {role.receipt_profile: role.key for role in roles}
+    for receipt in receipts:
+        key = by_profile.get(receipt.get("profile"))  # type: ignore[arg-type]
+        if key is None:
+            raise ValueError(
+                f"a receipt of profile {receipt.get('profile')!r} is not one this engine's roles "
+                "record"
+            )
+        grouped[key].append(receipt)
+    return grouped
+
+
+def apply_receipts(
+    roles: Sequence[DecisionRole],
+    state: Mapping[str, Any],
+    source: Mapping[str, Any],
+    receipts: Sequence[Mapping[str, Any]],
+    seam: Any,
+) -> tuple[Any, tuple[Any, ...]]:
+    """The engine's seam for the minute after every role applied its receipts, and what each
+    receipt did, in decision order.
+
+    Each role, in key order, takes its own receipts in decision order and the seam the roles
+    before it left; a receipt of no role the engine hosts is refused by name.
+    """
+    grouped = _by_role(roles, receipts)
+    dispositions: list[Any] = []
+    for role in roles:
+        seam, done = role.adapter.apply(role, state, source, grouped[role.key], seam)
+        dispositions.extend(done)
+    return seam, tuple(sorted(dispositions, key=lambda disposition: disposition.decision_seq))
+
+
+def append_role_events(
+    roles: Sequence[DecisionRole],
+    previous_state: Mapping[str, Any],
+    next_state: Mapping[str, Any],
+    source: Mapping[str, Any],
+    receipts: Sequence[Mapping[str, Any]],
+    dispositions: Sequence[Any],
+    events: tuple[Any, ...],
+) -> tuple[Any, ...]:
+    """The minute's events with each role's events for the receipts it consumed appended, role by
+    role in key order."""
+    grouped = _by_role(roles, receipts)
+    by_sequence = {disposition.decision_seq: disposition for disposition in dispositions}
+    for role in roles:
+        own = grouped[role.key]
+        events = role.adapter.events(
+            role,
+            previous_state,
+            next_state,
+            source,
+            own,
+            [by_sequence[receipt["decision_seq"]] for receipt in own],
+            events,
+        )
+    return events
+
+
+class Asking(Protocol):
+    """What a run of minutes asks of the world outside it, minute by minute."""
+
+    def offerable(
+        self, tick: int, due: Mapping[str, Sequence[RoleOption]]
+    ) -> Mapping[str, frozenset[str]]:
+        """For each subject due at ``tick``, with the options they have, the labels that may be
+        offered to them. Asked once a minute, for every subject due in it."""
+        ...
+
+    def answers(self, requests: Sequence[dict[str, Any]]) -> Sequence[dict[str, Any]]:
+        """One result per request, in the same order: ``{status, reason, proposal, provider}``,
+        as a receipt records it."""
+        ...
+
+
+#: How an engine advances one minute: from a state, its seed, the inputs the minute consumes and
+#: the seam the roles left, to the next state and the minute's events.
+Step = Callable[[Mapping[str, Any], str, list[Mapping[str, Any]], Any], tuple[Any, tuple[Any, ...]]]
+
+
+@dataclass(slots=True)
+class PlayedMinutes:
+    """What a run did: every minute's state after it, its events, requests and receipts, and how
+    many minutes each subject began at a choice point."""
+
+    states: list[dict[str, Any]] = field(default_factory=list)
+    events: list[Any] = field(default_factory=list)
+    requests: list[dict[str, Any]] = field(default_factory=list)
+    receipts: list[dict[str, Any]] = field(default_factory=list)
+    choice_points: Counter[str] = field(default_factory=Counter)
+
+    @property
+    def minute_digests(self) -> list[str]:
+        return [society_state_sha256(state) for state in self.states]
+
+
+def _only(labels: frozenset[str]) -> Callable[[Sequence[RoleOption]], list[RoleOption]]:
+    def offered(options: Sequence[RoleOption]) -> list[RoleOption]:
+        return [option for option in options if option.label in labels]
+
+    return offered
+
+
+def play_minutes(
+    roles: Sequence[DecisionRole],
+    role: DecisionRole,
+    *,
+    start: dict[str, Any],
+    sources: Sequence[Mapping[str, Any]],
+    seed: str,
+    ticks: int,
+    step: Step,
+    config_for: Callable[[str], Mapping[str, Any] | None],
+    request_id_for: Callable[[str, int], uuid.UUID],
+    asking: Asking,
+    seam: Callable[[Mapping[str, Any], Sequence[str]], Any],
+    contract: DecisionContract | None = None,
+    on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None]
+    | None = None,
+) -> PlayedMinutes:
+    """Play ``ticks`` minutes from ``start``, asking ``asking`` for ``role``'s subjects.
+
+    The first minute consumes every input of ``sources``, each later one the last, as a step
+    consumes queued inputs. Each minute, every subject at a choice point for whom ``config_for``
+    names a model is asked, with the options the ask may offer, and each answer is a receipt; the
+    roles an engine hosts (``roles``) then apply the minute's receipts over the seam ``seam``
+    starts from, and ``step`` advances it. ``on_minute(tick, requests, receipts)`` is called after
+    each minute's answers are receipted and before the minute advances.
+    """
+    contract = contract or role.contract()
+    state = start
+    played = PlayedMinutes()
+    latest = sources[-1]
+    sequence = 0
+    for minute in range(1, ticks + 1):
+        consumed = list(sources) if minute == 1 else [latest]
+        due = [s for s in sorted(role.adapter.subjects(state)) if role.adapter.due(state, s)]
+        played.choice_points.update(due)
+        asked: dict[str, Sequence[RoleOption]] = {}
+        for subject in due:
+            if config_for(subject) is None:
+                continue
+            options = role.adapter.options(role, state, latest, subject, contract, seed=seed)
+            if options:
+                asked[subject] = options
+        kept = asking.offerable(state["tick"], asked) if asked else {}
+        requests = []
+        for subject in sorted(asked):
+            request, _status = role_request(
+                role,
+                state,
+                latest,
+                subject,
+                request_id=request_id_for(subject, state["tick"]),
+                contract=contract,
+                seed=seed,
+                provider_config=dict(config_for(subject) or {}),
+                offer=_only(kept.get(subject, frozenset())),
+            )
+            if request is not None:
+                requests.append(request)
+        results = list(asking.answers(requests)) if requests else []
+        if len(results) != len(requests):
+            raise ValueError("every request of a minute gets exactly one result")
+        receipts = []
+        for request, result in zip(requests, results, strict=True):
+            sequence += 1
+            receipt = role_receipt(role, request, sequence, dict(result))
+            validate_role_receipt(role, receipt, request)
+            receipts.append(receipt)
+        if on_minute is not None:
+            on_minute(state["tick"] + 1, requests, receipts)
+        applied, decided = apply_receipts(roles, state, latest, receipts, seam(state, due))
+        after, events = step(state, seed, consumed, applied)
+        events = append_role_events(roles, state, after, latest, receipts, decided, events)
+        played.states.append(after)
+        played.events.extend(events)
+        played.requests.extend(requests)
+        played.receipts.extend(receipts)
+        state = after
+    return played
+
+
+@dataclass(frozen=True, slots=True)
+class _Stored:
+    """Answers from what a run stored: the options each stored request offered, and its receipt."""
+
+    requests: Mapping[tuple[str, int], dict[str, Any]]
+    receipts: Mapping[str, dict[str, Any]]
+    used: set[str]
+
+    def offerable(
+        self, tick: int, due: Mapping[str, Sequence[RoleOption]]
+    ) -> dict[str, frozenset[str]]:
+        # A subject the run asked was offered exactly the options their stored request records;
+        # one it did not ask was offered too few, and is offered none again.
+        return {
+            subject: frozenset(
+                option["label"]
+                for option in self.requests.get((subject, tick), {"context": {"options": []}})[
+                    "context"
+                ]["options"]
+            )
+            for subject in due
+        }
+
+    def answers(self, requests: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+        results = []
+        for request in requests:
+            minute = request["base_tick"] + 1
+            stored = self.requests.get((request["subject_id"], request["base_tick"]))
+            receipt = self.receipts.get(request["request_id"])
+            if stored is None or receipt is None:
+                raise ReplayMismatch("a rebuilt request has no stored answer", minute=minute)
+            if stored != request or receipt["request_sha256"] != request["document_sha256"]:
+                raise ReplayMismatch("a rebuilt request is not the one stored", minute=minute)
+            self.used.add(request["request_id"])
+            results.append(
+                {key: receipt[key] for key in ("status", "reason", "proposal", "provider")}
+            )
+        return results
+
+
+def replay_minutes(
+    stored: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]],
+    *,
+    minute_digests: Sequence[str],
+    play: Callable[[Asking], PlayedMinutes],
+) -> PlayedMinutes:
+    """Play again from the requests and receipts a run stored, asking nothing, and hold it to its
+    record.
+
+    ``stored`` is every request the run recorded with its receipt, in decision order,
+    ``minute_digests`` the state digest it recorded after each minute, and ``play`` the run's own
+    minutes played with an asking port. A rebuilt request that is not the stored one, a receipt
+    that is not rebuilt to the same bytes, a stored receipt no minute asks for, or a minute that
+    ends in another state: each is a :class:`ReplayMismatch`.
+    """
+    requests = {(str(r["subject_id"]), int(r["base_tick"])): dict(r) for r, _ in stored}
+    receipts = {str(receipt["request_id"]): dict(receipt) for _, receipt in stored}
+    if len(requests) != len(stored) or len(receipts) != len(stored):
+        raise ReplayMismatch("a subject is asked twice in one minute, or a request answered twice")
+    answering = _Stored(requests, receipts, set())
+    played = play(answering)
+    if len(played.states) != len(minute_digests):
+        raise ReplayMismatch("the run recorded another number of minutes")
+    for minute, (found, recorded) in enumerate(
+        zip(played.minute_digests, minute_digests, strict=True), 1
+    ):
+        if found != recorded:
+            raise ReplayMismatch("the minute ends in another state", minute=minute)
+    if [dict(receipt) for _, receipt in stored] != played.receipts:
+        raise ReplayMismatch("a stored receipt is not the one its request rebuilds")
+    if answering.used != set(receipts):
+        raise ReplayMismatch("a stored receipt answers no request the run asks")
+    return played

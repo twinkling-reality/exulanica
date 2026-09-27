@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "catalog_id": "decision-roles",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "junction_signal",
+      "subject": "signal",
+      "adapter": "junction_signal",
+      "engines": [],
+      "required_use_cases": [
+        "text"
+      ],
+      "catalog_directory": "tests/decision_role_fixtures",
+      "action_catalog": "junction-signal-action",
+      "policy_catalog": "junction-signal-policy",
+      "action_version": 1,
+      "policy_version": 1,
+      "own_order_from_policy_version": 1,
+      "subjects_bound": "model_signals_maximum",
+      "request_profile": "exulanica.junction-signal-decision-request/v1",
+      "receipt_profile": "exulanica.junction-signal-decision/v1",
+      "choice_profile": "exulanica.junction-signal-model-choice/v1",
+      "choice_subjects": "subjects",
+      "context_profile": "exulanica.junction-signal-context/v1",
+      "prompt_version": "junction-signal-choice/v1",
+      "instruction": "You decide which way one simulated traffic signal at a junction lets traffic through next. The junction is invented and the world is a simulation. Choose exactly one of the offered actions, as it is written, and nothing else.",
+      "choice_description": "Choose what the signal does next: exactly one of the offered actions.",
+      "not_offered": "That answer is not one of the offered actions. Choose exactly one of them, as it is written.",
+      "reason": "A traffic signal at a two-way junction choosing, once it has held one way for its shortest green, whether to let the other way go: a role declared in test data alone, with one adapter module and its own engine step, which proves a part of a world that changes is run by a chosen model through the one decision path with no code outside its adapter. No society engine hosts it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    }
+  ]
+}

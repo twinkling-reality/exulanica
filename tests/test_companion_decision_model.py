@@ -15,7 +15,7 @@ import dataclasses
 import uuid
 
 import pytest
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import load_manifest
 from exulanica.selection.inhabitant_words import inhabitant_words_catalog
 from exulanica.selection.society_question import (
     _APPLIED,
@@ -27,7 +27,7 @@ from exulanica.selection.society_question import (
     _deciding_models,
 )
 from exulanica.world.society import UnavailableSocietyInput
-from exulanica.world.society_decision_contract import DECISION_REASONS
+from exulanica.world.society_decision_contract import DECISION_REASONS, person_role
 from exulanica.world.society_model_decisions import _DISPOSITIONS
 from exulanica.world.society_planner import REASON_CODES
 
@@ -50,7 +50,7 @@ def test_the_codes_this_reads_are_the_ones_the_planner_and_the_minute_record():
 
 def test_a_model_is_named_by_its_description_up_to_the_first_comma():
     manifest = load_manifest()
-    offered = manifest.offered_models(Role.SOCIETY_DECISION)
+    offered = manifest.offered_models(person_role().chosen)
     assert offered, "the manifest offers no model for a person's decisions"
     for spec in offered:
         name = manifest.model_name(spec.model_id)
@@ -61,7 +61,7 @@ def test_a_model_is_named_by_its_description_up_to_the_first_comma():
 
 def test_a_description_with_no_comma_is_the_whole_name_and_an_undeclared_model_its_id():
     manifest = load_manifest()
-    spec = manifest.offered_models(Role.SOCIETY_DECISION)[0]
+    spec = manifest.offered_models(person_role().chosen)[0]
     plain = dataclasses.replace(spec, description="A model with a one-part description")
     changed = dataclasses.replace(manifest, models={**manifest.models, spec.model_id: plain})
     assert changed.model_name(spec.model_id) == "A model with a one-part description"

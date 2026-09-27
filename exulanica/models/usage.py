@@ -93,7 +93,7 @@ def _as_int(value: Any) -> int:
 class CallUsage:
     """What one call attempt consumed, or the most it can have, and which of the two ``usd`` is."""
 
-    role: Role
+    role: Role | str
     model_id: str
     #: The key of the provider the attempt was sent to, as the manifest names it.
     provider: str
@@ -125,7 +125,7 @@ class CallUsage:
     def failed(
         cls,
         *,
-        role: Role,
+        role: Role | str,
         spec: ModelSpec,
         reached_provider: bool | None,
         timed_out: bool,
@@ -161,7 +161,7 @@ class CallUsage:
     def from_response(
         cls,
         *,
-        role: Role,
+        role: Role | str,
         spec: ModelSpec,
         usage: Mapping[str, Any] | None,
         cache_hit: bool = False,

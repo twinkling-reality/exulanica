@@ -1,5 +1,5 @@
 {
-  "manifest_version": "2",
+  "manifest_version": "3",
   "pipeline_version": 3,
   "note": "The only place in product code where a hosted model identifier appears (tests/test_models_manifest.py scans exulanica/ and web/packages/*/src; applied migrations are frozen SQL and keep the identifiers they were written with). Every price, context window and use_cases list below was read from flavors[].model_id in the catalog of the model's provider on that provider's catalog_retrieved_at. Bumping any identifier here MUST bump pipeline_version, because stored caption vectors and evaluation records are keyed by it. The response cache key names the provider and the model as well, so a cached answer is never served for another model.",
 
@@ -236,13 +236,7 @@
 
   "judging_note": "A model's judging map names each judgement a policy may admit it to make, with the record of the probe that measured it. The place-proposal policy admits exactly the models whose judging names sign_completeness, so moving the vision role to a model this manifest has not measured leaves place naming off until its own probe is recorded here.",
 
-  "chosen_roles_note": "A chosen role has no model of its own here. The world names one, for a person or a group, among the models whose declared answering fits the caller's contract, and with no choice nothing is asked. A model answers a chosen role only by a mechanism its answering map names, each mechanism naming the record whose probe verified it; a model whose map names none is offered to no chosen role. Its calls have no fallback, because a choice names one model, and no timeout of their own: the caller bounds each call by its contract.",
-  "chosen_roles": {
-    "society_decision": {
-      "required_use_cases": ["text"],
-      "rationale": "A person in a world choosing what to do next, asked through the society's decision contract (assets/catalogs/society/society-decision-policy.v1.json and society-decision-action.v1.json). The world's owner chooses the model; with no choice the built-in planner decides and no model is asked."
-    }
-  },
+  "answering_note": "A model a world may choose for one of its decision roles has no role entry here. The roles, and the use cases a model must declare to be offered each, are declared once by the decision role registry (assets/catalogs/roles). A model is offered to a role only when its answering map names a mechanism by which it was verified to answer a choice, each mechanism naming the record whose probe verified it; a model whose map names none is offered to no role. A chosen model's calls have no fallback, because a choice names one model, and no timeout of their own: the caller bounds each call by its role's contract.",
 
   "roles": {
     "reasoning_cheap": {

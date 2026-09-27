@@ -2,10 +2,11 @@
 
 The purposeful society (``exulanica-society/v2``) takes a model's decision for a person the way it
 takes a person's own direct request: as a goal policy for the coming minute, over the seam the
-planner already has. A decision is a stored receipt (``exulanica.society-decision/v2``), asked
-before the minute by the host for a person whose world's owner chose a model for them and bound to
-the exact state and input it was asked over. This module decides, deterministically and without
-any model, what each receipt does to the minute, in decision order:
+planner already has. A decision is a stored receipt of the person role, under the receipt profile
+its registry entry names, asked before the minute by the host for a person whose world's owner
+chose a model for them and bound to the exact state and input it was asked over. This module
+decides, deterministically and without any model, what each receipt does to the minute, in
+decision order:
 
 *   A receipt that is not ``accepted`` does nothing to the minute; its disposition is its status
     and its reason the receipt's, and the routine decides that turn.
@@ -36,18 +37,18 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from dataclasses import dataclass
 from typing import Any, Final
 
+from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
     DecisionOption,
     TalkPromise,
     option_goal_policy,
+    person_role,
     recheck_option,
     recheck_talk,
 )
-from exulanica.world.society_decisions import PERSON_DECISION_PROFILE
 from exulanica.world.society_planner import input_sha256
 
 __all__ = [
@@ -63,21 +64,9 @@ DECISION_EVENT_KIND: Final = "decision_applied"
 _DISPOSITIONS: Final = ("applied", "rejected", "unavailable", "stale", "superseded")
 
 
-@dataclass(frozen=True, slots=True)
-class DecisionDisposition:
-    """What one receipt did to one minute, and why."""
-
-    decision_seq: int
-    request_id: str
-    subject_id: str
-    disposition: str
-    reason: str
-    decision_sha256: str
-
-
-def _checked(receipt: Mapping[str, Any]) -> None:
+def _checked(receipt: Mapping[str, Any], profile: str) -> None:
     if (
-        receipt.get("profile") != PERSON_DECISION_PROFILE
+        receipt.get("profile") != profile
         or receipt["document_sha256"] != input_sha256(dict(receipt))
         or receipt["status"] not in ("accepted", "rejected", "unavailable", "stale")
     ):
@@ -89,13 +78,17 @@ def model_goal_policies(
     document: Mapping[str, Any],
     receipts: Sequence[Mapping[str, Any]],
     directed: Mapping[str, dict[str, Any]],
+    *,
+    profile: str | None = None,
 ) -> tuple[dict[str, dict[str, Any]], tuple[DecisionDisposition, ...]]:
     """The minute's goal policies, a direct request's and each applied choice's, and what every
     receipt did, in decision order.
 
     ``directed`` is the direct requests' policies for this minute, which are kept as they are and
-    come first. ``document`` is the input the minute consumes last.
+    come first. ``document`` is the input the minute consumes last. ``profile`` is the receipt
+    profile of the role consuming them, the person role's registry entry's when left out.
     """
+    profile = person_role().receipt_profile if profile is None else profile
     policies = {subject: dict(policy) for subject, policy in directed.items()}
     promised = {
         policy["place_node_id"] for policy in directed.values() if "place_node_id" in policy
@@ -113,7 +106,7 @@ def model_goal_policies(
     # anything for, but a conversation with the one asking, is not free to be asked to talk.
     own: dict[str, DecisionOption] = {}
     for index, receipt in enumerate(receipts):
-        _checked(receipt)
+        _checked(receipt, profile)
         subject = receipt["subject_id"]
         reason = receipt["reason"]
         if receipt["status"] != "accepted":

@@ -52,6 +52,7 @@ from exulanica.world.society_decision_contract import (
     PROMPT_VERSION,
     DecisionContract,
     decision_contract,
+    person_role,
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
@@ -265,7 +266,7 @@ class SocietyComparisonRepository:
             raise ComparisonRefused("group_person_unknown", "the group names somebody not here")
         choices = SocietyModelChoiceRepository(
             self.connection, self.workspace_id, world_id=self.world_id
-        ).history(version_id)
+        ).history(version_id, person_role())
         if source["kind"] == "owner_choice":
             named = next(
                 (choice for choice in choices if choice["choice_seq"] == source["choice_seq"]),

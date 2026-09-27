@@ -19,7 +19,13 @@ from exulanica.models.choice import ChoiceRefused, ChoiceRequest
 from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, PROVIDER_NOT_ADMITTED, ModelClient
 from exulanica.models.egress import parse_egress_allowlist
 from exulanica.models.errors import ManifestError, ModelUnavailableError, ProviderRefused
-from exulanica.models.manifest import MANIFEST_PATH, AnsweringMechanism, Role, parse_manifest
+from exulanica.models.manifest import (
+    MANIFEST_PATH,
+    AnsweringMechanism,
+    ChosenRoleBinding,
+    Role,
+    parse_manifest,
+)
 from exulanica.models.policy import HostedRequestRefused, request_parts
 from exulanica.models.transport import HttpResponse
 
@@ -33,6 +39,11 @@ REQUEST = ChoiceRequest(
     options=("resting on a bench, 12 m away", "by a tree, 5 m away", "wait here a minute"),
 )
 MESSAGES = [{"role": "system", "content": "Choose."}, {"role": "user", "content": "Options."}]
+#: A role a world chooses a model for, as the decision role registry would pass one down: the
+#: model layer knows no role of its own.
+CHOSEN = ChosenRoleBinding(
+    role="example_choice", required_use_cases=("text",), rationale="A role these tests declare."
+)
 
 
 def _document() -> dict:
@@ -152,7 +163,7 @@ def test_a_choice_by_a_forced_function_returns_the_option_and_sends_exactly_that
     client = _client(manifest, transport)
 
     result = client.choose(
-        Role.SOCIETY_DECISION,
+        CHOSEN,
         model_id,
         MESSAGES,
         REQUEST,
@@ -179,7 +190,7 @@ def test_a_choice_by_a_strict_schema_returns_the_option():
     answer = json.dumps({"action": "wait here a minute"})
     transport = FakeTransport([HttpResponse(200, json.dumps(chat_body(answer, model=model_id)))])
     result = _client(manifest, transport).choose(
-        Role.SOCIETY_DECISION,
+        CHOSEN,
         model_id,
         MESSAGES,
         REQUEST,
@@ -203,7 +214,7 @@ def test_a_schema_answer_that_is_not_an_offered_action_is_refused_as_a_choice():
     transport = FakeTransport([HttpResponse(200, json.dumps(chat_body(answer, model=model_id)))])
     with pytest.raises(ChoiceRefused, match="did not answer with one of the offered actions"):
         _client(manifest, transport).choose(
-            Role.SOCIETY_DECISION,
+            CHOSEN,
             model_id,
             MESSAGES,
             REQUEST,
@@ -238,7 +249,7 @@ def test_a_reply_that_is_not_exactly_one_option_is_refused(reply, message):
     transport = FakeTransport([reply(model_id)])
     with pytest.raises(ChoiceRefused, match=message):
         _client(manifest, transport).choose(
-            Role.SOCIETY_DECISION,
+            CHOSEN,
             model_id,
             MESSAGES,
             REQUEST,
@@ -258,7 +269,7 @@ def test_a_model_not_offered_or_asked_by_an_unverified_mechanism_is_refused_befo
     client = _client(manifest, transport)
     with pytest.raises(ChoiceRefused, match="not verified to answer by tool_call"):
         client.choose(
-            Role.SOCIETY_DECISION,
+            CHOSEN,
             model_id,
             MESSAGES,
             REQUEST,
@@ -269,7 +280,7 @@ def test_a_model_not_offered_or_asked_by_an_unverified_mechanism_is_refused_befo
     unverified = next(m for m in sorted(manifest.models) if not manifest.models[m].answering)
     with pytest.raises(ManifestError, match="not offered"):
         client.choose(
-            Role.SOCIETY_DECISION,
+            CHOSEN,
             unverified,
             MESSAGES,
             REQUEST,
@@ -287,7 +298,7 @@ def test_a_withdrawn_chosen_model_is_reported_withdrawn_and_never_answered_by_an
     transport = FakeTransport([model_not_found(model_id)])
     with pytest.raises(ModelUnavailableError):
         _client(manifest, transport).choose(
-            Role.SOCIETY_DECISION,
+            CHOSEN,
             model_id,
             MESSAGES,
             REQUEST,
@@ -319,7 +330,7 @@ def test_a_provider_the_allowlist_does_not_declare_is_refused_by_name_and_sends_
     assert dict(client.refusals) == {SECOND: PROVIDER_NOT_ADMITTED}
     with pytest.raises(ProviderRefused) as refused:
         client.choose(
-            Role.SOCIETY_DECISION,
+            CHOSEN,
             SECOND_MODEL,
             MESSAGES,
             REQUEST,
@@ -348,7 +359,7 @@ def test_a_provider_whose_credential_is_not_set_is_refused_by_name(monkeypatch):
     assert dict(client.refusals) == {SECOND: PROVIDER_CREDENTIAL_ABSENT}
     with pytest.raises(ProviderRefused, match=SECOND):
         client.choose(
-            Role.SOCIETY_DECISION,
+            CHOSEN,
             SECOND_MODEL,
             MESSAGES,
             REQUEST,

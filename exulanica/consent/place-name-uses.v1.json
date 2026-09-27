@@ -15,8 +15,7 @@
         "exulanica/ingest/worker_command.py",
         "exulanica/selection/calls.py",
         "exulanica/selection/embeddings.py",
-        "exulanica/selection/question.py",
-        "exulanica/world/society_decisions.py"
+        "exulanica/selection/question.py"
       ],
       "honoured_by": [
         "exulanica.epistemics.caption_embeddings:embed_capture",

@@ -336,7 +336,8 @@ runs: `build_services` injects it as `Services.released_place_names`, which the 
 and the API's derivative worker ask, and `exulanica/ingest/worker_command.py` gives it to the
 standalone worker's caption pass. A `Services` built by hand, as most tests build one, keeps the
 resolver that releases nothing. A society decision releases no place's name on whatever role it
-runs: `Services.request_policy` requires the release to be named, and the society runtime names
+runs: `Services.request_policy` requires the release to be named, and the rules the decision host
+and a comparison attach to every ask (`Services.person_decision_policy`) name
 `no_place_released`, because a grant for the Companion's roles describes the Companion's requests.
 The vision stage sends the product's own instruction and the photograph, and its policy releases no
 place's name. `tests/test_place_name_release_paths.py` runs each path the uses file names and

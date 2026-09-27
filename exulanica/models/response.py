@@ -48,7 +48,7 @@ __all__ = ["checked_payload", "embedding_from_body", "result_from_body"]
 def _record_attempt(
     budget: BudgetGuard,
     *,
-    role: Role,
+    role: Role | str,
     spec: ModelSpec,
     body: Any,
     cache_hit: bool,
@@ -83,7 +83,7 @@ def _is_vector_row(row: Any) -> bool:
 
 def result_from_body(
     *,
-    role: Role,
+    role: Role | str,
     spec: ModelSpec,
     body: Mapping[str, Any],
     budget: BudgetGuard,
@@ -230,7 +230,7 @@ def checked_payload(
 
 
 def embedding_from_body(
-    role: Role,
+    role: Role | str,
     spec: ModelSpec,
     body: Mapping[str, Any],
     *,

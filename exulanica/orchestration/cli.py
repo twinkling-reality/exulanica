@@ -29,6 +29,7 @@ from exulanica.orchestration.preflight import (
     validate_layout,
 )
 from exulanica.reconstruction import DepthModel
+from exulanica.world.decision_roles import decision_roles
 from exulanica.world_package.package import PackageError, load_private_key
 
 __all__ = ["main"]
@@ -166,7 +167,7 @@ def _vision_model(mode: str, data_dir: Path) -> VisionModel | None:
     if mode == "unavailable":
         return None
     try:
-        report = run_preflight()
+        report = run_preflight(chosen=decision_roles().chosen)
         report.raise_for_status()
         client = ModelClient(cache=FileResponseCache(data_dir / "model-cache"), max_attempts=3)
         return NebiusVisionModel(client)

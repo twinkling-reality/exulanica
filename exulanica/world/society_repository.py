@@ -10,6 +10,8 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
+from exulanica.world.decision_roles import decision_roles
+from exulanica.world.role_decisions import append_role_events, apply_receipts
 from exulanica.world.society import (
     SOCIETY_POPULATION,
     SOCIETY_TICK_SECONDS,
@@ -47,7 +49,6 @@ from exulanica.world.society_living import (
     living_places,
     routine_for,
 )
-from exulanica.world.society_model_decisions import append_decision_events, model_goal_policies
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,
@@ -589,11 +590,13 @@ class SocietyRepository:
                         external_goal_policy=goal_policy,
                     )
                 else:
-                    # A person's model decisions are receipts asked before this minute; with
-                    # none, the policies are the direct requests' alone and nothing is added.
+                    # The model decisions of every role this engine hosts are receipts asked
+                    # before this minute; with none, the policies are the direct requests' alone
+                    # and nothing is added.
+                    roles = decision_roles().hosted_by(row["engine_version"])
                     receipts = self._decisions(row, after=self._consumed_decisions(row))
-                    policies, decided = model_goal_policies(
-                        row["state"], inputs[-1], receipts, goal_policy
+                    policies, decided = apply_receipts(
+                        roles, row["state"], inputs[-1], receipts, goal_policy
                     )
                     state, events = advance_purposeful_society(
                         row["state"], row["seed"], inputs, goal_policy=policies
@@ -608,8 +611,8 @@ class SocietyRepository:
                     events,
                 )
                 if engine.owner_model_choice:
-                    events = append_decision_events(
-                        row["state"], state, inputs[-1], receipts, decided, events
+                    events = append_role_events(
+                        roles, row["state"], state, inputs[-1], receipts, decided, events
                     )
             else:
                 raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
@@ -874,7 +877,8 @@ class SocietyRepository:
                     raise ValueError("missing or extra society transition")
                 presences = self._presences(row)
                 # Replayed from what was stored and bound, never asked again.
-                person_decisions, person_bindings = (
+                roles = decision_roles().hosted_by(row["engine_version"])
+                role_decisions, role_bindings = (
                     ({d["decision_seq"]: d for d in self._decisions(row)}, self._bindings(row))
                     if engine.owner_model_choice
                     else ({}, {})
@@ -943,10 +947,10 @@ class SocietyRepository:
                         if processed != [(b["decision_seq"], b["disposition"]) for b in bindings]:
                             raise ValueError("social decision disposition replay mismatch")
                     else:
-                        bindings = person_bindings.get(transition["tick"], [])
-                        receipts = [person_decisions[b["decision_seq"]] for b in bindings]
-                        policies, decided = model_goal_policies(
-                            state, inputs[-1], receipts, goal_policy
+                        bindings = role_bindings.get(transition["tick"], [])
+                        receipts = [role_decisions[b["decision_seq"]] for b in bindings]
+                        policies, decided = apply_receipts(
+                            roles, state, inputs[-1], receipts, goal_policy
                         )
                         if [(d.decision_seq, d.disposition) for d in decided] != [
                             (b["decision_seq"], b["disposition"]) for b in bindings
@@ -964,8 +968,8 @@ class SocietyRepository:
                         events,
                     )
                     if engine.owner_model_choice:
-                        events = append_decision_events(
-                            previous_state, state, inputs[-1], receipts, decided, events
+                        events = append_role_events(
+                            roles, previous_state, state, inputs[-1], receipts, decided, events
                         )
                     action_events = [
                         event for event in events if event.kind == "user_action_requested"

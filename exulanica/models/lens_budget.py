@@ -315,7 +315,7 @@ class LensBudgetGuard(BudgetGuard):
         self,
         spec: ModelSpec,
         *,
-        role: Role,
+        role: Role | str,
         prompt_chars: int = 0,
         max_tokens: int = 0,
         extra_prompt_tokens: int = 0,

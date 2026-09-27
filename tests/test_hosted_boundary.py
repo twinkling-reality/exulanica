@@ -42,9 +42,9 @@ from typing import Any
 import pytest
 from exulanica.api.authorisation import TokenDirectory
 from exulanica.api.composer_rights import composer_rights_check
+from exulanica.api.decision_host import RoleAsk, ask
 from exulanica.api.routes.selection import society_answer_model
 from exulanica.api.services import Services
-from exulanica.api.society_person_decisions import PersonAsk, ask_person
 from exulanica.db.migrate import provision_workspace
 from exulanica.db.session import Database
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
@@ -80,8 +80,7 @@ from exulanica.selection.plan import (
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import answer_question
 from exulanica.selection.society_question import answer_about_society, build_scene
-from exulanica.world.society_decision_contract import decision_contract
-from exulanica.world.society_decisions import SocietyDecisionProvider
+from exulanica.world.society_decision_contract import decision_contract, person_role
 
 from conftest import ingest_observed, write_photo
 from model_fakes import FakeTransport, chat_body
@@ -123,11 +122,7 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "query embedding": ("exulanica.selection.embeddings", "embed_query"),
     "caption embedding": ("exulanica.epistemics.caption_embeddings", "embed_capture"),
     "vision": ("exulanica.ingest.vision", "NebiusVisionModel.observe"),
-    "society decision": (
-        "exulanica.world.society_decisions",
-        "SocietyDecisionProvider.propose",
-    ),
-    "society person choice": ("exulanica.api.society_person_decisions", "ask_person"),
+    "role decision": ("exulanica.api.decision_host", "ask"),
 }
 
 _PATH_AT = {site: path for path, site in HOSTED_CALL_PATHS.items()}
@@ -491,27 +486,6 @@ def run_vision(world: World) -> Witness:
     return transport
 
 
-def run_society(world: World) -> Witness:
-    """A society decision, bound as the society runtime binds it, over a context naming both."""
-    transport = Witness([_json_reply({"kind": "wait", "target_id": None}, Role.REASONING_CHEAP)])
-    provider = SocietyDecisionProvider(_process_client(transport), Role.REASONING_CHEAP, "a" * 64)
-    bound = dataclasses.replace(
-        provider,
-        client=provider.client.with_policy(
-            world.services.request_policy(
-                world.repository.workspace_id,
-                lambda: _lent(world.connection),
-                released_places=no_place_released,
-            )
-        ),
-    )
-    result = bound.propose(
-        {"own_beliefs": [{"origin": "communication", "text": f"{PERSON} waits at {PLACE}"}]}
-    )
-    assert result["status"] == "accepted", result
-    return transport
-
-
 def _chosen_manifest():
     """The manifest with one chat model verified to answer by a forced function."""
     document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"), parse_float=Decimal)
@@ -526,18 +500,23 @@ def _chosen_manifest():
     return parse_manifest(document), model_id
 
 
-def _person_client(world: World, manifest, model_id: str) -> tuple[Any, Witness]:
-    """The process's client with the workspace's rules attached, as the host attaches them."""
+def _tool_answer(model_id: str, label: str) -> HttpResponse:
+    """A model's answer by the forced function, naming ``label``."""
     body = chat_body("", model=model_id, finish_reason="tool_calls")
     body["choices"][0]["message"]["content"] = None
     body["choices"][0]["message"]["tool_calls"] = [
         {
             "id": "c",
             "type": "function",
-            "function": {"name": "act", "arguments": json.dumps({"action": "wait here a minute"})},
+            "function": {"name": "act", "arguments": json.dumps({"action": label})},
         }
     ]
-    transport = Witness([HttpResponse(status_code=200, text=json.dumps(body))])
+    return HttpResponse(status_code=200, text=json.dumps(body))
+
+
+def _person_client(world: World, manifest, model_id: str) -> tuple[Any, Witness]:
+    """The process's client with the workspace's rules attached, as the host attaches them."""
+    transport = Witness([_tool_answer(model_id, "wait here a minute")])
     client = ModelClient(api_key="test-key-not-real", manifest=manifest, transport=transport)
     return (
         client.with_policy(
@@ -551,10 +530,11 @@ def _person_client(world: World, manifest, model_id: str) -> tuple[Any, Witness]
     )
 
 
-def _ask_person(world: World, labels: tuple[str, ...]) -> tuple[dict[str, Any], Witness]:
-    """A person's decision, asked as the host asks it, over a situation that names both."""
-    manifest, model_id = _chosen_manifest()
-    client, transport = _person_client(world, manifest, model_id)
+def _ask_as_the_host(
+    client: ModelClient, manifest, model_id: str, labels: tuple[str, ...]
+) -> dict[str, Any]:
+    """A person's decision, asked of ``model_id`` as the host asks it, over a situation that names
+    the saved person and place, offering waiting and ``labels``."""
     wait = {"kind": "wait", "action": "wait", "target_id": None, "activity": None}
     context = {
         "tick": 3,
@@ -577,9 +557,10 @@ def _ask_person(world: World, labels: tuple[str, ...]) -> tuple[dict[str, Any], 
             ),
         ],
     }
-    result = ask_person(
+    return ask(
         client,
-        PersonAsk(
+        RoleAsk(
+            person_role(),
             {"request_id": str(uuid.uuid4()), "context": context},
             manifest.spec(model_id),
             AnsweringMechanism.TOOL_CALL,
@@ -587,7 +568,13 @@ def _ask_person(world: World, labels: tuple[str, ...]) -> tuple[dict[str, Any], 
         decision_contract(),
         time.monotonic() + 20.0,
     )
-    return result, transport
+
+
+def _ask_person(world: World, labels: tuple[str, ...]) -> tuple[dict[str, Any], Witness]:
+    """A person's decision, asked as the host asks it, over a situation that names both."""
+    manifest, model_id = _chosen_manifest()
+    client, transport = _person_client(world, manifest, model_id)
+    return _ask_as_the_host(client, manifest, model_id, labels), transport
 
 
 def run_person(world: World) -> Witness:
@@ -620,8 +607,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "environment drafter": (run_environment, "put the selected tree"),
     "caption embedding": (run_caption, "RUNNING CLUB"),
     "vision": (run_vision, "Describe this photograph"),
-    "society decision": (run_society, "waits at"),
-    "society person choice": (run_person, "wait here a minute"),
+    "role decision": (run_person, "wait here a minute"),
 }
 
 #: The paths whose call site replaces saved names itself, and the modules it replaces them with.
@@ -713,7 +699,7 @@ def test_a_choice_whose_description_carries_a_saved_name_is_refused(world):
     )
     with pytest.raises(HostedRequestRefused, match="the description of the choice"):
         client.choose(
-            Role.SOCIETY_DECISION,
+            person_role().chosen,
             model_id,
             [{"role": "user", "content": "What next?"}],
             forged,

@@ -22,12 +22,12 @@ from exulanica.api.society_comparison_runner import (
     SocietyComparisonRunner,
     _RunStoppedBeforeStart,
 )
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import load_manifest
 from exulanica.world.society_comparison_result import (
     ComparisonRefused,
     check_definition_body,
 )
-from exulanica.world.society_decision_contract import decision_contract
+from exulanica.world.society_decision_contract import decision_contract, person_role
 
 from comparison_support import development_body, model_arm, seeded_catalogs
 
@@ -60,13 +60,13 @@ def _runner() -> SocietyComparisonRunner:
 
 
 def _arm(model_id: str) -> dict:
-    spec = MANIFEST.offered(Role.SOCIETY_DECISION, model_id)
+    spec = MANIFEST.offered(person_role().chosen, model_id)
     return _runner().model_arm(ComparisonArm(spec.provider, spec.model_id), "candidate")
 
 
 def test_an_arm_records_the_order_its_model_is_asked_in_and_whose_order_it_is():
-    nano = MANIFEST.offered(Role.SOCIETY_DECISION, NANO)
-    qwen = MANIFEST.offered(Role.SOCIETY_DECISION, QWEN)
+    nano = MANIFEST.offered(person_role().chosen, NANO)
+    qwen = MANIFEST.offered(person_role().chosen, QWEN)
     # The positive controls: Nano's manifest entry states an order measured for it, Qwen's none.
     assert [m.value for m in nano.answering_order] == ["json_schema", "tool_call"]
     assert qwen.answering_order == ()
@@ -93,7 +93,7 @@ def test_the_first_contract_asks_every_model_in_its_own_order():
     """The first decision policy predates a model's own order: under it Nano is asked as every
     model is, by a forced call first, so the contract version is part of the answering too."""
     first = decision_contract(versions={"society-decision-action": 1, "society-decision-policy": 1})
-    nano = MANIFEST.offered(Role.SOCIETY_DECISION, NANO)
+    nano = MANIFEST.offered(person_role().chosen, NANO)
     assert not first.asks_in_a_models_own_order
     assert first.answering(nano) == {
         "order": ["tool_call", "json_schema"],
@@ -188,7 +188,7 @@ def test_a_run_whose_model_would_be_asked_in_another_order_stops_before_it_asks(
 def test_a_test_arm_is_recorded_as_the_runner_records_one():
     """The shared test arm names its answering by the contract, as the runner does."""
     arm = model_arm("candidate")
-    spec = MANIFEST.offered(Role.SOCIETY_DECISION, arm["decider"]["model_id"])
+    spec = MANIFEST.offered(person_role().chosen, arm["decider"]["model_id"])
     assert arm["answering"] == decision_contract().answering(spec)
 
 

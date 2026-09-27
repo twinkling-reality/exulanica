@@ -436,13 +436,14 @@ def probe(as_run: bytes) -> None:
         TransportError,
         TruncatedResponseError,
     )
-    from exulanica.models.manifest import AnsweringMechanism, Role, load_manifest
+    from exulanica.models.manifest import AnsweringMechanism, load_manifest
     from exulanica.models.policy import BenchmarkInputs
     from exulanica.world.society_decision_contract import (
         PROMPT_VERSION,
         choice_request,
         decision_contract,
         decision_messages,
+        person_role,
     )
 
     # The tree, before anything is asked.
@@ -479,7 +480,7 @@ def probe(as_run: bytes) -> None:
                 started = time.monotonic()
                 try:
                     chosen = sender.choose(
-                        Role.SOCIETY_DECISION,
+                        person_role().chosen,
                         spec.model_id,
                         decision_messages(case, mechanism),
                         choice_request(case),
@@ -940,7 +941,7 @@ def preregister_run() -> None:
             "played_by": (
                 "the playback worker the application builds for the workspaces it lists "
                 "(Services.build_society_control_worker), one claim at a time: the claim, the "
-                "host's decision phase before the minute (PersonDecisionHost.before_minute), "
+                "host's decision phase before the minute (DecisionHost.before_minute), "
                 "then the minute"
             ),
             "harness_intervention": (

@@ -37,7 +37,7 @@ T = TypeVar("T", bound=BaseModel)
 class ChatResult:
     """One completed chat call, with everything the ledger and the caller need."""
 
-    role: Role
+    role: Role | str
     model_id: str
     #: The key of the provider that served ``model_id``, as the manifest names it.
     provider: str

@@ -1,10 +1,12 @@
 """Short committed reservations and immutable results around lock-free provider inference.
 
-A social society (``exulanica-society/v3``) reserves a v1 request over one cast member's beliefs;
-a purposeful society (``exulanica-society/v2``) reserves a v2 request over what a person may do
-next under the decision contract (:meth:`SocietyDecisionRepository.prepare_person`), naming the
-model its world's owner chose. Either is finished once, in a later short transaction, with the
-exact state and input checked again.
+A society whose engine hosts a decision role reserves that role's request over what a subject may
+do next under the role's contract (:meth:`SocietyDecisionRepository.prepare_role`), naming the
+model its world's owner chose: a person's in a purposeful society (``exulanica-society/v2``)
+first. It is finished once, in a later short transaction, with the exact state and input checked
+again. Every read of a role's rows names the role's own profile. A social society
+(``exulanica-society/v3``) keeps the v1 requests and receipts its retired proposal route stored,
+each read back with the memories its context named; nothing reserves or answers a new one.
 """
 
 from __future__ import annotations
@@ -15,34 +17,35 @@ from typing import Final
 
 from psycopg.types.json import Jsonb
 
+from exulanica.world.decision_roles import (
+    DecisionContract,
+    DecisionRole,
+    RoleOption,
+    decision_roles,
+)
+from exulanica.world.role_decisions import role_request
 from exulanica.world.society import (
     SocietyBytesNotRead,
     StaleSocietyState,
     UnavailableSocietyInput,
     UnknownSociety,
     inputs_ahead,
-    society_state_sha256,
 )
 from exulanica.world.society_controls import MAX_CATCHUP_TICKS
-from exulanica.world.society_decision_contract import DecisionContract, DecisionOption
 from exulanica.world.society_decisions import (
-    PERSON_REQUEST_PROFILE,
     REQUEST_PROFILE,
-    person_request,
     receipt_for,
-    seal,
     validate_decision_receipt,
     validate_decision_request,
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_repository import SocietyRepository
-from exulanica.world.society_social import decision_context, validate_proposal
 
-#: What a person's receipt must say of the call to match its request: the model it asked, how.
-_PERSON_PROVENANCE = ("provider", "model_id", "mechanism", "prompt_version")
+#: What a role's receipt must say of the call to match its request: the model it asked, how.
+_ROLE_PROVENANCE = ("provider", "model_id", "mechanism", "prompt_version")
 
 
-#: How many minutes back a claim looks for a person's request its host never answered: the
+#: How many minutes back a claim looks for a role's request its host never answered: the
 #: minutes one claim can advance, and one more. A host that stops between reserving a request and
 #: recording its answer is followed by a claim well within that.
 UNANSWERED_WINDOW_TICKS: Final = MAX_CATCHUP_TICKS + 1
@@ -106,10 +109,10 @@ class SocietyDecisionRepository:
 
     def _context_inputs(self, row: dict, request: dict) -> tuple[dict[int, dict], dict]:
         """The inputs a request's context was asked over, and the latest, never the history
-        between them: a person's one input, or a social request's input and its memories'."""
+        between them: a role's one input, or a social request's input and its memories'."""
         latest_seq = self.society._chain(row)
         wanted = {request["input_seq"], latest_seq}
-        if request["profile"] != PERSON_REQUEST_PROFILE:
+        if request["profile"] == REQUEST_PROFILE:
             context = request["context"]
             wanted |= {
                 memory["input_seq"]
@@ -120,8 +123,8 @@ class SocietyDecisionRepository:
 
     def _authorize_context(self, request: dict, documents: Mapping[int, dict]) -> None:
         self.society._authorize(documents[request["input_seq"]])
-        if request["profile"] == PERSON_REQUEST_PROFILE:
-            # A person's context is read from the one input it was asked over, and no memory.
+        if request["profile"] != REQUEST_PROFILE:
+            # A role's context is read from the one input it was asked over, and no memory.
             return
         context = request["context"]
         for memory in [*context["own_observations"], *context["own_beliefs"]]:
@@ -130,75 +133,10 @@ class SocietyDecisionRepository:
                 raise ValueError("decision memory input binding mismatch")
             self.society._authorize(document)
 
-    def prepare(
-        self,
-        version_id: uuid.UUID,
-        *,
-        request_id: uuid.UUID,
-        subject_id: uuid.UUID,
-        base_tick: int,
-        base_state_sha256: str,
-        provider_config: dict | None,
-    ) -> tuple[dict, bool]:
-        """Caller must commit and close its connection before using the returned context."""
-        row = self._row(version_id)
-        existing = self._request(row, request_id)
-        with inputs_ahead(self.connection, self._context_ahead(row, existing)):
-            self.society.snapshot(version_id)
-            if existing:
-                if (
-                    existing["subject_id"],
-                    existing["base_tick"],
-                    existing["base_state_sha256"],
-                ) != (str(subject_id), base_tick, base_state_sha256):
-                    raise StaleSocietyState("idempotency key already binds a different request")
-                return self.read(version_id, request_id), False
-        if row["current_tick"] != base_tick or row["state_sha256"] != base_state_sha256:
-            raise StaleSocietyState("society changed before decision request")
-        occupied = self.connection.execute(
-            "select request_id from world_society_decision_request where workspace_id=%s "
-            "and society_id=%s and subject_id=%s and base_tick=%s",
-            (row["workspace_id"], row["society_id"], subject_id, base_tick),
-        ).fetchone()
-        if occupied:
-            raise StaleSocietyState("subject already has a decision reservation at this tick")
-        document = self.society._validated_inputs(row)[-1]
-        context = decision_context(row["state"], document, str(subject_id))
-        request = seal(
-            {
-                "profile": REQUEST_PROFILE,
-                "request_id": str(request_id),
-                "subject_id": str(subject_id),
-                "branch_id": str(version_id),
-                "base_tick": base_tick,
-                "base_state_sha256": base_state_sha256,
-                "input_seq": document["input_seq"],
-                "input_sha256": document["document_sha256"],
-                "context": context,
-                "context_sha256": society_state_sha256(context),
-                "provider_config": provider_config,
-            }
-        )
-        validate_decision_request(request)
-        self.connection.execute(
-            "insert into world_society_decision_request("
-            "workspace_id,society_id,request_id,subject_id,"
-            "base_tick,input_seq,document,document_sha256) values(%s,%s,%s,%s,%s,%s,%s,%s)",
-            (
-                row["workspace_id"],
-                row["society_id"],
-                request_id,
-                subject_id,
-                base_tick,
-                document["input_seq"],
-                Jsonb(request),
-                request["document_sha256"],
-            ),
-        )
-        return {"request": request, "decision": None, "status": "in_progress"}, True
-
-    def person_decisions(self, version_id: uuid.UUID, *, latest: int | None = None) -> list[dict]:
-        """The person decisions this society recorded, in order, with what their minutes did.
+    def role_decisions(
+        self, role: DecisionRole, version_id: uuid.UUID, *, latest: int | None = None
+    ) -> list[dict]:
+        """``role``'s decisions this society recorded, in order, with what their minutes did.
 
         One row per receipt: whose, which model it asked (the request's, so a decision refused
         before any call still names it), how it ended, the call's cost and time, the option it
@@ -219,10 +157,9 @@ class SocietyDecisionRepository:
             "join world_society_decision_request r using(workspace_id,society_id,request_id) "
             "left join world_society_transition_decision t "
             "using(workspace_id,society_id,decision_seq) "
-            "where d.workspace_id=%s and d.society_id=%s "
-            "and d.document->>'profile'='exulanica.society-decision/v2' "
+            "where d.workspace_id=%s and d.society_id=%s and d.document->>'profile'=%s "
             "order by d.decision_seq desc limit %s",
-            (row["workspace_id"], row["society_id"], latest),
+            (row["workspace_id"], row["society_id"], role.receipt_profile, latest),
         ).fetchall()
         decisions = []
         for value in reversed(rows):
@@ -256,8 +193,9 @@ class SocietyDecisionRepository:
             )
         return decisions
 
-    def prepare_person(
+    def prepare_role(
         self,
+        role: DecisionRole,
         version_id: uuid.UUID,
         *,
         request_id: uuid.UUID,
@@ -266,20 +204,21 @@ class SocietyDecisionRepository:
         base_state_sha256: str,
         contract: DecisionContract,
         provider_config: dict,
-        offer: Callable[[Sequence[DecisionOption]], Sequence[DecisionOption]] | None = None,
+        offer: Callable[[Sequence[RoleOption]], Sequence[RoleOption]] | None = None,
     ) -> tuple[dict, bool]:
-        """Reserve a person's request over the options they have now, or return the one reserved.
+        """Reserve a subject's request of ``role`` over the options they have now, or return the
+        one reserved.
 
         ``offer`` keeps the options that may be offered, in their order: the caller leaves out
         any the rules its ask is sent under would change. ``None`` in place of a request when the
-        person has nothing to choose this minute, fewer than two options or nothing but waiting
-        among what is offered: nothing is reserved and no model is asked. The context is refused
-        before any reservation when it is larger than the contract's bound. The caller commits and
-        closes its connection before asking the model.
+        subject has nothing to choose this minute, fewer than two options or nothing but the
+        role's idle action among what is offered: nothing is reserved and no model is asked. The
+        context is refused before any reservation when it is larger than the contract's bound.
+        The caller commits and closes its connection before asking the model.
         """
         row = self._row(version_id)
-        if not society_engine(row["engine_version"]).owner_model_choice:
-            raise ValueError(f"{row['engine_version']} takes no person decisions")
+        if not role.hosted_by(row["engine_version"]):
+            raise ValueError(f"{row['engine_version']} takes no {role.subject} decisions")
         existing = self._request(row, request_id)
         with inputs_ahead(self.connection, self._context_ahead(row, existing)):
             self.society.snapshot(version_id)
@@ -302,7 +241,8 @@ class SocietyDecisionRepository:
             raise StaleSocietyState("subject already has a decision reservation at this tick")
         latest_seq = self.society._chain(row)
         document = self.society._inputs(row, [latest_seq])[latest_seq]
-        request, status = person_request(
+        request, status = role_request(
+            role,
             row["state"],
             document,
             str(subject_id),
@@ -345,7 +285,7 @@ class SocietyDecisionRepository:
         ``decision_sources_unavailable``, with no proposal and with the call that was made, if one
         was. So is one whose finish meets the race between reading its inputs' bytes and the asset
         read lock on its ``last_try``
-        (``asked_again_after_a_race`` in :mod:`exulanica.world.society`): what the person could
+        (``asked_again_after_a_race`` in :mod:`exulanica.world.society`): what the subject could
         see could not be read, and the request is closed rather than left in progress. A try
         before the last raises the race, to be asked again.
         """
@@ -356,6 +296,10 @@ class SocietyDecisionRepository:
         existing = self._result(row, request)
         if existing["decision"] is not None:
             return existing
+        if decision_roles().for_request(request["profile"]) is None:
+            # A social society's stored request: its proposal route is retired, and nothing
+            # answers one now.
+            raise ValueError("only a decision role's request is answered")
         documents, latest = self._context_inputs(row, request)
         try:
             with inputs_ahead(self.connection, [*documents.values(), latest]):
@@ -379,10 +323,10 @@ class SocietyDecisionRepository:
                 or latest["document_sha256"] != request["input_sha256"]
             ):
                 result = {**result, "status": "stale", "reason": "decision_context_changed"}
-            elif result["status"] == "accepted" and request["profile"] == PERSON_REQUEST_PROFILE:
+            elif result["status"] == "accepted":
                 if result["provider"] is None or any(
                     result["provider"].get(key) != request["provider_config"][key]
-                    for key in _PERSON_PROVENANCE
+                    for key in _ROLE_PROVENANCE
                 ):
                     result = {
                         **result,
@@ -392,36 +336,13 @@ class SocietyDecisionRepository:
                     }
                 else:
                     result = {**result, "reason": "validated_choice"}
-            elif result["status"] == "accepted":
-                if request["provider_config"] is None or result["provider"] is None:
-                    result = {
-                        **result,
-                        "status": "rejected",
-                        "reason": "missing_provider_provenance",
-                    }
-                elif any(
-                    result["provider"].get(key) != request["provider_config"][key]
-                    for key in ("role", "manifest_sha256")
-                ):
-                    result = {
-                        **result,
-                        "status": "rejected",
-                        "reason": "provider_configuration_changed",
-                    }
-                else:
-                    reason = validate_proposal(request["context"], latest, result["proposal"])
-                    result = {
-                        **result,
-                        "status": "rejected" if reason else "accepted",
-                        "reason": reason or "validated_known_affordance_choice",
-                    }
-        if request["profile"] == PERSON_REQUEST_PROFILE and result["status"] != "accepted":
+        if result["status"] != "accepted":
             # Only an accepted answer is kept as a proposal; the rest record why none applies.
             result = {**result, "proposal": None}
         return self._record_receipt(row, request, request_id, result)
 
-    def unanswered_person_requests(self, version_id: uuid.UUID) -> list[uuid.UUID]:
-        """Person requests reserved in the last few minutes before the current one that no
+    def unanswered_requests(self, role: DecisionRole, version_id: uuid.UUID) -> list[uuid.UUID]:
+        """``role``'s requests reserved in the last few minutes before the current one that no
         receipt answers.
 
         A host that stopped between reserving a request and recording its answer leaves one; the
@@ -443,7 +364,7 @@ class SocietyDecisionRepository:
                 (
                     row["workspace_id"],
                     row["society_id"],
-                    PERSON_REQUEST_PROFILE,
+                    role.request_profile,
                     row["current_tick"] - UNANSWERED_WINDOW_TICKS,
                     row["current_tick"],
                 ),
@@ -451,14 +372,14 @@ class SocietyDecisionRepository:
         ]
 
     def close_unanswered(self, version_id: uuid.UUID, request_id: uuid.UUID) -> dict:
-        """Record that a person's request was never answered in the minute it was asked for.
+        """Record that a role's request was never answered in the minute it was asked for.
 
         Its receipt says so by name (``unanswered_in_its_minute``), and the next minute consumes
         it like any other unaccepted receipt, so the history closes what was left open.
         """
         row = self._row(version_id)
         request = self._request(row, request_id)
-        if request is None or request["profile"] != PERSON_REQUEST_PROFILE:
+        if request is None or decision_roles().for_request(request["profile"]) is None:
             raise UnknownSociety("decision request is unavailable")
         existing = self._result(row, request)
         if existing["decision"] is not None:

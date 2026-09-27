@@ -8,8 +8,8 @@ workspace policy of :mod:`exulanica.epistemics.hosted_requests`, which releases 
 where the resolver it was built with does. What is held here is the wiring between the two,
 through the constructions the product runs:
 
-*   ``build_services`` gives the right's resolver to every route's client, to the society
-    runtime's policy and to the API's derivative worker;
+*   ``build_services`` gives the right's resolver to every route's client, to the policy a
+    decision role's model is asked under and to the API's derivative worker;
 *   the standalone worker command gives it to its caption pass;
 *   the vision stage keeps the resolver that releases nothing, because no vision use is offered.
 
@@ -51,7 +51,7 @@ from exulanica.db.migrate import provision_workspace
 from exulanica.db.roles import EXECUTOR_ROLE, provision_runtime_role
 from exulanica.db.session import DATABASE_URL_ENV
 from exulanica.env import env_name
-from exulanica.epistemics.hosted_requests import borrowing, no_place_released
+from exulanica.epistemics.hosted_requests import borrowing
 from exulanica.epistemics.saved_names import Redacted
 from exulanica.ingest import worker_command
 from exulanica.ingest.hosted_policy import photograph_policy
@@ -80,7 +80,7 @@ from conftest import (
 )
 from model_fakes import FakeTransport, chat_body
 from test_companion_saved_names import PERSON, PLACE, TEXT, _vector_reply, named
-from test_hosted_boundary import HOSTED_CALL_PATHS
+from test_hosted_boundary import HOSTED_CALL_PATHS, _ask_as_the_host, _chosen_manifest, _tool_answer
 from test_selection_proposal import WORLD, _seed_world, current_reference, draft
 from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_support import registered_world
@@ -600,36 +600,25 @@ def test_a_question_asked_in_words_searches_without_the_name_even_while_it_is_al
     assert json.loads(searched)["input"] == ["running club"]
 
 
-def test_a_society_decision_carries_no_place_allowed_for_the_embedding_use(instance):
-    """The society runtime's policy releases no place's name, whatever its namer allowed."""
-    from exulanica.world.society_decisions import SocietyDecisionProvider
-
-    client, transport = instance.client()
-    transport.by_model[MANIFEST[Role.REASONING_CHEAP].primary.model_id] = _chat(
-        json.dumps({"kind": "wait", "target_id": None})
-    )
+def test_a_decision_role_s_ask_carries_no_place_allowed_for_the_embedding_use(instance):
+    """The rules a decision role's model is asked under release no place's name, whatever its
+    namer allowed: the host and a comparison attach ``Services.person_decision_policy`` to every
+    ask."""
+    manifest, model_id = _chosen_manifest()
+    client, transport = instance.client(manifest)
+    transport.by_path["role decision"] = _tool_answer(model_id, "wait here a minute")
     services = instance.services(client)
     instance.grant()
-    provider = SocietyDecisionProvider(client, Role.REASONING_CHEAP, "a" * 64)
-    # Bound as a society decision's runtime bound it before the proposal route was retired: the
-    # workspace's policy, releasing no place's name, on a fresh read-only session per judgement.
-    bound = dataclasses.replace(
-        provider,
-        client=provider.client.with_policy(
-            services.request_policy(
-                instance.workspace_id,
-                lambda: services.readonly_database.session(instance.workspace_id),
-                released_places=no_place_released,
-            )
-        ),
-    )
 
-    result = bound.propose(
-        {"own_beliefs": [{"origin": "communication", "text": f"{PERSON} waits at {PLACE}"}]}
+    result = _ask_as_the_host(
+        client.with_policy(services.person_decision_policy(instance.workspace_id)),
+        manifest,
+        model_id,
+        ("resting on a bench, 12 m away",),
     )
 
     assert result["status"] == "accepted", result
-    (decided,) = transport.sent_by("society decision")
+    (decided,) = transport.sent_by("role decision")
     assert _withholds_the_place(decided)
 
 

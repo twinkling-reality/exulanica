@@ -3,28 +3,22 @@
 ``exulanica-society/v3`` is not creatable (the engine table), and its explicitly requested model
 proposals (``POST .../society/decisions``) are refused by name: a model decides for a person only
 as the world's owner chose. A v3 society stored before that, with a proposal it recorded, still
-reads, advances and replays byte for byte. Authenticated PG18 evidence; the provider transport is
-a synthetic fixture, and the stored society is planted by the write its creation made.
+reads, advances and replays byte for byte. Authenticated PG18 evidence; the stored society and its
+proposal are planted by the writes their creation and that route made.
 """
 
-import json
 import uuid
 from dataclasses import replace
 
 import pytest
 from exulanica.db.roles import provision_runtime_role
-from exulanica.epistemics.hosted_requests import no_place_released
-from exulanica.models.manifest import Role
-from exulanica.models.transport import HttpResponse
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
-from exulanica.world.society_decisions import SocietyDecisionProvider
 from exulanica.world.society_repository import SocietyRepository
 
 import test_world_objects_api as object_helpers
 from conftest import scratch_role_database
-from model_fakes import chat_body
-from retired_society_support import plant_retired_society
+from retired_society_support import plant_retired_decision, plant_retired_society
 from social_society_fixtures import add_social_marker, social_input
 from society_fixtures import SEED
 from test_society_purposeful_postgres import step
@@ -108,55 +102,28 @@ def social(objects_api, repository, spine_schema):
     return api, repo, version, route, changed, rights, body
 
 
-def provider_for(client, transport, manifest):
-    model = manifest[Role.REASONING_CHEAP].primary.model_id
-    transport.responses.append(
-        HttpResponse(
-            status_code=200,
-            text=json.dumps(
-                chat_body(
-                    json.dumps({"kind": "choose_goal", "target_id": "authored:new-marker:visit"}),
-                    model=model,
-                )
-            ),
-        )
-    )
-    return SocietyDecisionProvider(client, Role.REASONING_CHEAP, "a" * 64)
-
-
-def _answered(api, repo, version, body, client, transport, manifest) -> dict:
-    """A proposal the retired route recorded: reserved, asked of a model under the workspace's
-    policy with no place's name released, and finished, as its runtime did each step."""
-    decisions = SocietyDecisionRepository(repo)
-    provider = provider_for(client, transport, manifest)
-    services = api.client.app.state.services
-    workspace = repo.workspace_id
-    provider = replace(
-        provider,
-        client=provider.client.with_policy(
-            services.request_policy(
-                workspace,
-                lambda: services.readonly_database.session(workspace),
-                released_places=no_place_released,
-            )
-        ),
-    )
-    request_id = uuid.UUID(body["idempotency_key"])
+def _answered(repo, version, body) -> dict:
+    """A proposal the retired route recorded: a known target it checked and accepted."""
     with repo.connection.transaction():
-        reservation, fresh = decisions.prepare(
+        recorded = plant_retired_decision(
+            SocietyDecisionRepository(repo),
             version,
-            request_id=request_id,
-            subject_id=uuid.UUID(body["subject_id"]),
-            base_tick=body["base_tick"],
-            base_state_sha256=body["base_state_sha256"],
-            provider_config=provider.configuration,
+            request_id=uuid.UUID(body["idempotency_key"]),
+            subject_id=body["subject_id"],
+            provider_config={
+                "role": "reasoning_cheap",
+                "model_id": "offline-proposal-fixture",
+                "manifest_sha256": "a" * 64,
+            },
+            result={
+                "status": "accepted",
+                "reason": "validated_known_affordance_choice",
+                "proposal": {"kind": "choose_goal", "target_id": "authored:new-marker:visit"},
+                "provider": {"evidence": "offline typed proposal fixture, not a model execution"},
+            },
         )
-    assert fresh
-    result = provider.propose(reservation["request"]["context"])
-    with repo.connection.transaction():
-        finished = decisions.finish(version, request_id, result)
     repo.connection.commit()
-    return finished
+    return recorded
 
 
 def test_a_v3_society_is_refused_by_name_and_nothing_is_written(objects_api, repository):
@@ -204,9 +171,9 @@ def test_a_model_proposal_is_refused_by_name_and_nothing_is_reserved(social):
     )
 
 
-def test_a_stored_v3_proposal_reads_advances_and_replays(social, client, transport, manifest):
+def test_a_stored_v3_proposal_reads_advances_and_replays(social):
     api, repo, version, route, _changed, _rights, body = social
-    recorded = _answered(api, repo, version, body, client, transport, manifest)
+    recorded = _answered(repo, version, body)
     assert recorded["decision"]["status"] == "accepted"
     lookup = api.in_world(route + "/decisions/" + body["idempotency_key"])
     read = api.get(lookup)
@@ -223,7 +190,6 @@ def test_a_stored_v3_proposal_reads_advances_and_replays(social, client, transpo
     assert replay.status_code == 200, replay.text
     assert replay.json()["replay_verified"]
     assert replay.json()["state_sha256"] == completed["state_sha256"]
-    assert len(transport.requests) == 1
     bindings = repo.connection.execute(
         "select tick,disposition from world_society_transition_decision where society_id=%s",
         (uuid.UUID(completed["society_id"]),),
@@ -232,3 +198,39 @@ def test_a_stored_v3_proposal_reads_advances_and_replays(social, client, transpo
     events = api.get(api.in_world(route + "/events?limit=256")).json()["events"]
     assert any(e["event_kind"] == "decision_applied" for e in events)
     assert len(completed["state"]["inhabitants"]) == 128
+
+
+def test_a_stored_v3_request_never_answered_reads_as_pending_and_is_never_answered(social):
+    """A request the retired route reserved and never answered stays pending: it reads as such,
+    and a finish is refused by name and records nothing, so no receipt of that kind is new."""
+    api, repo, version, route, _changed, _rights, body = social
+    decisions = SocietyDecisionRepository(repo)
+    request_id = uuid.UUID(body["idempotency_key"])
+    with repo.connection.transaction():
+        plant_retired_decision(
+            decisions, version, request_id=request_id, subject_id=body["subject_id"], result=None
+        )
+    repo.connection.commit()
+    lookup = api.in_world(route + "/decisions/" + body["idempotency_key"])
+    read = api.get(lookup)
+    assert read.status_code == 200, read.text
+    assert (read.json()["status"], read.json()["decision"]) == ("in_progress", None)
+    with (
+        pytest.raises(ValueError, match="only a decision role's request is answered"),
+        repo.connection.transaction(),
+    ):
+        decisions.finish(
+            version,
+            request_id,
+            {"status": "unavailable", "reason": "provider_not_configured"}
+            | {"proposal": None, "provider": None},
+        )
+    repo.connection.commit()
+    assert (
+        repo.connection.execute(
+            "select count(*) as n from world_society_decision where workspace_id=%s",
+            (repo.workspace_id,),
+        ).fetchone()["n"]
+        == 0
+    )
+    assert api.get(lookup).json() == read.json()

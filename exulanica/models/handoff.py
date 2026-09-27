@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from exulanica.models.egress import declared_origin
-from exulanica.models.manifest import Manifest, Role
+from exulanica.models.manifest import ChosenRoleBinding, Manifest, Role
 
 __all__ = [
     "LOCAL_PROCESS",
@@ -153,18 +153,18 @@ class ModelHandoff:
         )
 
     @classmethod
-    def chosen(cls, manifest: Manifest, role: Role | str, model_id: str) -> ModelHandoff:
+    def chosen(cls, manifest: Manifest, binding: ChosenRoleBinding, model_id: str) -> ModelHandoff:
         """One model a world chose for a chosen role, sent to its provider's origin.
 
         A choice names one model and its calls have no fallback, so the hand-over names exactly
         that model. A model the manifest does not offer the role is refused by the manifest.
         """
-        spec = manifest.offered(role, model_id)
+        spec = manifest.offered(binding, model_id)
         return cls(
             identities=(
                 ModelIdentity(
                     provider=spec.provider,
-                    role=str(Role(role)),
+                    role=binding.role,
                     model_id=spec.model_id,
                     revision=None,
                 ),

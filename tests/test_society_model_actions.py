@@ -26,22 +26,21 @@ import uuid
 from decimal import Decimal
 from pathlib import Path
 
-import exulanica.api.society_person_decisions as host_module
+import exulanica.api.decision_host as host_module
 import pytest
-from exulanica.api.society_person_decisions import PersonAsk, PersonDecisionHost, ask_person
+from exulanica.api.decision_host import DecisionHost, RoleAsk
+from exulanica.api.society_person_decisions import PersonAsk, ask_person
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ManifestError
 from exulanica.models.manifest import (
     MANIFEST_PATH,
     AnsweringMechanism,
-    Role,
     load_manifest,
     parse_manifest,
 )
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_authored_ground import AUTHORED_GROUND_POPULATION
-from exulanica.world.society_catalogs import DECISION_CONTRACT_VERSIONS
 from exulanica.world.society_decision_contract import (
     CHOSEN_BY_MODEL,
     DecisionOption,
@@ -49,6 +48,7 @@ from exulanica.world.society_decision_contract import (
     choice_options,
     decision_contract,
     option_goal_policy,
+    person_role,
     recheck_option,
     recheck_talk,
 )
@@ -241,7 +241,7 @@ def test_the_second_contract_states_standing_and_talking_and_the_first_stays_as_
     second, first = decision_contract(), decision_contract(V1)
     assert (
         second.versions
-        == DECISION_CONTRACT_VERSIONS
+        == person_role().contract_versions
         == {
             "society-decision-action": 2,
             "society-decision-policy": 2,
@@ -870,9 +870,9 @@ def test_an_ask_that_raises_past_its_own_record_logs_its_class_and_never_its_tex
     def raises(*_args, **_kwargs):
         raise _Unnamed(_CARRIED)
 
-    monkeypatch.setattr(host_module, "ask_person", raises)
-    ask = PersonAsk(request, manifest.spec(model_id), AnsweringMechanism.TOOL_CALL)
-    ((request_id, result),) = PersonDecisionHost._ask(
+    monkeypatch.setattr(host_module, "ask", raises)
+    ask = RoleAsk(person_role(), request, manifest.spec(model_id), AnsweringMechanism.TOOL_CALL)
+    ((request_id, result),) = DecisionHost._ask(
         None, None, [ask], contract, time.monotonic() + 20.0, Decimal("1"), 0
     )
     assert str(request_id) == request["request_id"]
@@ -1016,14 +1016,14 @@ def test_a_model_is_asked_in_its_own_measured_order_and_otherwise_in_the_contrac
     )
     assert str(contract.mechanism_for(ordered.spec(model_id))) == "json_schema"
     # The host asks by the same rule.
-    askable = host_module._askable(ordered, contract, model_id)
+    askable = host_module._askable(person_role(), ordered, contract, model_id)
     assert askable is not None and str(askable[1]) == "json_schema"
 
 
 def test_the_manifests_answering_orders_are_the_ones_the_probes_rules_selected():
     record = json.loads(Path(PROBE).read_text(encoding="utf-8"))["record"]
     manifest = load_manifest()
-    offered = {spec.model_id: spec for spec in manifest.offered_models(Role.SOCIETY_DECISION)}
+    offered = {spec.model_id: spec for spec in manifest.offered_models(person_role().chosen)}
     # A positive control: the probe asked every offered model, and selected an order for one.
     assert set(record["models"]) == set(offered)
     assert any(found["answering_order_selected"] for found in record["models"].values())
@@ -1246,21 +1246,37 @@ def test_a_request_or_comparison_asked_under_the_first_contract_keeps_its_mechan
 
 
 def test_a_policy_offering_fewer_options_than_a_request_needs_is_refused_by_name(monkeypatch):
-    import exulanica.world.society_decision_contract as contract_module
-    from exulanica.world.society_catalogs import load_decision_catalogs
+    import dataclasses
 
-    actions, policy, chosen, digest = load_decision_catalogs()
+    import exulanica.world.decision_roles as roles_module
+
+    role = person_role()
+    loaded = roles_module._catalog
 
     def reading(maximum):
-        bounded = {**policy, "options_maximum": {**policy["options_maximum"], "value": maximum}}
-        monkeypatch.setattr(
-            contract_module,
-            "load_decision_catalogs",
-            lambda versions=None: (actions, bounded, chosen, digest),
-        )
-        return contract_module._contract(None)
+        def bounded(read_role, catalog_id, version, schema):
+            catalog = loaded(read_role, catalog_id, version, schema)
+            if catalog_id != read_role.policy_catalog:
+                return catalog
+            entries = tuple(
+                dataclasses.replace(
+                    entry,
+                    values=tuple(
+                        (
+                            name,
+                            maximum if (entry.key, name) == ("options_maximum", "value") else value,
+                        )
+                        for name, value in entry.values
+                    ),
+                )
+                for entry in catalog.entries
+            )
+            return dataclasses.replace(catalog, entries=entries)
 
-    with pytest.raises(contract_module.ContractError, match="options_maximum is at least 2"):
+        monkeypatch.setattr(roles_module, "_catalog", bounded)
+        return roles_module._contract(role, role.contract_versions)
+
+    with pytest.raises(roles_module.ContractError, match="options_maximum is at least 2"):
         reading(1)
     # The positive control: at the fewest, a person is offered standing and waiting alone.
     narrow = reading(2)

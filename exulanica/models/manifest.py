@@ -30,11 +30,14 @@ its provider, and no code names one. The origin a provider's requests reach is d
 spelling, so it is never stated a second time, and a URL the allowlist could not declare is
 refused here. A role's chain stays on one provider, because a hand-over names one destination.
 
-**A chosen role has no model here.** The world names one, for a person or a group, among the
-models the manifest offers the role: a model is offered when its ``answering`` map names at least
-one mechanism by which it was verified to answer a choice, each naming the record of the probe
-that verified it, and its catalog use cases hold the role's. A model with no verified mechanism
-is offered to no chosen role.
+**A chosen role has no model here, and no entry.** A world names a model for a decision role, a
+person today, among the models the manifest offers the role. The roles themselves are declared as
+data by the decision role registry above this package (``exulanica.world.decision_roles``), which
+passes each role's requirements down as a :class:`ChosenRoleBinding`; this package names no
+chosen role. A model is offered to a binding when its ``answering`` map names at least one
+mechanism by which it was verified to answer a choice, each naming the record of the probe that
+verified it, and its catalog use cases hold the binding's. A model with no verified mechanism is
+offered to no chosen role.
 
 **Casing is load bearing.** The catalog's human-readable ``name`` field differs from the callable
 ``model_id``, inconsistently across the reasoning line: one identifier doubles its vendor prefix,
@@ -102,7 +105,12 @@ _JUDGEMENT: Final = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
 
 class Role(StrEnum):
-    """What a call site asks for. Never an identifier, never a vendor, never a size."""
+    """What a call site asks for. Never an identifier, never a vendor, never a size.
+
+    Only the roles the manifest binds to a model. A role whose model a world chooses is a decision
+    role, declared by the registry above this package and reaching it as a
+    :class:`ChosenRoleBinding`.
+    """
 
     REASONING_CHEAP = "reasoning_cheap"
     REASONING_MID = "reasoning_mid"
@@ -110,8 +118,11 @@ class Role(StrEnum):
     VISION = "vision"
     STRUCTURED_EXTRACTION = "structured_extraction"
     EMBEDDING = "embedding"
-    #: A person in a world choosing what to do next; the world chooses the model.
-    SOCIETY_DECISION = "society_decision"
+
+
+#: A chosen role's key: the name every call record of it carries, the same shape a model
+#: identity's role takes (``exulanica.models.handoff``).
+_CHOSEN_KEY: Final = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
 
 class CatalogFormat(StrEnum):
@@ -339,11 +350,27 @@ class RoleBinding:
 
 @dataclass(frozen=True, slots=True)
 class ChosenRoleBinding:
-    """A role whose model a world chooses, and what a model must declare to be offered it."""
+    """A role whose model a world chooses, and what a model must declare to be offered it.
 
-    role: Role
+    Built by the decision role registry from a role's entry, never read from this manifest: its
+    ``role`` is the role's key, which may not be a role the manifest binds.
+    """
+
+    role: str
     required_use_cases: tuple[str, ...]
     rationale: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.role, str) or not _CHOSEN_KEY.fullmatch(self.role):
+            raise ManifestError(f"{self.role!r} is not a chosen role's key")
+        if self.role in {role.value for role in Role}:
+            raise ManifestError(
+                f"{self.role} is a role the manifest binds to a model, so no world chooses it"
+            )
+        if not self.required_use_cases or not all(
+            isinstance(use_case, str) and use_case for use_case in self.required_use_cases
+        ):
+            raise ManifestError(f"chosen role {self.role} names the use cases a model needs")
 
     def offers(self, spec: ModelSpec) -> bool:
         """Whether ``spec`` may be chosen for this role: a chat model, verified to answer a
@@ -365,7 +392,6 @@ class Manifest:
     models: Mapping[str, ModelSpec]
     roles: Mapping[Role, RoleBinding]
     timeout_rule: TimeoutRule
-    chosen_roles: Mapping[Role, ChosenRoleBinding]
 
     def __getitem__(self, role: Role | str) -> RoleBinding:
         try:
@@ -373,13 +399,9 @@ class Manifest:
         except ValueError as exc:
             known = ", ".join(sorted(r.value for r in Role))
             raise ManifestError(
-                f"no binding for role {role!r}; the manifest binds {known}"
+                f"no binding for role {role!r}; the manifest binds {known}. A role a world "
+                "chooses a model for is asked with offered()"
             ) from exc
-        if resolved in self.chosen_roles:
-            raise ManifestError(
-                f"role {resolved} is chosen by the world, so the manifest binds no model to it; "
-                "ask for the model a world chose with offered()"
-            )
         try:
             return self.roles[resolved]
         except KeyError as exc:
@@ -429,24 +451,12 @@ class Manifest:
         except KeyError as exc:
             raise ManifestError(f"no provider {provider_id!r} is declared in the manifest") from exc
 
-    def chosen(self, role: Role | str) -> ChosenRoleBinding:
-        """The chosen role's binding, or a refusal: a manifest-bound role is not chosen."""
-        try:
-            return self.chosen_roles[Role(role)]
-        except (KeyError, ValueError) as exc:
-            known = ", ".join(sorted(r.value for r in self.chosen_roles))
-            raise ManifestError(
-                f"role {role!r} is not chosen by a world; the chosen roles are {known}"
-            ) from exc
-
-    def offered_models(self, role: Role | str) -> tuple[ModelSpec, ...]:
+    def offered_models(self, binding: ChosenRoleBinding) -> tuple[ModelSpec, ...]:
         """Every model a world may choose for a chosen role, in identifier order."""
-        binding = self.chosen(role)
         return tuple(spec for _, spec in sorted(self.models.items()) if binding.offers(spec))
 
-    def offered(self, role: Role | str, model_id: str) -> ModelSpec:
+    def offered(self, binding: ChosenRoleBinding, model_id: str) -> ModelSpec:
         """The model a world chose for a chosen role, or a refusal naming why it is not offered."""
-        binding = self.chosen(role)
         spec = self.spec(model_id)
         if not binding.offers(spec):
             raise ManifestError(
@@ -475,13 +485,16 @@ class Manifest:
 
         Fallbacks are included. A fallback that has itself been removed is a failover that fails,
         which is worse than no failover because it is only discovered under load. So is every
-        model offered to a chosen role, since a world may have chosen it.
+        chat model verified to answer a choice, since a chosen role may be offered it and a world
+        may have chosen it: the manifest names no chosen role, so it counts every model one could
+        be offered.
         """
         reachable: set[str] = set()
         for binding in self.roles.values():
             reachable.update(spec.model_id for spec in binding.chain)
-        for role in self.chosen_roles:
-            reachable.update(spec.model_id for spec in self.offered_models(role))
+        reachable.update(
+            model_id for model_id, spec in self.models.items() if spec.is_chat and spec.answering
+        )
         return frozenset(reachable)
 
 
@@ -753,30 +766,16 @@ def _role_timeout(
     return stated, MappingProxyType(dict(basis))
 
 
-def _chosen_role(role: Role, raw: Any) -> ChosenRoleBinding:
-    if not isinstance(raw, Mapping):
-        raise ManifestError(f"chosen role {role} must be an object")
-    fields = {"required_use_cases", "rationale"}
-    if set(raw) != fields:
-        raise ManifestError(
-            f"chosen role {role} states exactly {sorted(fields)}: no primary, fallback or "
-            "timeout, because the world chooses its model and the caller bounds its calls"
-        )
-    use_cases = raw["required_use_cases"]
-    if not isinstance(use_cases, list) or not all(isinstance(u, str) and u for u in use_cases):
-        raise ManifestError(f"chosen role {role}: required_use_cases is a list of use cases")
-    return ChosenRoleBinding(
-        role=role,
-        required_use_cases=tuple(use_cases),
-        rationale=_text(raw, "rationale", f"chosen role {role}"),
-    )
-
-
 def parse_manifest(document: Mapping[str, Any]) -> Manifest:
     """Validate a manifest document and freeze it. Raises ``ManifestError`` on anything wrong."""
-    for key in ("providers", "models", "roles", "chosen_roles", "pipeline_version", "timeout_rule"):
+    for key in ("providers", "models", "roles", "pipeline_version", "timeout_rule"):
         if key not in document:
             raise ManifestError(f"manifest is missing top-level key {key!r}")
+    if "chosen_roles" in document:
+        raise ManifestError(
+            "manifest states chosen_roles, which the decision role registry declares "
+            "(exulanica.world.decision_roles): a role a world chooses a model for has no entry here"
+        )
 
     raw_providers: Mapping[str, Any] = document["providers"]
     if not isinstance(raw_providers, Mapping) or not raw_providers:
@@ -784,18 +783,11 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
     providers = {key: _provider_from(key, raw) for key, raw in raw_providers.items()}
     raw_models: Mapping[str, Any] = document["models"]
     raw_roles: Mapping[str, Any] = document["roles"]
-    raw_chosen: Mapping[str, Any] = document["chosen_roles"]
     rule = _timeout_rule(document["timeout_rule"])
     specs = {model_id: _spec_from(model_id, raw, providers) for model_id, raw in raw_models.items()}
 
     _reject_unknown_roles(raw_roles)
-    _reject_unknown_roles(raw_chosen)
-    both = sorted(set(raw_roles) & set(raw_chosen))
-    if both:
-        raise ManifestError(
-            "a role is bound to a model or chosen by a world, never both: " + ", ".join(both)
-        )
-    missing = {role.value for role in Role} - set(raw_roles) - set(raw_chosen)
+    missing = {role.value for role in Role} - set(raw_roles)
     if missing:
         raise ManifestError(
             "manifest does not bind every role. Missing: " + ", ".join(sorted(missing))
@@ -835,8 +827,6 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
                 role, raw, "image_prompt_tokens_reserved"
             ),
         )
-    chosen = {Role(name): _chosen_role(Role(name), raw) for name, raw in raw_chosen.items()}
-
     return Manifest(
         manifest_version=str(document.get("manifest_version", "0")),
         pipeline_version=int(document["pipeline_version"]),
@@ -844,7 +834,6 @@ def parse_manifest(document: Mapping[str, Any]) -> Manifest:
         models=specs,
         roles=bindings,
         timeout_rule=rule,
-        chosen_roles=MappingProxyType(chosen),
     )
 
 

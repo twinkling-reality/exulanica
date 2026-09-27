@@ -56,7 +56,7 @@ from conftest import (
     write_photo,
     write_point_map,
 )
-from retired_society_support import plant_retired_society
+from retired_society_support import plant_retired_decision, plant_retired_society
 from social_society_fixtures import social_input
 from society_fixtures import SEED, society_input
 from society_living_fixtures import grid_input
@@ -648,22 +648,14 @@ def decision_request(owner) -> dict[str, Any]:
         profile=SOCIAL,
         initial_input=document,
     )
-    decisions = SocietyDecisionRepository(society)
     key = uuid.uuid4()
     with connection.transaction():
-        decisions.prepare(
+        plant_retired_decision(
+            SocietyDecisionRepository(society),
             version_id,
             request_id=key,
-            subject_id=uuid.UUID(state["state"]["social"]["cast_ids"][0]),
-            base_tick=state["current_tick"],
-            base_state_sha256=state["state_sha256"],
-            provider_config=None,
-        )
-    with connection.transaction():
-        decisions.finish(
-            version_id,
-            key,
-            {
+            subject_id=state["state"]["social"]["cast_ids"][0],
+            result={
                 "status": "unavailable",
                 "reason": "provider_not_configured",
                 "proposal": None,

@@ -32,16 +32,15 @@ from exulanica.world.society import society_state_sha256
 from exulanica.world.society_authored_ground import AUTHORED_GROUND_POPULATION
 from exulanica.world.society_decision_contract import (
     DECISION_REASONS,
-    INSTRUCTION,
     at_choice_point,
     choice_options,
     choice_request,
     decision_context,
     decision_contract,
     decision_messages,
+    person_role,
 )
 from exulanica.world.society_decisions import (
-    PERSON_REQUEST_PROFILE,
     receipt_for,
     seal,
     validate_decision_receipt,
@@ -98,7 +97,7 @@ def _request(state, document, subject, options, *, model="example/model"):
     context = decision_context(state, document, subject, options)
     return seal(
         {
-            "profile": PERSON_REQUEST_PROFILE,
+            "profile": person_role().request_profile,
             "request_id": str(uuid.uuid5(square.SOCIETY, f"{subject}:{state['tick']}")),
             "subject_id": subject,
             "branch_id": state["branch_id"],
@@ -555,7 +554,7 @@ def test_an_ask_whose_time_has_run_out_sends_nothing_and_says_so(left):
 def test_an_asks_bound_covers_every_ask_the_square_makes():
     """What the host decides a model's ask needs is at least what its calls reserve: both answers,
     the second carrying the retry's note, for every choice the square offers in its first hour."""
-    from exulanica.api.society_person_decisions import _NOT_OFFERED, ask_bound_usd
+    from exulanica.api.society_person_decisions import ask_bound_usd
 
     manifest, model_id = _offered_manifest()
     spec = manifest.spec(model_id)
@@ -569,7 +568,7 @@ def test_an_asks_bound_covers_every_ask_the_square_makes():
             context = decision_context(state, document, subject, options)
             for mechanism in (AnsweringMechanism.TOOL_CALL, AnsweringMechanism.JSON_SCHEMA):
                 first = decision_messages(context, mechanism)
-                second = [*first, {"role": "user", "content": _NOT_OFFERED}]
+                second = [*first, {"role": "user", "content": person_role().not_offered}]
                 reserved = sum(
                     budget.estimate_usd(
                         spec,
@@ -585,7 +584,7 @@ def test_an_asks_bound_covers_every_ask_the_square_makes():
     # instruction alone with the answer's bound, falls short of a real ask.
     assert asked > 20
     instruction_alone = contract.value("answer_attempts_maximum") * budget.estimate_usd(
-        spec, prompt_chars=len(INSTRUCTION), max_tokens=answer_tokens(spec) or 0
+        spec, prompt_chars=len(person_role().instruction), max_tokens=answer_tokens(spec) or 0
     )
     assert instruction_alone < reserved
 
@@ -660,14 +659,14 @@ def test_a_refusal_is_decided_on_money_spent_never_on_calls_under_way():
     """A call under way, the Companion's say, holds part of the budget until it is recorded. The
     host neither refuses for it nor lets a refusal come and go with it: once spending leaves too
     little, the refusal holds until the process restarts."""
-    from exulanica.api.society_person_decisions import host_refusal, smallest_ask_usd
+    from exulanica.api.decision_host import host_refusal, smallest_ask_usd
     from exulanica.models.manifest import Role, load_manifest
     from exulanica.models.usage import CallUsage
 
     manifest = load_manifest()
     contract = decision_contract()
     smallest = smallest_ask_usd(
-        BudgetGuard(ceiling_usd=Decimal(1), max_calls=10), manifest, contract
+        person_role(), BudgetGuard(ceiling_usd=Decimal(1), max_calls=10), manifest, contract
     )
     assert smallest is not None
     spec = manifest[Role.REASONING_CHEAP].primary
@@ -685,7 +684,7 @@ def test_a_refusal_is_decided_on_money_spent_never_on_calls_under_way():
     held = guard.reserve(spec, role=Role.REASONING_CHEAP, prompt_chars=chars, max_tokens=2048)
     # What calls under way hold leaves less than the smallest ask, and nothing is spent.
     assert guard.available_usd < smallest and guard.spent_usd == 0
-    assert host_refusal(client, manifest, contract) is None
+    assert host_refusal(person_role(), client, manifest, contract) is None
     guard.record(
         CallUsage.failed(
             role=Role.REASONING_CHEAP,
@@ -698,11 +697,11 @@ def test_a_refusal_is_decided_on_money_spent_never_on_calls_under_way():
         released=held,
     )
     assert (guard.held_usd, guard.spent_usd) == (Decimal(0), held)
-    assert host_refusal(client, manifest, contract) == "process_budget_spent"
+    assert host_refusal(person_role(), client, manifest, contract) == "process_budget_spent"
 
 
 def test_every_reason_a_person_decision_records_is_in_the_stated_set():
-    from exulanica.api.society_person_decisions import _failure_reason
+    from exulanica.api.decision_host import _failure_reason
     from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, PROVIDER_NOT_ADMITTED
     from exulanica.models.errors import (
         BudgetExceededError,

@@ -14,9 +14,13 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import load_manifest
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
-from exulanica.world.society_decision_contract import PROMPT_VERSION, decision_contract
+from exulanica.world.society_decision_contract import (
+    PROMPT_VERSION,
+    decision_contract,
+    person_role,
+)
 
 #: The seeds tests run, committed to the development phase of a test copy of the catalogs.
 SEEDS = ("d1" * 32, "d2" * 32)
@@ -61,7 +65,7 @@ def seeded_catalogs(
 def model_arm(role: str) -> dict[str, Any]:
     """An arm run by the first model the manifest offers a person's decisions."""
     contract = decision_contract()
-    spec = load_manifest().offered_models(Role.SOCIETY_DECISION)[0]
+    spec = load_manifest().offered_models(person_role().chosen)[0]
     mechanism = contract.mechanism_for(spec)
     assert mechanism is not None
     return {

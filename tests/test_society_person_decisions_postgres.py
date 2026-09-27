@@ -2,7 +2,7 @@
 
 The application connects as a provisioned runtime role; the owner's choices are recorded through
 the choice repository over that role's session, and the host's decision phase
-(:class:`~exulanica.api.society_person_decisions.PersonDecisionHost`) asks a scripted model behind
+(:class:`~exulanica.api.decision_host.DecisionHost`) asks a scripted model behind
 the real client, as playback asks before a minute. The minute is then taken through the steps
 route, and replay through the replay route. What is shown:
 
@@ -25,35 +25,38 @@ import time
 import uuid
 from collections import Counter
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import psycopg
 import pytest
 from exulanica.api.authorisation import load_token_directory
-from exulanica.api.society_control_worker import SocietyControlWorker
-from exulanica.api.society_person_decisions import (
-    PersonDecisionHost,
+from exulanica.api.decision_host import (
+    DecisionHost,
     ask_bound_usd,
     host_refusal,
     model_refusal,
     smallest_ask_usd,
 )
+from exulanica.api.routes import society_models
+from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.epistemics.hosted_requests import no_place_released
 from exulanica.identity import IdentityRepository, rename_entity
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.egress import parse_egress_allowlist
-from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest, parse_manifest
+from exulanica.models.manifest import MANIFEST_PATH, load_manifest, parse_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.inhabitant_words import inhabitant_words_catalog
 from exulanica.selection.society_question import EVENT_LINES
+from exulanica.world.decision_roles import DecisionRole, load_decision_roles
 from exulanica.world.society import SocietyBytesNotRead
 from exulanica.world.society_controls import LEASE_SECONDS, MAX_CATCHUP_TICKS, ControlClaim
 from exulanica.world.society_decision_contract import (
-    CHOICE_DESCRIPTION,
     at_choice_point,
     decision_contract,
+    person_role,
 )
 from exulanica.world.society_decision_repository import (
     UNANSWERED_WINDOW_TICKS,
@@ -123,7 +126,7 @@ class _Chooser(FakeTransport):
 
 def _unoffered(manifest) -> str:
     """A declared model the manifest offers no person's decisions."""
-    offered = {spec.model_id for spec in manifest.offered_models(Role.SOCIETY_DECISION)}
+    offered = {spec.model_id for spec in manifest.offered_models(person_role().chosen)}
     return next(model_id for model_id in sorted(manifest.models) if model_id not in offered)
 
 
@@ -136,7 +139,7 @@ def _client(manifest, transport) -> ModelClient:
     )
 
 
-def _host(world, client, services, manifest, *, listed=True) -> PersonDecisionHost:
+def _host(world, client, services, manifest, *, listed=True) -> DecisionHost:
     def policy_for(workspace_id):
         return services.request_policy(
             workspace_id,
@@ -144,7 +147,7 @@ def _host(world, client, services, manifest, *, listed=True) -> PersonDecisionHo
             released_places=no_place_released,
         )
 
-    return PersonDecisionHost(
+    return DecisionHost(
         database=services.database,
         runtime=services.society_runtime,
         client=client,
@@ -173,8 +176,9 @@ def _choose(services, world, people, model, *, manifest, key=None) -> dict[str, 
             connection, world["workspace"], world_id=world["binding"].world_id
         ).record_choice(
             world["binding"].version_id,
+            person_role(),
             request_id=key or uuid.uuid4(),
-            people=people,
+            subjects=people,
             model=model,
             chosen_by=world["session"].actor,
             manifest=manifest,
@@ -378,8 +382,6 @@ def test_what_happened_in_a_model_run_world_says_the_model_chose_and_no_receipt_
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_an_exact_retry_of_a_choice_is_answered_before_anything_else_is_checked(app, monkeypatch):
-    import exulanica.world.society_model_choice_repository as repository
-
     world, client = app
     services = _services(client)
     manifest, model_id = _offered()
@@ -388,14 +390,8 @@ def test_an_exact_retry_of_a_choice_is_answered_before_anything_else_is_checked(
     model = {"provider": manifest.spec(model_id).provider, "model_id": model_id}
     key = uuid.uuid4()
     first = _choose(services, world, people, model, manifest=manifest, key=key)
-    # Whatever would refuse a new choice now, the one already recorded is its retry's answer: here
-    # the engine table stops letting this engine's owner choose.
-    table = repository.society_engine
-    monkeypatch.setattr(
-        repository,
-        "society_engine",
-        lambda name: dataclasses.replace(table(name), owner_model_choice=False),
-    )
+    # Whatever would refuse a new choice now, the one already recorded is its retry's answer.
+    monkeypatch.setattr(DecisionRole, "hosted_by", lambda _role, _engine: False)
     assert _choose(services, world, people, model, manifest=manifest, key=key) == first
     with pytest.raises(ModelChoiceRefused) as refused:
         _choose(services, world, people, model, manifest=manifest)
@@ -428,11 +424,9 @@ def test_each_world_hour_bound_is_named_on_each_receipt_past_it_and_asks_nothing
     world, client = app
     services = _services(client)
     manifest, model_id = _offered()
-    import exulanica.api.society_person_decisions as host_module
-
     contract = decision_contract()
     bounded = dataclasses.replace(contract, policy={**contract.policy, bound: limit})
-    monkeypatch.setattr(host_module, "decision_contract", lambda: bounded)
+    monkeypatch.setattr(DecisionRole, "contract", lambda _role, versions=None: bounded)
     transport = _Chooser()
     snapshot = stays._inhabited(world, client)
     people = [person["id"] for person in snapshot["state"]["inhabitants"]]
@@ -479,7 +473,10 @@ def test_a_provider_the_host_does_not_admit_is_asked_for_nothing_and_nothing_is_
         snapshot = stays._step(world, client, snapshot)
     assert _decisions(services, world, snapshot) == [] and transport.requests == []
     assert _requests(services, world, snapshot) == 0
-    assert model_refusal(refused, manifest, decision_contract(), model) == "provider_not_admitted"
+    assert (
+        model_refusal(person_role(), refused, manifest, decision_contract(), model)
+        == "provider_not_admitted"
+    )
 
 
 def _moved(manifest, model_id):
@@ -524,7 +521,10 @@ def test_a_choice_whose_model_moved_to_another_provider_is_sent_nothing_and_name
     )
     # The positive control: the moved model is askable here, from its new provider.
     assert moved_client.refusals == {}
-    assert model_refusal(moved_client, moved, decision_contract(), model) == "provider_changed"
+    assert (
+        model_refusal(person_role(), moved_client, moved, decision_contract(), model)
+        == "provider_changed"
+    )
     host = _host(world, moved_client, services, moved)
     for _ in range(3):
         host.before_minute(_claim(world, snapshot), time.monotonic() + LEASE_SECONDS)
@@ -598,7 +598,7 @@ def test_a_choice_names_this_societys_people_and_an_offered_model_or_is_refused(
     with services.database.session(world["workspace"]) as connection:
         current = SocietyModelChoiceRepository(
             connection, world["workspace"], world_id=world["binding"].world_id
-        ).current(world["binding"].version_id)
+        ).current(world["binding"].version_id, person_role())
         assert current[people[0]]["model"] is None
         assert current[people[1]]["model"] == model
         assert current[people[0]]["choice_seq"] == routine["choice_seq"] == 2
@@ -627,8 +627,9 @@ def test_a_choice_names_this_societys_people_and_an_offered_model_or_is_refused(
             connection, world["workspace"], world_id=world["binding"].world_id
         ).record_choice(
             world["binding"].version_id,
+            person_role(),
             request_id=uuid.uuid4(),
-            people=people[2:4],
+            subjects=people[2:4],
             model=model,
             chosen_by=world["session"].actor,
             manifest=manifest,
@@ -866,7 +867,8 @@ def test_a_request_left_unanswered_is_closed_by_name_after_its_minute_ran_with_t
             )
         )
         with connection.transaction():
-            reserved, fresh = decisions.prepare_person(
+            reserved, fresh = decisions.prepare_role(
+                person_role(),
                 world["binding"].version_id,
                 request_id=uuid.uuid4(),
                 subject_id=uuid.UUID(people[0]),
@@ -987,9 +989,9 @@ def test_a_host_that_can_ask_nobody_reserves_nothing_writes_nothing_and_says_why
     services = _services(client)
     manifest = load_manifest()
     contract = decision_contract()
-    spec = manifest.offered_models(Role.SOCIETY_DECISION)[0]
+    spec = manifest.offered_models(person_role().chosen)[0]
     probe = BudgetGuard(ceiling_usd=Decimal(1), max_calls=100)
-    smallest = smallest_ask_usd(probe, manifest, contract)
+    smallest = smallest_ask_usd(person_role(), probe, manifest, contract)
     guard = _guard_for(cause, smallest)
     transport = _Chooser()
     model_client = (
@@ -1016,7 +1018,7 @@ def test_a_host_that_can_ask_nobody_reserves_nothing_writes_nothing_and_says_why
     listed = dataclasses.replace(
         services, model_client=model_client, society_control_workspaces=(world["workspace"],)
     )
-    assert listed.model_host_refusal(world["workspace"]) == refusal
+    assert listed.model_host_refusal(world["workspace"], person_role()) == refusal
     # What the page reads and what an operator reads say the same thing.
     client.app.state.services = listed
     scope, _, society = routes(world)
@@ -1049,12 +1051,12 @@ def test_a_person_whose_model_no_longer_fits_the_budget_is_asked_nothing_and_tol
     probe = BudgetGuard(ceiling_usd=Decimal(1), max_calls=100)
     offered = [
         spec
-        for spec in manifest.offered_models(Role.SOCIETY_DECISION)
+        for spec in manifest.offered_models(person_role().chosen)
         if contract.mechanism_for(spec) is not None
     ]
-    dearest = max(offered, key=lambda spec: ask_bound_usd(probe, spec, contract))
-    need = ask_bound_usd(probe, dearest, contract)
-    cheapest = smallest_ask_usd(probe, manifest, contract)
+    dearest = max(offered, key=lambda spec: ask_bound_usd(person_role(), probe, spec, contract))
+    need = ask_bound_usd(person_role(), probe, dearest, contract)
+    cheapest = smallest_ask_usd(person_role(), probe, manifest, contract)
     # The positive control: the model given needs more than twice the cheapest ask, so a ceiling
     # can fit the cheapest ask in the share and not the model given.
     assert cheapest is not None and 2 * cheapest < need
@@ -1065,7 +1067,7 @@ def test_a_person_whose_model_no_longer_fits_the_budget_is_asked_nothing_and_tol
         transport=(transport := _Chooser()),
         budget=BudgetGuard(ceiling_usd=ceiling, max_calls=100),
     )
-    assert host_refusal(model_client, manifest, contract) is None
+    assert host_refusal(person_role(), model_client, manifest, contract) is None
     snapshot = stays._inhabited(world, client)
     people = [person["id"] for person in snapshot["state"]["inhabitants"]]
     model = {"provider": dearest.provider, "model_id": dearest.model_id}
@@ -1097,7 +1099,7 @@ class _Changing:
 
     def admit(self, request):
         self.shown.extend(request.texts)
-        self.judged += request.texts[:1] == (CHOICE_DESCRIPTION,)
+        self.judged += request.texts[:1] == (person_role().choice_description,)
         replaced = []
         for text in request.texts:
             for word in self.words:
@@ -1264,7 +1266,8 @@ def test_a_person_left_one_option_is_asked_nothing_and_nothing_is_written(app):
 
         def prepare(offer):
             with connection.transaction():
-                return decisions.prepare_person(
+                return decisions.prepare_role(
+                    person_role(),
                     world["binding"].version_id,
                     request_id=uuid.uuid4(),
                     subject_id=uuid.UUID(subject),
@@ -1318,7 +1321,8 @@ def test_a_request_older_than_the_window_is_left_unanswered_and_harms_nothing(ap
             )
         )
         with connection.transaction():
-            reserved, fresh = decisions.prepare_person(
+            reserved, fresh = decisions.prepare_role(
+                person_role(),
                 world["binding"].version_id,
                 request_id=uuid.uuid4(),
                 subject_id=uuid.UUID(people[0]),
@@ -1344,7 +1348,7 @@ def test_a_request_older_than_the_window_is_left_unanswered_and_harms_nothing(ap
         repository = SocietyDecisionRepository(
             SocietyRepository(connection, world["workspace"], world_id=world["binding"].world_id)
         )
-        assert repository.unanswered_person_requests(world["binding"].version_id) == []
+        assert repository.unanswered_requests(person_role(), world["binding"].version_id) == []
     host = _host(world, _client(manifest, _Chooser()), services, manifest)
     host.before_minute(_claim(world, snapshot), time.monotonic() + LEASE_SECONDS)
     assert orphan not in {r["request_id"] for r in _decisions(services, world, snapshot)}
@@ -1366,7 +1370,7 @@ def test_a_request_older_than_the_window_is_left_unanswered_and_harms_nothing(ap
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-@pytest.mark.parametrize("where", ["prepare_person", "finish"])
+@pytest.mark.parametrize("where", ["prepare_role", "finish"])
 def test_a_race_with_the_asset_read_lock_is_asked_once_more_and_nothing_is_lost(
     app, monkeypatch, where
 ):
@@ -1456,3 +1460,26 @@ def test_a_society_records_only_the_decision_receipts_of_its_own_engine(app):
                 receipt["document_sha256"],
             ),
         )
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_the_models_routes_name_a_registry_with_no_role_deciding_for_people(app, monkeypatch):
+    """A registry that states no role deciding for people is answered by both models routes as a
+    named problem, never a server error."""
+    world, client = app
+    scope, _, society = routes(world)
+    stays._inhabited(world, client)
+    # The positive control: with the production registry, the read is served.
+    assert client.get(society + "/models", headers=OWNER, params=scope).status_code == 200
+    # The registry the tests declare a traffic signal in, which decides for no person.
+    signals = load_decision_roles(
+        Path(__file__).resolve().parent / "decision_role_fixtures",
+        adapters="decision_role_fixtures",
+    )
+    monkeypatch.setattr(society_models, "decision_roles", lambda: signals)
+    body = {"idempotency_key": str(uuid.uuid4()), "people": [str(uuid.uuid4())], "model": None}
+    read = client.get(society + "/models", headers=OWNER, params=scope)
+    chosen = client.post(society + "/models", headers=OWNER, params=scope, json=body)
+    for answered in (read, chosen):
+        assert answered.status_code == 409, answered.text
+        assert answered.json()["code"] == "role_not_registered"

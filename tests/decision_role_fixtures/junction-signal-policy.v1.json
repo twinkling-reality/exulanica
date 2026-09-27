@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "catalog_id": "junction-signal-policy",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "answer_attempts_maximum",
+      "value": 2,
+      "reason": "An answer, then once more quoting why the first was refused.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "answer_rank_json_schema",
+      "value": 2,
+      "reason": "Asked second by a strict JSON schema of the offered actions.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "answer_rank_tool_call",
+      "value": 1,
+      "reason": "Asked first by one function forced by name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "concurrent_calls_maximum",
+      "value": 4,
+      "reason": "Every signal at a choice point is asked at once.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "context_bytes_maximum",
+      "value": 4000,
+      "reason": "A signal's situation is small; more is refused before a reservation.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "decision_deadline_ms",
+      "value": 20000,
+      "reason": "Asked inside the playback lease, as every role is.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "decisions_per_world_hour_maximum",
+      "value": 600,
+      "reason": "A declared ceiling on a world's asked decisions in an hour.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "model_signals_maximum",
+      "value": 4,
+      "reason": "At most four signals of one world are run by models.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "options_maximum",
+      "value": 4,
+      "reason": "A junction offers at most one switch per way and keeping the lights.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "process_reserve_percent",
+      "value": 50,
+      "reason": "Half of the process's model budget is kept for its other work.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "spend_per_world_hour_microusd",
+      "value": 20000,
+      "reason": "A declared ceiling on a world's hourly spend on signals.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    }
+  ]
+}

@@ -42,7 +42,9 @@ Everything here exists because of something that was measured, not assumed:
     model a world chose for a chosen role to pick one option of a
     :class:`~exulanica.models.choice.ChoiceRequest`, by a mechanism the model's manifest entry
     names as verified, with no fallback and no cache: a choice is an event in the world, asked
-    each time it happens.
+    each time it happens. The role reaches the client as a
+    :class:`~exulanica.models.manifest.ChosenRoleBinding` its caller built from the decision role
+    registry; the client names no chosen role.
 *   **Every request passes the client's policies before anything else happens to it.** ``chat``
     (and so ``structured`` and ``vision``) and ``embed`` hand the request to each attached policy
     before the cache key is computed, and send exactly the text the policies return. A client with
@@ -86,7 +88,14 @@ from exulanica.models.errors import (
     StructuredOutputError,
 )
 from exulanica.models.handoff import ModelHandoff
-from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec, Role, load_manifest
+from exulanica.models.manifest import (
+    AnsweringMechanism,
+    ChosenRoleBinding,
+    Manifest,
+    ModelSpec,
+    Role,
+    load_manifest,
+)
 from exulanica.models.messages import image_part, text_part
 from exulanica.models.policy import (
     HostedRequest,
@@ -294,21 +303,21 @@ class ModelClient:
         return bound
 
     def unchanged_by_policies(
-        self, role: Role | str, model_id: str, texts: Sequence[str]
+        self, chosen: ChosenRoleBinding, model_id: str, texts: Sequence[str]
     ) -> tuple[bool, ...]:
         """Which of ``texts`` every policy of this client would let leave exactly as it is.
 
-        Asked of the options of a choice before it is built, for ``model_id`` chosen in ``role``,
-        so that an option a policy would change is left out of the offer, rather than the whole
-        request refused when it is sent (``_admit``). Sends nothing and records nothing; a client
-        with no policy refuses as it would to send.
+        Asked of the options of a choice before it is built, for ``model_id`` chosen in the role
+        ``chosen`` describes, so that an option a policy would change is left out of the offer,
+        rather than the whole request refused when it is sent (``_admit``). Sends nothing and
+        records nothing; a client with no policy refuses as it would to send.
         """
-        role = Role(role)
+        role = chosen.role
         if not self._policies:
             raise NoHostedRequestPolicy(
                 f"this client has no hosted-request policy, so it sends nothing to the {role} role"
             )
-        handoff = ModelHandoff.chosen(self._manifest, role, model_id)
+        handoff = ModelHandoff.chosen(self._manifest, chosen, model_id)
         admitted = tuple(texts)
         for policy in self._policies:
             admitted = tuple(
@@ -331,7 +340,7 @@ class ModelClient:
 
     def _admit(
         self,
-        role: Role,
+        role: Role | str,
         payload: dict[str, Any],
         photographs: Iterable[uuid.UUID],
         placeholders: Mapping[uuid.UUID, str] | None = None,
@@ -696,7 +705,7 @@ class ModelClient:
 
     def choose(
         self,
-        role: Role | str,
+        chosen: ChosenRoleBinding,
         model_id: str,
         messages: Sequence[Mapping[str, Any]],
         request: ChoiceRequest,
@@ -709,7 +718,8 @@ class ModelClient:
         keep_usd: Decimal = Decimal(0),
         keep_calls: int = 0,
     ) -> ChoiceResult:
-        """One option of ``request``, picked by the model a world chose for a chosen role.
+        """One option of ``request``, picked by the model a world chose for the role ``chosen``
+        describes.
 
         The model must be one the manifest offers the role, asked by a mechanism its entry names
         as verified, at a provider this client admits and holds a credential for; anything else is
@@ -719,8 +729,8 @@ class ModelClient:
         ``timeout`` bounds the wait, as the caller's contract gives it, and ``keep_usd`` and
         ``keep_calls`` are the part of this process's budget the ask must leave for other work.
         """
-        role = Role(role)
-        spec = self._manifest.offered(role, model_id)
+        role = chosen.role
+        spec = self._manifest.offered(chosen, model_id)
         if mechanism not in spec.answering:
             raise ChoiceRefused(
                 f"{model_id} is not verified to answer by {mechanism}; its manifest entry names "
@@ -757,7 +767,7 @@ class ModelClient:
             role,
             built,
             (),
-            handoff=ModelHandoff.chosen(self._manifest, role, model_id),
+            handoff=ModelHandoff.chosen(self._manifest, chosen, model_id),
             choice=request,
         )
         served = self._chain.walk_one(

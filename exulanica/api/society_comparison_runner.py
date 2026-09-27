@@ -54,10 +54,11 @@ from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ManifestError
-from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec, Role
+from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
 from exulanica.models.policy import HostedRequestPolicy
 from exulanica.models.usage import usd_string
 from exulanica.selection.validation import Session
+from exulanica.world.decision_roles import RoleOption
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
 from exulanica.world.society_comparison import PlayedRun, RunPlan, play
 from exulanica.world.society_comparison_repository import (
@@ -76,8 +77,8 @@ from exulanica.world.society_comparison_verdict import ANCHOR_ROLES
 from exulanica.world.society_decision_contract import (
     PROMPT_VERSION,
     DecisionContract,
-    DecisionOption,
     decision_contract,
+    person_role,
 )
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 from exulanica.world.society_repository import SocietyRepository
@@ -198,7 +199,7 @@ class _Asking:
         self.model_of = model_of
 
     def offerable(
-        self, tick: int, due: Mapping[str, Sequence[DecisionOption]]
+        self, tick: int, due: Mapping[str, Sequence[RoleOption]]
     ) -> dict[str, frozenset[str]]:
         asked = sorted({self.model_of(subject) for subject in due})
         for model_id in asked:
@@ -269,7 +270,7 @@ class _Anchor:
     """An anchor arm asks nobody."""
 
     def offerable(
-        self, tick: int, due: Mapping[str, Sequence[DecisionOption]]
+        self, tick: int, due: Mapping[str, Sequence[RoleOption]]
     ) -> dict[str, frozenset[str]]:
         raise AssertionError("an anchor arm asks nobody")
 
@@ -316,7 +317,7 @@ class SocietyComparisonRunner:
         mechanism a model answers by changes what it chooses, not only how long it takes."""
         contract = decision_contract()
         try:
-            spec = self.manifest.offered(Role.SOCIETY_DECISION, arm.model_id)
+            spec = self.manifest.offered(person_role().chosen, arm.model_id)
         except ManifestError as exc:
             raise ValueError(f"{arm.model_id} is not offered for a person's decisions") from exc
         mechanism = contract.mechanism_for(spec)
@@ -356,7 +357,7 @@ class SocietyComparisonRunner:
                 raise ComparisonRefused("society_unavailable", "the version holds no society")
             choices = SocietyModelChoiceRepository(
                 connection, self.workspace_id, world_id=self.world_id
-            ).history(version_id)
+            ).history(version_id, person_role())
         return sorted(person["id"] for person in row["state"]["inhabitants"]), choices
 
     def group_of_choice(self, version_id: uuid.UUID, choice_seq: int) -> dict[str, Any]:
@@ -443,7 +444,7 @@ class SocietyComparisonRunner:
             if config is None:
                 continue
             try:
-                spec = self.manifest.offered(Role.SOCIETY_DECISION, config["model_id"])
+                spec = self.manifest.offered(person_role().chosen, config["model_id"])
             except ManifestError as exc:
                 raise ComparisonRefused(
                     "answering_not_the_models", f"{config['model_id']} is not offered"
@@ -594,7 +595,7 @@ class SocietyComparisonRunner:
         for config in configs:
             assert config is not None
             try:
-                spec = self.manifest.offered(Role.SOCIETY_DECISION, config["model_id"])
+                spec = self.manifest.offered(person_role().chosen, config["model_id"])
             except ManifestError:
                 raise _RunStoppedBeforeStart("model_no_longer_offered") from None
             mechanism = plan.contract.mechanism_for(spec)

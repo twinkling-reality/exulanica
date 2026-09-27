@@ -16,6 +16,7 @@ import pytest
 from exulanica.models.errors import ManifestError, PreflightError, TransportError
 from exulanica.models.manifest import MANIFEST_PATH, Role, parse_manifest
 from exulanica.models.preflight import catalog_flavors, main, run_preflight
+from exulanica.world.decision_roles import decision_roles
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPOSITORY / "exulanica" / "models"
@@ -73,8 +74,11 @@ def _entry(catalogs, model_id):
 
 
 def test_every_role_is_bound_or_chosen_and_never_both(manifest):
-    assert set(manifest.roles) | set(manifest.chosen_roles) == set(Role)
-    assert not set(manifest.roles) & set(manifest.chosen_roles)
+    """The manifest binds every role a call site names; a role a world chooses a model for is the
+    decision role registry's, and never one of those."""
+    assert set(manifest.roles) == set(Role)
+    chosen = {role.key for role in decision_roles()}
+    assert chosen and not chosen & {role.value for role in Role}
 
 
 def test_prices_are_decimal_not_float(manifest):

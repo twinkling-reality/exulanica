@@ -75,7 +75,7 @@ def _played(world, client, services, manifest, transport, *, minutes, rules=None
 
 
 def manifest_model(manifest):
-    return next(spec.model_id for spec in manifest.offered_models(pg.Role.SOCIETY_DECISION))
+    return next(spec.model_id for spec in manifest.offered_models(pg.person_role().chosen))
 
 
 def _sent_labels(transport):

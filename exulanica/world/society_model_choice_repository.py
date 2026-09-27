@@ -1,17 +1,19 @@
-"""Which model runs which people of a purposeful society: the world owner's choices, as world data.
+"""Which model runs which subjects of a society, for each decision role: the owner's choices.
 
-A choice names a model the manifest offers a person's decisions (``Role.SOCIETY_DECISION``), by
-provider and identifier, or the built-in planner (no model), for one person or a group of the
-society's people. Choices are appended in order and never changed (migration 0110,
-``world_society_model_choice``), each naming who made it and when, so a person's model at any
-time is the latest choice naming them, and a society with no choice is run by its routine alone.
+A choice names a model the manifest offers a decision role (:mod:`exulanica.world.decision_roles`),
+by provider and identifier, or the world's own rules (no model), for one subject or a group of the
+role's subjects: a person's decisions in a purposeful society first. Choices are appended in order
+and never changed (migration 0110, ``world_society_model_choice``), each naming who made it and
+when, and each recorded under its role's own choice profile, so a subject's model at any time is
+the latest choice of their role naming them, and a society with no choice is run by its rules
+alone.
 
-What a choice may name is checked here, by name: the society must be a purposeful one of this
-world; every person must be one of its people; the model must be declared, offered to the role
-(a chat model a probe verified to answer a choice) and askable under the decision contract by a
-mechanism it was verified for; and the people a model runs stay within the contract's
-``model_people_maximum``. Whether this process can reach the model's provider is the host's to
-say, not the world's: a choice outlives a deployment.
+What a choice may name is checked here, by name: the society's engine must host the role; every
+subject must be one the role may decide for in its state; the model must be declared, offered to
+the role (a chat model a probe verified to answer a choice, with the use cases the role needs) and
+askable under the role's contract by a mechanism it was verified for; and the subjects models run
+stay within the bound the role's contract names. Whether this process can reach the model's
+provider is the host's to say, not the world's: a choice outlives a deployment.
 """
 
 from __future__ import annotations
@@ -24,20 +26,17 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from exulanica.models.errors import ManifestError
-from exulanica.models.manifest import Manifest, Role
+from exulanica.models.manifest import Manifest
+from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
 from exulanica.world.society import UnknownSociety
-from exulanica.world.society_decision_contract import DecisionContract
-from exulanica.world.society_engines import society_engine
 from exulanica.world.society_planner import input_sha256
 
 __all__ = [
-    "CHOICE_PROFILE",
     "CHOICE_REFUSALS",
     "ModelChoiceRefused",
     "SocietyModelChoiceRepository",
 ]
 
-CHOICE_PROFILE: Final = "exulanica.society-model-choice/v1"
 #: Why a choice is refused, by the code the route answers with, and the detail.
 CHOICE_REFUSALS: Final = {
     "engine_takes_no_model_choice": "only a purposeful society's people are run by chosen models",
@@ -63,7 +62,9 @@ class ModelChoiceRefused(ValueError):
         self.detail = CHOICE_REFUSALS[code]
 
 
-def _model_record(manifest: Manifest, contract: DecisionContract, model: Any) -> dict | None:
+def _model_record(
+    role: DecisionRole, manifest: Manifest, contract: DecisionContract, model: Any
+) -> dict | None:
     if model is None:
         return None
     if not isinstance(model, Mapping) or set(model) != {"provider", "model_id"}:
@@ -75,7 +76,7 @@ def _model_record(manifest: Manifest, contract: DecisionContract, model: Any) ->
     if spec.provider != provider:
         raise ModelChoiceRefused("model_not_declared")
     try:
-        manifest.offered(Role.SOCIETY_DECISION, model_id)
+        manifest.offered(role.chosen, model_id)
     except ManifestError as exc:
         raise ModelChoiceRefused("model_not_offered") from exc
     if contract.mechanism_for(spec) is None:
@@ -112,12 +113,27 @@ class SocietyModelChoiceRepository:
         ).fetchall()
 
     @staticmethod
-    def _current(rows: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
-        current: dict[str, dict[str, Any]] = {}
+    def _of(role: DecisionRole, rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+        """The rows of ``role``'s choices; a choice of a profile no registered role writes is
+        refused by name, never read as anybody's."""
+        found = []
         for row in rows:
+            profile = row["document"]["profile"]
+            if decision_roles().for_choice(profile) is None:
+                raise ValueError(f"a model choice of profile {profile!r} names no registered role")
+            if profile == role.choice_profile:
+                found.append(row)
+        return found
+
+    @staticmethod
+    def _current(
+        role: DecisionRole, rows: Sequence[Mapping[str, Any]]
+    ) -> dict[str, dict[str, Any]]:
+        current: dict[str, dict[str, Any]] = {}
+        for row in SocietyModelChoiceRepository._of(role, rows):
             document = row["document"]
-            for person in document["people"]:
-                current[person] = {
+            for subject in document[role.choice_subjects]:
+                current[subject] = {
                     "model": document["model"],
                     "choice_seq": document["choice_seq"],
                     "chosen_by": document["chosen_by"],
@@ -125,29 +141,33 @@ class SocietyModelChoiceRepository:
                 }
         return current
 
-    def current(self, version_id: uuid.UUID) -> dict[str, dict[str, Any]]:
-        """Each person's latest choice, by subject id; a person never chosen for is absent."""
-        return self._current(self._rows(self._society(version_id, lock=False)["society_id"]))
+    def current(self, version_id: uuid.UUID, role: DecisionRole) -> dict[str, dict[str, Any]]:
+        """Each subject's latest choice of ``role``, by subject id; one never chosen for is
+        absent."""
+        return self._current(role, self._rows(self._society(version_id, lock=False)["society_id"]))
 
-    def history(self, version_id: uuid.UUID) -> list[dict[str, Any]]:
-        """Every choice made for this society, in order, as stored."""
+    def history(self, version_id: uuid.UUID, role: DecisionRole) -> list[dict[str, Any]]:
+        """Every choice made for ``role`` in this society, in order, as stored."""
         return [
             {**row["document"], "recorded_at": row["recorded_at"]}
-            for row in self._rows(self._society(version_id, lock=False)["society_id"])
+            for row in self._of(
+                role, self._rows(self._society(version_id, lock=False)["society_id"])
+            )
         ]
 
     def record_choice(
         self,
         version_id: uuid.UUID,
+        role: DecisionRole,
         *,
         request_id: uuid.UUID,
-        people: Sequence[str],
+        subjects: Sequence[str],
         model: Mapping[str, str] | None,
         chosen_by: uuid.UUID,
         manifest: Manifest,
         contract: DecisionContract,
     ) -> dict[str, Any]:
-        """Record one choice, or return the one this idempotency key already recorded.
+        """Record one choice of ``role``, or return the one this idempotency key already recorded.
 
         An exact retry is answered with the recorded choice before anything else is checked, so
         it still returns after the model stops being offered.
@@ -155,39 +175,40 @@ class SocietyModelChoiceRepository:
         with self.connection.transaction():
             society = self._society(version_id, lock=True)
             rows = self._rows(society["society_id"])
-            chosen = sorted(set(people))
+            chosen = sorted(set(subjects))
             existing = next((row for row in rows if row["request_id"] == request_id), None)
             if existing is not None:
                 document = existing["document"]
                 if (
-                    document["people"] != chosen
-                    or len(chosen) != len(people)
+                    document["profile"] != role.choice_profile
+                    or document[role.choice_subjects] != chosen
+                    or len(chosen) != len(subjects)
                     or document["model"] != (None if model is None else dict(model))
                     or document["chosen_by"] != str(chosen_by)
                 ):
                     raise ModelChoiceRefused("choice_key_reused")
                 return {**document, "recorded_at": existing["recorded_at"]}
-            if not society_engine(society["engine_version"]).owner_model_choice:
+            if not role.hosted_by(society["engine_version"]):
                 raise ModelChoiceRefused("engine_takes_no_model_choice")
-            if len(chosen) != len(people):
+            if len(chosen) != len(subjects):
                 raise ModelChoiceRefused("person_named_twice")
-            record = _model_record(manifest, contract, model)
-            inhabitants = {person["id"] for person in society["state"]["inhabitants"]}
-            if not chosen or not set(chosen) <= inhabitants:
+            record = _model_record(role, manifest, contract, model)
+            present = set(role.adapter.subjects(society["state"]))
+            if not chosen or not set(chosen) <= present:
                 raise ModelChoiceRefused("person_not_in_this_world")
-            after = self._current(rows)
-            for person in chosen:
-                after[person] = {"model": record}
+            after = self._current(role, rows)
+            for subject in chosen:
+                after[subject] = {"model": record}
             run = sum(1 for choice in after.values() if choice["model"] is not None)
-            if run > contract.value("model_people_maximum"):
+            if run > contract.value(role.subjects_bound):
                 raise ModelChoiceRefused("too_many_model_people")
             sequence = (rows[-1]["choice_seq"] if rows else 0) + 1
             document: dict[str, Any] = {
-                "profile": CHOICE_PROFILE,
+                "profile": role.choice_profile,
                 "choice_seq": sequence,
                 "request_id": str(request_id),
                 "society_id": str(society["society_id"]),
-                "people": chosen,
+                role.choice_subjects: chosen,
                 "model": record,
                 "contract": contract.binding(),
                 "chosen_by": str(chosen_by),

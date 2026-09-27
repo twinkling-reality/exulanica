@@ -87,9 +87,10 @@ def _preflight(stream: Any) -> bool:
     """
     from exulanica.models.errors import TransportError
     from exulanica.models.preflight import run_preflight
+    from exulanica.world.decision_roles import decision_roles
 
     try:
-        report = run_preflight()
+        report = run_preflight(chosen=decision_roles().chosen)
     except TransportError as exc:
         print(f"preflight: could not reach the catalog ({exc})", file=stream)
         return False

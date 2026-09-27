@@ -22,11 +22,13 @@ Each model is checked against the catalog of the provider serving it, read by th
 declared ``catalog_format``. Every model a role reaches is checked, and so is every model offered
 to a role a world chooses, because a world may have chosen it.
 
-Run it as ``exulanica-preflight``, the console script, or as
-``python -m exulanica.models.preflight``. Exit status 0 clean, 1 on any failure, so CI and the
-weekly uptime check on a running deployment can both call it without parsing output.
-Pass ``--catalog-file PROVIDER=PATH`` to check a provider against a saved snapshot, which is how
-the offline test runs.
+The deployment runs it as ``exulanica-preflight``, the console script
+(``exulanica/orchestration/catalog_preflight.py``), which gives :func:`main` the roles the
+decision role registry declares, so each model a role is offered is also held to the use cases
+that role needs; this package sits below the registry and cannot read it. Exit status 0 clean, 1
+on any failure, so CI and the weekly uptime check on a running deployment can both call it
+without parsing output. Pass ``--catalog-file PROVIDER=PATH`` to check a provider against a saved
+snapshot, which is how the offline test runs.
 """
 
 from __future__ import annotations
@@ -43,6 +45,7 @@ from typing import Any, Final
 from exulanica.models.errors import PreflightError, TransportError
 from exulanica.models.manifest import (
     CatalogFormat,
+    ChosenRoleBinding,
     Manifest,
     Provider,
     load_manifest,
@@ -165,21 +168,25 @@ def catalog_entries(
     )
 
 
-def _roles_using(manifest: Manifest, model_id: str) -> tuple[str, ...]:
+def _roles_using(
+    manifest: Manifest, model_id: str, chosen: Sequence[ChosenRoleBinding]
+) -> tuple[str, ...]:
     bound = (
         str(binding.role)
         for binding in manifest.roles.values()
         if any(spec.model_id == model_id for spec in binding.chain)
     )
-    chosen = (
-        str(role)
-        for role in manifest.chosen_roles
-        if any(spec.model_id == model_id for spec in manifest.offered_models(role))
+    offered = (
+        binding.role
+        for binding in chosen
+        if any(spec.model_id == model_id for spec in manifest.offered_models(binding))
     )
-    return tuple(sorted((*bound, *chosen)))
+    return tuple(sorted((*bound, *offered)))
 
 
-def _required_use_cases(manifest: Manifest, model_id: str) -> list[tuple[str, tuple[str, ...]]]:
+def _required_use_cases(
+    manifest: Manifest, model_id: str, chosen: Sequence[ChosenRoleBinding]
+) -> list[tuple[str, tuple[str, ...]]]:
     """Each role reaching ``model_id``, bound or chosen, with the use cases it needs."""
     needs = [
         (str(binding.role), binding.required_use_cases)
@@ -187,9 +194,9 @@ def _required_use_cases(manifest: Manifest, model_id: str) -> list[tuple[str, tu
         if any(spec.model_id == model_id for spec in binding.chain)
     ]
     needs.extend(
-        (str(role), manifest.chosen(role).required_use_cases)
-        for role in manifest.chosen_roles
-        if any(spec.model_id == model_id for spec in manifest.offered_models(role))
+        (binding.role, binding.required_use_cases)
+        for binding in chosen
+        if any(spec.model_id == model_id for spec in manifest.offered_models(binding))
     )
     return needs
 
@@ -199,12 +206,16 @@ def run_preflight(
     manifest: Manifest | None = None,
     catalogs: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     transport: Transport | None = None,
+    chosen: Sequence[ChosenRoleBinding] = (),
 ) -> PreflightReport:
     """Run all three checks. Fetches each provider's catalog unless ``catalogs`` supplies them.
 
     ``catalogs`` maps a provider key to that provider's catalog document. When it is given, it
     must hold every provider a checked model is served by: a provider it leaves out is refused by
-    name rather than skipped.
+    name rather than skipped. ``chosen`` holds the roles a world may choose a model for, from the
+    decision role registry above this package: each reaches the models the manifest offers it,
+    which then also need its use cases. Every model verified to answer a choice is checked
+    whether or not a role is given.
     """
     manifest = manifest or load_manifest()
     referenced = sorted(manifest.referenced_model_ids())
@@ -229,7 +240,7 @@ def run_preflight(
     issues: list[PreflightIssue] = []
 
     for model_id in referenced:
-        roles = _roles_using(manifest, model_id)
+        roles = _roles_using(manifest, model_id, chosen)
         spec = manifest.spec(model_id)
         flavor = live.get((spec.provider, model_id))
         if flavor is None:
@@ -248,7 +259,7 @@ def run_preflight(
             continue
 
         declared = {str(u) for u in (flavor.get("use_cases") or ())}
-        for role, required in _required_use_cases(manifest, model_id):
+        for role, required in _required_use_cases(manifest, model_id, chosen):
             missing = [u for u in required if u not in declared]
             if missing:
                 issues.append(
@@ -294,7 +305,9 @@ def _catalog_file(value: str) -> tuple[str, Path]:
     return provider, Path(path)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None, *, chosen: Sequence[ChosenRoleBinding] = ()) -> int:
+    """The command: check the manifest, and hold the models offered to each role in ``chosen``
+    to that role's use cases (:func:`run_preflight`)."""
     parser = argparse.ArgumentParser(
         prog="exulanica-preflight",
         description="Check every model identifier in the manifest against its provider's catalog.",
@@ -321,7 +334,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
 
     try:
-        report = run_preflight(manifest=manifest, catalogs=catalogs)
+        report = run_preflight(manifest=manifest, catalogs=catalogs, chosen=chosen)
     except TransportError as exc:
         # A catalog that cannot be reached is not a passing preflight. Saying so is the whole
         # point: the check exists to be believed when it is green.
@@ -344,7 +357,3 @@ def main(argv: Sequence[str] | None = None) -> int:
         if report.ok:
             print("[PASS] every referenced identifier resolves and still fits its role")
     return 0 if report.ok else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

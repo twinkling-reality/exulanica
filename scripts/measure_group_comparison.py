@@ -593,10 +593,10 @@ def dry_run(seeds_path: Path) -> None:
 
 def preregister() -> None:
     """State the comparison before any held-out seed is run, with the tree it measures."""
-    from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
+    from exulanica.models.manifest import MANIFEST_PATH, load_manifest
     from exulanica.world.society_catalogs import load_comparison_catalogs
     from exulanica.world.society_comparison_result import protocol_values, scoring_binding
-    from exulanica.world.society_decision_contract import decision_contract
+    from exulanica.world.society_decision_contract import decision_contract, person_role
 
     if (ROOT / PREREGISTRATION).exists():
         raise SystemExit(f"{PREREGISTRATION} exists")
@@ -606,7 +606,7 @@ def preregister() -> None:
     contract = decision_contract()
     candidates = []
     for provider, model_id in MODELS:
-        spec = manifest.offered(Role.SOCIETY_DECISION, model_id)
+        spec = manifest.offered(person_role().chosen, model_id)
         answering = contract.answering(spec)
         if spec.provider != provider or answering is None:
             raise SystemExit(f"{provider}/{model_id} is not askable under the contract")
@@ -728,11 +728,10 @@ def run(as_run: bytes, seeds_path: Path) -> None:
         <= dt.datetime.fromisoformat(window["not_after_utc"])
     ):
         raise SystemExit(f"the run starts within its registered hours, {window['local']}")
-    from exulanica.models.manifest import Role
-    from exulanica.world.society_decision_contract import decision_contract
+    from exulanica.world.society_decision_contract import decision_contract, person_role
 
     for candidate in registered["candidates"]:
-        spec = load_manifest().offered(Role.SOCIETY_DECISION, candidate["model_id"])
+        spec = load_manifest().offered(person_role().chosen, candidate["model_id"])
         if decision_contract().answering(spec) != candidate["answering"]:
             raise SystemExit(f"{candidate['model_id']} would be asked otherwise than registered")
     raw = os.environ.get(BUDGET_VARIABLE)

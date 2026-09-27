@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "catalog_id": "junction-signal-action",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "turn",
+      "kind": "green",
+      "words": "let the {direction} traffic go, {waiting} waiting",
+      "reason": "Switching the signal so the other way goes: one option for each way that is waiting at red, named by the way and how many cars wait there.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    },
+    {
+      "key": "keep",
+      "kind": "hold",
+      "words": "keep the lights as they are",
+      "reason": "Letting the way that goes keep going for another minute: offered beside a way to switch to, and never alone.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica decision role tests; see the entry reason"
+      }
+    }
+  ]
+}

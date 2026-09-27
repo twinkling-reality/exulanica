@@ -832,8 +832,11 @@ Conflating them is the common mistake, and here it would be an expensive one.
 ## 7. Model catalog preflight
 
 **This one is implemented.** `exulanica/models/preflight.py`, exposed as the console script
-`exulanica-preflight` and runnable as `python -m exulanica.models.preflight`. Exit status 0 when clean
-and 1 on any failure, so a build step and a scheduled check can both call it without parsing output.
+`exulanica-preflight` through `exulanica/orchestration/catalog_preflight.py` and runnable as
+`python -m exulanica.orchestration.catalog_preflight`, which gives it the roles the decision role
+registry declares, so each model a role is offered is also held to that role's use cases. Exit
+status 0 when clean and 1 on any failure, so a build step and a scheduled check can both call it
+without parsing output.
 
 ### 7.1 The risk it addresses
 

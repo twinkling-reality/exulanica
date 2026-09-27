@@ -22,11 +22,12 @@ records the purposeful routine it was composed under (``PURPOSEFUL_ROUTINE_VERSI
 input that records none is read under ``UNRECORDED_ROUTINE_VERSIONS``, the rules the society was
 first released with, so no stored input changes meaning.
 
-The contract a model answers under when it runs a person in a world is read from the same
-directory, :func:`load_decision_catalogs`: ``society-decision-action``, what such a person may be
-asked to do and how each option reads, and ``society-decision-policy``, the bounds on asking.
-A decision request records the versions it was asked under, and a new contract is a new version
-published beside the old one.
+The contract a model answers under when it runs a person in a world lives in the same directory:
+``society-decision-action``, what such a person may be asked to do and how each option reads, and
+``society-decision-policy``, the bounds on asking. The person's decision role names them in its
+registry entry, with the versions a new request records, and reads them by the schemas every
+role's contract is read by (:mod:`exulanica.world.decision_roles`). A decision request records the
+versions it was asked under, and a new contract is a new version published beside the old one.
 
 How such a person's hour is scored, and the protocol and seeds a comparison of the models that run
 them is made under, are read from the same directory too, :func:`load_comparison_catalogs`:
@@ -58,6 +59,7 @@ from exulanica.grammar.catalogs import (
 )
 from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.records import KEY_PATTERN
+from exulanica.world.role_catalogs import role_action_schema, role_policy_schema
 
 if TYPE_CHECKING:
     from exulanica.world.object_catalog import WorldObjectCatalog
@@ -70,12 +72,6 @@ __all__ = [
     "COMPARISON_PROTOCOL_CATALOG",
     "COMPARISON_SEEDS_CATALOG",
     "COMPARISON_VERSIONS",
-    "DECISION_ACTION_CATALOG",
-    "DECISION_ACTION_KINDS",
-    "DECISION_ACTION_KINDS_BY_VERSION",
-    "DECISION_CONTRACT_VERSIONS",
-    "DECISION_POLICY_ASKS_IN_A_MODELS_OWN_ORDER",
-    "DECISION_POLICY_CATALOG",
     "LEGACY_IDENTITY_CATALOG",
     "LEGACY_IDENTITY_DIGESTS",
     "PERSON_SCORE_CATALOG",
@@ -97,7 +93,6 @@ __all__ = [
     "check_object_kinds",
     "legacy_identity",
     "load_comparison_catalogs",
-    "load_decision_catalogs",
     "load_purposeful_routine",
     "load_routine_model",
     "purposeful_routine",
@@ -141,22 +136,15 @@ LEGACY_IDENTITY_DIGESTS: Final = {
 }
 LEGACY_IDENTITY_KINDS: Final = ("profile", "role", "first_name", "last_name", "weather", "resource")
 AFFORDANCE_DIGESTS: Final = {1: "ca280468cc1051bd5f4dfadc72625c9b14be9a9fdeec840b72696349a2d0986b"}
-#: The contract a model answers under when it runs a person: what it may be asked to do, and the
-#: bounds on asking. A new decision request records these versions, and a stored one the versions
-#: it was asked under, each published beside the next, so every request replays as it was asked.
-DECISION_ACTION_CATALOG: Final = "society-decision-action"
-DECISION_POLICY_CATALOG: Final = "society-decision-policy"
-DECISION_CONTRACT_VERSIONS: Final = {DECISION_ACTION_CATALOG: 2, DECISION_POLICY_CATALOG: 2}
-#: What an action asks of the engine: to go to one place for its activity, to wait a minute, to
-#: stand a while nearby, or to stop and talk with one other person.
-DECISION_ACTION_KINDS: Final = ("target", "wait", "stand", "talk")
-#: The kinds each version of the action catalog states, each once: the first offered places and
-#: waiting alone, and the second also what the routine has people do at no place.
-DECISION_ACTION_KINDS_BY_VERSION: Final = {1: ("target", "wait"), 2: DECISION_ACTION_KINDS}
-#: Whether each version of the decision policy asks a model in its own measured answering order
-#: (a manifest entry's ``answering_order``) before the policy's: every request the first version
-#: asked recorded the mechanism the policy's own order gave, and is read and asked under it again.
-DECISION_POLICY_ASKS_IN_A_MODELS_OWN_ORDER: Final = {1: False, 2: True}
+#: The catalogs of the contract a model answers under when it runs a person, and the versions this
+#: directory keeps of each: the first offered places and waiting alone, and the second also what
+#: the routine has people do at no place. Every request records the versions it was asked under,
+#: so every version any request names stays beside the next; the person role's registry entry
+#: states which versions a new request records.
+_DECISION_CATALOG_VERSIONS: Final = {
+    "society-decision-action": (1, 2),
+    "society-decision-policy": (1, 2),
+}
 #: How a person's hour is scored, and the protocol and seeds a comparison of models is made under.
 PERSON_SCORE_CATALOG: Final = "society-person-score"
 COMPARISON_PROTOCOL_CATALOG: Final = "society-comparison-protocol"
@@ -470,24 +458,12 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         entry_check=_affordance_bounds,
     ),
     **{
-        (DECISION_ACTION_CATALOG, version): CatalogSchema(
-            DECISION_ACTION_CATALOG,
-            version,
-            (
-                ("kind", _choice(kinds)),
-                ("words", text_field),
-                ("reason", text_field),
-            ),
-        )
-        for version, kinds in DECISION_ACTION_KINDS_BY_VERSION.items()
+        ("society-decision-action", version): role_action_schema("society-decision-action", version)
+        for version in _DECISION_CATALOG_VERSIONS["society-decision-action"]
     },
     **{
-        (DECISION_POLICY_CATALOG, version): CatalogSchema(
-            DECISION_POLICY_CATALOG,
-            version,
-            (("value", integer_field(0, 10**9)), ("reason", text_field)),
-        )
-        for version in (1, 2)
+        ("society-decision-policy", version): role_policy_schema("society-decision-policy", version)
+        for version in _DECISION_CATALOG_VERSIONS["society-decision-policy"]
     },
     (PERSON_SCORE_CATALOG, 1): CatalogSchema(
         PERSON_SCORE_CATALOG,
@@ -971,37 +947,6 @@ def _activity_kinds(
                 f"{activity.key} is preferred at a need, and {kind.key} states no needed reason"
             )
     return found
-
-
-def load_decision_catalogs(
-    directory: Path = ROUTINE_DIRECTORY, versions: Mapping[str, int] | None = None
-) -> tuple[dict[str, dict[str, FieldValue]], dict[str, dict[str, FieldValue]], dict[str, int], str]:
-    """Read one version of each decision contract catalog: actions, policy, versions and digest.
-
-    ``versions`` names the version of each; left out, it is the contract a new decision request
-    records. What the values mean is checked by :mod:`exulanica.world.society_decision_contract`.
-    """
-    chosen = dict(DECISION_CONTRACT_VERSIONS if versions is None else versions)
-    if set(chosen) != set(DECISION_CONTRACT_VERSIONS):
-        raise CatalogError(
-            f"a decision contract reads exactly {sorted(DECISION_CONTRACT_VERSIONS)}"
-        )
-    for catalog_id, version in sorted(chosen.items()):
-        if (catalog_id, version) not in SCHEMAS:
-            raise CatalogError(f"{catalog_id} v{version} has no schema")
-    _claimed(directory)
-    catalogs = {
-        catalog_id: load_catalog(
-            directory.joinpath(f"{catalog_id}.v{version}.json"), SCHEMAS[(catalog_id, version)]
-        )
-        for catalog_id, version in sorted(chosen.items())
-    }
-    return (
-        _values(catalogs[DECISION_ACTION_CATALOG]),
-        _values(catalogs[DECISION_POLICY_CATALOG]),
-        chosen,
-        catalog_digest([catalogs[key] for key in sorted(catalogs)]),
-    )
 
 
 @dataclass(frozen=True, slots=True)
