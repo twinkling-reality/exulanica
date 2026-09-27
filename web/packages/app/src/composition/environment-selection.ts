@@ -325,6 +325,8 @@ export function mountEnvironmentSelection(
   let savedFlight: SavedWorldFlight | null = null;
   /** Why the saved world's flight stopped, as the inhabitants panel says it, or null. */
   let flightWords: string | null = null;
+  /** Flyers the saved world's objects host that have no home, as the panel says it, or null. */
+  let flightUnplaced: string | null = null;
   const districtAbort = new AbortController();
   const districtClient = deps.societyDistrictClient ?? new SocietyDistrictClient({ ...deps.credentials, signal: districtAbort.signal });
   const controlAbort = new AbortController();
@@ -515,12 +517,13 @@ export function mountEnvironmentSelection(
   }
 
   /**
-   * The saved world's flight: the inhabitants panel says in words why it stopped, and the canvas
-   * states it for tools (flying, retrying or refused, and the code).
+   * The saved world's flight: the inhabitants panel says in words why it stopped and which flyers
+   * have no home, and the canvas states it for tools (flying, retrying or refused, and the code).
    */
   function reflectFlight(status: SavedWorldFlightStatus): void {
-    if (flightWords !== status.refusalWords) {
+    if (flightWords !== status.refusalWords || flightUnplaced !== status.unplacedWords) {
       flightWords = status.refusalWords;
+      flightUnplaced = status.unplacedWords;
       renderInhabitantsPanel();
     }
     const canvas = deps.env.canvas;
@@ -1296,6 +1299,7 @@ export function mountEnvironmentSelection(
     inhabitantsPanel.render({
       society: view, objects: savedObjects(), walked, advanceBlocked: advanceBlocked(),
       playback: { control: societyControl, busy: controlBusy }, moved, noticing, flight: flightWords,
+      flightUnplaced,
     });
   }
 
@@ -1939,6 +1943,7 @@ export function mountEnvironmentSelection(
       savedFlight?.stop();
       savedFlight = null;
       flightWords = null;
+      flightUnplaced = null;
       for (const key of ['flightState', 'flightFlyers', 'flightUnplaced', 'flightUndrawn', 'flightFailure']) {
         if (deps.env.canvas) delete deps.env.canvas.dataset[key];
       }

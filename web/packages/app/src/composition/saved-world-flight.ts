@@ -21,7 +21,8 @@
  * world's first window arrives, because the old flight may cross whatever the edit put in its way.
  *
  * A kind whose parts are not in storage is named in the status and not drawn; nothing stands in
- * for it. A refusal the server will keep giving for this world as it stands (a 409: too many flyers,
+ * for it. Flyers the world's objects host that the flight could not home are named in words a
+ * person reads (`flightUnplacedWords`), from the served kind titles, counts and reasons. A refusal the server will keep giving for this world as it stands (a 409: too many flyers,
  * a world it cannot place or too large to fly over; a 422: a window it will not serve, other than
  * one too far from the flight's clock, which is read again from the clock) or an answer
  * this client cannot read stops the reading until the world is edited, and the status names it in
@@ -65,6 +66,8 @@ export interface SavedWorldFlightStatus {
   readonly failure: string | null;
   /** While refused, one line a person reads naming why; otherwise null. */
   readonly refusalWords: string | null;
+  /** Flyers the world's objects host that have no home, in words a person reads; otherwise null. */
+  readonly unplacedWords: string | null;
 }
 
 /** The statuses whose refusal the server keeps giving for a world until it is edited. */
@@ -80,6 +83,7 @@ const REFUSAL_WORDS: Readonly<Record<string, string>> = {
   flight_state_mismatch: "the server could not put this world's flight together",
   flight_step_out_of_range: "this page asked for flight too far from the present moment; open the world again",
   flight_window_too_long: 'this page asked for more flight at once than the server serves',
+  home_perch_unusable: "a flyer's home in this world is not a perch it can use",
 };
 
 /** The line a person reads when a flight is refused: why, in words, never a bare code. */
@@ -88,6 +92,49 @@ export function flightRefusalWords(error: unknown): string {
   const code = error instanceof ApiError ? error.code : '';
   const words = REFUSAL_WORDS[code] ?? `the server refused it${code ? ` (${code})` : ''}`;
   return `Flight stopped: ${words}.`;
+}
+
+/**
+ * Why flyers an object hosts have no home, by the reason the server names under `unplaced`: what
+ * the object meant to host them has. Every reason the server gives has words here, and every
+ * refusal code has words above (`tests/test_flight_page_words.py`).
+ */
+const UNPLACED_WORDS: Readonly<Record<string, string>> = {
+  home_perch_unusable: 'too few usable perches',
+};
+
+/**
+ * The line a person reads about flyers the world's objects host but the flight could not home, or
+ * null when every one has a home. One sentence for each kind and reason: the kind's title as the
+ * server serves it, how many, and why. It names no kind of object, which the flight does not
+ * serve; a kind with no served title is named by its key and a reason with no words by its code,
+ * visibly, never by a sentence nobody wrote.
+ */
+export function flightUnplacedWords(
+  unplaced: readonly FlightUnplaced[],
+  titles: ReadonlyMap<string, string>,
+): string | null {
+  const groups = new Map<string, { kind: string; reason: string; count: number; objects: Set<string> }>();
+  for (const row of unplaced) {
+    const key = JSON.stringify([row.kind, row.reason]);
+    const group = groups.get(key) ?? { kind: row.kind, reason: row.reason, count: 0, objects: new Set<string>() };
+    group.count += row.count;
+    group.objects.add(row.objectId);
+    groups.set(key, group);
+  }
+  if (groups.size === 0) return null;
+  const order = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  return [...groups.values()]
+    .sort((a, b) => order(a.kind, b.kind) || order(a.reason, b.reason))
+    .map(({ kind, reason, count, objects }) => {
+      const title = titles.get(kind) ?? kind;
+      const why = UNPLACED_WORDS[reason];
+      if (why === undefined) return `${title}: ${count} cannot live here (${reason}).`;
+      const one = objects.size === 1;
+      const hosts = one ? 'the object meant to host' : `the ${objects.size} objects meant to host`;
+      return `${title}: ${count} cannot live here; ${hosts} ${count === 1 ? 'it' : 'them'} ${one ? 'has' : 'have'} ${why}.`;
+    })
+    .join(' ');
 }
 
 export interface SavedWorldFlightDeps {
@@ -125,6 +172,8 @@ export function createSavedWorldFlight(deps: SavedWorldFlightDeps): SavedWorldFl
   const clearTimer = deps.clearInterval ?? globalThis.clearInterval.bind(globalThis);
   const loaded = new Set<string>();
   const undrawn = new Map<string, string>();
+  /** Each flying kind's title, by its key, as the latest read served it. */
+  const titles = new Map<string, string>();
   let drawing: string | null = null;
   /** The step length of the flight being drawn, in milliseconds, from its latest window. */
   let stepMs = 0;
@@ -141,7 +190,7 @@ export function createSavedWorldFlight(deps: SavedWorldFlightDeps): SavedWorldFl
   let retryAtMs = 0;
   let status: SavedWorldFlightStatus = Object.freeze({
     state: 'starting', flyers: 0, unplaced: [], undrawnKinds: [], lateHome: 0, failure: null,
-    refusalWords: null,
+    refusalWords: null, unplacedWords: null,
   });
 
   function report(
@@ -150,10 +199,13 @@ export function createSavedWorldFlight(deps: SavedWorldFlightDeps): SavedWorldFl
     state: SavedWorldFlightStatus['state'],
     refusalWords: string | null = null,
   ): void {
+    for (const kind of read?.kinds ?? []) titles.set(kind.look.key, kind.title);
+    const unplaced = read?.unplaced ?? status.unplaced;
     status = Object.freeze({
       state,
       flyers: read?.window.flyers.length ?? status.flyers,
-      unplaced: read?.unplaced ?? status.unplaced,
+      unplaced,
+      unplacedWords: flightUnplacedWords(unplaced, titles),
       undrawnKinds: Object.freeze([...undrawn].map(([key, why]) => `${key}: ${why}`)),
       lateHome: status.lateHome + (read?.lateHome ?? 0),
       failure,

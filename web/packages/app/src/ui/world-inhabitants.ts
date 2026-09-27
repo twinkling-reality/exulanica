@@ -315,6 +315,8 @@ export interface WorldInhabitantsPanel {
     readonly noticing?: Noticing | null;
     /** Why this world's flight stopped, in words a person reads, or null while it flies. */
     readonly flight?: string | null;
+    /** Flyers this world's objects host that have no home, in words a person reads, or null. */
+    readonly flightUnplaced?: string | null;
   }): void;
   /** Say that nothing can be shown here, and why. */
   unavailable(reason: string): void;
@@ -357,6 +359,7 @@ export function buildWorldInhabitants(handlers: {
   const movedLine = el('p', { class: 'world-help world-inhabitants-moved', hidden: true });
   const noticeLine = el('p', { class: 'world-inhabitants-notice', role: 'status', hidden: true });
   const flightLine = el('p', { class: 'world-help world-inhabitants-flight', role: 'status', hidden: true });
+  const unplacedLine = el('p', { class: 'world-help world-inhabitants-flight-unplaced', role: 'status', hidden: true });
   const presenceHelp = el('p', { class: 'world-help', hidden: true });
   const advanceWhy = el('p', { class: 'world-help', hidden: true });
   const area = el('p', { class: 'world-help', hidden: true });
@@ -376,7 +379,7 @@ export function buildWorldInhabitants(handlers: {
   pace.addEventListener('change', () => handlers.onPace?.(Number(pace.value) as SocietyPlaybackSpeed));
   const root = el('section', { class: 'world-inhabitants', 'aria-label': 'Inhabitants' }, [
     heading, summary, about, need, refusal, refusalDetails, bringIn, bringBack, play, paceLabel,
-    playbackStatus, playbackWhy, advance, advanceWhy, movedLine, noticeLine, flightLine,
+    playbackStatus, playbackWhy, advance, advanceWhy, movedLine, noticeLine, flightLine, unplacedLine,
     sendAway, presenceHelp, area, placesHeading, placesList, select,
   ]);
   root.dataset['state'] = 'idle';
@@ -411,10 +414,15 @@ export function buildWorldInhabitants(handlers: {
     return playing;
   };
 
-  const render: WorldInhabitantsPanel['render'] = ({ society, objects, walked, advanceBlocked, playback, moved, noticing, flight }) => {
-    // A stopped flight is said whether or not anyone lives here: the birds are the world's own.
+  const render: WorldInhabitantsPanel['render'] = ({
+    society, objects, walked, advanceBlocked, playback, moved, noticing, flight, flightUnplaced,
+  }) => {
+    // A stopped flight is said whether or not anyone lives here: the birds are the world's own,
+    // and so are flyers with no home.
     flightLine.hidden = !flight;
     flightLine.textContent = flight ?? '';
+    unplacedLine.hidden = !flightUnplaced;
+    unplacedLine.textContent = flightUnplaced ?? '';
     const snapshot = society.snapshot;
     const present = snapshot !== null;
     root.dataset['state'] = present ? 'present' : society.status;
@@ -499,7 +507,7 @@ export function buildWorldInhabitants(handlers: {
       root.dataset['state'] = 'unavailable';
       summary.textContent = reason;
       for (const node of [need, refusal, refusalDetails, bringIn, bringBack, play, paceLabel, playbackStatus, playbackWhy,
-        advance, advanceWhy, movedLine, noticeLine, flightLine, sendAway, presenceHelp, area, placesHeading, placesList, select]) {
+        advance, advanceWhy, movedLine, noticeLine, flightLine, unplacedLine, sendAway, presenceHelp, area, placesHeading, placesList, select]) {
         node.hidden = true;
       }
     },

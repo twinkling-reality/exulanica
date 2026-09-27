@@ -286,7 +286,13 @@ session renews (401), too many requests (429) and a server failure (5xx), is tri
 then twice as long each time, up to a minute; closing the world aborts a read in flight. The page
 also states the flight on its canvas for tools: `data-flight-state` (`starting`, `flying`,
 `retrying` or `refused`), `data-flight-flyers`, `data-flight-unplaced`, `data-flight-undrawn` and
-`data-flight-failure`.
+`data-flight-failure`. Flyers an object hosts that the flight could not home, listed under
+`unplaced`, are said on a line of their own, built from the answer alone: for each flying kind and
+reason, the kind's served title, how many, and why, as in "Small bird: 3 cannot live here; the
+object meant to host them has too few usable perches." The answer names no kind of object, so
+neither does the line. Every refusal code and every `unplaced` reason the server can give has words
+on the page, and no other ([`test_flight_page_words.py`](../tests/test_flight_page_words.py)); one
+the page does not know is shown as its code.
 
 [`flock.ts`](../web/packages/atlas-react/src/playcanvas/flight/flock.ts), owned by the saved world's
 region society, draws each flyer from the served steps only: its position along the segment between
@@ -353,7 +359,7 @@ recorded before viewers could share them.
 | Flight kinds, assets | `exulanica/world/flight_kinds.py`, migration 0114 | `tests/test_flight_kinds.py`, `tests/test_reviewed_asset_placeability.py` |
 | Perches and hosts | `exulanica/world/object_catalog.py`, `world-object.v3.json` | `tests/test_world_object_perches.py` |
 | Composition, route | `exulanica/world/flight_input.py`, `exulanica/api/routes/world_flight.py` | `tests/test_world_flight_api.py` |
-| Page and renderer | `web/packages/app/src/flight-api.ts`, `composition/saved-world-flight.ts`, `web/packages/atlas-react/src/playcanvas/flight/` | `flight-api.test.ts`, `saved-world-flight.test.ts`, `environment-selection-flight.test.ts`, `flight-flock.test.ts`, `authored-society-flight-assets.test.ts` |
+| Page and renderer | `web/packages/app/src/flight-api.ts`, `composition/saved-world-flight.ts`, `web/packages/atlas-react/src/playcanvas/flight/` | `flight-api.test.ts`, `saved-world-flight.test.ts`, `environment-selection-flight.test.ts`, `flight-flock.test.ts`, `authored-society-flight-assets.test.ts`, `tests/test_flight_page_words.py` (the page's words against the server's codes) |
 | Measurement | `scripts/measure_flight_bounds.py` | `tests/test_flight_bounds_record.py`, `tests/test_flight_worker_record.py` |
 
 The first flight bounds registration

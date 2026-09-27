@@ -9,6 +9,7 @@ import {
   POLL_MS,
   WINDOW_STEPS,
   createSavedWorldFlight,
+  flightUnplacedWords,
 } from '../src/composition/saved-world-flight.js';
 
 /**
@@ -166,6 +167,23 @@ describe('createSavedWorldFlight', () => {
     expect(flight.status.undrawnKinds).toEqual(['small_bird: cc0.small-bird-body is missing']);
   });
 
+  it('says in words which flyers have no home, with the kind title the server served', async () => {
+    const titled = (from: number): FlightRead => {
+      const answer = read(from);
+      return {
+        ...answer,
+        kinds: [{ ...answer.kinds[0]!, title: 'Served title' }],
+        unplaced: [{ objectId: 'tree-2', kind: 'small_bird', count: 3, reason: 'home_perch_unusable' }],
+      };
+    };
+    const { flight } = harness((from) => titled(from));
+    expect(flight.status.unplacedWords).toBeNull();
+    await flight.start();
+    expect(flight.status.unplacedWords).toBe(
+      'Served title: 3 cannot live here; the object meant to host them has too few usable perches.',
+    );
+  });
+
   it('draws an edited world from the clock at once', async () => {
     let digest = 'a'.repeat(64);
     const { flight, log } = harness((from) => read(from, digest));
@@ -250,6 +268,7 @@ describe('createSavedWorldFlight', () => {
   it.each([
     [409, 'flight_world_too_large', 'Flight stopped: this world is too large to fly over.'],
     [409, 'flight_unavailable', 'Flight stopped: something in this world cannot be placed for flight.'],
+    [409, 'home_perch_unusable', "Flight stopped: a flyer's home in this world is not a perch it can use."],
     [422, 'flight_step_out_of_range',
       'Flight stopped: this page asked for flight too far from the present moment; open the world again.'],
     [409, 'a_code_this_page_does_not_know', 'Flight stopped: the server refused it (a_code_this_page_does_not_know).'],
@@ -337,5 +356,49 @@ describe('createSavedWorldFlight', () => {
     expect(signal?.aborted).toBe(false);
     flight.stop();
     expect(signal?.aborted).toBe(true);
+  });
+});
+
+describe('flightUnplacedWords', () => {
+  const titles = new Map([['small_bird', 'Small bird'], ['owl', 'Tawny owl']]);
+  const row = (objectId: string, count: number, kind = 'small_bird', reason = 'home_perch_unusable') =>
+    ({ objectId, kind, count, reason });
+
+  it('says nothing when every flyer has a home', () => {
+    expect(flightUnplacedWords([], titles)).toBeNull();
+  });
+
+  it('names the served kind title, the count and why, for one flyer and for several', () => {
+    expect(flightUnplacedWords([row('tree-1', 3)], titles)).toBe(
+      'Small bird: 3 cannot live here; the object meant to host them has too few usable perches.',
+    );
+    expect(flightUnplacedWords([row('tree-1', 1)], titles)).toBe(
+      'Small bird: 1 cannot live here; the object meant to host it has too few usable perches.',
+    );
+  });
+
+  it('counts the objects and the flyers of one kind and reason together', () => {
+    expect(flightUnplacedWords([row('tree-1', 3), row('lamp-4', 2)], titles)).toBe(
+      'Small bird: 5 cannot live here; the 2 objects meant to host them have too few usable perches.',
+    );
+  });
+
+  it('names no kind of object, whatever the objects are called', () => {
+    // The flight serves the flyers' kind, not the objects': a tree is never assumed.
+    expect(flightUnplacedWords([row('tree-1', 3)], titles)).not.toMatch(/tree/iu);
+  });
+
+  it('says each kind in the order of its key, and shows a key or a code it has no words for', () => {
+    expect(flightUnplacedWords([
+      row('tree-1', 3),
+      row('tree-1', 1, 'owl'),
+      row('tower-2', 2, 'swift'),
+      row('tree-3', 4, 'small_bird', 'a_reason_this_page_does_not_know'),
+    ], titles)).toBe([
+      'Tawny owl: 1 cannot live here; the object meant to host it has too few usable perches.',
+      'Small bird: 4 cannot live here (a_reason_this_page_does_not_know).',
+      'Small bird: 3 cannot live here; the object meant to host them has too few usable perches.',
+      'swift: 2 cannot live here; the object meant to host them has too few usable perches.',
+    ].join(' '));
   });
 });

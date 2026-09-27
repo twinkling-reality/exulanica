@@ -72,24 +72,37 @@ describe('a saved world flight', () => {
       worldId: WORLD, versionId: 'version', regionId: 'region:starter', onStatus: expect.any(Function),
     });
     expect(flight.start).toHaveBeenCalledOnce();
-    // A refusal is said in words in the inhabitants panel, and stated on the canvas by its code.
+    // A refusal and flyers with no home are said in words in the inhabitants panel, each on its
+    // own line, and stated on the canvas by their codes.
     const onStatus = factory.mock.calls[0]![0].onStatus;
     const words = "Flight stopped: this world's objects would host more flyers than one world may hold.";
+    const homeless = 'Small bird: 3 cannot live here; the object meant to host them has too few usable perches.';
+    const line = mounted.root.querySelector<HTMLElement>('.world-inhabitants-flight');
+    const unplacedLine = mounted.root.querySelector<HTMLElement>('.world-inhabitants-flight-unplaced');
+    // The rest of the world flies; the flyers with no home are said on their own line.
+    onStatus({
+      state: 'flying', flyers: 21, lateHome: 0, failure: null,
+      unplaced: [{ objectId: 'tree', kind: 'small_bird', count: 3, reason: 'home_perch_unusable' }],
+      undrawnKinds: [], refusalWords: null, unplacedWords: homeless,
+    });
+    expect([line?.hidden, unplacedLine?.hidden, unplacedLine?.textContent]).toEqual([true, false, homeless]);
     onStatus({
       state: 'refused', flyers: 0, lateHome: 0, failure: 'too_many_flyers',
       unplaced: [{ objectId: 'tree', kind: 'small_bird', count: 3, reason: 'home_perch_unusable' }],
-      undrawnKinds: ['small_bird: cc0.small-bird-wing is missing'], refusalWords: words,
+      undrawnKinds: ['small_bird: cc0.small-bird-wing is missing'], refusalWords: words, unplacedWords: homeless,
     });
-    const line = mounted.root.querySelector<HTMLElement>('.world-inhabitants-flight');
     expect([line?.hidden, line?.textContent]).toEqual([false, words]);
+    expect([unplacedLine?.hidden, unplacedLine?.textContent]).toEqual([false, homeless]);
     expect({ ...mounted.canvas.dataset }).toMatchObject({
       flightState: 'refused', flightFailure: 'too_many_flyers', flightFlyers: '0',
       flightUnplaced: 'tree:home_perch_unusable', flightUndrawn: 'small_bird: cc0.small-bird-wing is missing',
     });
     onStatus({
       state: 'flying', flyers: 3, lateHome: 0, failure: null, unplaced: [], undrawnKinds: [], refusalWords: null,
+      unplacedWords: null,
     });
     expect([line?.hidden, line?.textContent]).toEqual([true, '']);
+    expect([unplacedLine?.hidden, unplacedLine?.textContent]).toEqual([true, '']);
     await mounted.afterAuthoredEdit('version');
     expect(flight.restart).toHaveBeenCalledOnce();
     await mounted.afterAuthoredEdit('another-version');
