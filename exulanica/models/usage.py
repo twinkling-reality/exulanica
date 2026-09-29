@@ -79,6 +79,9 @@ class CallOutcome(StrEnum):
     COMPLETED = "completed"
     FAILED = "failed"
     TIMED_OUT = "timed_out"
+    #: The caller's deadline for an optional call ended the wait, or left no time to send it.
+    #: Priced exactly as a timeout, or as a request that never left.
+    DEADLINE_ENDED = "deadline_ended"
 
 
 def _is_count(value: Any) -> bool:
@@ -133,12 +136,14 @@ class CallUsage:
         usd_bound: Decimal,
         used_fallback: bool = False,
         latency_s: float = 0.0,
+        deadline_ended: bool = False,
     ) -> CallUsage:
         """An attempt that returned no usable body.
 
         ``usd_bound`` is the attempt's reservation. It is charged unless the request never left,
         because only then is it known that the provider did no work: a timeout ends this side's
         wait and not the provider's generation, and an error body carries no usage to price.
+        ``deadline_ended`` names the caller's deadline as what ended it; the price does not change.
         """
         not_sent = reached_provider is False
         return cls(
@@ -153,7 +158,13 @@ class CallUsage:
             used_fallback=used_fallback,
             latency_s=latency_s,
             cost_basis=CostBasis.NOT_SENT if not_sent else CostBasis.UNKNOWN,
-            outcome=CallOutcome.TIMED_OUT if timed_out else CallOutcome.FAILED,
+            outcome=(
+                CallOutcome.DEADLINE_ENDED
+                if deadline_ended
+                else CallOutcome.TIMED_OUT
+                if timed_out
+                else CallOutcome.FAILED
+            ),
             failure=failure,
         )
 

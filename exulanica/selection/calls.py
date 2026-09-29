@@ -37,6 +37,8 @@ class AttemptOutcome(StrEnum):
     COMPLETED = "completed"
     #: The role's timeout passed before a whole reply arrived.
     TIMED_OUT = "timed_out"
+    #: The caller's deadline for an optional call passed first, or left no time to send it.
+    DEADLINE_ENDED = "deadline_ended"
     #: An error status, a dropped connection, a withdrawn model, or a connection never made.
     FAILED = "failed"
     #: A reply came back and the client refused it, as truncated or as outside the schema.
@@ -69,6 +71,7 @@ _UNRETURNED: Final = MappingProxyType(
     {
         CallOutcome.COMPLETED: AttemptOutcome.REPLY_REFUSED,
         CallOutcome.TIMED_OUT: AttemptOutcome.TIMED_OUT,
+        CallOutcome.DEADLINE_ENDED: AttemptOutcome.DEADLINE_ENDED,
         CallOutcome.FAILED: AttemptOutcome.FAILED,
     }
 )

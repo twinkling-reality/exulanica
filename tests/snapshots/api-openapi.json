@@ -13787,6 +13787,7 @@
     "enum": [
      "completed",
      "timed_out",
+     "deadline_ended",
      "failed",
      "reply_refused"
     ],

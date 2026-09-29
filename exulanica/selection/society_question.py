@@ -125,41 +125,55 @@ _APPLIED: Final = "applied"
 _TALK_OUTCOMES: Final = frozenset({"talk_started", "talk_ended", "talk_completed"})
 _TALK_KIND: Final = "social_contact"
 
-#: The role that chooses an answer's lines. Its timeout in the model manifest is the bound on one
-#: attempt, derived there from the longest call its primary made in the comparison it names.
+#: The role that chooses an answer's lines. Its timeout in the model manifest is the most one of its
+#: calls may take; this path waits less (:data:`COMPOSER_WAIT_SECONDS`).
 COMPOSER_ROLE: Final = Role.ANSWER_COMPOSER
 #: The role a typed question's plan is proposed by (``exulanica.selection.planner``), which runs
 #: before the composer is asked. A question the page sends with its plan asks no planner.
 PLANNER_ROLE: Final = Role.STRUCTURED_EXTRACTION
-#: How many times the composer is asked for one answer: once, with no repair; a refused choice is
-#: answered in the fixed words at once. In the comparison that chose its model
-#: (``docs/evaluation/2026-09-29-society-composer-models.json``) every one of the 35 choices that
-#: came back, of 40 asks over five models, was accepted on its first try, and the other 5 timed out,
-#: which a repair does not follow; a repair would only double the bound.
-SOCIETY_COMPOSER_ATTEMPTS: Final = 1
+#: How many times the composer may be asked for one answer: once, and once more only when a refused
+#: choice leaves time for it (:func:`compose_society_answer`). ``SOCIETY_ANSWER_PATH_CALLS`` in
+#: ``exulanica/selection/question.py`` counts it; the wait both share is one deadline.
+SOCIETY_COMPOSER_ATTEMPTS: Final = 2
+
+#: The longest a person waits for the composer's choice of lines, in seconds, from the moment the
+#: answer's fixed words are ready. A declared product figure, not a measurement of the model: the
+#: fixed words answer the question already, so a choice among them is worth only a short wait. About
+#: 10 seconds is the limit for keeping a person's attention on a dialogue while they wait (Nielsen,
+#: "Response Times: The 3 Important Limits", Usability Engineering, 1993), and it is the speed
+#: bound the comparison that chose the composer's model pre-registered
+#: (``docs/evaluation/2026-09-29-society-composer-models-preregistration.json``). In that
+#: comparison 7 of the chosen model's 8 calls came back within it and one took 44.2 seconds.
+#: Never longer than the role's timeout (:func:`composer_wait_seconds`).
+COMPOSER_WAIT_SECONDS: Final = 10
 
 
-def answer_wait_budget_seconds(manifest: Manifest) -> float:
-    """The longest a person waits for an answer about what happened, from the question's start.
+def composer_wait_seconds(manifest: Manifest) -> float:
+    """The composer's deadline on this path: :data:`COMPOSER_WAIT_SECONDS`, or the role's manifest
+    timeout when that is shorter, since a caller's deadline may only shorten a role's wait."""
+    return float(min(COMPOSER_WAIT_SECONDS, manifest[COMPOSER_ROLE].timeout_seconds))
 
-    One planner attempt's timeout, then the composer's: room for a typed question's plan and the
-    one choice after it. The fixed words are ready before the composer is asked, so composing is
-    worth only the time it saves the person, and it is asked only while its whole timeout is still
-    left of this; otherwise the answer is the fixed words at once. So the composer never runs past
-    it. Both timeouts are the manifest's, each derived there from a measurement by its timeout
-    rule, so nothing here restates a number. A planner that needs its own repair can still end past
-    this; the composer is then not asked.
-    """
-    return float(manifest[PLANNER_ROLE].timeout_seconds + manifest[COMPOSER_ROLE].timeout_seconds)
+
+def repair_needs_seconds(manifest: Manifest) -> float | None:
+    """How much of the deadline a refused choice must leave for the composer to be asked again:
+    the median call of the role's primary in the measurement its timeout rests on
+    (``timeout_basis.p50_ms`` in the manifest), so a repair likely to be cut short is not paid for.
+    None when the basis records no median, and then no repair is asked."""
+    median = manifest[COMPOSER_ROLE].timeout_basis.get("p50_ms")
+    if isinstance(median, bool) or not isinstance(median, int) or median <= 0:
+        return None
+    return median / 1000
 
 
 #: Said before the fixed words when no choice of lines came in time, by what happened to it.
+#: ``deadline_ended`` is formatted with the deadline the composer was given.
 _UNANSWERED: Final[Mapping[str, str]] = {
+    "deadline_ended": (
+        "The model that chooses the lines for this answer did not choose within {seconds:g} "
+        "seconds."
+    ),
     "timed_out": "The model that chooses the lines for this answer did not answer in time.",
     "failed": "The model that chooses the lines for this answer did not answer.",
-    "not_asked": (
-        "There was no time left to ask the model that chooses the lines for this answer."
-    ),
 }
 #: What the fixed words after that note show, by how many lines they hold.
 _UNANSWERED_SHOWN: Final[Mapping[int, str]] = {
@@ -1062,7 +1076,6 @@ def answer_about_society(
     saved: Sequence[SavedName],
     log: CallLog,
     max_tokens: int,
-    started: float | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> SocietyAnswer:
     """Answer one question about the people of a world, or refuse it by name.
@@ -1117,7 +1130,6 @@ def answer_about_society(
             log=log,
             saved=saved,
             max_tokens=max_tokens,
-            started=started,
             clock=clock,
         )
         if composed.late is not None:
@@ -1125,7 +1137,10 @@ def answer_about_society(
             # saying so. Not "deterministic", which means a choice the model made was discarded.
             shown = lines[-(MAX_CLAUSES - 3) :] if lines else []
             said = _UNANSWERED_SHOWN.get(len(shown), _UNANSWERED_SHOWN_MANY)
-            note = AnswerClause(text=f"{_UNANSWERED[composed.late]} {said}", type=ClauseType.META)
+            unanswered = _UNANSWERED[composed.late].format(
+                seconds=composer_wait_seconds(client.manifest)
+            )
+            note = AnswerClause(text=f"{unanswered} {said}", type=ClauseType.META)
             items = builder.items[-len(shown) :] if shown else []
             return SocietyAnswer(
                 answer=Answer(
@@ -1166,6 +1181,8 @@ def answer_about_society(
                 ]
             ),
             packet=packet,
+            # A repaired choice keeps the reasons its first choice was refused for.
+            rejections=composed.rejections,
         )
     elif selector.scope is SocietyScope.WORLD:
         clauses = _world_answer(builder, selector.aspect)
@@ -1210,10 +1227,9 @@ def compose_society_answer(
     log: CallLog,
     saved: Sequence[SavedName],
     max_tokens: int,
-    started: float | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> _Chosen:
-    """Ask the composer, once, which event lines answer the question, and check its choice.
+    """Ask the composer which event lines answer the question, and check its choice.
 
     **The composer chooses and never writes.** It returns the tokens of the lines that answer the
     question, at most :data:`MAX_CHOSEN_LINES`, and optionally one :class:`Framing`; the answer is
@@ -1223,16 +1239,16 @@ def compose_society_answer(
     thing checked is that every token is in the packet; a choice naming one that is not is refused,
     its reasons recorded in the call log, and the answer is the fixed words.
 
-    **It is asked once** (:data:`SOCIETY_COMPOSER_ATTEMPTS`): a refused choice, a timeout or any
-    failed call ends composition at once, because the answer is already in hand in fixed words and
-    composing is optional beside it. It is asked only while its whole bound is still left of
-    :func:`answer_wait_budget_seconds`, counted from ``started``, the question's start (this
-    call's, when not given); otherwise the answer is the fixed words at once. That bound is
-    :data:`COMPOSER_ROLE`'s timeout in the model manifest, derived there from the longest call its
-    primary made, for one attempt as the API's client makes it. The attempt is recorded in the
-    call log. The composer is sent the lines and the question, through the one policy boundary
-    every hosted request passes. Nothing here is photograph-derived, so no photograph right is
-    asked.
+    **It is waited for at most** :func:`composer_wait_seconds`, counted from this call, which is
+    made once the fixed words are ready: the answer is already in hand, so composing is worth only a
+    short wait. That is the client's deadline for the call (``deadline_s``), over the primary, any
+    fallback and any repair together; a call it ends is recorded as ``deadline_ended`` and the
+    answer is the fixed words. A refused choice is asked again once, with its reasons, only while
+    at least :func:`repair_needs_seconds` of the deadline is left, and within what is left;
+    otherwise the fixed words come at once. A timeout or any failed call ends composition. Every
+    attempt is recorded in the call log. The composer is sent the lines and the question, through
+    the one policy boundary every hosted request passes. Nothing here is photograph-derived, so no
+    photograph right is asked.
 
     **Every saved name is replaced here, a place's included, whatever right the account holder
     granted.** A place-name right is granted for a use whose purpose the account holder read
@@ -1245,33 +1261,56 @@ def compose_society_answer(
         {"role": "system", "content": _SOCIETY_COMPOSER_SYSTEM},
         {"role": "user", "content": f"{render_society_packet(packet)}\n\nQuestion: {asked}"},
     ]
-    began = clock() if started is None else started
-    bound = float(client.manifest[COMPOSER_ROLE].timeout_seconds)
-    if answer_wait_budget_seconds(client.manifest) - (clock() - began) < bound:
-        # Asking could outlast the bound, and the fixed words are ready now.
-        return _Chosen(rejections=("composer_not_asked: the wait bound",), late="not_asked")
-    try:
-        composed = client.structured(
-            COMPOSER_ROLE,
-            messages,
-            SocietyLineChoice,
-            prompt_version=PROMPT_VERSION,
-            max_tokens=max_tokens,
-        )
-        log.record(composed.call)
-        items = _chosen_lines(composed.value, packet)
-    except AnswerRejected as rejected:
-        log.rejected(rejected.reasons)
-        return _Chosen(rejections=rejected.reasons)
-    except (StructuredOutputError, TruncatedResponseError) as exc:
-        return _Chosen(rejections=(str(exc),))
-    except ModelError as exc:
-        # Timed out, failed or refused by the budget: nothing was chosen to discard.
-        return _Chosen(
-            rejections=(f"composer_unanswered: {type(exc).__name__}",),
-            late="timed_out" if getattr(exc, "timed_out", False) else "failed",
-        )
-    return _Chosen(items=items, framing=composed.value.framing)
+    ends = clock() + composer_wait_seconds(client.manifest)
+    repair_needs = repair_needs_seconds(client.manifest)
+    rejections: tuple[str, ...] = ()
+    for attempt in range(1, SOCIETY_COMPOSER_ATTEMPTS + 1):
+        left = ends - clock()
+        if attempt > 1 and (repair_needs is None or left < repair_needs):
+            # Too little of the deadline is left for a repair likely to come back in it.
+            break
+        try:
+            composed = client.structured(
+                COMPOSER_ROLE,
+                messages,
+                SocietyLineChoice,
+                prompt_version=PROMPT_VERSION,
+                max_tokens=max_tokens,
+                deadline_s=left,
+            )
+            log.record(composed.call)
+            items = _chosen_lines(composed.value, packet)
+        except AnswerRejected as rejected:
+            log.rejected(rejected.reasons)
+            rejections = rejected.reasons
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "That choice was refused for these reasons:\n"
+                        + "\n".join(f"- {reason}" for reason in rejected.reasons)
+                        + "\n\nChoose again, fixing exactly those."
+                    ),
+                }
+            )
+            continue
+        except (StructuredOutputError, TruncatedResponseError) as exc:
+            return _Chosen(rejections=(*rejections, str(exc)))
+        except ModelError as exc:
+            # Ended by the deadline, timed out, failed or refused by the budget: nothing was
+            # chosen to discard.
+            return _Chosen(
+                rejections=(*rejections, f"composer_unanswered: {type(exc).__name__}"),
+                late=(
+                    "deadline_ended"
+                    if getattr(exc, "deadline_ended", False)
+                    else "timed_out"
+                    if getattr(exc, "timed_out", False)
+                    else "failed"
+                ),
+            )
+        return _Chosen(items=items, framing=composed.value.framing, rejections=rejections)
+    return _Chosen(rejections=rejections)
 
 
 def _chosen_lines(

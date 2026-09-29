@@ -41,7 +41,6 @@ The planner and its catalogue are :mod:`exulanica.selection.planner`, both syste
 from __future__ import annotations
 
 import datetime as dt
-import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import suppress
@@ -103,6 +102,7 @@ from exulanica.selection.society_question import (
     SocietyScene,
     UnknownSocietyContext,
     answer_about_society,
+    composer_wait_seconds,
     planner_line,
     read_scene,
     refused,
@@ -133,6 +133,7 @@ __all__ = [
     "propose_plan",
     "render_content_answer",
     "requires_model",
+    "society_answer_bound_seconds",
 ]
 
 
@@ -174,26 +175,44 @@ ANSWER_PATH_CALLS: Final[tuple[tuple[Role, int], ...]] = (
 )
 
 #: Every hosted call an answer about a world's simulated people can make, in the same form: the
-#: planner and its repair, then the answer composer's one attempt
-#: (``exulanica.selection.society_question``). One question takes one of the two paths.
+#: planner and its repair, then the answer composer and its repair
+#: (``exulanica.selection.society_question``). One question takes one of the two paths. The
+#: composer's calls share one deadline (:func:`society_answer_bound_seconds`).
 SOCIETY_ANSWER_PATH_CALLS: Final[tuple[tuple[Role, int], ...]] = (
     (PLANNER_ROLE, PLANNER_ATTEMPTS),
     (COMPOSER_ROLE, SOCIETY_COMPOSER_ATTEMPTS),
 )
 
 
+def society_answer_bound_seconds(client: ModelClient) -> float:
+    """The longest the model calls of one answer about a world's simulated people can take.
+
+    Each required call site's count times what the client says one call to its role can take at
+    worst (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`), which is the planner
+    and its repair; then the composer's deadline
+    (:func:`~exulanica.selection.society_question.composer_wait_seconds`), which bounds all of its
+    calls together, because its choice is optional beside the fixed words it chooses among.
+    """
+    return sum(
+        count * client.worst_case_seconds(role)
+        for role, count in SOCIETY_ANSWER_PATH_CALLS
+        if role is not COMPOSER_ROLE
+    ) + composer_wait_seconds(client.manifest)
+
+
 def answer_bound_seconds(client: ModelClient) -> float:
     """The longest the model calls of one answer can take on ``client``, retries and fallbacks in.
 
-    For each path an answer can take, each call site's count times what the client says one call
-    to that role can take at worst (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`:
-    the manifest's timeout for the role, its chain and the client's retries); then the longer path.
-    The browser waits for an answer at least this long; ``tests/test_companion_ask_deadline.py``
-    holds its deadline to it.
+    For an answer about photographs, each call site's count times what the client says one call to
+    that role can take at worst (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`:
+    the manifest's timeout for the role, its chain and the client's retries); for one about a
+    world's simulated people, :func:`society_answer_bound_seconds`; then the longer path. The
+    browser waits for an answer at least this long; ``tests/test_companion_ask_deadline.py`` holds
+    its deadline to it.
     """
     return max(
-        sum(count * client.worst_case_seconds(role) for role, count in path)
-        for path in (ANSWER_PATH_CALLS, SOCIETY_ANSWER_PATH_CALLS)
+        sum(count * client.worst_case_seconds(role) for role, count in ANSWER_PATH_CALLS),
+        society_answer_bound_seconds(client),
     )
 
 
@@ -524,9 +543,6 @@ def answer_question(
         raise ValueError(
             "a model client is required to plan a question or compose a capture answer"
         )
-    # The question's start: an answer about the world's people is bounded from here, so a repair
-    # is not begun that would keep the person waiting past the bound.
-    started = time.monotonic()
     log = CallLog()
     # This question's own copy of the client, so its log hears every attempt it pays for and no
     # other question's; the copy keeps every policy the client has.
@@ -546,7 +562,6 @@ def answer_question(
             society_authorizer=society_authorizer,
             before_compose=before_compose,
             society_client=observed_society,
-            started=started,
             society=(
                 None
                 if society_version_id is None
@@ -575,7 +590,6 @@ def _answered(
     before_compose: Callable[[Iterable[uuid.UUID], ModelHandoff], None],
     society: SocietyContext | None,
     society_client: ModelClient | None,
-    started: float,
 ) -> AnsweredQuestion:
     """:func:`answer_question` after its preconditions, every call recorded in ``log``."""
     # A person's saved name never reaches a hosted model, and a place's only under a right the
@@ -638,7 +652,6 @@ def _answered(
         saved=saved,
         names=names,
         scene=scene,
-        started=started,
     )
     about_society = answered.plan is not None and answered.plan.intent is Intent.SOCIETY
     notes = []
@@ -708,7 +721,6 @@ def _planned(
     saved: Sequence[SavedName],
     names: RequestNames,
     scene: SocietyScene | SocietyRefusal | None,
-    started: float,
 ) -> AnsweredQuestion:
     """The question planned, if it came without a plan, and answered, with the scene read."""
     proposed = plan is None
@@ -748,7 +760,6 @@ def _planned(
             saved=saved,
             log=log,
             authorize=society_authorizer,
-            started=started,
         )
     try:
         validated = validate(connection, plan, session)
@@ -938,7 +949,6 @@ def _answered_about_society(
     saved: Sequence[SavedName],
     log: CallLog,
     authorize: Callable[[dict[str, Any]], None] | None,
-    started: float,
 ) -> AnsweredQuestion:
     """A question about the world's simulated people, answered from its society or refused.
 
@@ -956,7 +966,6 @@ def _answered_about_society(
             saved=saved,
             log=log,
             max_tokens=SOCIETY_COMPOSER_MAX_TOKENS,
-            started=started,
         )
     if (
         log.calls

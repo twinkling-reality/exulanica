@@ -33,6 +33,7 @@ from exulanica.selection.inhabitant_words import inhabitant_words, inhabitant_wo
 from exulanica.selection.plan import SocietyAspect, SocietyScope, SocietySelector
 from exulanica.selection.society_question import (
     COMPOSER_ROLE,
+    COMPOSER_WAIT_SECONDS,
     INHABITANT_PLACEHOLDER,
     MAX_CHOSEN_LINES,
     Framing,
@@ -40,9 +41,10 @@ from exulanica.selection.society_question import (
     SocietyRefusal,
     UnknownSocietyContext,
     answer_about_society,
-    answer_wait_budget_seconds,
     build_scene,
+    composer_wait_seconds,
     render_society_packet,
+    repair_needs_seconds,
 )
 from exulanica.world.society_authored_ground import AUTHORED_GROUND_POPULATION
 from exulanica.world.society_planner import (
@@ -452,6 +454,8 @@ def test_a_note_is_its_own_clause_and_never_costs_the_answer_one():
     ids=["timed out", "failed"],
 )
 def test_a_composer_that_gives_no_answer_leaves_the_fixed_words_after_one_attempt(failure):
+    """A wait that ends within the composer's deadline is the deadline's end, since the deadline
+    is shorter than the role's timeout; it is said with the deadline's own figure."""
     transport = FakeTransport([failure, failure])
     log = CallLog()
     client = (
@@ -473,9 +477,15 @@ def test_a_composer_that_gives_no_answer_leaves_the_fixed_words_after_one_attemp
     )
     # One attempt, not a repair after it: the person waits on one bound at most.
     assert len(transport.requests) == 1
-    assert [call.outcome for call in log.calls] == ["timed_out" if failure.timed_out else "failed"]
+    assert [call.outcome for call in log.calls] == [
+        "deadline_ended" if failure.timed_out else "failed"
+    ]
     texts = [clause.text for clause in said.answer.clauses]
-    cause = "did not answer in time." if failure.timed_out else "did not answer."
+    cause = (
+        f"did not choose within {COMPOSER_WAIT_SECONDS} seconds."
+        if failure.timed_out
+        else "did not answer."
+    )
     assert texts[1] == (
         f"The model that chooses the lines for this answer {cause} "
         "Here are the latest recorded lines instead."
@@ -661,10 +671,11 @@ def test_a_choice_of_more_lines_than_an_answer_holds_is_refused_by_name(count):
             framing=Framing.RECORDED,
         )
 
-    client, transport = _choosing(over)
+    # Refused, it is asked once more with time left, and refused again.
+    client, transport = _choosing(over, over)
     said = _happened(client)
     assert len(said.answer.clauses) <= MAX_CLAUSES
-    assert len(transport.requests) == 1
+    assert len(transport.requests) == (1 if count <= MAX_CHOSEN_LINES else 2)
     if count <= MAX_CHOSEN_LINES:
         # Positive control: as many lines as an answer holds are shown, filling it.
         assert not said.deterministic
@@ -679,20 +690,53 @@ def test_a_choice_of_more_lines_than_an_answer_holds_is_refused_by_name(count):
 def test_an_entry_with_no_token_is_refused_without_its_words():
     """The reasons are returned with the answer, so they carry no text the model wrote."""
     words = "the people who sat on the bench"
-    client, _ = _choosing(SocietyLineChoice(lines=[words]))
+    client, _ = _choosing(SocietyLineChoice(lines=[words]), SocietyLineChoice(lines=[words]))
     said = _happened(client)
     assert said.rejections == ("1 of the entries hold no token from the list",)
     assert said.deterministic
 
 
-def test_a_refused_choice_is_answered_in_the_fixed_words_at_once_with_its_reason_kept():
-    """The composer is asked once: a choice that names a line not in the list is not asked for
-    again, and why it was refused is kept with the answer, which the execution record serves."""
-    client, transport = _choosing(
+class _Recording(_Choosing):
+    """A composer transport that also keeps the wait each request was given."""
+
+    def __init__(self, *replies) -> None:
+        super().__init__(*replies)
+        self.waits: list[float] = []
+
+    def post_json(self, url, *, headers, payload, timeout) -> HttpResponse:
+        self.waits.append(timeout)
+        return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
+
+
+def _timed(*replies) -> tuple[ModelClient, _Recording]:
+    """A client whose own clock stands still, so each wait it hands the transport is exactly the
+    deadline it was given."""
+    transport = _Recording(*replies)
+    client = ModelClient(
+        api_key="test-key-not-real",
+        transport=transport,
+        budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        clock=lambda: 0.0,
+    ).with_policy(RecordingPolicy())
+    return client, transport
+
+
+def _times(*readings):
+    """A clock that reads each of ``readings`` in turn, then the last one for ever."""
+    queue = list(readings)
+    return lambda: queue.pop(0) if len(queue) > 1 else queue[0]
+
+
+def test_a_refused_choice_is_asked_again_within_what_is_left_of_the_deadline():
+    """A choice naming a line not in the list is asked for again, with its reasons, when at least
+    the role's recorded median call is left of the deadline, and waits only what is left."""
+    client, transport = _timed(
         SocietyLineChoice(lines=["ZZZZZZZZZZ"]),
         lambda payload: SocietyLineChoice(lines=_tokens(payload)[:1]),
     )
     log = CallLog()
+    wait = composer_wait_seconds(client.manifest)
+    spent = wait - repair_needs_seconds(client.manifest) - 0.5
     said = answer_about_society(
         _scene("what happened in the square?"),
         SocietySelector(scope=SocietyScope.WORLD, aspect=SocietyAspect.RECENT),
@@ -700,6 +744,36 @@ def test_a_refused_choice_is_answered_in_the_fixed_words_at_once_with_its_reason
         saved=(),
         log=log,
         max_tokens=1000,
+        clock=_times(0.0, 0.0, spent),
+    )
+    assert transport.waits == [wait, wait - spent]
+    assert (
+        "ZZZZZZZZZZ is not a token in the list"
+        in (transport.requests[1]["payload"]["messages"][-1]["content"])
+    )
+    assert not said.deterministic
+    assert said.rejections == ("ZZZZZZZZZZ is not a token in the list",)
+    assert [call.outcome for call in log.calls] == ["completed", "completed"]
+    assert [clause.text for clause in said.answer.clauses[1:-1]] == [said.packet.items[0].line]
+
+
+def test_a_refused_choice_is_answered_in_the_fixed_words_at_once_when_too_little_is_left():
+    """Less than the role's recorded median call left: no repair is paid for, and why the choice
+    was refused is kept with the answer, which the execution record serves."""
+    client, transport = _timed(
+        SocietyLineChoice(lines=["ZZZZZZZZZZ"]),
+        lambda payload: SocietyLineChoice(lines=_tokens(payload)[:1]),
+    )
+    log = CallLog()
+    spent = composer_wait_seconds(client.manifest) - repair_needs_seconds(client.manifest) + 0.5
+    said = answer_about_society(
+        _scene("what happened in the square?"),
+        SocietySelector(scope=SocietyScope.WORLD, aspect=SocietyAspect.RECENT),
+        client=client,
+        saved=(),
+        log=log,
+        max_tokens=1000,
+        clock=_times(0.0, 0.0, spent),
     )
     assert len(transport.requests) == 1
     assert said.deterministic
@@ -709,42 +783,40 @@ def test_a_refused_choice_is_answered_in_the_fixed_words_at_once_with_its_reason
     assert [clause.text for clause in said.answer.clauses[1:-1]] == [
         item.line for item in said.packet.items[-(MAX_CLAUSES - 2) :]
     ]
-    assert not any("did not answer" in clause.text for clause in said.answer.clauses)
+    assert not any("did not" in clause.text for clause in said.answer.clauses)
 
 
-@pytest.mark.parametrize("late", [True, False], ids=["late", "early"])
-def test_the_composer_is_not_asked_when_a_whole_attempt_no_longer_fits_the_wait_bound(late):
-    """A typed question's plan came back late: rather than wait on an attempt that could end past
-    the bound, the person has the fixed words at once, and nothing is sent."""
-    client, transport = _choosing(lambda payload: SocietyLineChoice(lines=_tokens(payload)[:1]))
-    bound = client.manifest[COMPOSER_ROLE].timeout_seconds
-    now = answer_wait_budget_seconds(client.manifest) - bound + (1.0 if late else -1.0)
-    said = _happened(client, started=0.0, clock=lambda: now)
-    texts = [clause.text for clause in said.answer.clauses]
-    if late:
-        assert transport.requests == []
-        assert said.rejections == ("composer_not_asked: the wait bound",)
-        assert texts[1] == (
-            "There was no time left to ask the model that chooses the lines for this answer. "
-            "Here are the latest recorded lines instead."
-        )
-        # Nothing a model chose was discarded: it was never asked.
-        assert not said.deterministic
-    else:
-        assert len(transport.requests) == 1
-        assert not said.deterministic and not said.rejections
+def test_the_composer_waits_its_deadline_not_its_role_s_timeout():
+    """The one call is given the product's deadline, which is far shorter than the role's
+    manifest timeout; the timeout stays the most any one request for the role may take."""
+    client, transport = _timed(lambda payload: SocietyLineChoice(lines=_tokens(payload)[:1]))
+    said = _happened(client, clock=lambda: 0.0)
+    assert transport.waits == [float(COMPOSER_WAIT_SECONDS)]
+    assert client.manifest[COMPOSER_ROLE].timeout_seconds > COMPOSER_WAIT_SECONDS
+    assert not said.deterministic and not said.rejections
 
 
-def test_the_wait_bound_is_one_plan_and_one_choice_by_the_manifest_s_timeouts():
-    """The bound is derived, not written: move either role's timeout and it moves."""
+def test_the_deadline_is_the_product_figure_or_the_role_s_timeout_when_that_is_shorter():
     manifest = load_manifest()
-    planner = manifest[Role.STRUCTURED_EXTRACTION].timeout_seconds
-    composer = manifest[COMPOSER_ROLE].timeout_seconds
-    assert answer_wait_budget_seconds(manifest) == planner + composer
+    assert composer_wait_seconds(manifest) == COMPOSER_WAIT_SECONDS
     roles = dict(manifest.roles)
-    roles[COMPOSER_ROLE] = dataclasses.replace(roles[COMPOSER_ROLE], timeout_seconds=composer + 5)
+    shorter = COMPOSER_WAIT_SECONDS - 5
+    basis = {**roles[COMPOSER_ROLE].timeout_basis, "longest_ms": shorter * 250}
+    roles[COMPOSER_ROLE] = dataclasses.replace(
+        roles[COMPOSER_ROLE], timeout_seconds=shorter, timeout_basis=basis
+    )
     moved = dataclasses.replace(manifest, roles=roles)
-    assert answer_wait_budget_seconds(moved) == planner + composer + 5
+    assert composer_wait_seconds(moved) == shorter
+
+
+def test_a_repair_needs_the_median_call_its_role_s_timeout_rests_on():
+    manifest = load_manifest()
+    median = manifest[COMPOSER_ROLE].timeout_basis["p50_ms"]
+    assert repair_needs_seconds(manifest) == median / 1000
+    roles = dict(manifest.roles)
+    basis = {k: v for k, v in roles[COMPOSER_ROLE].timeout_basis.items() if k != "p50_ms"}
+    roles[COMPOSER_ROLE] = dataclasses.replace(roles[COMPOSER_ROLE], timeout_basis=basis)
+    assert repair_needs_seconds(dataclasses.replace(manifest, roles=roles)) is None
 
 
 def test_the_composer_asks_its_own_role():
@@ -819,3 +891,18 @@ def test_every_framing_has_its_words_in_the_catalog():
     catalog = inhabitant_words_catalog()
     for framing in Framing:
         assert catalog.words("phrase", f"framing_{framing}")
+
+
+def test_the_words_past_the_deadline_state_the_deadline_the_composer_was_given(monkeypatch):
+    """The sentence reads its figure from the one constant: move the constant and it moves."""
+    from exulanica.selection import society_question
+
+    moved = COMPOSER_WAIT_SECONDS - 3
+    monkeypatch.setattr(society_question, "COMPOSER_WAIT_SECONDS", moved)
+    ended = TransportError("no whole response", timed_out=True, reached_provider=None)
+    client, transport = _timed(ended)
+    said = _happened(client, clock=lambda: 0.0)
+    assert transport.waits == [float(moved)]
+    assert said.answer.clauses[1].text.startswith(
+        f"The model that chooses the lines for this answer did not choose within {moved} seconds."
+    )

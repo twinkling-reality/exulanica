@@ -55,7 +55,11 @@ Everything here exists because of something that was measured, not assumed:
 *   **Each role's request is bounded by the role's own timeout**, which the manifest derives
     from the longest latency measured for the role's primary. ``timeout`` overrides it for every
     role, for a caller that reserves wall clock by a timeout of its own; the default is the
-    manifest's, and no other number stands in for it.
+    manifest's, and no other number stands in for it. **An optional call may be given a shorter
+    wait** (``deadline_s`` on :meth:`ModelClient.chat` and :meth:`ModelClient.structured`), by a
+    caller whose answer is already in hand without it; never a longer one. An attempt that
+    deadline ends is recorded as ``deadline_ended`` and priced as a timeout is (see
+    :mod:`exulanica.models.chain`).
 
 The client holds a cache, a budget guard and a ledger. All three are optional collaborators with
 inert defaults, so a caller gets no caching and generous limits unless it asks, and a test gets
@@ -177,6 +181,7 @@ class ModelClient:
         max_attempts: int = 1,
         sleep: Callable[[float], None] = time.sleep,
         policy: HostedRequestPolicy | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         # No policy means nothing is sent: every sending method refuses by name until one is
         # attached, here or with `with_policy` where the workspace is known.
@@ -239,6 +244,7 @@ class ModelClient:
             timeout=timeout,
             max_attempts=max_attempts,
             sleep=sleep,
+            clock=clock,
         )
 
     # -- introspection ---------------------------------------------------------------------
@@ -562,6 +568,7 @@ class ModelClient:
         use_cache: bool = True,
         photographs: Iterable[uuid.UUID] = (),
         placeholders: Mapping[uuid.UUID, str] | None = None,
+        deadline_s: float | None = None,
     ) -> ChatResult:
         """One chat completion, routed by role.
 
@@ -573,8 +580,14 @@ class ModelClient:
         client's policies decide whether they may go; see :mod:`exulanica.models.policy`.
         ``placeholders`` is the placeholder the caller already gave each entity the messages may
         name, which a policy writes for a name it withholds.
+
+        ``deadline_s`` is the most this call may take, counted from now, for an optional call whose
+        caller has its answer without it. It may not exceed the role's timeout
+        (``deadline_exceeds_role_timeout``); see :meth:`ModelChain.ends_at
+        <exulanica.models.chain.ModelChain.ends_at>`.
         """
         role = Role(role)
+        ends_at = self._chain.ends_at(role, deadline_s)
         resolved_max = self._resolve_max_tokens(role, max_tokens)
         payload = self._admit(
             role,
@@ -622,6 +635,7 @@ class ModelClient:
             prompt_chars=prompt_chars,
             extra_prompt_tokens=image_prompt_tokens,
             max_tokens=resolved_max,
+            ends_at=ends_at,
         )
         result = result_from_body(
             role=role,
@@ -669,6 +683,7 @@ class ModelClient:
         use_cache: bool = True,
         photographs: Iterable[uuid.UUID] = (),
         placeholders: Mapping[uuid.UUID, str] | None = None,
+        deadline_s: float | None = None,
     ) -> StructuredResult[T]:
         """The only path by which model output may become canonical state.
 
@@ -695,6 +710,7 @@ class ModelClient:
             use_cache=use_cache,
             photographs=photographs,
             placeholders=placeholders,
+            deadline_s=deadline_s,
         )
         # ``chat`` has already refused a body carrying more than one candidate object and
         # validated the survivor against the exact schema it sent, so ``call.payload`` is

@@ -323,24 +323,30 @@ there is not exactly one. The composer writes nothing: it returns which lines an
 question, at most nine, and at most one of the fixed framings the words catalog lists, and the
 answer is each chosen line in its own words, cited to it, in the order they were recorded. The
 answer leads with the simulated minutes of the lines it shows, because the simulation counts minutes
-and has no time of day. The composer is asked once. A choice that names a line not in the list,
-or more lines than nine, is refused, its reasons are kept with the answer, and the latest lines
-are given in fixed words. They are also given when no choice comes: the answer says first whether
-the composer did not answer in time, did not answer, or was not asked because no time was left,
-and whether one line or several follow.
+and has no time of day. A choice that names a line not in the list, or more lines than nine, is
+refused, and its reasons are kept with the answer. The composer is then asked once more, told
+those reasons, only while at least the chosen model's median call is left of its deadline;
+otherwise the latest lines are given in fixed words at once. They are also given when no choice comes: the answer says first whether
+the composer did not choose within its deadline, did not answer in time, or did not answer, and
+whether one line or several follow.
 
-The composer is asked only while its whole timeout still fits in the answer's wait budget, counted
-from the question's start: one planner call's timeout and one composer call's, both the model
-manifest's (`answer_wait_budget_seconds` in [society question](../exulanica/selection/society_question.py)),
-25 and 90 seconds, so 115 seconds. That is the longest a person waits for an answer about what
-happened, apart from the server's and the page's reads and the moment a withdrawn primary takes to
-refuse before its fallback is asked. When a typed question's plan needs the planner's repair,
-less than 90 seconds is left once the planner ends, at most 50 seconds in, so the composer is not
-asked and the fixed words come then. A question asked from the inspector carries its plan, asks no
-planner, and waits at most the composer's 90 seconds. The 90 seconds is the manifest's timeout rule applied to the chosen model's slowest call
-in the comparison that chose it, 44.2 seconds: twice that, rounded up. The typical wait is much
-shorter: in that comparison the median call of Nemotron 3 Super 120B took 6.5 seconds, against
-Nemotron 3 Nano's 22.9 seconds in the same window, one in which the provider was slow
+The composer's choice is optional: the fixed words it chooses among are ready before it is asked.
+So it is waited for at most 10 seconds from that moment, primary, fallback and repair together
+(`COMPOSER_WAIT_SECONDS` in [society question](../exulanica/selection/society_question.py)), a
+declared product figure rather than a measurement of the model. About 10 seconds is the limit for
+keeping a person's attention on a dialogue while they wait (Nielsen, "Response Times: The 3
+Important Limits"), and it is the speed bound the comparison that chose the model pre-registered.
+The one model client ends the call at that deadline, which may be shorter than the role's manifest
+timeout and never longer (`deadline_s` in [the model client](../exulanica/models/client.py)); an
+attempt it ends is recorded as `deadline_ended` and charged as a timed-out attempt is, at the most
+it can have cost, and an attempt left no time to be sent is recorded as never sent, at no cost.
+So a typed question waits at most its plan, two planner calls of 25 seconds each, then 10 seconds
+for the choice: 60 seconds, apart from the server's and the page's reads and the moment a
+withdrawn primary takes to refuse before its fallback is asked. A question asked from the
+inspector carries its plan, asks no planner, and waits at most the 10 seconds. The composer
+role's 90 second manifest timeout, twice its model's slowest call in that comparison (44.2
+seconds) rounded up, still bounds any one of its requests. In that comparison 7 of the chosen
+model's 8 calls came back within 10 seconds, and its median call took 6.5 seconds
 ([record](evaluation/2026-09-29-society-composer-models.json)). While the answer is composed, the
 Companion says it is looking at what happened in this world.
 After the composer's wait the society is checked again from its row alone, so a withdrawal made

@@ -14,11 +14,11 @@ time; the pre-registration binds their digest. Every candidate is asked every qu
 candidate on an in-memory copy of the manifest. Within each question the candidates take turns,
 so a slow minute at the provider falls on all of them rather than on one.
 
-The composer's own wait budget is held open here (a clock that never advances), so every
-question is asked; the product's bound is derived afterwards from what it measured. The run the
-record binds (its as-run copy beside it) allowed one repair per question and no answer used one,
-so the composer asks once; this live copy asks as the product does, and its run step refuses to
-run again, because the pre-registration binds the as-run bytes.
+The composer's own clock is held still here, so a refused choice is asked for again; the
+client's deadline for the composer still ends a slow call. The run the record binds (its as-run
+copy beside it) allowed one repair per question and waited each role's whole timeout, and no answer
+used a repair; this live copy asks as the product does, and its run step refuses to run again,
+because the pre-registration binds the as-run bytes.
 
 ``preregister`` writes the questions, the world's digest, the candidates, the rule that chooses a
 default and the bound, before any model is asked. ``dry-run`` drives the whole run over a scripted
@@ -317,8 +317,7 @@ def _ask(client: Any, question: str) -> dict[str, Any]:
             log=CallLog(),
             saved=(),
             max_tokens=MAX_TOKENS,
-            started=0.0,
-            # The wait budget held open: every refused choice is asked for again.
+            # The deadline's clock held still: a refused choice is asked for again.
             clock=lambda: 0.0,
         )
     except BudgetExceededError:

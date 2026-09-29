@@ -35,8 +35,10 @@ from exulanica.selection.question import (
     SOCIETY_ANSWER_PATH_CALLS,
     answer_bound_seconds,
     compose_answer,
+    society_answer_bound_seconds,
 )
 from exulanica.selection.request_names import RequestNames
+from exulanica.selection.society_question import composer_wait_seconds
 
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 from test_selection_request_goldens import _packet
@@ -158,31 +160,56 @@ def test_the_society_composer_sends_its_role_as_many_times_as_stated():
         log=CallLog(),
         saved=(),
         max_tokens=1000,
-        started=0.0,
+        # The deadline held open, so a refused choice is asked for again.
         clock=lambda: 0.0,
     )
     assert chosen.rejections, "the composer's choice was not refused, so nothing drove a repair"
     assert _sent(transport) == _to(Role.ANSWER_COMPOSER, attempts)
 
 
+def _with_timeouts(manifest, **seconds):
+    roles = dict(manifest.roles)
+    for name, timeout in seconds.items():
+        role = Role(name)
+        roles[role] = dataclasses.replace(roles[role], timeout_seconds=timeout)
+    return dataclasses.replace(manifest, roles=roles)
+
+
+def _client_for(manifest) -> ModelClient:
+    return ModelClient(
+        api_key="test-key-not-real",
+        manifest=manifest,
+        transport=FakeTransport(),
+        policy=RecordingPolicy(),
+    )
+
+
+def test_the_society_path_is_its_required_calls_and_the_composer_s_deadline():
+    """The composer's calls share one deadline, so the society path is the planner's worst case
+    and that deadline, whatever the composer role's timeout: a longer timeout does not move it."""
+    manifest = load_manifest()
+    for held in (manifest, _with_timeouts(manifest, answer_composer=1000)):
+        client = _client_for(held)
+        planner = dict(SOCIETY_ANSWER_PATH_CALLS)[Role.STRUCTURED_EXTRACTION]
+        assert society_answer_bound_seconds(client) == (
+            planner * client.worst_case_seconds(Role.STRUCTURED_EXTRACTION)
+            + composer_wait_seconds(held)
+        )
+        assert society_answer_bound_seconds(client) < (
+            planner * client.worst_case_seconds(Role.STRUCTURED_EXTRACTION)
+            + client.worst_case_seconds(Role.ANSWER_COMPOSER)
+        )
+
+
 def test_the_bound_is_the_longer_path_and_the_society_path_is_inside_it():
     """Each path's sum is inside the bound, and the bound is one of them, not their total: with
-    the answer composer's timeout made the longest, the society path is the bound."""
+    the photograph composer and the query vector made quick, the society path is the bound."""
     manifest = load_manifest()
-    roles = dict(manifest.roles)
-    roles[Role.ANSWER_COMPOSER] = dataclasses.replace(
-        roles[Role.ANSWER_COMPOSER], timeout_seconds=1000
-    )
-    for held in (manifest, dataclasses.replace(manifest, roles=roles)):
-        client = ModelClient(
-            api_key="test-key-not-real",
-            manifest=held,
-            transport=FakeTransport(),
-            policy=RecordingPolicy(),
-        )
+    for held in (manifest, _with_timeouts(manifest, reasoning_cheap=1, embedding=1)):
+        client = _client_for(held)
         paths = [
-            sum(count * client.worst_case_seconds(role) for role, count in path)
-            for path in (ANSWER_PATH_CALLS, SOCIETY_ANSWER_PATH_CALLS)
+            sum(count * client.worst_case_seconds(role) for role, count in ANSWER_PATH_CALLS),
+            society_answer_bound_seconds(client),
         ]
         assert answer_bound_seconds(client) == max(paths)
     assert paths[1] > paths[0], "the positive control: the society path is the longer one"

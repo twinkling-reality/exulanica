@@ -328,6 +328,8 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'provenance.costUnknown': 'The cost of a request that returned no answer is not known.',
   // A question that failed: the attempt that ended it, named by the model it was sent to.
   'provenance.failed.timed_out': '{model} was asked and timed out. The question waited {duration}.',
+  'provenance.failed.deadline_ended':
+    '{model} was asked and its deadline passed before it answered. The question waited {duration}.',
   'provenance.failed.failed': '{model} was asked and the request failed. The question waited {duration}.',
   'provenance.failed.reply_refused':
     '{model} replied and the reply could not be used. The question waited {duration}.',

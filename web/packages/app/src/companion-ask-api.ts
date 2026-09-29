@@ -104,9 +104,10 @@ export interface AnswerEvidence {
 /**
  * How one attempt ended, as the server's execution record says it (`AttemptOutcome` in
  * `exulanica/selection/calls.py`; `tests/test_execution_outcome_parity.py` holds the two equal).
- * Only `completed` is a result the workflow received; the others returned none.
+ * Only `completed` is a result the workflow received; the others returned none. `deadline_ended` is
+ * an optional call its caller's deadline ended, which the server prices as a timeout.
  */
-export const CALL_OUTCOMES = ['completed', 'timed_out', 'failed', 'reply_refused'] as const;
+export const CALL_OUTCOMES = ['completed', 'timed_out', 'deadline_ended', 'failed', 'reply_refused'] as const;
 export type CallOutcome = (typeof CALL_OUTCOMES)[number];
 
 /** Whether an attempt's cost is known (`CallCost` in the same module, held the same way). */

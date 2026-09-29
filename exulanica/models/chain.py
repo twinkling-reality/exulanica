@@ -19,6 +19,12 @@ this walks it. Three policies live here and nowhere else, each because of someth
 *   **Each role waits for its own timeout**, read from the manifest, where it is derived from the
     longest latency measured for the role's primary. A caller may pass one explicit timeout for
     every role instead, as a lens budget does for the per-call timeout it reserves wall clock by.
+*   **An optional call may carry its caller's deadline** (``deadline_s``), never longer than the
+    role's timeout: one end on this chain's clock, shared by the primary, any fallback and any
+    retry. Each attempt waits the shorter of the role's timeout and the time left; an attempt the
+    deadline ends is recorded as ``deadline_ended`` and priced exactly as a timeout, and one left
+    no time to be sent is recorded as never sent, at no cost. A caller states a deadline when its
+    answer is already in hand without the call, so the call is worth only the wait it saves.
 *   **Each request goes to its model's provider**, at the provider's own endpoint with the
     provider's own credential, both the manifest's. A model a world chose is walked alone, with
     no fallback and the timeout its caller's contract gives: a choice names one model, and a
@@ -103,6 +109,7 @@ class ModelChain:
         timeout: float | None,
         max_attempts: int,
         sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
@@ -117,6 +124,8 @@ class ModelChain:
         self._timeout = timeout
         self._max_attempts = max_attempts
         self._sleep = sleep
+        #: What every latency and every caller's deadline is read from; a test gives its own.
+        self._clock = clock
 
     def __repr__(self) -> str:
         # No credential, not even a prefix of one. A truncated key in a traceback is still a leak.
@@ -159,6 +168,23 @@ class ModelChain:
         if self._timeout is not None:
             return self._timeout
         return float(self._manifest[role].timeout_seconds)
+
+    def ends_at(self, role: Role, deadline_s: float | None) -> float | None:
+        """When a call for ``role`` with the caller's deadline ``deadline_s`` must end, on this
+        chain's clock, or None without one. A deadline longer than the role's timeout is refused
+        by name: the timeout is the most one request for the role may take, and a caller may only
+        shorten that wait, never lengthen it."""
+        if deadline_s is None:
+            return None
+        if not (isinstance(deadline_s, (int, float)) and deadline_s > 0):
+            raise ValueError(f"deadline_not_positive: a caller's deadline is {deadline_s!r}")
+        timeout = self.timeout_seconds(role)
+        if deadline_s > timeout:
+            raise ValueError(
+                f"deadline_exceeds_role_timeout: a deadline of {deadline_s:g} s is longer than "
+                f"the {timeout:g} s timeout of role {role}"
+            )
+        return self._clock() + deadline_s
 
     def _post(
         self, path: str, payload: Mapping[str, Any], spec: ModelSpec, *, timeout: float
@@ -244,6 +270,7 @@ class ModelChain:
         timeout: float,
         keep_usd: Decimal = Decimal(0),
         keep_calls: int = 0,
+        ends_at: float | None = None,
     ) -> tuple[dict[str, Any], int, Decimal]:
         """One model, up to ``max_attempts`` requests. Returns the body, requests issued, and the
         answering attempt's reservation.
@@ -253,8 +280,43 @@ class ModelChain:
         to it is the fallback, one level up. Each attempt is reserved against the budget
         separately, so a retry storm is spend the guard can see, and each one that fails is
         recorded against it, so the storm is also spend the ledger shows.
+
+        ``ends_at`` is the caller's deadline on this chain's clock (:meth:`ends_at`). An attempt
+        waits at most the time left before it; one that the deadline ends is recorded as
+        ``deadline_ended`` and charged as a timeout is, and when no time is left the request is
+        not sent and is recorded as never sent, at no cost. Neither is retried.
         """
         for attempt in range(1, self._max_attempts + 1):
+            wait = timeout
+            cut = False
+            if ends_at is not None:
+                left = ends_at - self._clock()
+                if left <= 0:
+                    usage = self._budget.record(
+                        CallUsage.failed(
+                            role=role,
+                            spec=spec,
+                            reached_provider=False,
+                            timed_out=False,
+                            deadline_ended=True,
+                            failure="deadline_ended: no time was left to send the request",
+                            usd_bound=Decimal(0),
+                            used_fallback=used_fallback,
+                        )
+                    )
+                    raise _with_cost(
+                        TransportError(
+                            f"the caller's deadline for {spec.model_id} had passed, so no "
+                            "request was sent",
+                            retryable=False,
+                            reached_provider=False,
+                            deadline_ended=True,
+                        ),
+                        usage,
+                        attempt,
+                    )
+                cut = left < timeout
+                wait = min(timeout, left)
             reserved = self._budget.reserve(
                 spec,
                 role=role,
@@ -267,15 +329,24 @@ class ModelChain:
                     else {}
                 ),
             )
-            started = time.monotonic()
+            started = self._clock()
             try:
-                return self._post(path, payload, spec, timeout=timeout), attempt, reserved
+                return self._post(path, payload, spec, timeout=wait), attempt, reserved
             except ModelUnavailableError as exc:
                 self._record_failure(
                     role, spec, exc, reserved, started, used_fallback, reached_provider=True
                 )
                 raise
             except TransportError as exc:
+                if cut and exc.timed_out:
+                    # The caller's deadline, not the role's timeout, ended this wait.
+                    exc = TransportError(
+                        str(exc),
+                        retryable=False,
+                        timed_out=True,
+                        reached_provider=exc.reached_provider,
+                        deadline_ended=True,
+                    )
                 usage = self._record_failure(
                     role, spec, exc, reserved, started, used_fallback, exc.reached_provider
                 )
@@ -305,10 +376,11 @@ class ModelChain:
                 spec=spec,
                 reached_provider=reached_provider,
                 timed_out=bool(getattr(exc, "timed_out", False)),
+                deadline_ended=bool(getattr(exc, "deadline_ended", False)),
                 failure=str(exc)[:300],
                 usd_bound=reserved,
                 used_fallback=used_fallback,
-                latency_s=time.monotonic() - started,
+                latency_s=self._clock() - started,
             ),
             released=reserved,
         )
@@ -322,8 +394,11 @@ class ModelChain:
         prompt_chars: int,
         extra_prompt_tokens: int,
         max_tokens: int,
+        ends_at: float | None = None,
     ) -> ChainResponse:
-        """Try the primary, then the fallback. Returns the body and which model served it."""
+        """Try the primary, then the fallback. Returns the body and which model served it.
+
+        ``ends_at`` is the caller's deadline (:meth:`ends_at`), one end for the whole walk."""
         binding = self._manifest[role]
         timeout = self.timeout_seconds(role)
         failures: list[str] = []
@@ -331,7 +406,7 @@ class ModelChain:
         attempts = 0
         for index, spec in enumerate(binding.chain):
             tried.append(spec.model_id)
-            started = time.monotonic()
+            started = self._clock()
             try:
                 body, made, reserved = self._post_with_retries(
                     path,
@@ -343,6 +418,7 @@ class ModelChain:
                     max_tokens=max_tokens,
                     used_fallback=index > 0,
                     timeout=timeout,
+                    ends_at=ends_at,
                 )
             except ModelUnavailableError as exc:
                 # Not retried, so exactly one request was issued against this identifier.
@@ -353,7 +429,7 @@ class ModelChain:
                 body=body,
                 spec=spec,
                 used_fallback=index > 0,
-                latency_s=time.monotonic() - started,
+                latency_s=self._clock() - started,
                 attempts=attempts + made,
                 tried=tuple(tried),
                 reserved_usd=reserved,
@@ -393,7 +469,7 @@ class ModelChain:
         if not timeout > 0:
             raise ValueError(f"a chosen model's timeout must be positive, got {timeout!r}")
         bound = timeout if self._timeout is None else min(timeout, self._timeout)
-        started = time.monotonic()
+        started = self._clock()
         body, made, reserved = self._post_with_retries(
             path,
             {**payload, "model": spec.model_id},
@@ -411,7 +487,7 @@ class ModelChain:
             body=body,
             spec=spec,
             used_fallback=False,
-            latency_s=time.monotonic() - started,
+            latency_s=self._clock() - started,
             attempts=made,
             tried=(spec.model_id,),
             reserved_usd=reserved,
@@ -432,4 +508,5 @@ def _with_cost(exc: TransportError, usage: CallUsage, attempts: int) -> Transpor
         retryable=exc.retryable,
         timed_out=exc.timed_out,
         reached_provider=exc.reached_provider,
+        deadline_ended=exc.deadline_ended,
     )

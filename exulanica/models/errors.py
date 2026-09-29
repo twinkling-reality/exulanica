@@ -64,6 +64,9 @@ class TransportError(ModelError):
     will be refused identically forever, and retrying it is spend with no new information.
 
     ``timed_out`` says the role's timeout passed before a whole response arrived.
+    ``deadline_ended`` says the caller's deadline for an optional call ended the wait instead, or
+    left no time to send the request at all (``reached_provider`` ``False`` then); either way the
+    caller's answer is already in hand without it, so it is never retried.
     ``reached_provider`` is what the ledger prices the attempt by: ``False`` when the request never
     left (the connection was not made), ``True`` when the provider answered with a status, and
     ``None`` when it was sent and nothing whole came back, which is the case where the provider may
@@ -77,11 +80,13 @@ class TransportError(ModelError):
         retryable: bool = True,
         timed_out: bool = False,
         reached_provider: bool | None = None,
+        deadline_ended: bool = False,
     ) -> None:
         super().__init__(message)
         self.retryable = retryable
         self.timed_out = timed_out
         self.reached_provider = reached_provider
+        self.deadline_ended = deadline_ended
 
 
 class ModelUnavailableError(ModelError):

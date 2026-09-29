@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import re
-import time
 import uuid
 from typing import Any
 
@@ -35,10 +34,13 @@ from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import TransportError
 from exulanica.models.transport import HttpResponse
-from exulanica.selection import question as question_module
 from exulanica.selection import society_question
 from exulanica.selection.plan import Intent, SelectionPlan, SocietyAspect, SocietyScope
-from exulanica.selection.society_question import Framing, SocietyLineChoice
+from exulanica.selection.society_question import (
+    COMPOSER_WAIT_SECONDS,
+    Framing,
+    SocietyLineChoice,
+)
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.worlds import AUTHORED_STARTER
 from fastapi.testclient import TestClient
@@ -488,14 +490,15 @@ def test_what_happened_is_composed_from_event_lines_alone_through_the_policy(wor
     assert "[inhabitant A]" in body["inhabitants"]
 
 
-def test_a_choice_of_a_line_not_in_the_list_is_answered_in_the_fixed_words_at_once(world):
+def test_a_choice_of_a_line_not_in_the_list_is_answered_in_the_fixed_words(world):
     transport = _Scripted(unknown=True)
     with world["open_app"](transport) as client:
         response = _ask(client, world, "What happened in the square?")
     body = response.json()
     assert response.status_code == 200, response.text
-    # The plan, then one choice, refused and not asked for again: the fixed words.
-    assert len(transport.requests) == 2
+    # The plan, then a choice refused, asked for once more with time left and refused again: the
+    # fixed words.
+    assert len(transport.requests) == 3
     assert body["deterministic"] is True
     assert body["execution"]["rejections"] == ["ZZZZZZZZZZ is not a token in the list"]
     assert all(
@@ -631,12 +634,17 @@ def test_a_composer_that_gives_no_answer_leaves_the_fixed_words_and_a_200(world,
     assert response.status_code == 200, response.text
     body = response.json()
     texts = [clause["text"] for clause in body["answer"]["clauses"]]
-    cause = "did not answer in time." if failure.timed_out else "did not answer."
+    cause = (
+        f"did not choose within {COMPOSER_WAIT_SECONDS} seconds."
+        if failure.timed_out
+        else "did not answer."
+    )
     assert texts[1].startswith(f"The model that chooses the lines for this answer {cause}")
     assert body["deterministic"] is False
     composer = [call for call in body["execution"]["calls"] if call["role"] == "answer_composer"]
+    # A wait ended within the composer's deadline is the deadline's end, not a provider timeout.
     assert [call["outcome"] for call in composer] == [
-        "timed_out" if failure.timed_out else "failed"
+        "deadline_ended" if failure.timed_out else "failed"
     ]
 
 
@@ -751,31 +759,30 @@ def test_a_typed_inhabitant_label_is_refused_by_name_before_it_is_planned(world)
     )
 
 
-def test_the_wait_bound_is_counted_from_the_question_s_start(world, monkeypatch):
-    """The planner's time is part of the person's wait, so the composer is given the question's
-    start, taken before the planner is asked, not a time of its own."""
-    seen: dict[str, float | None] = {}
-    plan, answer = question_module.propose_plan, question_module.answer_about_society
+class _Waits(_Scripted):
+    """A scripted model that keeps the wait each composer request was given."""
 
-    def planning(*args, **kwargs):
-        seen["planner"] = time.monotonic()
-        return plan(*args, **kwargs)
+    def __init__(self) -> None:
+        super().__init__()
+        self.composer_waits: list[float] = []
 
-    def answering(*args, **kwargs):
-        seen["started"] = kwargs.get("started")
-        return answer(*args, **kwargs)
+    def post_json(self, url, *, headers, payload, timeout) -> HttpResponse:
+        if not payload["messages"][0]["content"].startswith("You turn a question"):
+            self.composer_waits.append(timeout)
+        return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
 
-    monkeypatch.setattr(question_module, "propose_plan", planning)
-    monkeypatch.setattr(question_module, "answer_about_society", answering)
-    with world["open_app"](_Scripted()) as client:
+
+def test_the_composer_is_given_its_deadline_from_the_answer_path(world):
+    """Through the application the composer's one request waits at most the product's deadline,
+    counted once the fixed words are ready, never the role's manifest timeout."""
+    transport = _Waits()
+    with world["open_app"](transport) as client:
         _society(world, client)
-        before = time.monotonic()
         response = _ask(client, world, "What happened in the square?")
     assert response.status_code == 200, response.text
-    # Positive control: the question was planned, and answered about the world's people.
-    assert response.json()["plan"]["intent"] == "society" and "planner" in seen
-    started = seen["started"]
-    assert started is not None and before <= started <= seen["planner"]
+    assert response.json()["plan"]["intent"] == "society"
+    assert len(transport.composer_waits) == 1
+    assert 0 < transport.composer_waits[0] <= COMPOSER_WAIT_SECONDS
 
 
 def _save_name(world, name: str, entity_class: str) -> None:
