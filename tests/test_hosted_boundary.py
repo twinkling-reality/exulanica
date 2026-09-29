@@ -420,7 +420,6 @@ def run_society_question(world: World, *, client_for=None) -> Witness:
         saved=saved,
         log=CallLog(),
         max_tokens=4096,
-        attempts=1,
     )
     return transport
 

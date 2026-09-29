@@ -94,6 +94,9 @@ from exulanica.selection.planner import (
 from exulanica.selection.prompts import _COMPOSER_SYSTEM, PROMPT_VERSION
 from exulanica.selection.request_names import RequestNames
 from exulanica.selection.society_question import (
+    COMPOSER_ROLE,
+    PLANNER_ROLE,
+    SOCIETY_COMPOSER_ATTEMPTS,
     SocietyContext,
     SocietyEvidencePacket,
     SocietyRefusal,
@@ -118,6 +121,7 @@ __all__ = [
     "COMPOSER_ATTEMPTS",
     "PROMPT_VERSION",
     "QUERY_VECTORS",
+    "SOCIETY_ANSWER_PATH_CALLS",
     "AnsweredQuestion",
     "CallLog",
     "EntityChoice",
@@ -132,13 +136,13 @@ __all__ = [
 ]
 
 
-def _composer_max_tokens() -> int:
-    """The ceiling the manifest declares for the composer's role, or a refusal naming it."""
-    declared = load_manifest()[Role.REASONING_CHEAP].max_tokens
+def _composer_max_tokens(role: Role = Role.REASONING_CHEAP) -> int:
+    """The ceiling the manifest declares for a composer's role, or a refusal naming it."""
+    declared = load_manifest()[role].max_tokens
     if declared is None:
         raise ManifestError(
-            "reasoning_cheap declares no max_tokens, which the Companion composer needs: its "
-            "chain reasons inline and truncates at the default ceiling"
+            f"{role} declares no max_tokens, which a Companion composer needs: its chain reasons "
+            "inline and truncates at the default ceiling"
         )
     return declared.value
 
@@ -147,6 +151,9 @@ def _composer_max_tokens() -> int:
 #: where its measured reason is stated. A module name, so a measurement script can rebind it for
 #: one call (``scripts/measure_companion_memory.py``); nothing else restates the number.
 COMPOSER_MAX_TOKENS: Final = _composer_max_tokens()
+
+#: The society composer's token budget, the ``max_tokens`` its own role declares, as above.
+SOCIETY_COMPOSER_MAX_TOKENS: Final = _composer_max_tokens(COMPOSER_ROLE)
 
 #: How many times the composer may be asked for one answer: one try and one repair. The loop in
 #: :func:`compose_answer` runs to it, and :data:`ANSWER_PATH_CALLS` counts it.
@@ -166,16 +173,28 @@ ANSWER_PATH_CALLS: Final[tuple[tuple[Role, int], ...]] = (
     (Role.REASONING_CHEAP, COMPOSER_ATTEMPTS),
 )
 
+#: Every hosted call an answer about a world's simulated people can make, in the same form: the
+#: planner and its repair, then the answer composer's one attempt
+#: (``exulanica.selection.society_question``). One question takes one of the two paths.
+SOCIETY_ANSWER_PATH_CALLS: Final[tuple[tuple[Role, int], ...]] = (
+    (PLANNER_ROLE, PLANNER_ATTEMPTS),
+    (COMPOSER_ROLE, SOCIETY_COMPOSER_ATTEMPTS),
+)
+
 
 def answer_bound_seconds(client: ModelClient) -> float:
     """The longest the model calls of one answer can take on ``client``, retries and fallbacks in.
 
-    Each call site's count times what the client says one call to that role can take at worst
-    (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`: the manifest's timeout for
-    the role, its chain and the client's retries). The browser waits for an answer at least this
-    long; ``tests/test_companion_ask_deadline.py`` holds its deadline to it.
+    For each path an answer can take, each call site's count times what the client says one call
+    to that role can take at worst (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`:
+    the manifest's timeout for the role, its chain and the client's retries); then the longer path.
+    The browser waits for an answer at least this long; ``tests/test_companion_ask_deadline.py``
+    holds its deadline to it.
     """
-    return sum(count * client.worst_case_seconds(role) for role, count in ANSWER_PATH_CALLS)
+    return max(
+        sum(count * client.worst_case_seconds(role) for role, count in path)
+        for path in (ANSWER_PATH_CALLS, SOCIETY_ANSWER_PATH_CALLS)
+    )
 
 
 #: What the three candidates did on one 24-item packet, recorded because the choice is not
@@ -936,8 +955,7 @@ def _answered_about_society(
             client=client,
             saved=saved,
             log=log,
-            max_tokens=COMPOSER_MAX_TOKENS,
-            attempts=COMPOSER_ATTEMPTS,
+            max_tokens=SOCIETY_COMPOSER_MAX_TOKENS,
             started=started,
         )
     if (
@@ -970,7 +988,6 @@ def _answered_about_society(
         society_packet=said.packet,
         abstention=said.abstention,
         deterministic=said.deterministic,
-        repaired=said.repaired,
         rejections=said.rejections,
         calls=log.calls,
         # No saved name's placeholder: an answer about simulated people is the inspector's words

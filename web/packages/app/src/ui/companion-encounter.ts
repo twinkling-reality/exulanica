@@ -10,6 +10,7 @@ import {
   type CompanionStarterActions,
 } from './companion-choice-rail.js';
 import { buildCompanionEvidence, type ShownEvidence } from './companion-evidence.js';
+import type { AskingAbout } from './companion-speech.js';
 import type { CompanionPlacement } from './companion-placement.js';
 import { buildCompanionSpeech } from './companion-speech.js';
 import { el, replace } from './dom.js';
@@ -76,7 +77,7 @@ export interface CompanionEncounter {
    * on a full packet. A surface with nothing between the question and the reply looks broken for
    * that whole time, and the person's next move is to ask again.
    */
-  askStarted(question: string): void;
+  askStarted(question: string, about?: AskingAbout): void;
   showAnswer(answer: CompanionAnswer): void;
   /**
    * Show the photograph a citation names, in place of the face that cited it, with the way back.
@@ -217,6 +218,8 @@ export function buildCompanionEncounter(
   /** A durability notice, held on the same terms and for the same reason. */
   let memoryNotice: { readonly reasonKey: string; readonly detail: string } | null = null;
   let lastQuestion: string | null = null;
+  /** What the question being answered is answered from, for the words said while it waits. */
+  let askingAbout: AskingAbout = 'library';
   /*
    * The photograph a citation opened, held beside the answer and the turn rather than in place of
    * either, so `Back` redraws what cited it instead of asking again. Every opening takes a new
@@ -310,7 +313,7 @@ export function buildCompanionEncounter(
 
   function renderAsking(question: string): void {
     mode = 'asking';
-    speech.renderAsking(question);
+    speech.renderAsking(question, askingAbout);
     draw([toolbar, speech.root]);
   }
 
@@ -465,8 +468,9 @@ export function buildCompanionEncounter(
     reportRefusal(reasonKey) {
       speech.reportRefusal(reasonKey);
     },
-    askStarted(question) {
+    askStarted(question, about = 'library') {
       answer = null;
+      askingAbout = about;
       evidence = null;
       root.removeAttribute('data-evidence');
       pendingFailure = null;

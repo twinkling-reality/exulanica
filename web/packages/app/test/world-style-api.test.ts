@@ -83,6 +83,7 @@ const version = (id: string, revision: number, vitality = 0.82) => ({
   capability_mapping: binding().capabilityMapping,
   reference_ids: [],
   model_id: null,
+  model_name: null,
   prompt_version: null,
   refines_proposal_id: null,
 });

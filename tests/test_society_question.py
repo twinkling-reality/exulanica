@@ -9,6 +9,7 @@ the hosted boundary are ``tests/test_companion_asks_inhabitants_api.py``.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import re
 import uuid
@@ -18,7 +19,7 @@ from exulanica.epistemics.saved_names import SavedName
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import TransportError
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.answer import (
     MAX_CLAUSES,
@@ -31,7 +32,7 @@ from exulanica.selection.calls import CallLog
 from exulanica.selection.inhabitant_words import inhabitant_words, inhabitant_words_catalog
 from exulanica.selection.plan import SocietyAspect, SocietyScope, SocietySelector
 from exulanica.selection.society_question import (
-    ANSWER_WAIT_BUDGET_SECONDS,
+    COMPOSER_ROLE,
     INHABITANT_PLACEHOLDER,
     MAX_CHOSEN_LINES,
     Framing,
@@ -39,6 +40,7 @@ from exulanica.selection.society_question import (
     SocietyRefusal,
     UnknownSocietyContext,
     answer_about_society,
+    answer_wait_budget_seconds,
     build_scene,
     render_society_packet,
 )
@@ -117,6 +119,17 @@ def _explained() -> dict:
     )
 
 
+def _happened_packet():
+    """The packet a question about what happened over the whole square is composed from."""
+    from exulanica.selection import society_question
+
+    builder = society_question._Builder(
+        _scene("what happened in the square?"), inhabitant_words_catalog()
+    )
+    society_question._happened(builder)
+    return builder.packet()
+
+
 def _answer(scene, scope, aspect, client=None):
     return answer_about_society(
         scene,
@@ -125,7 +138,6 @@ def _answer(scene, scope, aspect, client=None):
         saved=(),
         log=CallLog(),
         max_tokens=1000,
-        attempts=2,
     )
 
 
@@ -458,7 +470,6 @@ def test_a_composer_that_gives_no_answer_leaves_the_fixed_words_after_one_attemp
         saved=(),
         log=log,
         max_tokens=1000,
-        attempts=2,
     )
     # One attempt, not a repair after it: the person waits on one bound at most.
     assert len(transport.requests) == 1
@@ -591,7 +602,6 @@ def _happened(client, scene=None, **timing):
         saved=(),
         log=CallLog(),
         max_tokens=1000,
-        attempts=2,
         **timing,
     )
 
@@ -620,7 +630,7 @@ def test_a_composed_answer_is_the_chosen_lines_each_in_its_own_words_in_the_list
     # Every sentence is a line's own words or code's: no text of the model's anywhere.
     lines = {item.line for item in said.packet.items}
     assert all(c.type is ClauseType.META or c.text in lines for c in clauses)
-    assert not said.deterministic and not said.repaired
+    assert not said.deterministic
 
 
 def test_two_tokens_written_into_one_entry_are_both_read():
@@ -633,7 +643,7 @@ def test_two_tokens_written_into_one_entry_are_both_read():
     assert [clause.text for clause in said.answer.clauses[1:-1]] == [
         item.line for item in said.packet.items[1:3]
     ]
-    assert not said.repaired and not said.deterministic
+    assert not said.deterministic
 
 
 @pytest.mark.parametrize("count", [9, 10, 12, 13])
@@ -651,17 +661,15 @@ def test_a_choice_of_more_lines_than_an_answer_holds_is_refused_by_name(count):
             framing=Framing.RECORDED,
         )
 
-    client, transport = _choosing(over, over)
+    client, transport = _choosing(over)
     said = _happened(client)
     assert len(said.answer.clauses) <= MAX_CLAUSES
+    assert len(transport.requests) == 1
     if count <= MAX_CHOSEN_LINES:
         # Positive control: as many lines as an answer holds are shown, filling it.
-        assert len(transport.requests) == 1 and not said.deterministic
+        assert not said.deterministic
         assert len(said.answer.clauses) == count + 3 == MAX_CLAUSES
     else:
-        assert len(transport.requests) == 2
-        retry = transport.requests[1]["payload"]["messages"][-1]["content"]
-        assert f"the choice names {count} lines; choose at most {MAX_CHOSEN_LINES}" in retry
         assert said.deterministic
         assert said.rejections == (
             f"the choice names {count} lines; choose at most {MAX_CHOSEN_LINES}",
@@ -671,60 +679,96 @@ def test_a_choice_of_more_lines_than_an_answer_holds_is_refused_by_name(count):
 def test_an_entry_with_no_token_is_refused_without_its_words():
     """The reasons are returned with the answer, so they carry no text the model wrote."""
     words = "the people who sat on the bench"
-    client, _ = _choosing(SocietyLineChoice(lines=[words]), SocietyLineChoice(lines=[words]))
+    client, _ = _choosing(SocietyLineChoice(lines=[words]))
     said = _happened(client)
     assert said.rejections == ("1 of the entries hold no token from the list",)
     assert said.deterministic
 
 
-def test_a_token_not_in_the_list_is_asked_for_once_more_and_then_the_fixed_words_given():
-    client, transport = _choosing(
-        SocietyLineChoice(lines=["ZZZZZZZZZZ"]), SocietyLineChoice(lines=["YYYYYYYYYY"])
-    )
-    said = _happened(client)
-    assert len(transport.requests) == 2
-    retry = transport.requests[1]["payload"]["messages"][-1]["content"]
-    assert "ZZZZZZZZZZ is not a token in the list" in retry
-    assert said.deterministic and not said.repaired
-    assert said.rejections == ("YYYYYYYYYY is not a token in the list",)
-    assert not any("did not answer" in clause.text for clause in said.answer.clauses)
-
-
-def test_a_repaired_choice_is_shown_and_says_it_was_repaired():
+def test_a_refused_choice_is_answered_in_the_fixed_words_at_once_with_its_reason_kept():
+    """The composer is asked once: a choice that names a line not in the list is not asked for
+    again, and why it was refused is kept with the answer, which the execution record serves."""
     client, transport = _choosing(
         SocietyLineChoice(lines=["ZZZZZZZZZZ"]),
         lambda payload: SocietyLineChoice(lines=_tokens(payload)[:1]),
     )
-    said = _happened(client)
-    assert len(transport.requests) == 2
-    assert said.repaired and not said.deterministic
-    assert said.answer.clauses[1].text == said.packet.items[0].line
+    log = CallLog()
+    said = answer_about_society(
+        _scene("what happened in the square?"),
+        SocietySelector(scope=SocietyScope.WORLD, aspect=SocietyAspect.RECENT),
+        client=client,
+        saved=(),
+        log=log,
+        max_tokens=1000,
+    )
+    assert len(transport.requests) == 1
+    assert said.deterministic
+    assert said.rejections == ("ZZZZZZZZZZ is not a token in the list",)
+    assert [call.outcome for call in log.calls] == ["completed"]
+    # The fixed words, with no note: a choice came in time and was refused.
+    assert [clause.text for clause in said.answer.clauses[1:-1]] == [
+        item.line for item in said.packet.items[-(MAX_CLAUSES - 2) :]
+    ]
+    assert not any("did not answer" in clause.text for clause in said.answer.clauses)
 
 
 @pytest.mark.parametrize("late", [True, False], ids=["late", "early"])
-def test_a_refused_choice_is_asked_again_only_while_a_whole_attempt_fits_the_wait_bound(late):
-    """Measured live: a refused reply 17 and 22 seconds in, then a repair that timed out, made the
-    person wait 78 and 83 seconds for the fixed words they could have had at once."""
-    client, transport = _choosing(
-        SocietyLineChoice(lines=["ZZZZZZZZZZ"]), SocietyLineChoice(lines=["ZZZZZZZZZZ"])
-    )
-    bound = client.manifest[Role.REASONING_CHEAP].timeout_seconds
-    # The first reply is back, and one second less, or one more, than a whole attempt is left.
-    now = ANSWER_WAIT_BUDGET_SECONDS - bound + (1.0 if late else -1.0)
+def test_the_composer_is_not_asked_when_a_whole_attempt_no_longer_fits_the_wait_bound(late):
+    """A typed question's plan came back late: rather than wait on an attempt that could end past
+    the bound, the person has the fixed words at once, and nothing is sent."""
+    client, transport = _choosing(lambda payload: SocietyLineChoice(lines=_tokens(payload)[:1]))
+    bound = client.manifest[COMPOSER_ROLE].timeout_seconds
+    now = answer_wait_budget_seconds(client.manifest) - bound + (1.0 if late else -1.0)
     said = _happened(client, started=0.0, clock=lambda: now)
-    # A choice the model made was refused either way, so the answer is the fixed words.
-    assert said.deterministic
     texts = [clause.text for clause in said.answer.clauses]
     if late:
-        assert len(transport.requests) == 1
-        assert said.rejections[-1] == "composer_repair_skipped: the wait bound"
+        assert transport.requests == []
+        assert said.rejections == ("composer_not_asked: the wait bound",)
         assert texts[1] == (
-            "The lines the model chose could not be used, and there was no time left to ask it "
-            "again. Here are the latest recorded lines instead."
+            "There was no time left to ask the model that chooses the lines for this answer. "
+            "Here are the latest recorded lines instead."
         )
+        # Nothing a model chose was discarded: it was never asked.
+        assert not said.deterministic
     else:
-        assert len(transport.requests) == 2
-        assert not any("could not be used" in text for text in texts)
+        assert len(transport.requests) == 1
+        assert not said.deterministic and not said.rejections
+
+
+def test_the_wait_bound_is_one_plan_and_one_choice_by_the_manifest_s_timeouts():
+    """The bound is derived, not written: move either role's timeout and it moves."""
+    manifest = load_manifest()
+    planner = manifest[Role.STRUCTURED_EXTRACTION].timeout_seconds
+    composer = manifest[COMPOSER_ROLE].timeout_seconds
+    assert answer_wait_budget_seconds(manifest) == planner + composer
+    roles = dict(manifest.roles)
+    roles[COMPOSER_ROLE] = dataclasses.replace(roles[COMPOSER_ROLE], timeout_seconds=composer + 5)
+    moved = dataclasses.replace(manifest, roles=roles)
+    assert answer_wait_budget_seconds(moved) == planner + composer + 5
+
+
+def test_the_composer_asks_its_own_role():
+    """The answer composer is its own manifest role, so its bound and model are its own: pointed
+    at a model no other composer uses, that is the model asked."""
+    manifest = load_manifest()
+    elsewhere = {spec.model_id for spec in manifest[Role.REASONING_CHEAP].chain}
+    other = next(
+        spec for spec in manifest.models.values() if spec.is_chat and spec.model_id not in elsewhere
+    )
+    roles = dict(manifest.roles)
+    roles[Role.ANSWER_COMPOSER] = dataclasses.replace(
+        roles[Role.ANSWER_COMPOSER], primary=other, fallback=None
+    )
+    transport = _Choosing(lambda payload: SocietyLineChoice(lines=_tokens(payload)[:1]))
+    client = ModelClient(
+        api_key="test-key-not-real",
+        manifest=dataclasses.replace(manifest, roles=roles),
+        transport=transport,
+        budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+    ).with_policy(RecordingPolicy())
+    _happened(client)
+    (sent,) = transport.requests
+    assert sent["payload"]["model"] == other.model_id
 
 
 def test_with_one_line_the_fixed_words_say_one_line_and_show_it():

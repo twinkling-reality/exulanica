@@ -147,6 +147,23 @@ describe('an answer whose record holds attempts that returned nothing', () => {
     expect(answer.provenance.plannedBy).toBe(PLANNER);
   });
 
+  it('names the model that chose the lines of an answer about the world\'s people', async () => {
+    const SOCIETY_COMPOSER = 'nvidia/nemotron-3-super-120b-a12b';
+    const answer = await client(json(answerBody([
+      wireCall({ role: 'structured_extraction', requested_model: PLANNER, served_model: PLANNER, requested_model_name: PLANNER_NAME, served_model_name: PLANNER_NAME, latency_ms: 1500 }),
+      wireCall({ role: 'answer_composer', requested_model: SOCIETY_COMPOSER, served_model: SOCIETY_COMPOSER, requested_model_name: 'Nemotron 3 Super 120B', served_model_name: 'Nemotron 3 Super 120B', latency_ms: 10_000 }),
+    ]))).ask('What happened in the square?');
+    const speech = buildCompanionSpeech({ speakerName: 'Companion', names: companionNames(() => null) });
+
+    speech.renderAnswer(answer);
+
+    expect(answer.provenance.composed).toBe('model');
+    expect(answer.provenance.servedModelName).toBe('Nemotron 3 Super 120B');
+    const provenance = speech.root.querySelector('.companion-provenance')?.textContent ?? '';
+    expect(provenance).toContain(fill('provenance.model', { model: 'Nemotron 3 Super 120B', duration: '11.5 s' }));
+    expect(provenance).not.toContain(SOCIETY_COMPOSER);
+  });
+
   it('says how many returned nothing, and that what they cost is not known', async () => {
     const answer = await client(json(answerBody([timedOut, wireCall()]))).ask('where was I?');
     const speech = buildCompanionSpeech({ speakerName: 'Companion', names: companionNames(() => null) });

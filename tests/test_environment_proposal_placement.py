@@ -22,6 +22,7 @@ from exulanica.environment import EnvironmentFeatureCatalog
 from exulanica.environment.feature_placement import nyc_instance_id, selected_feature_placement
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
 from fastapi.testclient import TestClient
 
@@ -99,6 +100,10 @@ def test_the_placement_carries_the_selection_the_catalog_and_the_request():
     assert (placement.origin.kind, placement.origin.role) == ("authored", "fictional")
 
 
+#: The model the environment drafter's role asks, as the manifest names it.
+DRAFTER = load_manifest()[Role.STRUCTURED_EXTRACTION].primary.model_id
+
+
 @pytest.mark.postgres
 def test_a_place_proposal_names_anchors_and_places_the_selected_building(
     composed, spine_schema, monkeypatch
@@ -121,7 +126,9 @@ def test_a_place_proposal_names_anchors_and_places_the_selected_building(
         [
             HttpResponse(
                 status_code=200,
-                text=json.dumps(chat_body(json.dumps({"operation": "place_selected_feature"}))),
+                text=json.dumps(
+                    chat_body(json.dumps({"operation": "place_selected_feature"}), model=DRAFTER)
+                ),
             )
         ]
     )
@@ -164,4 +171,7 @@ def test_a_place_proposal_names_anchors_and_places_the_selected_building(
     assert proposal["region_id"] == "region-a"
     assert proposal["transform"] == TRANSFORM
     assert proposal["origin_role"] == "fictional"
+    # The model that drew it, and its name by the one rule, which the panel prints.
+    assert proposal["model_id"] == DRAFTER
+    assert proposal["model_name"] == load_manifest().model_name(DRAFTER) != DRAFTER
     assert transport.call_count == 1

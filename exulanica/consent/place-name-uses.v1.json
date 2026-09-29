@@ -26,8 +26,7 @@
       "role": "reasoning_cheap",
       "purpose": "write the Companion's answer to a question you ask about your photographs",
       "used_by": [
-        "exulanica/selection/question.py",
-        "exulanica/selection/society_question.py"
+        "exulanica/selection/question.py"
       ],
       "honoured_by": [
         "exulanica.selection.question:compose_answer"
@@ -40,7 +39,8 @@
         "exulanica/selection/environment_proposal.py",
         "exulanica/selection/planner.py",
         "exulanica/selection/proposal.py",
-        "exulanica/selection/question.py"
+        "exulanica/selection/question.py",
+        "exulanica/selection/society_question.py"
       ],
       "honoured_by": [
         "exulanica.selection.environment_proposal:draft_environment_operation",

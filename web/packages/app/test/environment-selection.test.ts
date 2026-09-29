@@ -422,6 +422,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
       transform: request.transform,
       originRole: request.originRole,
       modelId: null,
+      modelName: null,
       promptVersion: 'deterministic-environment-preview-1',
     }));
     const propose = vi.fn(async (base, heldCatalog, placement) => ({
@@ -429,6 +430,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
       proposal: {
         ...deterministicPlace(base, heldCatalog, placement),
         modelId: 'served/model',
+        modelName: 'Served Model',
         promptVersion: 'environment-proposal-1',
       },
     }));
@@ -472,7 +474,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
     input.value = 'place this building';
     input.dispatchEvent(new Event('input'));
     button('Preview request').click();
-    await vi.waitFor(() => expect(mounted.root.textContent).toContain('Model: served/model'));
+    await vi.waitFor(() => expect(mounted.root.textContent).toContain('Model: Served Model'));
     expect(mounted.root.textContent).toContain('prompt: environment-proposal-1');
     button('Apply').click();
     await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
@@ -540,6 +542,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
           transform: request.transform,
           originRole: request.originRole,
           modelId: null,
+          modelName: null,
           promptVersion: 'deterministic-environment-preview-1',
         })),
       } as never,
@@ -615,6 +618,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
         transform: { xMm: 0, yMm: 0, zMm: 0, yawMicroradians: 0, scaleMilli: 1000 },
         originRole: role,
         modelId: model,
+        modelName: model === null ? null : `${model} as served`,
         promptVersion: 'environment-proposal-1',
       },
     });

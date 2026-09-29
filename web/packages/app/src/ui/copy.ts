@@ -140,6 +140,9 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   // sentence below is about the ASKING, never about what was found: what was found is written
   // by the server from the evidence and is rendered verbatim.
   'ask.working': 'Looking through your library.',
+  // Asked from the inspector about the world's simulated people: the answer is read from what
+  // the world's simulation recorded, not from the library.
+  'ask.working.world': 'Looking at what happened in this world.',
   'ask.emptyAnswer': 'The answer came back with nothing in it.',
 
   // A question that did not reach an answer. Four different facts, said as four sentences,

@@ -94,6 +94,17 @@ describe('an answer about the world\'s people', () => {
     mounted.dispose();
   });
 
+  it('says while it waits that it is looking at what happened in this world, not the library', async () => {
+    const { mounted } = harness();
+    mounted.askAbout('What happened in the square?', () => new Promise<CompanionAnswer>(() => undefined));
+    await settle();
+    expect(mounted.panel.mode()).toBe('asking');
+    const said = mounted.panel.root.textContent ?? '';
+    expect(said).toContain('Looking at what happened in this world.');
+    expect(said).not.toContain('Looking through your library.');
+    mounted.dispose();
+  });
+
   it('leaves a photograph answer kept, as it always was', async () => {
     const { mounted, remembered } = harness();
     mounted.summon();

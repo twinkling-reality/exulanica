@@ -13,6 +13,14 @@ import { drawSimulated, type DrawnPiece, type SocietyNames } from '../companion-
 import { el, replace } from './dom.js';
 import { fill, say } from './copy.js';
 
+/** What a question is answered from: the person's library, or the world's simulation. */
+export type AskingAbout = 'library' | 'world';
+
+const ASKING_WORDS: Readonly<Record<AskingAbout, string>> = {
+  library: 'ask.working',
+  world: 'ask.working.world',
+};
+
 export interface CompanionSpeechOptions {
   readonly speakerName: string;
   /** Turns each placeholder the Companion's words carry back into the account holder's name. */
@@ -27,8 +35,8 @@ export interface CompanionSpeech {
   /** Factual host guidance, visually in the speech band but attributed to no speaker. */
   renderGuidance(title: string, detail: string): void;
   reportRefusal(reasonKey: string): void;
-  /** The question is with the library. Says so, and says nothing about what it will find. */
-  renderAsking(question: string): void;
+  /** The question is being answered. Says from what, and says nothing about what it will find. */
+  renderAsking(question: string, about?: AskingAbout): void;
   renderAnswer(answer: CompanionAnswer): void;
   reportAskFailure(failure: AskUnavailable): void;
   /**
@@ -374,7 +382,7 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
         el('p', { class: 'companion-starter-copy', text: detail }),
       ]);
     },
-    renderAsking(question) {
+    renderAsking(question, about = 'library') {
       root.setAttribute('aria-labelledby', 'companion-speaker-name');
       lastQuestion = question;
       root.dataset['mode'] = 'asking';
@@ -382,7 +390,7 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       replace(root, [
         speaker(),
         el('p', { class: 'companion-question-echo', text: question }),
-        el('p', { class: 'companion-utterance', text: say('ask.working') }),
+        el('p', { class: 'companion-utterance', text: say(ASKING_WORDS[about]) }),
       ]);
     },
     renderAnswer,

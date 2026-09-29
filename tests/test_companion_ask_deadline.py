@@ -15,6 +15,7 @@ be the ones stated.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import inspect
 import json
 import re
@@ -31,6 +32,7 @@ from exulanica.selection.embeddings import embed_query
 from exulanica.selection.planner import propose_plan
 from exulanica.selection.question import (
     ANSWER_PATH_CALLS,
+    SOCIETY_ANSWER_PATH_CALLS,
     answer_bound_seconds,
     compose_answer,
 )
@@ -75,12 +77,14 @@ def test_the_page_waits_at_least_the_answer_bound_and_its_read_allowance():
     assert _milliseconds("ASK_TIMEOUT_MS") >= bound_ms + _milliseconds("PACKET_TIMEOUT_MS")
 
 
-def _roles_sent(transport: FakeTransport) -> list[Role]:
-    manifest = load_manifest()
-    by_model = {
-        spec.model_id: role for role, binding in manifest.roles.items() for spec in binding.chain
-    }
-    return [by_model[request["payload"]["model"]] for request in transport.requests]
+def _sent(transport: FakeTransport) -> list[str]:
+    """The model each request was sent to. Two roles may share a model, so a test names the role
+    it expects and compares with that role's primary rather than reading a role back."""
+    return [request["payload"]["model"] for request in transport.requests]
+
+
+def _to(role: Role, count: int) -> list[str]:
+    return [load_manifest()[role].primary.model_id] * count
 
 
 def _reply(body) -> HttpResponse:
@@ -92,9 +96,8 @@ def test_the_planner_sends_its_role_as_many_times_as_stated():
     client, transport = _api_client([_reply(refused)] * 5)
     with pytest.raises(SchemaViolationError):  # refused after its last repair
         propose_plan(client, "Which photographs show a boat?", (), names=RequestNames([]))
-    assert (
-        _roles_sent(transport)
-        == [Role.STRUCTURED_EXTRACTION] * dict(ANSWER_PATH_CALLS)[Role.STRUCTURED_EXTRACTION]
+    assert _sent(transport) == _to(
+        Role.STRUCTURED_EXTRACTION, dict(ANSWER_PATH_CALLS)[Role.STRUCTURED_EXTRACTION]
     )
 
 
@@ -111,9 +114,8 @@ def test_the_composer_sends_its_role_as_many_times_as_stated():
     client, transport = _api_client([_reply(chat_body(invented.model_dump_json()))] * 5)
     _, deterministic, _ = compose_answer(client, "Where was this?", _packet())
     assert deterministic, "the composer was not driven to its last repair"
-    assert (
-        _roles_sent(transport)
-        == [Role.REASONING_CHEAP] * dict(ANSWER_PATH_CALLS)[Role.REASONING_CHEAP]
+    assert _sent(transport) == _to(
+        Role.REASONING_CHEAP, dict(ANSWER_PATH_CALLS)[Role.REASONING_CHEAP]
     )
 
 
@@ -125,10 +127,62 @@ def test_the_query_vector_is_one_embedding_request():
     }
     client, transport = _api_client([_reply(body)])
     embed_query(client, "a boat in a harbour")
-    assert _roles_sent(transport) == [Role.EMBEDDING] * dict(ANSWER_PATH_CALLS)[Role.EMBEDDING]
+    assert _sent(transport) == _to(Role.EMBEDDING, dict(ANSWER_PATH_CALLS)[Role.EMBEDDING])
 
 
 def test_every_role_the_answer_path_sends_is_counted_once():
     roles = [role for role, _ in ANSWER_PATH_CALLS]
     assert len(roles) == len(set(roles))
     assert set(roles) == {Role.STRUCTURED_EXTRACTION, Role.EMBEDDING, Role.REASONING_CHEAP}
+    society = [role for role, _ in SOCIETY_ANSWER_PATH_CALLS]
+    assert len(society) == len(set(society))
+    assert set(society) == {Role.STRUCTURED_EXTRACTION, Role.ANSWER_COMPOSER}
+    # The same planner asks either way, so it is counted the same on both paths.
+    planner = Role.STRUCTURED_EXTRACTION
+    assert dict(SOCIETY_ANSWER_PATH_CALLS)[planner] == dict(ANSWER_PATH_CALLS)[planner]
+
+
+def test_the_society_composer_sends_its_role_as_many_times_as_stated():
+    from exulanica.selection.calls import CallLog
+    from exulanica.selection.society_question import SocietyLineChoice, compose_society_answer
+
+    from test_society_question import _happened_packet
+
+    unknown = SocietyLineChoice(lines=["ZZZZZZZZZZ"])
+    client, transport = _api_client([_reply(chat_body(unknown.model_dump_json()))] * 5)
+    attempts = dict(SOCIETY_ANSWER_PATH_CALLS)[Role.ANSWER_COMPOSER]
+    chosen = compose_society_answer(
+        client,
+        "What happened in the square?",
+        _happened_packet(),
+        log=CallLog(),
+        saved=(),
+        max_tokens=1000,
+        started=0.0,
+        clock=lambda: 0.0,
+    )
+    assert chosen.rejections, "the composer's choice was not refused, so nothing drove a repair"
+    assert _sent(transport) == _to(Role.ANSWER_COMPOSER, attempts)
+
+
+def test_the_bound_is_the_longer_path_and_the_society_path_is_inside_it():
+    """Each path's sum is inside the bound, and the bound is one of them, not their total: with
+    the answer composer's timeout made the longest, the society path is the bound."""
+    manifest = load_manifest()
+    roles = dict(manifest.roles)
+    roles[Role.ANSWER_COMPOSER] = dataclasses.replace(
+        roles[Role.ANSWER_COMPOSER], timeout_seconds=1000
+    )
+    for held in (manifest, dataclasses.replace(manifest, roles=roles)):
+        client = ModelClient(
+            api_key="test-key-not-real",
+            manifest=held,
+            transport=FakeTransport(),
+            policy=RecordingPolicy(),
+        )
+        paths = [
+            sum(count * client.worst_case_seconds(role) for role, count in path)
+            for path in (ANSWER_PATH_CALLS, SOCIETY_ANSWER_PATH_CALLS)
+        ]
+        assert answer_bound_seconds(client) == max(paths)
+    assert paths[1] > paths[0], "the positive control: the society path is the longer one"

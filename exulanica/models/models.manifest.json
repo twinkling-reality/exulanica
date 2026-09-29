@@ -65,7 +65,7 @@
       "catalog_use_cases": ["dedicated-endpoint", "text", "summarization", "context_and_rag", "code", "reasoning", "function_calling", "complex_writing"],
       "catalog_license": "nvidia-open-model-license",
       "region_informational": "us-central1",
-      "note": "Configured as the reasoning_mid primary and reasoning_hard fallback. No production caller selects reasoning_mid. The callable identifier uses lowercase letters as listed."
+      "note": "The answer_composer primary, and configured as the reasoning_mid primary and reasoning_hard fallback. No production caller selects reasoning_mid. The callable identifier uses lowercase letters as listed."
     },
     "nvidia/Nemotron-3-Ultra-550b-a55b": {
       "provider": "nebius_token_factory",
@@ -255,6 +255,23 @@
       "max_tokens": {"value": 32768, "basis": "The Companion composer's ceiling, sixteen times the chain's default. The Lightning fallback reasons inline on every call and cannot be told not to: measured against the live endpoint, the plan truncated at 2048 and 4096 and conformed at 16384, and the composer conformed at 16384 on a 24-item packet and truncated at the same ceiling on an 8-item one. Its spend varies per call, so the ceiling sits well above the largest observed. A ceiling is not a spend; a low one costs a failed answer."},
       "required_use_cases": ["text", "reasoning"],
       "rationale": "Used by selection.question.compose_answer to produce cited Companion answers from validated evidence packets. The comparison in docs/evaluation/2026-09-09-companion-memory.json supports Nano latency and validator conformance on four packets; it does not establish general reasoning quality or coverage of every continuity decision. Model-unavailability errors can select Lightning. Answer validation failures receive a repair attempt and then a deterministic answer, not automatic escalation to a larger model."
+    },
+    "answer_composer": {
+      "primary": "nvidia/nemotron-3-super-120b-a12b",
+      "fallback": "nvidia/Nemotron-3_5-Lightning",
+      "timeout_seconds": 90,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-29-society-composer-models.json",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "rows": 8,
+        "p50_ms": 6470,
+        "p99_ms": 44181,
+        "longest_ms": 44181,
+        "note": "One call per question, eight fixed questions about what happened in a simulated square, in the pre-registered comparison of the licence-cleared text models; every call's choice was accepted on its first try. Seven of the eight came back within 9 s. The run's window was slow at the provider: in it Qwen3 235B Instruct timed out once and DeepSeek V4 Flash four times at 60 s."
+      },
+      "max_tokens": {"value": 16384, "basis": "The ceiling every candidate was asked with in the comparison the timeout names, at which the slowest reasoning candidate was earlier measured to conform on a packet of this size; the primary chose accepted lines within it for 8 of 8 questions, using at most 2821 completion tokens. A ceiling is not a spend; a low one costs a failed answer."},
+      "required_use_cases": ["text"],
+      "rationale": "Chooses which recorded lines answer a question about what happened among a world's simulated people (exulanica/selection/society_question.py); it writes no text of its own. Chosen by the rule pre-registered in docs/evaluation/2026-09-29-society-composer-models-preregistration.json over the text models whose licence entry is resolved: Super, Lightning, Nano and Qwen3 235B were eligible; none of the NVIDIA ones answered all eight within 10 s, so the rule took the one fastest at its slowest, and the next in that order is the fallback. Model-unavailability errors select the fallback; a refused choice is answered in fixed words, never by a larger model. It is its own role although its chain is reasoning_mid's, because its timeout rests on the composer's own recorded calls: it neither moves nor is moved by reasoning_mid's basis, and its model can change by its own comparison."
     },
     "reasoning_mid": {
       "primary": "nvidia/nemotron-3-super-120b-a12b",

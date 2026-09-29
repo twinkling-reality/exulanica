@@ -113,8 +113,14 @@ export type CallOutcome = (typeof CALL_OUTCOMES)[number];
 export const CALL_COSTS = ['known', 'unknown', 'not_sent'] as const;
 export type CallCost = (typeof CALL_COSTS)[number];
 
-/** The role the answer path's composer runs as: the call whose sentence is on the screen. */
-export const COMPOSER_ROLE = 'reasoning_cheap';
+/**
+ * The roles an answer's composer runs as, one per answer path: a question about the person's
+ * photographs, and one about what happened among the world's simulated people. The call whose
+ * sentence, or choice of lines, is on the screen. `tests/test_execution_outcome_parity.py` reads
+ * each from a call its composer actually makes.
+ */
+export const COMPOSER_ROLES = ['reasoning_cheap', 'answer_composer'] as const;
+const composes = (call: ModelCall): boolean => (COMPOSER_ROLES as readonly string[]).includes(call.role);
 
 export interface ModelCall {
   readonly role: string;
@@ -724,8 +730,8 @@ function provenanceOf(
   // first, because a repair replaces the attempt before it and it is the repair whose sentence is
   // on the screen.
   const received = calls.filter((call) => call.outcome === 'completed');
-  const composing = [...received].reverse().find((call) => call.role === COMPOSER_ROLE) ?? null;
-  const planning = received.find((call) => call.role !== COMPOSER_ROLE) ?? null;
+  const composing = [...received].reverse().find(composes) ?? null;
+  const planning = received.find((call) => !composes(call)) ?? null;
   const plannedBy = planning?.servedModel ?? null;
   const plannedByName = planning?.servedModelName ?? null;
   const unnamed = { servedModel: null, servedModelName: null } as const;

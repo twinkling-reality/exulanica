@@ -30,7 +30,7 @@ from exulanica.selection.proposal import (
 from exulanica.world import STYLE_REGISTRY, StyleReference
 
 from model_fakes import chat_body
-from test_companion_ask_deadline import _api_client, _milliseconds, _reply, _roles_sent
+from test_companion_ask_deadline import _api_client, _milliseconds, _reply, _sent, _to
 
 
 def test_the_page_waits_at_least_the_appearance_bound_and_its_read_allowance():
@@ -51,8 +51,8 @@ def test_the_classifier_and_the_drafter_send_their_role_as_many_times_as_stated(
     catalogue = (SourceChoice(uuid.uuid4(), uuid.uuid4(), None, "reference:x"),)
     with pytest.raises(StructuredOutputError):  # refused after its repair
         draft_appearance(client, "make it warmer", current, catalogue)
-    assert _roles_sent(transport) == [
-        role for role, count in APPEARANCE_PATH_CALLS for _ in range(count)
+    assert _sent(transport) == [
+        model for role, count in APPEARANCE_PATH_CALLS for model in _to(role, count)
     ]
 
 

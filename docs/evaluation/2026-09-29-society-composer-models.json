@@ -1,0 +1,171 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "bound_usd": "0.10",
+    "decision": {
+      "eligible": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "nvidia/Nemotron-3_5-Lightning",
+        "nvidia/nemotron-3-super-120b-a12b"
+      ],
+      "fallback": "nvidia/Nemotron-3_5-Lightning",
+      "order": [
+        "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia/Nemotron-3_5-Lightning",
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "Qwen/Qwen3-235B-A22B-Instruct-2507"
+      ],
+      "primary": "nvidia/nemotron-3-super-120b-a12b"
+    },
+    "head": "3bf3ce4bd6fe9def3ceb0b15ce3e6c6f016bf205",
+    "manifest_sha256": "172b3c9b4d4412cd61248ac63c6f0e361336cd2105c26b4cd37251c462aa4503",
+    "measured": {
+      "roles": {
+        "answer_composer": {
+          "primary": "nvidia/nemotron-3-super-120b-a12b",
+          "primary_measured": {
+            "longest_ms": 44181,
+            "p50_ms": 6470,
+            "p99_ms": 44181,
+            "rows": 8
+          }
+        }
+      }
+    },
+    "preregistration": "docs/evaluation/2026-09-29-society-composer-models-preregistration.json",
+    "preregistration_record_sha256": "445c0d77b19ca8fd5a22b8740bd8f0052ee6a98f401a20d039087fef377dbcb1",
+    "rule": {
+      "answer_time": "one question's answer time is the sum of its composer attempts' latencies, as the client measured each",
+      "choice": "the eligible NVIDIA model (identifier beginning nvidia/) with the lowest p95 answer time is chosen when that p95 is at most speed_bound_ms; otherwise the eligible model with the lowest p95 answer time. Ties go to the lower total cost.",
+      "eligible": "a candidate is eligible when at least 7 of the 8 questions were composed and accepted by the extractive checks, after at most one repair",
+      "fallback": "the fallback is the next eligible model in the same order (NVIDIA first when within speed_bound_ms, then by p95), or none when no other model is eligible",
+      "p95_with_eight": "with 8 questions per model the p95 by nearest rank is the slowest of the 8",
+      "speed_bound_ms": 10000,
+      "speed_bound_reason": "the Companion's evidence run measured the product's composer (Nano) at 12.3 to 19.6 s per answer; an NVIDIA default must answer faster than that at its slowest to be worth preferring. A longest call of 10 s gives, through the manifest's timeout rule (twice the longest, rounded up to 5 s), a per-call timeout of 20 s, and a whole-question budget of the planner's 25 s plus two such attempts, 65 s; a slower default moves both up",
+      "why_nvidia_first": "AGENTS.md prefers NVIDIA models where they meet the task; meeting it here is being eligible and answering within speed_bound_ms at the 95th percentile"
+    },
+    "run_artifact": "docs/evaluation/artifacts/2026-09-29-society-composer-models/run.json",
+    "run_sha256": "56d6b470d6ffdeb8d282a3b2dfb4090422ec870ada5ff565093847233d35a4a7",
+    "script_as_run": "docs/evaluation/artifacts/2026-09-29-society-composer-models/measure_society_composer_models-as-run.py.txt",
+    "script_sha256": "ccf172b57c89ebe1e51881d1f44f43bc4c8812664d35bf584fb55863157eb2cc",
+    "spent_usd": "0.06399158",
+    "summaries": [
+      {
+        "accepted": 7,
+        "accepted_first_try": 7,
+        "answer_ms": {
+          "longest": 60003,
+          "p50": 2903,
+          "p95_slowest_of_8": 60003
+        },
+        "calls": {
+          "longest_ms": 60003,
+          "p50_ms": 2903,
+          "p99_ms": 60003,
+          "rows": 8,
+          "timed_out": 1
+        },
+        "cost_known": false,
+        "cost_usd": "0.01228720",
+        "fell_back": {
+          "timed_out": 1
+        },
+        "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "questions": 8
+      },
+      {
+        "accepted": 4,
+        "accepted_first_try": 4,
+        "answer_ms": {
+          "longest": 60005,
+          "p50": 58405,
+          "p95_slowest_of_8": 60005
+        },
+        "calls": {
+          "longest_ms": 60005,
+          "p50_ms": 58405,
+          "p99_ms": 60005,
+          "rows": 8,
+          "timed_out": 4
+        },
+        "cost_known": false,
+        "cost_usd": "0.02167438",
+        "fell_back": {
+          "timed_out": 4
+        },
+        "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "questions": 8
+      },
+      {
+        "accepted": 8,
+        "accepted_first_try": 8,
+        "answer_ms": {
+          "longest": 56381,
+          "p50": 22894,
+          "p95_slowest_of_8": 56381
+        },
+        "calls": {
+          "longest_ms": 56381,
+          "p50_ms": 22894,
+          "p99_ms": 56381,
+          "rows": 8,
+          "timed_out": 0
+        },
+        "cost_known": true,
+        "cost_usd": "0.00487872",
+        "fell_back": {},
+        "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "questions": 8
+      },
+      {
+        "accepted": 8,
+        "accepted_first_try": 8,
+        "answer_ms": {
+          "longest": 45621,
+          "p50": 24727,
+          "p95_slowest_of_8": 45621
+        },
+        "calls": {
+          "longest_ms": 45621,
+          "p50_ms": 24727,
+          "p99_ms": 45621,
+          "rows": 8,
+          "timed_out": 0
+        },
+        "cost_known": true,
+        "cost_usd": "0.01358058",
+        "fell_back": {},
+        "model_id": "nvidia/Nemotron-3_5-Lightning",
+        "questions": 8
+      },
+      {
+        "accepted": 8,
+        "accepted_first_try": 8,
+        "answer_ms": {
+          "longest": 44181,
+          "p50": 6470,
+          "p95_slowest_of_8": 44181
+        },
+        "calls": {
+          "longest_ms": 44181,
+          "p50_ms": 6470,
+          "p99_ms": 44181,
+          "rows": 8,
+          "timed_out": 0
+        },
+        "cost_known": true,
+        "cost_usd": "0.01157070",
+        "fell_back": {},
+        "model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "questions": 8
+      }
+    ],
+    "window": {
+      "ended": "2026-09-29T12:14:57-0400",
+      "started": "2026-09-29T11:58:30-0400"
+    },
+    "within_bound": true
+  },
+  "record_sha256": "3551cb27f0ff58e91b71a59ce1743f7b4ddd0359aed547945c299059f671844d"
+}

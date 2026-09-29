@@ -19850,6 +19850,17 @@
       ],
       "title": "Model Id"
      },
+     "model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Name"
+     },
      "prompt_version": {
       "type": "string",
       "title": "Prompt Version"
@@ -19874,6 +19885,7 @@
      "transform",
      "origin_role",
      "model_id",
+     "model_name",
      "prompt_version"
     ],
     "title": "PlaceEnvironmentProposalView"
@@ -21112,6 +21124,17 @@
       ],
       "title": "Model Id"
      },
+     "model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Name"
+     },
      "prompt_version": {
       "type": "string",
       "title": "Prompt Version"
@@ -21125,6 +21148,7 @@
      "base_state_sha256",
      "instance_id",
      "model_id",
+     "model_name",
      "prompt_version"
     ],
     "title": "RemoveEnvironmentProposalView"
@@ -24486,6 +24510,17 @@
       ],
       "title": "Model Id"
      },
+     "model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Name"
+     },
      "prompt_version": {
       "anyOf": [
        {
@@ -24556,6 +24591,7 @@
      "profile",
      "reference_ids",
      "model_id",
+     "model_name",
      "prompt_version",
      "refines_proposal_id",
      "recipe_binding",
@@ -24814,6 +24850,17 @@
       ],
       "title": "Model Id"
      },
+     "model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Name"
+     },
      "prompt_version": {
       "anyOf": [
        {
@@ -24856,6 +24903,7 @@
      "capability_mapping",
      "reference_ids",
      "model_id",
+     "model_name",
      "prompt_version",
      "refines_proposal_id"
     ],
@@ -25086,6 +25134,17 @@
       ],
       "title": "Model Id"
      },
+     "model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Name"
+     },
      "prompt_version": {
       "type": "string",
       "title": "Prompt Version"
@@ -25098,6 +25157,7 @@
      "version_id",
      "base_state_sha256",
      "model_id",
+     "model_name",
      "prompt_version"
     ],
     "title": "UndoEnvironmentProposalView"

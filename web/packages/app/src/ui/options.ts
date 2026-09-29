@@ -120,7 +120,8 @@ export interface WorldStyleAuthorityPresentation {
   }[];
   readonly proposal?: {
     readonly origin: string;
-    readonly model: string | null;
+    /** The name the server serves for the model that drew it; the page never derives one. */
+    readonly modelName: string | null;
     readonly promptVersion: string | null;
     readonly referenceCount: number;
     readonly refinesProposalId: string | null;
@@ -751,9 +752,9 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
             text: `${value.proposal.referenceCount} provenance references · ${refinement}`,
           }),
           el('span', {
-            text: value.proposal.model === null
+            text: value.proposal.modelName === null
               ? 'No model provenance'
-              : `${value.proposal.model} · ${value.proposal.promptVersion ?? 'prompt version unavailable'}`,
+              : `${value.proposal.modelName} · ${value.proposal.promptVersion ?? 'prompt version unavailable'}`,
           }),
         );
       } else {

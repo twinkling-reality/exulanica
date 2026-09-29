@@ -40,6 +40,8 @@ interface EnvironmentProposalBase {
   readonly versionId: string;
   readonly baseStateSha256: string;
   readonly modelId: string | null;
+  /** The name a person reads for `modelId`, as the server serves it (`Manifest.model_name`). */
+  readonly modelName: string | null;
   readonly promptVersion: string;
 }
 
@@ -307,6 +309,7 @@ export class EnvironmentSelectionClient {
       transform: request.transform,
       originRole: request.originRole,
       modelId: null,
+      modelName: null,
       promptVersion: 'deterministic-environment-preview-1',
     });
   }
@@ -390,6 +393,7 @@ function parseEnvironmentProposal(value: unknown): EnvironmentProposal {
     versionId: text(row['version_id'], 'proposal version'),
     baseStateSha256: digest(row['base_state_sha256'], 'proposal base state'),
     modelId: row['model_id'] === null ? null : text(row['model_id'], 'proposal model'),
+    modelName: row['model_name'] === null ? null : text(row['model_name'], 'proposal model name'),
     promptVersion: text(row['prompt_version'], 'proposal prompt version'),
   };
   if (operation === 'undo_latest_version_edit') {

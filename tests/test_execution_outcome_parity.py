@@ -3,8 +3,8 @@
 The server's record says how each attempt ended and whether its cost is known
 (``AttemptOutcome`` and ``CallCost`` in ``exulanica/selection/calls.py``), and the page finds the
 composer by the role it runs as (``web/packages/app/src/companion-ask-api.ts``). Neither language
-reads the other, so each list is written twice and held to one text here. The composer's role is
-read from a call ``compose_answer`` actually makes, not from a copy of it.
+reads the other, so each list is written twice and held to one text here. The composers' roles are
+read from calls ``compose_answer`` and ``compose_society_answer`` actually make, not from a copy.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ from exulanica.selection.question import compose_answer
 
 from model_fakes import RecordingPolicy, chat_body
 from test_companion_acceptance import retained_packet
-from test_consent_wording_is_one_text import typescript_constant
 
 __all__ = ["retained_packet"]
 
@@ -40,11 +39,27 @@ def test_the_page_names_every_outcome_the_server_writes():
     assert _typescript_list("CALL_COSTS", source) == [member.value for member in CallCost]
 
 
-def test_the_page_finds_the_composer_by_the_role_it_runs_as(client, transport, retained_packet):
+def test_the_page_finds_each_composer_by_the_role_it_runs_as(client, transport, retained_packet):
+    """One composer per answer path, the photographs' and the simulated people's, in that order."""
+    from exulanica.selection.society_question import SocietyLineChoice, compose_society_answer
+
+    from test_society_question import _happened_packet
+
     answer = Answer(clauses=[AnswerClause(text="Nothing.", type="meta")]).model_dump_json()
     transport.responses.append(HttpResponse(status_code=200, text=json.dumps(chat_body(answer))))
-    log = CallLog()
-    compose_answer(client.with_policy(RecordingPolicy()), "What is it?", retained_packet, log=log)
+    photographs = CallLog()
+    sending = client.with_policy(RecordingPolicy())
+    compose_answer(sending, "What is it?", retained_packet, log=photographs)
 
-    (call,) = log.calls
-    assert typescript_constant("COMPOSER_ROLE", SOURCE.read_text(encoding="utf-8")) == call.role
+    packet = _happened_packet()
+    choice = SocietyLineChoice(lines=[packet.items[0].token]).model_dump_json()
+    transport.responses.append(HttpResponse(status_code=200, text=json.dumps(chat_body(choice))))
+    society = CallLog()
+    compose_society_answer(
+        sending, "What happened?", packet, log=society, saved=(), max_tokens=1000
+    )
+
+    (photograph_call,) = photographs.calls
+    (society_call,) = society.calls
+    written = _typescript_list("COMPOSER_ROLES", SOURCE.read_text(encoding="utf-8"))
+    assert written == [photograph_call.role, society_call.role]

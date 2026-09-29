@@ -488,14 +488,14 @@ def test_what_happened_is_composed_from_event_lines_alone_through_the_policy(wor
     assert "[inhabitant A]" in body["inhabitants"]
 
 
-def test_a_choice_of_a_line_not_in_the_list_is_asked_again_then_fixed_words_given(world):
+def test_a_choice_of_a_line_not_in_the_list_is_answered_in_the_fixed_words_at_once(world):
     transport = _Scripted(unknown=True)
     with world["open_app"](transport) as client:
         response = _ask(client, world, "What happened in the square?")
     body = response.json()
     assert response.status_code == 200, response.text
-    # The plan, one choice and one more, both refused, then the fixed words.
-    assert len(transport.requests) == 3
+    # The plan, then one choice, refused and not asked for again: the fixed words.
+    assert len(transport.requests) == 2
     assert body["deterministic"] is True
     assert body["execution"]["rejections"] == ["ZZZZZZZZZZ is not a token in the list"]
     assert all(
@@ -634,7 +634,7 @@ def test_a_composer_that_gives_no_answer_leaves_the_fixed_words_and_a_200(world,
     cause = "did not answer in time." if failure.timed_out else "did not answer."
     assert texts[1].startswith(f"The model that chooses the lines for this answer {cause}")
     assert body["deterministic"] is False
-    composer = [call for call in body["execution"]["calls"] if call["role"] == "reasoning_cheap"]
+    composer = [call for call in body["execution"]["calls"] if call["role"] == "answer_composer"]
     assert [call["outcome"] for call in composer] == [
         "timed_out" if failure.timed_out else "failed"
     ]

@@ -113,6 +113,7 @@ class Role(StrEnum):
     """
 
     REASONING_CHEAP = "reasoning_cheap"
+    ANSWER_COMPOSER = "answer_composer"
     REASONING_MID = "reasoning_mid"
     REASONING_HARD = "reasoning_hard"
     VISION = "vision"

@@ -554,7 +554,8 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
   function askAbout(question: string, answer: () => Promise<CompanionAnswer>): void {
     if (panel.state() !== 'open') summon();
     direct = answer;
-    controller.askDirectly(question);
+    // Asked from the inspector about the world's people, so answered from its simulation.
+    controller.askDirectly(question, 'world');
     reflectTurnState(controller.current());
   }
 

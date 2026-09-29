@@ -312,7 +312,8 @@ read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-wor
 to the society's state and to the event that explains it, read by its id however long ago it was
 recorded, with no model call. The page and the server choose among those words by one rule, held by
 cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). What happened
-over the whole world is chosen by the reasoning role from at most 24 event lines rebuilt from each
+over the whole world is chosen by the answer composer role (`answer_composer` in the
+[model manifest](../exulanica/models/models.manifest.json)) from at most 24 event lines rebuilt from each
 event's recorded outcome, reason and minute in the same words, never from a stored summary, a
 position, a seed or a digest. The line of a minute whose goal a person's model chose names that
 model, by the name the People panel shows (`Manifest.model_name` in
@@ -322,14 +323,26 @@ there is not exactly one. The composer writes nothing: it returns which lines an
 question, at most nine, and at most one of the fixed framings the words catalog lists, and the
 answer is each chosen line in its own words, cited to it, in the order they were recorded. The
 answer leads with the simulated minutes of the lines it shows, because the simulation counts minutes
-and has no time of day. A choice that names a line not in the list, or more lines than nine, is
-asked for once more, and the latest lines are given in fixed words when it is refused twice. They
-are also given when no choice comes: the answer says first whether the composer did not answer in
-time, did not answer, or made a choice there was no time to ask again for, and whether one line or
-several follow; a call that timed out is not repeated. A refused choice is asked for again only
-while one attempt's bound still fits in the answer's wait budget, 75 seconds from the question's
-start (`ANSWER_WAIT_BUDGET_SECONDS`): the first attempt is never skipped and may take the role's
-whole 60 seconds, so a shorter budget would not bound the wait and would only stop every repair.
+and has no time of day. The composer is asked once. A choice that names a line not in the list,
+or more lines than nine, is refused, its reasons are kept with the answer, and the latest lines
+are given in fixed words. They are also given when no choice comes: the answer says first whether
+the composer did not answer in time, did not answer, or was not asked because no time was left,
+and whether one line or several follow.
+
+The composer is asked only while its whole timeout still fits in the answer's wait budget, counted
+from the question's start: one planner call's timeout and one composer call's, both the model
+manifest's (`answer_wait_budget_seconds` in [society question](../exulanica/selection/society_question.py)),
+25 and 90 seconds, so 115 seconds. That is the longest a person waits for an answer about what
+happened, apart from the server's and the page's reads and the moment a withdrawn primary takes to
+refuse before its fallback is asked. When a typed question's plan needs the planner's repair,
+less than 90 seconds is left once the planner ends, at most 50 seconds in, so the composer is not
+asked and the fixed words come then. A question asked from the inspector carries its plan, asks no
+planner, and waits at most the composer's 90 seconds. The 90 seconds is the manifest's timeout rule applied to the chosen model's slowest call
+in the comparison that chose it, 44.2 seconds: twice that, rounded up. The typical wait is much
+shorter: in that comparison the median call of Nemotron 3 Super 120B took 6.5 seconds, against
+Nemotron 3 Nano's 22.9 seconds in the same window, one in which the provider was slow
+([record](evaluation/2026-09-29-society-composer-models.json)). While the answer is composed, the
+Companion says it is looking at what happened in this world.
 After the composer's wait the society is checked again from its row alone, so a withdrawal made
 while it chooses applies from the next question. Every simulated fact is a clause of type
 `simulation`, which must cite and is never a statement about the person's past; an answer about
@@ -386,9 +399,13 @@ before its fallback among them), and `reply_refused` for a reply the client refu
 outside the schema. The cost basis is `known`, `unknown` when the request was sent and nothing
 priced it, so the provider may bill it and `usd` is null, or `not_sent` when the connection was
 never made. A completed call identifies requested and served model, fallback use, attempts, latency
-and available token counts. The served model of every call, the query-vector call included, is the
-identifier the response body named; when a body names none, the record keeps it null with the
-reason `response_names_no_model`, and an attempt that returned no result carries
+and available token counts. Each model it names comes with the name a person reads for it,
+`requested_model_name` and `served_model_name` by `Manifest.model_name`
+([manifest](../exulanica/models/manifest.py)), and the page prints those names and derives none;
+the world style versions and proposals and the environment proposals the panels show carry
+`model_name` beside `model_id` by the same rule. The served model of every call, the query-vector
+call included, is the identifier the response body named; when a body names none, the record keeps
+it null with the reason `response_names_no_model`, and an attempt that returned no result carries
 `result_not_returned`, rather than repeating the requested model. Provider usage that is absent
 remains absent rather than becoming a measured zero, and no entry carries the provider's or the
 transport's words about a failure. Read the exact fields in

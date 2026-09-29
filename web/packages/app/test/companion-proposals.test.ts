@@ -112,10 +112,15 @@ const version = (id: string, revision: number, softness = 0.46, over: object = {
   capability_mapping: binding().capabilityMapping,
   reference_ids: [],
   model_id: null,
+  model_name: null,
   prompt_version: null,
   refines_proposal_id: null,
   ...over,
 });
+
+/** The name the server serves beside a model's identifier (`Manifest.model_name`). */
+const servedName = (modelId: string): string =>
+  modelId === 'Qwen/Qwen3-235B-A22B-Instruct-2507' ? 'Qwen3 235B Instruct' : modelId;
 
 /** What `POST /selection/appearance` answers with, in the route's own snake-case. */
 const wireProposal = (over: object = {}) => ({
@@ -319,6 +324,8 @@ async function harness(over: {
   applyStale?: boolean;
   /** Every apply is answered as a preview that outlived the authority's lifetime for one. */
   applyExpired?: boolean;
+  /** Carried by the version an apply makes, as the authority serves it. */
+  appliedWith?: object;
   /** A status the n-th read of the current version answers with instead of the version, 1-based. */
   currentStatus?: (read: number) => number | undefined;
   /** Every restore meets a saved world another page advanced, as the authority answers it. */
@@ -390,6 +397,8 @@ async function harness(over: {
               parameters: (body['profile'] as Record<string, unknown>)['parameters'],
             },
             model_id: body['modelId'],
+            // As the server serves it: Manifest.model_name of the model that drew it.
+            model_name: body['modelId'] == null ? null : servedName(String(body['modelId'])),
             prompt_version: body['promptVersion'],
             reference_ids: body['referenceIds'],
             provenance: {
@@ -419,7 +428,7 @@ async function harness(over: {
         return stale();
       }
       close(id);
-      current = version('v1', 1, 0.8);
+      current = version('v1', 1, 0.8, over.appliedWith ?? {});
       remember(current);
       return json(current);
     }
@@ -587,7 +596,9 @@ describe('a Companion proposal through the appearance surface', () => {
     expect(review.hidden).toBe(false);
     expect(review.textContent).toContain('companion proposal ready for review');
     expect(review.textContent).toContain('1 provenance references');
-    expect(review.textContent).toContain('Qwen/Qwen3-235B-A22B-Instruct-2507');
+    // By the name the server serves, never by its identifier.
+    expect(review.textContent).toContain('Qwen3 235B Instruct');
+    expect(review.textContent).not.toContain('Qwen/Qwen3-235B-A22B-Instruct-2507');
     expect(review.textContent).toContain('proposal-1');
     // And this is the assertion the file exists for.
     expect(applied).toEqual([]);
@@ -609,6 +620,25 @@ describe('a Companion proposal through the appearance surface', () => {
     expect(applied).toHaveLength(1);
     expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed', 'accepted']);
     expect(outcomes.at(-1)).toMatchObject({ originReference: 'companion-utterance:0f2c' });
+  });
+
+  it('names the model behind the saved version by the name the server serves', async () => {
+    const { mounted } = await harness({
+      appliedWith: {
+        provenance: { origin: 'companion', actor: 'actor-1', origin_reference: 'companion-utterance:0f2c' },
+        model_id: COMPANION.modelId,
+        model_name: servedName(COMPANION.modelId),
+        prompt_version: COMPANION.promptVersion,
+      },
+    });
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!.click();
+    await settle();
+
+    const saved = mounted.options.root.querySelector('.world-style-provenance')!.textContent ?? '';
+    expect(saved).toContain('Saved from a Companion proposal · Qwen3 235B Instruct · proposal-1');
+    expect(saved).not.toContain(COMPANION.modelId);
   });
 
   it('reports a refusal from the authority instead of leaving the proposal in limbo', async () => {
@@ -1029,6 +1059,7 @@ const openPreview = (over: {
       candidate: version(`candidate-${over.id}`, 0, over.softness ?? 0.8, {
         provenance,
         model_id: companion ? COMPANION.modelId : null,
+        model_name: companion ? servedName(COMPANION.modelId) : null,
         prompt_version: companion ? COMPANION.promptVersion : null,
         reference_ids: companion ? COMPANION.referenceIds : [],
         ...other,
@@ -1044,6 +1075,7 @@ const openPreview = (over: {
       profile: { profile_id: profile.profileId, profile_version: profile.profileVersion, parameters },
       reference_ids: companion ? COMPANION.referenceIds : [],
       model_id: companion ? COMPANION.modelId : null,
+        model_name: companion ? servedName(COMPANION.modelId) : null,
       prompt_version: companion ? COMPANION.promptVersion : null,
       refines_proposal_id: null,
       recipe_binding: binding(profile),

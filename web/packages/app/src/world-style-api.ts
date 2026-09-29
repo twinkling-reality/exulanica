@@ -73,6 +73,8 @@ export interface WorldStyleVersionRecord {
   readonly capabilityMapping: Readonly<Record<string, string>>;
   readonly referenceIds: readonly string[];
   readonly modelId: string | null;
+  /** The name a person reads for `modelId`, as the server serves it (`Manifest.model_name`). */
+  readonly modelName: string | null;
   readonly promptVersion: string | null;
   readonly refinesProposalId: string | null;
 }
@@ -98,6 +100,8 @@ export interface WorldStyleProposalRecord {
   readonly profile: WorldStyleReferenceRecord;
   readonly referenceIds: readonly string[];
   readonly modelId: string | null;
+  /** The name a person reads for `modelId`, as the server serves it (`Manifest.model_name`). */
+  readonly modelName: string | null;
   readonly promptVersion: string | null;
   readonly refinesProposalId: string | null;
   readonly recipeBinding: WorldStyleRecipeBinding;
@@ -870,6 +874,7 @@ function parseVersion(value: unknown, historical = false): WorldStyleVersionReco
     capabilityMapping,
     referenceIds: freezeStrings(array(version['reference_ids'], 'version reference IDs')),
     modelId: nullableText(version['model_id'], 'model ID'),
+    modelName: nullableText(version['model_name'], 'model name'),
     promptVersion: nullableText(version['prompt_version'], 'prompt version'),
     refinesProposalId: nullableText(version['refines_proposal_id'], 'refined proposal ID'),
   });
@@ -906,6 +911,7 @@ function parseProposal(value: unknown): WorldStyleProposalRecord {
     profile,
     referenceIds: freezeStrings(array(proposal['reference_ids'], 'proposal reference IDs')),
     modelId: nullableText(proposal['model_id'], 'model ID'),
+    modelName: nullableText(proposal['model_name'], 'model name'),
     promptVersion: nullableText(proposal['prompt_version'], 'prompt version'),
     refinesProposalId: nullableText(proposal['refines_proposal_id'], 'refined proposal ID'),
     recipeBinding: binding,

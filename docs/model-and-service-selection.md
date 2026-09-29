@@ -27,6 +27,7 @@ checked again before an execution campaign.
 | Role | Implementation | Evidence and boundary |
 | --- | --- | --- |
 | Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. A pre-registered held-out comparison kept Nano against Super and Ultra: neither cleared the margin on hard grounded questions ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). |
+| Choosing the lines of an answer about what happened among a world's simulated people | Nebius Token Factory: Nemotron 3 Super 120B; Lightning fallback | `exulanica/selection/society_question.py::compose_society_answer` asks `ANSWER_COMPOSER` once; it chooses recorded lines and writes no text. A pre-registered comparison of the five text models whose licence entries are resolved chose it by answer time: 8 of 8 choices accepted, median 6.5 s, slowest of 8 44.2 s, in a window when the provider was slow ([record](evaluation/2026-09-29-society-composer-models.json)). Eight questions over one simulated square do not establish quality on other worlds. |
 | Request classification, search planning, appearance drafts and environment drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request`, `draft_appearance` and `draft_environment_operation` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
 | Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. On synthetic held-out photographs M3 omitted and misplaced fewer objects than MiniCPM, which also reported people who were not there ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). Synthetic drawings do not establish accuracy on real photographs. |
 | A person's decisions in a world | The open model the world's owner chose for that person, among those the manifest offers the person's decision role (`society_decision`, declared by the decision role registry); none unless chosen | `exulanica/api/decision_host.py` asks through `ModelClient.choose` before a minute of play, and the planner takes only a validated answer ([below](#providers-chosen-roles-and-a-persons-decisions)). Each offered model's mechanism was verified by a pre-registered probe ([record](evaluation/2026-09-25-society-person-models-probe.json)); measurements compare what four models decide, and two judged comparisons found no measured difference between the models they compared ([below](#judged-comparisons-of-models-deciding-for-people)). |
@@ -64,11 +65,13 @@ that latency, rounded up to a multiple of 5 seconds. The manifest parser refuses
 rule does not produce, and refuses a basis measured on a model other than the primary. The basis
 is read from the retained evaluation records by
 [`scripts/survey_hosted_call_latency.py`](../scripts/survey_hosted_call_latency.py) and recorded in
-[the latency record](evaluation/2026-09-24-hosted-call-latency.json).
+[the latency record](evaluation/2026-09-24-hosted-call-latency.json); the answer composer's is its
+own comparison's record ([record](evaluation/2026-09-29-society-composer-models.json)).
 
 | Role | Primary's longest measured call | Timeout |
 | --- | --- | --- |
 | `reasoning_cheap` (Companion answers) | 28,031 ms of 217 calls | 60 s |
+| `answer_composer` (lines of an answer about simulated people) | 44,181 ms of 8 calls | 90 s |
 | `structured_extraction` (classification, planning, drafts) | 12,326 ms of 217 calls | 25 s |
 | `embedding` (query and caption vectors) | 16,676 ms of 19 calls | 35 s |
 | `vision` (photograph observations) | 11,001 ms of 137 rows, each an upper bound | 25 s |
@@ -88,8 +91,10 @@ calls for at most the sum of their timeouts. A planner call and its repair
 repair ([question](../exulanica/selection/question.py)) come to 205 seconds. A withdrawn primary
 adds the time its refusal took before the fallback is asked, which the bound counts as one more
 timeout for each call whose role has a fallback: 375 seconds on the API's client.
-`answer_bound_seconds` in [question](../exulanica/selection/question.py) computes that bound from
-`ModelClient.worst_case_seconds` and the answer path's own call counts, and the page waits for an
+A question about what happened among a world's simulated people takes the planner and its repair
+and one answer composer call instead, 280 seconds on the API's client by the same count.
+`answer_bound_seconds` in [question](../exulanica/selection/question.py) computes the longer of the
+two paths from `ModelClient.worst_case_seconds` and each path's own call counts, and the page waits for an
 answer that long plus its allowance for an ordinary read;
 `tests/test_companion_ask_deadline.py` holds the page's `ASK_TIMEOUT_MS` to it.
 

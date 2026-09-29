@@ -16,6 +16,7 @@ from __future__ import annotations
 import sys
 
 import pytest
+from exulanica.models.manifest import Role
 
 from test_companion_place_release import _allow_every_use, _persons_parts
 from test_companion_saved_names import PLACE, named
@@ -65,9 +66,27 @@ def test_the_boundary_alone_keeps_an_allowed_place_and_every_person_out(world, m
 
 
 def test_without_the_society_policy_the_grant_would_release_the_place(world, monkeypatch):
-    """The control for the two tests above: through the workspace's own client, which releases
-    a granted place for the reasoning role, and with the call site's replacement off, the place's
-    name does leave. So each layer above is what holds it."""
+    """The control for the tests here: through the workspace's own client, which releases a
+    granted place for the photograph composer's role, with the call site's replacement off and the
+    society composer asking that role, the place's name does leave. So each layer is what holds it.
+    """
+    society_question = sys.modules["exulanica.selection.society_question"]
+    monkeypatch.setattr(society_question, "redact_names", _unreplaced)
+    monkeypatch.setattr(society_question, "COMPOSER_ROLE", Role.REASONING_CHEAP)
+    transport = run_society_question(
+        _allow_every_use(world),
+        client_for=lambda services, connection, workspace: services.hosted_model(
+            connection, workspace
+        ),
+    )
+    society = _sent(transport, "society composer")
+    assert any(PLACE.lower() in body.lower() for body in society)
+
+
+def test_the_composer_s_own_role_is_no_use_a_place_right_covers(world, monkeypatch):
+    """Through the workspace's own client and with the call site's replacement off, the society
+    composer's role still receives no granted place: no place-name use offers it, so the policy
+    releases nothing for it."""
     monkeypatch.setattr(
         sys.modules["exulanica.selection.society_question"], "redact_names", _unreplaced
     )
@@ -78,7 +97,9 @@ def test_without_the_society_policy_the_grant_would_release_the_place(world, mon
         ),
     )
     society = _sent(transport, "society composer")
-    assert any(PLACE.lower() in body.lower() for body in society)
+    assert society
+    for body in society:
+        assert PLACE.lower() not in body.lower(), "a granted place reached the composer's role"
 
 
 def test_the_call_site_alone_keeps_an_allowed_place_out(world):

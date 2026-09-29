@@ -31,6 +31,7 @@ from exulanica.environment import (
 )
 from exulanica.environment.feature_placement import nyc_instance_id, selected_feature_placement
 from exulanica.environment.nyc_open_data import PROVIDER_KEY as NYC_OPEN_DATA_PROVIDER_KEY
+from exulanica.models.manifest import load_manifest
 from exulanica.selection.environment_proposal import (
     ENVIRONMENT_PROMPT_VERSION,
     EnvironmentOperation,
@@ -98,6 +99,8 @@ class PlaceEnvironmentProposalView(BaseModel):
     transform: EnvironmentTransformContext
     origin_role: Literal["fictional", "personal"]
     model_id: str | None
+    #: The name a person reads for ``model_id`` (``Manifest.model_name``): no page derives one.
+    model_name: str | None
     prompt_version: str
 
 
@@ -109,6 +112,8 @@ class RemoveEnvironmentProposalView(BaseModel):
     base_state_sha256: str
     instance_id: str
     model_id: str | None
+    #: The name a person reads for ``model_id`` (``Manifest.model_name``): no page derives one.
+    model_name: str | None
     prompt_version: str
 
 
@@ -119,6 +124,8 @@ class UndoEnvironmentProposalView(BaseModel):
     version_id: uuid.UUID
     base_state_sha256: str
     model_id: str | None
+    #: The name a person reads for ``model_id`` (``Manifest.model_name``): no page derives one.
+    model_name: str | None
     prompt_version: str
 
 
@@ -304,6 +311,9 @@ def environment_proposal(
         "version_id": body.version_id,
         "base_state_sha256": body.base_state_sha256,
         "model_id": decision.model_id,
+        "model_name": None
+        if decision.model_id is None
+        else load_manifest().model_name(decision.model_id),
         "prompt_version": ENVIRONMENT_PROMPT_VERSION,
     }
     if decision.operation is EnvironmentOperation.REMOVE_SELECTED_AUTHORED_INSTANCE:

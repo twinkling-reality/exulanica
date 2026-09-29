@@ -1101,7 +1101,7 @@ export function mountEnvironmentSelection(
     }
     previewText.textContent += value.promptVersion === 'deterministic-environment-preview-1'
       ? ' Deterministic preview; no model ran.'
-      : ` Model: ${value.modelId ?? 'not reported'} · prompt: ${value.promptVersion}.`;
+      : ` Model: ${value.modelName ?? 'not reported'} · prompt: ${value.promptVersion}.`;
   }
 
   function placementRequest(): EnvironmentPlacementRequest | null {
@@ -1166,6 +1166,7 @@ export function mountEnvironmentSelection(
       baseStateSha256: current.stateSha256,
       instanceId: instanceId(chosen),
       modelId: null,
+      modelName: null,
       promptVersion: 'deterministic-environment-preview-1',
     });
   });
@@ -1202,6 +1203,7 @@ export function mountEnvironmentSelection(
       versionId: current.versionId,
       baseStateSha256: current.stateSha256,
       modelId: null,
+      modelName: null,
       promptVersion: 'deterministic-environment-preview-1',
     });
   });

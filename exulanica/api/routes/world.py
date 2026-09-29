@@ -49,6 +49,7 @@ from exulanica.api.dependencies import (
 from exulanica.api.services import Services
 from exulanica.api.world_edit import SavedEntryAdvanceBody
 from exulanica.api.world_scope import WorldId
+from exulanica.models.manifest import load_manifest
 from exulanica.world import (
     STYLE_REGISTRY,
     InvalidatedSourceVersion,
@@ -242,6 +243,8 @@ class StyleVersionView(BaseModel):
     capability_mapping: dict[str, str]
     reference_ids: list[str]
     model_id: str | None
+    #: The name a person reads for ``model_id`` (``Manifest.model_name``): no page derives one.
+    model_name: str | None
     prompt_version: str | None
     refines_proposal_id: uuid.UUID | None
 
@@ -296,6 +299,8 @@ class StyleProposalView(BaseModel):
     profile: StyleReferenceView
     reference_ids: list[str]
     model_id: str | None
+    #: The name a person reads for ``model_id`` (``Manifest.model_name``): no page derives one.
+    model_name: str | None
     prompt_version: str | None
     refines_proposal_id: uuid.UUID | None
     recipe_binding: dict[str, JsonValue]
@@ -674,9 +679,14 @@ def _version_view(version: StyleVersion) -> StyleVersionView:
         capability_mapping=dict(version.capability_mapping),
         reference_ids=list(version.reference_ids),
         model_id=version.model_id,
+        model_name=_model_name(version.model_id),
         prompt_version=version.prompt_version,
         refines_proposal_id=version.refines_proposal_id,
     )
+
+
+def _model_name(model_id: str | None) -> str | None:
+    return None if model_id is None else load_manifest().model_name(model_id)
 
 
 def _proposal_view(record: StyleProposalRecord) -> StyleProposalView:
@@ -694,6 +704,7 @@ def _proposal_view(record: StyleProposalRecord) -> StyleProposalView:
         profile=_reference_view(proposal.profile),
         reference_ids=list(proposal.reference_ids),
         model_id=proposal.model_id,
+        model_name=_model_name(proposal.model_id),
         prompt_version=proposal.prompt_version,
         refines_proposal_id=proposal.refines_proposal_id,
         recipe_binding=dict(record.recipe_binding),

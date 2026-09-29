@@ -164,7 +164,7 @@ describe('Options', () => {
       ],
       proposal: {
         origin: 'companion',
-        model: 'reviewed-personalizer-v1',
+        modelName: 'Reviewed Personalizer',
         promptVersion: 'world-style-v1',
         referenceCount: 2,
         refinesProposalId: 'proposal-0',
@@ -175,6 +175,7 @@ describe('Options', () => {
     expect(view.root.textContent).toContain('settings by actor-1');
     expect(view.root.textContent).toContain('companion proposal ready for review');
     expect(view.root.textContent).toContain('2 provenance references');
+    expect(view.root.textContent).toContain('Reviewed Personalizer · world-style-v1');
     expect(view.root.textContent).toContain('Refines an earlier proposal');
     expect(view.root.querySelector('.world-style-proposal-review')?.textContent)
       .not.toContain('proposal-0');

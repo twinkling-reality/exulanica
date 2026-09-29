@@ -1003,7 +1003,7 @@ function presentWorldStyleAuthority(
           : current.provenance.origin === 'companion'
             ? 'Saved from a Companion proposal'
             : 'Saved from a reviewed appearance choice',
-        current.modelId,
+        current.modelName,
         current.promptVersion,
         current.refinesProposalId === null ? null : 'Refines an earlier proposal',
       ].filter((item): item is string => item !== null).join(' · ');
@@ -1029,7 +1029,7 @@ function presentWorldStyleAuthority(
       : {
           proposal: {
             origin: active.request.origin,
-            model: active.request.modelId,
+            modelName: active.preview.candidate.modelName,
             promptVersion: active.request.promptVersion,
             referenceCount: active.request.referenceIds.length,
             refinesProposalId: active.request.refinesProposalId,

@@ -9,6 +9,7 @@ import {
 import type { EvidenceHandle, GraphSnapshot, UpdateProposal } from '@exulanica/graph-client';
 import { AskUnavailable, type CompanionAnswer } from './companion-ask-api.js';
 import type { CompanionEncounter } from './ui/companion-encounter.js';
+import type { AskingAbout } from './ui/companion-speech.js';
 import { say } from './ui/copy.js';
 
 /**
@@ -157,7 +158,7 @@ export interface CompanionController {
    * Ask a question that is not an answer to the open turn, such as one a person asked from the
    * inspector about somebody in the world. The open turn stays open.
    */
-  askDirectly(question: string): void;
+  askDirectly(question: string, about?: AskingAbout): void;
   /** The evidence behind a chip, for opening the photograph it came from. */
   evidenceAt(index: number): EvidenceHandle | null;
   /**
@@ -219,12 +220,12 @@ export function createCompanionController(
     }
   }
 
-  async function ask(question: string): Promise<void> {
+  async function ask(question: string, about: AskingAbout = 'library'): Promise<void> {
     const askQuestion = options.askQuestion;
     if (askQuestion === undefined) return;
     const ticket = (asking += 1);
     answer = null;
-    panel?.askStarted(question);
+    panel?.askStarted(question, about);
     /*
      * Reported AFTER the caller's own synchronous handling, not during it.
      *
@@ -338,7 +339,7 @@ export function createCompanionController(
       optionIds.map(optionAnswer).filter(Boolean).join(', '),
     ),
     say: said,
-    askDirectly: (question) => void ask(question),
+    askDirectly: (question, about) => void ask(question, about),
     // The answer's citations while an answer is showing, the turn's evidence otherwise. One
     // index space, because `E` and the chips are one gesture and the surface showing decides
     // what it points at. A citation whose span could not be located resolves to null and stops

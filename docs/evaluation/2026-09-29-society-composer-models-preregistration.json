@@ -1,0 +1,67 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "attempts": 2,
+    "bound_usd": "0.10",
+    "candidates": [
+      "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "nvidia/Nemotron-3_5-Lightning",
+      "nvidia/nemotron-3-super-120b-a12b"
+    ],
+    "candidates_rule": "every chat model the manifest declares with a JSON schema and the use cases ['text'], except those whose licence entry is unresolved",
+    "composer_role": "answer_composer",
+    "earlier_measurements": [
+      "The Companion's evidence run asked the product's composer (reasoning_cheap, Nano) What happened in the square this morning? five times on a live world: 5 of 5 composed, 12.3 to 19.6 s. No candidate has been asked this set before this pre-registration was written.",
+      "A first pre-registration of this comparison digested the packet with its tokens, which each packet draws afresh, so its run refused before asking any model. This replaces it; nothing was asked under it and nothing was spent."
+    ],
+    "head": "3bf3ce4bd6fe9def3ceb0b15ce3e6c6f016bf205",
+    "manifest_sha256": "172b3c9b4d4412cd61248ac63c6f0e361336cd2105c26b4cd37251c462aa4503",
+    "max_tokens": 16384,
+    "measured": [
+      "per question and candidate: composed and accepted, repaired, fell back and why",
+      "every attempt: latency, outcome, prompt, completion and reasoning tokens, cost",
+      "per candidate: accepted share, answer time p50, p95 and longest, total cost"
+    ],
+    "not_asked_for_licence": {
+      "MiniMaxAI/MiniMax-M3": "UNVERIFIED: its licence text was never read (L-2, section 8)",
+      "nvidia/Nemotron-3-Ultra-550b-a55b": "UNVERIFIED direction of error: catalog-only (section 5)",
+      "openbmb/MiniCPM-V-4_5": "OPEN: its Hugging Face card frontmatter was never read"
+    },
+    "order": "question by question; within a question every candidate in turn",
+    "per_call_timeout": "the composer role's timeout_seconds in the manifest the run reads, the same for every candidate",
+    "prompt_version": "selection-9",
+    "question": "Which model should choose the lines of a Companion answer about what happened in a world: the share of answers composed and accepted, answer time p50 and p95, and cost",
+    "questions": [
+      "What happened in the square this morning?",
+      "What has been going on here?",
+      "Did anyone talk to each other?",
+      "Who has been resting?",
+      "What did people do in the last few minutes?",
+      "Tell me what happened while I was away.",
+      "Has anyone finished what they were doing?",
+      "What is everyone up to?"
+    ],
+    "rule": {
+      "answer_time": "one question's answer time is the sum of its composer attempts' latencies, as the client measured each",
+      "choice": "the eligible NVIDIA model (identifier beginning nvidia/) with the lowest p95 answer time is chosen when that p95 is at most speed_bound_ms; otherwise the eligible model with the lowest p95 answer time. Ties go to the lower total cost.",
+      "eligible": "a candidate is eligible when at least 7 of the 8 questions were composed and accepted by the extractive checks, after at most one repair",
+      "fallback": "the fallback is the next eligible model in the same order (NVIDIA first when within speed_bound_ms, then by p95), or none when no other model is eligible",
+      "p95_with_eight": "with 8 questions per model the p95 by nearest rank is the slowest of the 8",
+      "speed_bound_ms": 10000,
+      "speed_bound_reason": "the Companion's evidence run measured the product's composer (Nano) at 12.3 to 19.6 s per answer; an NVIDIA default must answer faster than that at its slowest to be worth preferring. A longest call of 10 s gives, through the manifest's timeout rule (twice the longest, rounded up to 5 s), a per-call timeout of 20 s, and a whole-question budget of the planner's 25 s plus two such attempts, 65 s; a slower default moves both up",
+      "why_nvidia_first": "AGENTS.md prefers NVIDIA models where they meet the task; meeting it here is being eligible and answering within speed_bound_ms at the 95th percentile"
+    },
+    "script": "scripts/measure_society_composer_models.py",
+    "script_sha256": "ccf172b57c89ebe1e51881d1f44f43bc4c8812664d35bf584fb55863157eb2cc",
+    "world": {
+      "lines": 24,
+      "lines_sha256": "df33e886bbd4cf2df7fca29e3223d9d1687bbecf656eab366e4fc38c687c15b2",
+      "tokens": "drawn afresh for every packet, as the product draws them",
+      "what": "the small square of tests/test_society_question.py: its first development seed, 40 simulated minutes, the latest lines as the composer is sent them"
+    },
+    "written_before_any_model_was_asked": true
+  },
+  "record_sha256": "445c0d77b19ca8fd5a22b8740bd8f0052ee6a98f401a20d039087fef377dbcb1"
+}
