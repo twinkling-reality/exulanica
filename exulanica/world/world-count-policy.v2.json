@@ -1,0 +1,15 @@
+{
+  "policy_id": "exulanica.world-count",
+  "version": 2,
+  "scope": "workspace",
+  "limits": {
+    "authored-starter": null,
+    "generated": 3,
+    "personal-source": 1
+  },
+  "reasons": {
+    "authored-starter": "A starter holds nothing but what its person places in it and costs nothing to make, so the policy does not count starters.",
+    "generated": "A workspace may hold three generated worlds. Each is made from a reviewed recipe that states its own tile count, at most four (exulanica/world/world_recipes.py, TILES_MAXIMUM), and each tile is baked once, off the request. No route deletes a world, so this limit times that maximum, twelve tiles, bounds every bake a workspace can cause; a route that deletes worlds reopens that bound. Generated worlds are therefore bounded here and by the recipes, not by the workspace tile quota, and a browser session holds no tiles.materialise.",
+    "personal-source": "One world is composed from a workspace's own photographs and other personal sources: code that means that world resolves it from the registry, and a second is another version of this policy."
+  }
+}

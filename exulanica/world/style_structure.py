@@ -6,9 +6,10 @@ structure/style identity.  Live composed digests are appearance CAS tokens.  Str
 is never the reason for compatibility.  Live typed identities may still agree when hex
 strings collide.
 
-Starter refuse reads a stored origin the caller supplies as ``starter_world``: the current
-snapshot's composer key, else the world registry's kind.  A registration with neither is
-refused as ``world_kind_unstated``; nothing reads a world's kind from its id.
+Starter refuse reads a stored origin the caller supplies as ``starter_world``: whether the world
+registry's kind for the world is source-independent, as that kind's entry states it (an authored
+starter or a world generated from a recipe).  A world the registry does not hold is refused as
+``world_kind_unstated``; nothing reads a world's kind from its id.
 
 ``preview_required`` is a CLASSIFY-family result.  ``REGISTER_TOPOLOGY`` does not emit it:
 family-matched digest change on a non-starter is the composer handoff.  COMPOSE tokens are

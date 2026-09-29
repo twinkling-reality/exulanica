@@ -1,1 +1,0 @@
-lane W4 (town1), assigned 0118 by root; 0119 (lane C4, comparestart) landed above it

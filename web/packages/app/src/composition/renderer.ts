@@ -101,6 +101,12 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       : import.meta.env.DEV && bakedTile !== null
         ? await (await import('./generated-tile.js')).prepareBakedTileWalk(env, bakedTile)
         : undefined;
+    // A saved world generated from a recipe draws the tiles its entry declares, read through its
+    // own version, once every one is baked; while one is not, the page says so and draws none.
+    const generatedWorld = generatedTile === undefined && state.activeWorldEntry?.generatedGround != null
+      && state.credentials !== null
+      ? await (await import('./generated-world.js')).openGeneratedWorld(env, state.credentials, state.activeWorldEntry)
+      : undefined;
     const district = generatedTile === undefined && state.activeWorldEntry === null
       ? await ownedDistrict({ preview: env.preview })
       : undefined;
@@ -162,6 +168,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       reducedMotion: env.systemReducedMotion.matches,
       ...(district === undefined ? {} : { ownedDistrict: district }),
       ...(generatedTile === undefined ? {} : { generatedTile }),
+      ...(generatedWorld == null ? {} : { generatedTile: generatedWorld }),
       ...(state.placementRegionIds === undefined ? {} : { placementRegionIds: state.placementRegionIds }),
       ...(state.activeWorldEntry?.authoredScene === null ||
           state.activeWorldEntry?.authoredScene === undefined

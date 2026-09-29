@@ -67,6 +67,7 @@ from exulanica.api.routes import (
     environment_sources,
     evidence,
     formation,
+    generated_worlds,
     geometry,
     graph,
     health,
@@ -371,6 +372,8 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_write.router)
     app.include_router(world_generation.router)
     app.include_router(worlds.router)
+    app.include_router(generated_worlds.router)
+    app.include_router(generated_worlds.tiles_router)
     # After the last router and before the application is handed to anybody: a route nobody
     # declared, or a declaration for a route that is gone, is a build failure with its name in it.
     require_complete_declaration(app)

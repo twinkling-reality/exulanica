@@ -7,6 +7,7 @@ import type {
   PersonalWorldState,
   SavedWorldEntry,
 } from '../world-entry-api.js';
+import { fill, say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 
 export interface WorldEntrySurface {
@@ -64,9 +65,11 @@ export function buildWorldEntrySurface(deps: WorldEntrySurface): HTMLElement {
         class: 'world-entry-choice-detail',
         text: unavailable
           ? unavailableMessage(entry.unavailableReason)
-          : entry.sourceKind === 'authored'
-            ? 'Authored world · saved changes and appearance'
-            : 'Personal world · saved changes and appearance',
+          : entry.generatedGround != null
+            ? fill('world.entry.generated', { recipe: entry.generatedGround.recipeLabel })
+            : entry.sourceKind === 'authored'
+              ? 'Authored world · saved changes and appearance'
+              : 'Personal world · saved changes and appearance',
       }),
     ]);
     button.addEventListener('click', () => {
@@ -314,12 +317,22 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
   return { root, refresh };
 }
 
+/** The reasons a generated world is served unavailable: its receipt no longer generates it. */
+const GENERATED_UNREADABLE: ReadonlySet<string> = new Set([
+  'generated_world_grammar_changed',
+  'generated_world_catalogs_changed',
+  'generated_world_output_changed',
+  'generated_world_unreadable',
+]);
+
 function unavailableMessage(reason: string | null): string {
   return reason === 'source_deleted'
     ? 'Its source material was deleted. The saved record remains, but it cannot be opened.'
     : reason === 'authored_version_changed'
       ? 'Its saved changes were updated elsewhere. Reconcile that update before opening it.'
-      : 'This saved world is unavailable and cannot be opened.';
+      : reason !== null && GENERATED_UNREADABLE.has(reason)
+        ? say('world.entry.generated-unreadable')
+        : 'This saved world is unavailable and cannot be opened.';
 }
 
 function entryFailure(error: unknown, fallback: string): string {

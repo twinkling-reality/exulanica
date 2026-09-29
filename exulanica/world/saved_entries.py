@@ -14,7 +14,12 @@ from exulanica.epistemics.source_images import selected_image
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
-from exulanica.world.errors import InvalidStyleData, StaleStyleVersion, UnknownWorldResource
+from exulanica.world.errors import (
+    InvalidStructuralData,
+    InvalidStyleData,
+    StaleStyleVersion,
+    UnknownWorldResource,
+)
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.reviewed_sources import reviewed_personal_sources
 from exulanica.world.source_membership_events import (
@@ -38,7 +43,13 @@ from exulanica.world.style_structure import (
     StyleVersionRef,
     raise_for_incompatible_structure_style,
 )
-from exulanica.world.worlds import AUTHORED_STARTER, new_world_id
+from exulanica.world.worlds import (
+    AUTHORED_STARTER,
+    GENERATED,
+    new_world_id,
+    refuse_past_limit,
+    world_kind,
+)
 
 __all__ = [
     "SavedWorldCandidate",
@@ -50,6 +61,7 @@ __all__ = [
     "SourceAttachmentSelection",
     "SourceRebindRequired",
     "StaleSavedWorldEntry",
+    "WorldTakesNoPhotographs",
 ]
 
 _WORKSPACE_LOCK_SEED: Final = 880_024
@@ -65,6 +77,12 @@ class SourceAttachmentOperationConflict(Exception):
 
 class SourceRebindRequired(Exception):
     """Attach named a photograph this world used before; adding it back is a rebind."""
+
+
+class WorldTakesNoPhotographs(ValueError):
+    """A photograph offered to a world whose kind is never composed with photographs."""
+
+    code: Final = "world_takes_no_photographs"
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,7 +155,7 @@ class SavedWorldEntry:
     entry_id: uuid.UUID
     world_id: str
     title: str
-    source_kind: Literal["personal", "authored"]
+    source_kind: Literal["personal", "authored", "generated"]
     source_snapshot_id: uuid.UUID
     source_snapshot_sha256: str
     authored_scene: object | None
@@ -158,6 +176,9 @@ class SavedWorldEntry:
     #: The floor every region of a world that states no ground has, as the society ground
     #: catalog declares it (``DeclaredFloor``); None for a world that states its own ground.
     declared_floor: object | None = None
+    #: What to draw of a world generated from a recipe (``GeneratedGround``): its region, where a
+    #: person arrives and each baked tile; None for every other world.
+    generated_ground: object | None = None
 
 
 class SavedWorldEntryRepository:
@@ -252,7 +273,7 @@ class SavedWorldEntryRepository:
         authored_version_id: uuid.UUID,
         style_version_id: uuid.UUID,
         created_by: uuid.UUID,
-        source_kind: Literal["personal", "authored"] = "personal",
+        source_kind: Literal["personal", "authored", "generated"] = "personal",
     ) -> SavedWorldEntry:
         clean_world_id = world_id.strip()
         clean_title = title.strip()
@@ -331,6 +352,50 @@ class SavedWorldEntryRepository:
                 style_version_id=style.version_id,
                 created_by=created_by,
                 source_kind="authored",
+            )
+
+    def create_generated(
+        self, *, title: str, recipe_key: str, created_by: uuid.UUID
+    ) -> SavedWorldEntry:
+        """Generate a world from a recipe and save its entry, in one transaction.
+
+        The world is generated for a fresh identity before the transaction, so no lock is held
+        while it runs; everything it writes is written together or not at all. An unknown recipe,
+        a recipe none of whose seed candidates generate, and a workspace already holding as many
+        generated worlds as the count policy allows are each refused by name, and nothing is
+        written. The count is asked before generating, so a workspace at its limit costs no
+        generation, and again under the workspace lock, where its answer holds.
+        """
+        from exulanica.world.generated_worlds import (
+            compose_generated_world,
+            create_generated_authorities,
+        )
+        from exulanica.world.world_recipes import world_recipe
+
+        clean_title = title.strip()
+        if not 1 <= len(clean_title) <= 200:
+            raise ValueError("title must contain between 1 and 200 characters")
+        recipe = world_recipe(recipe_key)
+        refuse_past_limit(self.connection, self.workspace_id, GENERATED)
+        world_id = new_world_id(GENERATED)
+        composed = compose_generated_world(recipe, world_id)
+        with self.connection.transaction():
+            self._lock_workspace()
+            _, style, authored_version_id = create_generated_authorities(
+                self.connection,
+                workspace_id=self.workspace_id,
+                actor=created_by,
+                title=clean_title,
+                recipe=recipe,
+                composed=composed,
+            )
+            return self.create(
+                world_id=world_id,
+                title=clean_title,
+                authored_version_id=authored_version_id,
+                style_version_id=style.version_id,
+                created_by=created_by,
+                source_kind="generated",
             )
 
     def update(
@@ -463,6 +528,16 @@ class SavedWorldEntryRepository:
                 style_version_id=style_version_id,
                 action="attached",
             )
+            kind = self.connection.execute(
+                "select w.kind from saved_world_entry e join world_identity w on "
+                "w.workspace_id=e.workspace_id and w.world_id=e.world_id "
+                "where e.workspace_id=%s and e.entry_id=%s",
+                (self.workspace_id, entry_id),
+            ).fetchone()
+            if kind is not None and not world_kind(kind["kind"]).takes_photographs:
+                raise WorldTakesNoPhotographs(
+                    f"a {kind['kind']} world takes no photographs: it is never composed with them"
+                )
             membership = self._membership_state(entry_id, [source.capture_id for source in sources])
             if any(state == "current" for state in membership.values()):
                 raise ValueError("a selected photograph is already attached to this saved world")
@@ -1293,9 +1368,22 @@ class SavedWorldEntryRepository:
                 placement=snapshot["placement"],
             )
             return
+        from exulanica.world.composers import composer_module
+        from exulanica.world.generated_worlds import generated_composer_keys
+
+        generated = generated_composer_keys()
+        if source_kind == "generated":
+            if composer_key not in generated:
+                raise ValueError("a generated entry must name a world a recipe generated")
+            composer_module(composer_key, int(snapshot["composer_version"])).receipt_digest_of(
+                snapshot["topology"]
+            )
+            return
         if source_kind == "personal":
             if composer_key == AUTHORED_STARTER_COMPOSER:
                 raise ValueError("an authored starter cannot be recorded as a personal source")
+            if composer_key in generated:
+                raise ValueError("a generated world cannot be recorded as a personal source")
             return
         raise ValueError("unknown saved world source kind")
 
@@ -1311,11 +1399,13 @@ class SavedWorldEntryRepository:
             "e.authored_state_sha256,e.authored_edit_seq,e.style_version_id,e.revision,"
             "e.created_by,e.created_at,e.updated_at,v.state_sha256 as current_state_sha256,"
             "v.edit_seq as current_edit_seq,v.source_snapshot_id,s.snapshot_sha256,"
-            "s.composer_key,s.composer_version,s.topology,s.placement,"
+            "s.composer_key,s.composer_version,s.topology,s.placement,w.kind as world_kind,"
             "exists(select 1 from world_structure_invalidation i "
             "where i.workspace_id=e.workspace_id and i.world_id=e.world_id "
             "and i.snapshot_id=v.source_snapshot_id) as source_invalidated "
-            "from saved_world_entry e join world_alternate_version v "
+            "from saved_world_entry e join world_identity w "
+            "on w.workspace_id=e.workspace_id and w.world_id=e.world_id "
+            "join world_alternate_version v "
             "on v.workspace_id=e.workspace_id and v.world_id=e.world_id "
             "and v.version_id=e.authored_version_id join world_structure_snapshot s "
             "on s.workspace_id=v.workspace_id and s.world_id=v.world_id "
@@ -1323,6 +1413,7 @@ class SavedWorldEntryRepository:
         )
 
     def _entry(self, row: dict[str, object]) -> SavedWorldEntry:
+        from exulanica.world.generated_worlds import generated_ground, unreadable_reason
         from exulanica.world.society_authored_ground import declared_floor
         from exulanica.world.starter import authored_starter_scene
 
@@ -1331,9 +1422,24 @@ class SavedWorldEntryRepository:
             row["authored_state_sha256"] != row["current_state_sha256"]
             or row["authored_edit_seq"] != row["current_edit_seq"]
         )
-        unavailable = source_invalidated or authored_changed
+        # A generated world whose receipt no longer generates what it recorded (its grammar or
+        # catalogs changed under it) is this one entry's unavailability, named, and never a failure
+        # of the listing every other world of the workspace is read in.
+        ground: object | None = None
+        unreadable: str | None = None
+        if world_kind(str(row["world_kind"])).draws_generated_tiles:
+            try:
+                ground = generated_ground(
+                    self.connection,
+                    self.workspace_id,
+                    str(row["world_id"]),
+                    row["source_snapshot_id"],
+                )
+            except InvalidStructuralData as exc:
+                unreadable = unreadable_reason(exc)
+        unavailable = source_invalidated or authored_changed or unreadable is not None
         source_kind = row["source_kind"]
-        if source_kind not in {"personal", "authored"}:
+        if source_kind not in {"personal", "authored", "generated"}:
             raise ValueError("unknown saved world source kind")
         scene = (
             authored_starter_scene(
@@ -1354,6 +1460,7 @@ class SavedWorldEntryRepository:
             source_snapshot_sha256=row["snapshot_sha256"],
             authored_scene=scene,
             declared_floor=declared_floor(str(row["composer_key"])),
+            generated_ground=ground,
             authored_version_id=row["authored_version_id"],
             authored_state_sha256=row["authored_state_sha256"],
             authored_edit_seq=row["authored_edit_seq"],
@@ -1363,7 +1470,9 @@ class SavedWorldEntryRepository:
             revision=row["revision"],
             availability="unavailable" if unavailable else "available",
             unavailable_reason=(
-                "source_deleted"
+                unreadable
+                if unreadable is not None
+                else "source_deleted"
                 if source_invalidated
                 else "authored_version_changed"
                 if authored_changed

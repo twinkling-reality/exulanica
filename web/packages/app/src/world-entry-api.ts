@@ -113,7 +113,7 @@ export interface SavedWorldEntry {
   readonly entryId: string;
   readonly worldId: string;
   readonly title: string;
-  readonly sourceKind: 'personal' | 'authored';
+  readonly sourceKind: 'personal' | 'authored' | 'generated';
   readonly sourceSnapshotId: string;
   readonly sourceSnapshotSha256: string;
   readonly authoredScene: AuthoredStarterScene | null;
@@ -140,6 +140,40 @@ export interface SavedWorldEntry {
    * a world that states its own ground; optional so entries built elsewhere need not name it.
    */
   readonly declaredFloor?: DeclaredFloor | null;
+  /**
+   * What the server declares the page draws of a world generated from a recipe: its baked tiles,
+   * the one region its people live in and where a person arrives. Null for every other world;
+   * optional so entries built elsewhere need not name it.
+   */
+  readonly generatedGround?: GeneratedGround | null;
+}
+
+/** A recipe a world can be generated from, as the server offers it. */
+export interface WorldRecipe {
+  readonly key: string;
+  readonly label: string;
+  readonly tiles: number;
+}
+
+/** One tile of a generated world and where its bake stands, as the server serves it. */
+export interface GeneratedTile {
+  readonly tileX: number;
+  readonly tileY: number;
+  readonly tileInputsDigest: string;
+  /** The stored bake the page reads through the world's version, once one is stored. */
+  readonly bakedTileId: string | null;
+  readonly state: 'baked' | 'baking' | 'failed';
+}
+
+/** A generated world's drawing, in its region's frame: millimetres east, up and south. */
+export interface GeneratedGround {
+  readonly recipeKey: string;
+  readonly recipeLabel: string;
+  readonly regionId: string;
+  readonly arrivalMm: readonly [east: number, height: number, south: number];
+  /** The way a person arriving faces, a plan vector: east, then south. */
+  readonly arrivalFacingMm: readonly [east: number, south: number];
+  readonly tiles: readonly GeneratedTile[];
 }
 
 /** A declared floor, in millimetres, as the server serves it on a saved world's entry. */
@@ -351,6 +385,25 @@ export class WorldEntryClient {
     return parseEntry(await this.#transport.getJson<unknown>(
       `/world-entries/${encodeURIComponent(entryId)}`,
     ));
+  }
+
+  /** The recipes this server generates worlds from, in the catalog's order. */
+  async recipes(): Promise<readonly WorldRecipe[]> {
+    const body = await this.#transport.getJson<unknown>('/worlds/recipes');
+    if (!Array.isArray(body)) throw new TypeError('The server returned an invalid recipe list.');
+    return Object.freeze(body.map((value) => {
+      const row = record(value, 'world recipe');
+      return Object.freeze({
+        key: text(row['key'], 'recipe key'),
+        label: text(row['label'], 'recipe label'),
+        tiles: positiveInteger(row['tiles'], 'recipe tile count'),
+      });
+    }));
+  }
+
+  /** Generate a world from a recipe and save it; its tiles are baked after this returns. */
+  async makeGenerated(recipe: string, title: string): Promise<SavedWorldEntry> {
+    return parseEntry(await this.#transport.postJson<unknown>('/worlds/generated', { recipe, title }));
   }
 
   /** Create or exact-idempotently reopen this workspace's source-independent starter. */
@@ -690,7 +743,7 @@ function parseEntry(value: unknown): SavedWorldEntry {
   const row = record(value, 'saved world entry');
   const sourceKind = row['source_kind'];
   const availability = row['availability'];
-  if (sourceKind !== 'personal' && sourceKind !== 'authored') {
+  if (sourceKind !== 'personal' && sourceKind !== 'authored' && sourceKind !== 'generated') {
     throw new TypeError('The server returned an unknown world source kind.');
   }
   if (availability !== 'available' && availability !== 'unavailable') {
@@ -709,8 +762,16 @@ function parseEntry(value: unknown): SavedWorldEntry {
   if (sourceKind === 'authored' && authoredScene === null) {
     throw new TypeError('An authored world entry did not include its pinned authored scene.');
   }
-  if (sourceKind === 'personal' && authoredScene !== null) {
-    throw new TypeError('A personal world entry cannot claim an authored starter scene.');
+  if (sourceKind !== 'authored' && authoredScene !== null) {
+    throw new TypeError('Only an authored world entry carries an authored starter scene.');
+  }
+  const generatedGround = parseGeneratedGround(row['generated_ground']);
+  // Only a generated world declares a generated ground, and an available one always does. One
+  // whose receipt no longer generates what it recorded is served unavailable, with the reason
+  // named and no ground, so the rest of the list still reads.
+  if (sourceKind !== 'generated' ? generatedGround !== null
+    : generatedGround === null && availability === 'available') {
+    throw new TypeError('A generated world entry, and only one, declares its generated ground.');
   }
   return Object.freeze({
     entryId: text(row['entry_id'], 'entry ID'),
@@ -738,6 +799,57 @@ function parseEntry(value: unknown): SavedWorldEntry {
     createdAt: text(row['created_at'], 'created time'),
     updatedAt: text(row['updated_at'], 'updated time'),
     declaredFloor: parseDeclaredFloor(row['declared_floor']),
+    generatedGround,
+  });
+}
+
+/** A generated world's declared drawing, or null when the entry names none. */
+function parseGeneratedGround(value: unknown): GeneratedGround | null {
+  if (value === undefined || value === null) return null;
+  const row = record(value, 'generated ground');
+  const arrival = row['arrival_mm'];
+  const facing = row['arrival_facing_mm'];
+  const tiles = row['tiles'];
+  if (!Array.isArray(arrival) || arrival.length !== 3) {
+    throw new TypeError('The server returned a generated ground with no arrival point.');
+  }
+  if (!Array.isArray(facing) || facing.length !== 2) {
+    throw new TypeError('The server returned a generated ground with no arrival facing.');
+  }
+  if (!Array.isArray(tiles) || tiles.length === 0) {
+    throw new TypeError('The server returned a generated ground with no tiles.');
+  }
+  return Object.freeze({
+    recipeKey: text(row['recipe_key'], 'recipe key'),
+    recipeLabel: text(row['recipe_label'], 'recipe label'),
+    regionId: text(row['region_id'], 'generated region ID'),
+    arrivalMm: Object.freeze([
+      integer(arrival[0], 'arrival east'),
+      integer(arrival[1], 'arrival height'),
+      integer(arrival[2], 'arrival south'),
+    ]) as GeneratedGround['arrivalMm'],
+    arrivalFacingMm: Object.freeze([
+      integer(facing[0], 'arrival facing east'),
+      integer(facing[1], 'arrival facing south'),
+    ]) as GeneratedGround['arrivalFacingMm'],
+    tiles: Object.freeze(tiles.map((tile: unknown) => {
+      const one = record(tile, 'generated tile');
+      const state = one['state'];
+      if (state !== 'baked' && state !== 'baking' && state !== 'failed') {
+        throw new TypeError('The server returned an unknown generated tile state.');
+      }
+      const bakedTileId = optionalText(one['baked_tile_id'], 'baked tile ID');
+      if ((state === 'baked' && bakedTileId === null) || (state === 'baking' && bakedTileId !== null)) {
+        throw new TypeError('A baked generated tile names its stored bake, and one still baking none.');
+      }
+      return Object.freeze({
+        tileX: integer(one['tile_x'], 'tile x'),
+        tileY: integer(one['tile_y'], 'tile y'),
+        tileInputsDigest: sha256(one['tile_inputs_digest'], 'tile inputs digest'),
+        bakedTileId,
+        state,
+      });
+    })),
   });
 }
 

@@ -1,9 +1,10 @@
 # Generated tile runtime
 
-Status: Development evaluation only: the browser reads baked texture sets and
-baked `.owd` tiles, draws a tile's `render_batch` with physically based materials under one
-versioned look, and stands the player on its `nav_envelope`. The app draws a generated tile only in
-the development preview, never in a saved world. The baked corridor street loads through the
+Status: the browser reads baked texture sets and baked `.owd` tiles, draws a tile's
+`render_batch` with physically based materials under one versioned look, and stands the player on
+its `nav_envelope`. A saved world generated from a recipe draws the baked tiles its entry declares
+([section 7.3](#73-a-saved-worlds-own-tiles), [ADR-0027](adr/0027-a-generated-world-is-drawn-in-its-own-world.md));
+naming any other tile is development evaluation only. The baked corridor street loads through the
 product route on the development page with its surfaces dressed: at tessellator 17, 1,496 of the
 corridor tile's 1,582 drawn surfaces are dressed by a material record
 ([generated corridor](generated-corridor-street.md#7-what-draws-and-what-does-not)).
@@ -408,6 +409,32 @@ On the second entry the page also draws the city's vehicles on the tile it walks
 credential and draws each window with `@exulanica/atlas-react/traffic`, and the shell's
 `data-tile-traffic` attribute says what it served and drew. The golden path draws none. The route,
 its windows and the page's reader are the [traffic contract](traffic-contract.md#served-traffic)'s.
+
+### 7.3 A saved world's own tiles
+
+A world generated from a recipe (`POST /worlds/generated`) declares on its saved entry what the page
+draws: `generated_ground`, each tile with the digest over its bake inputs, its stored bake and
+whether it is `baked`, `baking` or `failed`, the region its people live in and where a person
+arrives. `web/packages/app/src/composition/generated-world.ts` follows that declaration and nothing
+else. It reads each tile through the world's own version, `GET
+/world/versions/{version_id}/tiles/{baked_tile_id}/bytes`, which serves a tile only to the world
+whose snapshot names it, needs `world.read` rather than `tiles.materialise`, and charges no tile
+quota; it holds the bytes to the digest the route names before loading them; and it dresses them
+from the committed texture library (`web/packages/app/src/texture-library.ts`), which the build
+emits as assets fetched only for the sets a tile cites. A world of several tiles is drawn only once
+every one is baked, and then all of them: the first as the tile the walk is laid on and every other
+as a neighbour, drawn and composed into the ground the walk stands on (`neighbours` in
+`GeneratedTileSources`). The camera opens at the served arrival point, facing the way the entry says
+a person arriving faces: toward the nearest point of any street's crown line, the rule the world's
+composer applied when it made the world. While a tile is still baking, the page draws nothing in its
+place, says the world is being built (`world.generated.baking` in `ui/copy.ts`) and asks for the
+entry again every five seconds, reopening the world once every tile is baked. A tile is drawn only
+once its bake job is done, both of its bakes having agreed. A tile whose two bakes differed is never
+served, a tile whose bake job failed (the tessellator refused it, a publish was refused through
+every claim, or every claim was stranded) is never drawn, and in either case the page says the world
+is not drawn rather than waiting. The world's people hang from a root at the city's origin under the
+environment root, at the height of the surface where a person arrives (`hostGeneratedSociety`),
+because the society states plan positions only.
 
 ## 8. Budget
 

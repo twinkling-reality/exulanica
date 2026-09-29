@@ -78,11 +78,12 @@ const GENERATED_TILE_NAME_LIMIT = 64;
 /**
  * The baked generated tile a development preview asked to evaluate, or null.
  *
- * DEVELOPMENT EVALUATION ONLY. A generated tile may not appear in any person's world until a
- * superseding governance ADR is accepted in writing. So a tile can be named only on the synthetic
- * preview route: `preview` is {@link isAtlasPreview}, which is false in every production build,
- * and a preview session never carries a workspace credential. A workspace world has no way to ask
- * for a tile, and a production build has no code that could load one.
+ * DEVELOPMENT EVALUATION ONLY. A person's own world draws the tiles its saved entry declares, and
+ * only a world generated from a recipe declares any (ADR-0027, `composition/generated-world.ts`).
+ * Naming an arbitrary tile is evaluation, so a tile can be named only on the synthetic preview
+ * route: `preview` is {@link isAtlasPreview}, which is false in every production build, and a
+ * preview session never carries a workspace credential. A workspace world has no way to name a
+ * tile, and a production build has no code that could load a named one.
  *
  * The name is a plain word, never a path: the development module resolves it to a committed file.
  */
@@ -137,9 +138,9 @@ function whole(value: string | null, limit: number): number | null {
 /**
  * The baked tile a development preview asked the product route for, or null.
  *
- * DEVELOPMENT ONLY, and for the same reason {@link generatedTileEvaluationName} is: a generated
- * tile may not appear in any person's world until a superseding governance ADR is accepted in
- * writing. The difference between the two is where the container comes from. A `tile` name is a
+ * DEVELOPMENT ONLY, and for the same reason {@link generatedTileEvaluationName} is: a person's
+ * world draws only the tiles its own saved entry declares (ADR-0027), so asking for any other tile
+ * is evaluation. The difference between the two is where the container comes from. A `tile` name is a
  * golden committed to this repository; a `city` and coordinate, or a `baked_tile` key, is a
  * container fetched from `/tiles` with this session's credential, because a baked corridor street
  * is never committed. The texture sets are the committed library either way; no route serves

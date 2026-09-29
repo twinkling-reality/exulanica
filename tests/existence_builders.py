@@ -1021,6 +1021,52 @@ def feature_index_request(owner) -> dict[str, Any]:
     }
 
 
+def generated_tile(owner) -> dict[str, Any]:
+    """A world generated from the small-town recipe (API), and the key its first tile's bake is
+    stored under. No test bakes it, so the owner is answered that the world names no such baked
+    tile, where a stranger is answered that the world does not exist."""
+    from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
+    from exulanica.grammar.grammars.city.generation.tiles import tile_record
+    from exulanica.grammar.grammars.specified import GENERATED_LOD
+    from exulanica.ingest.stages import STAGES, baked_tile_id
+    from exulanica.world.generated_worlds import generation_receipt
+
+    if "generated" not in owner.memo:
+        owner.memo["generated"] = _ok(
+            owner.request(
+                "POST", "/worlds/generated", json={"recipe": "small_town", "title": "A town"}
+            ),
+            201,
+        )
+    entry = owner.memo["generated"]
+    _, receipt = generation_receipt(
+        owner.repository.connection,
+        owner.workspace_id,
+        entry["world_id"],
+        uuid.UUID(entry["source_snapshot_id"]),
+    )
+    tile_x, tile_y = receipt["tiles"][0]
+    record = tile_record(
+        seed=receipt["seed"],
+        catalogs=load_city_catalogs(),
+        tile_x=tile_x,
+        tile_y=tile_y,
+        lod=GENERATED_LOD,
+    )
+    return {
+        "/world/versions/{version_id}": entry["authored_version_id"],
+        "/world/versions/{version_id}/tiles/{baked_tile_id}": baked_tile_id(
+            STAGES["baked_tile"], record
+        ),
+    }
+
+
+def generated_tile_request(owner) -> dict[str, Any]:
+    """A request in the generated world the tile belongs to."""
+    generated_tile(owner)
+    return {"params": {"world_id": owner.memo["generated"]["world_id"]}}
+
+
 def entry_update_request(owner) -> dict[str, Any]:
     """The owner's saved world, saved again at the cursor it was read at."""
     entry_id = owner.real("/world-entries/{entry_id}")

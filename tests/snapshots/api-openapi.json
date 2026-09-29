@@ -12431,6 +12431,202 @@
      }
     }
    }
+  },
+  "/worlds/recipes": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The recipes a world can be generated from.",
+    "description": "Every recipe this server generates worlds from, in catalog order.",
+    "operationId": "recipes_worlds_recipes_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/WorldRecipeView"
+         },
+         "title": "Response Recipes Worlds Recipes Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/generated": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Generate a world from a recipe and save it as yours.",
+    "description": "Generate the recipe's world for a new identity, save it and its entry, and queue its bakes.\n\nAn unknown recipe, a recipe its composer does not generate, a recipe that generates no world\nfrom any of its seed candidates, and a workspace that already holds as many generated worlds\nas the count policy allows are each refused by name, and nothing is written.",
+    "operationId": "create_generated_world_worlds_generated_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CreateGeneratedWorldBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SavedWorldEntryView"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Refused by name; nothing was written."
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/tiles/{baked_tile_id}/bytes": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "One baked tile of a generated world, for the world that names it.",
+    "description": "A baked tile's bytes, served only when the version's own snapshot names the tile.",
+    "operationId": "read_world_tile_bytes_world_versions__version_id__tiles__baked_tile_id__bytes_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "baked_tile_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Baked Tile Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -15745,6 +15941,29 @@
     "title": "CorrectionBody",
     "description": "The person's own words. `answer_text` is what stands afterwards.\n\n`correction_note` is why they corrected it, which is a different sentence from the correction\nand is the one a later reader needs to understand what the system got wrong."
    },
+   "CreateGeneratedWorldBody": {
+    "properties": {
+     "recipe": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Recipe"
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "recipe",
+     "title"
+    ],
+    "title": "CreateGeneratedWorldBody"
+   },
    "CreateSavedWorldEntryBody": {
     "properties": {
      "world_id": {
@@ -17183,6 +17402,72 @@
     "title": "FeatureIndexPublication",
     "description": "A request to publish a complete replacement catalog for one admission."
    },
+   "GeneratedGroundView": {
+    "properties": {
+     "recipe_key": {
+      "type": "string",
+      "title": "Recipe Key"
+     },
+     "recipe_label": {
+      "type": "string",
+      "title": "Recipe Label"
+     },
+     "region_id": {
+      "type": "string",
+      "title": "Region Id"
+     },
+     "arrival_mm": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Arrival Mm"
+     },
+     "arrival_facing_mm": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Arrival Facing Mm"
+     },
+     "tiles": {
+      "items": {
+       "$ref": "#/components/schemas/GeneratedTileView"
+      },
+      "type": "array",
+      "title": "Tiles"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "recipe_key",
+     "recipe_label",
+     "region_id",
+     "arrival_mm",
+     "arrival_facing_mm",
+     "tiles"
+    ],
+    "title": "GeneratedGroundView",
+    "description": "What the page draws of a world generated from a recipe: its tiles, the one region its\npeople live in and where a person arrives, in that region's frame (east, height, south)."
+   },
    "GeneratedSceneBody": {
     "properties": {
      "model": {
@@ -17237,6 +17522,53 @@
     ],
     "title": "GeneratedSceneBody",
     "description": "One generation, as its producer describes it.\n\nEvery field is required. There is no partial generation: a receipt missing its model, its\nprompt digest, its conditioning or its seam describes an artifact nobody can place, and the\ntier's only value is that a generated surface can always be placed."
+   },
+   "GeneratedTileView": {
+    "properties": {
+     "tile_x": {
+      "type": "integer",
+      "title": "Tile X"
+     },
+     "tile_y": {
+      "type": "integer",
+      "title": "Tile Y"
+     },
+     "tile_inputs_digest": {
+      "type": "string",
+      "title": "Tile Inputs Digest"
+     },
+     "baked_tile_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Baked Tile Id"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "baked",
+       "baking",
+       "failed"
+      ],
+      "title": "State"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "tile_x",
+     "tile_y",
+     "tile_inputs_digest",
+     "baked_tile_id",
+     "state"
+    ],
+    "title": "GeneratedTileView"
    },
    "GeneratedWorldView": {
     "properties": {
@@ -22198,7 +22530,8 @@
       "type": "string",
       "enum": [
        "personal",
-       "authored"
+       "authored",
+       "generated"
       ],
       "title": "Source Kind"
      },
@@ -22225,6 +22558,16 @@
       "anyOf": [
        {
         "$ref": "#/components/schemas/DeclaredFloorView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "generated_ground": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/GeneratedGroundView"
        },
        {
         "type": "null"
@@ -25956,6 +26299,30 @@
      "limits"
     ],
     "title": "WorldCountPolicyView"
+   },
+   "WorldRecipeView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "tiles": {
+      "type": "integer",
+      "title": "Tiles"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "tiles"
+    ],
+    "title": "WorldRecipeView"
    },
    "WorldView": {
     "properties": {

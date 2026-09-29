@@ -32,17 +32,21 @@ describe('generated tile evaluation entry: who may ask', () => {
   });
 });
 
-/**
- * What only the evaluation path carries: the composition's own attribute and wording, the tile
- * runtime's refusal text and sky name, and tess's triangle digest domain.
- */
+/** What only the evaluation path carries: the composition's own attribute and wording. */
 const MARKERS = [
   GENERATED_TILE_EVALUATION_ATTRIBUTE,
   'Development evaluation of generated tile',
+  '__exulanicaProbeProductApi',
+] as const;
+/**
+ * What the tile runtime carries, which a production build holds because a saved world generated
+ * from a recipe is drawn from its own baked tiles (`composition/generated-world.ts`): the runtime's
+ * refusal text and sky name, and tess's triangle digest domain.
+ */
+const RUNTIME_MARKERS = [
   'No surface_material record dresses this surface: the tile states that none exists.',
   'generated-tile-sky',
   'exulanica/owd-triangle-digest',
-  '__exulanicaProbeProductApi',
 ] as const;
 
 // Relative to web/, where the suite runs.
@@ -88,18 +92,23 @@ function buildApp(mode: 'production' | 'development'): {
 }
 
 describe('generated tile evaluation entry: unreachable from a production build', () => {
-  it('emits no tile code, no tile and no texture set in a production build', () => {
+  it('emits no evaluation code and no development tile in a production build', () => {
     const production = buildApp('production');
     expect(production.names.some((name) => name.endsWith('index.html'))).toBe(true);
     for (const marker of MARKERS) expect(production.text.includes(marker), marker).toBe(false);
-    expect(production.names.filter((name) => /\.(?:owd|ltex)$/.test(name))).toEqual([]);
-    expect(production.names.filter((name) => /generated-tile/.test(name))).toEqual([]);
+    expect(production.names.filter((name) => /\.owd$/.test(name))).toEqual([]);
     expect(production.holdsTileBytes).toBe(false);
+    // A saved generated world is drawn in production: the tile runtime and the texture library it
+    // is dressed from are there, and nothing that could load a development tile is.
+    for (const marker of RUNTIME_MARKERS) expect(production.text.includes(marker), marker).toBe(true);
+    expect(production.names.some((name) => name.endsWith('.ltex'))).toBe(true);
   }, 180_000);
 
   it('would see all of it if the development branch were reachable (the control)', () => {
     const development = buildApp('development');
-    for (const marker of MARKERS) expect(development.text.includes(marker), marker).toBe(true);
+    for (const marker of [...MARKERS, ...RUNTIME_MARKERS]) {
+      expect(development.text.includes(marker), marker).toBe(true);
+    }
     expect(development.names.some((name) => name.endsWith('.ltex'))).toBe(true);
     expect(development.names.some((name) => name.endsWith('.owd'))).toBe(true);
     expect(development.holdsTileBytes).toBe(true);

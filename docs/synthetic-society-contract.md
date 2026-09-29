@@ -80,9 +80,9 @@ Implementation:
 - shared identity, draws, events and digests: `exulanica/world/society.py`;
 - which engines exist and what each can do: `exulanica/world/society-engines.v2.json`, read by
   `exulanica/world/society_engines.py`;
-- the grounds a society stands on, with the population, lattice and declared area of each:
-  `assets/catalogs/society-ground/society-ground.v1.json`, read by
-  `exulanica/world/society_grounds.py`;
+- the grounds a society stands on, with what people walk, the population rule, lattice and
+  declared area of each: `assets/catalogs/society-ground/society-ground.v2.json` (version 1 kept
+  beside it), read by `exulanica/world/society_grounds.py`;
 - sending a society's people away and bringing them back:
   `exulanica/world/society_presence.py`;
 - the frozen v1 engine and the fixed tables stored v1 to v3 histories depend on:
@@ -162,7 +162,8 @@ and `web/packages/app/test/society-engine-literals.test.ts` does the same for th
 
 The v1 to v3 population is 128 over a district; their pure initializer accepts 100 to 512 there.
 A society on a saved world's own ground starts with the population its ground's entry in the
-society ground catalog states, 8 for the built-in starter (below). V4 sizes its population to its
+society ground catalog states, 8 for the built-in starter, or derives by its rule, one per place in
+a home for a generated town (below). V4 sizes its population to its
 place (below). Each engine's bounds are stated once, in the engine table (above). The population
 is canonical state, independent of how many people a renderer draws. Inhabitant UUIDv5 identities derive from
 society identity and ordinal. The same society ID/seed/population preserves those identities across
@@ -443,6 +444,35 @@ is, because a ground module need not state an edge.
   photograph, and its people move with it, because every position they have is in the region's
   own frame. The page reads a flight only for a world with an authored scene, the starter, so a
   made world has no birds (`web/packages/app/src/composition/environment-selection.ts`).
+- A world generated from a recipe of the city grammar (composer `city-grammar-town`,
+  [`exulanica/world/composers/city_grammar_town.py`](../exulanica/world/composers/city_grammar_town.py))
+  states its ground in its own records: footways, corners, crossings and the entrances of its
+  premises. Its catalog entry (`generated_town`, navigation `walking_surfaces`, navigation profile
+  `city-walking-surfaces/v1`) has people walk those surfaces rather than a lattice, and
+  `exulanica.society-composition/walking-surfaces-v1`
+  ([`exulanica/world/society_walking_surfaces.py`](../exulanica/world/society_walking_surfaces.py))
+  composes `exulanica.society-input/walking-surfaces-v1` (migration 0118) from the city place the
+  living society reads a city by (`place_from_city_records`), with the world's records read
+  through its receipt (`town_records` in `exulanica/world/generated_worlds.py`). Positions are
+  east and south of the city's origin in plan, in the frame `generated-ground-local-mm`, whose
+  altitude reference is `plan-only`: the height a person stands at stays in the records. The walkable
+  area is the rectangle the world's tiles cover, a walking clearance beyond each edge, because the
+  surfaces run to the edge. A person arrives at the world's spawn (`arrival: spawn`), which the
+  composer derived by one rule when it made the world: the standing spot nearest the centre of
+  the world's extent. The activities are the world's own: every premises whose use class admits
+  visitors is somewhere to visit, stood at at its entrance, and every piece of street furniture
+  whose use class seats people is somewhere to rest, one place per seat; a place that cannot keep a
+  standing spacing from another, and any object the person placed in the town, is recorded as
+  unreachable (`authored_affordance_unreachable`), because the composition joins nothing a person
+  placed to the world's surfaces. The population is the entry's rule, `residents`: one inhabitant
+  per place in a home the world's premises offer (each premises' use class's resident capacity),
+  recorded in the input, and a world whose homes hold nobody, or more than the entry's figure of
+  128 (the tick budget: one tick of 128 people on the small town's graph took 62 ms at the median
+  and 78 ms at the 95th percentile, measured with `scripts/measure_generated_world.py`), starts no
+  society (`409 world_holds_no_residents`, `409 population_over_tick_budget`). The ground builder
+  reads a ground by its entry's navigation and floor forms, never by the entry's name
+  (`tests/test_generated_worlds.py`). A comparison runs at most eight people, so a town's society
+  is refused by the comparison as any larger society is.
 
 The declared figure keeps the lattice at 121 nodes, which holds one tick of 128 inhabitants near a
 tenth of a second, and it equals the only bounded starter ground the product has shipped, so an
@@ -462,7 +492,7 @@ about the person's world.
   that is not the built-in authored starter at a supported module version, and a ground kind the
   projection has no rule for are refused with the reason rather than guessed at.
 - Declared by the ground's entry in the society ground catalog
-  (`assets/catalogs/society-ground/society-ground.v1.json`, read by
+  (`assets/catalogs/society-ground/society-ground.v2.json`, read by
   `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a
   route lattice at two metre spacing over the area, inset by the navigation clearance. A flat
   rectangle has no paths of its own, so a graph over it is a discretisation the entry fixes, not a

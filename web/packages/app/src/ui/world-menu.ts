@@ -1,4 +1,5 @@
 import type { AtlasCommand } from './atlas-commands.js';
+import { say } from './copy.js';
 import { el } from './dom.js';
 import { createModalFocus } from './modal-focus.js';
 
@@ -14,6 +15,8 @@ export function buildWorldMenu(options: {
   readonly onExperiment?: () => void;
   /** Opens the comparisons of the models that ran this world's people; absent with no world. */
   readonly onCompare?: () => void;
+  /** Offers the recipes a new world can be generated from; absent where no worlds are saved. */
+  readonly onMakeWorld?: () => void;
   readonly onCommand: (command: AtlasCommand) => void;
 }): WorldMenu {
   const root = el('section', {
@@ -26,7 +29,7 @@ export function buildWorldMenu(options: {
   let activate = (action: () => void): void => action();
 
   const entry = (
-    command: AtlasCommand | 'world' | 'experiment' | 'compare',
+    command: AtlasCommand | 'world' | 'experiment' | 'compare' | 'make',
     label: string,
     detail: string,
     key: string,
@@ -47,7 +50,9 @@ export function buildWorldMenu(options: {
         ? options.onExperiment!
         : command === 'compare'
           ? options.onCompare!
-          : () => options.onCommand(command)));
+          : command === 'make'
+            ? options.onMakeWorld!
+            : () => options.onCommand(command)));
     return button;
   };
 
@@ -66,6 +71,9 @@ export function buildWorldMenu(options: {
     ]),
     ...(options.onCompare === undefined ? [] : [
       entry('compare', 'Compare models', 'Two open models, the same hour', '', 'world-menu-compare'),
+    ]),
+    ...(options.onMakeWorld === undefined ? [] : [
+      entry('make', say('worldMenu.make'), say('worldMenu.make.detail'), '', 'world-menu-make'),
     ]),
     entry('companion', 'Companion', 'Call the Unnamed Companion', 'X', 'world-menu-companion'),
     entry('options', 'Customize world', 'Light, material, and atmosphere', 'O', 'world-menu-customize'),

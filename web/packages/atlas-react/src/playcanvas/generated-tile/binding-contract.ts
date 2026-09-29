@@ -10,9 +10,9 @@ import type { CameraState } from '../controls.js';
  * stands, and hands the tile the scene to draw into. It never reads the tile's geometry, never
  * derives ground from what is drawn, and never falls back to the owned district's ground.
  *
- * DEVELOPMENT EVALUATION ONLY. A generated tile may not appear in any person's world until a
- * superseding governance ADR is accepted. The app reaches this contract only from the development
- * preview route; see `docs/generated-tile-runtime.md`.
+ * The app reaches this contract from the development preview route and for a saved world
+ * generated from a recipe, whose entry declares the tiles it draws (ADR-0027); see
+ * `docs/generated-tile-runtime.md`.
  */
 export interface GeneratedTileMount {
   /** Support and collision for the player, from the tile's navigation and collision projections. */

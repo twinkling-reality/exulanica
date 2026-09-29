@@ -61,6 +61,13 @@ source snapshot. Reads return
 `availability: unavailable` and `unavailable_reason: source_deleted`; the browser shows the
 recorded entry and refuses to open it. Authored work remains recorded by its existing authority.
 
+A world generated from a recipe is read through its receipt. When the receipt no longer generates
+what it recorded, reads return `availability: unavailable`, no `generated_ground`, and the reason
+named: `generated_world_grammar_changed` or `generated_world_catalogs_changed` when the grammar's
+descriptor or its catalogs changed under it, `generated_world_output_changed` when its records
+came out otherwise, and `generated_world_unreadable` for any other refusal. The catalog still
+serves every other world, and the browser shows the entry and refuses to open it.
+
 ## Entry and creation
 
 `GET /world-entries` is the entry catalog. A single available entry opens directly. More than one

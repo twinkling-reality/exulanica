@@ -37,8 +37,10 @@ from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_INPUTS,
     LOCAL_FAILURE_INPUTS,
     LOCAL_INPUT,
+    POPULATION_INPUTS,
     ROUTINE_INPUTS,
     UNREAD_PLACEMENT_REASONS,
+    WALKING_SURFACES_INPUT,
     is_authored_ground,
     validate_local_affordances,
     validate_unread_placements,
@@ -75,17 +77,27 @@ NAVIGATION_PROFILES = {
     AUTHORED_GROUND_INPUT: "authored-ground-lattice/v1",
     AUTHORED_GROUND_INPUT_V2: "authored-ground-lattice/v1",
     AUTHORED_GROUND_INPUT_V3: "authored-ground-lattice/v1",
+    WALKING_SURFACES_INPUT: "city-walking-surfaces/v1",
 }
+#: The frame a walking-surfaces input's positions are in: east and south millimetres about its
+#: region's origin, with no altitude: the surface a person stands on stays in the world's records.
+WALKING_SURFACES_FRAME: Final = "generated-ground-local-mm"
+WALKING_SURFACES_ALTITUDE: Final = "plan-only"
 FRAME_NAMES = {
     INPUT_PROFILE: "flatiron-local-mm",
     LOCAL_INPUT: "flatiron-local-mm",
     AUTHORED_GROUND_INPUT: "authored-ground-local-mm",
     AUTHORED_GROUND_INPUT_V2: "authored-ground-local-mm",
     AUTHORED_GROUND_INPUT_V3: "authored-ground-local-mm",
+    WALKING_SURFACES_INPUT: WALKING_SURFACES_FRAME,
 }
+#: The altitude reference a profile's frame states, where it is not the flat authored ground.
+FRAME_ALTITUDES: Final = {WALKING_SURFACES_INPUT: WALKING_SURFACES_ALTITUDE}
+#: The origin each profile's targets may state, besides a district's and a placed object's.
+WORLD_TARGET_ORIGINS: Final = {WALKING_SURFACES_INPUT: ("premises", "furniture")}
 #: Input profiles whose activities state the places their occupants stand at. A society advancing
 #: over one keeps each place to one person and keeps people waiting clear of every place.
-PLACE_INPUTS = (AUTHORED_GROUND_INPUT_V2, AUTHORED_GROUND_INPUT_V3)
+PLACE_INPUTS = (AUTHORED_GROUND_INPUT_V2, AUTHORED_GROUND_INPUT_V3, WALKING_SURFACES_INPUT)
 #: Every reason code the planner records on a goal, an action or an event, stated once: the browser
 #: has words for exactly these (``REASON_WORDS`` in web/packages/app/src/ui/world-inhabitants.ts,
 #: held to this set by society-words-parity.test.ts), and tests/test_society_reason_codes.py fails
@@ -206,6 +218,8 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         fields.add("unread_placements")
     if document.get("profile") in ROUTINE_INPUTS:
         fields.add("routine")
+    if document.get("profile") in POPULATION_INPUTS:
+        fields.add("population")
     _require(set(document) == fields, "invalid society input fields")
     profile = document["profile"]
     _require(profile in NAVIGATION_PROFILES, "unsupported society input profile")
@@ -225,9 +239,18 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         frame["name"] == FRAME_NAMES[profile]
         and frame["axis_order"] == ["east", "south"]
         and frame["horizontal_unit"] == "millimetre"
-        and frame["altitude_reference"] == "authored-flat-ground",
+        and frame["altitude_reference"] == FRAME_ALTITUDES.get(profile, "authored-flat-ground"),
         "unsupported frame",
     )
+    if profile in POPULATION_INPUTS:
+        population = document["population"]
+        _require(
+            isinstance(population, dict)
+            and set(population) == {"rule", "size"}
+            and _text(population["rule"])
+            and _integer(population["size"], 0, 512),
+            "invalid population",
+        )
     _require(
         not surveyed
         or (
@@ -410,7 +433,11 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         )
         _require(
             (target["origin"] == "district" and target["object_id"] is None)
-            or (target["origin"] == "authored" and _text(target["object_id"])),
+            or (target["origin"] == "authored" and _text(target["object_id"]))
+            or (
+                target["origin"] in WORLD_TARGET_ORIGINS.get(profile, ())
+                and _text(target["object_id"])
+            ),
             "invalid target origin",
         )
         target_ids.append(target["target_id"])

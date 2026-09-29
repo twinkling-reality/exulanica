@@ -735,6 +735,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}": (
         Owned(build.experiment_attempt)
     ),
+    "/world/versions/{version_id}/tiles/{baked_tile_id}": Owned(build.generated_tile),
 }
 
 #: Routes that ask about a narrower kind than their address names, each with the builder that makes
@@ -743,6 +744,9 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
 BUILDER_OVERRIDES: Final[Mapping[str, Mapping[str, Owned | Shared]]] = {
     "GET /world/versions/{version_id}/society/district": {
         "/world/versions/{version_id}": Owned(build.district_version)
+    },
+    "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes": {
+        "/world/versions/{version_id}": Owned(build.generated_tile)
     },
 }
 
@@ -755,6 +759,7 @@ EXISTENCE_REQUESTS: Final[Mapping[str, Callable[[Any], dict[str, Any]]]] = {
     ),
     "PUT /world-entries/{entry_id}": build.entry_update_request,
     "POST /world/styles/previews/{preview_id}/apply": build.style_apply_request,
+    "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes": build.generated_tile_request,
 }
 
 

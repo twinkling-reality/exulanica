@@ -820,6 +820,12 @@ def _resolve(
             "arrangement_needs_authored_ground",
             "the version's snapshot is not an authored ground the society can read",
         )
+    if ground.navigation_form != "lattice":
+        return frame.blocked(
+            "arrangement_needs_authored_ground",
+            "an arrangement meets the society's lattice, and this world's people walk the "
+            "surfaces its own records state",
+        )
     layout = lay_out(
         arrangement,
         viewer_x_mm=request.viewer_x_mm,

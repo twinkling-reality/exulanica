@@ -10,12 +10,16 @@ only the ledger's world exports.
 
 **Kinds.** :data:`WORLD_KINDS` is the one list. ``personal-source`` is a world composed from the
 workspace's own photographs and other personal sources; ``authored-starter`` is a
-source-independent authored world that starts empty. Migration 0099's CHECK restates the list,
-because a database cannot import this module, and ``tests/test_worlds.py`` holds the two equal.
+source-independent authored world that starts empty; ``generated`` is a source-independent world
+the server generates from a reviewed recipe (:mod:`exulanica.world.world_recipes`). Each kind
+states whether it is source-independent, which is what the style layer asks of a world. The
+latest migration that lists the kinds in ``world_identity``'s CHECK restates the list, because a
+database cannot import this module, and ``tests/test_worlds.py`` holds the two equal.
 
-**How many.** :data:`WORLD_COUNT_POLICY` is read from ``world-count-policy.v1.json`` and states,
+**How many.** :data:`WORLD_COUNT_POLICY` is read from ``world-count-policy.v2.json`` and states,
 for every kind, the most worlds of that kind one workspace may hold, or ``null`` for a kind the
-policy does not count. Version 1 allows one personal-source world. The limit is checked by the
+policy does not count, with the reason for each figure. Version 2 allows one personal-source
+world and three generated worlds. The limit is checked by the
 server when a world is created, under the workspace lock every world writer takes, and a creation
 past it is refused as :class:`WorldLimitReached`. Worlds that already exist are never removed by a
 policy: the policy governs creation. Allowing several personal-source worlds is another version of
@@ -48,6 +52,7 @@ from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = [
     "AUTHORED_STARTER",
+    "GENERATED",
     "PERSONAL_SOURCE",
     "WORLD_COUNT_POLICY",
     "WORLD_KINDS",
@@ -63,6 +68,7 @@ __all__ = [
     "ensure_personal_source_world",
     "load_world_count_policy",
     "new_world_id",
+    "refuse_past_limit",
     "register_world",
     "require_world",
     "resolve_personal_source_world",
@@ -75,8 +81,10 @@ __all__ = [
 PERSONAL_SOURCE: Final = "personal-source"
 #: The kind of a source-independent authored world that starts empty.
 AUTHORED_STARTER: Final = "authored-starter"
+#: The kind of a source-independent world the server generates from a reviewed recipe.
+GENERATED: Final = "generated"
 
-#: The migration that admitted both kinds, by file stem.
+#: The migration that admitted the first two kinds, by file stem.
 _ADMITTED_BY: Final = "0099_a_world_is_registered_before_it_holds_anything"
 
 #: The longest world id the registry and every world table accept.
@@ -95,21 +103,41 @@ class WorldKind:
     id_prefix: str
     #: The migration whose CHECK first listed this kind, by file stem.
     admitted_by: str
+    #: Whether a world of this kind holds no personal source: nothing sourced may be activated in
+    #: it and its composed topology is not overlaid, the style layer's rule for such a world.
+    source_independent: bool
+    #: Whether a world of this kind is drawn from generated tiles its own snapshot names, which
+    #: its saved entry then declares for the page to draw (docs/adr/0027).
+    draws_generated_tiles: bool = False
+    #: Whether photographs may be attached to a saved world of this kind, and so composed into it.
+    #: A generated world is never composed with photographs (docs/adr/0027).
+    takes_photographs: bool = True
 
 
-#: Every kind of world, in the order migration 0099's CHECK lists them.
+#: Every kind of world, in the order the kind CHECK lists them.
 WORLD_KINDS: Final[tuple[WorldKind, ...]] = (
     WorldKind(
         PERSONAL_SOURCE,
         "a world composed from the workspace's own photographs and other personal sources",
         "world:personal:",
         _ADMITTED_BY,
+        source_independent=False,
     ),
     WorldKind(
         AUTHORED_STARTER,
         "a source-independent authored world that starts empty",
         "world:authored:",
         _ADMITTED_BY,
+        source_independent=True,
+    ),
+    WorldKind(
+        GENERATED,
+        "a source-independent world the server generates from a reviewed recipe",
+        "world:generated:",
+        "0118_a_world_is_generated_from_a_recipe",
+        source_independent=True,
+        draws_generated_tiles=True,
+        takes_photographs=False,
     ),
 )
 
@@ -193,14 +221,17 @@ class WorldCountPolicy:
 
 
 def load_world_count_policy(path: Path) -> WorldCountPolicy:
-    """Read and check a policy document: every kind stated exactly once, each limit at least 1."""
+    """Read and check a policy document: every kind stated exactly once, each limit at least 1,
+    and from version 2 on a reason for each kind's figure."""
     document = json.loads(path.read_text(encoding="utf-8"))
-    if set(document) != {"policy_id", "version", "scope", "limits"}:
-        raise ValueError(f"{path.name} must state policy_id, version, scope and limits only")
+    version = document.get("version")
+    if type(version) is not int or version < 1:
+        raise ValueError(f"{path.name} needs a positive integer version")
+    keys = {"policy_id", "version", "scope", "limits"} | ({"reasons"} if version >= 2 else set())
+    if set(document) != keys:
+        raise ValueError(f"{path.name} must state {', '.join(sorted(keys))} only")
     if document["scope"] != "workspace":
         raise ValueError(f"{path.name} counts per {document['scope']!r}; only workspace is read")
-    if not isinstance(document["version"], int) or document["version"] < 1:
-        raise ValueError(f"{path.name} needs a positive integer version")
     limits = document["limits"]
     stated = set(limits)
     known = {kind.name for kind in WORLD_KINDS}
@@ -212,6 +243,12 @@ def load_world_count_policy(path: Path) -> WorldCountPolicy:
     for kind, limit in limits.items():
         if limit is not None and (type(limit) is not int or limit < 1):
             raise ValueError(f"{path.name} limits {kind} to {limit!r}; a limit is null or >= 1")
+    reasons = document.get("reasons", {})
+    if "reasons" in keys and (
+        set(reasons) != known
+        or any(not isinstance(text, str) or not text.strip() for text in reasons.values())
+    ):
+        raise ValueError(f"{path.name} must state a reason for exactly the kinds {sorted(known)}")
     return WorldCountPolicy(
         policy_id=document["policy_id"],
         version=document["version"],
@@ -222,7 +259,7 @@ def load_world_count_policy(path: Path) -> WorldCountPolicy:
 
 #: The policy the server checks every world creation against.
 WORLD_COUNT_POLICY: WorldCountPolicy = load_world_count_policy(
-    Path(__file__).with_name("world-count-policy.v1.json")
+    Path(__file__).with_name("world-count-policy.v2.json")
 )
 
 
@@ -292,6 +329,33 @@ def require_world(
     return world
 
 
+def refuse_past_limit(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    kind: str,
+    *,
+    policy: WorldCountPolicy | None = None,
+) -> None:
+    """Refuse a world of ``kind`` that would take the workspace past the count policy's limit.
+
+    :func:`register_world` asks it under the workspace lock, where its answer is the one that
+    holds. A caller about to do expensive work before registering (generating a world) asks it
+    first, unlocked: a cheap early refusal that may be stale, never a permission.
+    """
+    counted = current_world_count_policy() if policy is None else policy
+    limit = counted.limit(kind)
+    if limit is None:
+        return
+    with connection.cursor(row_factory=dict_row) as cursor:
+        held = cursor.execute(
+            "select count(*) as held from world_identity where workspace_id=%s and kind=%s",
+            (workspace_id, kind),
+        ).fetchone()
+    assert held is not None
+    if held["held"] >= limit:
+        raise WorldLimitReached(kind, limit, counted)
+
+
 def register_world(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
@@ -327,16 +391,8 @@ def register_world(
                     f"world {world_id!r} is registered as {existing.kind}, not {kind}"
                 )
             return existing
-        limit = policy.limit(kind)
+        refuse_past_limit(connection, workspace_id, kind, policy=policy)
         with connection.cursor(row_factory=dict_row) as cursor:
-            if limit is not None:
-                held = cursor.execute(
-                    "select count(*) as held from world_identity where workspace_id=%s and kind=%s",
-                    (workspace_id, kind),
-                ).fetchone()
-                assert held is not None
-                if held["held"] >= limit:
-                    raise WorldLimitReached(kind, limit, policy)
             row = cursor.execute(
                 "insert into world_identity (workspace_id,world_id,kind,provenance,created_by) "
                 f"values (%s,%s,%s,%s,%s) returning {_COLUMNS}",

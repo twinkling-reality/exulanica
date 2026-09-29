@@ -46,6 +46,7 @@ from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
+from exulanica.world.generated_worlds import generation_receipt, town_records
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.society import (
     SocietyBytesNotRead,
@@ -80,6 +81,10 @@ from exulanica.world.society_input_policy import (
 from exulanica.world.society_living import current_routine
 from exulanica.world.society_planner import input_sha256, validate_society_input
 from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.society_walking_surfaces import (
+    build_walking_surfaces_input,
+    walking_surfaces_place,
+)
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Text = Annotated[str, Field(min_length=1, max_length=500)]
@@ -127,12 +132,27 @@ class _ReadFirst:
     so a row that names other bytes under the lock is known to have changed in between.
     ``locked`` is whether this transaction's society has taken the lock, after which nothing is
     read ahead. ``read`` holds what was already read ahead, so it is read once a transaction.
+    ``towns`` holds, by world and snapshot, what a generated world's society is composed from:
+    its records generated again through its receipt and the place they make, or the refusal
+    reading them raised. Generating a world takes a noticeable time, and every guarded write in
+    the deployment waits on the asset read lock while it is held, so it is done before the lock.
     """
 
     found: dict[tuple[str, int | None], bytes | str | None] = field(default_factory=dict)
     rows: dict[str, ReviewedRow] = field(default_factory=dict)
     read: set[tuple[str, str]] = field(default_factory=set)
+    towns: dict[tuple[str, uuid.UUID], _TownRead] = field(default_factory=dict)
     locked: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _TownRead:
+    """A generated world's records as its receipt generated them before the asset read lock: the
+    receipt's digest and the place the records make, or the refusal generating them raised."""
+
+    receipt_sha256: str | None
+    place: Mapping[str, Any] | None
+    refusal: str | None
 
 
 #: What a saved world's input says of the edit it follows, not of what its society reads: its
@@ -380,6 +400,33 @@ class SocietyRuntime:
             outside="a society's inputs are locked only inside the transaction that records them",
         )
         read.locked = True
+
+    @staticmethod
+    def _read_town_ahead(
+        connection: psycopg.Connection,
+        binding: AuthoredWorldSocietyBinding,
+        ground: SocietyGround,
+        read: _ReadFirst,
+    ) -> None:
+        """Generate a generated world's records and their place before the asset read lock.
+
+        For a ground whose people walk the world's own surfaces, once a transaction: the records
+        through the world's receipt (:func:`town_records`, which generates them again on a cold
+        cache) and the place they make. A refusal is kept and raised when the input is composed,
+        so a transaction that composes nothing is not refused for a world it does not read.
+        """
+        key = (binding.world_id, ground.snapshot_id)
+        if read.locked or ground.navigation_form != "walking_surfaces" or key in read.towns:
+            return
+        try:
+            generated = town_records(
+                connection, binding.workspace_id, binding.world_id, ground.snapshot_id
+            )
+        except InvalidStructuralData as exc:
+            read.towns[key] = _TownRead(None, None, str(exc))
+            return
+        place = walking_surfaces_place(ground.place_id, generated.records)
+        read.towns[key] = _TownRead(generated.receipt_sha256, place, None)
 
     def _transaction_read(self, connection: psycopg.Connection) -> _ReadFirst:
         """What this transaction read before the asset read lock; call inside the transaction.
@@ -728,7 +775,8 @@ class SocietyRuntime:
         binding: SocietyRuntimeBinding | AuthoredWorldSocietyBinding,
         read: _ReadFirst,
     ) -> None:
-        """Read what composing the bound version's next input asks of the store."""
+        """Read what composing the bound version's next input asks of the store, and generate a
+        generated world's records and their place, all before the asset read lock."""
         if ("composition", binding.binding_id) in read.read:
             return
         read.read.add(("composition", binding.binding_id))
@@ -738,6 +786,10 @@ class SocietyRuntime:
                 self._read_district_ahead(connection, session, binding, read)
             else:
                 version = self._authored_version(connection, session, binding)
+                _, ground = self._authored_scope(
+                    connection, session, binding.version_id, binding.region_id
+                )
+                self._read_town_ahead(connection, binding, ground, read)
         except UnavailableSocietyInput:
             return  # Refused the same way, from rows, under the lock.
         self._read_version_ahead(connection, read, version)
@@ -1276,16 +1328,53 @@ class SocietyRuntime:
                 self._asset(connection, assignment["asset_key"], obj.asset_sha256, registry, read)
         except UnavailableSocietyInput as exc:
             reason = str(exc)
-        return build_authored_ground_society_input_v3(
-            ground=ground,
-            version=version,
-            input_seq=seq,
-            dependency_refs=self._authored_refs(binding, ground),
-            availability="available" if reason is None else "unavailable",
-            unavailable_reason=reason,
-            reviewed_affordances=registry,
-            segment_blocked=segment_blocked,
-            standing=self._standing,
+        # What people walk is the ground's navigation form, from its catalog entry: a lattice over
+        # the area the ground states or declares, or the walking surfaces the world's own records
+        # state. A form with no composition is refused by name.
+        if ground.navigation_form == "lattice":
+            return build_authored_ground_society_input_v3(
+                ground=ground,
+                version=version,
+                input_seq=seq,
+                dependency_refs=self._authored_refs(binding, ground),
+                availability="available" if reason is None else "unavailable",
+                unavailable_reason=reason,
+                reviewed_affordances=registry,
+                segment_blocked=segment_blocked,
+                standing=self._standing,
+            )
+        if ground.navigation_form == "walking_surfaces":
+            # The records and the place they make were generated before the asset read lock
+            # (``_read_town_ahead``); under it only the receipt's digest is read again, so the
+            # input is composed from the receipt the world's snapshot still names.
+            town = read.towns.get((binding.world_id, ground.snapshot_id))
+            if town is None:
+                raise UnavailableSocietyInput(
+                    "the world's records were not read before the asset read lock"
+                )
+            if town.refusal is not None or town.place is None:
+                raise UnavailableSocietyInput(f"the world's records are unreadable: {town.refusal}")
+            try:
+                digest, _ = generation_receipt(
+                    connection, binding.workspace_id, binding.world_id, ground.snapshot_id
+                )
+            except InvalidStructuralData as exc:
+                raise UnavailableSocietyInput(f"the world's records are unreadable: {exc}") from exc
+            if digest != town.receipt_sha256:
+                raise UnavailableSocietyInput("the world's receipt changed after it was read")
+            return build_walking_surfaces_input(
+                ground=ground,
+                version=version,
+                place=town.place,
+                input_seq=seq,
+                dependency_refs=self._authored_refs(binding, ground),
+                availability="available" if reason is None else "unavailable",
+                unavailable_reason=reason,
+                reviewed_affordances=registry,
+                standing=self._standing,
+            )
+        raise UnavailableSocietyInput(
+            f"no society composition walks a {ground.navigation_form!r} ground"
         )
 
     def _authored_initial_input(

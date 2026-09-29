@@ -233,7 +233,12 @@ _P = Permission
 #: routes require it, and a browser session still cannot ask for a world or read a tile's bytes.
 #: Granting it
 #: lets a browser spend the workspace's tile ceiling, which is why it is granted here deliberately
-#: or not at all rather than inherited.
+#: or not at all rather than inherited. A world generated from a reviewed recipe
+#: (``POST /worlds/generated``) is not asked for through that door: it is bounded by the
+#: world-count policy's ``generated`` limit and the recipes' stated tile counts, not by the tile
+#: quota, and its page reads its own baked tiles through its version
+#: (``GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes``, world.read). A browser
+#: session still holds no ``tiles.materialise``.
 ACCOUNT_OWNER_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
     {
         _P.LIBRARY_READ,
@@ -511,7 +516,9 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}",
     "GET /world/versions/{version_id}/society/models",
     "GET /world/versions/{version_id}/society/replay",
+    "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes",
     "GET /worlds",
+    "GET /worlds/recipes",
 )
 
 #: Metered against the workspace tile quota, by being declared here: the baked tiles of a generated
@@ -572,6 +579,7 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
     "POST /world/versions/{version_id}/society/presence",
     "POST /world/versions/{version_id}/society/steps",
+    "POST /worlds/generated",
 )
 
 #: World writes that read admission state. Attach and rebind resolve and pin a human review,

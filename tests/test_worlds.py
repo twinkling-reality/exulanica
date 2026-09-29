@@ -23,6 +23,7 @@ from exulanica.world import worlds
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.worlds import (
     AUTHORED_STARTER,
+    GENERATED,
     PERSONAL_SOURCE,
     WORLD_COUNT_POLICY,
     WORLD_KINDS,
@@ -47,7 +48,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MIGRATION = (
     ROOT / "exulanica" / "migrations" / ("0099_a_world_is_registered_before_it_holds_anything.sql")
 )
-POLICY = ROOT / "exulanica" / "world" / "world-count-policy.v1.json"
+POLICY = ROOT / "exulanica" / "world" / "world-count-policy.v2.json"
 
 #: World tables whose rows do not all name a world: the stored generated column each one's key
 #: reads instead of ``world_id``, and that column's expression as the catalog prints it.
@@ -77,9 +78,10 @@ def _raised(limit: int) -> worlds.WorldCountPolicy:
 
 def test_the_policy_allows_one_personal_source_world_and_states_every_kind():
     assert WORLD_COUNT_POLICY.policy_id == "exulanica.world-count"
-    assert WORLD_COUNT_POLICY.version == 1
+    assert WORLD_COUNT_POLICY.version == 2
     assert WORLD_COUNT_POLICY.limit(PERSONAL_SOURCE) == 1
     assert WORLD_COUNT_POLICY.limit(AUTHORED_STARTER) is None
+    assert WORLD_COUNT_POLICY.limit(GENERATED) == 3
     assert set(WORLD_COUNT_POLICY.limits) == {kind.name for kind in WORLD_KINDS}
     document = json.loads(POLICY.read_text(encoding="utf-8"))
     assert WORLD_COUNT_POLICY.limits == document["limits"]
@@ -94,7 +96,8 @@ def test_the_policy_allows_one_personal_source_world_and_states_every_kind():
         (lambda d: d["limits"].update({PERSONAL_SOURCE: True}), "a limit is null or >= 1"),
         (lambda d: d.update({"scope": "account"}), "only workspace is read"),
         (lambda d: d.update({"version": 0}), "positive integer version"),
-        (lambda d: d.update({"note": "x"}), "policy_id, version, scope and limits only"),
+        (lambda d: d.update({"note": "x"}), "limits, policy_id, reasons, scope, version only"),
+        (lambda d: d["reasons"].pop(GENERATED), "a reason for exactly the kinds"),
     ],
 )
 def test_a_policy_document_that_does_not_state_each_kind_once_is_refused(tmp_path, change, refusal):
@@ -106,12 +109,25 @@ def test_a_policy_document_that_does_not_state_each_kind_once_is_refused(tmp_pat
         load_world_count_policy(path)
 
 
+def _listed_kinds(migration: pathlib.Path) -> list[str]:
+    """The kinds a migration's world_identity kind CHECK lists, in order."""
+    text = migration.read_text(encoding="utf-8")
+    listed = re.search(r"check \(kind in \(([^)]*)\)\)", text)
+    assert listed is not None, f"{migration.name}'s kind CHECK is not where this test reads it"
+    return re.findall(r"'([a-z-]+)'", listed.group(1))
+
+
 def test_the_migration_check_lists_exactly_the_registered_kinds():
-    text = MIGRATION.read_text(encoding="utf-8")
-    listed = re.search(r"kind\s+text not null check \(kind in \(([^)]*)\)\)", text)
-    assert listed is not None, "0099's kind CHECK is not where this test reads it"
-    assert re.findall(r"'([a-z-]+)'", listed.group(1)) == [kind.name for kind in WORLD_KINDS]
-    assert {kind.admitted_by for kind in WORLD_KINDS} == {MIGRATION.stem}
+    """Each kind names the migration that admitted it; each such migration's CHECK lists every
+    kind admitted up to it, in order, and the latest lists them all."""
+    stems = sorted({kind.admitted_by for kind in WORLD_KINDS})
+    assert stems[0] == MIGRATION.stem
+    for stem in stems:
+        admitted = [kind.name for kind in WORLD_KINDS if kind.admitted_by <= stem]
+        assert _listed_kinds(MIGRATION.with_name(f"{stem}.sql")) == admitted
+    assert [kind.name for kind in WORLD_KINDS if kind.admitted_by == stems[-1]] == [
+        kind.name for kind in WORLD_KINDS
+    ][len(_listed_kinds(MIGRATION)) :]
 
 
 def test_a_new_world_id_is_fresh_and_spelled_by_its_kind():
@@ -345,7 +361,7 @@ def test_a_second_personal_source_world_is_refused_by_name_under_the_shipped_pol
     assert (refused.value.kind, refused.value.limit) == (PERSONAL_SOURCE, 1)
     assert refused.value.policy is WORLD_COUNT_POLICY
     assert refused.value.code == "world_limit_reached"
-    assert "exulanica.world-count version 1" in str(refused.value)
+    assert f"exulanica.world-count version {WORLD_COUNT_POLICY.version}" in str(refused.value)
     assert [w.world_id for w in workspace_worlds(connection, workspace)] == [kept.world_id]
     # An uncounted kind is not refused, however many there are.
     for _ in range(3):
@@ -373,7 +389,9 @@ def test_raising_the_limit_is_a_policy_value_and_the_new_limit_is_enforced(repos
         )
         for n in range(2)
     ]
-    assert all(world.provenance["policy"]["version"] == 2 for world in made)
+    assert all(
+        world.provenance["policy"]["version"] == WORLD_COUNT_POLICY.version + 1 for world in made
+    )
     with pytest.raises(WorldLimitReached) as refused:
         register_world(
             connection,

@@ -38,7 +38,7 @@ from exulanica.world.society_engines import (
     creatable_engine,
     society_engine,
 )
-from exulanica.world.society_grounds import society_ground_for_navigation
+from exulanica.world.society_grounds import society_population
 from exulanica.world.society_input_policy import is_authored_ground
 from exulanica.world.society_legacy import advance_society, initial_society
 from exulanica.world.society_living import (
@@ -228,10 +228,10 @@ class SocietyRepository:
                 self._validate_scope(version_id, initial_input)
                 self._authorize(initial_input)
                 # A saved world's own ground holds the population its entry in the society ground
-                # catalog states, found by the navigation profile its input records; a district,
-                # its full population.
+                # catalog states or derives by its rule, found by the navigation profile its
+                # input records; a district, its full population.
                 population = (
-                    society_ground_for_navigation(initial_input["navigation"]["profile"]).population
+                    society_population(initial_input)
                     if is_authored_ground(initial_input["profile"])
                     else SOCIETY_POPULATION
                 )

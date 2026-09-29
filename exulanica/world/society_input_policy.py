@@ -25,6 +25,11 @@ LOCAL_INPUT = "exulanica.society-input/v2"
 AUTHORED_GROUND_INPUT = "exulanica.society-input/authored-ground-v1"
 AUTHORED_GROUND_INPUT_V2 = "exulanica.society-input/authored-ground-v2"
 AUTHORED_GROUND_INPUT_V3 = "exulanica.society-input/authored-ground-v3"
+#: A saved world whose own records state its walking surfaces (a world generated from the city
+#: grammar): the society walks those surfaces, the world's premises and benches are its activities,
+#: and the input records the population its ground's rule derived (migration 0118).
+WALKING_SURFACES_COMPOSITION = "exulanica.society-composition/walking-surfaces-v1"
+WALKING_SURFACES_INPUT = "exulanica.society-input/walking-surfaces-v1"
 UNREACHABLE = "authored_affordance_unreachable"
 #: An object that moves offers no activity: where it stands when an inhabitant arrives is a phase
 #: the renderer holds and the society does not.
@@ -44,6 +49,7 @@ _PAIRS = (
     (AUTHORED_GROUND_COMPOSITION, AUTHORED_GROUND_INPUT),
     (AUTHORED_GROUND_COMPOSITION_V2, AUTHORED_GROUND_INPUT_V2),
     (AUTHORED_GROUND_COMPOSITION_V3, AUTHORED_GROUND_INPUT_V3),
+    (WALKING_SURFACES_COMPOSITION, WALKING_SURFACES_INPUT),
 )
 #: Compositions that record a known unreachable authored activity against that activity alone,
 #: type-check authored transforms strictly, and publish an ``unavailable_affordances`` list.
@@ -52,12 +58,14 @@ LOCAL_FAILURE_COMPOSITIONS = (
     AUTHORED_GROUND_COMPOSITION,
     AUTHORED_GROUND_COMPOSITION_V2,
     AUTHORED_GROUND_COMPOSITION_V3,
+    WALKING_SURFACES_COMPOSITION,
 )
 LOCAL_FAILURE_INPUTS = (
     LOCAL_INPUT,
     AUTHORED_GROUND_INPUT,
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
+    WALKING_SURFACES_INPUT,
 )
 #: Every input profile a saved world's own ground produces, oldest first. A society's inputs may
 #: move forward along this order and never back.
@@ -65,10 +73,18 @@ AUTHORED_GROUND_INPUTS: Final = (
     AUTHORED_GROUND_INPUT,
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
+    WALKING_SURFACES_INPUT,
 )
 #: Input profiles that record the purposeful routine they were composed under. Every other profile
 #: records none and is read under the routine the society was first released with.
-ROUTINE_INPUTS: Final = (AUTHORED_GROUND_INPUT_V3,)
+ROUTINE_INPUTS: Final = (AUTHORED_GROUND_INPUT_V3, WALKING_SURFACES_INPUT)
+#: Input profiles that record the population their ground's rule derived from the world.
+POPULATION_INPUTS: Final = (WALKING_SURFACES_INPUT,)
+#: The kinds of a world's own records an input may name an activity of, besides the objects its
+#: person placed, per input profile: a record's subject is its kind and its identity.
+WORLD_RECORD_SUBJECTS: Final[Mapping[str, tuple[str, ...]]] = {
+    WALKING_SURFACES_INPUT: ("city.premises", "city.street_furniture"),
+}
 #: Why an activity may be recorded as unavailable on its own, per input profile. A profile only
 #: ever gains reasons in a new version, so a stored input is read with the vocabulary it was
 #: written under.
@@ -77,11 +93,15 @@ LOCAL_RECORD_REASONS: Final[Mapping[str, frozenset[str]]] = {
     AUTHORED_GROUND_INPUT: frozenset({UNREACHABLE}),
     AUTHORED_GROUND_INPUT_V2: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
     AUTHORED_GROUND_INPUT_V3: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
+    # A world that states its walking surfaces joins no object its person placed to them, and a
+    # place of its own too close to another's is not stood at: either activity is unreachable.
+    WALKING_SURFACES_INPUT: frozenset({UNREACHABLE}),
 }
 #: Why a placement may be named as unread, per input profile that carries the list.
 UNREAD_PLACEMENT_REASONS: Final[Mapping[str, frozenset[str]]] = {
     AUTHORED_GROUND_INPUT_V2: frozenset({NO_AUTHORED_FRAME}),
     AUTHORED_GROUND_INPUT_V3: frozenset({NO_AUTHORED_FRAME}),
+    WALKING_SURFACES_INPUT: frozenset({NO_AUTHORED_FRAME}),
 }
 #: The bound on a local record list, shared with targets as the input bound always was.
 LOCAL_RECORD_BOUND: Final = 4096
@@ -131,10 +151,13 @@ def validate_local_affordances(document: dict, affordances: Collection[str]) -> 
             raise ValueError("invalid unavailable affordance reference")
         if row["version_id"] != document["version_id"] or row["affordance"] not in affordances:
             raise ValueError("unavailable affordance scope or action mismatch")
-        subject = f"authored:{row['version_id']}:{row['object_id']}"
+        subjects = {f"authored:{row['version_id']}:{row['object_id']}"} | {
+            f"{kind}:{row['object_id']}"
+            for kind in WORLD_RECORD_SUBJECTS.get(document["profile"], ())
+        }
         if (
-            row["subject_id"] != subject
-            or row["target_id"] != f"{subject}:{row['affordance']}"
+            row["subject_id"] not in subjects
+            or row["target_id"] != f"{row['subject_id']}:{row['affordance']}"
             or row["reason"] not in reasons
         ):
             raise ValueError("unavailable affordance identity or reason mismatch")

@@ -19,8 +19,16 @@ The [composition contract](../world-composition-contract.md) defines this target
 [Authored starter worlds](../saved-world-entry.md) provide a source-independent starting space.
 Reference photographs can be attached without replacing authored edits; attachment alone does not
 reconstruct or place scene geometry. A world can also be made from the person's reviewed
-photographs ([scene reconstruction](scene-reconstruction.md)). Either kind of saved world can host
-people, whose choices the world's owner can hand to open models
+photographs ([scene reconstruction](scene-reconstruction.md)), or generated from a recipe of the
+catalogs: World menu, Make a world, lists the recipes in the
+[world recipe catalog](../../assets/catalogs/world-recipes/world-recipe.v1.json), whose one entry is
+a small town of one 128 m tile. The server generates it from the city grammar for the world's own
+identity (`POST /worlds/generated`,
+[`exulanica/world/generated_worlds.py`](../../exulanica/world/generated_worlds.py)), saves it with a
+receipt of how, and bakes its tile off the request; the application draws the town once its tile
+is baked ([generated tile runtime](../generated-tile-runtime.md#73-a-saved-worlds-own-tiles)). A
+generated world takes no photographs, and a workspace holds at most three. Every kind of saved
+world can host people, whose choices the world's owner can hand to open models
 ([people and models in a world](simulation.md)).
 
 Reviewed appearance controls and bounded language-driven appearance proposals
@@ -69,6 +77,15 @@ development preview. Its source data and the line between source facts and rende
 specified in [owned district and source admission](../owned-district-and-admission.md).
 
 ## Gaps
+
+A generated world has one recipe, a town of one tile, and its people follow the purposeful routine
+(visiting shops, resting on benches, standing and talking), not the living society's homes and
+shifts. A recipe may state up to four tiles, and a world of several is drawn only once every tile
+is baked, but no larger town is offered: the city grammar's street layout centres its blocks on the
+district's middle, so the small town's specification over two tiles makes the same two blocks with
+bare ground beside them. A comparison of models runs at most eight people, so a town's society is
+not compared. The page still offers Add photos in a generated world, which the server refuses by
+name.
 
 Reusable real-world extraction, persistent geographic anchors, unified search
 across memories/imports/creations, geometric blending and general language-driven

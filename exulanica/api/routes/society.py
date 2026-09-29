@@ -33,6 +33,7 @@ from exulanica.world.society_engines import (
     creatable_engine,
     society_engine,
 )
+from exulanica.world.society_grounds import SocietyPopulationRefused
 from exulanica.world.society_planner import SocietyStartRefused
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import SocietyRepository
@@ -110,6 +111,9 @@ def _call(operation: Callable[[], Any], *, invalid_status: int = 422) -> Any:
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
     except SocietyLivesElsewhere as exc:
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
+    except SocietyPopulationRefused as exc:
+        # The world's own premises imply a population no society over its ground may start with.
+        return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
     except ValueError as exc:
         return JSONResponse(
             status_code=invalid_status,

@@ -49,7 +49,7 @@ afterAll(async () => {
 
 describe('the development evaluation route resolves the texture sets a tile cites', () => {
   it('answers every pinned set with a URL module whose URL serves exactly the pinned bytes', async () => {
-    const sources = await fetch(`${origin}/src/dev/generated-tile-sources.ts`);
+    const sources = await fetch(`${origin}/src/texture-library.ts`);
     expect(sources.status).toBe(200);
     const code = await sources.text();
     expect(pinned.length).toBeGreaterThan(0);
@@ -57,7 +57,7 @@ describe('the development evaluation route resolves the texture sets a tile cite
       const specifier = [...code.matchAll(/"([^"]+\.ltex\?[^"]*url[^"]*)"/g)]
         .map((match) => match[1]!)
         .find((candidate) => candidate.includes(set.content_sha256));
-      expect(specifier, `${set.set_id} is imported by the dev sources`).toBeDefined();
+      expect(specifier, `${set.set_id} is imported by the texture library`).toBeDefined();
       const module = await fetch(`${origin}${specifier!.includes('import') ? specifier : specifier!.replace('?', '?import&')}`);
       expect(module.status).toBe(200);
       expect(module.headers.get('content-type'), `${set.set_id} answers with a module, not its bytes`).toMatch(/javascript/);

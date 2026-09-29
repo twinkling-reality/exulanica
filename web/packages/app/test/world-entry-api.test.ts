@@ -12,7 +12,7 @@ import {
 
 /** The count policy the server checks world creation against, read from the server's own file. */
 const SERVER_POLICY = JSON.parse(readFileSync(
-  new URL('../../../../exulanica/world/world-count-policy.v1.json', import.meta.url), 'utf8',
+  new URL('../../../../exulanica/world/world-count-policy.v2.json', import.meta.url), 'utf8',
 )) as { readonly limits: Readonly<Record<string, number | null>> };
 
 const worldsWire = (worlds: readonly { readonly world_id: string; readonly kind: string }[]) => ({
@@ -161,6 +161,55 @@ describe('saved world entry client', () => {
     const empty = vi.fn(async () => Response.json([wire({ declared_floor: { half_extent_mm: 0, elevation_mm: 0 } })]));
     await expect(new WorldEntryClient({ baseUrl: 'https://exulanica.test', token: 'private', fetch: empty }).entries())
       .rejects.toThrow('declared floor with no extent');
+  });
+
+  it('reads what a generated world declares to draw, and refuses a declaration that does not add up', async () => {
+    const ground = {
+      recipe_key: 'small_town',
+      recipe_label: 'A small town',
+      region_id: 'region:generated',
+      arrival_mm: [64000, 99, -58700],
+      arrival_facing_mm: [0, 3400],
+      tiles: [{
+        tile_x: 0, tile_y: 0, tile_inputs_digest: 'f'.repeat(64),
+        baked_tile_id: '14141414-1414-4141-8141-141414141414', state: 'baked',
+      }],
+    };
+    const generated = wire({ source_kind: 'generated', generated_ground: ground });
+    const client = (body: unknown) => new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch: vi.fn(async () => Response.json(body)),
+    });
+    const [entry] = await client([generated]).entries();
+    expect(entry!.sourceKind).toBe('generated');
+    expect(entry!.generatedGround).toEqual({
+      recipeKey: 'small_town',
+      recipeLabel: 'A small town',
+      regionId: 'region:generated',
+      arrivalMm: [64000, 99, -58700],
+      arrivalFacingMm: [0, 3400],
+      tiles: [{
+        tileX: 0, tileY: 0, tileInputsDigest: 'f'.repeat(64),
+        bakedTileId: '14141414-1414-4141-8141-141414141414', state: 'baked',
+      }],
+    });
+    // Only a generated entry declares a generated ground, and an available one always does.
+    await expect(client([wire({ generated_ground: ground })]).entries()).rejects.toThrow('generated ground');
+    await expect(client([wire({ source_kind: 'generated' })]).entries()).rejects.toThrow('generated ground');
+    // A generated world its receipt no longer generates is listed unavailable, named, with no
+    // ground, beside the others rather than failing the list.
+    const unreadable = wire({
+      source_kind: 'generated', availability: 'unavailable',
+      unavailable_reason: 'generated_world_grammar_changed', generated_ground: null,
+    });
+    const [kept, other] = await client([unreadable, wire()]).entries();
+    expect(kept!.availability).toBe('unavailable');
+    expect(kept!.unavailableReason).toBe('generated_world_grammar_changed');
+    expect(kept!.generatedGround).toBeNull();
+    expect(other!.availability).toBe('available');
+    // A tile still baking names no stored bake, and a baked one always does.
+    const baking = { ...ground, tiles: [{ ...ground.tiles[0], state: 'baking' }] };
+    await expect(client([wire({ source_kind: 'generated', generated_ground: baking })]).entries())
+      .rejects.toThrow('stored bake');
   });
 
   it('opens a personal-source world a caller names without reading the list', async () => {

@@ -49,6 +49,8 @@ import { buildScene } from './scene.js';
 import type { AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { buildWorldMenu } from './ui/world-menu.js';
+import { buildWorldRecipes } from './ui/world-recipes.js';
+import { GENERATED_WORLD_READY_EVENT } from './composition/generated-world-ready.js';
 import { buildWorldIdentity } from './ui/world-identity.js';
 import {
   CompanionAskClient,
@@ -339,6 +341,47 @@ function personalWorldControl(): PersonalWorldControl | undefined {
   return control;
 }
 
+/**
+ * A generated world whose tiles were still baking when it opened is opened again, in place, once
+ * they are baked (`GENERATED_WORLD_READY_EVENT`): its entry is read again and the world mounted.
+ */
+shell.addEventListener(GENERATED_WORLD_READY_EVENT, () => {
+  const client = state.worldEntries;
+  const active = state.activeWorldEntry;
+  if (client === null || active === null) return;
+  void (async () => {
+    const entry = await client.entry(active.entryId);
+    state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((candidate) =>
+      candidate.entryId === entry.entryId ? entry : candidate));
+    await openWorldEntryContext(state, entry);
+    await mount();
+  })();
+});
+
+/**
+ * The recipes a new world can be generated from. A world made from one is opened the way a chosen
+ * saved world is: its entry becomes the active one and the world is mounted afresh.
+ */
+function showWorldRecipes(): void {
+  const client = state.worldEntries;
+  if (client === null) return;
+  shell.querySelector('.world-recipes')?.remove();
+  const panel = buildWorldRecipes({
+    recipes: () => client.recipes(),
+    make: (recipe) => client.makeGenerated(recipe.key, recipe.label),
+    open: async (entry) => {
+      panel.root.remove();
+      state.savedWorldEntries = await client.entries();
+      await openWorldEntryContext(state, entry);
+      state.worldEntryError = null;
+      shell.removeAttribute('data-world-state');
+      await mount();
+    },
+    onClose: () => panel.root.remove(),
+  });
+  shell.append(panel.root);
+}
+
 /** Show the list. Only `mountNoWorld` calls this, and only when there is a choice to make. */
 async function mountWorldEntry(): Promise<void> {
   const entries = state.worldEntries;
@@ -524,7 +567,8 @@ async function mount(): Promise<void> {
   canvas.hidden = false;
   shell.removeAttribute('data-world-state');
 
-  const built = state.activeWorldEntry?.sourceKind === 'authored'
+  // A world with no personal source lays out no photographs: its scene is empty.
+  const built = state.activeWorldEntry != null && state.activeWorldEntry.sourceKind !== 'personal'
     ? {
         scene: makeScene([], 1, current.stateVersion),
         omitted: Object.freeze([]),
@@ -580,12 +624,13 @@ async function mount(): Promise<void> {
 
   const firstUse = createFirstUseGuidance(window.localStorage, {
     // A person who has already built in this world is not new, whatever this device remembers,
-    // and a world drawn from their photographs is not empty: its places are drawn content.
+    // and a world drawn from their photographs, or generated from a recipe, is not empty: its
+    // places or its streets are drawn content.
     worldHasContent: () => {
       const entry = state.activeWorldEntry;
       return entry !== null &&
         (entry.currentAuthoredEditSeq > 0 || entry.sourceAttachments.length > 0 ||
-          built.scene.islands.length > 0);
+          built.scene.islands.length > 0 || entry.generatedGround != null);
     },
     smallSquareOffered: () => objects.smallSquareOffered(),
   });
@@ -786,9 +831,12 @@ async function mount(): Promise<void> {
   });
   state.disposeEnvironmentSelection = () => environmentSelection.dispose();
 
-  // Scene segments belong to source-backed geometry. The authored starter descriptor declares no
-  // source dependencies or reconstructed scene, so it mounts no panel and makes no segment request.
-  const segments = isAuthoredStarter ? null : mountSegments({
+  // Scene segments belong to source-backed geometry. A world with no personal source (the authored
+  // starter, or one generated from a recipe) declares no source dependencies or reconstructed
+  // scene, so it mounts no panel and makes no segment request.
+  const sourceless = isAuthoredStarter || (state.activeWorldEntry != null
+    && state.activeWorldEntry.sourceKind !== 'personal');
+  const segments = sourceless ? null : mountSegments({
     env,
     state,
     snapshot: current,
@@ -976,6 +1024,12 @@ async function mount(): Promise<void> {
     ...(state.activeWorldEntry === null ? {} : {
       onExperiment: () => dispatchShell({ type: 'toggle-experiment' }),
       onCompare: () => dispatchShell({ type: 'toggle-compare' }),
+    }),
+    ...(state.worldEntries === null ? {} : {
+      onMakeWorld: () => {
+        dispatchShell({ type: 'toggle-menu' });
+        showWorldRecipes();
+      },
     }),
     onCommand: handleAtlasCommand,
   });

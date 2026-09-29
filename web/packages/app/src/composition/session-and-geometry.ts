@@ -276,7 +276,9 @@ async function connectEntrySourceMedia(
   entry: SavedWorldEntry,
   settingsNotices: readonly string[],
 ): Promise<void> {
-  if (entry.sourceKind === 'authored') {
+  // A world with no personal source (an authored starter or one generated from a recipe) holds no
+  // photographs, so it has no source media to read.
+  if (entry.sourceKind !== 'personal') {
     state.previewSourceMedia = new Map();
     state.sourceMediaNotices = Object.freeze(settingsNotices);
     return;

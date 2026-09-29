@@ -74,7 +74,13 @@ from exulanica.world.society_input_policy import (
     input_profile,
 )
 from exulanica.world.society_place import ceil_distance
-from exulanica.world.society_planner import CLEARANCE_MM, input_sha256, validate_society_input
+from exulanica.world.society_planner import (
+    CLEARANCE_MM,
+    WALKING_SURFACES_ALTITUDE,
+    WALKING_SURFACES_FRAME,
+    input_sha256,
+    validate_society_input,
+)
 from exulanica.world.starter import AUTHORED_STARTER_COMPOSER
 
 #: The descriptor profile. It names the ground a saved world states, the area the society walks,
@@ -150,10 +156,13 @@ class SocietyGround:
     """A saved world's authored ground as a society reads it, bound to the snapshot it came from.
 
     ``ground_kind`` is what the ground module states, ``flat`` for a bounded rectangle and
-    ``endless`` for a plane with no edge, or ``unstated`` for a world that states no ground at all,
-    such as one made from photographs, whose people walk the plane its objects are placed on.
-    ``area`` is where the society walks. ``element_id`` is the ground's element, or None where the
-    world has no ground element.
+    ``endless`` for a plane with no edge, ``unstated`` for a world that states no ground at all,
+    such as one made from photographs, whose people walk the plane its objects are placed on, or
+    ``surfaces`` for a world whose own records state the surfaces people walk, such as one
+    generated from the city grammar. ``area`` is where the society walks. ``element_id`` is the
+    ground's element, or None where the world has no ground element. ``navigation_form`` is what
+    people walk, as the ground's catalog entry states it: a lattice over ``area``, or the world's
+    walking surfaces inside it.
     """
 
     world_id: str
@@ -163,7 +172,7 @@ class SocietyGround:
     element_id: str | None
     module_key: str
     module_version: int
-    ground_kind: Literal["flat", "endless", "unstated"]
+    ground_kind: Literal["flat", "endless", "unstated", "surfaces"]
     elevation_mm: int
     area: WalkableArea
     #: Where a person arrives in this world, on the ground plane, by the ground's arrival rule in
@@ -178,6 +187,8 @@ class SocietyGround:
     #: ground's own entry in the society ground catalog states them; each reader passes its entry's.
     lattice_mm: int = LATTICE_MM
     navigation_profile: str = NAVIGATION_PROFILE
+    #: What people walk: ``lattice`` or ``walking_surfaces`` (the catalog's navigation forms).
+    navigation_form: str = "lattice"
 
     @property
     def support_id(self) -> str:
@@ -211,6 +222,10 @@ class SocietyGround:
             "clearance_mm": CLEARANCE_MM,
             "lattice_mm": self.lattice_mm,
         }
+        if self.navigation_form != "lattice":
+            # Stated only where it is not a lattice, so every ground document written before
+            # grounds had forms keeps the digest its stored inputs bind.
+            document["navigation_form"] = self.navigation_form
         document["document_sha256"] = society_state_sha256(document)
         return document
 
@@ -224,6 +239,13 @@ class SocietyGround:
         A saved world's ground is source-independent, so this frame states no geodetic origin
         rather than placing an authored world somewhere on the Earth it was never measured on.
         """
+        if self.navigation_form == "walking_surfaces":
+            return {
+                "name": WALKING_SURFACES_FRAME,
+                "axis_order": ["east", "south"],
+                "horizontal_unit": "millimetre",
+                "altitude_reference": WALKING_SURFACES_ALTITUDE,
+            }
         return {
             "name": FRAME_NAME,
             "axis_order": ["east", "south"],
@@ -1048,19 +1070,25 @@ def authored_ground_from_snapshot(
     """Read a saved world's ground out of its own structural snapshot, and say where to walk.
 
     The snapshot's composer names its ground in the society ground catalog
-    (:func:`~exulanica.world.society_grounds.society_ground_for_composer`), and that ground's
-    reader reads it: the built-in starter's (:func:`_starter_ground`) or a world made from
-    photographs (:func:`_made_world_ground`). ``region_id`` is the region the society stands in,
-    which a world of several regions needs named. A composer the catalog does not state, or a
-    ground with no reader, is refused with ``InvalidStructuralData``, never read by guessing.
+    (:func:`~exulanica.world.society_grounds.society_ground_for_composer`), and the reader for
+    that ground's navigation and floor forms reads it: a lattice on a ground the world states
+    (the built-in starter's, :func:`_starter_ground`), a lattice on a floor the society declares
+    (a world made from photographs, :func:`_made_world_ground`) or the walking surfaces a world's
+    own records state (a generated world, :func:`_walking_surfaces_ground`). ``region_id`` is the
+    region the society stands in, which a world of several regions needs named. A composer the
+    catalog does not state, or forms with no reader, are refused with ``InvalidStructuralData``,
+    never read by guessing.
     """
     try:
         kind = society_ground_for_composer(composer_key)
     except UnknownSocietyGround as exc:
         raise InvalidStructuralData(str(exc)) from exc
-    reader = _GROUND_READERS.get(kind.key)
+    reader = _GROUND_READERS.get((kind.navigation, kind.floor))
     if reader is None:
-        raise InvalidStructuralData(f"no reader is implemented for the society ground {kind.key!r}")
+        raise InvalidStructuralData(
+            f"no reader is implemented for a ground that walks a {kind.navigation} on a "
+            f"{kind.floor} floor (society ground {kind.key!r})"
+        )
     return reader(
         kind,
         world_id=world_id,
@@ -1118,7 +1146,7 @@ def _starter_ground(
         )
     stated = region.ground
     if isinstance(stated, BoundedAuthoredGround):
-        ground_kind: Literal["flat", "endless", "unstated"] = "flat"
+        ground_kind: Literal["flat", "endless", "unstated", "surfaces"] = "flat"
         area = WalkableArea("ground", 0, 0, stated.half_width_mm, stated.half_depth_mm)
     elif isinstance(stated, EndlessAuthoredGround):
         ground_kind = "endless"
@@ -1244,8 +1272,18 @@ def _made_world_ground(
     )
 
 
-#: Each ground the catalog states, read by its own reader. A ground with none is refused by name.
-_GROUND_READERS: Final = {
-    "authored_starter": _starter_ground,
-    "made_world": _made_world_ground,
+def _walking_surfaces_ground(kind: SocietyGroundKind, **snapshot: Any) -> SocietyGround:
+    """A world whose own records state its walking surfaces (:mod:`society_walking_surfaces`)."""
+    from exulanica.world.society_walking_surfaces import walking_surfaces_ground
+
+    return walking_surfaces_ground(kind, **snapshot)
+
+
+#: The reader for each pair of forms a ground's catalog entry states, what people walk and what
+#: they stand on, never the entry's name: another ground of the same forms needs only an entry.
+#: Forms with no reader are refused by name.
+_GROUND_READERS: Final[Mapping[tuple[str, str], Callable[..., SocietyGround]]] = {
+    ("lattice", "stated"): _starter_ground,
+    ("lattice", "declared"): _made_world_ground,
+    ("walking_surfaces", "stated"): _walking_surfaces_ground,
 }

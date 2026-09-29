@@ -124,8 +124,8 @@
       "refusal": null,
       "space": {
         "kind": "ground-lattice",
-        "profiles": ["authored-ground-lattice/v1", "bounded-sidewalk-graph/v1", "exulanica.society-place/v1", "exulanica.society-place/v2"],
-        "reason": "The route graph a society's input or a living society's place states: a district's sidewalk graph, a saved world's declared lattice or a living place's walking graph."
+        "profiles": ["authored-ground-lattice/v1", "bounded-sidewalk-graph/v1", "city-walking-surfaces/v1", "exulanica.society-place/v1", "exulanica.society-place/v2"],
+        "reason": "The route graph a society's input or a living society's place states: a district's sidewalk graph, a saved world's declared lattice, the walking surfaces a generated world's records state, or a living place's walking graph."
       },
       "status": "built"
     }

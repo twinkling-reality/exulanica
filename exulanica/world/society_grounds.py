@@ -2,14 +2,18 @@
 
 ``assets/catalogs/society-ground/society-ground.v<N>.json`` states, once for each kind of ground a
 saved world's society is composed over, the facts about that ground which no world states: the
-structural composer whose ground it reads, where a person arrives on it (the spawn the world states,
-or by rule the origin of the region the society lives in), the navigation profile its route lattice
-is recorded under, the lattice spacing, the area a society declares where the ground states no
-edge, and how many people a society over it starts with, each with the reason for its figure. A
-navigation profile names one discretisation and one population, so two grounds that share one
-state the same figures, and the catalog refuses two that do not. The society's
-ground builder (:mod:`exulanica.world.society_authored_ground`) reads the spacing and the declared
-area, and the repository reads the population when it creates a society; nothing else states them.
+structural composer whose ground it reads, what people walk on it (a lattice over an area, or the
+walking surfaces the world's own records state), where a person arrives on it (the spawn the world
+states, or by rule the origin of the region the society lives in), what they stand on (a ground the
+world states, or a floor the society declares), the navigation profile its routes are recorded
+under, the lattice spacing, the area a society declares where the ground states no edge, and how
+many people a society over it starts with (a stated figure, or a rule over the world's own premises
+with the most people it may produce), each with the reason for its figure. A navigation profile
+names one discretisation and one population, so two grounds that share one state the same figures,
+and the catalog refuses two that do not. The society's ground builder
+(:mod:`exulanica.world.society_authored_ground`) reads a ground by its navigation and floor forms,
+never by its entry's name, and the spacing and declared area; the repository reads the population
+when it creates a society (:func:`society_population`); nothing else states them.
 
 A stored input records the navigation profile, the spacing and the area it was composed with, so
 replay never reads this catalog. A different figure for a ground is therefore a new entry with a
@@ -41,16 +45,21 @@ __all__ = [
     "CATALOG_VERSION",
     "GROUND_ARRIVALS",
     "GROUND_FLOORS",
+    "GROUND_NAVIGATIONS",
+    "POPULATION_RULES",
     "SocietyGroundKind",
+    "SocietyPopulationRefused",
     "UnknownSocietyGround",
     "load_society_grounds",
+    "refuse_population_over_budget",
     "society_ground_for_composer",
     "society_ground_for_navigation",
     "society_grounds",
+    "society_population",
 ]
 
 CATALOG_ID: Final = "society-ground"
-CATALOG_VERSION: Final = 1
+CATALOG_VERSION: Final = 2
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", CATALOG_ID)
 )
@@ -60,6 +69,15 @@ GROUND_ARRIVALS: Final = ("spawn", "region_origin")
 #: What people stand on: a ground the world's own module states, or a floor the society declares
 #: in every region of a world that states none.
 GROUND_FLOORS: Final = ("stated", "declared")
+#: What people walk: a square lattice over the area a ground states or declares, or the walking
+#: surfaces the world's own records state.
+GROUND_NAVIGATIONS: Final = ("lattice", "walking_surfaces")
+#: How many people a society over a ground starts with: the figure its entry states, or one for
+#: each place in a home the world's own premises offer, up to the figure its entry states.
+POPULATION_RULES: Final = ("stated", "residents")
+#: A figure a form states none of: a ground that walks its world's surfaces states no lattice and
+#: declares no area, and says so with this, which its entry check requires.
+_STATES_NONE: Final = 0
 #: A positive figure with no upper bound of its own: ``_entry_check`` bounds each figure against
 #: the others, the navigation clearance and the reviewed reach.
 _POSITIVE = integer_field(1, sys.maxsize)
@@ -67,6 +85,15 @@ _POSITIVE = integer_field(1, sys.maxsize)
 
 class UnknownSocietyGround(CatalogError):
     """A composer or navigation profile the ground catalog does not state."""
+
+
+class SocietyPopulationRefused(ValueError):
+    """A population a ground's rule derived that no society over the ground may start with."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,11 +109,17 @@ class SocietyGroundKind:
     arrival: str
     #: What people stand on: one of :data:`GROUND_FLOORS`.
     floor: str
-    #: How many people a new society over this ground starts with.
+    #: How many people a new society over this ground starts with: the stated figure, or under
+    #: the ``residents`` rule the most the rule may produce.
     population: int
     lattice_mm: int
     #: The half extent of the square a society declares where the ground states no edge.
     declared_half_extent_mm: int
+    #: What people walk: one of :data:`GROUND_NAVIGATIONS`. The first catalog version walks a
+    #: lattice on every ground.
+    navigation: str = "lattice"
+    #: How the population is found: one of :data:`POPULATION_RULES`.
+    population_rule: str = "stated"
 
 
 def _figure(values: Mapping[str, object], name: str) -> int:
@@ -116,7 +149,27 @@ def _entry_check(where: str, values: Mapping[str, Any]) -> None:
             f"world is created with holds ({saved_world.population_minimum} to "
             f"{saved_world.population_maximum})"
         )
+    if values.get("navigation", "lattice") == "walking_surfaces":
+        # A ground whose world states its own walking surfaces walks them: no lattice and no
+        # declared area, and a population the world's own premises imply.
+        if (values["lattice_mm"], values["declared_half_extent_mm"]) != (_STATES_NONE,) * 2:
+            raise CatalogError(
+                f"{where}: a ground that walks its world's surfaces states no "
+                "lattice and declares no area"
+            )
+        if values["floor"] != "stated":
+            raise CatalogError(
+                f"{where}: a world that states its walking surfaces states its floor"
+            )
+        return
+    if values.get("population_rule", "stated") != "stated":
+        raise CatalogError(
+            f"{where}: only a ground that walks its world's surfaces finds its "
+            "population in the world's premises"
+        )
     lattice = _figure(values, "lattice_mm")
+    if lattice < 1:
+        raise CatalogError(f"{where}: a lattice has a positive spacing")
     # Every point of a lattice cell is within half its diagonal of a node, and a person reaches an
     # object from a node only within the reviewed reach.
     if lattice**2 > 2 * REVIEWED_REACH_MM**2:
@@ -128,6 +181,11 @@ def _entry_check(where: str, values: Mapping[str, Any]) -> None:
         raise CatalogError(
             f"{where}: a declared area holds a lattice step inside the navigation clearance"
         )
+
+
+#: A figure a form may state as none (:data:`_STATES_NONE`), bounded against the others by
+#: ``_entry_check``.
+_NON_NEGATIVE = integer_field(_STATES_NONE, sys.maxsize)
 
 
 _SCHEMAS: Final = MappingProxyType(
@@ -151,7 +209,30 @@ _SCHEMAS: Final = MappingProxyType(
                 ("reason", text_field),
             ),
             entry_check=_entry_check,
-        )
+        ),
+        2: CatalogSchema(
+            CATALOG_ID,
+            2,
+            (
+                ("composer_key", text_field),
+                ("navigation_profile", text_field),
+                ("navigation", _choice(GROUND_NAVIGATIONS)),
+                ("navigation_reason", text_field),
+                ("arrival", _choice(GROUND_ARRIVALS)),
+                ("arrival_reason", text_field),
+                ("floor", _choice(GROUND_FLOORS)),
+                ("floor_reason", text_field),
+                ("population_rule", _choice(POPULATION_RULES)),
+                ("population", _POSITIVE),
+                ("population_reason", text_field),
+                ("lattice_mm", _NON_NEGATIVE),
+                ("lattice_reason", text_field),
+                ("declared_half_extent_mm", _NON_NEGATIVE),
+                ("declared_area_reason", text_field),
+                ("reason", text_field),
+            ),
+            entry_check=_entry_check,
+        ),
     }
 )
 
@@ -181,6 +262,8 @@ def load_society_grounds(
             population=_figure(values, "population"),
             lattice_mm=_figure(values, "lattice_mm"),
             declared_half_extent_mm=_figure(values, "declared_half_extent_mm"),
+            navigation=str(values.get("navigation", "lattice")),
+            population_rule=str(values.get("population_rule", "stated")),
         )
         for entry in catalog.entries
         for values in (dict(entry.values),)
@@ -188,9 +271,15 @@ def load_society_grounds(
     composers = [ground.composer_key for ground in grounds]
     if len(set(composers)) != len(composers):
         raise CatalogError(f"{CATALOG_ID}: two grounds name the same composer_key")
-    figures: dict[str, tuple[int, int, int]] = {}
+    figures: dict[str, tuple[object, ...]] = {}
     for ground in grounds:
-        stated = (ground.population, ground.lattice_mm, ground.declared_half_extent_mm)
+        stated = (
+            ground.navigation,
+            ground.population_rule,
+            ground.population,
+            ground.lattice_mm,
+            ground.declared_half_extent_mm,
+        )
         if figures.setdefault(ground.navigation_profile, stated) != stated:
             raise CatalogError(
                 f"{CATALOG_ID}: grounds sharing navigation_profile {ground.navigation_profile} "
@@ -223,3 +312,48 @@ def society_ground_for_navigation(navigation_profile: str) -> SocietyGroundKind:
     raise UnknownSocietyGround(
         f"no society ground is stated for the navigation profile {navigation_profile!r}"
     )
+
+
+def society_population(document: Mapping[str, Any]) -> int:
+    """How many people a society over a saved world's input starts with, by its ground's rule.
+
+    The ground is found by the navigation profile the input records. A stated figure is the
+    entry's. Under the ``residents`` rule the input records the population its composition
+    derived from the world's premises, and a figure outside one to the entry's figure is refused
+    by name: a world whose homes hold nobody, or more people than one tick of the society was
+    measured to hold, starts no society rather than a different one.
+    """
+    ground = society_ground_for_navigation(document["navigation"]["profile"])
+    if ground.population_rule == "stated":
+        return ground.population
+    recorded = document.get("population")
+    if (
+        not isinstance(recorded, Mapping)
+        or type(size := recorded.get("size")) is not int
+        or recorded.get("rule") != ground.population_rule
+    ):
+        raise SocietyPopulationRefused(
+            "population_not_recorded",
+            f"an input over the {ground.key} ground records the population its "
+            f"{ground.population_rule} rule derived",
+        )
+    if size < 1:
+        raise SocietyPopulationRefused(
+            "world_holds_no_residents",
+            "this world's premises offer no place in a home, so its society would hold nobody",
+        )
+    refuse_population_over_budget(size, ground)
+    return size
+
+
+def refuse_population_over_budget(size: int, ground: SocietyGroundKind) -> None:
+    """Refuse, by name, a population past the most one tick of a society over ``ground`` was
+    measured to hold. A composition that derives a population asks it before its input is
+    validated, so a world whose homes hold more is refused by this name rather than as a
+    malformed input."""
+    if size > ground.population:
+        raise SocietyPopulationRefused(
+            "population_over_tick_budget",
+            f"this world's homes hold {size} people, and a society over the {ground.key} ground "
+            f"holds at most {ground.population}, the most one of its ticks was measured to hold",
+        )

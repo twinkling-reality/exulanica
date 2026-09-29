@@ -685,6 +685,29 @@
   border: 0;
   font-size: 9px;
 }
+/* The recipes a new world can be generated from: one choice per recipe, over the world. */
+#shell .world-recipes {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 41;
+  display: grid;
+  gap: 12px;
+  width: min(460px, 86vw);
+  padding: 24px 28px;
+  box-sizing: border-box;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--raised) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--raised) 64%, var(--edge));
+  border-radius: 3px;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(18px) saturate(108%);
+}
+#shell .world-recipes h2 { margin: 0; font: 400 21px/1.2 var(--ui-font-display); }
+#shell .world-recipes p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+#shell .world-recipes-list { display: grid; gap: 7px; }
+#shell .world-recipes-choice,
+#shell .world-recipes-close { justify-self: start; }
 #shell .world-menu-world { grid-column: span 2; }
 #shell .world-menu-character { grid-column: span 2; grid-row: span 2; }
 #shell .world-menu-settings { grid-column: span 2; }

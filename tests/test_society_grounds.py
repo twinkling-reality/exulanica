@@ -1,6 +1,6 @@
 """The grounds a society stands on are data, and the starter's reads exactly as it did.
 
-``assets/catalogs/society-ground/society-ground.v1.json`` states the starter ground's population,
+``assets/catalogs/society-ground/society-ground.v<N>.json`` states the starter ground's population,
 lattice spacing and declared area, with their reasons; the ground builder and the repository read
 them there. The goldens below were computed from the tree before the figures moved out of code
 (main at d7d3b2f1, the starter's constants 8, 2,000 mm and 12,000 mm), over the same objects and
@@ -104,21 +104,26 @@ def test_the_builders_figures_are_the_catalogs():
         society_ground_for_navigation("bounded-sidewalk-graph/v1")
 
 
-def test_every_ground_can_be_compared_under_the_comparison_protocol():
+def test_every_stated_ground_can_be_compared_under_the_comparison_protocol():
     """A comparison runs the society its world holds, with the population that society recorded
-    from its ground; the protocol refuses a larger one by name. Every ground a comparable engine
-    stands on therefore states a population the protocol runs, so no saved world is made that
-    cannot be compared."""
+    from its ground; the protocol refuses a larger one by name. Every ground that states its
+    population therefore states one the protocol runs. A ground whose population is its world's
+    residents (a generated town) may hold more, and a comparison of it is refused by name until
+    the protocol's maximum moves on a measurement of replaying one."""
     assert society_grounds(), "the parity needs a ground to hold"
     maximum = protocol_value(load_comparison_catalogs(), "population_maximum")
     assert CREATES["saved_world"] in COMPARISON_ENGINES
-    assert all(ground.population <= maximum for ground in society_grounds())
+    stated = [ground for ground in society_grounds() if ground.population_rule == "stated"]
+    assert stated, "the parity needs a stated ground to hold"
+    assert all(ground.population <= maximum for ground in stated)
 
 
 def _malformed(tmp_path, change) -> None:
-    document = json.loads((CATALOG_DIRECTORY / "society-ground.v1.json").read_text("utf-8"))
+    for path in CATALOG_DIRECTORY.glob("*.json"):
+        (tmp_path / path.name).write_bytes(path.read_bytes())
+    document = json.loads((CATALOG_DIRECTORY / "society-ground.v2.json").read_text("utf-8"))
     change(document["entries"])
-    (tmp_path / "society-ground.v1.json").write_text(json.dumps(document), encoding="utf-8")
+    (tmp_path / "society-ground.v2.json").write_text(json.dumps(document), encoding="utf-8")
     load_society_grounds(tmp_path)
 
 
@@ -151,9 +156,10 @@ def test_a_malformed_ground_catalog_is_refused(tmp_path, change, message):
 
 
 def test_a_file_the_catalog_has_no_schema_for_is_refused(tmp_path):
-    source = CATALOG_DIRECTORY / "society-ground.v1.json"
-    (tmp_path / source.name).write_bytes(source.read_bytes())
-    (tmp_path / "society-ground.v2.json").write_bytes(source.read_bytes())
+    for path in CATALOG_DIRECTORY.glob("*.json"):
+        (tmp_path / path.name).write_bytes(path.read_bytes())
+    source = CATALOG_DIRECTORY / "society-ground.v2.json"
+    (tmp_path / "society-ground.v3.json").write_bytes(source.read_bytes())
     with pytest.raises(CatalogError, match="files with no schema"):
         load_society_grounds(tmp_path)
 
@@ -162,11 +168,11 @@ def test_a_file_the_catalog_has_no_schema_for_is_refused(tmp_path):
 def test_the_repository_starts_a_saved_world_with_its_grounds_population(saved_world, monkeypatch):
     """Read from the ground's entry when a society is created: an entry stating three people
     starts three, over the same input."""
-    from exulanica.world import society_repository
+    from exulanica.world import society_grounds
 
-    stated = society_repository.society_ground_for_navigation
+    stated = society_grounds.society_ground_for_navigation
     monkeypatch.setattr(
-        society_repository,
+        society_grounds,
         "society_ground_for_navigation",
         lambda profile: dataclasses.replace(stated(profile), population=3),
     )

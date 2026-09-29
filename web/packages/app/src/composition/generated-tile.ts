@@ -1,10 +1,10 @@
 /**
  * DEVELOPMENT EVALUATION of one baked generated tile, inside the normal shell.
  *
- * A generated tile may not appear in any person's world until a superseding governance ADR is
- * accepted in writing. So this module is reached only from `renderer.ts`, only behind
- * `import.meta.env.DEV`, and only when the synthetic preview route names a tile; it refuses to run
- * otherwise. A production build drops the branch and this module with it, which
+ * A person's own world draws the tiles its saved entry declares, through `./generated-world.ts`
+ * (ADR-0027); naming any tile is evaluation. So this module is reached only from `renderer.ts`,
+ * only behind `import.meta.env.DEV`, and only when the synthetic preview route names a tile; it
+ * refuses to run otherwise. A production build drops the branch and this module with it, which
  * `test/generated-tile-evaluation.test.ts` proves by building the app.
  *
  * The tile replaces the owned district for that page: same shell, same Companion, same reticle,

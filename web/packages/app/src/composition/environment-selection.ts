@@ -5,6 +5,7 @@ import {
 } from '@exulanica/atlas-core';
 import { ApiError } from '@exulanica/graph-client';
 import {
+  hostGeneratedSociety,
   hostRegionSociety,
   localizeNYCFeatures,
   openingIsland,
@@ -1727,6 +1728,13 @@ export function mountEnvironmentSelection(
   async function societyRegion(entry: NonNullable<SessionState['activeWorldEntry']>): Promise<string | null> {
     if (entry.authoredScene != null) return entry.authoredScene.region.regionId;
     const binding = deps.state.atlas?.binding;
+    // A generated world's people live in the one region its entry declares, in the city's frame
+    // its tiles are drawn in, standing where a person arrives (`hostGeneratedSociety`).
+    if (entry.generatedGround != null) {
+      const { regionId, arrivalMm } = entry.generatedGround;
+      return binding?.generatedTile == null || hostGeneratedSociety(binding, regionId, arrivalMm[1]) === null
+        ? null : regionId;
+    }
     if (entry.declaredFloor == null || binding === undefined) return null;
     const client = deps.societyClient ?? new SocietyClient({ ...deps.credentials, worldId: entry.worldId });
     const stored = await client.read(entry.authoredVersionId).catch((error: unknown) => {
@@ -1807,7 +1815,8 @@ export function mountEnvironmentSelection(
       offerLayers(kind);
     }
     const entry = deps.state.activeWorldEntry;
-    if (!deps.env.preview && entry != null && (entry.authoredScene != null || entry.declaredFloor != null)) {
+    if (!deps.env.preview && entry != null
+      && (entry.authoredScene != null || entry.declaredFloor != null || entry.generatedGround != null)) {
       try {
         const regionId = await societyRegion(entry);
         if ((phase as string) === 'disposed') return;

@@ -1,0 +1,22 @@
+{
+  "grammar_id": "city",
+  "grammar_version": 3,
+  "bindings": [
+    {
+      "level": "city",
+      "values": {
+        "block_depth_mm": 40000,
+        "block_length_mm": 90000,
+        "city_extent_x_mm": 128000,
+        "city_extent_y_mm": 128000,
+        "driving_side": "right",
+        "front_setback_mm": 0,
+        "gutter_width_mm": 300,
+        "memory_precinct_lots": 0,
+        "storey_band_high": 4,
+        "storey_band_low": 2,
+        "terrain_relief_mm": 0
+      }
+    }
+  ]
+}

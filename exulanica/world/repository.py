@@ -59,7 +59,7 @@ from exulanica.world.style_structure import (
     classify_structure_style_compatibility,
     raise_for_incompatible_structure_style,
 )
-from exulanica.world.worlds import AUTHORED_STARTER
+from exulanica.world.worlds import world_kind
 
 __all__ = ["WorldStyleRepository"]
 
@@ -1331,27 +1331,17 @@ class WorldStyleRepository:
         )
 
     def _starter_world_fact(self) -> bool | None:
-        """The current snapshot's composer key where one is stored, else the world registry's
-        kind; ``None`` only for a world the registry does not hold, which the classifier refuses.
+        """Whether the world is source-independent, as its registered kind states
+        (:data:`exulanica.world.worlds.WORLD_KINDS`); ``None`` only for a world the registry does
+        not hold, which the classifier refuses. Every world is registered before any world table
+        names it (migration 0099), so the registry is the one place a world's kind is read.
         """
 
-        snapshot = self.connection.execute(
-            "select s.composer_key from world_structure_state st "
-            "join world_structure_snapshot s on s.workspace_id=st.workspace_id "
-            "and s.world_id=st.world_id and s.snapshot_id=st.current_snapshot_id "
-            "where st.workspace_id=%s and st.world_id=%s",
-            (self.workspace_id, self.world_id),
-        ).fetchone()
-        # The starter module builds on this one, so its composer key is read at call time.
-        from exulanica.world.starter import AUTHORED_STARTER_COMPOSER
-
-        if snapshot is not None:
-            return snapshot["composer_key"] == AUTHORED_STARTER_COMPOSER
         registered = self.connection.execute(
             "select kind from world_identity where workspace_id=%s and world_id=%s",
             (self.workspace_id, self.world_id),
         ).fetchone()
-        return None if registered is None else registered["kind"] == AUTHORED_STARTER
+        return None if registered is None else world_kind(registered["kind"]).source_independent
 
     def _validate_reference_compatibility(
         self, reference: StyleReference, topology_digest: str

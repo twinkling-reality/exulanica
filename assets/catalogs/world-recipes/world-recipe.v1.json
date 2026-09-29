@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-recipe",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "small_town",
+      "label": "A small town",
+      "composer": "city-grammar-town",
+      "composer_version": 1,
+      "specification": "small-town.v1",
+      "candidates": 4,
+      "candidates_reason": "A world's seed is drawn from this recipe and the world's own identity, trying candidates 0, 1, 2 and 3 in that order and keeping the first that generates and whose tile documents pass the grammar's own checks; a world none of them generates is refused by name rather than given a seed chosen any other way. Measured on the development machine over 40 world identities, 32 first candidates passed and 8 were refused by the grammar's tile check (a street tree reaching outside its owner's extent), so four candidates leave about one world in six hundred refused. Four is also the request's bound: generation runs inside the request that makes a world, and four candidates at the slowest candidate measured (0.32 s, generation and tile checks together) stay under two seconds.",
+      "tiles": 1,
+      "reason": "One 128 m tile of the city grammar, version 3, with the streets, blocks, lots, buildings, premises, street furniture and walking surfaces its stages draw from the seed and nothing placed by hand. Blocks 90 m by 40 m fit a one-tile district: on the same tile, 140 m and 120 m blocks left no room for a block (0 of 16 seeds generated each) and 100 m by 56 m blocks generated for 2 of 12 seeds, while 90 m by 40 m generated for 40 of 40. Two to four storeys make a small town rather than a corridor of six-storey walls; no lot is kept back as a memory precinct, so every lot is built on; a flat terrain keeps walking surfaces within the step the city grammar publishes. Traffic keeps right, a value the grammar requires to be stated.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    }
+  ]
+}

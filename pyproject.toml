@@ -164,6 +164,10 @@ exulanica-scene-worker = "exulanica.ingest.scene_worker_command:main"
 # recipes in a Node process of its own, under a timeout and a memory ceiling, and records each
 # bake before its bytes are written. Needs Node and the web package installed; downloads nothing.
 exulanica-material-bake = "exulanica.world.material_bake_command:main"
+# `uv run exulanica-generated-tile-worker --workspace <uuid> --once`. Bakes the tiles worlds
+# generated from a recipe are waiting for, off the request: claims each job as the runtime role and
+# publishes each bake through the owner connection migration 0072 requires. Needs Node and web/.
+exulanica-generated-tile-worker = "exulanica.ingest.generated_tiles_command:main"
 # `uv run exulanica-wmp project ...` creates a signed, independently verifiable World Memory
 # Package; verify, inspect, and diff never open PostgreSQL.
 exulanica-wmp = "exulanica.world_package.cli:main"

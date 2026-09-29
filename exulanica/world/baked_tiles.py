@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 import psycopg
+from psycopg.rows import dict_row
 
 from exulanica.db.read_check import final_read_check
 from exulanica.errors import BlobNotFoundError, ExulanicaError
@@ -48,6 +49,7 @@ __all__ = [
     "TileBytesMissing",
     "TileQuotaRefused",
     "UnknownBakedTile",
+    "current_bake",
 ]
 
 TILE_MEDIA_TYPE: Final = "application/vnd.exulanica.owd"
@@ -124,6 +126,26 @@ class ServedTile:
 
 def _hex(value: object) -> str:
     return bytes(value).hex()  # type: ignore[arg-type]
+
+
+#: Which of one tile's bakes is current: the most recently published, ties broken by key, a
+#: faulted bake included. :meth:`BakedTileRepository.current` says why; :func:`current_bake` reads
+#: it for one tile by the digest over its bake inputs.
+_CURRENT_FIRST: Final = "baked_at desc, baked_tile_id desc"
+
+
+def current_bake(connection: psycopg.Connection, tile_inputs_digest: str) -> BakedTile | None:
+    """The current bake of the tile whose bake inputs have this digest, by the rule every listing
+    of baked tiles uses, or None when it was never baked. A tile document baked by two tessellators
+    has two rows (migration 0077), so the digest alone names no single row; this names the current
+    one."""
+    with connection.cursor(row_factory=dict_row) as cursor:
+        row = cursor.execute(
+            f"select {_COLUMNS} from baked_tile where tile_inputs_digest = %s "
+            f"order by {_CURRENT_FIRST} limit 1",
+            (bytes.fromhex(tile_inputs_digest),),
+        ).fetchone()
+    return None if row is None else _row(row)
 
 
 def _row(row: Mapping[str, Any]) -> BakedTile:
@@ -257,7 +279,7 @@ class BakedTileRepository:
         rows = self.connection.execute(
             f"select distinct on (lod, tile_y, tile_x) {_COLUMNS} from baked_tile "
             "where world_seed = %s and (%s::int is null or lod = %s) "
-            "order by lod, tile_y, tile_x, baked_at desc, baked_tile_id desc",
+            f"order by lod, tile_y, tile_x, {_CURRENT_FIRST}",
             (bytes.fromhex(world_seed), lod, lod),
         ).fetchall()
         return [_row(row) for row in rows]
@@ -283,6 +305,24 @@ class BakedTileRepository:
         problem theirs. The row is checked again under the final read check, so ``connection`` must
         be idle, as a route's autocommit connection is between statements.
         """
+        tile, data = self._checked_bytes(baked_tile_id)
+        charged = self._charge(workspace_id, baked_tile_id)
+        return ServedTile(data=data, tile=tile, charged=charged)
+
+    def serve_to_its_world(self, baked_tile_id: uuid.UUID) -> ServedTile:
+        """One tile's bytes for the generated world whose snapshot names it, never charged.
+
+        Checked exactly as :meth:`serve` checks them, and recorded in no delivery ledger: the
+        caller has read that a generated world the workspace holds names this tile, and a
+        generated world's tiles are bounded by the world-count policy and the reviewed recipes it
+        is made from, not by the tile quota (``exulanica/api/permissions.py``).
+        """
+        tile, data = self._checked_bytes(baked_tile_id)
+        return ServedTile(data=data, tile=tile, charged=False)
+
+    def _checked_bytes(self, baked_tile_id: uuid.UUID) -> tuple[BakedTile, bytes]:
+        """A servable tile's bytes, held to their digest, then the row checked again under the
+        final read check. ``connection`` must be idle."""
         tile = self.servable(baked_tile_id)
         try:
             data = self.store.get(BlobId(bytes.fromhex(tile.container_sha256)))
@@ -295,8 +335,7 @@ class BakedTileRepository:
         ):
             raise TileBytesMissing(f"baked tile {baked_tile_id}'s bytes are not what it records")
         self._final_check(tile)
-        charged = self._charge(workspace_id, baked_tile_id)
-        return ServedTile(data=data, tile=tile, charged=charged)
+        return tile, data
 
     def _charge(self, workspace_id: uuid.UUID, baked_tile_id: uuid.UUID) -> bool:
         """Record the delivery, spending one tile of the quota the first time only.

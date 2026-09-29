@@ -89,10 +89,10 @@ describe('the About panel says what the open world is, by its kind', () => {
       'Official BUILDING footprints. Memory and fantasy layers are separate from the geographic view.');
   });
 
-  it('generated-tile: generated for development evaluation, not recorded from a real place', () => {
+  it('generated-tile: generated from the catalogs, not recorded from a real place', () => {
     const sentence = aboutWorld(kind({ generatedTile: TILE }));
-    expect(sentence).toBe('A generated street tile, opened for development evaluation. Its streets and building '
-      + 'forms are generated, not recorded from a real place.');
+    expect(sentence).toBe('A world generated from the city grammar\'s catalogs. Its streets, buildings and shops '
+      + 'are generated, not recorded from a real place.');
     expectPlainSentence(sentence);
     expect(sentence).not.toMatch(/sidewalk|BUILDING footprints|source-backed/i);
   });

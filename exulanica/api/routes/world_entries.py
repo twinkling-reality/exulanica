@@ -26,7 +26,7 @@ from exulanica.world import (
     SourceAttachmentSelection,
     StaleSavedWorldEntry,
 )
-from exulanica.world.saved_entries import SourceRebindRequired
+from exulanica.world.saved_entries import SourceRebindRequired, WorldTakesNoPhotographs
 from exulanica.world.source_membership_events import (
     MembershipEventConflict,
     MembershipEventRefused,
@@ -104,18 +104,49 @@ class DeclaredFloorView(BaseModel):
     elevation_mm: int
 
 
+class GeneratedTileView(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    tile_x: int
+    tile_y: int
+    tile_inputs_digest: str
+    #: The stored bake the page reads through this world's version, once one is stored.
+    baked_tile_id: uuid.UUID | None
+    #: ``baked`` when its bytes are served, ``baking`` while none is stored, ``failed`` when a
+    #: stored bake was found nondeterministic and is never served.
+    state: Literal["baked", "baking", "failed"]
+
+
+class GeneratedGroundView(BaseModel):
+    """What the page draws of a world generated from a recipe: its tiles, the one region its
+    people live in and where a person arrives, in that region's frame (east, height, south)."""
+
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    recipe_key: str
+    recipe_label: str
+    region_id: str
+    arrival_mm: tuple[int, int, int]
+    #: The way a person arriving faces, a plan vector east then south: toward the nearest street.
+    arrival_facing_mm: tuple[int, int]
+    tiles: list[GeneratedTileView]
+
+
 class SavedWorldEntryView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     entry_id: uuid.UUID
     world_id: str
     title: str
-    source_kind: Literal["personal", "authored"]
+    source_kind: Literal["personal", "authored", "generated"]
     source_snapshot_id: uuid.UUID
     source_snapshot_sha256: str
     authored_scene: AuthoredStarterSceneView | None
     #: Set for a world whose regions have the declared floor its people stand on; the app draws it.
     declared_floor: DeclaredFloorView | None
+    #: Set for a world generated from a recipe: the baked tiles the app draws, its region and where
+    #: a person arrives.
+    generated_ground: GeneratedGroundView | None = None
     authored_version_id: uuid.UUID
     authored_state_sha256: str
     authored_edit_seq: int
@@ -283,6 +314,8 @@ def _view(entry: SavedWorldEntry) -> SavedWorldEntryView:
         values["authored_scene"] = AuthoredStarterSceneView.model_validate(entry.authored_scene)
     if entry.declared_floor is not None:
         values["declared_floor"] = DeclaredFloorView.model_validate(entry.declared_floor)
+    if entry.generated_ground is not None:
+        values["generated_ground"] = GeneratedGroundView.model_validate(entry.generated_ground)
     values["source_attachments"] = [
         SavedWorldSourceAttachmentView.model_validate(attachment)
         for attachment in entry.source_attachments
@@ -466,6 +499,8 @@ def attach_sources(
             status_code=422,
             content={"code": "rebind_required", "detail": str(exc)},
         )
+    except WorldTakesNoPhotographs as exc:
+        return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
     except (InvalidStructuralData, ValueError) as exc:
         return JSONResponse(
             status_code=422,

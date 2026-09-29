@@ -1,48 +1,31 @@
 /**
- * DEVELOPMENT ONLY: where the evaluation entry finds a baked tile and the texture sets it names.
+ * DEVELOPMENT ONLY: where the evaluation entry finds a baked tile.
  *
  * Served from the repository the way `config.ts` serves the owned district: Vite resolves each file
  * to a URL at build time, and the page fetches the bytes. Nothing here is reachable from a
  * production build, because the only importer is `composition/generated-tile.ts`, which is
  * imported only behind `import.meta.env.DEV`; `test/generated-tile-evaluation.test.ts` builds the
- * app and proves no tile, texture set or tile code is emitted.
+ * app and proves no development tile is emitted.
  *
  * A tile is named by its file name without `.owd`, and only `./tiles/` is searched: pinned golden
  * bakes this entry carries for development (see `./tiles/README.md`). Baked corridor streets are not
  * files in the repository; they live in the baked tile store and a permission-gated route serves
  * them, so they are not reachable from here.
  *
- * The texture library is separate from the tiles on purpose. A tile fetched from the route cites the
- * same committed, published sets a golden does, and nothing serves those sets over HTTP yet, so
- * `committedTextureLibrary()` hands them to either path. Where the container comes from is the part
- * that differs, and it is the part that must never be committed.
+ * The texture library is separate from the tiles on purpose, and it is not development only: a
+ * saved generated world is dressed from the same committed sets
+ * (`../texture-library.ts`), so both paths read that one module. Where the container
+ * comes from is the part that differs, and it is the part that must never be committed.
  */
 
-import textureManifestUrl from '../../../../../assets/textures/manifest.json?url';
+import { type CommittedTextureLibrary, committedTextureLibrary } from '../texture-library.js';
+
+export { type CommittedTextureLibrary, committedTextureLibrary };
 
 const TILES: Readonly<Record<string, () => Promise<string>>> = import.meta.glob<string>(
   './tiles/*.owd',
   { query: '?url', import: 'default' },
 );
-
-/**
- * The committed sets' URLs, imported eagerly. The blobs sit outside the app's workspace, and Vite's
- * development server resolves a `?url` import of such a file only when a module imports it statically
- * (as the manifest above is); a lazy import of one is answered with its raw bytes instead of a URL
- * module, so the page could not load it. Eager imports are static, and they carry URLs, not bytes.
- * `test/generated-tile-sources.test.ts` resolves every pinned set through a real development server.
- */
-const TEXTURE_SETS: Readonly<Record<string, string>> = import.meta.glob<string>(
-  '../../../../../assets/textures/blobs/*.ltex',
-  { query: '?url', import: 'default', eager: true },
-);
-
-/** The committed texture library, which a tile from either source draws with. */
-export interface CommittedTextureLibrary {
-  readonly textureManifest: Uint8Array;
-  /** Bytes of a pinned set by its content digest, or a refusal if the repository has none. */
-  readonly textureSet: (contentSha256: string) => Promise<Uint8Array>;
-}
 
 export interface GeneratedTileSourceBytes extends CommittedTextureLibrary {
   readonly name: string;
@@ -65,22 +48,7 @@ export function generatedTileNames(): readonly string[] {
   return Object.keys(TILES).map((path) => baseName(path, '.owd')).sort();
 }
 
-/**
- * The committed manifest and the sets it pins, for a tile from any source. A tile fetched from the
- * product route needs exactly this and nothing else from the repository.
- */
-export async function committedTextureLibrary(): Promise<CommittedTextureLibrary> {
-  const textureManifest = await bytesAt(textureManifestUrl, 'The texture manifest');
-  return {
-    textureManifest,
-    async textureSet(contentSha256: string): Promise<Uint8Array> {
-      const entry = Object.entries(TEXTURE_SETS).find(([candidate]) => baseName(candidate, '.ltex') === contentSha256);
-      if (entry === undefined) throw new Error(`No committed texture set has digest ${contentSha256}`);
-      return bytesAt(entry[1], `Texture set ${contentSha256}`);
-    },
-  };
-}
-
+/** A pinned development tile by name, with the committed texture library it is dressed from. */
 export async function generatedTileSource(name: string): Promise<GeneratedTileSourceBytes> {
   const matches = Object.entries(TILES).filter(([path]) => baseName(path, '.owd') === name);
   if (matches.length === 0) {
