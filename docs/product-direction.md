@@ -121,7 +121,7 @@ and society activities are versioned catalogs under [`assets/catalogs`](../asset
 | Surface | Contract and acceptance boundary |
 | --- | --- |
 | Models deciding | [Decision roles](decision-roles-contract.md) and the [society contract](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose): a world's owner chooses an open model for a person or a group, and each choice is validated, receipted and replayed without a call. A role is registry data with one adapter module; the person is the only registered role. |
-| Comparisons | [Comparisons of models](society-experiments.md#comparisons-of-models): the same simulated hour once per model for one group, scored against the routine and waiting, bounded by a same-model control and shown side by side in the application's Compare view. A comparison starts from a local command, not from the application. |
+| Comparisons | [Comparisons of models](society-experiments.md#comparisons-of-models): the same simulated hour once per model for one group, scored against the routine and waiting, bounded by a same-model control and shown side by side in the application's Compare view, where the world's owner starts one within a spending bound they state; a local command defines and runs one by the same definition. |
 | Movement | [Movement modules](movement-modules-contract.md): walking, and flight for small birds on a clock every viewer shares. Road movement is built and connected to nothing. |
 | Worlds made from photographs | [Saved-world entry](saved-world-entry.md#which-photographs-a-personal-source-world-is-composed-from): a world composed from the person's reviewed photographs, one region per place, with later photographs added on confirmation. Each region has a declared floor, and the world hosts eight people on one of them, whose models its owner can choose. |
 | World entry and persistence | [Saved-world entry](saved-world-entry.md): owned authored starters, saved versions and reference photographs. Attaching a photograph does not create recovered scene geometry. |
@@ -136,9 +136,8 @@ and society activities are versioned catalogs under [`assets/catalogs`](../asset
 A fixture, test or recorded run establishes its stated boundary. Package verification is not
 runnable import; a successful upload is not a reconstructed place; a renderer is not a simulator.
 
-Not built: comparisons started from the application, model roles other than a person, traffic,
-weather or an economy run by models, a model choice in the owned district's living society, and a
-retraining loop.
+Not built: model roles other than a person, traffic, weather or an economy run by models, a model
+choice in the owned district's living society, and a retraining loop.
 
 ## First milestone
 
@@ -153,14 +152,12 @@ what accepts it and where the implementation stands.
 | A world to run | A small town from the catalogs opens as a saved version in the application, with its people visible and moving under the deterministic planner. | In part. A saved world furnished with the catalog's small square opens with eight people moving under the deterministic planner; no town is built from the catalogs. The [living-world rehearsal](evaluation/2026-09-25-rehearsal-living-world.json) passed this deliverable in part. |
 | A model per group | The people are split into named groups, and each group's decisions come from the open model chosen for it, through the one hosted policy boundary. The engine validates every proposed action; an invalid proposal is refused with its reason and the person keeps a valid state. | Implemented. The owner chooses a model for a person or a group, asked through the policy boundary; an answer the engine refuses is recorded with its reason, and the routine decides that turn. |
 | Recorded decisions | Every decision stores the model that served it, the observation it saw and the validated action. A run replays exactly from those records without calling a model. | Implemented. Every request and receipt is stored with the model that served it, and replay reads them without a call. |
-| Swap and compare | Two runs start from the same saved version and differ only in one group's model. The application shows them side by side, with the people and events that differ. | Implemented for one simulated hour, started from a local command. The Compare view shows the verdict and numbers, then one seed's hour from above on each side with what each person did minute by minute. |
+| Swap and compare | Two runs start from the same saved version and differ only in one group's model. The application shows them side by side, with the people and events that differ. | Implemented for one simulated hour, started from the application's Compare view within a bound its owner states, or from a local command. The Compare view shows the runs finishing, then the verdict and numbers, then one seed's hour from above on each side with what each person did minute by minute. |
 | Honest difference | A control pair with the same model in both arms bounds the difference that run-to-run variation alone produces; a reported difference between models exceeds that bound, or the comparison says it does not. | Implemented. A control arm runs one model twice, and the verdict says whether a difference between models exceeds what that pair shows. |
-| Independent reading | The runs, their decisions and the models that served them can be read through the authenticated API by a client other than the browser. | Not recorded. The comparisons, their runs and each stored decision are readable through the authenticated API, and no client other than the browser has a recorded run reading them. |
+| Independent reading | The runs, their decisions and the models that served them can be read through the authenticated API by a client other than the browser. | Recorded. The [developer client](capabilities/developer-client.md#reading-a-comparison-of-models) reads a comparison started from the application, its runs and every stored decision through the authenticated API with `world.read` alone ([record](evaluation/2026-09-29-developer-client-comparison.json)). |
 
 The gap between the implementation and the milestone as stated: the world is the small square's
-eight people rather than a town, a comparison covers one simulated hour rather than a day, it
-starts from a local command rather than the application, and no independent client has a recorded
-run reading the results.
+eight people rather than a town, and a comparison covers one simulated hour rather than a day.
 
 Two judged comparisons found no measured difference in how people fared between Qwen3 235B
 Instruct and Nemotron 3.5 Lightning, first for all eight people of the small square and then for a

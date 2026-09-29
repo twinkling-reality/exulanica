@@ -140,3 +140,41 @@
   .comparison-sides, .comparison-detail { grid-template-columns: 1fr; }
   .comparison-strip { grid-template-columns: 6rem minmax(0, 1fr); }
 }
+/* Starting a comparison: what is compared, what it could cost and typically costs, and the bound. */
+.comparison-start { display: grid; gap: .6rem; padding: .75rem 1rem; border: 1px solid var(--edge, #c5cfd2); background: var(--raised, #fff); }
+.comparison-start h3 { margin: 0; font-size: .95rem; }
+.comparison-start p { margin: 0; }
+.comparison-start-role, .comparison-start-note { color: var(--ink-soft, #4e5d64); }
+.comparison-start-note:empty { display: none; }
+.comparison-start-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: .6rem .9rem; }
+.comparison-start-fields select { width: 100%; }
+.comparison-start label { display: grid; gap: .2rem; }
+.comparison-start label > span { color: var(--ink-soft, #4e5d64); font-size: .8rem; }
+.comparison-start .comparison-start-check { display: flex; align-items: center; gap: .5rem; grid-column: 1 / -1; }
+.comparison-start select, .comparison-start input[type='number'], .comparison-start input[type='text'] {
+  min-height: 2.25rem;
+  padding: .3rem .5rem;
+  color: inherit;
+  background: var(--raised, #fff);
+  border: 1px solid var(--edge, #c5cfd2);
+  border-radius: 4px;
+  font: inherit;
+  max-width: 100%;
+}
+.comparison-start-plan { padding: .5rem .75rem; border-left: 3px solid var(--comparison-waiting); background: var(--atlas-plane, #f5f8f7f2); }
+.comparison-start-refusal { color: var(--ink, #202a2f); }
+.comparison-start-go { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }
+.comparison-start-go input { width: 8rem; }
+.comparison-start-button {
+  min-height: 2.5rem;
+  padding: .45rem .9rem;
+  color: var(--raised, #fff);
+  background: var(--accent, #40545d);
+  border: 1px solid var(--accent, #40545d);
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 600;
+}
+.comparison-start-button:disabled { opacity: .5; }
+.comparison-listing-progress { font-weight: 600; }
+.comparison-progress { margin-bottom: .35rem; font-weight: 600; }

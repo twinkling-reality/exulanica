@@ -35,6 +35,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -48,8 +49,11 @@ from exulanica.api.decision_host import (
     host_refusal,
     model_refusal,
     question_refusal,
+    share_kept,
 )
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
+from exulanica.api.society_comparison_start import development_seeds_in
+from exulanica.api.society_comparison_worker import SocietyComparisonWorker
 from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.consent.place_name_rights import released_place_names
@@ -73,6 +77,7 @@ from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores, tile_sto
 from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society import world_society_seed
+from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
 from exulanica.world.society_composition import REVIEWED_REACH_MM, reviewed_affordance_registry
 from exulanica.world.society_controls import (
     BASE_TICK_INTERVAL_DIVISOR,
@@ -119,6 +124,18 @@ SOCIETY_CONTROL_WORKER_ENV: Final = env_name("SOCIETY_CONTROL_WORKER")
 #: accounts. Absent or ``[]`` plays none. Independent of the account-wide switch above.
 SOCIETY_CONTROL_WORKSPACES_ENV: Final = env_name("SOCIETY_CONTROL_WORKSPACES")
 
+#: Who plays the comparisons started from the application, for the workspaces this host asks models
+#: for. Absent (or an explicit on), this process, in a thread. ``process``, a process of its own
+#: (``python -m exulanica.orchestration.comparison_worker``), and this one only serves starts.
+#: ``0``, ``false``, ``off`` or ``no``, nobody, and every start is refused
+#: (``comparisons_not_played``), since a start nothing plays would hold its world until the end.
+COMPARISON_WORKER_ENV: Final = env_name("COMPARISON_WORKER")
+
+#: A file of development seeds, one per line, that comparisons started from the application run
+#: on: a line is used only when its digest is one the seed catalog commits to the development
+#: phase. Absent, this computer holds none, and no comparison can be started from the application.
+COMPARISON_SEEDS_ENV: Final = env_name("COMPARISON_SEEDS")
+
 #: The base wait between simulated minutes, in whole milliseconds, within the bounds
 #: ``exulanica.world.society_controls`` declares. Absent means its declared default.
 SOCIETY_TICK_INTERVAL_MS_ENV: Final = env_name("SOCIETY_TICK_INTERVAL_MS")
@@ -131,6 +148,7 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
     "society_control_workspaces_duplicate": "names a workspace more than once",
     "society_tick_interval_not_integer": "must be a whole number of milliseconds",
+    "comparison_worker_not_recognised": "must be absent, on, process or off",
     "society_tick_interval_out_of_bounds": (
         f"must be {BASE_TICK_INTERVAL_MIN_MS} to {BASE_TICK_INTERVAL_MAX_MS} milliseconds and "
         f"divisible by {BASE_TICK_INTERVAL_DIVISOR}, so every speed divides it exactly"
@@ -205,6 +223,17 @@ class Services:
     runs_society_control_worker: bool = False
     #: ``build_services`` reads it from ``EXULANICA_SOCIETY_TICK_INTERVAL_MS``.
     society_base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS
+    #: The development seeds comparisons started from the application run on, in the seed
+    #: catalog's order; ``build_services`` reads them from ``EXULANICA_COMPARISON_SEEDS``.
+    comparison_seeds: tuple[str, ...] = ()
+    #: The catalogs a comparison is defined and scored under; None for the committed ones.
+    comparison_catalogs: ComparisonCatalogs | None = None
+    #: True when this process plays the comparisons started from the application; off for a
+    #: hand-constructed Services, as the derivative worker is.
+    runs_comparison_worker: bool = False
+    #: True when the configuration names a process of its own that plays them
+    #: (``EXULANICA_COMPARISON_WORKER=process``). With neither, no start is accepted.
+    comparisons_played_elsewhere: bool = False
     #: The place-name right's resolver, asked by every workspace policy this instance attaches
     #: whether a confirmed place's name may go to a hand-over. ``build_services`` injects the
     #: right's own (``exulanica.consent.place_name_rights``); the one that releases nothing is
@@ -303,6 +332,46 @@ class Services:
             workspace_id=workspace_id,
             world_id=world_id,
             actor=actor,
+            catalogs=self.comparison_catalogs or load_comparison_catalogs(),
+        )
+
+    def comparison_refusal(self, workspace_id: uuid.UUID) -> str | None:
+        """Why this server starts no comparison for a workspace, or None when it may: it holds no
+        development seed (``comparisons_not_set_up``), nothing plays the comparisons started here
+        (``comparisons_not_played``), it asks no model for the workspace
+        (``comparisons_not_run_here``), or it has no model client."""
+        if not self.comparison_seeds:
+            return "comparisons_not_set_up"
+        if not (self.runs_comparison_worker or self.comparisons_played_elsewhere):
+            return "comparisons_not_played"
+        if workspace_id not in self.society_control_workspaces:
+            return "comparisons_not_run_here"
+        if self.model_client is None:
+            return PROVIDER_CREDENTIAL_ABSENT
+        return None
+
+    def comparison_room(self, role: DecisionRole) -> Decimal | None:
+        """What this process's model budget has left for a comparison it plays itself, beside
+        the share ``role``'s contract keeps for other work; None where another process plays them,
+        whose budget this one cannot see."""
+        if not self.runs_comparison_worker or self.model_client is None:
+            return None
+        budget = self.model_client.budget
+        keep_usd, _keep_calls = share_kept(budget, role.contract())
+        return budget.ceiling_usd - budget.spent_usd - keep_usd
+
+    def build_comparison_worker(self, *, keeps_share: bool) -> SocietyComparisonWorker | None:
+        """What plays the comparisons started from the application, for the workspaces this host
+        asks models for, or None where it asks models for none or has no society runtime."""
+        if self.society_runtime is None or not self.society_control_workspaces:
+            return None
+        return SocietyComparisonWorker(
+            self.database,
+            runner_for=self.comparison_runner,
+            client=self.model_client,
+            manifest=load_manifest(),
+            workspaces=self.society_control_workspaces,
+            keeps_share=keeps_share,
         )
 
     def model_host_refusal(self, workspace_id: uuid.UUID, role: DecisionRole) -> str | None:
@@ -549,6 +618,7 @@ def build_services(
     if client is None and _role_credentials_set(environ):
         client = ModelClient()
     store = LocalContentAddressedStore(data_dir / BLOB_NAMESPACE)
+    comparison_player = _comparison_player(env_get("COMPARISON_WORKER", environ))
 
     return Services(
         database=database,
@@ -571,6 +641,9 @@ def build_services(
         society_base_tick_interval_ms=_society_tick_interval_ms(
             env_get("SOCIETY_TICK_INTERVAL_MS", environ)
         ),
+        comparison_seeds=_comparison_seeds(env_get("COMPARISON_SEEDS", environ)),
+        runs_comparison_worker=comparison_player == "here",
+        comparisons_played_elsewhere=comparison_player == "process",
         restore_state_path=(
             Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
         ),
@@ -671,6 +744,31 @@ def _character_appearance_runtime(
         store=store,
         catalog=catalog,
     )
+
+
+def _comparison_seeds(value: str | None) -> tuple[str, ...]:
+    """The development seeds the file ``value`` names holds, or none where it names no file this
+    process can read, which ``Services.warnings`` says; never a seed in any message."""
+    if not value:
+        return ()
+    try:
+        text = Path(value).read_text(encoding="utf-8")
+    except OSError:
+        return ()
+    return development_seeds_in(text, load_comparison_catalogs())
+
+
+def _comparison_player(value: str | None) -> str:
+    """Who plays the comparisons started from the application (``EXULANICA_COMPARISON_WORKER``):
+    ``here``, ``process`` or ``none``, or a named refusal of anything else."""
+    normalized = (value or "").strip().lower()
+    if normalized in ("", "1", "true", "on", "yes"):
+        return "here"
+    if normalized == "process":
+        return "process"
+    if normalized in ("0", "false", "off", "no"):
+        return "none"
+    raise SocietySettingRefused("comparison_worker_not_recognised", COMPARISON_WORKER_ENV)
 
 
 def _enabled(value: str | None) -> bool:

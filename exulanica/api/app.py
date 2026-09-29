@@ -244,6 +244,21 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.society_control_worker = society_worker
     app.state.society_control_thread = society_thread
+    # Comparisons started from the application are played here unless the configuration names
+    # another player or none (EXULANICA_COMPARISON_WORKER); this process serves other work too, so
+    # they keep its share.
+    comparison_worker = (
+        services.build_comparison_worker(keeps_share=True)
+        if services.runs_comparison_worker
+        else None
+    )
+    comparison_thread = (
+        threading.Thread(
+            target=comparison_worker.run, args=(society_stop,), name="comparisons", daemon=True
+        )
+        if comparison_worker is not None
+        else None
+    )
     worker = services.build_derivative_worker()
     app.state.derivative_worker = worker
     if worker is not None:
@@ -251,6 +266,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         if society_thread is not None:
             society_thread.start()
+        if comparison_thread is not None:
+            comparison_thread.start()
         # What startup made lives as long as the server. A full garbage collection walks every
         # tracked object and holds the interpreter's lock while it does, so no request the server is
         # answering moves: over about 172,000 objects once the application is imported, 33 to 36 ms
@@ -267,6 +284,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         society_stop.set()
         if society_thread is not None:
             await asyncio.to_thread(society_thread.join)
+        if comparison_thread is not None:
+            await asyncio.to_thread(comparison_thread.join)
         if worker is not None:
             worker.stop()
         # The flight's worker process starts at the first flight read; it stops with the server.

@@ -210,10 +210,10 @@ def test_one_model_is_asked_one_way_wherever_it_decides():
         "answering": dict(arm["answering"]),
     }
     # The positive control: the same answering in both places is held.
-    _held_asking(body, [outside], contract)
+    _held_asking(body, [outside], contract, person_role())
     outside["answering"] = {**arm["answering"], "order": ["tool_call"]}
     with pytest.raises(ComparisonRefused, match="asking_not_the_definitions"):
-        _held_asking(body, [outside], contract)
+        _held_asking(body, [outside], contract, person_role())
 
 
 def test_a_run_reads_the_answering_its_definition_recorded_for_each_model():

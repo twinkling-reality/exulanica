@@ -74,7 +74,7 @@ from typing import Any, Final, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from exulanica.models.budget import BudgetGuard
+from exulanica.models.budget import BoundedBudget, BudgetGuard
 from exulanica.models.cache import CacheKey, NullResponseCache, ResponseCache, cache_key
 from exulanica.models.chain import ModelChain
 from exulanica.models.choice import ChoiceRefused, ChoiceRequest
@@ -301,6 +301,22 @@ class ModelClient:
         bound._recorder = recorder
         bound._chain = self._chain.with_budget(recorder)
         return bound
+
+    def with_bound(self, bound: BoundedBudget) -> ModelClient:
+        """This client, spending through ``bound``, a part of its own budget, or a part of such a
+        part, with a ceiling of its own: every attempt is reserved and recorded against the part,
+        which passes it on towards this client's budget, so every bound on the way and the
+        process's ceiling hold. The copy shares the manifest, the cache and the policies, and
+        :attr:`budget` stays the process's."""
+        guard = bound.guard
+        while isinstance(guard, BoundedBudget):
+            guard = guard.guard
+        if guard is not self._recorder:
+            raise ValueError("a bound is a part of the budget this client spends from")
+        bounded = copy.copy(self)
+        bounded._recorder = bound
+        bounded._chain = self._chain.with_budget(bound)
+        return bounded
 
     def unchanged_by_policies(
         self, chosen: ChosenRoleBinding, model_id: str, texts: Sequence[str]

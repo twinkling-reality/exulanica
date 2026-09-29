@@ -33,26 +33,27 @@ import json
 import os
 import sys
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final
 
 from exulanica.api.services import build_services
-from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
+from exulanica.api.society_comparison_runner import ComparisonArm
+from exulanica.api.society_comparison_start import (
+    PHASE,
+    ComparisonSelection,
+    comparison_body,
+    definition_body,
+)
 from exulanica.models.usage import usd_string
 from exulanica.world.society_catalogs import load_comparison_catalogs
 from exulanica.world.society_comparison_repository import seed_digest
-from exulanica.world.society_comparison_result import comparison_result, protocol_value
+from exulanica.world.society_comparison_result import comparison_result
 
-__all__ = ["comparison_body", "development_seeds", "main"]
+__all__ = ["comparison_body", "development_seeds", "main", "parser", "selection"]
 
 BUDGET_VARIABLE: Final = "EXULANICA_BUDGET_USD"
-#: The phase a comparison this command defines runs on.
-PHASE: Final = "development"
-#: The anchor arms every comparison runs, by key.
-ROUTINE_ARM: Final = "routine"
-WAIT_ARM: Final = "wait"
 
 
 def development_seeds(path: Path, count: int) -> list[str]:
@@ -75,67 +76,6 @@ def development_seeds(path: Path, count: int) -> list[str]:
     if len(wanted) < count or any(digest not in found for digest in wanted):
         raise SystemExit(f"{path} does not hold the first {count} committed development seeds")
     return [found[digest] for digest in wanted]
-
-
-#: A group of everybody, as a definition states it: nobody named, nobody outside it.
-EVERYBODY: Final = {"people": None, "source": {"kind": "everyone"}}
-
-
-def comparison_body(
-    runner: SocietyComparisonRunner,
-    models: Sequence[ComparisonArm],
-    seeds: Sequence[str],
-    *,
-    control: bool,
-    phase: str = PHASE,
-    preregistration: dict[str, str] | None = None,
-    group: Mapping[str, Any] | None = None,
-    others: Sequence[Mapping[str, Any]] = (),
-) -> dict[str, Any]:
-    """A definition's body: the group every arm decides for, what decides for everybody else
-    (:meth:`~exulanica.api.society_comparison_runner.SocietyComparisonRunner.others_for`), the
-    anchors, one arm per model, the control, and the claim."""
-    catalogs = runner.catalogs
-    arms: dict[str, dict[str, Any]] = {
-        ROUTINE_ARM: {
-            "role": "one",
-            "decider": {"kind": "routine"},
-            "provider_config": None,
-            "answering": None,
-            "description": "Their own routine",
-        },
-        WAIT_ARM: {
-            "role": "zero",
-            "decider": {"kind": "wait"},
-            "provider_config": None,
-            "answering": None,
-            "description": "Waiting where they are",
-        },
-    }
-    keys = []
-    for index, model in enumerate(models):
-        key = f"model_{chr(ord('a') + index)}"
-        arms[key] = runner.model_arm(model, "candidate")
-        keys.append(key)
-    control_pair = None
-    if control:
-        arms[f"{keys[0]}_again"] = runner.model_arm(models[0], "control")
-        control_pair = [keys[0], f"{keys[0]}_again"]
-    family = [[ROUTINE_ARM, key] for key in keys]
-    primary = family[0]
-    if len(keys) >= 2:
-        primary = [keys[0], keys[1]]
-        family = [primary, *family]
-    return {
-        "window_ticks": protocol_value(catalogs, "window_ticks"),
-        "phase": phase,
-        "seeds": [seed_digest(seed) for seed in seeds],
-        "group": dict(EVERYBODY if group is None else group),
-        "others": [dict(other) for other in others],
-        "arms": arms,
-        "claim": {"primary": primary, "family": family, "control": control_pair},
-        "preregistration": preregistration,
-    }
 
 
 def _summary(result: dict[str, Any]) -> dict[str, Any]:
@@ -169,27 +109,31 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
-    parser.add_argument("--workspace", type=uuid.UUID, required=True)
-    parser.add_argument("--world", required=True)
-    parser.add_argument("--version", type=uuid.UUID, required=True)
-    parser.add_argument("--actor", type=uuid.UUID, required=True)
-    parser.add_argument("--model", action="append", required=True, help="<provider>/<model id>")
-    parser.add_argument("--control", action="store_true", help="run the first model twice")
-    chosen = parser.add_mutually_exclusive_group()
+def parser() -> argparse.ArgumentParser:
+    """The command's arguments."""
+    held = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
+    held.add_argument("--workspace", type=uuid.UUID, required=True)
+    held.add_argument("--world", required=True)
+    held.add_argument("--version", type=uuid.UUID, required=True)
+    held.add_argument("--actor", type=uuid.UUID, required=True)
+    held.add_argument("--model", action="append", required=True, help="<provider>/<model id>")
+    held.add_argument("--control", action="store_true", help="run the first model twice")
+    chosen = held.add_mutually_exclusive_group()
     chosen.add_argument(
         "--group-choice", type=int, default=None, help="the owner's choice whose people to swap"
     )
     chosen.add_argument(
         "--group", action="append", default=None, help="a person to swap, by subject id"
     )
-    parser.add_argument("--seeds", type=Path, required=True)
-    parser.add_argument("--seed-count", type=int, default=1)
-    parser.add_argument("--comparison", type=uuid.UUID, default=None)
-    arguments = parser.parse_args(argv)
-    if not os.environ.get(BUDGET_VARIABLE):
-        raise SystemExit(f"{BUDGET_VARIABLE} must state this command's bound")
+    held.add_argument("--seeds", type=Path, required=True)
+    held.add_argument("--seed-count", type=int, default=1)
+    held.add_argument("--comparison", type=uuid.UUID, default=None)
+    return held
+
+
+def selection(arguments: argparse.Namespace) -> ComparisonSelection:
+    """What the arguments compare, as the one definition path takes it; a model not named as
+    ``<provider>/<model id>``, and more than two models or no seed, are refused by the command."""
     if not 1 <= len(arguments.model) <= 2 or arguments.seed_count < 1:
         raise SystemExit("one or two models, and at least one seed")
     models = []
@@ -198,24 +142,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not provider or not model_id:
             raise SystemExit(f"--model {named!r} is not <provider>/<model id>")
         models.append(ComparisonArm(provider=provider, model_id=model_id))
+    return ComparisonSelection(
+        models=tuple(models),
+        control=arguments.control,
+        group="owner_choice"
+        if arguments.group_choice is not None
+        else "named"
+        if arguments.group is not None
+        else "everyone",
+        seed_count=arguments.seed_count,
+        choice_seq=arguments.group_choice,
+        people=None if arguments.group is None else tuple(arguments.group),
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    arguments = parser().parse_args(argv)
+    if not os.environ.get(BUDGET_VARIABLE):
+        raise SystemExit(f"{BUDGET_VARIABLE} must state this command's bound")
+    selected = selection(arguments)
     services = build_services()
     runner = services.comparison_runner(arguments.workspace, arguments.world, arguments.actor)
     if runner is None:
         raise SystemExit("this environment configures no society runtime")
     seeds = development_seeds(arguments.seeds, arguments.seed_count)
     comparison_id = arguments.comparison or uuid.uuid4()
-    group = None
-    if arguments.group_choice is not None:
-        group = runner.group_of_choice(arguments.version, arguments.group_choice)
-    elif arguments.group is not None:
-        group = {"people": sorted(set(arguments.group)), "source": {"kind": "named"}}
-    others = runner.others_for(arguments.version, None if group is None else group["people"])
     runner.define(
         arguments.version,
         comparison_id=comparison_id,
-        body=comparison_body(
-            runner, models, seeds, control=arguments.control, group=group, others=others
-        ),
+        body=definition_body(runner, arguments.version, selected, seeds),
     )
     runner.run_all(comparison_id, runner.reserve_all(comparison_id, seeds))
     with services.database.session(arguments.workspace) as connection:

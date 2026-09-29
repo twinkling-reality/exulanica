@@ -1,19 +1,21 @@
-"""Trusted local execution of a comparison: every run, minutes back to back, models asked as the
-host asks them.
+"""Trusted execution of a comparison: every run, minutes back to back, models asked as the host
+asks them.
 
-A comparison is defined and run by a local command (``python -m exulanica.orchestration.compare``),
-never from a route: the page only reads what a comparison recorded. The runner plays each run
-through :func:`exulanica.world.society_comparison.play`. Every person a model decides for, the
-group under a model arm and anybody outside it whose world's owner chose a model, is asked as the
-host's playback asks a person whose owner chose a model, save that rules which would change a
-question fail the run where the host leaves those people to their routine, and that an ask ends
-by the contract's deadline alone, with no lease to end within: the workspace's rules judge the
-fixed description and every label once a minute before anybody is asked, for each model in one
-pass, a label they would change is left out (``_sendable_labels``), and each person is asked by
-:func:`~exulanica.api.society_person_decisions.ask_person`, through the one client, with no
-database connection held while anybody is asked. Each minute's receipts are appended as they are
-paid for, and a run ends in one outcome: completed, with its minutes' digests and the score's
-terms, or failed by name.
+A comparison is defined by one path (:mod:`exulanica.api.society_comparison_start`), whether the
+local command (``python -m exulanica.orchestration.compare``) defines and runs it or a world's
+owner starts it from the application, which a host's comparison worker then runs
+(:mod:`exulanica.api.society_comparison_worker`). The runner plays each run through
+:func:`exulanica.world.society_comparison.play`, under the decision role its definition's
+contract names. Every subject a model decides for, the group under a model arm and anybody outside
+it whose world's owner chose a model, is asked as the host's playback asks one whose owner chose a
+model, save that rules which would change a question fail the run where the host leaves those
+people to their routine, and that an ask ends by the contract's deadline alone, with no lease to
+end within: the workspace's rules judge the fixed description and every label once a minute before
+anybody is asked, for each model in one pass, a label they would change is left out
+(:func:`~exulanica.api.decision_host.sendable_labels`), and each is asked by
+:func:`~exulanica.api.decision_host.ask`, through the one client, with no database connection held
+while anybody is asked. Each minute's receipts are appended as they are paid for, and a run ends in
+one outcome: completed, with its minutes' digests and the score's terms, or failed by name.
 
 A seed's anchors run before any model run of it, and a model run starts only once both of its
 seed's anchors completed: one refused by name while either has no outcome (``anchors_first``), and
@@ -25,12 +27,17 @@ denominator is fixed before any model is asked and no model's answers move it; i
 comparison with a model outside the group, the anchors ask it too, and the served result says so.
 
 What makes a run fail rather than complete is the host, never the model: a process budget that no
-longer fits one ask of the arm's model, a provider or credential the process refuses, a model the
-manifest no longer offers, rules that would change the question itself, or a request the rules
-refused. A score that counted such turns would describe the host. The whole process budget,
-``EXULANICA_BUDGET_USD``, is the comparison's: the runner keeps none of it back for other work, as
-the host keeps a share, because a comparison's process does nothing else. The world's hour
-bounds on a live world's decisions do not apply: a comparison writes nothing the live world reads.
+longer fits one ask of the arm's model, a bound the comparison was started under that no longer
+fits one ask or refused a call's reservation, a provider or credential the process refuses, a model
+the manifest no longer offers, rules that would change the question itself, or a request the rules
+refused. A
+score that counted such turns would describe the host. The local command's whole process budget,
+``EXULANICA_BUDGET_USD``, is the comparison's: it keeps none of it back for other work, as the host
+keeps a share, because the command's process does nothing else. A comparison started from the
+application runs under the bound its owner stated, a part of the host's process budget
+(:class:`~exulanica.models.budget.BoundedBudget`), and leaves the share the contract keeps for the
+host's other work. The world's hour bounds on a live world's decisions do not apply: a comparison
+writes nothing the live world reads.
 """
 
 from __future__ import annotations
@@ -44,23 +51,22 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Final
 
-from exulanica.api.society_person_decisions import (
-    PersonAsk,
-    _sendable_labels,
-    ask_bound_usd,
-    ask_person,
-)
+import psycopg
+
+from exulanica.api.decision_host import RoleAsk, ask, ask_bound_usd, sendable_labels, share_kept
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
+from exulanica.models.budget import BoundedBudget
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ManifestError
 from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
 from exulanica.models.policy import HostedRequestPolicy
 from exulanica.models.usage import usd_string
 from exulanica.selection.validation import Session
-from exulanica.world.decision_roles import RoleOption
+from exulanica.world.decision_roles import DecisionRole, RoleOption, decision_roles
+from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
-from exulanica.world.society_comparison import PlayedRun, RunPlan, play
+from exulanica.world.society_comparison import PlayedRun, RunPlan, plan_role, play
 from exulanica.world.society_comparison_repository import (
     SocietyComparisonRepository,
     run_id_for,
@@ -74,29 +80,40 @@ from exulanica.world.society_comparison_result import (
     run_outcome,
 )
 from exulanica.world.society_comparison_verdict import ANCHOR_ROLES
-from exulanica.world.society_decision_contract import (
-    PROMPT_VERSION,
-    DecisionContract,
-    decision_contract,
-    person_role,
-)
+from exulanica.world.society_decision_contract import DecisionContract
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 from exulanica.world.society_repository import SocietyRepository
 
-__all__ = ["RUN_FAILURE_CODES", "ComparisonArm", "SocietyComparisonRunner", "call_facts"]
+__all__ = [
+    "BOUND_SPENT",
+    "PEOPLE",
+    "RUN_FAILURE_CODES",
+    "ClaimLost",
+    "ComparisonArm",
+    "HostStopping",
+    "RunHost",
+    "SocietyComparisonRunner",
+    "call_facts",
+]
 
 _LOG = logging.getLogger(__name__)
 #: Every code a failed run's outcome records. Each says the host, not the model, ended the run's
-#: asking: a budget that no longer fits one ask, a provider or a credential the process refuses, a
-#: model the manifest no longer offers, serves from another provider or asks otherwise than the
-#: definition recorded, rules that would change the question itself, or a request the rules
-#: refused; a run the process stopped part way, found with receipts and no outcome; or a model run
-#: whose seed's anchors did not complete, closed before it asks. A receipt whose reason is one of
-#: them stops its run there; every other reason a turn was not the model's is the model's own, and
-#: is reported beside the score. The page has words for each.
+#: asking: a budget that no longer fits one ask, the bound a comparison was started under that no
+#: longer fits one ask or refused a call, a provider or a credential the process refuses, a model
+#: the manifest no longer offers, serves from another provider or asks otherwise than the definition
+#: recorded, rules that would change the question itself, or a request the rules refused; a run the
+#: process stopped part way, found with receipts and no outcome; a run a host could not play because
+#: the society's inputs are no longer available to it; one the comparison's claims closed before it
+#: was played, after hosts that claimed it kept stopping; or a model run whose seed's anchors did
+#: not complete, closed before it asks. A receipt whose reason is one of them stops its run there;
+#: every other reason a turn was not the model's is the model's own, and is reported beside the
+#: score. The page has words for each.
 RUN_FAILURE_CODES: Final = frozenset(
     {
         "anchor_failed",
+        "comparison_bound_spent",
+        "comparison_stopped",
+        "input_unavailable",
         "interrupted",
         "model_no_longer_offered",
         "process_budget_spent",
@@ -116,6 +133,14 @@ INTERRUPTED: Final = "interrupted"
 QUESTION_CHANGED: Final = "question_changed_by_rules"
 #: Why a model run is closed before it asks: an anchor of its seed failed, so it has no score.
 ANCHOR_FAILED: Final = "anchor_failed"
+#: Why a run stopped: the bound its comparison was started under no longer fits one ask of the
+#: dearest model due before a minute, or refused a call's reservation during one.
+BOUND_SPENT: Final = "comparison_bound_spent"
+#: Why a run a host could not play was closed: the society's inputs are no longer available to it.
+INPUT_UNAVAILABLE: Final = "input_unavailable"
+#: The word the subjects of a comparison's groups are known by: a society's people. The role a
+#: comparison defines by, unless it names another, is the one registered role deciding for them.
+PEOPLE: Final = "person"
 
 
 def _recorded_answering(
@@ -146,6 +171,33 @@ class _RunStopped(Exception):
 
 class _RunStoppedBeforeStart(_RunStopped):
     """A model arm the host cannot ask at all, found before its first minute."""
+
+
+class ClaimLost(Exception):
+    """The host playing a comparison no longer holds its claim: another host took it over after
+    its lease ran out. The run is left as it stands, with no outcome, for that host to close."""
+
+
+class HostStopping(Exception):
+    """The host playing a comparison is stopping. A run that has asked nothing yet is left with
+    no outcome, for the next claim to play from its start; one that has is closed as
+    ``interrupted``, since its hour cannot be played again under the receipts it holds."""
+
+
+@dataclass(frozen=True)
+class RunHost:
+    """What the host that claimed a comparison asks of each run it plays.
+
+    ``minute`` is called before each run and after each of its minutes: it renews the host's
+    claim, and raises :class:`ClaimLost` once the host no longer holds it. ``stopping`` says the
+    host is stopping (:class:`HostStopping`). ``recorded`` is called with the connection whose
+    transaction records a run's outcome, before it commits, so what the host keeps of its progress
+    is written with the outcome or not at all.
+    """
+
+    minute: Callable[[], None]
+    stopping: Callable[[], bool]
+    recorded: Callable[[psycopg.Connection], None]
 
 
 def call_facts(receipts: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -179,8 +231,8 @@ class ComparisonArm:
 
 
 class _Asking:
-    """A run's asking, minute by minute, as the host asks a chosen person's model: one or more
-    models, each person asked of the model that decides for them."""
+    """A run's asking, minute by minute, as the host asks a chosen subject's model: one or more
+    models, each subject asked of the model that decides for them, under the run's role."""
 
     def __init__(
         self,
@@ -189,14 +241,29 @@ class _Asking:
         contract: DecisionContract,
         models: Mapping[str, tuple[ModelSpec, AnsweringMechanism]],
         model_of: Callable[[str], str],
+        *,
+        role: DecisionRole,
+        bound: BoundedBudget | None = None,
+        run_bound: BoundedBudget | None = None,
+        keeps_share: bool = False,
     ) -> None:
         self.client = client
         self.manifest = manifest
         self.contract = contract
         #: Each model the run asks, by identifier, and how it is asked.
         self.models = models
-        #: The model that decides for a person a model decides for, by subject id.
+        #: The model that decides for a subject a model decides for, by subject id.
         self.model_of = model_of
+        self.role = role
+        #: The bound a comparison started from the application runs under, or None for the local
+        #: command, whose whole process budget is the comparison's.
+        self.bound = bound
+        #: This run's own part of that bound, which every call of the run is reserved through, so
+        #: what the bound refused is known run by run, whatever the other runs sharing it do.
+        self.run_bound = run_bound
+        #: The part of the process's budget and calls the asks leave for its other work: the
+        #: contract's share where the process does other work, nothing for the local command.
+        self.keep = share_kept(client.budget, contract) if keeps_share else (Decimal(0), 0)
 
     def offerable(
         self, tick: int, due: Mapping[str, Sequence[RoleOption]]
@@ -206,16 +273,30 @@ class _Asking:
             refused = self.client.refusals.get(self.models[model_id][0].provider)
             if refused is not None:
                 raise _RunStopped(refused)
-        # Room is judged as the host judges it, on what is spent, with nothing kept back: the
-        # comparison's process does no other work, so the whole budget is the comparison's. One
-        # ask of the dearest model due must fit.
+        # Room is judged as the host judges it, on what is spent: one ask of the dearest model
+        # due must fit, beside the part kept for other work where the process does any.
         budget = self.client.budget
-        need = max(ask_bound_usd(budget, self.models[m][0], self.contract) for m in asked)
+        bound_of = {
+            model_id: ask_bound_usd(self.role, budget, self.models[model_id][0], self.contract)
+            for model_id in asked
+        }
+        need = max(bound_of.values())
         calls = self.contract.value("answer_attempts_maximum")
-        if budget.ceiling_usd - budget.spent_usd < need or (
-            budget.max_calls - budget.billed_calls < calls
-        ):
+        keep_usd, keep_calls = self.keep
+        left_usd = budget.ceiling_usd - budget.spent_usd
+        left_calls = budget.max_calls - budget.billed_calls
+        if left_usd < need or left_calls < calls:
             raise _RunStopped("process_budget_spent")
+        if left_usd - keep_usd < need or left_calls - keep_calls < calls:
+            raise _RunStopped("process_share_spent")
+        # The bound is judged by the same rule on what the comparison spent: a minute is asked
+        # only while one ask of its dearest model fits what is left of it. Every call's
+        # reservation is then held to the bound by the bound itself.
+        if self.bound is not None and (
+            self.bound.ceiling_usd - self.bound.spent_usd < need
+            or self.bound.max_calls - self.bound.billed_calls < calls
+        ):
+            raise _RunStopped(BOUND_SPENT)
         sendable: dict[str, frozenset[str]] = {}
         for model_id in asked:
             labels = sorted(
@@ -226,23 +307,33 @@ class _Asking:
                     for option in options
                 }
             )
-            found = _sendable_labels(self.client, model_id, labels)
+            found = sendable_labels(self.role, self.client, model_id, labels)
             if found is None:
                 raise _RunStopped(QUESTION_CHANGED)
             sendable[model_id] = found
         return {subject: sendable[self.model_of(subject)] for subject in due}
 
+    def bound_refused(self) -> bool:
+        """Whether the bound refused a call of this run: a receipt says only that a budget
+        refused an ask, and the bound is a part of the process's budget."""
+        return self.run_bound is not None and self.run_bound.refusals > 0
+
     def answers(self, requests: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         ends_at = time.monotonic() + self.contract.value("decision_deadline_ms") / 1000
         workers = max(1, min(self.contract.value("concurrent_calls_maximum"), len(requests)))
+        keep_usd, keep_calls = self.keep
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = [
                 pool.submit(
-                    ask_person,
+                    ask,
                     self.client,
-                    PersonAsk(request, *self.models[request["provider_config"]["model_id"]]),
+                    RoleAsk(
+                        self.role, request, *self.models[request["provider_config"]["model_id"]]
+                    ),
                     self.contract,
                     ends_at,
+                    keep_usd=keep_usd,
+                    keep_calls=keep_calls,
                 )
                 for request in requests
             ]
@@ -251,9 +342,9 @@ class _Asking:
                 try:
                     results.append(future.result())
                 except Exception:
-                    # An error before anything was sent: an error in an attempt is ask_person's,
-                    # which keeps what the attempts cost. Never an exception's text, which may
-                    # carry request bytes or a credential.
+                    # An error before anything was sent: an error in an attempt is ask's, which
+                    # keeps what the attempts cost. Never an exception's text, which may carry
+                    # request bytes or a credential.
                     _LOG.error("A comparison's ask failed; the routine decides that turn")
                     results.append(
                         {
@@ -277,6 +368,9 @@ class _Anchor:
     def answers(self, requests: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         raise AssertionError("an anchor arm asks nobody")
 
+    def bound_refused(self) -> bool:
+        return False
+
 
 @dataclass(frozen=True)
 class SocietyComparisonRunner:
@@ -293,6 +387,18 @@ class SocietyComparisonRunner:
     actor: uuid.UUID
     #: The score, protocol and seed catalogs a comparison is defined and scored under.
     catalogs: ComparisonCatalogs = field(default_factory=load_comparison_catalogs)
+    #: The decision role this runner defines comparisons for: the one registered role deciding for
+    #: a society's people, unless its caller names another. A run asks the role its definition's
+    #: contract names (:func:`~exulanica.world.society_comparison.plan_role`), whichever this is.
+    decision_role: DecisionRole = field(
+        default_factory=lambda: decision_roles().deciding_for(PEOPLE)
+    )
+    #: The bound a comparison started from the application runs under, a part of the process's
+    #: budget; None for the local command, whose whole process budget is the comparison's.
+    bound: BoundedBudget | None = None
+    #: Whether its asks leave the contract's share of the process's budget for other work, as a
+    #: host serving the application does; the local command's process does no other work.
+    keeps_share: bool = False
 
     def _repository(self, connection: Any) -> SocietyComparisonRepository:
         session = Session(workspace_id=self.workspace_id, actor=self.actor)
@@ -315,11 +421,14 @@ class SocietyComparisonRunner:
         answering (the order it is asked in and whose order that is,
         :meth:`~exulanica.world.society_decision_contract.DecisionContract.answering`), since the
         mechanism a model answers by changes what it chooses, not only how long it takes."""
-        contract = decision_contract()
+        role = self.decision_role
+        contract = role.contract()
         try:
-            spec = self.manifest.offered(person_role().chosen, arm.model_id)
+            spec = self.manifest.offered(role.chosen, arm.model_id)
         except ManifestError as exc:
-            raise ValueError(f"{arm.model_id} is not offered for a person's decisions") from exc
+            raise ValueError(
+                f"{arm.model_id} is not offered for a {role.subject}'s decisions"
+            ) from exc
         mechanism = contract.mechanism_for(spec)
         answering = contract.answering(spec)
         if spec.provider != arm.provider or mechanism is None or answering is None:
@@ -331,7 +440,7 @@ class SocietyComparisonRunner:
             "mechanism": mechanism.value,
             "choice_seq": choice_seq,
             "manifest_sha256": self.manifest_sha256,
-            "prompt_version": PROMPT_VERSION,
+            "prompt_version": role.prompt_version,
             "contract": contract.binding(),
             "deadline_ms": contract.value("decision_deadline_ms"),
         }
@@ -349,20 +458,27 @@ class SocietyComparisonRunner:
             "description": spec.description,
         }
 
-    def _choices(self, version_id: uuid.UUID) -> tuple[list[str], list[dict[str, Any]]]:
-        """The version's people, by subject id, and every choice its owner made, in order."""
-        with self.database.session(self.workspace_id) as connection:
-            row = self._repository(connection).society._row(version_id)
-            if row is None:
-                raise ComparisonRefused("society_unavailable", "the version holds no society")
-            choices = SocietyModelChoiceRepository(
-                connection, self.workspace_id, world_id=self.world_id
-            ).history(version_id, person_role())
+    def _choices(
+        self, version_id: uuid.UUID, connection: Any = None
+    ) -> tuple[list[str], list[dict[str, Any]]]:
+        """The version's people, by subject id, and every choice its owner made for them, in
+        order, read on ``connection`` or on a session of the runner's own."""
+        if connection is None:
+            with self.database.session(self.workspace_id) as held:
+                return self._choices(version_id, held)
+        row = self._repository(connection).society._row(version_id)
+        if row is None:
+            raise ComparisonRefused("society_unavailable", "the version holds no society")
+        choices = SocietyModelChoiceRepository(
+            connection, self.workspace_id, world_id=self.world_id
+        ).history(version_id, self.decision_role)
         return sorted(person["id"] for person in row["state"]["inhabitants"]), choices
 
-    def group_of_choice(self, version_id: uuid.UUID, choice_seq: int) -> dict[str, Any]:
+    def group_of_choice(
+        self, version_id: uuid.UUID, choice_seq: int, *, connection: Any = None
+    ) -> dict[str, Any]:
         """The group one of the owner's choices named, as a definition's body states it."""
-        _people, choices = self._choices(version_id)
+        _people, choices = self._choices(version_id, connection)
         choice = next((held for held in choices if held["choice_seq"] == choice_seq), None)
         if choice is None:
             raise ComparisonRefused("choice_unknown", f"no choice {choice_seq} in this world")
@@ -375,12 +491,14 @@ class SocietyComparisonRunner:
             },
         }
 
-    def others_for(self, version_id: uuid.UUID, group: Sequence[str] | None) -> list[dict]:
+    def others_for(
+        self, version_id: uuid.UUID, group: Sequence[str] | None, *, connection: Any = None
+    ) -> list[dict]:
         """Everybody outside ``group`` and what decides for them in every arm: the model the
         owner's latest choice for them names, asked as the host asks it, or their routine. A model
         the owner chose that this server cannot ask as the contract asks it is refused by name,
         since every arm would ask it."""
-        people, choices = self._choices(version_id)
+        people, choices = self._choices(version_id, connection)
         if group is None:
             return []
         latest: dict[str, dict[str, Any]] = {}
@@ -423,14 +541,23 @@ class SocietyComparisonRunner:
         *,
         comparison_id: uuid.UUID,
         body: Mapping[str, Any],
+        connection: Any = None,
     ) -> dict[str, Any]:
+        """Record ``body`` as a comparison of this version's society asking this runner's role,
+        in a transaction of its own, or inside the caller's on ``connection``."""
         self._answering_held(body)
-        with self.database.session(self.workspace_id) as connection, connection.transaction():
+        if connection is None:
+            with self.database.session(self.workspace_id) as held:
+                return self.define(
+                    version_id, comparison_id=comparison_id, body=body, connection=held
+                )
+        with connection.transaction():
             return self._repository(connection).define(
                 version_id,
                 comparison_id=comparison_id,
                 body=body,
                 created_by=self.actor,
+                role=self.decision_role,
                 catalogs=self.catalogs,
             )
 
@@ -438,13 +565,13 @@ class SocietyComparisonRunner:
         """Every model a definition names, an arm's or a person's outside the group, is recorded
         with the answering the contract and its manifest entry give it now: a definition that
         says otherwise could never run as it states itself (:meth:`_asking`)."""
-        contract = decision_contract()
+        contract = self.decision_role.contract()
         for held in [*body["arms"].values(), *body["others"]]:
             config = held.get("provider_config")
             if config is None:
                 continue
             try:
-                spec = self.manifest.offered(person_role().chosen, config["model_id"])
+                spec = self.manifest.offered(self.decision_role.chosen, config["model_id"])
             except ManifestError as exc:
                 raise ComparisonRefused(
                     "answering_not_the_models", f"{config['model_id']} is not offered"
@@ -458,9 +585,15 @@ class SocietyComparisonRunner:
 
     # -- runs -------------------------------------------------------------------------------
 
-    def reserve_all(self, comparison_id: uuid.UUID, seeds: Sequence[str]) -> list[uuid.UUID]:
-        """Every run of the comparison, one per arm and seed, reserved before anything is asked."""
-        with self.database.session(self.workspace_id) as connection, connection.transaction():
+    def reserve_all(
+        self, comparison_id: uuid.UUID, seeds: Sequence[str], *, connection: Any = None
+    ) -> list[uuid.UUID]:
+        """Every run of the comparison, one per arm and seed, reserved before anything is asked,
+        in a transaction of its own, or inside the caller's on ``connection``."""
+        if connection is None:
+            with self.database.session(self.workspace_id) as held:
+                return self.reserve_all(comparison_id, seeds, connection=held)
+        with connection.transaction():
             repository = self._repository(connection)
             definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
             return [
@@ -469,10 +602,18 @@ class SocietyComparisonRunner:
                 for arm in sorted(definition["arms"])
             ]
 
-    def run_all(self, comparison_id: uuid.UUID, run_ids: Sequence[uuid.UUID]) -> list[dict]:
+    def run_all(
+        self,
+        comparison_id: uuid.UUID,
+        run_ids: Sequence[uuid.UUID],
+        *,
+        host: RunHost | None = None,
+    ) -> list[dict]:
         """Play every run that has no outcome yet, the protocol's number at a time: every
         anchor first, so each seed's routine run has recorded the group's choice points before any
-        model is asked on that seed. Outcomes come back in the order ``run_ids`` names them."""
+        model is asked on that seed. Outcomes come back in the order ``run_ids`` names them.
+        ``host`` is the host that claimed the comparison (:class:`RunHost`); the local command
+        plays with none."""
         at_once = protocol_value(self.catalogs, "runs_at_once")
         with self.database.session(self.workspace_id) as connection:
             repository = self._repository(connection)
@@ -485,20 +626,39 @@ class SocietyComparisonRunner:
                 found.update(
                     zip(
                         wave,
-                        pool.map(lambda run_id: self.run(comparison_id, run_id), wave),
+                        pool.map(lambda run_id: self.run(comparison_id, run_id, host=host), wave),
                         strict=True,
                     )
                 )
         return [found[run_id] for run_id in run_ids]
 
-    def run(self, comparison_id: uuid.UUID, run_id: uuid.UUID) -> dict[str, Any]:
+    def run(
+        self, comparison_id: uuid.UUID, run_id: uuid.UUID, *, host: RunHost | None = None
+    ) -> dict[str, Any]:
         """Play one reserved run and record its outcome; a run already finished is read back.
 
         A run that holds receipts and no outcome was stopped part way, by a crash or a killed
         process. Its hour is not played again, which would ask the models again for receipts it
         already holds: before anything is asked, it is recorded as failed, ``interrupted``, as
         the host closes what a stopped claim left open, and running it again is a new comparison.
+        Under a claiming ``host``, the claim is renewed before the run and after each minute, a
+        host that is stopping closes the run as ``interrupted`` at its next minute, a run whose
+        society's inputs are no longer available is closed as ``input_unavailable``, and every
+        outcome is recorded in a transaction the host also writes its progress in
+        (:attr:`RunHost.recorded`).
         """
+        if host is not None:
+            if host.stopping():
+                raise HostStopping
+            host.minute()
+
+        def recorded(connection: psycopg.Connection, outcome: dict) -> dict:
+            """An outcome recorded on ``connection``, in its open transaction, which the claiming
+            host's progress joins."""
+            if host is not None:
+                host.recorded(connection)
+            return outcome
+
         with self.database.session(self.workspace_id) as connection, connection.transaction():
             repository = self._repository(connection)
             done = repository.outcome(run_id)
@@ -507,14 +667,33 @@ class SocietyComparisonRunner:
             if repository.stored(run_id):
                 reserved = repository._run(run_id)
                 definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
-                return repository.finish(
-                    comparison_id,
-                    run_id,
-                    self._failed(
-                        definition, reserved["arm"], seed_digest(reserved["seed"]), INTERRUPTED
+                return recorded(
+                    connection,
+                    repository.finish(
+                        comparison_id,
+                        run_id,
+                        self._failed(
+                            definition, reserved["arm"], seed_digest(reserved["seed"]), INTERRUPTED
+                        ),
                     ),
                 )
-            plan, definition = repository.plan(comparison_id, run_id)
+            try:
+                plan, definition = repository.plan(comparison_id, run_id)
+            except UnavailableSocietyInput:
+                if host is None:
+                    raise
+                reserved = repository._run(run_id)
+                definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
+                return recorded(
+                    connection,
+                    repository.finish(
+                        comparison_id,
+                        run_id,
+                        self._failed(
+                            definition, reserved["arm"], reserved["seed_digest"], INPUT_UNAVAILABLE
+                        ),
+                    ),
+                )
             reserved = repository._run(run_id)
             arm = reserved["arm"]
             if definition_version(definition) == 2:
@@ -525,12 +704,18 @@ class SocietyComparisonRunner:
                         "a model run starts once both anchors of its seed have completed",
                     )
                 if any(status != "completed" for status in anchors):
-                    return repository.finish(
-                        comparison_id,
-                        run_id,
-                        self._failed(definition, arm, reserved["seed_digest"], ANCHOR_FAILED),
+                    return recorded(
+                        connection,
+                        repository.finish(
+                            comparison_id,
+                            run_id,
+                            self._failed(definition, arm, reserved["seed_digest"], ANCHOR_FAILED),
+                        ),
                     )
         digest = seed_digest(plan.seed)
+
+        asking: _Asking | _Anchor | None = None
+        stored: list[int] = []
 
         def store(tick: int, requests: Sequence[dict], receipts: Sequence[dict]) -> None:
             if receipts:
@@ -539,22 +724,54 @@ class SocietyComparisonRunner:
                     connection.transaction(),
                 ):
                     self._repository(connection).append(comparison_id, run_id, requests, receipts)
+                stored.append(tick)
             stopped = next(
                 (r["reason"] for r in receipts if r["reason"] in RUN_FAILURE_CODES), None
             )
+            if stopped == "process_budget_spent" and asking is not None and asking.bound_refused():
+                # The bound refused one of this run's reservations: calls of this minute, or of
+                # another run sharing the bound, held what was left. The receipt names a budget
+                # that refused, and the run the bound it was started under.
+                stopped = BOUND_SPENT
             if stopped is not None:
                 raise _RunStopped(stopped)
+            if host is not None:
+                host.minute()
+                if host.stopping():
+                    if stored:
+                        raise _RunStopped(INTERRUPTED)
+                    raise HostStopping
 
         try:
-            played = play(
-                plan, self._asking(plan, _recorded_answering(definition, arm)), on_minute=store
-            )
+            asking = self._asking(plan, _recorded_answering(definition, arm))
+            played = play(plan, asking, on_minute=store)
         except _RunStopped as stop:
             outcome = self._failed(definition, arm, digest, stop.code)
         else:
             outcome = self._completed(plan, definition, arm, digest, played)
         with self.database.session(self.workspace_id) as connection, connection.transaction():
-            return self._repository(connection).finish(comparison_id, run_id, outcome)
+            return recorded(
+                connection, self._repository(connection).finish(comparison_id, run_id, outcome)
+            )
+
+    def fail_open(self, comparison_id: uuid.UUID, codes: Mapping[uuid.UUID, str]) -> None:
+        """Record each run of ``codes`` that has no outcome yet as failed by its code, asking
+        nothing: what a host closing a comparison does with the runs it will never play."""
+        for code in codes.values():
+            if code not in RUN_FAILURE_CODES:
+                raise ValueError(f"a run fails only by a stated code, not {code!r}")
+        with self.database.session(self.workspace_id) as connection, connection.transaction():
+            repository = self._repository(connection)
+            definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
+            for run_id, code in codes.items():
+                if repository.outcome(run_id) is not None:
+                    continue
+                reserved = repository._run(run_id)
+                repository.finish(
+                    comparison_id,
+                    run_id,
+                    self._failed(definition, reserved["arm"], reserved["seed_digest"], code),
+                )
 
     @staticmethod
     def _anchor_statuses(
@@ -591,11 +808,12 @@ class SocietyComparisonRunner:
             return _Anchor()
         if self.client is None:
             raise _RunStoppedBeforeStart("provider_credential_absent")
+        role = plan_role(plan)
         models: dict[str, tuple[ModelSpec, AnsweringMechanism]] = {}
         for config in configs:
             assert config is not None
             try:
-                spec = self.manifest.offered(person_role().chosen, config["model_id"])
+                spec = self.manifest.offered(role.chosen, config["model_id"])
             except ManifestError:
                 raise _RunStoppedBeforeStart("model_no_longer_offered") from None
             mechanism = plan.contract.mechanism_for(spec)
@@ -604,7 +822,7 @@ class SocietyComparisonRunner:
                 spec.provider != config["provider"]
                 or mechanism is None
                 or mechanism.value != config["mechanism"]
-                or config["prompt_version"] != PROMPT_VERSION
+                or config["prompt_version"] != role.prompt_version
                 or (held is not None and plan.contract.answering(spec) != dict(held))
             ):
                 raise _RunStoppedBeforeStart("provider_configuration_changed")
@@ -612,15 +830,27 @@ class SocietyComparisonRunner:
 
         def model_of(subject: str) -> str:
             _decider, config = plan.decider_for(subject)
-            assert config is not None, "only a person a model decides for is asked"
+            assert config is not None, "only a subject a model decides for is asked"
             return str(config["model_id"])
 
+        client = self.client.with_policy(self.policy_for(self.workspace_id))
+        run_bound = (
+            None
+            if self.bound is None
+            else BoundedBudget(
+                self.bound, ceiling_usd=self.bound.ceiling_usd, max_calls=self.bound.max_calls
+            )
+        )
         return _Asking(
-            self.client.with_policy(self.policy_for(self.workspace_id)),
+            client if run_bound is None else client.with_bound(run_bound),
             self.manifest,
             plan.contract,
             models,
             model_of,
+            role=role,
+            bound=self.bound,
+            run_bound=run_bound,
+            keeps_share=self.keeps_share,
         )
 
     @staticmethod

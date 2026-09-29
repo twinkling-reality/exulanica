@@ -42,6 +42,7 @@ from exulanica.world import (
     society_score,
     society_score_v2,
 )
+from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society_catalogs import (
     SEED_PHASES,
     ComparisonCatalogs,
@@ -91,6 +92,7 @@ __all__ = [
     "check_definition_body",
     "comparison_result",
     "decimal_text",
+    "definition_role",
     "definition_version",
     "listing_document",
     "others_asked",
@@ -221,6 +223,17 @@ def definition_version(definition: Mapping[str, Any]) -> int:
         if definition.get("profile") == profile:
             return version
     raise ComparisonRefused("definition_unknown", f"no comparison {definition.get('profile')!r}")
+
+
+def definition_role(definition: Mapping[str, Any]) -> DecisionRole:
+    """The decision role a comparison asks: the registered role whose contract is the one its
+    definition recorded (:meth:`~exulanica.world.decision_roles.RoleRegistry.for_contract`). A
+    definition names its role by that contract, catalogs and digest, so no second field states it;
+    one no registered role holds is refused by name."""
+    try:
+        return decision_roles().for_contract(definition["contract"])
+    except RoleRefused as exc:
+        raise ComparisonRefused(exc.code, exc.detail) from exc
 
 
 # -- definitions --------------------------------------------------------------------------------
@@ -636,13 +649,15 @@ def comparison_result(
     catalogs: ComparisonCatalogs | None = None,
     *,
     model_name: Callable[[str], str],
+    start: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A comparison's scores, per seed and per arm, what each arm's model answered beside them,
     its registered differences and the server's verdict, read from its definition and its runs'
     outcomes alone, under the catalogs its binding recorded, by the bound reading of
     :func:`~exulanica.world.society_comparison_verdict.read_comparison`; this formats what it
     found. ``catalogs`` stands in for the recorded ones where a caller reads under a copy of its
-    own; ``model_name`` names each model a decider asks."""
+    own; ``model_name`` names each model a decider asks; ``start`` is its start where it was
+    started from the application."""
     definition = row["document"]
     recorded = definition["scoring"]
     found_catalogs = _recorded_catalogs(recorded) if catalogs is None else catalogs
@@ -737,6 +752,7 @@ def comparison_result(
         "created_at": row["created_at"].isoformat(),
         "phase": definition["phase"],
         "score_version": reading.version,
+        "start": None if start is None else dict(start),
         "window_ticks": definition["window_ticks"],
         "population": definition["population"],
         "preregistration": definition["preregistration"],
@@ -779,16 +795,18 @@ def _first_refused(calls: Sequence[Mapping[str, Any]]) -> str | None:
 
 def listing_document(
     rows: Sequence[Mapping[str, Any]],
-    counts: Mapping[uuid.UUID, tuple[int, int]],
+    counts: Mapping[uuid.UUID, tuple[int, int, int]],
     *,
     model_name: Callable[[str], str],
+    starts: Mapping[uuid.UUID, Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """A version's comparisons, newest first, each with its arms, who it scores and how far its
-    runs got; ``model_name`` names each model a decider asks."""
+    """A version's comparisons, newest first, each with its arms, who it scores, how far its runs
+    got and, for one started from the application, its start (``starts``, by comparison id: its
+    bound, what it spent and where it stands); ``model_name`` names each model a decider asks."""
     comparisons = []
     for row in rows:
         definition = row["document"]
-        runs, completed = counts.get(row["comparison_id"], (0, 0))
+        runs, completed, finished = counts.get(row["comparison_id"], (0, 0, 0))
         arms = definition["arms"]
         group = _group_document(definition)
         comparisons.append(
@@ -802,7 +820,11 @@ def listing_document(
                 "seeds": len(definition["seeds"]),
                 "runs": runs,
                 "runs_completed": completed,
+                "runs_finished": finished,
                 "runs_expected": len(definition["seeds"]) * len(arms),
+                "start": None
+                if (start := starts.get(row["comparison_id"])) is None
+                else dict(start),
             }
         )
     return {"profile": LISTING_PROFILE, "comparisons": comparisons}

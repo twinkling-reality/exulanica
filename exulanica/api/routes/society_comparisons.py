@@ -1,4 +1,4 @@
-"""The comparisons of the models that ran a world's people: read, never run.
+"""The comparisons of the models that ran a world's people: read, planned and started.
 
 ``GET /world/versions/{version_id}/society/comparisons`` lists a version's comparisons, newest
 first, each with its arms, the group they decide for and how far its runs got. ``GET
@@ -12,34 +12,77 @@ what the run recorded, and returns what the page draws: the place, each person's
 decides for each of them and what every turn did. A replay that differs from its record is refused
 by name (``run_replay_mismatch``), never shown.
 
-None of these asks a model or writes anything. A comparison is defined and run by the local command
-``python -m exulanica.orchestration.compare``. No response carries a run's seed. A comparison this
-code cannot read, one naming a binding, catalogs, a definition or a score version it does not hold,
-or whose outcomes scored other people than its group, is answered by name as a conflict (409),
-never as a server error.
+None of these asks a model or writes anything. A comparison started from the application also
+serves its start: the bound its owner stated, what its asks spent, and where it stands. No response
+carries a run's seed. A comparison this code cannot read, one naming a binding, catalogs, a
+definition or a score version it does not hold, or whose outcomes scored other people than its
+group, is answered by name as a conflict (409), never as a server error.
+
+``POST .../comparisons/plan`` answers what a start would, and writes nothing: the roles, groups,
+models and development seeds this server offers a comparison of the version's society, with why a
+model cannot be asked here, and, for a selection, the runs it plans, the most it can cost and what
+one like it typically cost, or the refusal a start of it would meet. ``POST .../comparisons``
+starts one (:mod:`exulanica.api.society_comparison_start`): in one transaction it defines the
+comparison through the one definition path the local command defines by, reserves every run and
+records the start with the bound its owner stated, at most the most it can cost. A host's
+comparison worker plays it off the request path (:mod:`exulanica.api.society_comparison_worker`).
+The comparison's id is the caller's, keyed within its workspace: the same start sent again is
+answered with the start it made, and every refusal is named (``START_REFUSALS``).
 """
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
-from typing import Any, Final
+from collections.abc import Sequence
+from decimal import Decimal, InvalidOperation
+from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 
-from exulanica.api.dependencies import CurrentSession, ScopedConnection
+from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.services import Services
+from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
+from exulanica.api.society_comparison_start import (
+    MODELS_MOST,
+    START_REFUSALS,
+    TYPICAL_RECORD,
+    ComparisonCost,
+    ComparisonSelection,
+    StartRefused,
+    comparison_cost,
+    definition_body,
+    typical_per_person_hour,
+)
 from exulanica.api.world_scope import WorldId
+from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import load_manifest
+from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
+from exulanica.world.society_catalogs import load_comparison_catalogs
 from exulanica.world.society_comparison import ReplayMismatch
-from exulanica.world.society_comparison_repository import SocietyComparisonRepository
+from exulanica.world.society_comparison_repository import (
+    ComparisonConflict,
+    SocietyComparisonRepository,
+)
 from exulanica.world.society_comparison_result import (
     ComparisonRefused,
     comparison_result,
     listing_document,
+    protocol_value,
     replay_document,
     verified_replay,
 )
+from exulanica.world.society_comparison_start_repository import (
+    ComparisonRunning,
+    SocietyComparisonStarts,
+    StartConflict,
+    start_document,
+)
+from exulanica.world.society_engines import society_engine
+from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_score import ScoreRefused
 from exulanica.world.worlds import require_world
@@ -50,6 +93,13 @@ __all__ = ["router"]
 
 #: A run that has no completed hour to draw, answered by name rather than as a missing run.
 RUN_NOT_COMPLETED: Final = "run_not_completed"
+PLAN_PROFILE: Final = "exulanica.society-comparison-plan/v1"
+#: What prices a model's asks where this server has no client: the manifest's prices, no ceiling.
+_ESTIMATOR: Final = BudgetGuard(ceiling_usd=Decimal(0), max_calls=0)
+#: The most seeds one comparison names, migration 0113's bound on a definition.
+_SEEDS_MOST: Final = 64
+#: A bound in US dollars as the person states it: a positive decimal to the ledger's eight places.
+_BOUND_PATTERN: Final = r"^[0-9]{1,6}(\.[0-9]{1,8})?$"
 
 
 def _comparisons(
@@ -67,6 +117,26 @@ def _comparisons(
             ),
         )
     )
+
+
+def _starts(
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: str,
+    comparison_ids: Sequence[uuid.UUID],
+    comparisons: SocietyComparisonRepository,
+) -> dict[uuid.UUID, dict[str, Any]]:
+    """The start of each comparison started from the application, as the reads serve it."""
+    starts = SocietyComparisonStarts(connection, session.workspace_id)
+    rows = starts.read(world_id, comparison_ids)
+    if not rows:
+        return {}
+    spent = comparisons.spending(list(rows))
+    now = starts.now()
+    return {
+        comparison_id: start_document(row, spent.get(comparison_id, Decimal(0)), now)
+        for comparison_id, row in rows.items()
+    }
 
 
 def _unreadable(exc: ComparisonRefused | ScoreRefused) -> JSONResponse:
@@ -92,11 +162,81 @@ def society_comparisons(
     if comparisons.society._row(version_id) is None:
         raise UnknownSociety("society is unavailable")
     rows = comparisons.definitions(version_id)
-    counts = comparisons.run_counts([row["comparison_id"] for row in rows])
+    ids = [row["comparison_id"] for row in rows]
+    counts = comparisons.run_counts(ids)
+    starts = _starts(connection, session, world_id, ids, comparisons)
     try:
-        return listing_document(rows, counts, model_name=load_manifest().model_name)
+        return listing_document(rows, counts, model_name=load_manifest().model_name, starts=starts)
     except (ComparisonRefused, ScoreRefused) as exc:
         return _unreadable(exc)
+
+
+@router.get("/plan")
+def plan_society_comparison(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+    role: Annotated[str | None, Query(min_length=1, max_length=63)] = None,
+    group: Literal["everyone", "owner_choice", "named"] | None = None,
+    choice_seq: Annotated[int | None, Query(ge=1)] = None,
+    person: Annotated[list[uuid.UUID], Query(max_length=512)] = [],  # noqa: B006
+    model: Annotated[list[str], Query(max_length=MODELS_MOST)] = [],  # noqa: B006
+    control: bool = False,
+    seeds: Annotated[int, Query(ge=1, le=_SEEDS_MOST)] = 1,
+) -> Any:
+    """What a start would do, writing nothing: the roles, groups, models and development seeds
+    this server offers a comparison of the version's society, and, for the selection the query
+    names (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group),
+    the runs it plans, the most it can cost and what one like it typically cost, or the refusal a
+    start of it would meet."""
+    comparisons = _comparisons(connection, session, request, world_id)
+    society = _society(comparisons, version_id)
+    services = get_services(request)
+    refusal = services.comparison_refusal(session.workspace_id)
+    running = SocietyComparisonStarts(connection, session.workspace_id).unfinished(world_id)
+    document: dict[str, Any] = {
+        "profile": PLAN_PROFILE,
+        "refusal": None if refusal is None else {"code": refusal, "detail": _HOST_DETAIL[refusal]},
+        "running": None if running is None else str(running["comparison_id"]),
+        "roles": _choices(services, connection, session, world_id, version_id, society),
+        "seeds_available": len(services.comparison_seeds),
+        "models_most": MODELS_MOST,
+        "window_ticks": protocol_value(
+            services.comparison_catalogs or load_comparison_catalogs(), "window_ticks"
+        ),
+        "typical_record": TYPICAL_RECORD,
+        "plan": None,
+        "plan_refusal": None,
+    }
+    if role is None or group is None or not model:
+        return document
+    try:
+        chosen = []
+        for named in model:
+            provider, _, model_id = named.partition("/")
+            if not provider or not model_id:
+                raise StartRefused("model_not_offered", f"{named!r} is not <provider>/<model id>")
+            chosen.append(ChosenModel(provider=provider, model_id=model_id))
+        prepared = _prepare(
+            services,
+            connection,
+            session,
+            world_id,
+            version_id,
+            society,
+            role_key=role,
+            group=ChosenGroup(kind=group, choice_seq=choice_seq, people=person or None),
+            models=chosen,
+            control=control,
+            seed_count=seeds,
+        )
+    except StartRefused as exc:
+        document["plan_refusal"] = {"code": exc.code, "detail": exc.detail}
+    else:
+        document["plan"] = prepared.cost.document()
+    return document
 
 
 @router.get("/{comparison_id}")
@@ -110,9 +250,13 @@ def society_comparison(
 ) -> Any:
     comparisons = _comparisons(connection, session, request, world_id)
     row = comparisons.definition(version_id, comparison_id)
+    start = _starts(connection, session, world_id, [comparison_id], comparisons).get(comparison_id)
     try:
         return comparison_result(
-            row, comparisons.runs(comparison_id), model_name=load_manifest().model_name
+            row,
+            comparisons.runs(comparison_id),
+            model_name=load_manifest().model_name,
+            start=start,
         )
     except (ComparisonRefused, ScoreRefused) as exc:
         return _unreadable(exc)
@@ -153,4 +297,338 @@ def society_comparison_run(
         outcome["seed_digest"],
         played,
         model_name=load_manifest().model_name,
+    )
+
+
+# -- a comparison planned and started from the application -------------------------------------
+
+
+class ChosenModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    provider: Annotated[str, Field(min_length=1, max_length=63)]
+    model_id: Annotated[str, Field(min_length=1, max_length=200)]
+
+
+class ChosenGroup(BaseModel):
+    """The people every arm decides for: everybody, the people one of the owner's choices named,
+    or people named."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["everyone", "owner_choice", "named"]
+    choice_seq: Annotated[int, Field(ge=1)] | None = None
+    people: Annotated[list[uuid.UUID], Field(max_length=512)] | None = None
+
+
+class ComparisonStartBody(BaseModel):
+    """A comparison started: what it compares, its id (the caller's, keyed within its workspace)
+    and the most its asks may spend, in US dollars."""
+
+    model_config = ConfigDict(extra="forbid")
+    comparison_id: uuid.UUID
+    role: Annotated[str, Field(min_length=1, max_length=63)]
+    group: ChosenGroup
+    models: Annotated[list[ChosenModel], Field(min_length=1, max_length=MODELS_MOST)]
+    control: bool = False
+    seeds: Annotated[int, Field(ge=1, le=_SEEDS_MOST)]
+    bound_usd: Annotated[str, Field(pattern=_BOUND_PATTERN)]
+
+
+#: What a host refusal says, where this server starts no comparison for the workspace.
+_HOST_DETAIL: Final = {
+    "comparisons_not_set_up": "this server holds no development seed to run a comparison on",
+    "comparisons_not_played": "nothing plays the comparisons started on this server",
+    "comparisons_not_run_here": "this server does not ask models for this workspace",
+    "provider_credential_absent": "this server holds no key for the models' service",
+}
+
+
+def _start_refused(exc: StartRefused) -> JSONResponse:
+    return JSONResponse(status_code=exc.status, content={"code": exc.code, "detail": exc.detail})
+
+
+def _society(comparisons: SocietyComparisonRepository, version_id: uuid.UUID) -> dict[str, Any]:
+    row = comparisons.society._row(version_id)
+    if row is None:
+        raise UnknownSociety("society is unavailable")
+    return row
+
+
+class _Prepared:
+    """A selection held to this server and the world's records, and what it would define."""
+
+    def __init__(
+        self,
+        runner: SocietyComparisonRunner,
+        role: DecisionRole,
+        seeds: tuple[str, ...],
+        body: dict[str, Any],
+        cost: ComparisonCost,
+    ) -> None:
+        self.runner, self.role, self.seeds, self.body, self.cost = runner, role, seeds, body, cost
+
+
+def _prepare(
+    services: Services,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: str,
+    version_id: uuid.UUID,
+    society: dict[str, Any],
+    *,
+    role_key: str,
+    group: ChosenGroup,
+    models: Sequence[ChosenModel],
+    control: bool,
+    seed_count: int,
+) -> _Prepared:
+    """What a start of this selection would define, through the one definition path, or the
+    refusal it would meet (:class:`StartRefused`); reads only."""
+    refusal = services.comparison_refusal(session.workspace_id)
+    if refusal is not None:
+        raise StartRefused(refusal, _HOST_DETAIL[refusal])
+    try:
+        role = decision_roles().role(role_key)
+    except RoleRefused as exc:
+        raise StartRefused("role_not_registered", exc.detail) from exc
+    runner = services.comparison_runner(session.workspace_id, world_id, session.actor)
+    if runner is None:
+        raise StartRefused("comparisons_not_run_here", "this server runs no society")
+    runner = dataclasses.replace(runner, decision_role=role)
+    engine = str(society["engine_version"])
+    if not society_engine(engine).comparisons:
+        raise StartRefused("engine_takes_no_comparison", f"{engine} takes no comparison")
+    if not role.hosted_by(engine):
+        raise StartRefused("role_not_hosted", f"{engine} hosts no {role.key} decisions")
+    population = int(society["population_size"])
+    most_people = protocol_value(runner.catalogs, "population_maximum")
+    if population > most_people:
+        raise StartRefused(
+            "population_over_comparison_bound",
+            f"{population} people; a comparison runs at most {most_people}",
+        )
+    arms = [ComparisonArm(model.provider, model.model_id) for model in models]
+    if len(set(arms)) != len(arms):
+        raise StartRefused("model_named_twice", "a comparison runs a model twice only as control")
+    for arm in arms:
+        try:
+            runner._model(arm, None)
+        except ValueError as exc:
+            raise StartRefused("model_not_offered", str(exc)) from exc
+        refused = services.choice_refusal(
+            role,
+            {"provider": arm.provider, "model_id": arm.model_id},
+            connection,
+            session.workspace_id,
+        )
+        if refused is not None:
+            raise StartRefused("model_not_askable_here", f"{arm.model_id}: {refused}")
+    if not 1 <= seed_count <= len(services.comparison_seeds):
+        raise StartRefused(
+            "seeds_out_of_range",
+            f"this server holds {len(services.comparison_seeds)} development seeds",
+        )
+    here = {person["id"] for person in society["state"]["inhabitants"]}
+    people: tuple[str, ...] | None = None
+    if group.kind == "named":
+        people = tuple(sorted({str(person) for person in group.people or ()}))
+        if not people:
+            raise StartRefused("group_empty", "a group names somebody")
+        if not set(people) <= here:
+            raise StartRefused("group_person_unknown", "the group names somebody not here")
+    elif not here:
+        raise StartRefused("group_empty", "this world holds nobody to decide for")
+    if (group.kind == "owner_choice") != (group.choice_seq is not None):
+        raise StartRefused("choice_unknown", "a group of an owner's choice names that choice")
+    selection = ComparisonSelection(
+        models=tuple(arms),
+        control=control,
+        group=group.kind,
+        seed_count=seed_count,
+        choice_seq=group.choice_seq if group.kind == "owner_choice" else None,
+        people=people,
+    )
+    seeds = services.comparison_seeds[:seed_count]
+    try:
+        body = definition_body(runner, version_id, selection, seeds, connection=connection)
+    except ComparisonRefused as exc:
+        if exc.code in START_REFUSALS:
+            raise StartRefused(exc.code, str(exc)) from exc
+        raise
+    client = services.model_client
+    cost = comparison_cost(
+        body,
+        population,
+        role,
+        client.budget if client is not None else _ESTIMATOR,
+        load_manifest(),
+    )
+    return _Prepared(runner, role, seeds, body, cost)
+
+
+def _choices(
+    services: Services,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: str,
+    version_id: uuid.UUID,
+    society: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Each role a comparison of this society may ask, with the groups and the models it offers:
+    everybody and each of the owner's choices whose people are all still here, newest first, and
+    every model the manifest offers the role, with why this server cannot ask it, if it cannot,
+    and what it typically cost."""
+    manifest = load_manifest()
+    names = {person["id"]: person["display_name"] for person in society["state"]["inhabitants"]}
+    typical = typical_per_person_hour()
+    roles = []
+    for role in decision_roles().hosted_by(str(society["engine_version"])):
+        history = SocietyModelChoiceRepository(
+            connection, session.workspace_id, world_id=world_id
+        ).history(version_id, role)
+        groups: list[dict[str, Any]] = [
+            {
+                "kind": "everyone",
+                "choice_seq": None,
+                "size": len(names),
+                "people": None,
+                "model": None,
+            }
+        ]
+        for choice in reversed(history):
+            if choice["people"] and set(choice["people"]) <= set(names):
+                model = choice["model"]
+                groups.append(
+                    {
+                        "kind": "owner_choice",
+                        "choice_seq": choice["choice_seq"],
+                        "size": len(choice["people"]),
+                        "people": [
+                            {"id": person, "name": names[person]}
+                            for person in sorted(choice["people"])
+                        ],
+                        "model": None
+                        if model is None
+                        else {**model, "name": manifest.model_name(model["model_id"])},
+                    }
+                )
+        contract = role.contract()
+        models = [
+            {
+                "provider": spec.provider,
+                "model_id": spec.model_id,
+                "name": manifest.model_name(spec.model_id),
+                "description": spec.description,
+                "refusal": services.choice_refusal(
+                    role,
+                    {"provider": spec.provider, "model_id": spec.model_id},
+                    connection,
+                    session.workspace_id,
+                ),
+                "typical_usd_per_person_hour": None
+                if spec.model_id not in typical
+                else format(typical[spec.model_id], "f"),
+            }
+            for spec in manifest.offered_models(role.chosen)
+            if contract.mechanism_for(spec) is not None
+        ]
+        # What this process's budget has left is not served here: it reflects every workspace's
+        # spend, so only a caller who may start one learns it, when a start's bound exceeds it.
+        roles.append(
+            {
+                "key": role.key,
+                "subject": role.subject,
+                "groups": groups,
+                "models": models,
+            }
+        )
+    return roles
+
+
+@router.post("", status_code=201)
+def start_society_comparison(
+    version_id: uuid.UUID,
+    body: ComparisonStartBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+    response: Response,
+) -> Any:
+    comparisons = _comparisons(connection, session, request, world_id)
+    society = _society(comparisons, version_id)
+    services = get_services(request)
+    starts = SocietyComparisonStarts(connection, session.workspace_id)
+    existing = starts.read(world_id, [body.comparison_id]).get(body.comparison_id)
+    try:
+        if existing is None and (running := starts.unfinished(world_id)) is not None:
+            raise StartRefused(
+                "comparison_running",
+                f"comparison {running['comparison_id']} of this world has not finished",
+            )
+        prepared = _prepare(
+            services,
+            connection,
+            session,
+            world_id,
+            version_id,
+            society,
+            role_key=body.role,
+            group=body.group,
+            models=body.models,
+            control=body.control,
+            seed_count=body.seeds,
+        )
+        try:
+            bound = Decimal(body.bound_usd)
+        except InvalidOperation as exc:  # pragma: no cover - the pattern admits decimals only
+            raise StartRefused("bound_out_of_range", "a bound is a decimal") from exc
+        if not Decimal(0) < bound <= prepared.cost.most_usd:
+            raise StartRefused(
+                "bound_out_of_range",
+                f"a bound above $0 and at most ${prepared.cost.most_usd}, the most it can cost",
+            )
+        room = services.comparison_room(prepared.role)
+        if existing is None and room is not None and bound > room:
+            raise StartRefused(
+                "bound_over_budget",
+                f"this server's model budget has ${room} left for comparisons",
+            )
+        with connection.transaction():
+            prepared.runner.define(
+                version_id,
+                comparison_id=body.comparison_id,
+                body=prepared.body,
+                connection=connection,
+            )
+            prepared.runner.reserve_all(body.comparison_id, prepared.seeds, connection=connection)
+            starts.record(
+                world_id,
+                body.comparison_id,
+                requested_by=session.actor,
+                bound_usd=bound,
+                bound_calls=prepared.cost.calls,
+                runs_planned=prepared.cost.runs,
+            )
+    except StartRefused as exc:
+        return _start_refused(exc)
+    except ComparisonRunning as exc:
+        return _start_refused(
+            StartRefused("comparison_running", f"comparison {exc.comparison_id} has not finished")
+        )
+    except (ComparisonConflict, StartConflict) as exc:
+        return _start_refused(StartRefused("comparison_conflict", str(exc)))
+    except ComparisonRefused as exc:
+        return JSONResponse(
+            status_code=START_REFUSALS.get(exc.code, 409),
+            content={"code": exc.code, "detail": str(exc)},
+        )
+    if existing is not None:
+        response.status_code = 200
+    row = comparisons.definition(version_id, body.comparison_id)
+    ids = [body.comparison_id]
+    return listing_document(
+        [row],
+        comparisons.run_counts(ids),
+        model_name=load_manifest().model_name,
+        starts=_starts(connection, session, world_id, ids, comparisons),
     )

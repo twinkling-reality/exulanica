@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from .client import ApiRefusal, ClientError, Exchange, WorldClient
+from .comparisons import ComparisonStop, read_comparison
 from .discovery import (
     Behaviour,
     Operation,
@@ -490,7 +491,7 @@ def _arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m exulanica_client", description=__doc__.split("\n\n")[0]
     )
-    parser.add_argument("command", choices=("discover", "walkthrough"))
+    parser.add_argument("command", choices=("discover", "walkthrough", "comparisons"))
     parser.add_argument("--base-url", default=os.environ.get("EXULANICA_API_URL"))
     parser.add_argument(
         "--token-env",
@@ -517,6 +518,12 @@ def _arguments(argv: Sequence[str] | None) -> argparse.Namespace:
         help="the person's choice; the server never infers it",
     )
     parser.add_argument("--object-id", help="the new object's id; a fresh one otherwise")
+    parser.add_argument(
+        "--comparison",
+        help="the comparison to read; the newest started from the application otherwise",
+    )
+    parser.add_argument("--world", help="with --version, the world whose comparisons to read")
+    parser.add_argument("--version", help="with --world, the version whose comparisons to read")
     parser.add_argument("--transcript", type=Path, help="write the transcript as JSON here")
     args = parser.parse_args(argv)
     if not args.base_url:
@@ -541,6 +548,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_discovery(*discover(client))
             record["result"] = "discovered"
             code = _EXIT_CONFIRMED
+        elif args.command == "comparisons":
+            transcript.step = "read"
+            world = (
+                {"world_id": args.world, "authored_version_id": args.version}
+                if args.world and args.version
+                else _choose_saved_world(client.saved_worlds(), args)
+            )
+            read_comparison(
+                client, world, args, record, step=lambda name: setattr(transcript, "step", name)
+            )
+            failed = [check["check"] for check in record["checks"] if not check["holds"]]
+            record["result"] = "confirmed" if not failed else "not confirmed"
+            for check in record["checks"]:
+                print(f"  {'holds' if check['holds'] else 'FAILS'}: {check['check']}")
+            code = _EXIT_CONFIRMED if not failed else _EXIT_STOPPED
         else:
             walkthrough(client, transcript, args, record)
             failed = [check["check"] for check in record["checks"] if not check["holds"]]
@@ -548,7 +570,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             for check in record["checks"]:
                 print(f"  {'holds' if check['holds'] else 'FAILS'}: {check['check']}")
             code = _EXIT_CONFIRMED if not failed else _EXIT_STOPPED
-    except (Stop, ApiRefusal, ClientError) as stopped:
+    except (Stop, ComparisonStop, ApiRefusal, ClientError) as stopped:
         print(f"stopped: {stopped}", file=sys.stderr)
         record.update({"result": "stopped", "reason": str(stopped)})
         code = _EXIT_STOPPED

@@ -36,6 +36,8 @@ FIRST_VERSIONS: dict[str, int] = json.loads(FIRST_PREREGISTRATION.read_text(enco
 ]["scoring"]["catalogs"]["versions"]
 #: A group of everybody, as a definition body states it.
 EVERYBODY = {"people": None, "source": {"kind": "everyone"}}
+#: The role a comparison of a society's people asks: the one registered role deciding for them.
+PEOPLE_ROLE = person_role()
 
 
 def seeded_catalogs(

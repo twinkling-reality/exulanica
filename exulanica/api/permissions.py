@@ -377,9 +377,11 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 )
 
 #: World writes that commit the world to a model: a choice of the model that runs a world's
-#: people commits the world's host to asking it.
+#: people commits the world's host to asking it, and a comparison started from the application
+#: commits it to asking the models compared, within the bound its owner stated.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
+    "POST /world/versions/{version_id}/society/comparisons",
     "POST /world/versions/{version_id}/society/models",
 )
 
@@ -493,6 +495,7 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/society/actions",
     "GET /world/versions/{version_id}/society/actions/{request_id}",
     "GET /world/versions/{version_id}/society/comparisons",
+    "GET /world/versions/{version_id}/society/comparisons/plan",
     "GET /world/versions/{version_id}/society/comparisons/{comparison_id}",
     "GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}",
     "GET /world/versions/{version_id}/society/control",

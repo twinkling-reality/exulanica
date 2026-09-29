@@ -77,6 +77,7 @@ def test_a_comparison_asks_on_the_whole_budget_where_the_host_keeps_part_back():
         CONTRACT,
         {SPEC.model_id: (SPEC, mechanism)},
         lambda _subject: SPEC.model_id,
+        role=person_role(),
     )
     assert asking.offerable(0, DUE) == {"someone": frozenset(o.label for o in DUE["someone"])}
     _spend(budget, Decimal("0.00002"))

@@ -1,0 +1,595 @@
+{
+  "finished": {
+    "comparisons": [
+      {
+        "arms": [
+          {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
+            "decider": {
+              "kind": "model",
+              "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+              "name": "Qwen3 235B Instruct",
+              "provider": "nebius_token_factory"
+            },
+            "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+            "key": "model_a",
+            "role": "candidate"
+          },
+          {
+            "answering": null,
+            "decider": {
+              "kind": "routine"
+            },
+            "description": "Their own routine",
+            "key": "routine",
+            "role": "one"
+          },
+          {
+            "answering": null,
+            "decider": {
+              "kind": "wait"
+            },
+            "description": "Waiting where they are",
+            "key": "wait",
+            "role": "zero"
+          }
+        ],
+        "comparison_id": "060fff63-fc4b-430d-8cf4-36e863508c71",
+        "created_at": "2026-09-29T17:03:35.509370+00:00",
+        "group": {
+          "size": 8,
+          "source": {
+            "kind": "everyone"
+          }
+        },
+        "phase": "development",
+        "runs": 3,
+        "runs_completed": 3,
+        "runs_expected": 3,
+        "runs_finished": 3,
+        "score_version": 2,
+        "seeds": 1,
+        "start": {
+          "bound_usd": "0.05000000",
+          "closed_reason": null,
+          "finished_at": "2026-09-29T17:03:37.179705+00:00",
+          "runs_planned": 3,
+          "spent_usd": "0.01274000",
+          "presumed_usd": "0.00000000",
+          "started_at": "2026-09-29T17:03:35.512035+00:00",
+          "state": "finished"
+        }
+      }
+    ],
+    "profile": "exulanica.society-comparisons/v2"
+  },
+  "plan": {
+    "models_most": 2,
+    "plan": null,
+    "plan_refusal": null,
+    "profile": "exulanica.society-comparison-plan/v1",
+    "refusal": null,
+    "roles": [
+      {
+        "groups": [
+          {
+            "choice_seq": null,
+            "kind": "everyone",
+            "model": null,
+            "people": null,
+            "size": 8
+          }
+        ],
+        "key": "society_decision",
+        "models": [
+          {
+            "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+            "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+            "name": "Qwen3 235B Instruct",
+            "provider": "nebius_token_factory",
+            "refusal": null,
+            "typical_usd_per_person_hour": "0.00140000"
+          },
+          {
+            "description": "DeepSeek V4 Flash, an open reasoning model from DeepSeek.",
+            "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+            "name": "DeepSeek V4 Flash",
+            "provider": "nebius_token_factory",
+            "refusal": null,
+            "typical_usd_per_person_hour": null
+          },
+          {
+            "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
+            "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+            "name": "Nemotron 3 Nano 30B",
+            "provider": "nebius_token_factory",
+            "refusal": null,
+            "typical_usd_per_person_hour": "0.00055000"
+          },
+          {
+            "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
+            "model_id": "nvidia/Nemotron-3_5-Lightning",
+            "name": "Nemotron 3.5 Lightning",
+            "provider": "nebius_token_factory",
+            "refusal": null,
+            "typical_usd_per_person_hour": "0.00182500"
+          }
+        ],
+        "subject": "person"
+      }
+    ],
+    "running": null,
+    "seeds_available": 2,
+    "typical_record": "docs/evaluation/2026-09-26-society-group-comparison.json",
+    "window_ticks": 60
+  },
+  "planned": {
+    "models_most": 2,
+    "plan": {
+      "asks_most": 480,
+      "calls_most": 960,
+      "most_usd": "2.74310400",
+      "runs": 3,
+      "typical_record": "docs/evaluation/2026-09-26-society-group-comparison.json",
+      "typical_usd": "0.01120000"
+    },
+    "plan_refusal": null,
+    "profile": "exulanica.society-comparison-plan/v1",
+    "refusal": null,
+    "roles": [
+      {
+        "groups": [
+          {
+            "choice_seq": null,
+            "kind": "everyone",
+            "model": null,
+            "people": null,
+            "size": 8
+          }
+        ],
+        "key": "society_decision",
+        "models": [
+          {
+            "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+            "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+            "name": "Qwen3 235B Instruct",
+            "provider": "nebius_token_factory",
+            "refusal": null,
+            "typical_usd_per_person_hour": "0.00140000"
+          },
+          {
+            "description": "DeepSeek V4 Flash, an open reasoning model from DeepSeek.",
+            "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+            "name": "DeepSeek V4 Flash",
+            "provider": "nebius_token_factory",
+            "refusal": null,
+            "typical_usd_per_person_hour": null
+          },
+          {
+            "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
+            "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+            "name": "Nemotron 3 Nano 30B",
+            "provider": "nebius_token_factory",
+            "refusal": null,
+            "typical_usd_per_person_hour": "0.00055000"
+          },
+          {
+            "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
+            "model_id": "nvidia/Nemotron-3_5-Lightning",
+            "name": "Nemotron 3.5 Lightning",
+            "provider": "nebius_token_factory",
+            "refusal": null,
+            "typical_usd_per_person_hour": "0.00182500"
+          }
+        ],
+        "subject": "person"
+      }
+    ],
+    "running": null,
+    "seeds_available": 2,
+    "typical_record": "docs/evaluation/2026-09-26-society-group-comparison.json",
+    "window_ticks": 60
+  },
+  "result": {
+    "arms": [
+      {
+        "answering": {
+          "mechanism": "tool_call",
+          "order": [
+            "tool_call",
+            "json_schema"
+          ],
+          "record": null,
+          "source": "contract"
+        },
+        "decider": {
+          "kind": "model",
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "name": "Qwen3 235B Instruct",
+          "provider": "nebius_token_factory"
+        },
+        "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+        "key": "model_a",
+        "role": "candidate"
+      },
+      {
+        "answering": null,
+        "decider": {
+          "kind": "routine"
+        },
+        "description": "Their own routine",
+        "key": "routine",
+        "role": "one"
+      },
+      {
+        "answering": null,
+        "decider": {
+          "kind": "wait"
+        },
+        "description": "Waiting where they are",
+        "key": "wait",
+        "role": "zero"
+      }
+    ],
+    "comparison_id": "060fff63-fc4b-430d-8cf4-36e863508c71",
+    "control": null,
+    "control_bound": null,
+    "created_at": "2026-09-29T17:03:35.509370+00:00",
+    "differences": [],
+    "group": {
+      "people": [
+        {
+          "id": "49a06852-bb89-5213-a858-6c829a0ab4b6",
+          "name": "Dara Ash 4"
+        },
+        {
+          "id": "65296681-23b0-5481-8e82-d1c6cf7fe86d",
+          "name": "Faye Ash 6"
+        },
+        {
+          "id": "6d9deb8d-c100-5e17-9ee7-27207d91fb1b",
+          "name": "Juno Ash 8"
+        },
+        {
+          "id": "a985cdd9-483f-5851-beef-b95a825b7144",
+          "name": "Ari Ash 1"
+        },
+        {
+          "id": "ba9c56e4-0e23-5bbe-9c81-dab01bc8e33e",
+          "name": "Ivo Ash 7"
+        },
+        {
+          "id": "d800532a-8ced-5a78-bdfa-31e9f98c992d",
+          "name": "Emi Ash 5"
+        },
+        {
+          "id": "e4962e43-ed6c-5e09-b3ac-983459c4deea",
+          "name": "Bela Ash 2"
+        },
+        {
+          "id": "e53c81e4-e4bf-5171-a0d7-b90e9cff8bd4",
+          "name": "Cleo Ash 3"
+        }
+      ],
+      "size": 8,
+      "source": {
+        "kind": "everyone"
+      }
+    },
+    "others": [],
+    "others_asked": false,
+    "phase": "development",
+    "population": 8,
+    "preregistration": null,
+    "primary": [
+      "routine",
+      "model_a"
+    ],
+    "profile": "exulanica.society-comparison-result/v2",
+    "score_version": 2,
+    "seeds": [
+      {
+        "excluded": null,
+        "name": null,
+        "runs": {
+          "model_a": {
+            "calls": {
+              "asked": 91,
+              "cost_known": true,
+              "cost_usd": "0.01274000",
+              "first_answers_refused": 0,
+              "latency_ms": {
+                "p50": 3,
+                "p95": 5
+              }
+            },
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 68,
+              "left_to_routine": 25,
+              "not_answered": 2,
+              "not_applied": 23,
+              "per_routine_choice": {
+                "answered": "0.6869",
+                "left_to_routine": "0.2525",
+                "refused": "0.0000"
+              },
+              "reasons": {
+                "model_call_failed": 2,
+                "partner_busy": 16,
+                "place_taken_this_minute": 7
+              },
+              "refused": 0,
+              "routine_choice_points": 99,
+              "shares": {
+                "answered": "0.7312",
+                "left_to_routine": "0.2688",
+                "refused": "0.0000"
+              },
+              "turns": 93
+            },
+            "run_id": "18d5dec2-ed3a-5ea2-b454-6a32f2d56f0d",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "routine": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "a24bd819-3122-5d67-995e-759450a7bd03",
+            "score": "1.0000",
+            "status": "completed"
+          },
+          "wait": {
+            "calls": null,
+            "failure": null,
+            "others_calls": null,
+            "reliability": {
+              "answered": 0,
+              "left_to_routine": 0,
+              "not_answered": 0,
+              "not_applied": 0,
+              "per_routine_choice": null,
+              "reasons": {},
+              "refused": 0,
+              "routine_choice_points": null,
+              "shares": null,
+              "turns": 0
+            },
+            "run_id": "f8e71fb5-9632-581a-a65d-753155c0d618",
+            "score": "0.0000",
+            "status": "completed"
+          }
+        },
+        "seed_digest": "ef10d747dfd582f69c152750b7a36498feefcd01028cc5206b9ac0e7437db150"
+      }
+    ],
+    "start": {
+      "bound_usd": "0.05000000",
+      "closed_reason": null,
+      "finished_at": "2026-09-29T17:03:37.179705+00:00",
+      "runs_planned": 3,
+      "spent_usd": "0.01274000",
+      "presumed_usd": "0.00000000",
+      "started_at": "2026-09-29T17:03:35.512035+00:00",
+      "state": "finished"
+    },
+    "summaries": {
+      "model_a": {
+        "cost_known": true,
+        "cost_usd_per_hour": "0.0127",
+        "held_out": {
+          "activities_per_person": "3.5000",
+          "first_answers_refused": "0.0000",
+          "minutes_by_activity": {
+            "rest": "0.4792",
+            "stand": "0.0333",
+            "talk": "0.1604",
+            "visit": "0.1354"
+          },
+          "waiting_share": "0.0000",
+          "walking_share": "0.1917"
+        },
+        "interval": null,
+        "latency_ms": {
+          "p50": 3,
+          "p95": 5
+        },
+        "mean_score": "1.0000",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 68,
+          "left_to_routine": 25,
+          "not_answered": 2,
+          "not_applied": 23,
+          "per_routine_choice": {
+            "answered": "0.6869",
+            "left_to_routine": "0.2525",
+            "refused": "0.0000"
+          },
+          "reasons": {
+            "model_call_failed": 2,
+            "partner_busy": 16,
+            "place_taken_this_minute": 7
+          },
+          "refused": 0,
+          "routine_choice_points": 99,
+          "shares": {
+            "answered": "0.7312",
+            "left_to_routine": "0.2688",
+            "refused": "0.0000"
+          },
+          "turns": 93
+        }
+      },
+      "routine": {
+        "cost_known": true,
+        "cost_usd_per_hour": null,
+        "held_out": {
+          "activities_per_person": "3.8750",
+          "first_answers_refused": null,
+          "minutes_by_activity": {
+            "rest": "0.3500",
+            "stand": "0.0375",
+            "talk": "0.3542",
+            "visit": "0.0854"
+          },
+          "waiting_share": "0.0000",
+          "walking_share": "0.1729"
+        },
+        "interval": null,
+        "latency_ms": {
+          "p50": null,
+          "p95": null
+        },
+        "mean_score": "1.0000",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 0,
+          "left_to_routine": 0,
+          "not_answered": 0,
+          "not_applied": 0,
+          "per_routine_choice": null,
+          "reasons": {},
+          "refused": 0,
+          "routine_choice_points": null,
+          "shares": null,
+          "turns": 0
+        }
+      },
+      "wait": {
+        "cost_known": true,
+        "cost_usd_per_hour": null,
+        "held_out": {
+          "activities_per_person": "0.0000",
+          "first_answers_refused": null,
+          "minutes_by_activity": {},
+          "waiting_share": "1.0000",
+          "walking_share": "0.0000"
+        },
+        "interval": null,
+        "latency_ms": {
+          "p50": null,
+          "p95": null
+        },
+        "mean_score": "0.0000",
+        "others_cost_known": true,
+        "others_cost_usd_per_hour": null,
+        "reliability": {
+          "answered": 0,
+          "left_to_routine": 0,
+          "not_answered": 0,
+          "not_applied": 0,
+          "per_routine_choice": null,
+          "reasons": {},
+          "refused": 0,
+          "routine_choice_points": null,
+          "shares": null,
+          "turns": 0
+        }
+      }
+    },
+    "verdict": {
+      "answered_shares_differ": null,
+      "code": "not_judged",
+      "higher": null,
+      "reason": "development_seeds"
+    },
+    "window_ticks": 60
+  },
+  "started": {
+    "comparisons": [
+      {
+        "arms": [
+          {
+            "answering": {
+              "mechanism": "tool_call",
+              "order": [
+                "tool_call",
+                "json_schema"
+              ],
+              "record": null,
+              "source": "contract"
+            },
+            "decider": {
+              "kind": "model",
+              "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+              "name": "Qwen3 235B Instruct",
+              "provider": "nebius_token_factory"
+            },
+            "description": "Qwen3 235B Instruct, an open model from the Qwen team that answers without reasoning first.",
+            "key": "model_a",
+            "role": "candidate"
+          },
+          {
+            "answering": null,
+            "decider": {
+              "kind": "routine"
+            },
+            "description": "Their own routine",
+            "key": "routine",
+            "role": "one"
+          },
+          {
+            "answering": null,
+            "decider": {
+              "kind": "wait"
+            },
+            "description": "Waiting where they are",
+            "key": "wait",
+            "role": "zero"
+          }
+        ],
+        "comparison_id": "060fff63-fc4b-430d-8cf4-36e863508c71",
+        "created_at": "2026-09-29T17:03:35.509370+00:00",
+        "group": {
+          "size": 8,
+          "source": {
+            "kind": "everyone"
+          }
+        },
+        "phase": "development",
+        "runs": 3,
+        "runs_completed": 0,
+        "runs_expected": 3,
+        "runs_finished": 0,
+        "score_version": 2,
+        "seeds": 1,
+        "start": {
+          "bound_usd": "0.05000000",
+          "closed_reason": null,
+          "finished_at": null,
+          "runs_planned": 3,
+          "spent_usd": "0.00000000",
+          "presumed_usd": "0.00000000",
+          "started_at": "2026-09-29T17:03:35.512035+00:00",
+          "state": "waiting"
+        }
+      }
+    ],
+    "profile": "exulanica.society-comparisons/v2"
+  }
+}

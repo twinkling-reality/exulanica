@@ -2386,6 +2386,262 @@
       }
      }
     }
+   },
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Start Society Comparison",
+    "operationId": "start_society_comparison_world_versions__version_id__society_comparisons_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ComparisonStartBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Start Society Comparison World Versions  Version Id  Society Comparisons Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/comparisons/plan": {
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Plan Society Comparison",
+    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, and, for the selection the query\nnames (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group),\nthe runs it plans, the most it can cost and what one like it typically cost, or the refusal a\nstart of it would meet.",
+    "operationId": "plan_society_comparison_world_versions__version_id__society_comparisons_plan_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "role",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 63
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Role"
+      }
+     },
+     {
+      "name": "group",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "everyone",
+          "owner_choice",
+          "named"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Group"
+      }
+     },
+     {
+      "name": "choice_seq",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 1
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Choice Seq"
+      }
+     },
+     {
+      "name": "person",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "maxItems": 512,
+       "default": [],
+       "title": "Person"
+      }
+     },
+     {
+      "name": "model",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 2,
+       "default": [],
+       "title": "Model"
+      }
+     },
+     {
+      "name": "control",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Control"
+      }
+     },
+     {
+      "name": "seeds",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 64,
+       "minimum": 1,
+       "default": 1,
+       "title": "Seeds"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Plan Society Comparison World Versions  Version Id  Society Comparisons Plan Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/world/versions/{version_id}/society/comparisons/{comparison_id}": {
@@ -14332,6 +14588,54 @@
     ],
     "title": "ChoiceParameterView"
    },
+   "ChosenGroup": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "everyone",
+       "owner_choice",
+       "named"
+      ],
+      "title": "Kind"
+     },
+     "choice_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Choice Seq"
+     },
+     "people": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "type": "array",
+        "maxItems": 512
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "People"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "title": "ChosenGroup",
+    "description": "The people every arm decides for: everybody, the people one of the owner's choices named,\nor people named."
+   },
    "ChosenModel": {
     "properties": {
      "provider": {
@@ -14578,6 +14882,61 @@
      "fatigue_p95_milli"
     ],
     "title": "Comparison"
+   },
+   "ComparisonStartBody": {
+    "properties": {
+     "comparison_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Comparison Id"
+     },
+     "role": {
+      "type": "string",
+      "maxLength": 63,
+      "minLength": 1,
+      "title": "Role"
+     },
+     "group": {
+      "$ref": "#/components/schemas/ChosenGroup"
+     },
+     "models": {
+      "items": {
+       "$ref": "#/components/schemas/ChosenModel"
+      },
+      "type": "array",
+      "maxItems": 2,
+      "minItems": 1,
+      "title": "Models"
+     },
+     "control": {
+      "type": "boolean",
+      "title": "Control",
+      "default": false
+     },
+     "seeds": {
+      "type": "integer",
+      "maximum": 64.0,
+      "minimum": 1.0,
+      "title": "Seeds"
+     },
+     "bound_usd": {
+      "type": "string",
+      "pattern": "^[0-9]{1,6}(\\.[0-9]{1,8})?$",
+      "title": "Bound Usd"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "comparison_id",
+     "role",
+     "group",
+     "models",
+     "seeds",
+     "bound_usd"
+    ],
+    "title": "ComparisonStartBody",
+    "description": "A comparison started: what it compares, its id (the caller's, keyed within its workspace)\nand the most its asks may spend, in US dollars."
    },
    "ComposePersonalWorldBody": {
     "properties": {

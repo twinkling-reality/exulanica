@@ -18,6 +18,7 @@ from exulanica.errors import ExulanicaError
 
 __all__ = [
     "AmbiguousStructuredOutputError",
+    "BudgetBoundExceeded",
     "BudgetExceededError",
     "BudgetShareExceeded",
     "GuidedJsonForbiddenError",
@@ -196,3 +197,9 @@ class BudgetShareExceeded(BudgetExceededError):
 
     The rest is kept for the process's other work, which goes on; nothing was sent.
     """
+
+
+class BudgetBoundExceeded(BudgetExceededError):
+    """A call that would take one piece of work past the bound it was started under, a part of
+    the process's budget with a ceiling of its own (:class:`~exulanica.models.budget.
+    BoundedBudget`); nothing was sent."""

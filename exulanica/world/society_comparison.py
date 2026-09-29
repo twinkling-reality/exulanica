@@ -45,6 +45,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final
 
+from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.role_decisions import (
     Asking,
     PlayedMinutes,
@@ -57,7 +58,6 @@ from exulanica.world.society_decision_contract import (
     DecisionContract,
     DecisionOption,
     option_goal_policy,
-    person_role,
 )
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
@@ -74,6 +74,7 @@ __all__ = [
     "PlayedRun",
     "ReplayMismatch",
     "RunPlan",
+    "plan_role",
     "play",
     "replay",
     "request_id",
@@ -153,6 +154,13 @@ def _check_decider(
         raise ValueError(f"exactly a model {who} records what its requests ask")
 
 
+def plan_role(plan: RunPlan) -> DecisionRole:
+    """The decision role a run asks: the registered role whose contract is the one the run is
+    asked under (:meth:`~exulanica.world.decision_roles.RoleRegistry.for_contract`), so a run
+    names its role by the contract its comparison recorded rather than assuming a person."""
+    return decision_roles().for_contract(plan.contract.binding())
+
+
 def request_id(run_id: uuid.UUID, subject_id: str, tick: int) -> uuid.UUID:
     """The request a person is asked with in one run's minute: one per person, run and minute."""
     return uuid.uuid5(run_id, f"person-decision:{subject_id}:{tick}")
@@ -217,9 +225,10 @@ def _minutes(
     on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None]
     | None = None,
 ) -> PlayedMinutes:
-    """``plan``'s minutes, by the one loop every role runs by: the arm's model asked for its
-    people, its waiting anchor as the seam each minute begins from, the routine for the rest."""
-    role = person_role()
+    """``plan``'s minutes, by the one loop every role runs by, under the role the run's contract
+    names (:func:`plan_role`): the arm's model asked for its people, its waiting anchor as the
+    seam each minute begins from, the routine for the rest."""
+    role = plan_role(plan)
     waiting = _wait_policy(plan.contract)
 
     def config_for(subject: str) -> Mapping[str, Any] | None:

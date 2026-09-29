@@ -35,11 +35,22 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Final
 
 from exulanica.env import env_get, env_name
-from exulanica.models.errors import BudgetExceededError, BudgetShareExceeded
+from exulanica.models.errors import (
+    BudgetBoundExceeded,
+    BudgetExceededError,
+    BudgetShareExceeded,
+)
 from exulanica.models.manifest import ModelSpec, Role
 from exulanica.models.usage import USD_QUANTUM, CallUsage, CostLedger
 
-__all__ = ["DEFAULT_CEILING_USD", "DEFAULT_MAX_CALLS", "BudgetGuard", "BudgetShareExceeded"]
+__all__ = [
+    "DEFAULT_CEILING_USD",
+    "DEFAULT_MAX_CALLS",
+    "BoundedBudget",
+    "BudgetBoundExceeded",
+    "BudgetGuard",
+    "BudgetShareExceeded",
+]
 
 #: A full corpus pass was measured at roughly $0.41, and twenty development iterations at about
 #: $10. Five dollars is generous for one process and small against a $25 prepaid balance, so a
@@ -248,3 +259,112 @@ class BudgetGuard:
     def _settle(self, reserved: Decimal) -> None:
         self._held_usd = max(Decimal(0), self._held_usd - reserved)
         self._held_calls = max(0, self._held_calls - 1)
+
+
+class BoundedBudget(BudgetGuard):
+    """A part of a budget guard with a ceiling of its own: one piece of work's bound inside the
+    process's budget, such as a comparison of models started with a bound a person stated.
+
+    Every reservation, release and record goes on to ``guard``, the process's own or a part of
+    it, so every ceiling above this one and any part a call must leave for other work still hold;
+    this also refuses a call that would take the part's own spend and holds past its
+    ``ceiling_usd`` or ``max_calls`` (:class:`BudgetBoundExceeded`), and says so in
+    :attr:`refusals`. A reservation is held until its usage is recorded, as the process's guard
+    holds it, so calls admitted at once, by one piece of work or several sharing the part, never
+    take it past its ceiling together. What the part spent is its own ledger's, recorded as the
+    process's is. A part of a part, one for each of several pieces of work sharing a bound, knows
+    which of them the bound refused.
+    """
+
+    def __init__(self, guard: BudgetGuard, *, ceiling_usd: Decimal, max_calls: int) -> None:
+        # Deliberately not BudgetGuard.__init__, whose defaults read the process's environment:
+        # a part's ceiling is the one stated for it.
+        if ceiling_usd <= 0 or max_calls < 1:
+            raise ValueError("a bounded part of a budget allows at least one call and some spend")
+        self._guard = guard
+        self.ceiling_usd = ceiling_usd
+        self.max_calls = max_calls
+        self.ledger = CostLedger()
+        self._held_usd = Decimal(0)
+        self._held_calls = 0
+        #: How many calls this part refused by its own ceiling, or a part it passes calls on to
+        #: refused by its own; never the process's own refusals.
+        self.refusals = 0
+        self._lock = threading.Lock()
+
+    def __copy__(self) -> BoundedBudget:
+        # The same part: a copy would be a second ceiling over the same spending.
+        return self
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> BoundedBudget:
+        return self
+
+    @property
+    def guard(self) -> BudgetGuard:
+        """The budget this is a part of."""
+        return self._guard
+
+    def reserve(
+        self,
+        spec: ModelSpec,
+        *,
+        role: Role | str,
+        prompt_chars: int = 0,
+        max_tokens: int = 0,
+        extra_prompt_tokens: int = 0,
+        keep_usd: Decimal = Decimal(0),
+        keep_calls: int = 0,
+    ) -> Decimal:
+        """Admit this call within this part's ceiling, then within the process's budget,
+        leaving ``keep_usd`` and ``keep_calls`` of the process's for its other work."""
+        projected = self.estimate_usd(
+            spec,
+            prompt_chars=prompt_chars,
+            max_tokens=max_tokens,
+            extra_prompt_tokens=extra_prompt_tokens,
+        )
+        with self._lock:
+            if (
+                self.billed_calls + self._held_calls >= self.max_calls
+                or self.spent_usd + self._held_usd + projected > self.ceiling_usd
+            ):
+                self.refusals += 1
+                raise BudgetBoundExceeded(
+                    f"this {role} call could cost up to ${projected}, and the bound it runs "
+                    f"under has ${self.ceiling_usd} of which ${self.spent_usd} is spent and "
+                    f"${self._held_usd.quantize(USD_QUANTUM)} held. No request was sent.",
+                    spent_usd=self.spent_usd,
+                    ceiling_usd=self.ceiling_usd,
+                )
+            self._held_usd += projected
+            self._held_calls += 1
+        try:
+            reserved = self._guard.reserve(
+                spec,
+                role=role,
+                prompt_chars=prompt_chars,
+                max_tokens=max_tokens,
+                extra_prompt_tokens=extra_prompt_tokens,
+                keep_usd=keep_usd,
+                keep_calls=keep_calls,
+            )
+        except BaseException as exc:
+            with self._lock:
+                self._settle(projected)
+                if isinstance(exc, BudgetBoundExceeded):
+                    self.refusals += 1
+            raise
+        return reserved
+
+    def release(self, reserved: Decimal) -> None:
+        self._guard.release(reserved)
+        with self._lock:
+            self._settle(reserved)
+
+    def record(self, usage: CallUsage, *, released: Decimal | None = None) -> CallUsage:
+        recorded = self._guard.record(usage, released=released)
+        with self._lock:
+            if released is not None:
+                self._settle(released)
+            self.ledger.record(usage)
+        return recorded

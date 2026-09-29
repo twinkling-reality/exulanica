@@ -1,16 +1,18 @@
 /**
- * The same hour of a saved world, run with each arm of a comparison: read, never run.
+ * The same hour of a saved world, run with each arm of a comparison: planned, started and read.
  *
  * Speaks `/world/versions/{id}/society/comparisons` (`exulanica/api/routes/society_comparisons.py`):
- * a version's comparisons, one comparison's scores and the server's verdict, and one run replayed
- * from the requests and receipts it stored. None of these asks a model; a comparison is defined
- * and run by the local command, and a run's read replays it on the server with no call. The page
- * never decides whether two arms differ: the verdict is the server's, and this module only carries
- * its code. No document here carries a seed: seeds are named by the digest a catalog commits.
+ * a version's comparisons, one comparison's scores and the server's verdict, one run replayed from
+ * the requests and receipts it stored, what a start of a comparison would be (its plan), and the
+ * start itself. None of the reads asks a model, and a run's read replays it on the server with no
+ * call; a started comparison is played by the server off the request, under the bound its owner
+ * stated. The page never decides whether two arms differ, or what a comparison may cost: the
+ * verdict and the plan are the server's, and this module only carries them. No document here
+ * carries a seed: seeds are named by the digest a catalog commits.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
-import type { NamedModelRef } from './society-models-api.js';
+import type { ModelRef, NamedModelRef } from './society-models-api.js';
 import { openWorldPath } from './world-scope.js';
 
 /**
@@ -100,6 +102,27 @@ export interface OtherPerson extends NamedPerson {
   readonly choice: OwnerChoice | null;
 }
 
+/**
+ * Where a comparison started from the application stands, by the server's word: `START_STATES`
+ * in `exulanica/world/society_comparison_start_repository.py`, held to it by a parity test.
+ */
+export const START_STATES = ['waiting', 'running', 'finished', 'closed'] as const;
+export type StartState = typeof START_STATES[number];
+
+/** A comparison's start: the bound its owner stated, what its asks spent, and where it stands. */
+export interface ComparisonStart {
+  readonly boundUsd: Decimal;
+  readonly spentUsd: Decimal;
+  /** What servers that stopped were presumed to have spent on asks they never recorded. */
+  readonly presumedUsd: Decimal;
+  readonly state: StartState;
+  /** Why the server closed it before every run was played, by code, or null. */
+  readonly closedReason: string | null;
+  readonly runsPlanned: number;
+  readonly startedAt: string;
+  readonly finishedAt: string | null;
+}
+
 export interface ComparisonListing {
   readonly comparisonId: string;
   readonly createdAt: string;
@@ -111,7 +134,11 @@ export interface ComparisonListing {
   readonly seeds: number;
   readonly runs: number;
   readonly runsCompleted: number;
+  /** Runs with an outcome, completed or failed. */
+  readonly runsFinished: number;
   readonly runsExpected: number;
+  /** Its start where it was started from the application; null for one the local command ran. */
+  readonly start: ComparisonStart | null;
 }
 
 /** A value the server computed exactly and wrote as a decimal: shown as written, never clipped. */
@@ -245,6 +272,7 @@ export interface ComparisonResult {
   readonly differences: readonly ComparisonDifference[];
   readonly controlBound: Decimal | null;
   readonly verdict: Verdict;
+  readonly start: ComparisonStart | null;
 }
 
 export interface PlanNode { readonly id: string; readonly x: number; readonly z: number }
@@ -395,6 +423,20 @@ function arm(value: unknown): ComparisonArm {
 
 const phase = oneOf<Phase>(['development', 'held_out']);
 
+function comparisonStart(value: unknown): ComparisonStart {
+  const held = object(value);
+  return {
+    boundUsd: decimal(held['bound_usd']),
+    spentUsd: decimal(held['spent_usd']),
+    presumedUsd: decimal(held['presumed_usd']),
+    state: oneOf(START_STATES)(held['state']),
+    closedReason: maybe(held['closed_reason'], text),
+    runsPlanned: count(held['runs_planned']),
+    startedAt: text(held['started_at']),
+    finishedAt: maybe(held['finished_at'], text),
+  };
+}
+
 export function parseComparisons(value: unknown): readonly ComparisonListing[] {
   const row = object(value);
   if (row['profile'] !== 'exulanica.society-comparisons/v2') invalid();
@@ -411,7 +453,9 @@ export function parseComparisons(value: unknown): readonly ComparisonListing[] {
       seeds: count(held['seeds']),
       runs: count(held['runs']),
       runsCompleted: count(held['runs_completed']),
+      runsFinished: count(held['runs_finished']),
       runsExpected: count(held['runs_expected']),
+      start: maybe(held['start'], comparisonStart),
     };
   }));
 }
@@ -560,6 +604,7 @@ export function parseComparison(value: unknown): ComparisonResult {
       reason: maybe(verdict['reason'], text),
       answeredSharesDiffer: maybe(verdict['answered_shares_differ'], flag),
     },
+    start: maybe(row['start'], comparisonStart),
   });
 }
 
@@ -654,6 +699,177 @@ export function parseRunReplay(value: unknown): RunReplay {
   });
 }
 
+/** A group a comparison may decide for: everybody, or the people one of the owner's choices named. */
+export interface PlanGroup {
+  readonly kind: GroupSourceKind;
+  readonly choiceSeq: number | null;
+  readonly size: number;
+  readonly people: readonly NamedPerson[] | null;
+  /** The model that choice named, or null for their routine and for everybody. */
+  readonly model: NamedModelRef | null;
+}
+
+/** A model a comparison may ask, whether this server can ask it, and what it typically cost. */
+export interface PlanModel extends NamedModelRef {
+  readonly description: string;
+  /** Why this server cannot ask it now, by code, or null. */
+  readonly refusal: string | null;
+  /**
+   * What one person cost for a simulated hour under it in a recorded comparison
+   * (`typicalRecord`), or null where none measured it: a measurement, never a bound.
+   */
+  readonly typicalUsdPerPersonHour: Decimal | null;
+}
+
+/** A decision role a comparison of this society may ask, with the groups and models it offers. */
+export interface PlanRole {
+  readonly key: string;
+  /** The word the role's subjects are known by. */
+  readonly subject: string;
+  readonly groups: readonly PlanGroup[];
+  readonly models: readonly PlanModel[];
+}
+
+/** What a selection would run and what it can cost: the most, derived, and the typical, measured. */
+export interface PlanFigures {
+  readonly runs: number;
+  readonly asksMost: number;
+  readonly callsMost: number;
+  readonly mostUsd: Decimal;
+  readonly typicalUsd: Decimal | null;
+  readonly typicalRecord: string;
+}
+
+export interface Refusal {
+  readonly code: string;
+  readonly detail: string;
+}
+
+/** What this server offers a comparison of a version's society, and a selection's plan. */
+export interface ComparisonPlan {
+  /** Why this server starts no comparison here, or null. */
+  readonly refusal: Refusal | null;
+  /** The comparison of this world still running, by id, or null. */
+  readonly running: string | null;
+  readonly roles: readonly PlanRole[];
+  readonly seedsAvailable: number;
+  readonly modelsMost: number;
+  readonly windowTicks: number;
+  readonly typicalRecord: string;
+  readonly plan: PlanFigures | null;
+  /** Why a start of the selection would be refused, or null. */
+  readonly planRefusal: Refusal | null;
+}
+
+/** What a person chose to compare. */
+export interface ComparisonSelection {
+  readonly role: string;
+  readonly group: { readonly kind: GroupSourceKind; readonly choiceSeq?: number; readonly people?: readonly string[] };
+  readonly models: readonly ModelRef[];
+  readonly control: boolean;
+  readonly seeds: number;
+}
+
+/** A comparison started: what it compares, its id, and the most its asks may spend. */
+export interface StartRequest extends ComparisonSelection {
+  readonly comparisonId: string;
+  readonly boundUsd: Decimal;
+}
+
+const refusal = (value: unknown): Refusal => {
+  const held = object(value);
+  return { code: text(held['code']), detail: words(held['detail']) };
+};
+
+const namedModel = (value: unknown): NamedModelRef => {
+  const held = object(value);
+  return { provider: text(held['provider']), modelId: text(held['model_id']), name: text(held['name']) };
+};
+
+function planFigures(value: unknown): PlanFigures {
+  const held = object(value);
+  return {
+    runs: count(held['runs']),
+    asksMost: count(held['asks_most']),
+    callsMost: count(held['calls_most']),
+    mostUsd: decimal(held['most_usd']),
+    typicalUsd: maybe(held['typical_usd'], decimal),
+    typicalRecord: text(held['typical_record']),
+  };
+}
+
+export function parsePlan(value: unknown): ComparisonPlan {
+  const row = object(value);
+  if (row['profile'] !== 'exulanica.society-comparison-plan/v1') invalid();
+  return Object.freeze({
+    refusal: maybe(row['refusal'], refusal),
+    running: maybe(row['running'], text),
+    roles: list(row['roles']).map((entry) => {
+      const held = object(entry);
+      return {
+        key: text(held['key']),
+        subject: text(held['subject']),
+        groups: list(held['groups']).map((group) => {
+          const offered = object(group);
+          return {
+            kind: oneOf<GroupSourceKind>(GROUP_SOURCES)(offered['kind']),
+            choiceSeq: maybe(offered['choice_seq'], count),
+            size: count(offered['size']),
+            people: maybe(offered['people'], (people) => list(people).map(namedPerson)),
+            model: maybe(offered['model'], namedModel),
+          };
+        }),
+        models: list(held['models']).map((model) => {
+          const offered = object(model);
+          return {
+            ...namedModel(offered),
+            description: words(offered['description']),
+            refusal: maybe(offered['refusal'], text),
+            typicalUsdPerPersonHour: maybe(offered['typical_usd_per_person_hour'], decimal),
+          };
+        }),
+      };
+    }),
+    seedsAvailable: count(row['seeds_available']),
+    modelsMost: count(row['models_most']),
+    windowTicks: count(row['window_ticks']),
+    typicalRecord: text(row['typical_record']),
+    plan: maybe(row['plan'], planFigures),
+    planRefusal: maybe(row['plan_refusal'], refusal),
+  });
+}
+
+/** A selection as the plan route's query names it. */
+export function planQuery(selection: ComparisonSelection): URLSearchParams {
+  const query = new URLSearchParams({
+    role: selection.role,
+    group: selection.group.kind,
+    control: String(selection.control),
+    seeds: String(selection.seeds),
+  });
+  if (selection.group.choiceSeq !== undefined) query.set('choice_seq', String(selection.group.choiceSeq));
+  for (const person of selection.group.people ?? []) query.append('person', person);
+  for (const model of selection.models) query.append('model', `${model.provider}/${model.modelId}`);
+  return query;
+}
+
+/** A start as the start route's body states it. */
+export function startBody(request: StartRequest): Record<string, unknown> {
+  return {
+    comparison_id: request.comparisonId,
+    role: request.role,
+    group: {
+      kind: request.group.kind,
+      ...(request.group.choiceSeq === undefined ? {} : { choice_seq: request.group.choiceSeq }),
+      ...(request.group.people === undefined ? {} : { people: [...request.group.people] }),
+    },
+    models: request.models.map((model) => ({ provider: model.provider, model_id: model.modelId })),
+    control: request.control,
+    seeds: request.seeds,
+    bound_usd: request.boundUsd,
+  };
+}
+
 export interface SocietyComparisonClientOptions extends TransportOptions {
   /** The open world the versions belong to; null where none is open, which sends nothing. */
   readonly worldId: string | null;
@@ -666,7 +882,13 @@ export interface SocietyComparisonReadPort {
   run(versionId: string, comparisonId: string, runId: string): Promise<RunReplay>;
 }
 
-export class SocietyComparisonClient implements SocietyComparisonReadPort {
+/** What starts a comparison: its plan, and the start. */
+export interface SocietyComparisonStartPort {
+  plan(versionId: string, selection: ComparisonSelection | null): Promise<ComparisonPlan>;
+  start(versionId: string, request: StartRequest): Promise<readonly ComparisonListing[]>;
+}
+
+export class SocietyComparisonClient implements SocietyComparisonReadPort, SocietyComparisonStartPort {
   readonly #transport: Transport;
   readonly #worldId: string | null;
   constructor(options: SocietyComparisonClientOptions) {
@@ -688,6 +910,16 @@ export class SocietyComparisonClient implements SocietyComparisonReadPort {
     return this.#transport.getJson<unknown>(this.#path(
       versionId, `/${encodeURIComponent(comparisonId)}/runs/${encodeURIComponent(runId)}`,
     )).then(parseRunReplay);
+  }
+
+  async plan(versionId: string, selection: ComparisonSelection | null): Promise<ComparisonPlan> {
+    const query = selection === null ? '' : `?${planQuery(selection).toString()}`;
+    return this.#transport.getJson<unknown>(this.#path(versionId, `/plan${query}`)).then(parsePlan);
+  }
+
+  async start(versionId: string, request: StartRequest): Promise<readonly ComparisonListing[]> {
+    return this.#transport.postJson<unknown>(this.#path(versionId, ''), startBody(request))
+      .then(parseComparisons);
   }
 
   #path(versionId: string, rest: string): string {

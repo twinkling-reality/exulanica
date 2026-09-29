@@ -74,8 +74,10 @@
         "runs": 8,
         "runs_completed": 8,
         "runs_expected": 8,
+        "runs_finished": 8,
         "score_version": 2,
-        "seeds": 2
+        "seeds": 2,
+        "start": null
       }
     ],
     "profile": "exulanica.society-comparisons/v2"
@@ -478,6 +480,7 @@
         "seed_digest": "760c29cbe9611967c28af6c06867dd5112267f21ea4a0be9679dc1a92f27c4ee"
       }
     ],
+    "start": null,
     "summaries": {
       "model_a": {
         "cost_known": true,

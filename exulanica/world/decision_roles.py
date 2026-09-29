@@ -434,9 +434,46 @@ class RoleRegistry:
     def for_choice(self, profile: str) -> DecisionRole | None:
         return self._by("choice_profile", profile)
 
+    def for_contract(self, binding: Mapping[str, Any]) -> DecisionRole:
+        """The role a record's contract binding names: the one registered role whose contract,
+        at the catalog versions the binding names, is exactly that binding, versions and digest.
+        A record names the role it was asked under by the contract it recorded, so no second
+        field states it; a binding no role's contract matches, or two roles' do, is refused."""
+        versions = binding.get("catalog_versions")
+        found = []
+        for role in self:
+            if not isinstance(versions, Mapping) or set(versions) != {
+                role.action_catalog,
+                role.policy_catalog,
+            }:
+                continue
+            try:
+                held = role.contract(versions).binding()
+            except (CatalogError, ContractError):
+                continue
+            if held == dict(binding):
+                found.append(role)
+        if len(found) != 1:
+            raise RoleRefused(
+                "role_not_registered",
+                f"{len(found)} registered roles hold the contract this record names",
+            )
+        return found[0]
+
     def hosted_by(self, engine: str) -> tuple[DecisionRole, ...]:
         """The roles an engine's minutes consume receipts of, in key order."""
         return tuple(role for role in self if role.hosted_by(engine))
+
+    def deciding_for(self, subject: str) -> DecisionRole:
+        """The one registered role deciding for ``subject``, the word its subjects are known by;
+        a registry stating none or several is refused by name."""
+        found = [role for role in self if role.subject == subject]
+        if len(found) != 1:
+            raise RoleRefused(
+                "role_not_registered",
+                f"the registry states {len(found)} roles deciding for a {subject}",
+            )
+        return found[0]
 
     @property
     def chosen(self) -> tuple[ChosenRoleBinding, ...]:

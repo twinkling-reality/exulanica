@@ -55,8 +55,9 @@ alone, where the host's also ends in time for its lease. Everybody outside the g
 arm, what their world's owner had chosen for them when the comparison was defined: a model, asked
 the same way, or their routine. So two arms differ only in who decides for the group. A control arm
 runs one candidate model a second time to bound what run-to-run variation alone produces. The pure
-loop and its replay are `exulanica/world/society_comparison.py`; the local runner is
-`exulanica/api/society_comparison_runner.py`.
+loop and its replay are `exulanica/world/society_comparison.py`; the runner is
+`exulanica/api/society_comparison_runner.py`, and the one definition the application's start and the
+local command share is `exulanica/api/society_comparison_start.py`.
 
 ### Records
 
@@ -179,11 +180,13 @@ receipts with no billed call.
 
 ### Reads
 
-Three routes read what a comparison recorded; none asks a model or writes anything.
+Four routes read what a comparison recorded or what a start of one would be; none asks a model or
+writes anything.
 
 | Method and path | Permission | Result |
 | --- | --- | --- |
-| `GET /world/versions/{version_id}/society/comparisons` | `world.read` | The version's comparisons, newest first, with their arms, the group they decide for and how far their runs got |
+| `GET /world/versions/{version_id}/society/comparisons` | `world.read` | The version's comparisons, newest first, with their arms, the group they decide for, how far their runs got and, for one started from the application, its start: the bound, what its asks spent, what hosts that stopped are presumed to have spent unrecorded, and where it stands |
+| `GET /world/versions/{version_id}/society/comparisons/plan` | `world.read` | What this server offers a comparison of the version's society, the roles its engine hosts with their groups and models, and for a selection its runs, the most it can cost and what one like it typically costs, or the refusal a start of it would meet ([running a comparison](#running-a-comparison)) |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}` | `world.read` | Scores per seed and per arm with intervals and, beside each, what its arm's model answered; the group and who decides for everybody else; the registered differences and the server's verdict |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run replayed from its stored requests and receipts, with no model call, held to its recorded minute digests, events and receipts, naming who decides for each person; a replay that differs is refused as `run_replay_mismatch` |
 
@@ -196,7 +199,90 @@ than its group, is answered as a conflict (409) with the code it was refused by,
 
 ### Running a comparison
 
-A comparison is defined and run by a local command, never from a route:
+A comparison is defined by one path, `exulanica/api/society_comparison_start.py`, whether its
+world's owner starts it from the application or the local command defines and runs it; for every
+set of the command's flags the definition is the one the command made before the application could
+start one ([`tests/test_compare_command_definition.py`](../tests/test_compare_command_definition.py)).
+A definition names the decision role it asks by the contract it records, which the role registry
+resolves to one role, and a run asks that role.
+
+**Starting one from the application.** `POST /world/versions/{version_id}/society/comparisons`
+requires `world.write` and `model.invoke`, which in a browser only the workspace's owner holds. It
+takes the group, one or two models the manifest offers the role, whether the first runs again as the
+control, how many development seeds, the comparison's id and the bound in US dollars its asks may
+spend. In one transaction it defines the comparison over the version's society as it stands,
+reserves every run and records the start (migration 0119), who started it, its bound and its plan,
+which are never changed. The id is the caller's, keyed within its workspace: the same start sent
+again is answered with it, another start under that id is refused (`comparison_conflict`), and
+another workspace naming the same id starts its own. A world plays one started comparison at a time
+(`comparison_running`). Every other refusal is named (`START_REFUSALS`): a server that holds no
+development seed (`comparisons_not_set_up`), where nothing plays the comparisons started on it
+(`comparisons_not_played`), that does not ask models for the workspace (`comparisons_not_run_here`)
+or that holds no model key; a society whose engine takes no comparison or hosts no such role, or
+which holds more people than the protocol's `population_maximum`; a role not registered; a model the
+role is not offered, one named twice, or one this server cannot ask now, whether for the group or
+for somebody outside it whose owner chose it; a group naming nobody, somebody not here or a choice
+this world does not hold; more seeds than the server holds; and a bound above the most the
+comparison can cost (`bound_out_of_range`) or above what this server's model budget has left beside
+the part its decision contract keeps for other work (`bound_over_budget`).
+
+**What it can cost.** The most is derived: a run asks each subject a model decides for at most once
+a minute, so its asks are at most the protocol's window times those subjects (the arm's group under
+a model arm and, in every arm, anybody outside the group whose owner chose a model), and each ask
+costs at most `ask_bound_usd`, every answer the contract allows at the manifest's prices for the
+longest situation and answer the contract allows. What one like it typically costs is a
+measurement: in the [judged group comparison](evaluation/2026-09-26-society-group-comparison.json)
+each model's arms spent, per person and simulated hour, $0.0018 (Nemotron 3.5 Lightning), $0.0014
+(Qwen3 235B Instruct) and $0.00055 (Nemotron 3 Nano 30B), under 2 percent of the most. The plan
+route and the page give both, and the person states the bound, at most the most; nothing starts
+until they do.
+
+**Where it runs.** A host's comparison worker (`exulanica/api/society_comparison_worker.py`) plays
+it off the request path, for the workspaces the host asks models for
+(`EXULANICA_SOCIETY_CONTROL_WORKSPACES`), by the lease the playback worker claims a society by: it
+claims the workspace's oldest unfinished start whose lease is free or has run out, for the control's
+30 s lease, renews it before each run and after each simulated minute, and plays the runs without an
+outcome through the runner, the anchors first, with no connection held while a model is asked. Where
+it runs is `EXULANICA_COMPARISON_WORKER`: absent, the API's process runs it in a thread; `process`,
+`python -m exulanica.orchestration.comparison_worker` runs the same worker in a process of its own
+and the API only serves starts; off, nothing plays them, and the API refuses every start
+(`comparisons_not_played`) rather than accept one no host would ever claim, which would keep its
+world from starting another. Development seeds are read from the file `EXULANICA_COMPARISON_SEEDS`
+names: a line is used only when its digest is one the seed catalog commits to the development phase,
+and none is printed or served.
+
+**The bound.** Every call of a started comparison is reserved against a part of the process's model
+budget whose ceiling is the bound (`BoundedBudget` in `exulanica/models/budget.py`), which passes
+each reservation on to the process's own budget, so the process's ceiling holds too; the asks of a
+comparison the API's process plays leave the decision contract's share of that budget for the
+Companion and the live world. A run asks a minute only while one ask of the dearest model due still
+fits what is left of the bound, the rule the host applies to its own budget, and each call's
+reservation is held until its usage is recorded, so calls made at once never take the bound past its
+ceiling between them. A run the bound no longer fits stops before the minute, and a run one of whose
+calls the bound refused stops after it; either fails by name (`comparison_bound_spent`). An attempt
+whose cost is unknown, such as one that timed out, counts at the most it can have cost, so a
+provider slow to answer spends the bound faster than its answers alone would. A comparison writes no
+world decision, so a live world's hourly bounds neither count nor limit it; the comparison and the
+live world's decisions draw on the same process budget, and once what is left no longer fits a live
+person's ask, that person follows their routine (`process_budget_spent` or `process_share_spent` on
+the models route) until the process restarts.
+
+**A host that stops.** A host that stops part way leaves its lease to run out and at most
+`runs_at_once` runs with receipts and no outcome. The next claim records each of those as failed,
+`interrupted`, before asking anything, and plays the rest, from the bound less what the comparison's
+receipts say it spent and less what claims that took it over presumed. A claim that takes over a
+lease that ran out cannot tell a host killed in the middle of a minute from one that stalled before
+it, so it presumes the most one minute of a run can cost for as many open runs as the stopped host
+may have been playing at once, since those asks may have been paid for and never recorded, and keeps
+it on the start, served as `presumed_usd`, so every later claim deducts it too; it only grows. A run
+given an outcome sets the count of claims in a row that finished no run back, in the transaction
+that records the outcome, so a host that finished runs before it stopped, whether it let its lease
+go or was killed, is never counted as one that finished none. After three claims in a row that
+finished no run, the next closes the start (`claims_spent`): runs with receipts fail `interrupted`
+and the rest `comparison_stopped`. A claim whose bound is spent, or which this process's model
+budget cannot hold, closes the start with every run left failed by that name, asking nothing.
+
+**From the local command.** The command defines and runs one in its own process:
 
 ```
 EXULANICA_BUDGET_USD=<bound> python -m exulanica.orchestration.compare --workspace <uuid> \
@@ -234,8 +320,17 @@ For a chosen seed and two arms it draws both runs from above on one clock (play,
 minute scrubber), what each person did minute by minute on each side with a mark where the two hours
 went differently, and the inspector on a person of either side, saying who decided their latest turn
 and why, and for a person outside the group, that they keep that decider in every arm. The page
-shows every number as the server wrote it and never decides whether two arms differ; it reads
-nothing but the three routes above.
+shows every number as the server wrote it and never decides whether two arms differ.
+
+Above the list, the world's owner starts a comparison from what the plan route offers: who the
+models decide for (everybody, or the people of one of their choices), a first and a second model
+with what each typically costs and why one cannot be asked now, whether the first runs a second
+time, and how many seeds. For the choice it shows the runs, the most they could cost and what one
+like it typically costs, and the bound the person types; Start stays unavailable until the bound is
+above zero and at most that most. A started comparison is listed with its progress, runs finished of
+runs planned and its spend of its bound, with what a server that stopped may have spent where there
+is any, read again every four seconds while it waits or runs, and opens in the view as its runs
+finish; a refusal and a closed start are said in words by their codes.
 
 ## Intervention experiments over a living society
 

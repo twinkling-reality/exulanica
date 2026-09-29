@@ -4,7 +4,8 @@ A program outside the application can use a person's world through the public AP
 from the application's private state. [`clients/python`](../../clients/python) is a small client
 that does it with the Python standard library alone: it reads the person's saved world, asks the
 server which edits, behaviours and assets it supports, places a reviewed object, gives it bounded
-motion, and checks every fact of the result on a fresh read.
+motion, and checks every fact of the result on a fresh read. It also reads a comparison of models
+a world's owner started from the application, with its runs and their decisions.
 
 It is written in Python without dependencies so that it runs anywhere Python does, with no install
 step, and so that it shares no code or generated types with the browser application, which is
@@ -73,6 +74,24 @@ the client: its request body carries `base_state_sha256` and its answer is the s
 the society's state, and answer with something else, so they are not counted
 ([`discovery.py`](../../clients/python/exulanica_client/discovery.py)).
 
+## Reading a comparison of models
+
+```bash
+EXULANICA_TOKEN=<token> python3 -m exulanica_client comparisons --base-url https://<api> \
+  [--comparison <uuid>] [--world <world id> --version <uuid>] --transcript comparison.json
+```
+
+It needs only `world.read`. It reads the comparisons of the saved world's version (or of the world
+and version named), takes the one named or the newest a world's owner started from the application,
+reads its start, arms and every run's outcome, and then every completed run of a model arm, replayed
+by the server from what it stored, with its decisions. From those reads alone it checks that the
+start finished within the bound its owner stated, that every planned run has an outcome, that each
+model arm names its model, that every run it read was replayed from its record, and that each run's
+replayed decisions are exactly the asks the comparison counted for it, each for somebody a model
+decides for in that run ([`comparisons.py`](../../clients/python/exulanica_client/comparisons.py)).
+It sends GET requests only and reads no seed, which no response carries. The exit code is 0 when
+every check holds, 1 when the reading stopped or a check failed, and 2 when no token is set.
+
 ## Using it as a library
 
 ```python
@@ -121,8 +140,8 @@ review as a diff.
   reconciling instead.
 - It does not start motion. It stores a behaviour; trigger, stop and reset are the renderer's
   controls ([world-objects-contract.md](../world-objects-contract.md#behaviours)).
-- It reads no society, model choice, stored decision or comparison. Those routes are in the
-  [World API guide](world-api.md#people-and-models).
+- It reads comparisons of models, their runs and decisions, and no society, model choice or live
+  decision. Those routes are in the [World API guide](world-api.md#people-and-models).
 - It follows no redirect and sends no token over plain `http` to another machine. urllib would
   copy the `Authorization` header to a redirect's target.
 
@@ -135,3 +154,10 @@ in the repository rather than in the client's own report.
 [The recorded run](../evaluation/2026-09-23-developer-client.json) did the same against the
 acceptance runtime with a synthetic workspace, and binds the transcript and the application's view
 of the saved world afterwards, with the object drawn where the client placed it.
+[`tests/test_developer_client_comparisons.py`](../../tests/test_developer_client_comparisons.py)
+runs the comparison reading with a token granted `world.read` alone, over a comparison started
+through the start route and played by the host's worker, and holds the asks it counted to the
+receipts the repository stored.
+[Its recorded run](../evaluation/2026-09-29-developer-client-comparison.json) read a comparison of
+Nemotron 3.5 Lightning and Nemotron 3 Nano 30B that a synthetic world's owner started from the
+Compare view, with every one of its checks holding.

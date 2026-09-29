@@ -692,6 +692,7 @@ def _comparison(owner) -> dict[str, Any]:
             comparison_id=comparison_id,
             body=comparison_support.development_body(catalogs),
             created_by=owner.actor,
+            role=comparison_support.PEOPLE_ROLE,
             catalogs=catalogs,
         )
         run_id = comparisons.reserve(

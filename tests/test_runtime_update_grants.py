@@ -62,6 +62,11 @@ RUNTIME_UPDATES: dict[str, str] = {
     "reconstruction_scene_job": "the scene queue claims, fails and retries; a tombstone cancels",
     "route_permission_refusal": "a repeated refusal is counted in place (api/permissions.py)",
     "scene_training_right": "withdrawal, once; migration 0080 refuses every other change",
+    "society_comparison_start": (
+        "a comparison worker claims, renews, releases and finishes a start's lease, keeps what a "
+        "takeover presumes spent, and a run's outcome sets its claim count back "
+        "(world/society_comparison_start_repository.py); migration 0119 refuses every other change"
+    ),
     "stage_registry": "registering a stage moves its current version (stage_registry.py)",
     "workspace_tile_quota": "tile use is counted against the quota (api/quotas.py)",
     "world_alternate_environment_instance": "an instance moves and is removed",

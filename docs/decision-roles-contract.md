@@ -121,8 +121,11 @@ What a role in a world still needs in code, because only the person is built:
 - **A route and a panel.** The models route and the People panel serve the one role whose subject
   is `person` (`SUBJECT` in `exulanica/api/routes/society_models.py`), and answer
   `409 role_not_registered` unless exactly one registered role decides for people.
-- **Comparisons.** A comparison asks the person role alone
-  (`exulanica/api/society_person_decisions.py`).
+- **Comparisons.** A comparison names the role it asks by the contract its definition records,
+  which the registry resolves to one role (`RoleRegistry.for_contract`), and asks it through the
+  generic path, and the start controls offer the roles the society's engine hosts. Its waiting
+  anchor applies the person's wait, and migration 0113 admits only the person's request and receipt
+  profiles in a comparison's decisions, so a second role's comparison needs both.
 - **Words.** The page and the Companion have words for the person's reason codes only, the
   `decision_reason` entries of `assets/catalogs/society-words/society-inhabitant-words.v1.json`,
   held to the person's reasons by `tests/test_companion_decision_model.py` and
@@ -300,8 +303,10 @@ which that ask's receipt names.
 
 The recorded choice is what authorises this spending: a caller who may play the world
 (`world.write`) starts it by playing, without holding `model.invoke`, and never beyond these bounds.
-A comparison of models spends from its own process budget and keeps none of it back, and a world's
-hourly bounds do not apply to it, since it writes nothing the live world reads
+A comparison of models run by the local command spends from its own process's budget and keeps none
+of it back; one started from the application spends within the bound its owner stated, a part of
+the playing process's budget, and leaves the contract's share for the process's other work. A
+world's hourly bounds do not apply to either, since a comparison writes nothing the live world reads
 ([comparisons of models](society-experiments.md#comparisons-of-models)).
 
 ## What a decision does in its minute

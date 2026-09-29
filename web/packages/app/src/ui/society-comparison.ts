@@ -32,6 +32,7 @@ import { el, replace } from './dom.js';
 import { createLivingWorldInspector } from './living-world-inspector.js';
 import { buildComparisonPlan, classWords, minuteAt, minuteClass } from './society-comparison-plan.js';
 import { buildComparisonStrips } from './society-comparison-strips.js';
+import { progressWords, startWords } from './society-comparison-start.js';
 import './society-comparison.css';
 
 /**
@@ -55,6 +56,9 @@ export const NOT_JUDGED_WORDS: Readonly<Record<string, string>> = {
 /** Why a run failed, by `RUN_FAILURE_CODES` in `exulanica/api/society_comparison_runner.py`. */
 export const FAILURE_WORDS: Readonly<Record<string, string>> = {
   anchor_failed: 'a run of the routine or of waiting on this seed did not complete, so this run could never be scored and asked nothing',
+  comparison_bound_spent: 'the bound you set for this comparison had too little left for its next ask, so it stopped there',
+  comparison_stopped: 'the server stopped running the comparison before this run was played',
+  input_unavailable: 'this world\'s places were no longer available to run it on',
   interrupted: 'the process that ran it stopped part way, so its hour was not finished; a new comparison runs it again',
   model_no_longer_offered: 'the model is no longer offered for decisions',
   process_budget_spent: 'the model budget it ran under had too little left',
@@ -278,6 +282,8 @@ export interface ComparisonDay {
 
 export interface SocietyComparisonView {
   readonly root: HTMLElement;
+  /** Where the controls that start a comparison go, above the list. */
+  readonly startSlot: HTMLElement;
   /** List the version's comparisons, `selected` open. */
   showList(listings: readonly ComparisonListing[], selected: string | null): void;
   /** Show a comparison's numbers and verdict, and which day and sides are chosen. */
@@ -311,6 +317,9 @@ function listingRow(listing: ComparisonListing, selected: boolean, onOpen: () =>
       text: `${listing.phase === 'held_out' ? 'Held-out seeds' : 'Development seeds'}, ${listing.seeds} ${listing.seeds === 1 ? 'seed' : 'seeds'}, ${listing.group.source.kind === 'everyone' ? 'everybody' : `a group of ${listing.group.size}`}, ${listing.runsCompleted} of ${listing.runsExpected} runs completed`,
     }),
     el('time', { datetime: listing.createdAt, text: when(listing.createdAt) }),
+    ...((progress) => (progress === null ? [] : [el('span', { class: 'comparison-listing-progress', text: progress })]))(
+      progressWords(listing),
+    ),
   ]);
   button.addEventListener('click', onOpen);
   return button;
@@ -402,6 +411,7 @@ export function buildSocietyComparisonView(handlers: {
   readonly onComparison: (comparisonId: string) => void;
   readonly onDay: (day: ComparisonDay) => void;
 }): SocietyComparisonView {
+  const startSlot = el('div', { class: 'comparison-start-slot' });
   const list = el('nav', { class: 'comparison-list', 'aria-label': 'Comparisons of this world' });
   const summary = el('section', { class: 'comparison-summary', 'aria-live': 'polite' });
   const dayPart = el('section', { class: 'comparison-day' });
@@ -419,11 +429,11 @@ export function buildSocietyComparisonView(handlers: {
         el('h2', { id: 'society-comparison-title', class: 'comparison-title', text: 'Compare models' }),
         el('p', {
           class: 'comparison-note',
-          text: 'The same hour of this world, decided by different open models, replayed from what each run recorded. Nothing here asks a model.',
+          text: 'The same hour of this world, decided by different open models, replayed from what each run recorded. Reading a comparison asks no model; starting one asks the models you choose, within the bound you set.',
         }),
       ]),
     ]),
-    el('div', { class: 'comparison-scroll' }, [list, summary, dayPart]),
+    el('div', { class: 'comparison-scroll' }, [startSlot, list, summary, dayPart]),
   ]);
   root.hidden = true;
   let frame = 0;
@@ -436,6 +446,7 @@ export function buildSocietyComparisonView(handlers: {
 
   return {
     root,
+    startSlot,
     status(part, title, detail) {
       if (part === 'day') stop();
       state(part === 'list' ? list : part === 'result' ? summary : dayPart, title, detail);
@@ -443,7 +454,7 @@ export function buildSocietyComparisonView(handlers: {
     showList(listings, selected) {
       if (listings.length === 0) {
         state(list, 'No comparison of this world yet',
-          'A comparison is run by the local compare command; this view reads what it recorded.');
+          'Start one above, or run the local compare command; this view reads what each recorded.');
         return;
       }
       replace(list, [
@@ -467,6 +478,11 @@ export function buildSocietyComparisonView(handlers: {
       seedSelect.addEventListener('change', () => handlers.onDay({ ...day, seedDigest: seedSelect.value }));
       replace(summary, [
         el('section', { class: 'comparison-verdict', 'data-verdict': result.verdict.code }, [
+          ...(result.start === null ? [] : [el('p', {
+            class: 'comparison-progress',
+            text: startWords(result.start, result.seeds.reduce((finished, seed) =>
+              finished + Object.values(seed.runs).filter((run) => run.status !== 'incomplete').length, 0)),
+          })]),
           el('h3', { text: VERDICT_WORDS[result.verdict.code] }),
           el('p', { text: verdictDetail(result) }),
           el('p', { class: 'comparison-group', text: groupWords(result) }),

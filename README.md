@@ -60,10 +60,11 @@ the world's owner can choose an open model to decide for one person or a group; 
 validated, stored and replayed without calling the model again
 ([people and models in a world](docs/capabilities/simulation.md)). A comparison runs the same
 simulated hour once per model for one group of people, scores how they fared against a control
-run, and the application shows the runs side by side; judged comparisons are recorded
-([comparisons of models](docs/society-experiments.md#comparisons-of-models)). Not built:
-comparisons started from the application, model roles other than a person, traffic, weather or an
-economy run by models, and a retraining loop. The
+run, and the application shows the runs side by side; the world's owner starts one from the
+application's Compare view, within a spending bound they state, on a server that holds development
+seeds, and judged comparisons are recorded
+([comparisons of models](docs/society-experiments.md#comparisons-of-models)). Not built: model
+roles other than a person, traffic, weather or an economy run by models, and a retraining loop. The
 [first milestone](docs/product-direction.md#first-milestone) is two open models running one town,
 shown side by side; the implementation runs one simulated hour of a small square's eight people.
 
@@ -81,7 +82,7 @@ order they are delivered in:
     </td>
     <td width="50%" valign="top">
       <h3>Swap a model, see the difference</h3>
-      Run the same saved world's hour under two models and compare what happened. A comparison scores how the people fared against a control run and shows both runs side by side in the application; it is started from a local runner, not from the application.
+      Run the same saved world's hour under two models and compare what happened. A comparison scores how the people fared against a control run and shows both runs side by side in the application, where the world's owner starts it within a spending bound they state and watches its runs finish.
       <p><a href="docs/society-experiments.md">Controlled comparisons</a> · <a href="docs/product-direction.md#first-milestone">First milestone</a></p>
     </td>
   </tr>
@@ -131,7 +132,7 @@ supported operations; the full product direction is broader than those component
 
 | Area | Implemented foundation | Delivery target |
 | --- | --- | --- |
-| Models in the world | Open models in hosted roles through one policy boundary; a model chosen per person or group of a saved world's people, validated, stored and replayed; comparisons of models scored against a control and shown side by side | Comparisons started from the application, model roles other than a person, and a retraining loop |
+| Models in the world | Open models in hosted roles through one policy boundary; a model chosen per person or group of a saved world's people, validated, stored and replayed; comparisons of models started from the application within a stated bound, scored against a control and shown side by side | Model roles other than a person, and a retraining loop |
 | Persistent worlds | Authored starter worlds, worlds made from reviewed photographs, saved versions, object edits and undo, appearance state, reference photographs | A complete personal-media-to-editable-world journey |
 | Inspectable data | Supported point and surface representations, subject selection, structured records and source references | Complete reusable object extraction and consistent semantic coverage across sources |
 | Companion | Grounded answers, including about a world's simulated people; conversation memory kept across reloads; reviewed appearance proposals | Shared activity, durable personal continuity and broader creation tools |

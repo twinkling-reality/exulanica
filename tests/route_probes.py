@@ -41,6 +41,7 @@ from exulanica.api.permissions import ROUTE_RULES, Authentication, Public, Requi
 from exulanica.api.surface import routing_only_application
 from exulanica.consent.place_names import load_place_name_uses
 from exulanica.models.manifest import load_manifest
+from exulanica.world.decision_roles import decision_roles
 from exulanica.world.society_experiments import DEVELOPMENT_SEEDS
 
 import existence_builders as build
@@ -112,6 +113,10 @@ _PLACEMENT: Final = {
 #: The world a probe of a route that requires one is sent in. The sweeps' owners hold it, and so
 #: does the existence sweep's stranger, so a stranger's request reaches the route's own lookup.
 _IN_WORLD: Final = {"params": {"world_id": FIXTURE_WORLD_ID}}
+#: A model the manifest offers a person's decisions, which a comparison's start may name.
+_PERSON_MODEL: Final = load_manifest().offered_models(
+    decision_roles().deciding_for("person").chosen
+)[0]
 _PHOTO_POINT_MAP: Final = {
     "kind": "photo_point_map",
     "entry_id": str(uuid.uuid4()),
@@ -444,6 +449,17 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "base_state_sha256": _ZERO_DIGEST,
             "subject_id": str(uuid.uuid4()),
             "intent": {"kind": "go_to", "target_id": "fixture:target"},
+        },
+    },
+    "POST /world/versions/{version_id}/society/comparisons": {
+        **_IN_WORLD,
+        "json": {
+            "comparison_id": str(uuid.uuid4()),
+            "role": decision_roles().deciding_for("person").key,
+            "group": {"kind": "everyone"},
+            "models": [{"provider": _PERSON_MODEL.provider, "model_id": _PERSON_MODEL.model_id}],
+            "seeds": 1,
+            "bound_usd": "0.05",
         },
     },
     "PUT /world/versions/{version_id}/society/control": {

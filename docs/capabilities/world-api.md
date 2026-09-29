@@ -73,16 +73,20 @@ directed action name the tick and state digest they were made against, and a sta
 | `GET /world/versions/{version_id}/society/models` | The offered models, each person's choice and each model's decisions |
 | `POST /world/versions/{version_id}/society/models` | Choose a model for some people, or their routine; needs `model.invoke` beside `world.write` |
 | `GET /world/versions/{version_id}/society/decisions/{request_id}` | One stored decision: what the model was asked and what it answered |
-| `GET /world/versions/{version_id}/society/comparisons` | The comparisons of models run on this version |
+| `GET /world/versions/{version_id}/society/comparisons` | The comparisons of models run on this version, with the start and progress of one started from the application |
+| `GET /world/versions/{version_id}/society/comparisons/plan` | What a comparison of this version may be given, and for a selection its runs, the most it can cost and what one like it typically costs |
+| `POST /world/versions/{version_id}/society/comparisons` | Start a comparison within a stated bound; requires `world.write` and `model.invoke` |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}` | One comparison: its arms, scores and verdict |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | One run of one arm on one seed |
 | `GET /world/versions/{version_id}/flight` | The birds a saved version's objects host, as steps of their flight |
 
-Comparisons are read-only here: a comparison is defined and run by a local command
-([comparing models](simulation.md#comparing-models)). `POST .../society/decisions` refuses every
-request by name, because explicitly requested model proposals are retired. The full contract,
-including every refusal, is the [society contract](../synthetic-society-contract.md); paired
-experiments with an intervention are [society experiments](../society-experiments.md).
+A comparison started here is played by the server off the request, within the bound its owner
+stated; a local command defines and runs one the same way
+([running a comparison](../society-experiments.md#running-a-comparison)).
+`POST .../society/decisions` refuses every request by name, because explicitly requested model
+proposals are retired. The full contract, including every refusal, is the
+[society contract](../synthetic-society-contract.md); paired experiments with an intervention are
+[society experiments](../society-experiments.md).
 
 ### The pinned surface
 
@@ -130,8 +134,6 @@ move on purpose, so the refusal and the re-read are shown rather than asserted.
 - No route lists a source snapshot's regions. An authored starter world names its region in the
   saved world's `authored_scene`; otherwise a client learns a region id from an object that already
   uses one, or from `GET /world/source-media`. The server refuses a region its source lacks.
-- No route starts a comparison of models. A program reads the comparisons a local command ran, and
-  no recorded run of a client other than the browser has read one.
 
 ## Carrying a version elsewhere
 

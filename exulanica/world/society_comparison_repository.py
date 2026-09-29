@@ -25,12 +25,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from typing import Any, Final
 
 import psycopg
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json
+from exulanica.world.decision_roles import DecisionContract, DecisionRole
 from exulanica.world.society import (
     UnavailableSocietyInput,
     UnknownSociety,
@@ -44,15 +46,10 @@ from exulanica.world.society_comparison_result import (
     DEFINITION_PROFILES,
     ComparisonRefused,
     check_definition_body,
+    definition_role,
     definition_version,
     protocol_value,
     scoring_binding,
-)
-from exulanica.world.society_decision_contract import (
-    PROMPT_VERSION,
-    DecisionContract,
-    decision_contract,
-    person_role,
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
@@ -94,11 +91,14 @@ def _sealed(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def _held_asking(
-    body: Mapping[str, Any], others: Sequence[Mapping[str, Any]], contract: DecisionContract
+    body: Mapping[str, Any],
+    others: Sequence[Mapping[str, Any]],
+    contract: DecisionContract,
+    role: DecisionRole,
 ) -> None:
     """Every model a definition asks, an arm's or a person's outside the group, is asked under the
     terms the definition records: the contract it is defined under with that contract's deadline,
-    the prompt this code asks with, one manifest digest across them all, and one mechanism for each
+    the prompt the role asks with, one manifest digest across them all, and one mechanism for each
     model, one the contract accepts. A person outside the group asks as the owner's choice it
     names, which :meth:`SocietyComparisonRepository._people` holds; an arm's model is no owner's
     choice."""
@@ -119,7 +119,7 @@ def _held_asking(
         if (
             config["contract"] != contract.binding()
             or config["deadline_ms"] != contract.value("decision_deadline_ms")
-            or config["prompt_version"] != PROMPT_VERSION
+            or config["prompt_version"] != role.prompt_version
             or config["mechanism"] not in accepted
             or (choice is None) != (config["choice_seq"] is None)
         ):
@@ -161,9 +161,11 @@ class SocietyComparisonRepository:
         comparison_id: uuid.UUID,
         body: Mapping[str, Any],
         created_by: uuid.UUID,
+        role: DecisionRole,
         catalogs: ComparisonCatalogs | None = None,
     ) -> dict[str, Any]:
-        """Record a comparison over this version's society, frozen at its newest input.
+        """Record a comparison over this version's society, frozen at its newest input, asking
+        ``role``, whose contract the definition records and so names it by.
 
         ``body`` is everything the definition states that the society does not: ``window_ticks``,
         ``phase``, ``seeds`` (digests), ``group`` (the people the arms decide for, or None for
@@ -184,6 +186,10 @@ class SocietyComparisonRepository:
                 "engine_takes_no_comparison",
                 f"{row['engine_version']} cannot be run by a comparison's arms",
             )
+        if not role.hosted_by(row["engine_version"]):
+            raise ComparisonRefused(
+                "role_not_hosted", f"{row['engine_version']} hosts no {role.key} decisions"
+            )
         if row["population_size"] > protocol_value(catalogs, "population_maximum"):
             raise ComparisonRefused(
                 "population_over_comparison_bound",
@@ -194,9 +200,9 @@ class SocietyComparisonRepository:
         frozen = self.society._inputs(row, [latest])[latest]
         # One input alone: its own stored bytes are read before the lock its authorization takes.
         self.society._authorize(frozen)
-        contract = decision_contract()
-        group, others = self._people(version_id, row, body)
-        _held_asking(body, others, contract)
+        contract = role.contract()
+        group, others = self._people(version_id, row, body, role)
+        _held_asking(body, others, contract, role)
         document = _sealed(
             {
                 "profile": COMPARISON_PROFILE,
@@ -253,7 +259,11 @@ class SocietyComparisonRepository:
         return document
 
     def _people(
-        self, version_id: uuid.UUID, row: Mapping[str, Any], body: Mapping[str, Any]
+        self,
+        version_id: uuid.UUID,
+        row: Mapping[str, Any],
+        body: Mapping[str, Any],
+        role: DecisionRole,
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """The group and everybody else as a definition records them, held to the world's
         records: each person one of the society's, named as its state names them; a group from an
@@ -266,7 +276,7 @@ class SocietyComparisonRepository:
             raise ComparisonRefused("group_person_unknown", "the group names somebody not here")
         choices = SocietyModelChoiceRepository(
             self.connection, self.workspace_id, world_id=self.world_id
-        ).history(version_id, person_role())
+        ).history(version_id, role)
         if source["kind"] == "owner_choice":
             named = next(
                 (choice for choice in choices if choice["choice_seq"] == source["choice_seq"]),
@@ -407,18 +417,51 @@ class SocietyComparisonRepository:
             (self.workspace_id, self.world_id, comparison_id),
         ).fetchall()
 
-    def run_counts(self, comparison_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, tuple[int, int]]:
-        """How many runs each comparison reserved, and how many of them completed."""
+    def run_counts(
+        self, comparison_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, tuple[int, int, int]]:
+        """How many runs each comparison reserved, how many of them completed, and how many
+        finished, completed or failed."""
         rows = self.connection.execute(
             "select r.comparison_id,count(*) as runs,"
-            "count(o.run_id) filter (where o.status='completed') as completed "
+            "count(o.run_id) filter (where o.status='completed') as completed,"
+            "count(o.run_id) as finished "
             "from society_comparison_run r left join society_comparison_outcome o "
             "on o.workspace_id=r.workspace_id and o.world_id=r.world_id and o.run_id=r.run_id "
             "where r.workspace_id=%s and r.world_id=%s and r.comparison_id=any(%s) "
             "group by r.comparison_id",
             (self.workspace_id, self.world_id, list(comparison_ids)),
         ).fetchall()
-        return {row["comparison_id"]: (int(row["runs"]), int(row["completed"])) for row in rows}
+        return {
+            row["comparison_id"]: (int(row["runs"]), int(row["completed"]), int(row["finished"]))
+            for row in rows
+        }
+
+    def open_runs(self, comparison_id: uuid.UUID) -> list[dict[str, Any]]:
+        """A comparison's runs with no outcome yet, by seed digest and arm, each saying whether it
+        asked anything: one that did was stopped part way, and cannot be played again."""
+        return self.connection.execute(
+            "select r.run_id,r.arm,r.seed_digest,exists(select 1 from society_comparison_decision "
+            "d where d.workspace_id=r.workspace_id and d.world_id=r.world_id "
+            "and d.run_id=r.run_id) as asked from society_comparison_run r "
+            "where r.workspace_id=%s and r.world_id=%s and r.comparison_id=%s "
+            "and not exists(select 1 from society_comparison_outcome o where "
+            "o.workspace_id=r.workspace_id and o.world_id=r.world_id and o.run_id=r.run_id) "
+            "order by r.seed_digest, r.arm",
+            (self.workspace_id, self.world_id, comparison_id),
+        ).fetchall()
+
+    def spending(self, comparison_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Decimal]:
+        """What each comparison's asks cost, as its receipts recorded each call: a comparison that
+        asked nothing is absent."""
+        rows = self.connection.execute(
+            "select comparison_id,sum((receipt->'provider'->>'cost_usd')::numeric) as spent "
+            "from society_comparison_decision where workspace_id=%s and world_id=%s "
+            "and comparison_id=any(%s) and receipt->'provider' <> 'null'::jsonb "
+            "group by comparison_id",
+            (self.workspace_id, self.world_id, list(comparison_ids)),
+        ).fetchall()
+        return {row["comparison_id"]: Decimal(row["spent"]) for row in rows}
 
     def append(
         self,
@@ -507,7 +550,8 @@ class SocietyComparisonRepository:
         with inputs_ahead(self.connection, inputs):
             for document in inputs:
                 self.society._authorize(document)
-        contract = decision_contract(definition["contract"]["catalog_versions"])
+        role = definition_role(definition)
+        contract = role.contract(definition["contract"]["catalog_versions"])
         if contract.binding() != definition["contract"]:
             raise ComparisonRefused("contract_changed", "the contract's catalogs are not the same")
         arm = definition["arms"][run["arm"]]
