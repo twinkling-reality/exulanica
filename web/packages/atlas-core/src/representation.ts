@@ -605,11 +605,14 @@ export interface GeneratedDressing {
  * its surfaces' roles and dressing references, and a tile's coordinates, level of detail, inputs
  * digest, frame name and subject identity. Versions 2 and 3 differ in the tile record's
  * `coordinate_unit` (ADR-0024) and in the bound on a facade's own `grammar_version`, and this
- * contract reads neither. `packages/atlas-react/test/data-view/generated-subjects-city-v2.test.ts`
+ * contract reads neither. Version 4 differs from 3 only in what the streets stage lays (stop lines
+ * set back from crossings, kerbside parking lanes), with the same record kinds and versions,
+ * identity rule, surface roles and dressing references, so this contract reads it as version 3.
+ * `packages/atlas-react/test/data-view/generated-subjects-city-v2.test.ts`
  * holds this list to the versions the tessellator reads, so it cannot quietly fall behind: this
  * package does not depend on loom-tess, and that test does.
  */
-export const GENERATED_CITY_GRAMMAR_VERSIONS: readonly number[] = [2, 3];
+export const GENERATED_CITY_GRAMMAR_VERSIONS: readonly number[] = [2, 3, 4];
 
 const ENTRY_NEED = /^[a-z][a-z0-9_]*$/;
 const EXTENT_KEYS = ['max_x_mm', 'max_y_mm', 'max_z_mm', 'min_x_mm', 'min_y_mm', 'min_z_mm'];
