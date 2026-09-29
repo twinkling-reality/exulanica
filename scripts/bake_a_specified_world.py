@@ -171,8 +171,12 @@ def main() -> int:
     seed = derived_seed(payload)
     identity = derived_identity(seed)
 
-    catalogs = load_city_catalogs()
-    generation = generate_city(seed=seed, subject_identity=identity, bindings=bindings)
+    # The specification's own version decides which grammar generates it and which catalogs it
+    # reads, as the route's does; the seed is derived over it too, so two versions never share one.
+    catalogs = load_city_catalogs(grammar_version=grammar_version)
+    generation = generate_city(
+        seed=seed, subject_identity=identity, bindings=bindings, grammar_version=grammar_version
+    )
     records = city_records(generation)
     check_piece_lengths(records)
     values = dict(generation.receipt.parameters.values)
@@ -198,6 +202,7 @@ def main() -> int:
             tile_x=tile_x,
             tile_y=tile_y,
             lod=GENERATED_LOD,
+            grammar_version=grammar_version,
         )
         validate_city_document(document, catalogs=catalogs)
         documents.append(document)

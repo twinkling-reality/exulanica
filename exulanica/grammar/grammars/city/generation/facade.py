@@ -78,7 +78,6 @@ from exulanica.grammar.grammars.city import facade, massing, parcels, streets
 from exulanica.grammar.grammars.city.corners import strip_box
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_ADMISSIBLE_USES,
-    CITY_GRAMMAR_VERSION,
     CITY_SURFACE,
 )
 from exulanica.grammar.grammars.city.generation.signs import SIGN_FASCIA_MINIMUM_MM
@@ -573,7 +572,7 @@ def _generate(context: StageContext) -> Iterator[object]:
                         )
             draft = facade.FacadeRecord(
                 building_identity=building.identity,
-                grammar_version=CITY_GRAMMAR_VERSION,
+                grammar_version=context.grammar_version,
                 parameters=values.bindings(),
                 seed=context.seed,
                 output_digest="0" * 64,

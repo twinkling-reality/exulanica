@@ -9,9 +9,10 @@ and the grammars that implement it. The city is the first and largest grammar. A
 `box`, ships beside it and uses the same contract.
 
 The package emits integer records, never meshes or vertices. Turning records into triangles is
-the tessellator's. A generator cannot construct a citation. The registered city descriptor is
-`city.v3.json`: 28 record kinds with integer geometry, 91 declared parameters (80 integer, 11
-choice), four projection contracts, licensed catalogs, and one identity rule.
+the tessellator's. A generator cannot construct a citation. Two city descriptors are registered.
+`city.v3.json` states 28 record kinds with integer geometry, 91 declared parameters (80 integer, 11
+choice), four projection contracts, licensed catalogs, and one identity rule; `city.v4.json` states
+the same with the streets stage at its version 3 and 93 parameters (section 7).
 [generated-corridor-street](generated-corridor-street.md) records the street those stages make
 together and what it measures. `city.v1.json` and `city.v2.json` remain as pinned migration
 source schemas; they are not registered.
@@ -254,9 +255,11 @@ other rule, refuses (`tests/test_grammar_city_records.py`).
 
 ## 7. The city stages
 
-City grammar version 3 is registered (`city.v3.json`). `city.v1.json` and `city.v2.json` remain
-as pinned migration source schemas; they are not registered. Stage versions below are the
-`stage_version` values on that descriptor, not the grammar version. Ten stages emit records
+City grammar versions 3 and 4 are registered (`city.v3.json`, `city.v4.json`), and a caller names
+the version it generates; one that names none generates version 3, which every specification
+written before version 4 states. `city.v1.json` and `city.v2.json` remain as pinned migration
+source schemas; they are not registered. Stage versions below are the `stage_version` values on
+`city.v3.json`, not the grammar version. Ten stages emit records
 through `exulanica.grammar.grammars.city.generation`. The registered `tile` stage is an
 `UnimplementedStage`; tile documents are assembled after generation by
 `exulanica.grammar.grammars.city.generation.tiles`. Parameter counts are the 91 names in
@@ -266,7 +269,7 @@ through `exulanica.grammar.grammars.city.generation`. The registered `tile` stag
 | --- | --- | --- | --- | --- |
 | `terrain` | 2 | `city.terrain` | 4 | emits |
 | `districts` | 1 | `city.district` | 1 | emits |
-| `streets` | 2 | `city.street_node`, `city.street`, `city.street_segment`, `city.block`, `city.curb_edge`, `city.crossing`, `city.lane`, `city.junction`, `city.junction_approach`, `city.lane_connection`, `city.signal`, `city.parking_space`, `city.road_marking` | 13 | emits |
+| `streets` | 2 | `city.street_node`, `city.street`, `city.street_segment`, `city.block`, `city.curb_edge`, `city.crossing`, `city.lane`, `city.junction`, `city.junction_approach`, `city.lane_connection`, `city.signal`, `city.parking_space`, `city.road_marking` | 13 | emits all but `city.lane_connection`, `city.signal`, `city.parking_space` and `city.road_marking`, which it declares and writes none of |
 | `parcels` | 2 | `city.parcel` | 4 | emits |
 | `massing` | 2 | `city.massing`, `city.rooftop_object` | 15 | emits |
 | `facade` | 2 | `city.facade`, `city.ground_bay`, `city.entrance` | 25 | emits |
@@ -276,8 +279,26 @@ through `exulanica.grammar.grammars.city.generation`. The registered `tile` stag
 | `material` | 2 | `city.surface_material` | 10 | emits |
 | `tile` | 3 | `city.tile` | 0 | record-shape contract |
 
+**Version 4** runs every stage above at the same version except `streets`, which runs at stage
+version 3 and changes two rules, each read from data. A traffic lane flowing into a junction whose
+leg carries a crossing ends `stop_line_setback_mm` (1,250 to 3,000 mm, after the MUTCD's 4 feet
+before the nearest crosswalk line) before the crossing's near edge, where version 3 ends it at the
+junction side of the crossing. A street whose hierarchy's `kerbside_parking` is `both_sides` keeps
+a `parking` lane, `parking_lane_width_mm` wide, against each kerb, running between the crossings at
+its segment's ends, and its carriageway widens by both; version 4 reads the street hierarchy's
+edition 3 (`street-hierarchy.v3.json`), which gives that to the high street and to no other
+hierarchy, and every other catalog as version 3 does. It lays no bay, signal or lane connection.
+A parking lane is at least 2,150 mm wide, the widest vehicle class a general bay admits in
+traffic's vehicle-class catalog rounded up to the stage's 50 mm module, which the descriptor names
+by digest. Measured on the corridor specification, version 4 widens the high street's carriageway
+from 7,100 to 11,600 mm and keeps its 98 buildings; a city whose kerb runs are too short to hold a crossing
+and a stop line before it, or whose blocks lose the footway room, is refused by name, so some
+specifications version 3 lays are not worlds at version 4 (`tests/test_city_grammar_v4.py`).
+
 The record shapes are in `exulanica/grammar/grammars/city/` (`common.py` holds what every record
-shares), and `tests/fixtures/city-v2/record-shapes.json` is the whole table as data.
+shares), and `tests/fixtures/city-v2/record-shapes.json` is the whole table as data. Both versions
+declare the same record kinds at the same versions; a facade's own `grammar_version` states the
+version that generated it, and the document check holds it to the tile's pin.
 
 **Records carry integer geometry sufficient for a deterministic tessellation.** Everything a
 tessellator would otherwise guess is a field: rings, centrelines and kerb lines with elevations,
@@ -326,7 +347,10 @@ version 1 to 3, and every refusal).
 **The version 2 to 3 migration carries every parameter.** Version 3 changes one record shape and no
 subject rule, so its identity policy is `preserved`: every `(kind, owner, ordinal)` derives the
 identity version 2 derived for it, and each of the 91 parameters is carried or mapped
-(`city-migration.v3.json`).
+(`city-migration.v3.json`). The version 3 to 4 migration carries or maps every one of them
+unchanged and introduces `parking_lane_width_mm` and `stop_line_setback_mm`; its identity policy is
+`rekeyed`, because a lane's index counts every lane of its segment, parking lanes included, and a
+narrower block holds other lots under the same ordinals (`city-migration.v4.json`).
 
 **The tile document** (`exulanica.tile-document/v2`, `document.py`) is one tile's records as a bake
 reads them: canonical JSON of the tile record, and per grammar its descriptor digest, declared

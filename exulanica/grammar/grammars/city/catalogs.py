@@ -32,6 +32,7 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from types import MappingProxyType
 from typing import Final
 
 from exulanica.grammar.catalogs import (
@@ -54,12 +55,17 @@ from exulanica.grammar.grammars.city.common import (
     SURFACE_ROLES,
     FormPart,
 )
+from exulanica.grammar.grammars.city.descriptor import (
+    CITY_GENERATING_VERSIONS,
+    CITY_GRAMMAR_VERSION,
+)
 from exulanica.grammar.shapes import validate_record
 from exulanica.grammar.textures import TEXTURE_SET_ID, TextureSet, read_texture_manifest
 
 __all__ = [
     "CATALOG_DIRECTORY",
     "CITY_CATALOG_IDS",
+    "KERBSIDE_PARKING",
     "check_city_catalogs",
     "city_catalog_schemas",
     "city_vocabularies",
@@ -69,6 +75,12 @@ __all__ = [
 ]
 
 CATALOG_DIRECTORY: Final = Path(__file__).resolve().parents[4].joinpath("assets", "catalogs")
+#: Where a street keeps kerbside parking lanes: on each side, or nowhere.
+KERBSIDE_PARKING: Final = ("both_sides", "none")
+#: The street hierarchy edition each generating grammar version reads. Version 4's streets stage
+#: reads ``kerbside_parking``, which edition 3 adds; every field edition 2 states, edition 3
+#: states with the same value, and ``tests/test_city_grammar_v4.py`` holds the two to that.
+_STREET_HIERARCHY_EDITION: Final = MappingProxyType({3: 2, 4: 3})
 _MILLIMETRES: Final = integer_field(0, 100_000_000)
 _BAND_TOP: Final = integer_field(1, 100_000)
 _FORM_PART_FIELDS: Final = tuple(field.name for field in dataclasses.fields(FormPart))
@@ -187,7 +199,19 @@ def _class_admitted(
     return check
 
 
-def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[CatalogSchema, ...]:
+def city_catalog_schemas(
+    *, texture_sets: Mapping[str, TextureSet], grammar_version: int = CITY_GRAMMAR_VERSION
+) -> tuple[CatalogSchema, ...]:
+    """The schema of every catalog the city reads at ``grammar_version``, one edition each."""
+    hierarchy_edition = _STREET_HIERARCHY_EDITION.get(grammar_version)
+    if hierarchy_edition is None:
+        raise CatalogError(
+            f"city grammar version {grammar_version} reads no catalog set; the versions that "
+            f"generate are {sorted(_STREET_HIERARCHY_EDITION)}"
+        )
+    parking_fields: tuple[tuple[str, FieldCheck], ...] = (
+        (("kerbside_parking", choice_field(KERBSIDE_PARKING)),) if hierarchy_edition >= 3 else ()
+    )
     texture_pins = {set_id: texture_set.pin() for set_id, texture_set in texture_sets.items()}
     return (
         CatalogSchema("action-vocabulary", 1, (("label", text_field), REASON)),
@@ -396,7 +420,7 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
         ),
         CatalogSchema(
             "street-hierarchy",
-            2,
+            hierarchy_edition,
             (
                 ("label", text_field),
                 ("rank", integer_field(0, 1000)),
@@ -410,6 +434,7 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
                 ("speed_limit_maximum_mm_s", _MILLIMETRES),
                 ("kerb_height_minimum_mm", _MILLIMETRES),
                 ("kerb_height_maximum_mm", _MILLIMETRES),
+                *parking_fields,
                 REASON,
             ),
             entry_check=_ordered(
@@ -548,18 +573,32 @@ def check_city_catalogs(catalogs: Sequence[Catalog]) -> None:
         )
 
 
+def _file_name(schema: CatalogSchema) -> str:
+    return f"{schema.catalog_id}.v{schema.catalog_version}.json"
+
+
 def load_city_catalogs(
     directory: Path = CATALOG_DIRECTORY,
     *,
     texture_sets: Mapping[str, TextureSet] | None = None,
+    grammar_version: int = CITY_GRAMMAR_VERSION,
 ) -> tuple[Catalog, ...]:
-    """Every city catalog, each checked against its schema and all of them against each other.
+    """Every city catalog ``grammar_version`` reads, each checked against its schema and all of
+    them against each other.
 
     ``texture_sets`` defaults to the published manifest, read strictly: a missing or malformed
-    manifest is refused, never read as empty.
+    manifest is refused, never read as empty. The files another generating version reads may
+    stand beside them and are not loaded; any other file is refused.
     """
     published = read_texture_manifest() if texture_sets is None else texture_sets
-    catalogs = load_catalog_directory(directory, city_catalog_schemas(texture_sets=published))
+    schemas = city_catalog_schemas(texture_sets=published, grammar_version=grammar_version)
+    others = {
+        _file_name(schema)
+        for version in CITY_GENERATING_VERSIONS
+        for schema in city_catalog_schemas(texture_sets=published, grammar_version=version)
+    }
+    beside = others - {_file_name(schema) for schema in schemas}
+    catalogs = load_catalog_directory(directory, schemas, beside=beside)
     check_city_catalogs(catalogs)
     return catalogs
 

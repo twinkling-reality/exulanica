@@ -89,8 +89,9 @@ from exulanica.grammar.grammars.city.corners import corner_centre as _corner_cen
 from exulanica.grammar.grammars.city.corners import walk_round_face as _walk_round_face
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATH,
+    CITY_DESCRIPTOR_PATHS,
+    CITY_GENERATING_VERSIONS,
     CITY_GRAMMAR_ID,
-    CITY_GRAMMAR_VERSION,
 )
 from exulanica.grammar.grammars.city.districts import DistrictRecord
 from exulanica.grammar.grammars.city.facade import (
@@ -351,9 +352,7 @@ def _check_envelope(document: TileDocument) -> None:
         raise InvalidRecordError("grammars state exactly the tile's grammar pins, in order")
     for index, entry in enumerate(document.grammars):
         where = f"grammars[{index}]"
-        key = (entry.grammar_id, entry.grammar_version)
-        if key != (CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION):
-            raise InvalidRecordError(f"{where}: this reader knows city v2 records only, not {key}")
+        _require_readable(where, (entry.grammar_id, entry.grammar_version))
         require_identity("subject_identity", entry.subject_identity)
         _require_sorted(f"{where}.owned", entry.owned)
         _require_sorted(f"{where}.halo", entry.halo)
@@ -364,6 +363,14 @@ def _check_envelope(document: TileDocument) -> None:
         if overlap:
             raise InvalidRecordError(f"identities both owned and halo: {sorted(overlap)}")
         _check_external(where, entry)
+
+
+def _require_readable(where: str, key: tuple[str, int]) -> None:
+    if key[0] != CITY_GRAMMAR_ID or key[1] not in CITY_GENERATING_VERSIONS:
+        raise InvalidRecordError(
+            f"{where}: this reader knows city records at versions {CITY_GENERATING_VERSIONS}, "
+            f"not {key}"
+        )
 
 
 def _check_external(where: str, entry: GrammarRecords) -> None:
@@ -422,9 +429,7 @@ def read_tile_document(data: bytes) -> TileDocument:
     for index, entry in enumerate(envelope["grammars"]):
         where = f"grammars[{index}]"
         item = _object(where, entry, _GRAMMAR_KEYS)
-        key = (item["grammar_id"], item["grammar_version"])
-        if key != (CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION):
-            raise InvalidRecordError(f"{where}: this reader knows city v2 records only, not {key}")
+        _require_readable(where, (item["grammar_id"], item["grammar_version"]))
         grammars.append(
             GrammarRecords(
                 grammar_id=item["grammar_id"],
@@ -706,7 +711,11 @@ class _Checker:
 
     # -- pins ------------------------------------------------------------------------------
 
-    def check_pins(self, descriptor_path: Path) -> None:
+    def check_pins(self, descriptor_path: Path | None) -> None:
+        """The pins against what was loaded. ``descriptor_path`` defaults to the shipped
+        descriptor of the version the tile pins."""
+        if descriptor_path is None:
+            descriptor_path = CITY_DESCRIPTOR_PATHS[self.grammar.grammar_version]
         if self.grammar.descriptor_sha256 != descriptor_sha256(descriptor_path):
             raise _fail("descriptor_pin", "the tile pins a descriptor other than the one loaded")
         if self.grammar.declared_semantics != CITY_GRAMMAR.semantics:
@@ -716,6 +725,12 @@ class _Checker:
         for facade in self.of(FacadeRecord):
             if facade.seed != self.tile.city_seed:
                 raise _fail("seed", f"facade {facade.identity} states another seed")
+            if facade.grammar_version != self.grammar.grammar_version:
+                raise _fail(
+                    "facade_version",
+                    f"facade {facade.identity} states version {facade.grammar_version} in a "
+                    f"version {self.grammar.grammar_version} tile",
+                )
 
     # -- streets ---------------------------------------------------------------------------
 
@@ -1865,10 +1880,12 @@ def select_tile(
     extent; every identity a carried record names that is left out is listed as external. This
     selects and generates nothing: every record is one the caller already has.
     """
+    [pin] = tile.grammar_versions
+    _require_readable("the tile's grammar pin", (pin.grammar_id, pin.grammar_version))
     everything = GrammarRecords(
-        grammar_id=CITY_GRAMMAR_ID,
-        grammar_version=CITY_GRAMMAR_VERSION,
-        descriptor_sha256=descriptor_sha256(),
+        grammar_id=pin.grammar_id,
+        grammar_version=pin.grammar_version,
+        descriptor_sha256=pin.descriptor_sha256,
         declared_semantics=CITY_GRAMMAR.semantics,
         subject_identity=subject_identity,
         owned=tuple(sorted(records, key=record_sort_key)),
@@ -1905,7 +1922,7 @@ def validate_city_document(
     document: TileDocument,
     *,
     catalogs: Sequence[Catalog],
-    descriptor_path: Path = CITY_DESCRIPTOR_PATH,
+    descriptor_path: Path | None = None,
     vocabularies: Mapping[str, frozenset[str]] | None = None,
 ) -> CityDocumentReport:
     """Every check a tile's records can be held to without generating them. Refuses the first

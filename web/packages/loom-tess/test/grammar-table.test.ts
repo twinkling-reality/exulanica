@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { BAKE_PARAMETERS, boundOf, recordShapeVersions } from '../src/core/bake.js';
 import { CITY_V2 } from '../src/core/city-v2.js';
 import { CITY_V3 } from '../src/core/city-v3.js';
+import { CITY_V4 } from '../src/core/city-v4.js';
 import {
   checkEveryVersionStatesItsUnit,
   coordinateUnitOf,
@@ -52,7 +53,9 @@ function cityAt(version: number, changeTileShape?: (shape: any) => void): Gramma
 }
 
 /** A version past the newest, for the cases about a version this tessellator does not read. */
-const NEXT_VERSION = CITY_V3.grammar_version + 1;
+const NEXT_VERSION = Math.max(...GRAMMAR_TABLES.map((table) => table.grammar_version)) + 1;
+/** The versions this tessellator reads, as its refusals print them. */
+const READS = `\\[${GRAMMAR_TABLES.map((table) => table.grammar_version).join(',')}\\]`;
 /** The two REAL tables, which differ in their tile shape and not only in a version number. */
 const TWO_TABLES: readonly GrammarTable[] = GRAMMAR_TABLES;
 
@@ -69,10 +72,11 @@ describe('the grammar table', () => {
   it('is exactly each city grammar version\u2019s own shape table and descriptor frame', () => {
     expect(JSON.parse(JSON.stringify(CITY_V2))).toEqual(grammarTableFromSources(2));
     expect(JSON.parse(JSON.stringify(CITY_V3))).toEqual(grammarTableFromSources(3));
+    expect(JSON.parse(JSON.stringify(CITY_V4))).toEqual(grammarTableFromSources(4));
     // The list's CONTENTS, which says nothing about whether its readers address a table by what it
     // carries. The tests below are what say that.
-    expect(GRAMMAR_TABLES).toEqual([CITY_V2, CITY_V3]);
-    expect(GRAMMAR_TABLES.map((table) => table.grammar_version)).toEqual([2, 3]);
+    expect(GRAMMAR_TABLES).toEqual([CITY_V2, CITY_V3, CITY_V4]);
+    expect(GRAMMAR_TABLES.map((table) => table.grammar_version)).toEqual([2, 3, 4]);
   });
 
   it('gives the projections, the plane and each version\u2019s own tile shape from the table itself', () => {
@@ -114,7 +118,7 @@ describe('the table a tile record is read against', () => {
   it('is refused when no table states the version, rather than being some other version shape', () => {
     const unread = NEXT_VERSION + 1;
     expect(() => tileTableOf(TWO_TABLES, tileRecordPinned(unread), 'tile')).toThrow(
-      new RegExp(`pins city version ${unread}, and this tessellator reads \\[2,3\\]`),
+      new RegExp(`pins city version ${unread}, and this tessellator reads ${READS}`),
     );
     expect(() => tileTableOf(TWO_TABLES, tileRecordPinned(unread), 'tile')).toThrow(TileDocumentError);
   });
@@ -173,7 +177,7 @@ describe('the coordinate unit a document is read in (ADR-0024)', () => {
       shape.fields = shape.fields.filter((field: any) => field.name !== 'coordinate_unit');
     });
     expect(() => checkEveryVersionStatesItsUnit([...GRAMMAR_TABLES, undecided])).toThrow(
-      /city version 4 states no coordinate_unit and no version fixes one for it/,
+      new RegExp(`city version ${NEXT_VERSION} states no coordinate_unit and no version fixes one for it`),
     );
     expect(() => checkEveryVersionStatesItsUnit([...GRAMMAR_TABLES, undecided])).toThrow(TileDocumentError);
   });

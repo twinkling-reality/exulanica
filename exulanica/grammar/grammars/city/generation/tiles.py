@@ -36,7 +36,8 @@ from exulanica.grammar.catalogs import Catalog, catalog_digest
 from exulanica.grammar.contract import Generation, generate
 from exulanica.grammar.errors import InvalidRecordError
 from exulanica.grammar.geometry import integer_sqrt
-from exulanica.grammar.grammars.city import CITY_GRAMMAR
+from exulanica.grammar.grammars.city import city_grammar
+from exulanica.grammar.grammars.city.descriptor import CITY_DESCRIPTOR_PATHS, CITY_GRAMMAR_VERSION
 from exulanica.grammar.grammars.city.document import (
     TileDocument,
     descriptor_sha256,
@@ -71,9 +72,20 @@ PIECE_LIMIT_MM: Final = 1_000_000
 
 
 def generate_city(
-    *, seed: str, subject_identity: str, bindings: Sequence[CascadeBinding]
+    *,
+    seed: str,
+    subject_identity: str,
+    bindings: Sequence[CascadeBinding],
+    grammar_version: int = CITY_GRAMMAR_VERSION,
 ) -> Generation:
-    return generate(CITY_GRAMMAR, seed=seed, subject_identity=subject_identity, bindings=bindings)
+    """The city at ``grammar_version``; the version is the caller's to name, and version 3 is what
+    every specification written before version 4 states."""
+    return generate(
+        city_grammar(grammar_version),
+        seed=seed,
+        subject_identity=subject_identity,
+        bindings=bindings,
+    )
 
 
 def city_records(generation: Generation) -> tuple[object, ...]:
@@ -89,12 +101,18 @@ def tile_record(
     tile_y: int,
     lod: int,
     edit_delta_digest: str = EMPTY_EDIT_DELTA_DIGEST,
+    grammar_version: int = CITY_GRAMMAR_VERSION,
 ) -> TileRecord:
+    """The tile record a bake is keyed on, pinning ``grammar_version``'s descriptor; the catalogs
+    are the ones that version reads."""
+    grammar = city_grammar(grammar_version)
     return TileRecord(
         city_seed=seed,
         grammar_versions=(
             GrammarPin(
-                CITY_GRAMMAR.key.grammar_id, CITY_GRAMMAR.key.grammar_version, descriptor_sha256()
+                grammar.key.grammar_id,
+                grammar.key.grammar_version,
+                descriptor_sha256(CITY_DESCRIPTOR_PATHS[grammar_version]),
             ),
         ),
         coordinate_unit=WRITTEN_COORDINATE_UNIT,
@@ -120,6 +138,7 @@ def tile_document(
     tile_y: int,
     lod: int,
     edit_delta_digest: str = EMPTY_EDIT_DELTA_DIGEST,
+    grammar_version: int = CITY_GRAMMAR_VERSION,
 ) -> TileDocument:
     tile = tile_record(
         seed=seed,
@@ -128,6 +147,7 @@ def tile_document(
         tile_y=tile_y,
         lod=lod,
         edit_delta_digest=edit_delta_digest,
+        grammar_version=grammar_version,
     )
     return select_tile(tile, records, subject_identity=subject_identity)
 

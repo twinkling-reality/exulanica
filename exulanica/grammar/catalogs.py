@@ -35,7 +35,7 @@ database where registration would happen.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, TypeAlias
@@ -319,14 +319,18 @@ def load_catalog(path: Path, schema: CatalogSchema) -> Catalog:
 
 
 def load_catalog_directory(
-    directory: Path, schemas: Sequence[CatalogSchema]
+    directory: Path, schemas: Sequence[CatalogSchema], *, beside: Collection[str] = ()
 ) -> tuple[Catalog, ...]:
-    """Every schema has exactly one file, and every file has a schema. Sorted by id."""
+    """Every schema has exactly one file, and every file has a schema. Sorted by id.
+
+    ``beside`` names files that other schemas read, such as another grammar version's edition of a
+    catalog: they may be present and are not loaded. Any other file with no schema is refused.
+    """
     by_name = {f"{schema.catalog_id}.v{schema.catalog_version}.json": schema for schema in schemas}
     if len(by_name) != len(schemas):
         raise CatalogError("two schemas claim the same catalog file")
     present = sorted(path.name for path in directory.glob("*.json"))
-    unexpected = sorted(set(present) - set(by_name))
+    unexpected = sorted(set(present) - set(by_name) - set(beside))
     absent = sorted(set(by_name) - set(present))
     if unexpected or absent:
         raise CatalogError(

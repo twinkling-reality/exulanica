@@ -55,6 +55,20 @@ A node where three or four segments meet is a junction. A junction on the high
 street gives its high street legs priority and its other legs a stop; any other junction gives the
 street that continues through it priority and the street that ends there a stop. Its extent is the
 fill the corner rule states (:func:`~exulanica.grammar.grammars.city.corners.junction_fill_box`).
+
+**Stage version 3** (:data:`STAGE_V3`, which city grammar version 4 runs) lays everything above
+and changes two rules, each read from data:
+
+* **Stop lines stand before the crossing they approach.** A traffic lane flowing into a junction
+  whose leg carries a crossing ends ``stop_line_setback_mm`` before the crossing's near edge, so a
+  vehicle waiting at the line waits clear of the people crossing. Version 2 ends it at the
+  junction side of the crossing. A lane leaving a junction still starts where the kerb run does.
+* **Kerbside parking lanes.** A street whose hierarchy's ``kerbside_parking`` (street hierarchy
+  edition 3) is ``both_sides`` keeps a parking lane against each kerb, ``parking_lane_width_mm``
+  wide, the lane-use catalog's ``parking`` use, carrying no traffic. The carriageway widens by
+  both, so every kerb, footway and block stands that much further out. A parking lane runs between
+  the crossings at its segment's ends: nothing stands on a crossing. Bays are not laid here; a
+  reader derives them from the lane.
 """
 
 from __future__ import annotations
@@ -63,6 +77,7 @@ import dataclasses
 from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
+from functools import partial
 from itertools import combinations
 from typing import Final
 
@@ -77,7 +92,7 @@ from exulanica.grammar.grammars.city.corners import (
     junction_fill_box,
     strip_box,
 )
-from exulanica.grammar.grammars.city.descriptor import CITY_SURFACE
+from exulanica.grammar.grammars.city.descriptor import CITY_SURFACE, CITY_SURFACES
 from exulanica.grammar.grammars.city.generation.stage import (
     GeneratorStage,
     catalog,
@@ -92,6 +107,8 @@ from exulanica.grammar.grammars.city.generation.terrain import DATUM_MM
 __all__ = [
     "DIMENSION_MODULE_MM",
     "STAGE",
+    "STAGE_V3",
+    "STAGE_VERSION_3",
     "narrowest_reach",
     "street_hierarchies",
     "street_name_demand",
@@ -102,6 +119,15 @@ __all__ = [
 
 #: The module every street dimension this stage derives is a multiple of.
 DIMENSION_MODULE_MM: Final = 50
+#: The stage version that sets stop lines back and lays kerbside parking (the docstring's last
+#: section). Version 2 is :data:`~exulanica.grammar.grammars.city.streets.STAGE_VERSION`.
+STAGE_VERSION_3: Final = 3
+#: The lane-use keys this stage lays: every traffic lane is general, every kerbside lane parking.
+_GENERAL_USE: Final = "general"
+_PARKING_USE: Final = "parking"
+_BOTH_SIDES: Final = "both_sides"
+#: A street keeping kerbside parking keeps one lane against each of its two kerbs.
+_PARKING_LANES_BOTH_SIDES: Final = 2
 _HIGH: Final = "high_street"
 _LOCAL: Final = "local_street"
 _DISTRICT: Final = 0
@@ -109,9 +135,21 @@ _EAST: Final = (1, 0)
 _NORTH: Final = (0, 1)
 
 
+@dataclass(frozen=True, slots=True)
+class _Rules:
+    """What one stage version lays beyond version 2's streets."""
+
+    stop_line_setback: bool
+    kerbside_parking: bool
+
+
+_VERSION_2_RULES: Final = _Rules(stop_line_setback=False, kerbside_parking=False)
+_VERSION_3_RULES: Final = _Rules(stop_line_setback=True, kerbside_parking=True)
+
+
 def _modular(context: StageContext, name: str, ordinal: int, low: int, high: int) -> int:
     """A dimension on the stage's module: derived in module steps within ``[low, high]``."""
-    spec = CITY_SURFACE.parameters.get(name)
+    spec = CITY_SURFACES[context.grammar_version].parameters.get(name)
     low = max(low, spec.minimum)
     high = min(high, spec.maximum)
     first = low + (-low) % DIMENSION_MODULE_MM
@@ -181,15 +219,28 @@ def _ranges(hierarchies: Sequence[str], low_key: str, high_key: str) -> tuple[in
     return low, high
 
 
-def _section(hierarchy: str, lane_width_mm: int, gutter_width_mm: int) -> tuple[int, int, int]:
+def _parking_lanes(hierarchy: str, grammar_version: int) -> int:
+    """How many kerbside parking lanes a street of this hierarchy keeps, by edition 3's field."""
+    kept = entry("street-hierarchy", hierarchy, grammar_version)["kerbside_parking"]
+    return _PARKING_LANES_BOTH_SIDES if kept == _BOTH_SIDES else 0
+
+
+def _section(
+    hierarchy: str,
+    lane_width_mm: int,
+    gutter_width_mm: int,
+    parking_mm: tuple[int, int] = (0, 0),
+) -> tuple[int, int, int]:
     """Lanes, carriageway width, and the room a line of this hierarchy needs clear of the edge.
 
     ONE STATEMENT OF THE FORMULA. The layout reads it with the widths this city derived, and the
     two reaches below read it with the narrowest and widest the declared ranges admit.
+    ``parking_mm`` is how many kerbside parking lanes the street keeps and how wide each is.
     """
     fields = entry("street-hierarchy", hierarchy)
     lanes = fields["lanes_minimum"]
-    carriageway = lanes * lane_width_mm + 2 * gutter_width_mm
+    parking_lanes, parking_width = parking_mm
+    carriageway = lanes * lane_width_mm + parking_lanes * parking_width + 2 * gutter_width_mm
     reach = (
         carriageway // 2
         + CITY_SURFACE.parameters.get("kerb_width_mm").maximum
@@ -375,6 +426,7 @@ class _Street:
     hierarchy: str
     carriageway_mm: int = 0
     lanes: int = 0
+    parking_lanes: int = 0
     nodes: list[int] = field(default_factory=list)
     identity: str = ""
     name: str = ""
@@ -486,7 +538,7 @@ def _faces(
     return faces
 
 
-def _generate(context: StageContext) -> Iterator[object]:
+def _generate(context: StageContext, rules: _Rules = _VERSION_2_RULES) -> Iterator[object]:
     [district] = prior_records(context, districts.STAGE_ID, districts.DistrictRecord)
     patches = prior_records(context, terrain.STAGE_ID, terrain.TerrainRecord)
     if any(set(patch.height_mm) != {DATUM_MM} for patch in patches):
@@ -518,9 +570,28 @@ def _generate(context: StageContext) -> Iterator[object]:
         (_HIGH, _LOCAL), "speed_limit_minimum_mm_s", "speed_limit_maximum_mm_s"
     )
     speed = derived(context, "speed_limit_mm_s", _DISTRICT, minimum=speed_low, maximum=speed_high)
+    parking_width = 0
+    if rules.kerbside_parking:
+        parking = entry("lane-use", _PARKING_USE)
+        parking_width = _modular(
+            context,
+            "parking_lane_width_mm",
+            _DISTRICT,
+            parking["width_minimum_mm"],
+            parking["width_maximum_mm"],
+        )
+    setback = (
+        _modular(context, "stop_line_setback_mm", _DISTRICT, 0, 1_000_000)
+        if rules.stop_line_setback
+        else 0
+    )
+    crossing_width = _modular(context, "crossing_width_mm", _DISTRICT, 0, 1_000_000)
+
+    def parking_lanes(hierarchy: str) -> int:
+        return _parking_lanes(hierarchy, context.grammar_version) if rules.kerbside_parking else 0
 
     def section(hierarchy: str) -> tuple[int, int, int]:
-        return _section(hierarchy, lane_width, gutter)
+        return _section(hierarchy, lane_width, gutter, (parking_lanes(hierarchy), parking_width))
 
     middle_x, middle_y = (min_x + max_x) // 2, (min_y + max_y) // 2
     _lanes, _width, local_reach = section(_LOCAL)
@@ -554,6 +625,7 @@ def _generate(context: StageContext) -> Iterator[object]:
     names_left: dict[str, list[str]] = {}
     for street in every_street:
         street.lanes, street.carriageway_mm, _reach = section(street.hierarchy)
+        street.parking_lanes = parking_lanes(street.hierarchy)
         street.identity = context.identity("street", context.subject_identity, street.ordinal)
         options = names_left.setdefault(
             street.hierarchy,
@@ -741,6 +813,7 @@ def _generate(context: StageContext) -> Iterator[object]:
             )
         )
 
+    junction_nodes = _junction_nodes(segments, node_ids)
     lane_records = []
     segment_records = {}
     driving = district.driving_side
@@ -751,30 +824,77 @@ def _generate(context: StageContext) -> Iterator[object]:
         starts = [left.kerb_line_mm[0][axis_index], right.kerb_line_mm[0][axis_index]]
         ends = [left.kerb_line_mm[-1][axis_index], right.kerb_line_mm[-1][axis_index]]
         strip_start, strip_end = max(starts), min(ends)
+        start_crossing, end_crossing = _crossing_places(
+            strip_start,
+            strip_end,
+            crossing_width,
+            node_ids[_node_point(street, item.start)] in junction_nodes,
+            node_ids[_node_point(street, item.end)] in junction_nodes,
+        )
         half = street.lanes // 2
+        # Every lane of the segment from left to right looking from its start node: a kerbside
+        # parking lane against each kerb where the street keeps them, and the traffic lanes.
+        if street.parking_lanes not in (0, _PARKING_LANES_BOTH_SIDES):
+            raise InvalidRecordError(
+                f"street {street.ordinal} keeps {street.parking_lanes} parking lanes"
+            )
+        # Each lane's use, width, and place among the traffic lanes (None for a parking lane).
+        kerbside: list[tuple[str, int, int | None]] = (
+            [(_PARKING_USE, parking_width, None)] if street.parking_lanes else []
+        )
+        across_lanes = [
+            *kerbside,
+            *((_GENERAL_USE, lane_width, traffic) for traffic in range(street.lanes)),
+            *kerbside,
+        ]
         lanes = []
-        for index in range(street.lanes):
-            lateral = street.carriageway_mm // 2 - gutter - lane_width // 2 - index * lane_width
+        taken = 0
+        for index, (use, width, traffic) in enumerate(across_lanes):
+            lateral = street.carriageway_mm // 2 - gutter - taken - width // 2
+            taken += width
             z = DATUM_MM - abs(lateral) * camber // MILLIONTHS  # type: ignore[operator]
-            forward = (index >= half) == (driving == "right")
-            begin, finish = _point(street, strip_start, lateral), _point(street, strip_end, lateral)
+            begin_along, finish_along = strip_start, strip_end
+            if traffic is None:
+                # A parking lane runs between the crossings at its segment's ends.
+                forward = True
+                if start_crossing is not None:
+                    begin_along = start_crossing + crossing_width // 2
+                if end_crossing is not None:
+                    finish_along = end_crossing - crossing_width // 2
+            else:
+                forward = (traffic >= half) == (driving == "right")
+                if rules.stop_line_setback and forward and end_crossing is not None:
+                    finish_along = end_crossing - crossing_width // 2 - setback
+                if rules.stop_line_setback and not forward and start_crossing is not None:
+                    begin_along = start_crossing + crossing_width // 2 + setback
+            if finish_along <= begin_along:
+                raise InvalidRecordError(
+                    f"lane {index} of segment {item.ordinal} has no length between its kerb run's "
+                    "ends, its crossings and its stop line"
+                )
+            begin = _point(street, begin_along, lateral)
+            finish = _point(street, finish_along, lateral)
             line = ((*begin, z), (*finish, z)) if forward else ((*finish, z), (*begin, z))
-            end_node = item.end if forward else item.start
-            turns = _turns(street, end_node, forward, along, across, min_x, max_x)
-            offsets = (strip_start - item.start, strip_end - item.start)
-            low_lateral, high_lateral = lateral - lane_width // 2, lateral + lane_width // 2
+            offsets = (begin_along - item.start, finish_along - item.start)
+            low_lateral, high_lateral = lateral - width // 2, lateral + width // 2
             corners = [
-                _point(street, strip_start, low_lateral),
-                _point(street, strip_end, high_lateral),
+                _point(street, begin_along, low_lateral),
+                _point(street, finish_along, high_lateral),
             ]
+            if traffic is None:
+                direction, turns = "none", ()
+            else:
+                end_node = item.end if forward else item.start
+                direction = "forward" if forward else "backward"
+                turns = _turns(street, end_node, forward, along, across, min_x, max_x)
             lanes.append(
                 roads.LaneRecord(
                     identity=context.identity("lane", item.identity, index),
                     segment_identity=item.identity,
                     lane_index=index,
-                    lane_use="general",
-                    direction="forward" if forward else "backward",
-                    width_mm=lane_width,
+                    lane_use=use,
+                    direction=direction,
+                    width_mm=width,
                     centreline_mm=line,
                     start_offset_mm=offsets[0] if forward else offsets[1],
                     end_offset_mm=offsets[1] if forward else offsets[0],
@@ -845,11 +965,11 @@ def _generate(context: StageContext) -> Iterator[object]:
     )
     crossings = _crossings(
         context,
-        node_records,
+        junction_nodes,
         list(segment_records.values()),
         curbs,
         segments,
-        _modular(context, "crossing_width_mm", _DISTRICT, 0, 1_000_000),
+        crossing_width,
         derived(context, "dropped_kerb_upstand_mm", _DISTRICT),  # type: ignore[arg-type]
         camber,  # type: ignore[arg-type]
     )
@@ -914,9 +1034,37 @@ def _quadrant(record: streets.StreetSegmentRecord, node: streets.StreetNodeRecor
     ]
 
 
+def _junction_nodes(
+    segments: Mapping[tuple[int, int], _Segment], node_ids: Mapping[tuple[int, int], str]
+) -> frozenset[str]:
+    """The nodes three or more segments meet at: where a junction is, and a crossing on each leg."""
+    ends = Counter(
+        node_ids[_node_point(item.street, along)]
+        for item in segments.values()
+        for along in (item.start, item.end)
+    )
+    return frozenset(node for node, count in ends.items() if count >= 3)
+
+
+def _crossing_places(
+    strip_start: int, strip_end: int, width: int, at_start: bool, at_end: bool
+) -> tuple[int | None, int | None]:
+    """Where a segment's crossings stand along its street, at its start and at its end, or None.
+
+    THE ONE STATEMENT of where a crossing stands, which :func:`_crossings` lays and a stop line and
+    a parking lane stand back from: at the near end of the straight kerb run at a junction, and
+    only at the start where the run holds one crossing and not two.
+    """
+    if strip_end - strip_start < width:
+        return None, None
+    start = strip_start + width // 2 if at_start else None
+    wants_end = at_end and (strip_end - strip_start >= 2 * width or start is None)
+    return start, strip_end - width // 2 if wants_end else None
+
+
 def _crossings(
     context: StageContext,
-    nodes: list[streets.StreetNodeRecord],
+    junction_nodes: frozenset[str],
     segment_records: list[streets.StreetSegmentRecord],
     curbs: dict[tuple[int, str], streets.CurbEdgeRecord],
     segments: dict[tuple[int, int], _Segment],
@@ -939,15 +1087,6 @@ def _crossings(
     curbs_by_segment: dict[str, dict[str, streets.CurbEdgeRecord]] = {}
     for curb in curbs.values():
         curbs_by_segment.setdefault(curb.segment_identity, {})[curb.side] = curb
-    junction_nodes = {
-        node.identity
-        for node in nodes
-        if sum(
-            node.identity in (record.start_node_identity, record.end_node_identity)
-            for record in segment_records
-        )
-        >= 3
-    }
     records = []
     for record in segment_records:
         item = by_ordinal[record.identity]
@@ -959,14 +1098,14 @@ def _crossings(
         left, right = sides["left"], sides["right"]
         strip_start = max(left.kerb_line_mm[0][axis_index], right.kerb_line_mm[0][axis_index])
         strip_end = min(left.kerb_line_mm[-1][axis_index], right.kerb_line_mm[-1][axis_index])
-        run = strip_end - strip_start
-        if run < width:
-            continue
-        wanted = []
-        if record.start_node_identity in junction_nodes:
-            wanted.append(strip_start + width // 2)
-        if record.end_node_identity in junction_nodes and (run >= 2 * width or not wanted):
-            wanted.append(strip_end - width // 2)
+        places = _crossing_places(
+            strip_start,
+            strip_end,
+            width,
+            record.start_node_identity in junction_nodes,
+            record.end_node_identity in junction_nodes,
+        )
+        wanted = [along for along in places if along is not None]
         half = street.carriageway_mm // 2
         fall = half * camber // MILLIONTHS
         for ordinal, along in enumerate(sorted(wanted)):
@@ -1084,4 +1223,11 @@ STAGE: Final = GeneratorStage(
         *roads.SHAPES,
     ),
     _generate,
+)
+#: Stage version 3: the same records, with stop lines set back and kerbside parking lanes.
+STAGE_V3: Final = GeneratorStage(
+    streets.STAGE_ID,
+    STAGE_VERSION_3,
+    STAGE.shapes,
+    partial(_generate, rules=_VERSION_3_RULES),
 )

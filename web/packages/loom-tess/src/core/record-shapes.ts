@@ -3,8 +3,9 @@
  *
  * A grammar describes every record kind as data (`exulanica.grammar.shapes.describe_shapes`): each
  * field with its kind, bounds, counts and closed values, each named rule, how the record's own
- * identity is derived and which field states its extent. `city-v2.ts` is that table, generated
- * from the grammar's files and held equal to them by test. This module types it and looks things
+ * identity is derived and which field states its extent. `city-v2.ts`, `city-v3.ts` and
+ * `city-v4.ts` are that table for each version, generated from the grammar's files and held equal
+ * to them by test. This module types it and looks things
  * up in it; `document.ts` interprets it field by field. Nothing here is chosen by this package.
  *
  * WHAT A TABLE DOES NOT CARRY, stated so nobody assumes it. A named rule (`rules`) is a Python
@@ -14,7 +15,11 @@
  *
  * A tile names grammars by id and version, and core reads only the versions it has a table for.
  * Adding a grammar version is a new generated table, a rule per record kind in `expand.ts`, and a
- * bump of `TESSELLATOR_SOURCE_VERSION`, which the bake stage's parameters carry.
+ * bump of `TESSELLATOR_SOURCE_VERSION`, which the bake stage's parameters carry, whenever what the
+ * tessellator produces for a document already baked would change. City version 4 is the version
+ * that needed only its table: it declares the record kinds and versions version 3 does, every
+ * expander reads them alike, and a version 3 document bakes to the same bytes, so the source
+ * version stays and no version 3 bake moves.
  *
  * AND EVERY READER THAT TAKES ONE ANSWER OUT OF THE WHOLE LIST, which the paragraph above left
  * out for as long as the list had one member. A list of one makes every reader of it look right.
@@ -29,6 +34,7 @@
  */
 import { CITY_V2 } from './city-v2.js';
 import { CITY_V3 } from './city-v3.js';
+import { CITY_V4 } from './city-v4.js';
 import { FIELD_KINDS } from './grammar-table.js';
 import type { FieldShape, GrammarTable, NavigationRow, RecordShape } from './grammar-table.js';
 
@@ -56,7 +62,7 @@ export const TEXTURE_SET_ID_PATTERN = /^[a-z][a-z0-9.-]*$/;
  * fault is a version. `document.tileTableOf` is what resolves it, and the order here decides
  * nothing.
  */
-export const GRAMMAR_TABLES: readonly GrammarTable[] = [CITY_V2, CITY_V3];
+export const GRAMMAR_TABLES: readonly GrammarTable[] = [CITY_V2, CITY_V3, CITY_V4];
 
 export class ShapeTableError extends Error {}
 

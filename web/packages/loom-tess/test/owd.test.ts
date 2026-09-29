@@ -166,7 +166,7 @@ describe('decodeOwd', () => {
       const next = Math.max(...GRAMMAR_TABLES.map((table) => table.grammar_version)) + 1;
       (header.grammars as { grammar_version: number }[])[0]!.grammar_version = next;
       ((header.tile as { fields: { grammar_versions: { grammar_version: number }[] } }).fields.grammar_versions)[0]!.grammar_version = next;
-    }), /pins city version 4, and this tessellator reads \[2,3\]/],
+    }), /pins city version 5, and this tessellator reads \[2,3,4\]/],
     ['another profile', () => sameLength('exulanica.owd/v3', 'exulanica.owd/v4'), /profile/],
     ['a truth that is not invented', () => sameLength('"truth":"invented"', '"truth":"recorded"'), /truth/],
     ['a frame its grammar does not state', () => sameLength('"name":"city_local"', '"name":"city_locum"'), /frame is not the frame/],

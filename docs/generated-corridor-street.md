@@ -8,7 +8,10 @@ frontages, produced from one seed by the grammar's stages, cut into tiles, and h
 the grammar has. Nothing in it is drawn by hand and nothing in it is a fallback: a surface no
 published texture set dresses is drawn unavailable, and this document says how many there are.
 The counts below are the evidence logs', each naming the commit it was generated at, under city
-version 2; version 3 changes one record shape and no subject rule.
+version 2; version 3 changes one record shape and no subject rule. City version 4 lays the same
+specification with its stop lines before its crossings and a parking lane against each kerb of
+its high street, which widens the high street's carriageway from 7.1 m to 11.6 m; nothing below
+describes version 4's tiles.
 
 **It is generated content.** It is evidence of what the generator does and of nothing else, and the
 app draws it only in the development preview.

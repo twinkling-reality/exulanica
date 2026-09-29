@@ -128,7 +128,7 @@ def test_the_predicate_names_the_parameters_when_no_naming_could_exist(tmp_path,
     """Its sentence is the refusal a caller shows, so what it names is checked, not assumed."""
     directory = _catalogs_with_fewer_street_names(tmp_path, 1)
     loaded = {item.catalog_id: item for item in load_city_catalogs(directory)}
-    monkeypatch.setattr(generation_stage, "_catalogs", lambda: loaded)
+    monkeypatch.setattr(generation_stage, "_catalogs", lambda _grammar_version: loaded)
     values = dict(CORRIDOR_BINDINGS[0].values)
     message = generation_streets.street_name_shortfall(
         span_x_mm=values["city_extent_x_mm"],
@@ -213,7 +213,7 @@ def test_a_city_its_vocabulary_cannot_name_is_refused_before_a_record_exists(tmp
     """
     directory = _catalogs_with_fewer_street_names(tmp_path, 1)
     loaded = {item.catalog_id: item for item in load_city_catalogs(directory)}
-    monkeypatch.setattr(generation_stage, "_catalogs", lambda: loaded)
+    monkeypatch.setattr(generation_stage, "_catalogs", lambda _grammar_version: loaded)
     with pytest.raises(InvalidParameterError) as refusal:
         generate_city(
             seed=CORRIDOR_SEED,
@@ -234,7 +234,7 @@ def test_the_same_city_generates_when_the_catalog_is_whole(tmp_path, monkeypatch
     """
     directory = _catalogs_with_fewer_street_names(tmp_path, len(_catalog()["entries"]))
     loaded = {item.catalog_id: item for item in load_city_catalogs(directory)}
-    monkeypatch.setattr(generation_stage, "_catalogs", lambda: loaded)
+    monkeypatch.setattr(generation_stage, "_catalogs", lambda _grammar_version: loaded)
     generation = generate_city(
         seed=CORRIDOR_SEED, subject_identity=CORRIDOR_CITY_IDENTITY, bindings=CORRIDOR_BINDINGS
     )

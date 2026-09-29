@@ -94,6 +94,7 @@ def test_two_seeds_derive_the_same_identity_through_a_stage_context():
         return StageContext(
             seed=seed,
             grammar_id="city",
+            grammar_version=3,
             stage_id="massing",
             parameters={},
             prior=(),

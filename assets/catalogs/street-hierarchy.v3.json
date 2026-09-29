@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "catalog_id": "street-hierarchy",
+  "catalog_version": 3,
+  "entries": [
+    {
+      "key": "avenue",
+      "label": "Avenue",
+      "rank": 0,
+      "lanes_minimum": 4,
+      "lanes_maximum": 6,
+      "lane_width_minimum_mm": 3000,
+      "lane_width_maximum_mm": 3650,
+      "footway_width_minimum_mm": 3500,
+      "footway_width_maximum_mm": 8000,
+      "speed_limit_minimum_mm_s": 11111,
+      "speed_limit_maximum_mm_s": 13888,
+      "kerb_height_minimum_mm": 150,
+      "kerb_height_maximum_mm": 180,
+      "kerbside_parking": "none",
+      "reason": "Authored street class. Street types are discussed in NACTO Urban Street Design Guide (Island Press, 2013), Streets, which was not re-read in this build and is not quoted; these classes and ranges are this grammar's own. An avenue's kerb lanes carry traffic, so this grammar gives it no kerbside parking lane. Kerbside parking is authored, not quoted from a standard.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "high_street",
+      "label": "High street",
+      "rank": 1,
+      "lanes_minimum": 2,
+      "lanes_maximum": 4,
+      "lane_width_minimum_mm": 3000,
+      "lane_width_maximum_mm": 3500,
+      "footway_width_minimum_mm": 3000,
+      "footway_width_maximum_mm": 6000,
+      "speed_limit_minimum_mm_s": 8333,
+      "speed_limit_maximum_mm_s": 13888,
+      "kerb_height_minimum_mm": 125,
+      "kerb_height_maximum_mm": 180,
+      "kerbside_parking": "both_sides",
+      "reason": "Authored street class. Street types are discussed in NACTO Urban Street Design Guide (Island Press, 2013), Streets, which was not re-read in this build and is not quoted; these classes and ranges are this grammar's own. A high street keeps a kerbside parking lane on each side, where shoppers' and deliveries' vehicles stand. Kerbside parking is authored, not quoted from a standard.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "local_street",
+      "label": "Local street",
+      "rank": 2,
+      "lanes_minimum": 2,
+      "lanes_maximum": 2,
+      "lane_width_minimum_mm": 2750,
+      "lane_width_maximum_mm": 3250,
+      "footway_width_minimum_mm": 1800,
+      "footway_width_maximum_mm": 3500,
+      "speed_limit_minimum_mm_s": 5555,
+      "speed_limit_maximum_mm_s": 8333,
+      "kerb_height_minimum_mm": 100,
+      "kerb_height_maximum_mm": 150,
+      "kerbside_parking": "none",
+      "reason": "Authored street class. Street types are discussed in NACTO Urban Street Design Guide (Island Press, 2013), Streets, which was not re-read in this build and is not quoted; these classes and ranges are this grammar's own. A local street keeps no kerbside parking lane in this edition, so its cross-section, and the blocks and lots it bounds, are edition 2's. Kerbside parking is authored, not quoted from a standard.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "narrow_street",
+      "label": "Narrow street",
+      "rank": 3,
+      "lanes_minimum": 1,
+      "lanes_maximum": 2,
+      "lane_width_minimum_mm": 2750,
+      "lane_width_maximum_mm": 3000,
+      "footway_width_minimum_mm": 1800,
+      "footway_width_maximum_mm": 2500,
+      "speed_limit_minimum_mm_s": 4166,
+      "speed_limit_maximum_mm_s": 5555,
+      "kerb_height_minimum_mm": 100,
+      "kerb_height_maximum_mm": 125,
+      "kerbside_parking": "none",
+      "reason": "Authored street class. Street types are discussed in NACTO Urban Street Design Guide (Island Press, 2013), Streets, which was not re-read in this build and is not quoted; these classes and ranges are this grammar's own. A narrow street has no room beside its lanes for a parked vehicle, so it has no kerbside parking lane. Kerbside parking is authored, not quoted from a standard.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

@@ -33,15 +33,23 @@ from exulanica.grammar.contract import (
 from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.grammars import builtin_registry
 from exulanica.grammar.grammars.box import BOX_GRAMMAR
-from exulanica.grammar.grammars.city import CITY_GRAMMAR, CITY_SHAPES, CITY_STAGES
+from exulanica.grammar.grammars.city import (
+    CITY_GRAMMAR,
+    CITY_GRAMMAR_V4,
+    CITY_GRAMMARS,
+    CITY_SHAPES,
+    CITY_STAGES,
+)
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATH,
-    CITY_GRAMMAR_VERSION,
+    CITY_GENERATING_VERSIONS,
     CITY_SURFACE,
     CITY_V1_DESCRIPTOR_PATH,
     CITY_V1_SURFACE,
     CITY_V2_DESCRIPTOR_PATH,
     CITY_V2_SHAPES_PATH,
+    CITY_V3_SHAPES_PATH,
+    CITY_V4_DESCRIPTOR_PATH,
 )
 from exulanica.grammar.grammars.city.tile import COORDINATE_UNITS
 from exulanica.grammar.shapes import describe_shapes
@@ -56,6 +64,7 @@ DESCRIPTOR_SHA256 = {
     ("city", 1): "1e580ada17333e886ad1067e65585ebd7014006749ba4f84a26ae0f9f673d273",
     ("city", 2): "c82ac5e7d39e95abbeef0d3ead599d87d5421fab7727341ae0df620ef208a7f1",
     ("city", 3): "e771deef96b49ba35f8a145acbd67dda4d939f93f7730a2b50da78e1727ab41f",
+    ("city", 4): "a11af93a79d33d13dc656e66dd8e38215061920e2fce4f751c0df1e1db7bcf20",
 }
 
 
@@ -96,15 +105,18 @@ def test_every_shipped_descriptor_is_pinned_by_its_digest():
     assert set(files) == set(DESCRIPTOR_SHA256)
     for key, path in files.items():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == DESCRIPTOR_SHA256[key], key
+    assert files[("city", 4)] == CITY_V4_DESCRIPTOR_PATH
     assert files[("city", 3)] == CITY_DESCRIPTOR_PATH
     assert files[("city", 2)] == CITY_V2_DESCRIPTOR_PATH
     assert files[("city", 1)] == CITY_V1_DESCRIPTOR_PATH
 
 
-def test_the_registered_grammars_are_exactly_the_pinned_current_versions():
+def test_the_registered_grammars_are_exactly_the_pinned_generating_versions():
     keys = {(key.grammar_id, key.grammar_version) for key in builtin_registry().registered_keys()}
-    assert keys == {("box", 1), ("city", 3)}
+    assert keys == {("box", 1), ("city", 3), ("city", 4)}
+    assert tuple(CITY_GRAMMARS) == CITY_GENERATING_VERSIONS == (3, 4)
     assert (BOX_GRAMMAR.descriptor_schema, CITY_GRAMMAR.descriptor_schema) == (1, 2)
+    assert CITY_GRAMMAR_V4.descriptor_schema == 2
 
 
 def test_the_frozen_version_2_shapes_differ_from_the_live_ones_in_two_stated_ways():
@@ -157,7 +169,35 @@ def test_the_frozen_version_2_shapes_differ_from_the_live_ones_in_two_stated_way
     assert [before["name"] for before, _ in differing] == ["grammar_version"]
     [(before, after)] = differing
     assert (before["minimum"], before["maximum"]) == (2, 2)
-    assert (after["minimum"], after["maximum"]) == (CITY_GRAMMAR_VERSION, CITY_GRAMMAR_VERSION)
+    assert (after["minimum"], after["maximum"]) == (
+        min(CITY_GENERATING_VERSIONS),
+        max(CITY_GENERATING_VERSIONS),
+    )
+
+
+def test_the_frozen_version_3_shapes_differ_from_the_live_ones_in_the_facade_bound_alone():
+    """Version 3's shape table is frozen beside its descriptor so the tessellator's version 3
+    table stays what it was when version 4 arrived. Version 4 changes no record shape: the one
+    difference is the facade's own ``grammar_version`` bound, which the live code widens to both
+    versions it generates. The document check holds each facade to its tile's pin."""
+    frozen = json.loads(CITY_V3_SHAPES_PATH.read_text(encoding="utf-8"))
+    live = json.loads(json.dumps(describe_shapes(CITY_SHAPES)))
+    assert frozen["nested"] == live["nested"]
+    by_kind = {shape["kind"]: shape for shape in frozen["records"]}
+    live_by_kind = {shape["kind"]: shape for shape in live["records"]}
+    assert set(by_kind) == set(live_by_kind)
+    moved = sorted(kind for kind in by_kind if by_kind[kind] != live_by_kind[kind])
+    assert moved == ["city.facade"]
+    was, now = by_kind["city.facade"], live_by_kind["city.facade"]
+    differing = [
+        (before, after)
+        for before, after in zip(was["fields"], now["fields"], strict=True)
+        if before != after
+    ]
+    [(before, after)] = differing
+    assert before["name"] == after["name"] == "grammar_version"
+    assert (before["minimum"], before["maximum"]) == (3, 3)
+    assert (after["minimum"], after["maximum"]) == (3, 4)
 
 
 def test_the_grammar_and_the_parameter_surface_read_the_descriptor_alike():

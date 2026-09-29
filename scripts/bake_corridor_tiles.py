@@ -12,6 +12,12 @@ grammar's own document check, bakes each through the Node tessellator's CLI (the
 each through migration 0072. Then it bakes every tile a second time and records it again: the
 answer must be ``identical`` for every tile, and anything else is the fault 0072 exists to keep.
 
+The corridor is generated at city grammar version 3, the version its specification and the
+visual gate were written against, unless ``--grammar-version=<N>`` names another the city
+generates: ``--grammar-version=4`` bakes the same specification with version 4's streets (stop
+lines set back before crossings, kerbside parking lanes), which the traffic in the development
+preview drives on. Each version's tiles are keyed apart, since a tile pins its descriptor.
+
 Name tiles as ``x,y`` arguments to bake only those, for instance ``2,0``. Every tile document is
 still generated and the city's reference closure still checked; only the bake and the record are
 narrowed. That is for the case where the tessellator refuses one tile and the others are wanted in
@@ -44,6 +50,7 @@ from pathlib import Path
 import psycopg
 from owd_entries import projections, undressed
 from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
+from exulanica.grammar.grammars.city.descriptor import CITY_GRAMMAR_VERSION
 from exulanica.grammar.grammars.city.document import document_bytes, validate_city_document
 from exulanica.grammar.grammars.city.generation.corridor import (
     CORRIDOR_BINDINGS,
@@ -150,12 +157,18 @@ def main() -> int:
     if not TSX.exists():
         print(f"the web toolchain is missing ({TSX}); run pnpm install in web/", file=sys.stderr)
         return 2
-    chosen = _chosen_tiles(sys.argv[1:])
+    flag = "--grammar-version="
+    versions = [argument for argument in sys.argv[1:] if argument.startswith(flag)]
+    grammar_version = int(versions[-1].removeprefix(flag)) if versions else CITY_GRAMMAR_VERSION
+    chosen = _chosen_tiles([argument for argument in sys.argv[1:] if argument not in versions])
     if chosen is None:
         return 2
-    catalogs = load_city_catalogs()
+    catalogs = load_city_catalogs(grammar_version=grammar_version)
     generation = generate_city(
-        seed=CORRIDOR_SEED, subject_identity=CORRIDOR_CITY_IDENTITY, bindings=CORRIDOR_BINDINGS
+        seed=CORRIDOR_SEED,
+        subject_identity=CORRIDOR_CITY_IDENTITY,
+        bindings=CORRIDOR_BINDINGS,
+        grammar_version=grammar_version,
     )
     records = city_records(generation)
     check_piece_lengths(records)
@@ -169,6 +182,7 @@ def main() -> int:
             tile_x=tile_x,
             tile_y=tile_y,
             lod=CORRIDOR_LOD,
+            grammar_version=grammar_version,
         )
         validate_city_document(document, catalogs=catalogs)
         documents.append(document)

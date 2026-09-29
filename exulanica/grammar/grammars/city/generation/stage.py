@@ -28,7 +28,7 @@ from exulanica.grammar.draw import draw_integer
 from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.geometry import Extent
 from exulanica.grammar.grammars.city.catalogs import entry_fields, load_city_catalogs
-from exulanica.grammar.grammars.city.descriptor import CITY_SURFACE
+from exulanica.grammar.grammars.city.descriptor import CITY_GRAMMAR_VERSION, CITY_SURFACES
 from exulanica.grammar.parameters import ParameterValue
 from exulanica.grammar.shapes import RecordShape, validate_record
 
@@ -97,16 +97,18 @@ def prior_records(context: StageContext, stage_id: str, record_type: type) -> li
 
 
 @cache
-def _catalogs() -> Mapping[str, Catalog]:
-    return {item.catalog_id: item for item in load_city_catalogs()}
+def _catalogs(grammar_version: int) -> Mapping[str, Catalog]:
+    return {item.catalog_id: item for item in load_city_catalogs(grammar_version=grammar_version)}
 
 
-def catalog(catalog_id: str) -> Catalog:
-    return _catalogs()[catalog_id]
+def catalog(catalog_id: str, grammar_version: int = CITY_GRAMMAR_VERSION) -> Catalog:
+    """A catalog as ``grammar_version`` reads it. Every field two versions' editions both state
+    has the same value in each, so a reader of such a field may name neither."""
+    return _catalogs(grammar_version)[catalog_id]
 
 
-def entry(catalog_id: str, key: str) -> dict[str, Any]:
-    return entry_fields(catalog(catalog_id), key)
+def entry(catalog_id: str, key: str, grammar_version: int = CITY_GRAMMAR_VERSION) -> dict[str, Any]:
+    return entry_fields(catalog(catalog_id, grammar_version), key)
 
 
 def draw(context: StageContext, decision: str, ordinal: int, minimum: int, maximum: int) -> int:
@@ -142,7 +144,7 @@ def derived(
     catalog entry the subject already has says so; a narrowing that misses the declared range is
     refused. A bound value outside the narrowed range is refused too, never clamped.
     """
-    spec = CITY_SURFACE.parameters.get(name)
+    spec = CITY_SURFACES[context.grammar_version].parameters.get(name)
     if spec.stage != context.stage_id:
         raise InvalidParameterError(f"{name} is read by {spec.stage}, not {context.stage_id}")
     bound = context.parameters.get(name)

@@ -49,7 +49,7 @@ from exulanica.grammar.grammars.city._skeleton import skeleton
 from exulanica.grammar.grammars.city.common import extent_field, require_point_in_extent
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_ADMISSIBLE_USES,
-    CITY_GRAMMAR_VERSION,
+    CITY_GENERATING_VERSIONS,
     CITY_SURFACE,
 )
 from exulanica.grammar.parameters import ParameterBinding, require_parameter_bindings
@@ -315,7 +315,9 @@ FACADE_SHAPE: Final = shapes.RecordShape(
     FacadeRecord,
     (
         shapes.identity("building_identity", "city.massing"),
-        shapes.integer("grammar_version", CITY_GRAMMAR_VERSION, CITY_GRAMMAR_VERSION),
+        shapes.integer(
+            "grammar_version", min(CITY_GENERATING_VERSIONS), max(CITY_GENERATING_VERSIONS)
+        ),
         shapes.records("parameters", shapes.PARAMETER_BINDING_SHAPE),
         shapes.seed("seed"),
         shapes.hex64("output_digest"),

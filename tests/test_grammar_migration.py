@@ -32,9 +32,10 @@ import pytest
 from exulanica.grammar.contract import ParameterSurface
 from exulanica.grammar.errors import GrammarError, InvalidParameterError
 from exulanica.grammar.grammars.city.descriptor import (
-    CITY_GRAMMAR_VERSION,
+    CITY_GENERATING_VERSIONS,
     CITY_MIGRATION_PATHS,
     CITY_SURFACE,
+    CITY_SURFACES,
     CITY_V1_SURFACE,
     CITY_V2_SURFACE,
 )
@@ -49,12 +50,8 @@ from exulanica.grammar.parameters import CascadeBinding
 # The city
 
 
-#: Every city surface by its version, so a test names the version it means rather than "current".
-CITY_SURFACES: dict[int, ParameterSurface] = {
-    1: CITY_V1_SURFACE,
-    2: CITY_V2_SURFACE,
-    CITY_GRAMMAR_VERSION: CITY_SURFACE,
-}
+#: The newest city version, which every migration chain reaches.
+_NEWEST = max(CITY_GENERATING_VERSIONS)
 
 
 def _city_migration(target: int) -> ParameterMigration:
@@ -62,7 +59,7 @@ def _city_migration(target: int) -> ParameterMigration:
 
 
 def test_every_city_version_after_the_first_ships_its_migration():
-    assert set(CITY_MIGRATION_PATHS) == set(range(2, CITY_GRAMMAR_VERSION + 1))
+    assert set(CITY_MIGRATION_PATHS) == set(range(2, _NEWEST + 1))
     for version, path in CITY_MIGRATION_PATHS.items():
         migration = ParameterMigration.read(path)
         assert (migration.source_version, migration.target_version) == (version - 1, version)
@@ -70,7 +67,7 @@ def test_every_city_version_after_the_first_ships_its_migration():
 
 def test_every_shipped_city_migration_has_a_surface_at_each_end():
     """A migration with no surface to check against is a document nothing holds to a grammar."""
-    assert set(CITY_SURFACES) == set(range(1, CITY_GRAMMAR_VERSION + 1))
+    assert set(CITY_SURFACES) == set(range(1, _NEWEST + 1))
     for version, surface in CITY_SURFACES.items():
         assert surface.key.grammar_version == version
 
@@ -202,9 +199,7 @@ def test_every_city_parameter_survives_the_version_2_migration_with_its_value(pi
 def test_a_city_chain_from_version_1_reaches_the_current_version():
     migrations = [_city_migration(target) for target in sorted(CITY_MIGRATION_PATHS)]
     empty = tuple(CascadeBinding.of(level, {}) for level in CITY_V1_SURFACE.cascade.levels)
-    result = migrate_chain(
-        migrations, CITY_SURFACES, empty, from_version=1, to_version=CITY_GRAMMAR_VERSION
-    )
+    result = migrate_chain(migrations, CITY_SURFACES, empty, from_version=1, to_version=_NEWEST)
     assert result.bindings == empty
     assert result.dropped == ()
 

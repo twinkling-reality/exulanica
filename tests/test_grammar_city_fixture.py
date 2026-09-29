@@ -67,7 +67,10 @@ from city_v2_fixture import builder
 FIXTURE = builder()
 DOCUMENT_SHA256 = "c380ee5b40f8b5b6b7e5ab31a84a007f87cba4038383012992167d1ff3eaa5f9"
 DOCUMENT_BYTES = 132_778
-SHAPES_SHA256 = "35603f3d7e5831de00dcd2e0ce9deca98faf84354274253aa384d50a7cbcfdb5"
+#: The live shape table. Version 3's, frozen when version 4 arrived, is
+#: ``exulanica/grammar/grammars/city/city-shapes.v3.json`` (SHA-256 35603f3d...); the two differ
+#: in the facade's own ``grammar_version`` bound alone.
+SHAPES_SHA256 = "aa316f1f6eb957149176ba41963c56a1368dc64ee5429c7ac76f40eca557784b"
 SHAPES_BYTES = 62_167
 
 #: Every city record kind but the tile record, which is the envelope rather than a record in it.
@@ -159,7 +162,7 @@ def test_the_fixture_uses_only_real_catalog_keys_and_published_texture_sets():
         ("profile", "profile is"),
         ("unsorted", "sorted by kind, version and identity"),
         ("both", "both owned and halo"),
-        ("grammar", "city v2 records only"),
+        ("grammar", "knows city records at versions"),
     ],
 )
 def test_a_document_outside_its_envelope_is_refused_when_read(text, message):

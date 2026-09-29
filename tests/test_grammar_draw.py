@@ -56,7 +56,11 @@ from exulanica.grammar.errors import (
 )
 from exulanica.grammar.grammars import builtin_registry
 from exulanica.grammar.grammars.city import CITY_STAGES
-from exulanica.grammar.grammars.city.descriptor import CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION
+from exulanica.grammar.grammars.city.descriptor import (
+    CITY_GENERATING_VERSIONS,
+    CITY_GRAMMAR_ID,
+    CITY_GRAMMAR_VERSION,
+)
 from exulanica.grammar.grammars.city.facade import FACADE_RECORD_FIELDS, FacadeRecord
 from exulanica.grammar.grammars.city.material import require_texture_set
 from exulanica.grammar.grammars.city.tile import tile_inputs_digest
@@ -95,8 +99,14 @@ _CITY_VALUES = {
     "memory_precinct_lots": 1,
 }
 _CITY_BINDINGS = (CascadeBinding.of("city", _CITY_VALUES),)
+#: Version 4's high street keeps a parking lane against each kerb and its stop lines stand back
+#: from its crossings. With this seed, at the 40 m block depth above a block leaves 2,950 mm for a
+#: footway the high street asks at least 3,000 mm of, and at 42 m a kerb run is too short for its
+#: crossing and a stop line before it; each is refused by name. 44 m is the least depth tried
+#: (in steps of 2 m) at which the city generates.
+_CITY_V4_BINDINGS = (CascadeBinding.of("city", {**_CITY_VALUES, "block_depth_mm": 44_000}),)
 #: What generating each registered grammar needs besides a seed and a subject.
-_BINDINGS = {"box": (), "city": _CITY_BINDINGS}
+_BINDINGS = {("box", 1): (), ("city", 3): _CITY_BINDINGS, ("city", 4): _CITY_V4_BINDINGS}
 
 
 def _stage_for(kind: str):
@@ -281,11 +291,16 @@ from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
 from exulanica.grammar.grammars.city.document import document_bytes
 
 seed, identity, builder_path = sys.argv[1], sys.argv[2], sys.argv[3]
-bindings = {"box": (), "city": (CascadeBinding.of("city", {
+values = {
     "driving_side": "right", "city_extent_x_mm": 256000, "city_extent_y_mm": 128000,
     "terrain_relief_mm": 0, "block_length_mm": 60000, "block_depth_mm": 40000,
     "gutter_width_mm": 300, "front_setback_mm": 0, "memory_precinct_lots": 1,
-}),)}
+}
+bindings = {
+    ("box", 1): (),
+    ("city", 3): (CascadeBinding.of("city", values),),
+    ("city", 4): (CascadeBinding.of("city", {**values, "block_depth_mm": 44000}),),
+}
 spec = importlib.util.spec_from_file_location("city_v2_fixture_builder", builder_path)
 fixture = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = fixture
@@ -294,7 +309,8 @@ registry = builtin_registry()
 emitted = {
     "generations": [
         generate(registry.get(key.grammar_id, key.grammar_version), seed=seed,
-                 subject_identity=identity, bindings=bindings[key.grammar_id]).payload()
+                 subject_identity=identity,
+                 bindings=bindings[(key.grammar_id, key.grammar_version)]).payload()
         for key in registry.registered_keys()
     ],
     "draws": {
@@ -463,7 +479,7 @@ def _generations() -> list[dict[str, object]]:
             registry.get(key.grammar_id, key.grammar_version),
             seed=SEED,
             subject_identity=IDENTITY,
-            bindings=_BINDINGS[key.grammar_id],
+            bindings=_BINDINGS[(key.grammar_id, key.grammar_version)],
         ).payload()
         for key in registry.registered_keys()
     ]
@@ -613,15 +629,15 @@ def test_the_city_declares_the_eleven_stages_in_order_each_versioned():
     )
 
 
-def test_only_the_current_city_version_is_registered():
-    """One city version is REGISTERED, the one this code describes, whatever versions it READS.
+def test_only_the_generating_city_versions_are_registered():
+    """The city versions REGISTERED are the ones this code generates, whatever versions it READS.
 
     The registry is what a generator runs; the tessellator reads a superseded version too
-    (ADR-0024), and these are different questions. Named for the version rather than naming the
-    number, so it does not go stale at the next bump.
+    (ADR-0024), and these are different questions. Named for the versions rather than naming the
+    numbers, so it does not go stale at the next bump.
     """
     keys = [(key.grammar_id, key.grammar_version) for key in builtin_registry().registered_keys()]
-    assert keys == [("box", 1), ("city", CITY_GRAMMAR_VERSION)]
+    assert keys == [("box", 1), *((CITY_GRAMMAR_ID, v) for v in CITY_GENERATING_VERSIONS)]
 
 
 def test_a_city_stage_with_a_generator_emits_records_and_every_other_says_it_has_none():

@@ -81,6 +81,8 @@ EXPECTED_CATALOGS = {
     "typology": (2, 7),
     "use-class": (1, 11),
 }
+#: The editions city version 4 reads in place of version 3's, with their entry counts.
+EXPECTED_V4_EDITIONS = {"street-hierarchy": (3, 4)}
 
 _ORIGINAL = {
     "spdx": "Apache-2.0",
@@ -154,7 +156,10 @@ def test_every_shipped_entry_carries_a_licence():
     files = sorted(CATALOG_DIRECTORY.glob("*.json"))
     assert [path.name for path in files] == sorted(
         f"{catalog_id}.v{version}.json"
-        for catalog_id, (version, _count) in EXPECTED_CATALOGS.items()
+        for catalog_id, (version, _count) in (
+            *EXPECTED_CATALOGS.items(),
+            *EXPECTED_V4_EDITIONS.items(),
+        )
     )
     entries = 0
     for path in files:
@@ -170,7 +175,9 @@ def test_every_shipped_entry_carries_a_licence():
             else:
                 assert licence["licence_source"] != "LICENSE"
                 assert licence["content_source"].startswith("assets/catalogs/sources/")
-    assert entries == sum(count for _version, count in EXPECTED_CATALOGS.values())
+    assert entries == sum(
+        count for _version, count in (*EXPECTED_CATALOGS.values(), *EXPECTED_V4_EDITIONS.values())
+    )
     for catalog in load_city_catalogs():
         for entry in catalog.entries:
             assert entry.licence.verdict in LICENCE_VERDICTS

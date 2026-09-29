@@ -82,13 +82,17 @@ checks all of them, against the descriptor and catalogs the tile pins.
 `src/core/city-v<N>.ts` is each grammar version's own table: `describe_shapes` over that version's
 record shapes, and its descriptor's frame, contract measures and navigation table (each kind's
 ground, cover and obstruction, without the row's prose reason). There is one per version this
-tessellator reads, and since ADR-0024 there are two: version 3 states a tile document's coordinate
-unit and version 2 does not, so a document is read against the shape the version IT PINS declares
-(`document.tileTableOf`) and never against whichever table sits first in the list.
+tessellator reads, and there are three: version 3 states a tile document's coordinate unit and
+version 2 does not (ADR-0024), so a document is read against the shape the version IT PINS
+declares (`document.tileTableOf`) and never against whichever table sits first in the list.
+Version 4 declares version 3's record kinds at version 3's record versions and changes what the
+streets stage lays, not how any record is drawn, so it needed a table and nothing else, and a
+version 3 document bakes to the same bytes it did before version 4 was read.
 
-A superseded version's shapes are frozen beside its descriptor (`city-shapes.v2.json`), because
-`describe_shapes` runs over the Python code and the code describes one version. The current
-version's come from what the fixture builder last wrote. Which is which is decided by reading the
+A version's shapes are frozen beside its descriptor once a later version exists
+(`city-shapes.v2.json`, `city-shapes.v3.json`), because `describe_shapes` runs over the Python
+code and the code describes the newest version's shapes. The newest version's come from what the
+fixture builder last wrote. Which is which is decided by reading the
 grammar directory, and each pairing is checked against the tile record version its descriptor
 declares. The tables are generated, not transcribed:
 

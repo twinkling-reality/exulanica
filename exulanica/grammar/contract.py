@@ -267,11 +267,14 @@ class StageContext:
     """What a stage may read: the seed, the subject, the parameters, and earlier emissions.
 
     ``subject_identity`` is the admitted identity of the subject the generation is for. It is
-    the root of every identity the stage derives, through :meth:`identity`.
+    the root of every identity the stage derives, through :meth:`identity`. ``grammar_version`` is
+    the version of the grammar running the stage, so a stage two versions share reads the
+    parameters that version declares; no draw domain and no identity names it.
     """
 
     seed: str
     grammar_id: str
+    grammar_version: int
     stage_id: str
     parameters: Mapping[str, ParameterValue]
     prior: tuple[StageEmission, ...]
@@ -851,6 +854,7 @@ def generate(
             StageContext(
                 seed=seed,
                 grammar_id=grammar.key.grammar_id,
+                grammar_version=grammar.key.grammar_version,
                 stage_id=stage.stage_id,
                 parameters=parameters,
                 prior=tuple(emissions),
