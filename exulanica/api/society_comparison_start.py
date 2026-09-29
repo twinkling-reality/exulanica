@@ -366,9 +366,10 @@ class TypicalFigures:
 
 
 @cache
-def typical_figures(navigation: str = TYPICAL_NAVIGATION) -> TypicalFigures | None:
+def typical_figures(navigation: str | None = TYPICAL_NAVIGATION) -> TypicalFigures | None:
     """The typical figures measured on the kind of ground ``navigation`` names, or None where no
-    measurement states it or its record is not beside this code."""
+    measurement states it, its record is not beside this code, or ``navigation`` is None (a
+    society whose engine takes no inputs stands on no ground a measurement names)."""
     entry = TYPICAL_RECORDS.get(navigation)
     if entry is None:
         return None
@@ -394,7 +395,7 @@ def figures_for(
     return typical_figures(TYPICAL_NAVIGATION), navigation == TYPICAL_NAVIGATION
 
 
-def typical_latency_ms(navigation: str = TYPICAL_NAVIGATION) -> dict[str, int]:
+def typical_latency_ms(navigation: str | None = TYPICAL_NAVIGATION) -> dict[str, int]:
     """How long each model a measurement ran took to answer one of a group's people, by model id:
     its 95th percentile answer time on ``navigation``'s ground, else on the small square. A model
     neither measured has no figure."""
@@ -404,7 +405,7 @@ def typical_latency_ms(navigation: str = TYPICAL_NAVIGATION) -> dict[str, int]:
 
 
 def answers_per_minute(
-    contract: DecisionContract, model_id: str, navigation: str = TYPICAL_NAVIGATION
+    contract: DecisionContract, model_id: str, navigation: str | None = TYPICAL_NAVIGATION
 ) -> int | None:
     """How many asks one run's minute can have answered by ``model_id``: the contract's concurrent
     calls, each answering one ask after another at the model's measured answer time on the
@@ -418,7 +419,7 @@ def answers_per_minute(
     )
 
 
-def typical_per_person_hour(navigation: str = TYPICAL_NAVIGATION) -> dict[str, Decimal]:
+def typical_per_person_hour(navigation: str | None = TYPICAL_NAVIGATION) -> dict[str, Decimal]:
     """What one of a group's people cost for a simulated hour under each model, by model id: as
     measured on ``navigation``'s ground where it was, else on the small square. A model neither
     measured has no figure."""
@@ -448,9 +449,10 @@ class ComparisonCost:
     #: What they would cost at the measured figures (:func:`typical_per_person_hour`), or None
     #: when a model it asks has no figure.
     typical_usd: Decimal | None
-    #: The most the asks of the runs played at once can hold reserved together: each run asks at
-    #: most the contract's concurrent calls at once, each held at its model's bound until its usage
-    #: is recorded (``BoundedBudget``).
+    #: The most the asks of the runs played at once can hold reserved together: the protocol's
+    #: runs at once, the dearest of the runs counted, each asking at most the contract's concurrent
+    #: calls at once, each held at its model's bound until its usage is recorded
+    #: (``BoundedBudget``).
     held_usd: Decimal
 
     #: Whether the typical figure was measured on the kind of ground this society stands on.
@@ -553,18 +555,16 @@ def comparison_cost(
                 per_hour += typical[model_id] * subjects
             else:
                 measured = False
-    # What one run of each arm can hold reserved at once: its minute's asks, at most the contract's
-    # concurrent calls of them, each at the dearest bound among the models the arm asks.
+    # What each run counted can hold reserved at once: its minute's asks, at most the contract's
+    # concurrent calls of them, each at the dearest bound among the models its arm asks. Runs are
+    # counted one by one, so two seeds of one arm played at the same time hold twice.
     concurrent = contract.value("concurrent_calls_maximum")
-    held_by_arm = sorted(
-        (
-            min(concurrent, sum(subjects for _model, subjects in pairs))
-            * max((bounds[model_id] for model_id, _ in pairs), default=Decimal(0))
-            for key, pairs in asked.items()
-            if any(key == run_key for run_key, _ in runs)
-        ),
-        reverse=True,
-    )
+    held_by_arm = {
+        key: min(concurrent, sum(subjects for _model, subjects in pairs))
+        * max((bounds[model_id] for model_id, _ in pairs), default=Decimal(0))
+        for key, pairs in asked.items()
+    }
+    held_by_run = sorted((held_by_arm[key] for key, _digest in runs), reverse=True)
     return ComparisonCost(
         runs=len(runs),
         asks=asks,
@@ -580,7 +580,7 @@ def comparison_cost(
         typical_usd=(per_hour * window / MINUTES_PER_HOUR).quantize(USD_QUANTUM)
         if measured
         else None,
-        held_usd=sum(held_by_arm[: max(1, at_once)], Decimal(0)).quantize(
+        held_usd=sum(held_by_run[: max(1, at_once)], Decimal(0)).quantize(
             USD_QUANTUM, rounding=ROUND_CEILING
         ),
         typical_matches=matches,

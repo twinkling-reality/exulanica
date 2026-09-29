@@ -17,7 +17,7 @@ of a comparison is held to the pair's budget over :data:`PAIR_RUNS`.
 So the most people a comparison runs, and the most of them a model may decide for in any one of
 its runs, are derived, never stated (:class:`ReadingBound`). A comparison whose dearest run would
 read for longer is refused by name (:func:`reading_refusal`): ``population_over_comparison_bound``
-when the society alone is too many for a run nobody is decided for,
+when the society is too many for a run in which a model decides for even one of them,
 ``decided_over_comparison_bound`` when the people a model decides for are. The first two protocol
 versions state ``population_maximum`` and bound nothing else.
 
@@ -78,8 +78,12 @@ class ReadingBound:
         )
 
     def population_most(self) -> int:
-        """The most people a run nobody is decided for may hold."""
-        return max(0, (self.run_us - self.fixed_us) // self.per_person_us)
+        """The most people a comparison's run may hold: a run in which a model decides for one of
+        them still fits, since every comparison has a model arm deciding for at least one person.
+        It is the largest population whose :meth:`decided_most` is at least one, solved from the
+        line: ``fixed + per_person x p + per_decided + per_pair x p`` within the run's share."""
+        room = self.run_us - self.fixed_us - self.per_decided_us
+        return max(0, room // (self.per_person_us + self.per_pair_us))
 
     def decided_most(self, population: int) -> int:
         """The most of ``population`` people a model may decide for in one run."""
@@ -110,7 +114,7 @@ def reading_bound(catalogs: ComparisonCatalogs) -> ReadingBound | None:
 
 def population_maximum(catalogs: ComparisonCatalogs) -> int:
     """The most people a comparison under ``catalogs`` runs: derived from the protocol's replay
-    line, or the figure an earlier protocol states."""
+    line (:meth:`ReadingBound.population_most`), or the figure an earlier protocol states."""
     bound = reading_bound(catalogs)
     if bound is None:
         return protocol_values(catalogs)["population_maximum"]

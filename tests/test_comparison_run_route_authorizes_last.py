@@ -21,6 +21,8 @@ from exulanica.api.society_comparison_runner import ComparisonArm, SocietyCompar
 from exulanica.env import env_get
 from exulanica.models.manifest import load_manifest
 from exulanica.orchestration.compare import comparison_body
+from exulanica.world import society_comparison_repository as repository_module
+from exulanica.world.society_comparison_verdict import ComparisonRefused
 from exulanica.world.society_decision_contract import person_role
 from fastapi.testclient import TestClient
 
@@ -152,3 +154,44 @@ def test_reading_a_comparison_run_reads_nothing_from_the_store_under_the_lock(
     assert any("api/society_runtime.py" in where for _, where in reads.every), (
         "the read authorized its inputs, reading their bytes before the lock"
     )
+
+
+@CURRENT_GROUND
+def test_a_withdrawn_right_is_answered_before_a_refusal_of_what_the_definition_records(
+    runtime_app, monkeypatch
+):
+    """A run whose inputs lost their rights is unavailable whatever else its definition meets: a
+    refusal of the definition's own records (its role, its contract's catalogs) is answered only
+    once the inputs' rights hold."""
+    world, make_app = runtime_app
+    key = world["plate"].asset_key
+    connection = world["connection"]
+    licence = connection.execute(
+        "select licence_sha256 from world_reviewed_asset where asset_key=%s", (key,)
+    ).fetchone()["licence_sha256"]
+    connection.commit()
+
+    def contract_changed(definition):
+        raise ComparisonRefused("contract_changed", "the contract's catalogs are not the same")
+
+    try:
+        with TestClient(make_app()) as client:
+            comparison_id, run_id = _completed_routine_run(client, world)
+            monkeypatch.setattr(repository_module, "definition_role", contract_changed)
+            # Positive control: with every right held, the definition's refusal is answered.
+            unreadable = _read(client, world, comparison_id, run_id)
+            assert unreadable.status_code == 409, unreadable.text
+            assert unreadable.json()["code"] == "contract_changed"
+            connection.execute(
+                "update world_reviewed_asset set licence_sha256=%s where asset_key=%s",
+                ("0" * 64, key),
+            )
+            connection.commit()
+            refused = _read(client, world, comparison_id, run_id)
+        assert refused.status_code == 424, refused.text
+        assert refused.json()["code"] == "unavailable_society_input"
+    finally:
+        connection.execute(
+            "update world_reviewed_asset set licence_sha256=%s where asset_key=%s", (licence, key)
+        )
+        connection.commit()

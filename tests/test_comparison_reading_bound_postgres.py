@@ -21,9 +21,9 @@ from comparison_support import seeded_catalogs
 pytestmark = pytest.mark.postgres
 saved_world = starts.saved_world
 started = starts.started
-#: A replay line under which one run's read allows 5,000 people nobody decides for and, of the
-#: saved world's eight, a model deciding for three: 5,000 us for the run, 1 us a person, 1,600 us a
-#: decided person.
+#: A replay line under which one run's read allows 3,400 people with a model deciding for one of
+#: them and, of the saved world's eight, a model deciding for three: 5,000 us for the run, 1 us a
+#: person, 1,600 us a decided person.
 TIGHT = {
     "pair_replay_budget_ms": 10,
     "replay_fixed_ms": 0,
@@ -40,7 +40,7 @@ def _tight(started) -> None:
     for key, value in TIGHT.items():
         protocol[key]["value"] = value
     tight = dataclasses.replace(catalogs, protocol=protocol)
-    assert (population_maximum(tight), decided_maximum(tight, 8)) == (5_000, 3)
+    assert (population_maximum(tight), decided_maximum(tight, 8)) == (3_400, 3)
     started["client"].app.state.services = dataclasses.replace(services, comparison_catalogs=tight)
 
 
@@ -65,7 +65,7 @@ def test_a_group_beyond_the_decided_bound_is_refused_and_one_within_it_starts(st
     offered = _plan(started)
     assert (offered["population"], offered["population_most"], offered["decided_most"]) == (
         8,
-        5_000,
+        3_400,
         3,
     )
     model = f"{starts.MODEL.provider}/{starts.MODEL.model_id}"

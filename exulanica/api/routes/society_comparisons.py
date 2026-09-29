@@ -201,7 +201,7 @@ def plan_society_comparison(
     start of it would meet."""
     comparisons = _comparisons(connection, session, request, world_id)
     society = _society(comparisons, version_id)
-    navigation = _navigation(comparisons, society)
+    navigation = comparisons.navigation_profile(society)
     services = get_services(request)
     refusal = services.comparison_refusal(session.workspace_id)
     running = SocietyComparisonStarts(connection, session.workspace_id).unfinished(world_id)
@@ -255,7 +255,7 @@ def plan_society_comparison(
     return document
 
 
-def _minutes(prepared: _Prepared, population: int, navigation: str) -> list[dict[str, Any]]:
+def _minutes(prepared: _Prepared, population: int, navigation: str | None) -> list[dict[str, Any]]:
     """For each model arm of a planned comparison, how many people its model decides for in one
     run and how many of a minute's asks the model can have answered by the decision contract's
     concurrency and deadline at its answer time measured on the society's kind of ground, else on
@@ -408,13 +408,6 @@ def _society(comparisons: SocietyComparisonRepository, version_id: uuid.UUID) ->
     return row
 
 
-def _navigation(comparisons: SocietyComparisonRepository, society: dict[str, Any]) -> str:
-    """The kind of ground the society stands on: the navigation profile of its newest input."""
-    latest = comparisons.society._chain(society)
-    document = comparisons.society._inputs(society, [latest])[latest]
-    return str(document["navigation"]["profile"])
-
-
 class _Prepared:
     """A selection held to this server and the world's records, and what it would define."""
 
@@ -442,7 +435,7 @@ def _prepare(
     models: Sequence[ChosenModel],
     control: bool,
     seed_count: int,
-    navigation: str,
+    navigation: str | None,
 ) -> _Prepared:
     """What a start of this selection would define, through the one definition path, or the
     refusal it would meet (:class:`StartRefused`); reads only."""
@@ -537,7 +530,7 @@ def _choices(
     world_id: str,
     version_id: uuid.UUID,
     society: dict[str, Any],
-    navigation: str,
+    navigation: str | None,
 ) -> list[dict[str, Any]]:
     """Each role a comparison of this society may ask, with the groups and the models it offers:
     everybody and each of the owner's choices whose people are all still here, newest first, and
@@ -643,7 +636,7 @@ def start_society_comparison(
             models=body.models,
             control=body.control,
             seed_count=body.seeds,
-            navigation=_navigation(comparisons, society),
+            navigation=comparisons.navigation_profile(society),
         )
         try:
             bound = Decimal(body.bound_usd)

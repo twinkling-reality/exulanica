@@ -45,14 +45,16 @@ def _line() -> dict[str, int]:
 
 
 def _derived(population: int | None = None) -> int:
-    """The bound derived by hand: one run's share of the pair's budget, less the fixed cost, over
-    what a person costs, and, for a population, what is left over what a decided person costs in a
-    society of that many."""
+    """The bound derived by hand: one run's share of the pair's budget, less the fixed cost and one
+    decided person, over what a person costs with what each adds to that decided person, and, for a
+    population, what is left over what a decided person costs in a society of that many."""
     line = _line()
     run_us = line["pair_replay_budget_ms"] * 1000 // 2
     room = run_us - line["replay_fixed_ms"] * 1000
     if population is None:
-        return room // line["replay_per_person_us"]
+        return (room - line["replay_per_decided_person_us"]) // (
+            line["replay_per_person_us"] + line["replay_per_decided_pair_us"]
+        )
     left = room - line["replay_per_person_us"] * population
     decided = line["replay_per_decided_person_us"] + line["replay_per_decided_pair_us"] * population
     return max(0, min(population, left // decided))
@@ -139,11 +141,12 @@ def test_a_comparison_beyond_either_bound_is_refused_by_name():
         "replay_per_decided_pair_us": 1_000,
     }
     catalogs = _with(load_comparison_catalogs(), **line)
-    # 4,000 ms left for people: at most 80 nobody decides for; at 40 people, 2,000 ms left and a
-    # decided person costs 60 + 40 x 1 = 100 ms, so a model decides for at most 20 of them.
-    assert population_maximum(catalogs) == 80
+    # 4,000 ms left for people and one decided person, who costs 60 ms and 1 ms for each person:
+    # (4,000 - 60) // (50 + 1) = 77 people at most; at 40 people, 2,000 ms left and a decided person
+    # costs 60 + 40 x 1 = 100 ms, so a model decides for at most 20 of them.
+    assert population_maximum(catalogs) == 77
     assert decided_maximum(catalogs, 40) == 20
-    assert reading_refusal(catalogs, 81)[0] == "population_over_comparison_bound"
+    assert reading_refusal(catalogs, 78)[0] == "population_over_comparison_bound"
     assert reading_refusal(catalogs, 40, _body([f"p{i}" for i in range(20)])) is None
     refused = reading_refusal(catalogs, 40, _body([f"p{i}" for i in range(19)], others_asked=2))
     assert refused is not None and refused[0] == "decided_over_comparison_bound"
@@ -208,3 +211,42 @@ def test_the_bounds_are_derived_in_one_place():
     ):
         text = (ROOT / module).read_text(encoding="utf-8")
         assert "reading_refusal(" in text and 'population_maximum"' not in text, module
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        None,
+        {
+            "pair_replay_budget_ms": 10_000,
+            "replay_fixed_ms": 1_000,
+            "replay_per_person_us": 50_000,
+            "replay_per_decided_person_us": 60_000,
+            "replay_per_decided_pair_us": 1_000,
+        },
+        {
+            "pair_replay_budget_ms": 10,
+            "replay_fixed_ms": 0,
+            "replay_per_person_us": 1,
+            "replay_per_decided_person_us": 1_600,
+            "replay_per_decided_pair_us": 0,
+        },
+    ],
+    ids=["committed", "steep", "no-pair-term"],
+)
+def test_the_most_people_a_comparison_runs_is_the_most_a_model_can_still_decide_for_one_of(line):
+    """Every comparison has a model arm deciding for at least one person, so the population bound
+    is the largest society in which a model may still decide for one: at it, one run of a group of
+    one is read within the budget; one more person is refused as too many, never as a model
+    deciding for too many."""
+    catalogs = (
+        load_comparison_catalogs() if line is None else _with(load_comparison_catalogs(), **line)
+    )
+    most = population_maximum(catalogs)
+    assert most > 0
+    assert decided_maximum(catalogs, most) >= 1
+    assert decided_maximum(catalogs, most + 1) == 0
+    one = _body(["p0"])
+    assert reading_refusal(catalogs, most, one) is None
+    refused = reading_refusal(catalogs, most + 1, one)
+    assert refused is not None and refused[0] == "population_over_comparison_bound"

@@ -533,17 +533,44 @@ class SocietyComparisonRepository:
 
     def plan(self, comparison_id: uuid.UUID, run_id: uuid.UUID) -> tuple[RunPlan, dict[str, Any]]:
         """The run's plan from its definition and the society's stored inputs, authorised now,
-        before anything is played or asked."""
-        plan, definition = self.read_plan(comparison_id, run_id)
-        self.authorize_inputs(plan.inputs)
-        return plan, definition
+        before anything is played or asked, and before anything the definition records is
+        refused, so a run whose inputs lost their rights is unavailable whatever else it meets."""
+        definition, run, inputs = self._frozen_inputs(comparison_id, run_id)
+        self.authorize_inputs(inputs)
+        return self._run_plan(run_id, definition, run, inputs), definition
 
     def read_plan(
         self, comparison_id: uuid.UUID, run_id: uuid.UUID
     ) -> tuple[RunPlan, dict[str, Any]]:
         """The run's plan from its definition and the society's stored inputs, not yet authorised:
         for a reader that authorises them with :meth:`authorize_inputs` after its own work and
-        before it answers anything drawn from them, as the run route does after a replay."""
+        before it answers anything drawn from them, as the run route does after a replay. A plan
+        the definition's records refuse (:class:`ComparisonRefused`) is refused only after the
+        inputs' rights are asked, as :meth:`plan` orders them, so a withdrawn right is answered
+        first."""
+        definition, run, inputs = self._frozen_inputs(comparison_id, run_id)
+        try:
+            return self._run_plan(run_id, definition, run, inputs), definition
+        except ComparisonRefused:
+            self.authorize_inputs(inputs)
+            raise
+
+    def navigation_profile(self, row: Mapping[str, Any]) -> str | None:
+        """The kind of ground a society stands on: the navigation profile of its newest input, or
+        None for a society whose engine takes no inputs, which stands on no ground a measurement
+        names. Read, never authorised: only the profile is used, which the input's composition
+        profile fixes whether or not the input is available."""
+        if not society_engine(str(row["engine_version"])).takes_inputs:
+            return None
+        latest = self.society._chain(dict(row))
+        document = self.society._inputs(dict(row), [latest])[latest]
+        return str(document["navigation"]["profile"])
+
+    def _frozen_inputs(
+        self, comparison_id: uuid.UUID, run_id: uuid.UUID
+    ) -> tuple[dict[str, Any], dict[str, Any], tuple[dict[str, Any], ...]]:
+        """The run's definition, its row and the society's inputs its definition froze, read and
+        held to the frozen input's digest, not authorised."""
         definition = self._definition(comparison_id)["document"]  # type: ignore[index]
         run = self._run(run_id)
         if run["comparison_id"] != comparison_id:
@@ -556,6 +583,17 @@ class SocietyComparisonRepository:
         inputs = tuple(documents[sequence] for sequence in range(1, frozen + 1))
         if inputs[-1]["document_sha256"] != definition["input"]["document_sha256"]:
             raise UnavailableSocietyInput("the comparison's frozen input changed")
+        return definition, run, inputs
+
+    def _run_plan(
+        self,
+        run_id: uuid.UUID,
+        definition: dict[str, Any],
+        run: dict[str, Any],
+        inputs: tuple[dict[str, Any], ...],
+    ) -> RunPlan:
+        """The plan the definition records for the run over ``inputs``, or the refusal of what it
+        records (its role, its contract's catalogs), by name."""
         role = definition_role(definition)
         contract = role.contract(definition["contract"]["catalog_versions"])
         if contract.binding() != definition["contract"]:
@@ -573,7 +611,7 @@ class SocietyComparisonRepository:
                 }
                 for other in definition["others"]
             }
-        plan = RunPlan(
+        return RunPlan(
             run_id=run_id,
             society_id=uuid.UUID(definition["society_id"]),
             seed=run["seed"],
@@ -586,7 +624,6 @@ class SocietyComparisonRepository:
             group=group,
             others=others,
         )
-        return plan, definition
 
     def authorize_inputs(self, inputs: Sequence[dict[str, Any]]) -> None:
         """Authorise a run's inputs now, each through the society's authorizer

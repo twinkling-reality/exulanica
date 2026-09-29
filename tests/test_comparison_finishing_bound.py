@@ -156,3 +156,21 @@ def test_a_society_is_planned_with_its_own_grounds_figures_or_promised_nothing()
     assert unmeasured.typical_matches is False
     assert unmeasured.typical_record == TYPICAL_RECORDS[TYPICAL_NAVIGATION][0]
     assert unmeasured.document()["typical_matches"] is False
+
+
+def test_runs_of_one_arm_played_at_once_each_hold_their_asks():
+    """Held room is counted run by run: two seeds of a one-model comparison played at the same
+    time hold two runs' asks, so the least bound that lets it finish covers both."""
+    body = {
+        "window_ticks": 60,
+        "seeds": ["0" * 64, "1" * 64],
+        "group": {"people": [f"p{i}" for i in range(4)]},
+        "others": [],
+        "arms": {"routine": _arm(None), "wait": _arm(None), "model_a": _arm(NANO)},
+    }
+    cost = comparison_cost(
+        body, 48, ROLE, ESTIMATOR, MANIFEST, at_once=2, navigation_profile=TYPICAL_NAVIGATION
+    )
+    assert cost.runs == 6
+    assert cost.held_usd == (2 * 4 * _bound(NANO)).quantize(Decimal("0.00000001"))
+    assert cost.suggested_usd == cost.typical_usd + cost.held_usd

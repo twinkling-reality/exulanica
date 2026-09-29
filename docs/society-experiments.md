@@ -273,8 +273,9 @@ for each person a model decides for, whose turns the replay builds again and hol
 stored, and 0.131 ms more for each of those for each person of the society, since building a
 decided person's options reads everybody else
 ([`exulanica/world/society_comparison_reading.py`](../exulanica/world/society_comparison_reading.py)).
-Every run is held to half the pair's budget, so a comparison runs at most 114 people, fewer than the
-128 a generated town's ground allows, which makes it the bound that applies to a town; and in one
+Every run is held to half the pair's budget, so a comparison runs at most 111 people, the most for
+which a run where a model decides for one of them still fits, fewer than the 128 a generated town's
+ground allows, which makes it the bound that applies to a town; and in one
 run a model may decide for all 30 people of a 30-person town, at most 29 of 44 or 24 of 56, the
 group under a model arm and anybody outside it whose owner chose a model counted together. A larger
 society is refused by name (`population_over_comparison_bound`), and so is a comparison whose model
