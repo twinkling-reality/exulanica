@@ -1,0 +1,2560 @@
+// The rehearsal's browser step handlers, one per runnable browser step of steps.json, by step id.
+//
+// A handler performs the person's action in the page and reports every observable the step list
+// declares for its step, by id, with what it saw: `ctx.observe(id, holds, observed)`. The result
+// assembly fails a step that reports less or more than its data declares, so a handler cannot pass
+// by checking less. Reads of the saved state go through the API with the run's token, recorded as
+// the step's evidence. What a later step needs that only the page knew is kept in `ctx.facts`.
+//
+// Waiting: every wait names what it waits for and has a bound, so a step that cannot happen fails
+// with that name instead of hanging its page session.
+
+import { randomBytes } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
+
+import { addUsd, increaseUsd } from './usd.mjs';
+import {
+  BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_LIST, TITLE_FIELD, WORLD_MENU_BUTTON, WORLD_READY,
+  chooseMenu, confirm, confirmation, enter, focusCanvas, liveObjects, objectRows, objectStatus, open,
+  openObjects, reload, savedWorld, waitForWorld,
+} from './app.mjs';
+
+// A write the page confirms and the API then holds: the confirmed request and the read after it.
+const SETTLE_MS = 30_000;
+// After the page's own deadlines for a reply have passed, the time it takes to draw its failure.
+// The page waits for each reply as long as the application's constants say (ctx.runtime
+// .page_deadlines_ms, read from the tree the run builds); this is only the drawing after them.
+const REPLY_DRAWN_MS = 15_000;
+// How often a wait on the API polls.
+const POLL_MS = 1_000;
+// A range control's step in Customize world is 0.05 (the reviewed style registry); a value read
+// back is the one set when it lies within half a step.
+const RANGE_TOLERANCE = 0.025;
+const TERMINAL_JOB_EVENTS = new Set(['job_succeeded', 'job_failed', 'job_cancelled', 'job_missing', 'job_unavailable']);
+
+const worldQuery = (ctx) => `world_id=${encodeURIComponent(ctx.facts.world_id)}`;
+const pick = (value, keys) => (value == null ? value : Object.fromEntries(keys.map((k) => [k, value[k]])));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/** How long an utterance to the Companion can take in the page: every deadline it waits on, in turn. */
+const replyDeadlineMs = (ctx) => Object.values(ctx.runtime.page_deadlines_ms ?? {})
+  .reduce((total, ms) => total + ms, 0) + REPLY_DRAWN_MS;
+
+async function until(what, timeoutMs, probe) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    last = await probe();
+    if (last) return last;
+    await sleep(POLL_MS);
+  }
+  throw new Error(`waited ${timeoutMs} ms for ${what}`);
+}
+
+/** The newest recorded response of this step's page traffic whose method and path match. */
+async function response(ctx, method, pathPrefix) {
+  const traffic = await ctx.page.traffic(ctx.step.id);
+  return [...traffic].reverse().find((r) => r.method === method && r.path.startsWith(pathPrefix)) ?? null;
+}
+
+async function responses(ctx, method, pathPrefix) {
+  return (await ctx.page.traffic(ctx.step.id)).filter((r) => r.method === method && r.path.startsWith(pathPrefix));
+}
+
+const usdOf = (execution) => (execution?.calls ?? [])
+  .reduce((total, call) => (call.usd == null ? total : addUsd(total, String(call.usd))), '0');
+
+// -- arrival -------------------------------------------------------------------------------------
+
+const TOKEN_FIELD = `document.querySelector('form.credential-gate input[aria-label="Access token"]')`;
+const ENTER = `document.querySelector('form.credential-gate button[aria-label="Enter Exulanica"]')`;
+
+async function accessGate(ctx) {
+  const { page } = ctx;
+  await page.navigate(ctx.runtime.app_url);
+  const first = await page.waitFor(`document.querySelector('form.credential-gate') ? 'gate' : (${WORLD_READY} ? 'world' : null)`,
+    90_000, 'the credential gate');
+  const gate = await page.evaluate(`(() => { const form = document.querySelector('form.credential-gate'); if (!form) return null;
+    const account = form.querySelector('button.account-sign-in');
+    return { token_field: !!form.querySelector('input[aria-label="Access token"]'),
+      account_sign_in: account ? (account.disabled ? 'disabled' : 'enabled') : 'absent' }; })()`);
+  ctx.observe('gate-shown', first === 'gate' && gate?.token_field === true && gate?.account_sign_in === 'disabled',
+    { first_surface: first, ...gate });
+  await ctx.screenshot('gate', 'the credential gate the production build shows on arrival');
+  if (first !== 'gate') throw new Error('the application opened without its credential gate');
+
+  // A token this instance was never given: 32 random bytes, made here and used once.
+  await page.typeInto(TOKEN_FIELD, randomBytes(32).toString('base64url'));
+  await page.click(ENTER, 'Enter Exulanica');
+  const refusal = await page.waitFor(`(() => { const p = document.querySelector('form.credential-gate p.gate-failure');
+    return p && !p.hidden && p.textContent.trim() ? p.textContent.trim() : null; })()`, 20_000,
+  'the gate to answer a token it does not hold').catch(() => null);
+  const openedWithWrongToken = await page.evaluate(WORLD_READY);
+  ctx.observe('wrong-token-refused', refusal !== null && !openedWithWrongToken, { refusal, world_opened: openedWithWrongToken });
+  await ctx.screenshot('wrong-token', 'the gate after a token this instance does not hold');
+
+  await page.typeInto(TOKEN_FIELD, ctx.token);
+  await page.click(ENTER, 'Enter Exulanica');
+  await waitForWorld(page);
+  ctx.observe('token-opens-world', await page.evaluate(WORLD_READY),
+    { title_field: await page.evaluate(`${TITLE_FIELD}?.value ?? null`) });
+}
+
+async function enterOwnedStarter(ctx) {
+  const { page } = ctx;
+  if (!await page.evaluate(WORLD_READY)) await open(ctx);
+  const surface = await page.evaluate(`(() => {
+    const visible = (e) => !!e && e.checkVisibility();
+    const start = [...document.querySelectorAll('button.companion-prompt-button')].find(b => b.textContent.trim() === 'Start building');
+    return {
+      title: document.querySelector('input[aria-label="World title"]')?.value ?? null,
+      world_menu: visible(document.querySelector('button.world-open-menu')),
+      add_object: visible(document.querySelector('button.world-add-object')),
+      add_photos: visible(document.querySelector('button.world-add-photos')),
+      canvas: visible(document.getElementById('atlas')),
+      visible_forms: [...document.querySelectorAll('#shell form')].filter(f => f.checkVisibility()).map(f => f.className),
+      first_use: document.querySelector('.companion-prompt-statement')?.textContent.trim() ?? null,
+      start_building: visible(start),
+      atlas: { ...document.getElementById('atlas')?.dataset },
+    }; })()`);
+  // The title form and the Companion's own composer are part of the world; anything else would be
+  // an introductory form standing between the person and their world.
+  const otherForms = surface.visible_forms
+    .filter((name) => !String(name).includes('world-title-form') && !String(name).includes('companion-composer'));
+  ctx.observe('starter-opens', surface.title !== null && surface.world_menu && surface.add_object && surface.add_photos
+    && surface.canvas && otherForms.length === 0, surface);
+  ctx.observe('first-use-card', Boolean(surface.first_use) && surface.start_building,
+    { statement: surface.first_use, start_building: surface.start_building });
+  ctx.observe('renderer-mounted', Boolean(surface.atlas.engine) && Number(surface.atlas.worldModules) >= 1, surface.atlas);
+  await ctx.screenshot('starter', 'the starter world on first entry, with the first-use card');
+
+  const before = await savedWorld(ctx);
+  const entry = before.entry;
+  ctx.observe('one-authored-starter', before.entries.length === 1 && entry.source_kind === 'authored'
+    && entry.availability === 'available' && entry.source_attachments.length === 0
+    && entry.authored_scene?.kind === 'authored-starter',
+  { entries: before.entries.length, entry: pick(entry, ['entry_id', 'title', 'source_kind', 'availability', 'authored_version_id', 'authored_state_sha256', 'authored_edit_seq', 'style_version_id', 'revision']) });
+  if (entry !== null) {
+    Object.assign(ctx.facts, { entry_id: entry.entry_id, world_id: entry.world_id, starter_style_version_id: entry.style_version_id });
+  }
+
+  await reload(ctx);
+  const after = await savedWorld(ctx);
+  ctx.observe('same-world-after-reload', after.entries.length === 1 && entry !== null
+    && same(pick(after.entry, ['entry_id', 'authored_version_id', 'authored_state_sha256', 'authored_edit_seq']),
+      pick(entry, ['entry_id', 'authored_version_id', 'authored_state_sha256', 'authored_edit_seq'])),
+  { entries: after.entries.length, entry: pick(after.entry, ['entry_id', 'authored_version_id', 'authored_state_sha256', 'authored_edit_seq']) });
+}
+
+/**
+ * Place & view's About panel names the open world. The words it must use are the API's own name
+ * for the scene the saved world holds (`authored-starter` read as "authored starter"), so the check
+ * holds the page to the data rather than to a copy of the product's sentence.
+ */
+async function readAboutThisPlace(ctx) {
+  const { page } = ctx;
+  const { entry } = await savedWorld(ctx);
+  const names = String(entry?.authored_scene?.kind ?? '').replace(/-/g, ' ');
+  await chooseMenu(page, 'world');
+  await page.waitFor(`document.getElementById('world-panel-details')?.checkVisibility() ?? false`, 10_000, 'About this place');
+  const about = await page.waitFor(`(() => { const t = document.querySelector('#world-panel-details .environment-selection-source')?.textContent.trim();
+    return t ? t : null; })()`, 10_000, 'the About sentence').catch(() => '');
+  const text = about.toLowerCase();
+  const claims = ctx.parameters.never_says.filter((words) => text.includes(words.toLowerCase()));
+  ctx.observe('about-states-the-world', names.length > 0 && text.includes(names.toLowerCase()) && claims.length === 0,
+    { about, names, district_claims_made: claims });
+  // Every control the panel offers, by the name a person reads. One inside a closed section is
+  // offered (it is a click away); one under a hidden element is not. Camera framing is opened so
+  // the screenshot shows what it holds.
+  const offered = await page.evaluate(`(() => {
+    const panel = document.getElementById('world-panel-details');
+    const hidden = (node) => { for (; node && node !== panel; node = node.parentElement) if (node.hidden) return true; return false; };
+    for (const section of panel.querySelectorAll('details')) {
+      if (section.querySelector(':scope > summary')?.textContent.trim() === 'Camera framing') section.open = true;
+    }
+    return [...panel.querySelectorAll('button, select, summary')].filter((control) => !hidden(control))
+      .map((control) => control.getAttribute('aria-label') ?? control.textContent.trim());
+  })()`).catch(() => []);
+  await ctx.screenshot('about', 'About this place on the starter world: what it says and the camera views it offers');
+  const districtViews = ctx.parameters.never_offers.filter((name) => offered.includes(name));
+  const missing = ctx.parameters.offers.filter((name) => !offered.includes(name));
+  ctx.observe('starter-offers-no-district-views', districtViews.length === 0 && missing.length === 0,
+    { offered, district_views_offered: districtViews, every_world_sections_missing: missing });
+  await page.click(BUTTON('Close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
+}
+
+async function nameWorld(ctx) {
+  const { page } = ctx;
+  const { title } = ctx.parameters;
+  const before = (await savedWorld(ctx)).entry;
+  await page.typeInto(TITLE_FIELD, title);
+  await page.key('Enter', 'Enter', { text: '\r' });
+  const status = await page.waitFor(`(() => { const s = document.querySelector('span.world-title-status')?.textContent.trim();
+    return s && !s.startsWith('Saving') ? s : null; })()`, SETTLE_MS, 'the title to save');
+  const field = await page.evaluate(`${TITLE_FIELD}.value`);
+  ctx.observe('title-saved-shown', field === title && !/could not/i.test(status), { status, field });
+  const after = (await ctx.api('GET', `/world-entries/${ctx.facts.entry_id}`)).body;
+  ctx.observe('title-held', after?.title === title && after?.revision > before.revision,
+    { before: pick(before, ['title', 'revision']), after: pick(after, ['title', 'revision']) });
+  ctx.facts.title = title;
+  await reload(ctx);
+  const reloaded = await page.evaluate(`${TITLE_FIELD}.value`);
+  ctx.observe('title-after-reload', reloaded === title, { field: reloaded });
+}
+
+async function exploreWalk(ctx) {
+  const { page } = ctx;
+  const hold = ctx.parameters.hold_milliseconds;
+  const focus = await focusCanvas(page);
+  ctx.observe('canvas-takes-keys', focus.focused, focus);
+  await ctx.screenshot('before-walk', 'the view before walking');
+  const moving = () => page.evaluate(`document.querySelector('#shell')?.dataset.moving ?? null`);
+  const samples = [];
+  await page.keyDown('KeyW', 'w');
+  const ends = Date.now() + hold;
+  while (Date.now() < ends) {
+    samples.push(await moving());
+    await sleep(100);
+  }
+  await page.keyUp('KeyW', 'w');
+  await sleep(800);
+  const after = await moving();
+  ctx.observe('moves-while-held', samples.includes('true'), { samples });
+  ctx.observe('stops-when-released', after === 'false', { after });
+  await ctx.screenshot('after-walk', 'the view after walking forward');
+}
+
+// -- creation ------------------------------------------------------------------------------------
+
+const ROW = `document.querySelector('aside.object-placement li.object-placement-item')`;
+const rowButton = (text) => `[...(${ROW})?.querySelectorAll('button') ?? []].find(b => b.textContent.trim() === ${JSON.stringify(text)})`;
+const motionWord = (page) => page.evaluate(`(${ROW})?.querySelector('.object-placement-motion')?.textContent.trim() ?? null`);
+
+async function waitForEdit(ctx, beyondSeq, what) {
+  return until(what, SETTLE_MS, async () => {
+    const read = await savedWorld(ctx);
+    return read.version?.edit_seq > beyondSeq ? read : null;
+  });
+}
+
+async function placeReviewedObject(ctx) {
+  const { page } = ctx;
+  await openObjects(page);
+  const assetSelect = `document.querySelector('select#object-placement-asset')`;
+  const choice = await page.evaluate(`(() => { const o = [...${assetSelect}.options].find(o => !o.disabled && o.value);
+    return o ? { key: o.value, title: o.text.trim() } : null; })()`);
+  if (choice === null) throw new Error('no reviewed object is available to place');
+  const before = await savedWorld(ctx);
+  await page.setValue(`document.querySelector('select#object-placement-role')`, ctx.parameters.origin_role);
+  // A panel refresh resets the asset to the first available one, so it is chosen last.
+  await page.setValue(assetSelect, choice.key);
+  await page.click(`document.querySelector('button.object-placement-place')`, 'Place before me');
+  const said = await confirmation(page, 'placing the object');
+  const verdict = await page.waitFor(`(() => { const v = ${OPEN_CONFIRM}?.querySelector('.composition-verdict');
+    const s = v?.dataset.state; return s && s !== 'checking' ? { state: s, text: v.innerText.trim() } : null; })()`,
+  SETTLE_MS, "the world's check of the placement");
+  const structure = await page.evaluate(`({ utterance: !!${OPEN_CONFIRM}.querySelector('blockquote.confirm-utterance'),
+    reversible: !!${OPEN_CONFIRM}.querySelector('p.confirm-reversible'),
+    confirm_enabled: !(${OPEN_CONFIRM}.querySelector('.confirm-actions button.primary')?.disabled ?? true) })`);
+  ctx.observe('confirm-before-write', verdict.state === 'ready' && structure.utterance && structure.reversible
+    && structure.confirm_enabled, { confirmation: said, verdict, ...structure });
+  await ctx.screenshot('confirm', 'the confirmation before the object is written, with its landing mark');
+  await confirm(page, 'placing the object');
+  const after = await waitForEdit(ctx, before.version.edit_seq, 'the placed object to be saved');
+  await page.waitFor(`document.querySelectorAll('aside.object-placement li.object-placement-item').length > 0`, SETTLE_MS, 'the placed object in the list');
+  const rows = await objectRows(page);
+  ctx.observe('object-listed', rows.length === 1 && rows[0].title === choice.title && rows[0].motion === 'no motion', rows);
+  const objects = liveObjects(after.version);
+  const placed = objects[0] ?? null;
+  ctx.observe('object-in-version', objects.length === 1 && placed.asset.asset_key === choice.key
+    && same(placed.origin, { kind: 'authored', role: ctx.parameters.origin_role })
+    && placed.transform.coordinate_space === 'region_local'
+    && after.entry.authored_state_sha256 === after.version.state_sha256
+    && after.entry.authored_edit_seq === after.version.edit_seq,
+  { object: placed, version: pick(after.version, ['version_id', 'state_sha256', 'edit_seq']),
+    entry_resume: pick(after.entry, ['authored_state_sha256', 'authored_edit_seq']) });
+  if (placed !== null) {
+    Object.assign(ctx.facts, { object_id: placed.object_id, asset_key: placed.asset.asset_key, asset_title: choice.title });
+  }
+  await ctx.screenshot('placed', 'the object on the ground, listed in the objects panel');
+}
+
+async function moveObject(ctx) {
+  const { page } = ctx;
+  await openObjects(page);
+  const before = await savedWorld(ctx);
+  const was = liveObjects(before.version).find((o) => o.object_id === ctx.facts.object_id);
+  await page.click(`(${ROW}).querySelector('button.object-placement-choose')`, 'the placed object in the list');
+  for (let press = 0; press < ctx.parameters.presses; press += 1) {
+    await page.key(ctx.parameters.key, ctx.parameters.key);
+    await sleep(150);
+  }
+  await page.click(BUTTON('Save this position', OBJECT_PANEL), 'Save this position');
+  const said = await confirmation(page, 'the move');
+  await confirm(page, 'the move');
+  const after = await waitForEdit(ctx, before.version.edit_seq, 'the move to be saved');
+  const status = await objectStatus(page);
+  ctx.observe('move-confirmed', said.length > 0 && status !== null, { confirmation: said, status });
+  const now = liveObjects(after.version).find((o) => o.object_id === ctx.facts.object_id);
+  const newest = after.version.edits.at(-1);
+  ctx.observe('transform-changed', now !== undefined && !same(now.transform, was.transform)
+    && newest.kind === 'move_object' && newest.object_id === ctx.facts.object_id,
+  { before: was?.transform, after: now?.transform, newest_edit: pick(newest, ['kind', 'object_id', 'edit_seq']) });
+  await ctx.screenshot('moved', 'the object after the saved move');
+}
+
+async function inspectObject(ctx) {
+  const { page } = ctx;
+  if (await page.evaluate(`${OBJECT_PANEL}?.checkVisibility() ?? false`)) {
+    await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel');
+  }
+  await chooseMenu(page, 'world');
+  await page.waitFor(`document.getElementById('world-panel-details')?.checkVisibility() ?? false`, 10_000, 'About this place');
+  const inspector = `document.querySelector('details.representation-inspector')`;
+  if (!await page.evaluate(`${inspector}?.open ?? false`)) {
+    await page.click(`${inspector}.querySelector('summary')`, 'World → data');
+  }
+  const shown = await page.waitFor(`(${inspector})?.open && (${inspector}).checkVisibility()`, 10_000, 'the World to data inspector').catch(() => false);
+  ctx.observe('inspector-shown', shown === true, { open_and_visible: shown });
+  const subjects = `${inspector}.querySelector('select[aria-label="Inspect a displayed geometry group"]')`;
+  const options = await page.waitFor(`(() => { const s = ${subjects}; if (!s) return null;
+    const o = [...s.options].map(x => ({ value: x.value, text: x.text.trim(), disabled: x.disabled }));
+    return o.some(x => x.value && !x.disabled) ? o : null; })()`, 15_000, 'a subject to inspect').catch(() => []);
+  const target = options.find((o) => o.value && !o.disabled && o.text.startsWith(ctx.facts.asset_key)) ?? null;
+  ctx.observe('subject-selectable', target !== null, { options, asset_key: ctx.facts.asset_key });
+  if (target === null) throw new Error('the placed object is not offered as a subject to inspect');
+  await page.setValue(subjects, target.value);
+  const lines = await page.waitFor(`(() => { const items = [...${inspector}.querySelectorAll('ul.representation-availability > li')]
+      .map(li => ({ kind: li.dataset.kind ?? null, state: li.dataset.state ?? null, text: li.innerText.trim() }));
+    return items.some(i => i.text.startsWith('Provenance') && i.text.includes(${JSON.stringify(ctx.facts.asset_key)})) ? items : null; })()`,
+  10_000, "the selected object's availability lines").catch(async () => page.evaluate(`[...${inspector}.querySelectorAll('ul.representation-availability > li')].map(li => ({ kind: li.dataset.kind ?? null, state: li.dataset.state ?? null, text: li.innerText.trim() }))`));
+  const description = await page.evaluate(`${inspector}.querySelector('.representation-description')?.innerText.trim() ?? null`);
+  const line = (label) => lines.find((l) => l.text.startsWith(`${label}:`)) ?? null;
+  const available = (l) => l !== null && /^\w+: available\./.test(l.text);
+  const provenance = line('Provenance');
+  ctx.observe('geometry-and-origin', available(line('Rendered')) && available(line('Point')) && available(provenance)
+    && provenance.text.includes(ctx.facts.asset_key), { lines, description });
+  const missing = lines.filter((l) => /^\w+: unavailable\./.test(l.text));
+  ctx.observe('missing-explicit', missing.length > 0 && missing.every((l) => /^\w+: unavailable\.\s+\S/.test(l.text)),
+    { unavailable: missing });
+  await ctx.screenshot('inspector', 'World to data with the placed object selected');
+  await page.click(BUTTON('Close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
+}
+
+async function giveBoundedMotion(ctx) {
+  const { page } = ctx;
+  await openObjects(page);
+  const before = await savedWorld(ctx);
+  await page.click(rowButton('Give it motion'), 'Give it motion');
+  await page.waitFor(`document.querySelector('div.object-placement-motion-editor')?.checkVisibility() ?? false`, 10_000, 'the motion editor');
+  await page.click(BUTTON('Save this motion', OBJECT_PANEL), 'Save this motion');
+  const said = await confirmation(page, 'the motion');
+  await confirm(page, 'the motion');
+  const after = await waitForEdit(ctx, before.version.edit_seq, 'the motion to be saved');
+  const word = await page.waitFor(`(() => { const w = (${ROW})?.querySelector('.object-placement-motion')?.textContent.trim();
+    return w && w !== 'no motion' ? w : null; })()`, SETTLE_MS, 'the object to show its motion').catch(() => null);
+  ctx.observe('motion-confirmed', said.length > 0 && word === 'still, where it was placed', { confirmation: said, motion: word });
+  const reviewed = (await ctx.api('GET', '/world/behaviours')).body;
+  const held = liveObjects(after.version).find((o) => o.object_id === ctx.facts.object_id)?.behaviour ?? null;
+  const entry = reviewed.find((b) => b.behaviour_key === held?.behaviour_key && b.behaviour_version === held?.behaviour_version);
+  const within = entry !== undefined && Object.entries(entry.parameters).every(([name, rule]) => {
+    const value = held.parameters[name];
+    return rule.kind === 'choice' ? rule.choices.includes(value) : Number.isInteger(value) && value >= rule.minimum && value <= rule.maximum;
+  });
+  ctx.observe('behaviour-held', within, { behaviour: held, reviewed: entry ?? null });
+  ctx.facts.behaviour = held;
+}
+
+async function triggerStopReset(ctx) {
+  const { page } = ctx;
+  await openObjects(page);
+  const before = (await savedWorld(ctx)).version;
+  const press = async (label, word) => {
+    await page.click(rowButton(label), label);
+    return page.waitFor(`(${ROW})?.querySelector('.object-placement-motion')?.textContent.trim() === ${JSON.stringify(word)}`,
+      10_000, `the object to read "${word}"`).then(() => word).catch(async () => motionWord(page));
+  };
+  const travelling = await press('Start', 'travelling');
+  ctx.observe('travelling', travelling === 'travelling', { motion: travelling });
+  await ctx.screenshot('travelling', 'the object while its motion runs');
+  await sleep(1200);
+  const stopped = await press('Stop', 'stopped part-way');
+  ctx.observe('stopped-part-way', stopped === 'stopped part-way', { motion: stopped });
+  const reset = await press('Reset', 'still, where it was placed');
+  ctx.observe('reset-to-rest', reset === 'still, where it was placed', { motion: reset });
+  const after = (await savedWorld(ctx)).version;
+  ctx.observe('no-write', after.state_sha256 === before.state_sha256 && after.edit_seq === before.edit_seq,
+    { before: pick(before, ['state_sha256', 'edit_seq']), after: pick(after, ['state_sha256', 'edit_seq']) });
+}
+
+async function refuseUnsupportedBehaviour(ctx) {
+  const { entry, version } = await savedWorld(ctx);
+  const held = ctx.facts.behaviour;
+  const reviewed = (await ctx.api('GET', '/world/behaviours')).body
+    .filter((b) => b.behaviour_key === held.behaviour_key).map((b) => b.behaviour_version);
+  const unlisted = Math.max(...reviewed) + 1;
+  const refused = await ctx.api('POST',
+    `/world/versions/${version.version_id}/objects/${encodeURIComponent(ctx.facts.object_id)}/behaviour?${worldQuery(ctx)}`, {
+      behaviour: { ...held, behaviour_version: unlisted },
+      base_state_sha256: version.state_sha256,
+      saved_entry: { entry_id: entry.entry_id, base_revision: entry.revision,
+        authored_state_sha256: entry.authored_state_sha256, authored_edit_seq: entry.authored_edit_seq },
+    });
+  const detail = String(refused.body?.detail ?? '');
+  ctx.observe('refused-with-reason', refused.status === 422 && /not reviewed/.test(detail),
+    { status: refused.status, code: refused.body?.code ?? null, detail, asked_for: `${held.behaviour_key}@${unlisted}` });
+  const after = (await savedWorld(ctx)).version;
+  ctx.observe('nothing-written', after.state_sha256 === version.state_sha256 && after.edit_seq === version.edit_seq,
+    { before: pick(version, ['state_sha256', 'edit_seq']), after: pick(after, ['state_sha256', 'edit_seq']) });
+}
+
+async function creationSurvivesReload(ctx) {
+  const { page } = ctx;
+  const before = await savedWorld(ctx);
+  await reload(ctx);
+  const after = await savedWorld(ctx);
+  ctx.observe('same-version-state', after.version.state_sha256 === before.version.state_sha256
+    && after.version.edit_seq === before.version.edit_seq,
+  { before: pick(before.version, ['state_sha256', 'edit_seq']), after: pick(after.version, ['state_sha256', 'edit_seq']) });
+  const was = liveObjects(before.version).find((o) => o.object_id === ctx.facts.object_id);
+  const now = liveObjects(after.version).find((o) => o.object_id === ctx.facts.object_id);
+  await openObjects(page);
+  const word = await page.waitFor(`(() => { const w = (${ROW})?.querySelector('.object-placement-motion')?.textContent.trim();
+    return w === 'still, where it was placed' ? w : null; })()`, SETTLE_MS, 'the object to be drawn at rest with its motion').catch(() => motionWord(page));
+  const editLabel = await page.evaluate(`[...(${ROW})?.querySelectorAll('button.object-placement-motion-edit') ?? []].map(b => b.textContent.trim())[0] ?? null`);
+  ctx.observe('definition-kept', now !== undefined && same(now.transform, was?.transform) && same(now.behaviour, was?.behaviour)
+    && word === 'still, where it was placed' && editLabel === 'Change its motion',
+  { transform: now?.transform, behaviour: now?.behaviour, motion: word, motion_control: editLabel });
+  const bytes = (await ctx.page.traffic(ctx.step.id)).filter((r) => r.method === 'GET'
+    && r.path.startsWith(`/api/world/assets/${ctx.facts.asset_key}/bytes`));
+  ctx.observe('object-drawn', bytes.some((r) => r.status === 200), bytes.map((r) => pick(r, ['path', 'status', 'bytes'])));
+  await ctx.screenshot('after-reload', 'the object after the reload');
+}
+
+async function undoLastChange(ctx) {
+  const { page } = ctx;
+  await openObjects(page);
+  const before = await savedWorld(ctx);
+  const newestBefore = before.version.edits.at(-1);
+  await page.click(BUTTON('Take back the last change', OBJECT_PANEL), 'Take back the last change');
+  const said = await confirmation(page, 'taking back the last change');
+  await confirm(page, 'taking back the last change');
+  const after = await waitForEdit(ctx, before.version.edit_seq, 'the undo to be saved');
+  const status = await objectStatus(page);
+  ctx.observe('undo-confirmed', said.length > 0 && status !== null, { confirmation: said, status });
+  const newest = after.version.edits.at(-1);
+  const now = liveObjects(after.version).find((o) => o.object_id === ctx.facts.object_id);
+  ctx.observe('undo-is-an-edit', newest.kind === 'undo' && newest.undone_edit_id === newestBefore.edit_id
+    && newestBefore.kind === 'set_object_behaviour' && after.version.edit_seq === before.version.edit_seq + 1
+    && now !== undefined && now.behaviour === null,
+  { undone: pick(newestBefore, ['edit_id', 'kind']), newest: pick(newest, ['kind', 'undone_edit_id', 'edit_seq']), object: now ?? null });
+  await reload(ctx);
+  const reloaded = await savedWorld(ctx);
+  ctx.observe('undo-kept', reloaded.version.state_sha256 === after.version.state_sha256
+    && reloaded.entry.authored_state_sha256 === after.version.state_sha256,
+  { version: pick(reloaded.version, ['state_sha256', 'edit_seq']), entry_resume: reloaded.entry.authored_state_sha256 });
+}
+
+// -- appearance ----------------------------------------------------------------------------------
+
+const OPTIONS = `document.querySelector('section.options-view')`;
+const LIFECYCLE = `document.querySelector('section.options-view p.world-style-lifecycle')`;
+const HISTORY = `document.querySelector('section.options-view select[aria-label="World design history"]')`;
+const control = (label) => `document.querySelector('section.options-view input[aria-label=${JSON.stringify(label)}]')`;
+
+async function openCustomize(page) {
+  if (!await page.evaluate(`${OPTIONS}?.checkVisibility() ?? false`)) await chooseMenu(page, 'options');
+  await page.waitFor(`${OPTIONS}?.checkVisibility() ?? false`, 10_000, 'Customize world');
+}
+
+async function currentStyle(ctx) {
+  const read = await ctx.api('GET', `/world/styles/current?${worldQuery(ctx)}`);
+  return read.body?.current ?? null;
+}
+
+function changedKeys(before, after) {
+  const keys = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
+  return [...keys].filter((key) => !same(before?.[key], after?.[key]));
+}
+
+async function changeAppearance(ctx) {
+  const { page } = ctx;
+  const before = await currentStyle(ctx);
+  await openCustomize(page);
+  const historyBefore = await page.evaluate(`[...(${HISTORY})?.options ?? []].map(o => o.value)`);
+  const set = await page.setValue(control(ctx.parameters.control), ctx.parameters.value);
+  const lifecycle = await page.waitFor(`(() => { const s = (${LIFECYCLE})?.dataset.state; return s === 'ready' ? { state: s, text: (${LIFECYCLE}).textContent.trim() } : null; })()`,
+    SETTLE_MS, 'the preview to be checked').catch(async () => page.evaluate(`({ state: (${LIFECYCLE})?.dataset.state ?? null, text: (${LIFECYCLE})?.textContent.trim() ?? null })`));
+  ctx.observe('preview-validated', lifecycle?.state === 'ready', { control: ctx.parameters.control, set_to: set, lifecycle });
+  await page.click(`document.querySelector('section.options-view button.world-style-apply')`, 'Apply world design');
+  const saved = await page.waitFor(`(() => { const s = (${LIFECYCLE})?.dataset.state; return s === 'saved' ? { state: s, text: (${LIFECYCLE}).textContent.trim() } : null; })()`,
+    SETTLE_MS, 'the design to be applied').catch(async () => page.evaluate(`({ state: (${LIFECYCLE})?.dataset.state ?? null, text: (${LIFECYCLE})?.textContent.trim() ?? null })`));
+  const historyAfter = await page.evaluate(`[...(${HISTORY})?.options ?? []].map(o => ({ value: o.value, text: o.text.trim() }))`);
+  const version = await page.evaluate(`document.querySelector('section.options-view p.world-style-version')?.textContent.trim() ?? null`);
+  ctx.observe('applied-as-new-revision', saved?.state === 'saved' && historyAfter.length === historyBefore.length + 1,
+    { lifecycle: saved, version, history: historyAfter });
+  await ctx.screenshot('applied', 'Customize world after applying the design');
+  const after = await currentStyle(ctx);
+  const entry = (await savedWorld(ctx)).entry;
+  const changed = changedKeys(before?.global_style?.parameters, after?.global_style?.parameters);
+  const value = changed.length === 1 ? after.global_style.parameters[changed[0]] : null;
+  ctx.observe('new-style-version', after !== null && before !== null && after.version_id !== before.version_id
+    && after.revision === before.revision + 1 && changed.length === 1
+    && Math.abs(Number(value) - Number(ctx.parameters.value)) <= RANGE_TOLERANCE
+    && entry.style_version_id === after.version_id,
+  { before: pick(before, ['version_id', 'revision']), after: pick(after, ['version_id', 'revision']), changed, value,
+    entry_style_version_id: entry.style_version_id });
+  Object.assign(ctx.facts, {
+    style_before: { version_id: before?.version_id, parameters: before?.global_style?.parameters ?? null },
+    style_applied: { version_id: after?.version_id, control: ctx.parameters.control, value: ctx.parameters.value,
+      parameter: changed.length === 1 ? changed[0] : null },
+  });
+}
+
+async function appearanceSurvivesReload(ctx) {
+  const { page } = ctx;
+  await reload(ctx);
+  await openCustomize(page);
+  const applied = ctx.facts.style_applied;
+  const shown = await page.evaluate(`${control(applied.control)}?.value ?? null`);
+  const entry = (await savedWorld(ctx)).entry;
+  const current = await currentStyle(ctx);
+  ctx.observe('style-kept', entry.style_version_id === applied.version_id && current?.version_id === applied.version_id
+    && Math.abs(Number(shown) - Number(applied.value)) <= RANGE_TOLERANCE,
+  { entry_style_version_id: entry.style_version_id, current: current?.version_id, control_value: shown });
+  await ctx.screenshot('kept', 'Customize world after the reload');
+}
+
+async function restoreOriginalAppearance(ctx) {
+  const { page } = ctx;
+  await openCustomize(page);
+  const original = ctx.facts.style_before;
+  const applied = ctx.facts.style_applied;
+  const options = await page.evaluate(`[...(${HISTORY})?.options ?? []].map(o => ({ value: o.value, text: o.text.trim() }))`);
+  if (!options.some((o) => o.value === original.version_id)) {
+    throw new Error(`the history does not offer the authored revision ${original.version_id}`);
+  }
+  const versionBefore = await page.evaluate(`document.querySelector('section.options-view p.world-style-version')?.textContent.trim() ?? null`);
+  await page.setValue(HISTORY, original.version_id);
+  await page.click(BUTTON('Restore selected version', OPTIONS), 'Restore selected version');
+  const versionAfter = await page.waitFor(`(() => { const t = document.querySelector('section.options-view p.world-style-version')?.textContent.trim();
+    return t && t !== ${JSON.stringify(versionBefore)} ? t : null; })()`, SETTLE_MS, 'the restore to be saved').catch(() => null);
+  const current = await currentStyle(ctx);
+  const shown = await page.evaluate(`${control(applied.control)}?.value ?? null`);
+  const authored = applied.parameter === null ? null : original.parameters[applied.parameter];
+  ctx.observe('restored-shown', versionAfter !== null && Math.abs(Number(shown) - Number(authored)) <= RANGE_TOLERANCE,
+    { version: versionAfter, control_value: shown, authored_value: authored });
+  ctx.observe('restored-values', current?.rollback_target_version_id === original.version_id
+    && same(current?.global_style?.parameters, original.parameters),
+  { current: pick(current, ['version_id', 'revision', 'rollback_target_version_id']) });
+  const history = (await ctx.api('GET', `/world/styles/versions?${worldQuery(ctx)}`)).body ?? [];
+  ctx.observe('history-kept', history.some((v) => v.version_id === applied.version_id)
+    && history.some((v) => v.version_id === original.version_id),
+  history.map((v) => pick(v, ['version_id', 'revision', 'rollback_target_version_id'])));
+  await ctx.screenshot('restored', 'Customize world after restoring the authored revision');
+  await reload(ctx);
+  await openCustomize(page);
+  const reloaded = await page.evaluate(`${control(applied.control)}?.value ?? null`);
+  ctx.observe('restore-kept', Math.abs(Number(reloaded) - Number(authored)) <= RANGE_TOLERANCE, { control_value: reloaded });
+  ctx.facts.style_restored_version_id = current?.version_id ?? null;
+}
+
+// -- a small square and the living world --------------------------------------------------------
+
+/** A visible first-use card control, by its words. */
+const CARD_BUTTON = (text) => `[...document.querySelectorAll('button.companion-prompt-button')]
+  .find(b => b.checkVisibility() && b.textContent.trim() === ${JSON.stringify(text)})`;
+const cardButtons = (page) => page.evaluate(`[...document.querySelectorAll('button.companion-prompt-button')]
+  .filter(b => b.checkVisibility()).map(b => b.textContent.trim())`);
+/** The roles the Create panel offers, by value and by the words a person reads. */
+const createPanelRoles = (page) => page.evaluate(`[...document.querySelectorAll('select#object-placement-role option')]
+  .filter(o => o.value).map(o => ({ value: o.value, text: o.text.trim() }))`);
+
+/** The newest answered arrangement request of this step whose path ends in `which`. */
+async function arrangementRequest(ctx, which) {
+  const traffic = await ctx.page.traffic(ctx.step.id);
+  return [...traffic].reverse().find((t) => t.method === 'POST' && t.status
+    && t.path.split('?')[0].endsWith(`/arrangements/${which}`)) ?? null;
+}
+
+/**
+ * The confirmation a square opens, once the world's check of it has answered: its words, the
+ * server's verdict, whether Confirm is offered, and whether anything was written before Confirm.
+ */
+async function squareConfirmation(ctx, before) {
+  const { page } = ctx;
+  const said = await confirmation(page, 'placing the square');
+  const verdict = await page.waitFor(`(() => { const v = ${OPEN_CONFIRM}?.querySelector('.composition-verdict');
+    const s = v?.dataset.state; return s && s !== 'checking' ? { state: s, text: v.innerText.trim() } : null; })()`,
+  SETTLE_MS, "the world's check of the square");
+  const confirmEnabled = await page.evaluate(`!(${OPEN_CONFIRM}?.querySelector('.confirm-actions button.primary')?.disabled ?? true)`);
+  const preview = await until('the preview of the square to be answered', SETTLE_MS, () => arrangementRequest(ctx, 'preview'));
+  const unwritten = (await savedWorld(ctx)).version.edit_seq === before.version.edit_seq;
+  const body = preview.response_body ?? {};
+  return {
+    said, verdict, confirmEnabled, unwritten, preview,
+    holds: verdict.state === 'ready' && confirmEnabled && unwritten && preview.status === 200
+      && body.availability === 'ready' && (body.would_add ?? []).length > 0,
+    shown: { confirmation: said, verdict, confirm_enabled: confirmEnabled, written_before_confirm: !unwritten,
+      preview: { status: preview.status, availability: body.availability ?? null, blocked_reason: body.blocked_reason ?? null,
+        blocked_detail: body.blocked_detail ?? null, arrangement: body.arrangement ?? null,
+        would_add: (body.would_add ?? []).map((o) => pick(o, ['object_id', 'asset_key', 'title'])) } },
+  };
+}
+
+/**
+ * After Confirm: the apply added exactly the objects the preview named, each as its own add edit
+ * with the chosen role, and the saved world resumes at the version it left.
+ */
+async function squareApplied(ctx, before, checked, role) {
+  const after = await waitForEdit(ctx, before.version.edit_seq, 'the square to be saved');
+  const apply = await until('the square to be applied', SETTLE_MS, () => arrangementRequest(ctx, 'apply'));
+  const named = (checked.preview.response_body?.would_add ?? []).map((o) => o.object_id);
+  const added = apply.response_body?.added_object_ids ?? [];
+  const edits = (after.version.edits ?? []).filter((e) => e.edit_seq > before.version.edit_seq);
+  const objects = liveObjects(after.version).filter((o) => added.includes(o.object_id));
+  return {
+    after, added,
+    holds: apply.status === 201 && added.length > 0 && same(added, named)
+      && edits.length === added.length && edits.every((e, i) => e.kind === 'add_object' && e.object_id === added[i])
+      && objects.length === added.length
+      && objects.every((o) => same(o.origin, { kind: 'authored', role }))
+      && after.entry.authored_state_sha256 === after.version.state_sha256
+      && after.entry.authored_edit_seq === after.version.edit_seq,
+    shown: { apply: { status: apply.status, added_object_ids: added, arrangement: apply.response_body?.arrangement ?? null },
+      preview_named: named, edits: edits.map((e) => pick(e, ['edit_seq', 'kind', 'object_id'])),
+      objects: objects.map((o) => ({ object_id: o.object_id, asset_key: o.asset?.asset_key, origin: o.origin })),
+      version: pick(after.version, ['version_id', 'state_sha256', 'edit_seq']),
+      entry_resume: pick(after.entry, ['authored_state_sha256', 'authored_edit_seq']) },
+  };
+}
+
+/**
+ * The welcome card's own square, pressed on the empty starter, the only moment the card offers
+ * it; then taken back one change at a time, so the creation session starts, as before, in a world
+ * with no object (the step's undo_reason).
+ */
+async function startWithSmallSquare(ctx) {
+  const { page } = ctx;
+  const { card_action: offer, origin_role: role } = ctx.parameters;
+  const offered = await page.waitFor(`(() => { const b = [...document.querySelectorAll('button.companion-prompt-button')]
+    .filter(b => b.checkVisibility()).map(b => b.textContent.trim()); return b.length ? b : null; })()`, SETTLE_MS, 'the first-use card').catch(() => []);
+  ctx.observe('card-offers-square', offered.includes(offer) && offered.includes('Start building'), { offered });
+  await ctx.screenshot('card', 'the welcome card of the empty starter');
+  const before = await savedWorld(ctx);
+  const roles = await createPanelRoles(page);
+  await page.click(CARD_BUTTON(offer), offer);
+  const asked = await page.waitFor(`(() => { const b = [...document.querySelectorAll('button.companion-prompt-button')]
+    .filter(b => b.checkVisibility()).map(b => b.textContent.trim());
+    return ${JSON.stringify(roles.map((r) => r.text))}.every(t => b.includes(t))
+      ? { statement: document.querySelector('.companion-prompt-statement')?.textContent.trim() ?? null, controls: b } : null; })()`,
+  SETTLE_MS, 'the card to ask what the square is').catch(async () => ({ statement: null, controls: await cardButtons(page) }));
+  const unasked = (await savedWorld(ctx)).version.edit_seq === before.version.edit_seq;
+  ctx.observe('card-asks-role', roles.length > 0 && asked.statement !== null && unasked,
+    { asked, create_panel_roles: roles, written: !unasked });
+  await ctx.screenshot('card-role', 'the card asking what the square is to the person');
+  const chosen = roles.find((r) => r.value === role);
+  if (chosen === undefined) throw new Error(`the Create panel offers no role ${role}`);
+  await page.click(CARD_BUTTON(chosen.text), chosen.text);
+  const checked = await squareConfirmation(ctx, before);
+  ctx.observe('confirm-before-write', checked.holds, checked.shown);
+  await ctx.screenshot('confirm', "the confirmation with the server's preview of the square");
+  await confirm(page, 'placing the square');
+  const applied = await squareApplied(ctx, before, checked, role);
+  ctx.observe('square-added-as-edits', applied.holds, applied.shown);
+  await openObjects(page);
+  await page.waitFor(`document.querySelectorAll('aside.object-placement li.object-placement-item').length === ${applied.added.length}`,
+    SETTLE_MS, 'the square in the objects panel').catch(() => null);
+  await ctx.screenshot('placed', 'the square placed from the card, listed in the objects panel');
+
+  // Taken back one confirmed change at a time; each undo names the newest add still standing.
+  const counts = [(await objectRows(page)).length];
+  const undone = [];
+  for (let index = 0; index < applied.added.length; index += 1) {
+    const was = await savedWorld(ctx);
+    await page.click(BUTTON('Take back the last change', OBJECT_PANEL), 'Take back the last change');
+    await confirmation(page, 'taking back the last change');
+    await confirm(page, 'taking back the last change');
+    const now = await waitForEdit(ctx, was.version.edit_seq, 'the take-back to be saved');
+    const left = counts.at(-1) - 1;
+    await page.waitFor(`document.querySelectorAll('aside.object-placement li.object-placement-item').length === ${left}`,
+      SETTLE_MS, 'the objects panel to list one fewer').catch(() => null);
+    counts.push((await objectRows(page)).length);
+    undone.push(pick(now.version.edits.at(-1), ['edit_seq', 'kind', 'undone_edit_id']));
+  }
+  const final = await savedWorld(ctx);
+  const adds = (applied.after.version.edits ?? []).filter((e) => applied.added.includes(e.object_id) && e.kind === 'add_object');
+  const newestFirst = [...adds].reverse().map((e) => e.edit_id);
+  ctx.observe('undone-newest-first', undone.length === adds.length && undone.every((u, i) => u.kind === 'undo'
+    && u.undone_edit_id === newestFirst[i]) && liveObjects(final.version).length === 0,
+  { undone, expected_undone: newestFirst, live_objects: liveObjects(final.version).length,
+    version: pick(final.version, ['state_sha256', 'edit_seq']) });
+  const card = await cardButtons(page);
+  ctx.observe('taken-back-one-at-a-time', counts.every((n, i) => n === applied.added.length - i) && !card.includes(offer)
+    && !card.includes('Start building'), { listed_after_each: counts, card_after: card });
+  await ctx.screenshot('taken-back', 'the objects panel after the square was taken back');
+  await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
+}
+
+/** The Create panel's own square, in the world the step names (the starter, or the made world). */
+async function furnishSmallSquare(ctx) {
+  const { page } = ctx;
+  const role = ctx.parameters.origin_role;
+  await openObjects(page);
+  const before = await savedWorld(ctx);
+  const rowsBefore = (await objectRows(page)).length;
+  await page.setValue(`document.querySelector('select#object-placement-role')`, role);
+  await page.click(`document.querySelector('button.object-placement-arrange')`, 'Place a small square before me');
+  const checked = await squareConfirmation(ctx, before);
+  ctx.observe('confirm-before-write', checked.holds, checked.shown);
+  await ctx.screenshot('confirm', "the confirmation with the server's preview of the square");
+  await confirm(page, 'placing the square');
+  const applied = await squareApplied(ctx, before, checked, role);
+  ctx.observe('square-added-as-edits', applied.holds, applied.shown);
+  const wouldAdd = checked.preview.response_body?.would_add ?? [];
+  const rows = await page.waitFor(`(() => { const rows = [...document.querySelectorAll('aside.object-placement li.object-placement-item')];
+    return rows.length === ${rowsBefore + applied.added.length} ? rows.map(li => li.querySelector('.object-placement-choose strong')?.textContent.trim() ?? null) : null; })()`,
+  SETTLE_MS, 'the square in the objects panel').catch(async () => (await objectRows(page)).map((r) => r.title));
+  const status = await objectStatus(page);
+  const title = checked.preview.response_body?.arrangement?.title ?? null;
+  const titles = [...new Set(wouldAdd.map((o) => o.title))];
+  ctx.observe('square-listed', rows.length === rowsBefore + applied.added.length && titles.every((t) => rows.includes(t))
+    && title !== null && String(status).includes(title) && String(status).includes(String(applied.added.length)),
+  { listed: rows, listed_before: rowsBefore, square_titles: titles, status });
+  // Each kind the square adds is drawn from its reviewed bytes, which the page fetches once a kind.
+  const kinds = [...new Set(wouldAdd.map((o) => o.asset_key))];
+  const fetched = await until('every kind of the square to be fetched', SETTLE_MS, async () => {
+    const traffic = await ctx.page.traffic(ctx.step.id);
+    const reads = kinds.map((key) => ({ asset_key: key, statuses: traffic.filter((t) => t.method === 'GET'
+      && t.path.startsWith(`/api/world/assets/${key}/bytes`)).map((t) => t.status) }));
+    return reads.every((r) => r.statuses.includes(200)) ? reads : null;
+  }).catch(async () => {
+    const traffic = await ctx.page.traffic(ctx.step.id);
+    return kinds.map((key) => ({ asset_key: key, statuses: traffic.filter((t) => t.method === 'GET'
+      && t.path.startsWith(`/api/world/assets/${key}/bytes`)).map((t) => t.status) }));
+  });
+  ctx.observe('square-drawn', kinds.length > 0 && fetched.every((r) => r.statuses.includes(200)), fetched);
+  ctx.facts[ctx.parameters.facts_key] = { object_ids: applied.added,
+    titles: Object.fromEntries(wouldAdd.map((o) => [o.object_id, o.title])) };
+  await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
+  await sleep(SQUARE_DRAWN_MS);
+  await ctx.screenshot('furnished', `${ctx.parameters.world_words} furnished with the small square`);
+}
+
+// People nearby: the inhabitants' panel, reached from the World menu's local navigation.
+const NEARBY = `document.getElementById('world-panel-nearby')`;
+const PEOPLE = `document.querySelector('section.world-inhabitants')`;
+const PLAYBACK = `${PEOPLE}?.querySelector('button[data-action]')`;
+const INSPECT = `document.querySelector('select[aria-label="Inspect nearby inhabitant"]')`;
+const INSPECTOR = `document.querySelector('.living-world-inspector')`;
+// After the square is confirmed, time for the page to draw its objects before the screenshot.
+const SQUARE_DRAWN_MS = 3_000;
+
+async function openPeopleNearby(page) {
+  if (await page.evaluate(`${NEARBY}?.checkVisibility() ?? false`)) return;
+  if (!await page.evaluate(`[...document.querySelectorAll('nav.world-local-nav button')].some(b => b.checkVisibility())`)) {
+    await chooseMenu(page, 'world');
+  }
+  await page.click(BUTTON('Nearby', `document.querySelector('nav.world-local-nav')`), 'Nearby');
+  await page.waitFor(`${NEARBY}?.checkVisibility() ?? false`, 10_000, 'People nearby');
+}
+
+/** What People nearby says: its summary, the simulated minute it names, and its playback line. */
+const peopleSeen = (page) => page.evaluate(`(() => { const p = ${PEOPLE}; if (!p) return null;
+  const shown = (e) => (e && e.checkVisibility() ? e.textContent.trim() : null);
+  const summary = shown(p.querySelector('.world-inhabitants-summary'));
+  const minute = /minute (\\d+)/i.exec(summary ?? '');
+  return { state: p.dataset.state ?? null, summary, minute: minute ? Number(minute[1]) : null,
+    playback: shown(p.querySelector('.world-inhabitants-playback')),
+    help: [...p.querySelectorAll('p.world-help')].map(shown).filter(Boolean),
+    control: (() => { const b = p.querySelector('button[data-action]'); return b && !b.hidden ? { action: b.dataset.action, text: b.textContent.trim(), disabled: b.disabled } : null; })() }; })()`);
+
+/** A society route of the starter's saved version. */
+const societyPath = (entry, suffix = '', query = '') =>
+  `/world/versions/${entry.authored_version_id}/society${suffix}?world_id=${encodeURIComponent(entry.world_id)}${query}`;
+
+async function bringInInhabitants(ctx) {
+  const { page } = ctx;
+  await openPeopleNearby(page);
+  await page.waitFor(`['absent', 'present'].includes(${PEOPLE}?.dataset.state)`, SETTLE_MS, 'People nearby to read the society');
+  await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
+  await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the inhabitants to be present');
+  await sleep(PAGE_SETTLE_MS);
+  const seen = await peopleSeen(page);
+  const { entry } = await savedWorld(ctx);
+  const society = (await ctx.api('GET', societyPath(entry, '', '&places=true'))).body;
+  const people = society?.state?.inhabitants ?? [];
+  const words = [seen?.summary, ...(seen?.help ?? [])].join(' ');
+  ctx.observe('people-present', seen?.state === 'present' && people.length > 0
+    && new RegExp(`\\b${people.length}\\b`).test(seen?.summary ?? '') && /simulated/i.test(words) && /invented/i.test(words),
+  { seen, inhabitants_read: people.length });
+  ctx.observe('society-of-simulated-people', people.length > 0 && society?.population_size === people.length
+    && people.every((p) => p.synthetic === true),
+  { population_size: society?.population_size ?? null, inhabitants: people.map((p) => pick(p, ['id', 'synthetic', 'role'])),
+    current_tick: society?.current_tick ?? null });
+  const square = ctx.facts.square?.object_ids ?? [];
+  const targets = (society?.places?.targets ?? []).filter((t) => square.includes(t.object_id));
+  const unreachable = (society?.places?.unreachable ?? []).filter((t) => square.includes(t.object_id));
+  ctx.observe('square-is-somewhere-to-go', targets.some((t) => t.enabled) && unreachable.every((t) => Boolean(t.reason)),
+    { targets, unreachable, places_available: society?.places?.available ?? null });
+  await ctx.screenshot('people', 'People nearby after Bring in inhabitants');
+}
+// After a panel changes, time for the page to draw what it read before it is read back.
+const PAGE_SETTLE_MS = 1_500;
+
+async function playAndWatchWalking(ctx) {
+  const { page } = ctx;
+  const { sample_seconds: seconds, walking_floor_m_per_s: floor, pace_p95_at_most_m_per_s: most,
+    ticks_per_two_intervals: perTwo } = ctx.parameters;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const read = async () => (await ctx.api('GET', societyPath(entry, '/control'))).body;
+  const idle = await read();
+  const offered = await page.waitFor(`(() => { const b = ${PLAYBACK}; return b && !b.hidden && !b.disabled && b.dataset.action === 'play' ? true : null; })()`,
+    SETTLE_MS, 'Play beside the people').catch(() => false);
+  await page.click(PLAYBACK, 'Play');
+  await page.waitFor(`${PLAYBACK}?.dataset.action === 'pause'`, SETTLE_MS, 'Pause to take the place of Play').catch(() => null);
+  await sleep(PAGE_SETTLE_MS);
+  const playing = await peopleSeen(page);
+  const control = await read();
+  ctx.observe('play-offered', offered === true && idle?.host_playback?.running === true
+    && playing?.control?.action === 'pause' && Boolean(playing?.playback),
+  { host_playback_before: idle?.host_playback ?? null, offered, seen: playing });
+  const interval = control?.host_playback?.interval_ms ?? null;
+  if (!Number.isInteger(interval) || interval <= 0) throw new Error(`the control read states no host interval: ${JSON.stringify(control?.host_playback ?? null)}`);
+  ctx.facts.playback_interval_ms = interval;
+  // A minute passes on its own before the watch, so the page's first read after Play is behind it.
+  const first = playing?.minute ?? -1;
+  await page.waitFor(`(() => { const m = /minute (\\d+)/i.exec(${PEOPLE}?.querySelector('.world-inhabitants-summary')?.textContent ?? '');
+    return m && Number(m[1]) > ${first}; })()`, FIRST_MINUTE_INTERVALS * interval, 'a minute to pass on its own');
+  await ctx.screenshot('watch-start', 'playing, at the start of the watch');
+  const start = { seen: await peopleSeen(page), control: pick(await read(), ['mode', 'current_tick', 'host_playback']) };
+  const motion = await page.evaluate(`window.__rehearsalWalkerMotion(${seconds}, ${floor})`, (seconds * 1000) + SETTLE_MS);
+  const end = { seen: await peopleSeen(page), control: pick(await read(), ['mode', 'current_tick', 'host_playback']) };
+  await ctx.screenshot('watch-end', `playing, ${seconds} s later`);
+  ctx.observe('minutes-pass', start.seen?.minute !== null && end.seen?.minute > start.seen?.minute,
+    { minute_at_start: start.seen?.minute ?? null, minute_at_end: end.seen?.minute ?? null, summary_at_end: end.seen?.summary ?? null });
+  const { walkers, ...summary } = motion ?? {};
+  const pace = motion?.walking?.pace_m_per_s ?? {};
+  ctx.observe('walking-continuously', motion !== null && motion.walkers_seen >= 1 && motion.walking.walker_frames > 0
+    && pace.p95 !== null && pace.p95 <= most,
+  { ...summary, pace_p95_at_most_m_per_s: most, walkers });
+  const advanced = (end.control?.current_tick ?? 0) - (start.control?.current_tick ?? 0);
+  const expected = Math.floor((seconds * 1000) / (2 * interval)) * perTwo;
+  ctx.observe('host-plays', control?.mode === 'playing' && control?.host_playback?.running === true
+    && end.control?.mode === 'playing' && advanced >= expected,
+  { start: start.control, end: end.control, advanced, expected_at_least: expected, interval_ms: interval });
+}
+// How many host intervals the first minute after Play may take to be read: the page polls the
+// control about every 2 s and re-reads the society when the tick moves (lane W2's playback reading),
+// and the first batch waits one interval, so three intervals leave a whole interval for both.
+const FIRST_MINUTE_INTERVALS = 3;
+
+/** The inspector's words about the one it shows, and the subject it names. */
+const inspectorSeen = (page) => page.evaluate(`(() => { const i = ${INSPECTOR}; if (!i || !i.checkVisibility()) return null;
+  return { subject: i.dataset.subjectId ?? null, who: i.querySelector('h3')?.textContent.trim() ?? null,
+    what: i.querySelector(':scope > p:not(.living-world-activity)')?.textContent.trim() ?? null,
+    doing: i.querySelector('.living-world-activity')?.textContent.trim() ?? null }; })()`);
+
+// A code or an identifier in a sentence meant for a person: a snake_case token, or a UUID.
+const CODE_IN_WORDS = /\b[a-z]+(?:_[a-z0-9]+)+\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/;
+
+async function inspectAnInhabitant(ctx) {
+  const { page } = ctx;
+  await openPeopleNearby(page);
+  const id = await page.waitFor(`[...(${INSPECT})?.options ?? []].find(o => o.value)?.value ?? null`, SETTLE_MS, 'someone nearby to inspect');
+  await page.setValue(INSPECT, id);
+  await page.waitFor(`${INSPECTOR}?.checkVisibility() ?? false`, 10_000, 'the inspector');
+  await sleep(PAGE_SETTLE_MS);
+  const seen = await inspectorSeen(page);
+  const sentences = [seen?.who, seen?.what, seen?.doing].filter(Boolean).join(' ');
+  const code = sentences.match(CODE_IN_WORDS)?.[0] ?? null;
+  ctx.observe('who-what-why', Boolean(seen?.who) && /simulated/i.test(seen?.what ?? '') && /invented/i.test(seen?.what ?? '')
+    && /memory/i.test(seen?.what ?? '') && /\bBecause\b/.test(seen?.doing ?? '') && code === null,
+  { ...seen, code_in_words: code });
+  await ctx.screenshot('inspector', 'the inspector on a nearby inhabitant');
+  const { entry } = await savedWorld(ctx);
+  const society = (await ctx.api('GET', societyPath(entry))).body;
+  const person = (society?.state?.inhabitants ?? []).find((p) => p.id === seen?.subject) ?? null;
+  ctx.observe('inspected-is-simulated', person !== null && person.synthetic === true,
+    { subject: seen?.subject ?? null, inhabitant: pick(person, ['id', 'synthetic', 'role', 'action']) });
+}
+
+/**
+ * Someone using the square, found the way a person finds them: the society read names who is
+ * resting at or visiting one of its objects, and that person's inspector must say so by the
+ * object's title. Read once a host interval, so the wait costs one read a simulated minute.
+ */
+async function objectInUse(ctx) {
+  const { page } = ctx;
+  const square = ctx.facts.square ?? { object_ids: [], titles: {} };
+  const interval = ctx.facts.playback_interval_ms;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const tried = [];
+  const found = await until('someone to use an object of the square', ctx.parameters.in_use_wait_seconds * 1000, async () => {
+    const society = (await ctx.api('GET', societyPath(entry, '', '&places=true'))).body;
+    const targets = new Map((society?.places?.targets ?? []).map((t) => [t.target_id, t]));
+    const nearby = await page.evaluate(`[...(${INSPECT})?.options ?? []].map(o => o.value).filter(Boolean)`);
+    for (const person of society?.state?.inhabitants ?? []) {
+      const action = person.action ?? {};
+      const target = targets.get(action.target_id);
+      if (!['rest', 'visit'].includes(action.kind) || action.status !== 'active' || !square.object_ids.includes(target?.object_id)) continue;
+      if (!nearby.includes(person.id)) { tried.push({ person: person.id, tick: society.current_tick, nearby: false }); continue; }
+      await page.setValue(INSPECT, person.id);
+      await sleep(PAGE_SETTLE_MS);
+      const seen = await inspectorSeen(page);
+      const title = square.titles[target.object_id];
+      const named = seen?.subject === person.id && new RegExp(`\\b${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(seen?.doing ?? '');
+      const use = { person: person.id, tick: society.current_tick, action: pick(action, ['kind', 'status', 'target_id', 'remaining_ticks']),
+        object_id: target.object_id, title, inspector: seen };
+      if (named) return use;
+      tried.push(use);
+    }
+    await sleep(Math.max(0, interval - POLL_MS));
+    return null;
+  }).catch(() => null);
+  ctx.observe('someone-uses-the-square', found !== null, { found, tried: tried.slice(-10) });
+  ctx.observe('use-recorded', found !== null && square.object_ids.includes(found.object_id)
+    && ['rest', 'visit'].includes(found.action.kind), found === null ? { square: square.object_ids } : pick(found, ['person', 'tick', 'action', 'object_id']));
+  if (found !== null) await ctx.screenshot('in-use', `someone using ${found.title}, an object of the square`);
+}
+
+async function pausePlayback(ctx) {
+  const { page } = ctx;
+  const interval = ctx.facts.playback_interval_ms;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const read = async () => (await ctx.api('GET', societyPath(entry, '/control'))).body;
+  await page.waitFor(`${PLAYBACK}?.dataset.action === 'pause' && !(${PLAYBACK}).disabled`, SETTLE_MS, 'Pause beside the people');
+  await page.click(PLAYBACK, 'Pause');
+  await page.waitFor(`${PLAYBACK}?.dataset.action === 'play'`, SETTLE_MS, 'Play to take the place of Pause').catch(() => null);
+  await sleep(PAGE_SETTLE_MS);
+  const paused = { seen: await peopleSeen(page), control: pick(await read(), ['mode', 'current_tick', 'host_playback']) };
+  await sleep(ctx.parameters.hold_intervals * interval);
+  const held = { seen: await peopleSeen(page), control: pick(await read(), ['mode', 'current_tick', 'host_playback']) };
+  const advance = await page.evaluate(`(() => { const b = ${BUTTON('Advance one minute', PEOPLE)}; return b ? !b.disabled : null; })()`);
+  ctx.observe('paused-in-words', paused.seen?.control?.action === 'play' && held.seen?.control?.action === 'play'
+    && paused.seen?.minute !== null && held.seen?.minute === paused.seen?.minute && advance === true,
+  { paused: paused.seen, held: held.seen, advance_offered: advance });
+  ctx.observe('minutes-stop', paused.control?.mode === 'paused' && held.control?.mode === 'paused'
+    && held.control?.current_tick === paused.control?.current_tick,
+  { paused: paused.control, held: held.control, held_ms: ctx.parameters.hold_intervals * interval });
+  await ctx.screenshot('paused', 'People nearby after Pause');
+}
+
+// -- models deciding for people ------------------------------------------------------------------
+
+// "Who decides for them": the section beside People nearby where the owner chooses a model.
+const MODELS = `document.querySelector('section.society-models')`;
+const MODEL_SELECT = `${MODELS}?.querySelector('select[aria-label="Who decides"]')`;
+const MODEL_BOX = (id) => `${MODELS}?.querySelector('fieldset.society-models-people input[type=checkbox][value="${id}"]')`;
+
+/** What "Who decides for them" shows: its host line, the models it offers, each person's row, and its result. */
+const modelsSeen = (page) => page.evaluate(`(() => { const s = ${MODELS}; if (!s || !s.checkVisibility()) return null;
+  const text = (e) => e?.textContent.trim() ?? null;
+  return { host: text(s.querySelector('p.society-models-host')), result: text(s.querySelector('p.society-models-result')),
+    options: [...s.querySelectorAll('select[aria-label="Who decides"] option')].map(o => ({ value: o.value, text: o.textContent.trim() })),
+    people: [...s.querySelectorAll('fieldset.society-models-people label[data-subject-id]')].map(l => ({ id: l.dataset.subjectId, text: l.textContent.trim() })),
+    summaries: [...s.querySelectorAll('ul.society-models-summaries > li')].map(li => ({ model: li.dataset.modelId ?? null, text: li.textContent.trim() })) }; })()`);
+
+/** The inspector's details as pairs, by the label a person reads. */
+const inspectorDetails = (page) => page.evaluate(`(() => { const i = ${INSPECTOR}; if (!i || !i.checkVisibility()) return null;
+  const pairs = {}; const terms = [...i.querySelectorAll('details dl dt')];
+  for (const dt of terms) { const dd = dt.nextElementSibling; pairs[dt.textContent.trim()] = dd?.textContent.trim() ?? null; }
+  return pairs; })()`);
+
+/** Open the inspector's details, so a screenshot shows who decided. */
+const openInspectorDetails = (page) => page.evaluate(`(() => { const d = ${INSPECTOR}?.querySelector('details'); if (d) d.open = true; return !!d; })()`);
+
+/**
+ * What the models deciding in this world have cost so far, as the product reports it, counted into
+ * the run's spend once: each call reads the total and reports what it adds to the last reading.
+ */
+async function decisionSpend(ctx, models) {
+  const rows = models?.by_model ?? [];
+  const total = rows.reduce((sum, row) => (row.cost_usd == null ? sum : addUsd(sum, String(row.cost_usd))), '0');
+  const unknown = rows.filter((row) => row.cost_known === false).map((row) => row.name ?? row.model_id);
+  if (unknown.length > 0) ctx.note(`the cost of some decisions is not known: ${unknown.join(', ')}`);
+  const added = increaseUsd(total, ctx.facts.decision_spend_reported_usd ?? '0');
+  if (added !== '0') ctx.spend(added);
+  ctx.facts.decision_spend_reported_usd = total;
+  return total;
+}
+
+/** The newest decision a model served for `subject`, from the society's events, newest first. */
+const modelDecisionEvents = async (ctx, entry) => ((await ctx.api('GET', societyPath(entry, '/events'))).body?.events ?? [])
+  .map((e) => e.document ?? {}).filter((d) => d.origin === 'model');
+
+async function chooseModelForAGroup(ctx) {
+  const { page } = ctx;
+  const { model, group_size: size } = ctx.parameters;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const read = async () => (await ctx.api('GET', societyPath(entry, '/models'))).body;
+  const before = await read();
+  await page.waitFor(`${MODELS}?.checkVisibility() ?? false`, SETTLE_MS, 'Who decides for them');
+  const offered = await modelsSeen(page);
+  const served = (before?.models ?? []).find((m) => m.provider === model.provider && m.model_id === model.model_id) ?? null;
+  const value = `${model.provider} ${model.model_id}`;
+  const option = offered?.options.find((o) => o.value === value) ?? null;
+  ctx.observe('models-offered', served !== null && served.refusal === null && before?.takes_model_choices === true
+    && before?.host_refusal === null && option !== null && option.text === served.name && /asks the models you choose/.test(offered?.host ?? ''),
+  { host: offered?.host ?? null, offered: offered?.options ?? [], chosen_model: served,
+    takes_model_choices: before?.takes_model_choices ?? null, host_refusal: before?.host_refusal ?? null });
+  const group = (offered?.people ?? []).slice(0, size).map((p) => p.id);
+  if (group.length !== size) throw new Error(`People nearby lists ${offered?.people.length ?? 0} people; the step chooses ${size}`);
+  for (const id of group) await page.click(MODEL_BOX(id), `the box beside ${id}`);
+  await page.setValue(MODEL_SELECT, value);
+  await page.click(BUTTON('Use for the chosen people', MODELS), 'Use for the chosen people');
+  const result = await page.waitFor(`(() => { const r = ${MODELS}?.querySelector('p.society-models-result')?.textContent.trim(); return r || null; })()`,
+    SETTLE_MS, 'what the choice did');
+  await sleep(PAGE_SETTLE_MS);
+  const seen = await modelsSeen(page);
+  const rows = (seen?.people ?? []).filter((p) => group.includes(p.id));
+  ctx.observe('group-chosen-in-words', new RegExp(`^${size} people are now decided by the model you chose`).test(result)
+    && rows.length === size && rows.every((r) => r.text.endsWith(`${served?.name}, which you chose.`)),
+  { result, rows, others: (seen?.people ?? []).filter((p) => !group.includes(p.id)) });
+  await ctx.screenshot('chosen', `Who decides for them after choosing ${served?.name ?? 'a model'} for ${size} people`);
+  const posted = (await responses(ctx, 'POST', `/api/world/versions/${entry.authored_version_id}/society/models`)).at(-1) ?? null;
+  const after = await read();
+  const choices = new Map((after?.choices ?? []).map((c) => [c.subject_id, c]));
+  const document = posted?.response_body ?? {};
+  ctx.observe('choice-recorded', posted?.status === 200 && same([...(document.people ?? [])].sort(), [...group].sort())
+    && document.model?.model_id === model.model_id && document.model?.provider === model.provider
+    && group.every((id) => choices.get(id)?.model?.model_id === model.model_id && choices.get(id)?.refusal == null)
+    && [...choices.values()].filter((c) => !group.includes(c.subject_id)).every((c) => c.model === null),
+  { posted: posted === null ? null : { status: posted.status, body: pick(document, ['choice_seq', 'people', 'model', 'chosen_by', 'document_sha256', 'recorded_at']) },
+    choices: [...choices.values()].map((c) => pick(c, ['subject_id', 'model', 'choice_seq', 'refusal'])) });
+  ctx.facts.model_group = { people: group, choice_seq: document.choice_seq ?? null, model, name: served?.name ?? null };
+  await decisionSpend(ctx, after);
+}
+
+/**
+ * A person of the group whose latest decision the model served and the minute applied, read in
+ * the inspector as a person reads it, and the same decision read from the API: the request with
+ * what the person saw, the receipt naming the model that served it and the validated action.
+ */
+async function inspectAModelDecision(ctx) {
+  const { page } = ctx;
+  const group = ctx.facts.model_group;
+  const interval = ctx.facts.playback_interval_ms;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const tried = [];
+  const found = await until('a decision the chosen model served and the minute applied', ctx.parameters.wait_seconds * 1000, async () => {
+    const models = (await ctx.api('GET', societyPath(entry, '/models'))).body;
+    const nearby = await page.evaluate(`[...(${INSPECT})?.options ?? []].map(o => o.value).filter(Boolean)`);
+    for (const latest of models?.latest ?? []) {
+      if (!group.people.includes(latest.subject_id) || latest.model_id !== group.model.model_id
+        || latest.status !== 'accepted' || latest.disposition !== 'applied' || !nearby.includes(latest.subject_id)) continue;
+      await page.setValue(INSPECT, latest.subject_id);
+      await sleep(PAGE_SETTLE_MS);
+      const seen = { ...(await inspectorSeen(page)), details: await inspectorDetails(page) };
+      const attempt = { latest: pick(latest, ['subject_id', 'decision_seq', 'consumed_tick', 'name', 'status', 'disposition', 'chose']), inspector: seen };
+      const said = seen.details?.['Latest decision'] ?? '';
+      if (seen.subject === latest.subject_id && said.includes(`${group.name} chose “${latest.chose}”, and they did it.`)) return attempt;
+      tried.push(attempt);
+    }
+    await sleep(Math.max(0, interval - POLL_MS));
+    return null;
+  }).catch(() => null);
+  const details = found?.inspector.details ?? {};
+  ctx.observe('decided-by-named', found !== null && details['Decided by'] === `${group.name}, which you chose.`
+    && found.inspector.what !== null, found ?? { tried: tried.slice(-6) });
+  ctx.observe('latest-decision-in-words', found !== null && new RegExp(`^At simulated minute \\d+, `).test(details['Latest decision'] ?? '')
+    && (details['Latest decision'] ?? '').includes(group.name) && (details['Latest decision'] ?? '').match(CODE_IN_WORDS) === null,
+  { latest_decision: details['Latest decision'] ?? null, decided_by: details['Decided by'] ?? null });
+  if (found !== null) {
+    await openInspectorDetails(page);
+    await ctx.screenshot('decision', `the inspector naming ${group.name} and the decision it made`);
+  }
+  // The same decision as stored: the event the minute wrote, the request and the receipt.
+  const event = found === null ? null : (await modelDecisionEvents(ctx, entry)).find((d) => d.subject_id === found.latest.subject_id
+    && d.decision_seq === found.latest.decision_seq) ?? null;
+  const stored = event === null ? null : (await ctx.api('GET', societyPath(entry, `/decisions/${event.request_id}`))).body;
+  const receipt = stored?.decision ?? {};
+  const request = stored?.request ?? {};
+  const options = JSON.stringify(request).includes('"options"');
+  ctx.observe('decision-recorded', event !== null && event.disposition === 'applied' && event.model?.model_id === group.model.model_id
+    && stored?.status === 'completed' && receipt.provider?.model_id === group.model.model_id && Boolean(receipt.provider?.served_model_id)
+    && receipt.proposal?.option?.label === found.latest.chose && event.chose === found.latest.chose && options,
+  { event: pick(event, ['subject_id', 'tick', 'origin', 'decision_seq', 'request_id', 'disposition', 'reason', 'model', 'chose']),
+    status: stored?.status ?? null, request_names_options: options,
+    receipt: { proposal: receipt.proposal ?? null, provider: pick(receipt.provider, ['provider', 'model_id', 'served_model_id', 'mechanism', 'answers_asked', 'latency_ms', 'cost_usd']) } });
+  // Replaying the society reads the stored receipts and asks no model: its spend does not move.
+  const spentBefore = await decisionSpend(ctx, (await ctx.api('GET', societyPath(entry, '/models'))).body);
+  const replay = await ctx.api('GET', societyPath(entry, '/replay'));
+  const models = (await ctx.api('GET', societyPath(entry, '/models'))).body;
+  const asked = (rows) => (rows ?? []).reduce((n, row) => n + (row.asked ?? 0), 0);
+  const spentAfter = await decisionSpend(ctx, models);
+  ctx.observe('replayed-without-a-model', replay.status === 200 && replay.body?.replay_verified === true,
+    { status: replay.status, replay_verified: replay.body?.replay_verified ?? null, spend_before_usd: spentBefore, spend_after_usd: spentAfter,
+      asked_after: asked(models?.by_model), note: 'the society keeps playing during the read, so later minutes may ask the model again' });
+}
+
+/**
+ * A person of the group standing or talking because their model chose it (model actions v2): the
+ * decision is found in the society's events, read in the inspector, and its receipt names the kind.
+ */
+async function modelChoseStandOrTalk(ctx) {
+  const { page } = ctx;
+  const group = ctx.facts.model_group;
+  const interval = ctx.facts.playback_interval_ms;
+  const kinds = ctx.parameters.kinds;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const seenEvents = [];
+  const tried = [];
+  const found = await until('a person to stand or talk because their model chose it', ctx.parameters.wait_seconds * 1000, async () => {
+    const events = await modelDecisionEvents(ctx, entry);
+    const nearby = await page.evaluate(`[...(${INSPECT})?.options ?? []].map(o => o.value).filter(Boolean)`);
+    for (const event of events) {
+      if (event.disposition !== 'applied' || !group.people.includes(event.subject_id) || !nearby.includes(event.subject_id)) continue;
+      const stored = (await ctx.api('GET', societyPath(entry, `/decisions/${event.request_id}`))).body;
+      const option = stored?.decision?.proposal?.option ?? null;
+      if (!kinds.includes(option?.kind)) continue;
+      seenEvents.push(pick(event, ['subject_id', 'tick', 'chose', 'request_id']));
+      await page.setValue(INSPECT, event.subject_id);
+      await sleep(PAGE_SETTLE_MS);
+      const seen = { ...(await inspectorSeen(page)), details: await inspectorDetails(page) };
+      const society = (await ctx.api('GET', societyPath(entry))).body;
+      const person = (society?.state?.inhabitants ?? []).find((p) => p.id === event.subject_id) ?? null;
+      const attempt = { event: pick(event, ['subject_id', 'tick', 'decision_seq', 'request_id', 'disposition', 'model', 'chose']),
+        option, provider: pick(stored?.decision?.provider, ['provider', 'model_id', 'served_model_id']), inspector: seen,
+        person: pick(person, ['id', 'goal', 'action']), tick_now: society?.current_tick ?? null };
+      const words = `${seen.doing ?? ''} ${seen.details?.['Latest decision'] ?? ''}`;
+      if (seen.subject === event.subject_id && (seen.details?.['Latest decision'] ?? '').includes(`chose “${event.chose}”`)
+        && /stand|talk/i.test(seen.doing ?? '') && words.includes(group.name)) return attempt;
+      tried.push(attempt);
+    }
+    await sleep(Math.max(0, interval - POLL_MS));
+    return null;
+  }).catch(() => null);
+  ctx.observe('standing-or-talking-in-words', found !== null, found ?? { model_stand_or_talk_events: seenEvents.slice(-6), tried: tried.slice(-4) });
+  ctx.observe('model-chose-the-action', found !== null && kinds.includes(found.option?.kind)
+    && found.provider?.model_id === group.model.model_id && found.option?.label === found.event.chose
+    && (found.option?.kind !== 'talk' || typeof found.option?.partner_id === 'string'),
+  found === null ? { kinds } : pick(found, ['event', 'option', 'provider', 'person', 'tick_now']));
+  if (found !== null) {
+    await openInspectorDetails(page);
+    await ctx.screenshot('stand-or-talk', `someone ${found.option.kind === 'talk' ? 'talking' : 'standing'} because ${group.name} chose it`);
+  }
+  await decisionSpend(ctx, (await ctx.api('GET', societyPath(entry, '/models'))).body);
+}
+
+// -- birds ----------------------------------------------------------------------------------------
+
+const FLIGHT_CANVAS = `document.querySelector('canvas[data-flight-state]')`;
+
+/** The flight's windows from `fromStep` for `count` steps, read the way the page reads them. */
+async function flightSteps(ctx, entry, fromStep, count, windowSteps) {
+  const windows = [];
+  for (let step = fromStep; step < fromStep + count; step += windowSteps) {
+    const read = await ctx.api('GET', `/world/versions/${entry.authored_version_id}/flight?${worldQuery(ctx)}&from_step=${step}&steps=${Math.min(windowSteps, fromStep + count - step)}`);
+    if (read.status !== 200) throw new Error(`the flight route answered ${read.status} for step ${step}`);
+    windows.push(read.body);
+  }
+  return windows;
+}
+
+/** Each flyer's state at every step the windows serve, by step, and the steps a flyer is late home. */
+function flightStates(windows) {
+  const states = new Map();
+  const late = new Set();
+  for (const window of windows) {
+    for (const row of window.flyers) {
+      const byStep = states.get(row.flyer_id) ?? new Map();
+      row.state.forEach((code, i) => byStep.set(window.from_step + i, window.states[code]));
+      states.set(row.flyer_id, byStep);
+    }
+    for (const entry of window.late_home ?? []) late.add(`${entry.step}:${entry.flyer_id}`);
+  }
+  return { states, late };
+}
+
+/**
+ * Birds flying and perching on the flight's shared clock, while the page stays responsive: the
+ * page is sampled over a stretch the served flight says holds both, each drawn bird is compared
+ * with the state the server serves at that moment, and the page's own interactions are timed.
+ */
+async function birdsFlyAndPerch(ctx) {
+  const { page } = ctx;
+  const { sample_seconds: seconds, transition_margin_steps: margin, interaction_presses: presses,
+    interaction_ms_at_most: most } = ctx.parameters;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const canvas = await page.waitFor(`(() => { const c = ${FLIGHT_CANVAS}; return c && c.dataset.flightState === 'flying'
+    ? { state: c.dataset.flightState, flyers: Number(c.dataset.flightFlyers), unplaced: c.dataset.flightUnplaced, undrawn: c.dataset.flightUndrawn, failure: c.dataset.flightFailure } : null; })()`,
+  SETTLE_MS, 'the birds to fly').catch(async () => page.evaluate(`(() => { const c = ${FLIGHT_CANVAS}; return c ? { ...c.dataset } : null; })()`));
+  const first = await ctx.api('GET', `/world/versions/${entry.authored_version_id}/flight?${worldQuery(ctx)}`);
+  const served = first.body ?? {};
+  const windowSteps = served.steps;
+  const stepMs = served.step_ms;
+  ctx.observe('birds-drawn', canvas?.state === 'flying' && first.status === 200 && canvas.flyers === (served.flyers ?? []).length
+    && canvas.flyers > 0 && !canvas.unplaced && !canvas.undrawn && !canvas.failure,
+  { canvas, flight: first.status === 200 ? { ...pick(served, ['module', 'step_ms', 'episode_steps', 'from_step', 'steps', 'clock_step', 'unplaced']),
+    flyers: (served.flyers ?? []).map((f) => pick(f, ['flyer_id', 'kind'])) } : { status: first.status, body: served } });
+  if (first.status !== 200 || !Number.isInteger(stepMs) || !Number.isInteger(windowSteps)) throw new Error('the flight route served no window');
+  // Wait, at most one episode, for a stretch of the sample's length in which some bird flies and some perches.
+  const sampleSteps = Math.ceil((seconds * 1000) / stepMs);
+  let start = null;
+  let horizon = served.clock_step;
+  const searched = [];
+  while (start === null && horizon < served.clock_step + served.episode_steps) {
+    const { states } = flightStates(await flightSteps(ctx, entry, horizon, windowSteps, windowSteps));
+    for (let step = horizon; step < horizon + windowSteps && start === null; step += 1) {
+      const at = [...states.values()].map((s) => s.get(step));
+      if (at.some((s) => s && s !== 'perching') && at.some((s) => s === 'perching')) start = step;
+    }
+    searched.push({ from_step: horizon, steps: windowSteps, found: start });
+    horizon += windowSteps;
+  }
+  if (start === null) throw new Error(`no bird left its perch in one episode: ${JSON.stringify(searched)}`);
+  const lead = Math.max(0, start * stepMs - Date.now() - 1000);
+  await sleep(lead);
+  await page.evaluate('window.__rehearsalBirdsStart()');
+  const pressed = [];
+  // Each press opens the World menu and a second one closes it, so the page ends as it began.
+  for (let i = 0; i < presses; i += 1) {
+    await sleep((seconds * 1000) / (presses + 1));
+    pressed.push(await page.click(WORLD_MENU_BUTTON, 'the World menu'));
+    await sleep(PAGE_SETTLE_MS);
+    pressed.push(await page.click(WORLD_MENU_BUTTON, 'the World menu, again'));
+  }
+  const drawn = await page.evaluate('window.__rehearsalBirdsStop()', 30_000);
+  await ctx.screenshot('birds', 'the starter while the birds fly and perch');
+  await openPeopleNearby(page);
+  // The served states over the sampled stretch, and each drawn bird compared with them.
+  const fromStep = Math.floor(drawn.first_ms / stepMs) - margin;
+  const toStep = Math.floor(drawn.last_ms / stepMs) + margin + 1;
+  const { states, late } = flightStates(await flightSteps(ctx, entry, fromStep, toStep - fromStep, windowSteps));
+  const near = (flyer, step) => {
+    const byStep = states.get(flyer);
+    for (let s = step - margin; s <= step + margin; s += 1) {
+      if (byStep?.get(s) !== byStep?.get(step) || late.has(`${s}:${flyer}`)) return true;
+    }
+    return false;
+  };
+  const compared = { agree: 0, disagree: 0, near_a_change: 0, moving_frames: 0, still_frames: 0, disagreements: [] };
+  for (const [flyer, frames] of Object.entries(drawn.flyers)) {
+    for (let i = 1; i < frames.length; i += 1) {
+      const [t, x, y, z] = frames[i];
+      const [, px, py, pz] = frames[i - 1];
+      const moved = Math.hypot(x - px, y - py, z - pz) > 0;
+      compared[moved ? 'moving_frames' : 'still_frames'] += 1;
+      const step = Math.floor(t / stepMs);
+      const state = states.get(flyer)?.get(step);
+      if (state === undefined || near(flyer, step)) { compared.near_a_change += 1; continue; }
+      if (moved === (state !== 'perching')) compared.agree += 1;
+      else {
+        compared.disagree += 1;
+        if (compared.disagreements.length < 10) compared.disagreements.push({ flyer, step, state, moved });
+      }
+    }
+  }
+  ctx.observe('fly-and-perch-on-the-clock', compared.moving_frames > 0 && compared.still_frames > 0 && compared.agree > 0 && compared.disagree === 0,
+    { ...compared, frames: drawn.frames, flyers_drawn: Object.keys(drawn.flyers).length, frame_ms: drawn.frame_ms,
+      sampled_steps: [fromStep + margin, toStep - margin - 1], transition_margin_steps: margin, sample_steps: sampleSteps, searched });
+  const interactions = drawn.interactions;
+  const worst = interactions.length ? Math.max(...interactions.map((e) => e.duration)) : null;
+  ctx.observe('page-stays-responsive', interactions.length > 0 && worst <= most,
+    { interactions, worst_ms: worst, at_most_ms: most, presses: pressed.length, pressed_notes: pressed.filter(Boolean), frame_ms: drawn.frame_ms });
+  await decisionSpend(ctx, (await ctx.api('GET', societyPath(entry, '/models'))).body);
+}
+
+// -- photos --------------------------------------------------------------------------------------
+
+const DRAWER = `document.querySelector('section.photos-drawer')`;
+const INTAKE = `document.querySelector('section.personal-intake')`;
+const INCLUDE_BOXES = `[...document.querySelectorAll('section.personal-intake input[type=checkbox][aria-label^="Include photograph"]')]`;
+
+async function openDrawer(page) {
+  if (!await page.evaluate(`${DRAWER}?.checkVisibility() ?? false`)) {
+    await page.click(`document.querySelector('aside.world-identity button.world-add-photos')`, 'Add photos');
+  }
+  await page.waitFor(`${DRAWER}?.checkVisibility() ?? false`, 10_000, 'the photo drawer');
+  // The workflow and its steps are folded; a person unfolds the ones they use.
+  await page.evaluate(`(() => { document.querySelectorAll('section.personal-intake details.photo-review-workflow, section.personal-intake details.intake-step').forEach(d => { d.open = true; }); return true; })()`);
+}
+
+async function openClosePhotoIntake(ctx) {
+  const { page } = ctx;
+  await openDrawer(page);
+  const inside = await page.evaluate(`({ upload: !!document.querySelector('input[aria-label="Original HEIC or JPEG photographs"]'),
+    canvas: document.getElementById('atlas')?.checkVisibility() ?? false, primary: document.querySelector('#shell')?.dataset.primary ?? null })`);
+  ctx.observe('drawer-beside-world', inside.upload && inside.canvas, inside);
+  await ctx.screenshot('drawer', 'the photo drawer beside the world');
+  await page.click(`document.querySelector('button.photos-drawer-close')`, 'Return to world');
+  await page.waitFor(`!(${DRAWER}?.checkVisibility() ?? false)`, 10_000, 'the drawer to close');
+  const back = await page.evaluate(`({ title: ${TITLE_FIELD}?.value ?? null, primary: document.querySelector('#shell')?.dataset.primary ?? null, ready: ${WORLD_READY} })`);
+  const entry = (await savedWorld(ctx)).entry;
+  ctx.observe('world-kept', back.ready && back.primary === 'world' && back.title === entry.title && entry.entry_id === ctx.facts.entry_id, back);
+}
+
+async function uploadSyntheticPhotographs(ctx) {
+  const { page } = ctx;
+  const drawn = ctx.runtime.photographs;
+  await openDrawer(page);
+  await page.setFiles(`document.querySelector('input[aria-label="Original HEIC or JPEG photographs"]')`, drawn.map((p) => p.path));
+  await page.click(BUTTON('Upload originals', INTAKE), 'Upload originals');
+  const listed = await page.waitFor(`${INCLUDE_BOXES}.length >= ${drawn.length} ? ${INCLUDE_BOXES}.length : null`, 60_000, 'the uploaded originals to be listed').catch(() => 0);
+  ctx.observe('originals-listed', listed === drawn.length, { listed, uploaded: drawn.length });
+  await ctx.screenshot('uploaded', 'the drawer after the upload');
+  const intake = await response(ctx, 'POST', '/api/intake');
+  const accepted = intake?.response_body?.accepted ?? [];
+  const byName = new Map(accepted.map((a) => [a.filename, a]));
+  const captures = drawn.map((p) => ({ ...p, ...(byName.get(p.file) ?? {}) }));
+  ctx.observe('captures-accepted', intake?.status === 202 && captures.every((c) => c.capture_id && c.blob_sha256 === c.sha256),
+    { status: intake?.status ?? null, accepted: accepted.map((a) => pick(a, ['filename', 'capture_id', 'blob_sha256', 'status'])),
+      refused: intake?.response_body?.refused ?? null });
+  ctx.facts.captures = captures.map((c) => pick(c, ['file', 'arm', 'capture_id', 'blob_sha256', 'bytes']));
+  ctx.facts.job_ids = [intake?.response_body?.queued_job_id].filter(Boolean);
+}
+
+function localDateTime(offsetDays) {
+  const end = new Date(Date.now() + offsetDays * 24 * 3600 * 1000);
+  return new Date(end.getTime() - end.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+async function authorizeAdmissionInApp(ctx) {
+  const { page } = ctx;
+  await openDrawer(page);
+  await page.setValue(`document.querySelector('input[aria-label="Purpose of this use"]')`, ctx.parameters.purpose);
+  await page.setValue(`document.querySelector('input[aria-label="Your account authority basis"]')`, ctx.parameters.authority_basis);
+  await page.setValue(`document.querySelector('input[aria-label="Authority valid until"]')`, localDateTime(ctx.parameters.valid_days));
+  await page.click(BUTTON('Authorize personal admission and request detection', INTAKE), 'Authorize personal admission');
+  const posted = await until('the admission to be answered', SETTLE_MS, async () => {
+    const r = await response(ctx, 'POST', '/api/personal-admission');
+    return r?.status ? r : null;
+  });
+  await sleep(1000);
+  const said = await page.evaluate(`${INTAKE}.innerText`);
+  ctx.observe('receipts-recorded', posted.status === 202 && /receipt/i.test(said),
+    { status: posted.status, drawer_mentions_receipts: /receipt/i.test(said) });
+  await ctx.screenshot('admitted', 'the drawer after authorizing admission');
+  const status = (await ctx.api('GET', '/personal-admission')).body;
+  const sources = new Set((status?.sources ?? []).map((s) => s.capture_id));
+  ctx.observe('admitted-for-detection', ctx.facts.captures.every((c) => sources.has(c.capture_id)),
+    { sources: status?.sources?.map((s) => pick(s, ['capture_id', 'eligibility_state', 'screening_kind'])) ?? null });
+  const job = posted.response_body?.queued_job_id;
+  if (job) ctx.facts.job_ids = [...(ctx.facts.job_ids ?? []), job];
+}
+
+// The drawer's model rights: the server's offers, each drawn as its own unticked box beside its
+// notice, in step 2 (offered with detection) and in step 4 (offered with the human review).
+const rightsFieldset = (label) => `document.querySelector(${JSON.stringify(`section.personal-intake fieldset[aria-label="${label}"]`)})`;
+const PROCESSING_RIGHTS = rightsFieldset('Models that may process these photos');
+const REVIEW_RIGHTS = rightsFieldset('Models that may use the reviewed photos');
+const offerRow = (role, fieldset = PROCESSING_RIGHTS) => `(${fieldset})?.querySelector(${JSON.stringify(`.model-right-offer[data-role="${role}"]`)})`;
+const offerBox = (role, fieldset = PROCESSING_RIGHTS) => `(${offerRow(role, fieldset)})?.querySelector('input[type=checkbox]')`;
+const drawnOffersIn = (fieldset) => `[...((${fieldset})?.querySelectorAll('.model-right-offer') ?? [])].map(row => {
+  const box = row.querySelector('input[type=checkbox]');
+  return { role: row.dataset.role ?? null, label: box?.getAttribute('aria-label') ?? null, checked: box?.checked ?? null,
+    choice: row.querySelector('.model-right-choice')?.textContent.trim() ?? null,
+    notice: row.querySelector('.model-right-notice')?.textContent ?? null }; })`;
+const drawnOffers = drawnOffersIn(PROCESSING_RIGHTS);
+// Each saved photograph's line in the drawer, by the capture id its File identity names, with the
+// state the drawer draws for every role and the stop controls beside them.
+const PHOTO_RIGHTS = `[...document.querySelectorAll('section.personal-intake .intake-original')].map(row => ({
+  capture: row.querySelector('details p')?.textContent.match(/capture ([0-9a-f-]{36})/)?.[1] ?? null,
+  states: Object.fromEntries([...row.querySelectorAll('.intake-original-rights .photo-right-state')].map(s => [s.dataset.role, s.textContent.trim()])),
+  stops: [...row.querySelectorAll('.intake-original-rights button.photo-right-stop')].map(b => b.textContent.trim()) }))`;
+
+const sameIdentity = (a, b) => a.provider === b.provider && a.role === b.role && a.model_id === b.model_id
+  && (a.revision ?? null) === (b.revision ?? null);
+
+/** Whether `rights` hold a current right at the offer's destination for every model of its chain. */
+function coversChain(offer, rights, current) {
+  return offer.models.every((model) => rights.some((right) => current(right)
+    && right.destination === offer.destination && sameIdentity(right.model, model)));
+}
+
+/**
+ * What step 2 draws against what the server offers with detection: the offers for `roles`, by role,
+ * and every way a drawn box departs from its offer (missing, ticked, another label, other words),
+ * plus any box drawn for a role the server does not offer with detection.
+ */
+export function compareOffers(roles, stated, drawn, offeredWith = 'detect') {
+  const detect = (stated ?? []).filter((o) => o.offered_with === offeredWith);
+  const offers = new Map(detect.filter((o) => roles.includes(o.role)).map((o) => [o.role, o]));
+  const drawnByRole = new Map(drawn.map((d) => [d.role, d]));
+  const mismatches = roles.flatMap((role) => {
+    const offer = offers.get(role);
+    const box = drawnByRole.get(role);
+    if (offer === undefined) return [`${role}: GET /personal-admission offers no such right with ${offeredWith === 'detect' ? 'detection' : offeredWith}`];
+    if (box === undefined) return [`${role}: no box is drawn`];
+    return [
+      box.checked !== false ? `${role}: the box is not unticked` : null,
+      box.label !== offer.label || box.choice !== offer.label ? `${role}: the label is not the offer's` : null,
+      box.notice !== offer.notice ? `${role}: the notice beside it is not the offer's word for word` : null,
+    ].filter(Boolean);
+  });
+  const unoffered = drawn.map((d) => d.role).filter((role) => !detect.some((o) => o.role === role));
+  return { offers, mismatches, unoffered };
+}
+
+/**
+ * For every photograph, what the grant recorded for `roles`: whether the posted admission named
+ * it, the roles its receipt covers across each chain, and the roles GET /personal-admission lists
+ * as current and granted against the words stated now.
+ */
+export function rightsPerPhoto(roles, offers, captures, sent, receipts, sources) {
+  const members = new Set((sent?.members ?? []).map((m) => m.capture_id));
+  const receiptOf = new Map((receipts ?? []).map((r) => [r.capture_id, r]));
+  const sourceOf = new Map((sources ?? []).map((s) => [s.capture_id, s]));
+  const offered = roles.filter((role) => offers.has(role));
+  return captures.map((c) => {
+    const listed = sourceOf.get(c.capture_id)?.model_rights ?? [];
+    return {
+      capture_id: c.capture_id,
+      in_request: members.has(c.capture_id),
+      receipt_covers: offered.filter((role) => coversChain(offers.get(role), receiptOf.get(c.capture_id)?.model_rights ?? [], (r) => !r.withdrawn)),
+      listed_current_with_these_words: offered.filter((role) => coversChain(offers.get(role), listed,
+        (r) => r.state === 'current' && r.notice_current === true)),
+      listed: listed.map((r) => pick(r, ['right_id', 'model', 'destination', 'state', 'notice_current', 'valid_until'])),
+    };
+  });
+}
+
+/** The rights-recorded rule: the drawer sent every role with the offer's own words, for every photograph, and each is recorded. */
+export function rightsRecorded(roles, offers, captures, posted, perPhoto) {
+  const sentRights = Array.isArray(posted?.request_body?.model_rights) ? posted.request_body.model_rights : [];
+  return posted?.status === 202
+    && same(sentRights.map((r) => r.role).sort(), [...roles].sort())
+    && sentRights.every((r) => offers.get(r.role)?.notice === r.notice)
+    && new Set((posted.request_body?.members ?? []).map((m) => m.capture_id)).size === captures.length
+    && perPhoto.length === captures.length
+    && perPhoto.every((p) => p.in_request && p.receipt_covers.length === roles.length
+      && p.listed_current_with_these_words.length === roles.length);
+}
+
+/**
+ * The end of each role's term over each photograph as the server recorded it: for each model of
+ * the role's chain, the latest current right covering it; for the role, the earliest of those. A
+ * role some model of which has no current right has no term (null).
+ */
+export function roleTerms(roles, offers, perPhoto) {
+  return Object.fromEntries(perPhoto.map((p) => [p.capture_id, Object.fromEntries(roles
+    .filter((role) => offers.has(role)).map((role) => {
+      const offer = offers.get(role);
+      const ends = offer.models.map((model) => p.listed
+        .filter((r) => r.state === 'current' && r.destination === offer.destination && sameIdentity(r.model, model))
+        .map((r) => r.valid_until).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null);
+      return [role, ends.includes(null) ? null : ends.sort((a, b) => Date.parse(a) - Date.parse(b))[0]];
+    }))]));
+}
+
+async function waitForJobs(ctx, jobs) {
+  const terminal = {};
+  await until('every derivative job to end', ctx.parameters.job_wait_seconds * 1000, async () => {
+    for (const job of jobs) {
+      if (terminal[job]) continue;
+      const events = (await ctx.api('GET', `/operations/derivative-jobs/${job}/events`)).body ?? [];
+      const end = events.find((e) => TERMINAL_JOB_EVENTS.has(e.event_type));
+      if (end) terminal[job] = end.event_type;
+    }
+    return jobs.every((job) => terminal[job]);
+  }).catch(() => null);
+  return terminal;
+}
+
+/**
+ * The person gives the vision, search and Companion rights in the drawer, against the words the
+ * server states. The offers are read from GET /personal-admission first, so the page is held to
+ * the server's own wording rather than to a copy here; the boxes are ticked with trusted clicks and
+ * the grant goes with a second detection request, which starts the work that needs the rights.
+ */
+async function grantModelRightsInApp(ctx) {
+  const { page } = ctx;
+  const { roles } = ctx.parameters;
+  await openDrawer(page);
+  const before = (await ctx.api('GET', '/personal-admission')).body;
+  const drawn = await page.waitFor(`(() => { const d = ${drawnOffers}; return d.length > 0 ? d : null; })()`,
+    SETTLE_MS, 'the model rights step 2 offers').catch(() => []);
+  const { offers, mismatches, unoffered } = compareOffers(roles, before?.model_right_offers, drawn);
+  await page.evaluate(`(() => { (${PROCESSING_RIGHTS})?.scrollIntoView({ block: 'start' }); return true; })()`);
+  await ctx.screenshot('offered', "step 2 with the server's model rights offered, every box unticked");
+
+  // The purpose, authority and term first, then the ticks, and the grant goes with the next click.
+  await page.setValue(`document.querySelector('input[aria-label="Purpose of this use"]')`, ctx.parameters.purpose);
+  await page.setValue(`document.querySelector('input[aria-label="Your account authority basis"]')`, ctx.parameters.authority_basis);
+  await page.setValue(`document.querySelector('input[aria-label="Authority valid until"]')`, localDateTime(ctx.parameters.valid_days));
+  const clicks = [];
+  for (const role of roles) {
+    const covered = await page.click(offerBox(role), `the ${role} box`).catch((error) => `not clicked: ${error.message}`);
+    clicks.push({ role, trusted: covered === null, note: covered, checked: await page.evaluate(`(${offerBox(role)})?.checked ?? null`) });
+  }
+  ctx.observe('rights-offered', mismatches.length === 0 && unoffered.length === 0
+    && clicks.every((c) => c.trusted && c.checked === true),
+  { offered_roles: [...offers.keys()], drawn: drawn.map((d) => ({ ...d, notice_equals_offer: d.notice === offers.get(d.role)?.notice })),
+    mismatches, drawn_but_not_offered: unoffered, clicks });
+  await ctx.screenshot('ticked', 'step 2 with the three rights ticked by the person');
+
+  await page.click(BUTTON('Authorize personal admission and request detection', INTAKE), 'Authorize personal admission');
+  const posted = await until('the admission carrying the rights to be answered', SETTLE_MS, async () => {
+    const r = await response(ctx, 'POST', '/api/personal-admission');
+    return r?.status ? r : null;
+  });
+  const sent = posted.request_body;
+  const status = (await ctx.api('GET', '/personal-admission')).body;
+  const perPhoto = rightsPerPhoto(roles, offers, ctx.facts.captures, sent, posted.response_body?.receipts, status?.sources);
+  ctx.observe('rights-recorded', rightsRecorded(roles, offers, ctx.facts.captures, posted, perPhoto),
+    { status: posted.status, detail: posted.response_body?.detail ?? null,
+      request_body_recorded: sent != null && typeof sent === 'object',
+      sent: (Array.isArray(sent?.model_rights) ? sent.model_rights : []).map((r) => ({ role: r.role, valid_until: r.valid_until,
+        notice_equals_offer: offers.get(r.role)?.notice === r.notice })),
+      members: (sent?.members ?? []).map((m) => m.capture_id), per_photo: perPhoto });
+
+  // The drawer reads the recorded rights back. Each photo's line names every role in the server's
+  // short name, with the end of the term the server recorded as the person's clock reads it: for a
+  // role, the earliest over its chain's models of the latest current right covering that model.
+  const terms = roleTerms(roles, offers, perPhoto);
+  const lines = await page.evaluate(`((terms, offers) => Object.fromEntries(Object.entries(terms).map(([capture, byRole]) =>
+    [capture, Object.fromEntries(Object.entries(byRole).map(([role, end]) =>
+      [role, end === null ? null : offers[role] + ': allowed until ' + new Date(end).toLocaleString()]))])))(
+    ${JSON.stringify(terms)}, ${JSON.stringify(Object.fromEntries([...offers].map(([role, o]) => [role, o.short])))})`);
+  const listedOk = (rows) => ctx.facts.captures.every((c) => {
+    const row = rows.find((r) => r.capture === c.capture_id);
+    return row !== undefined && roles.every((role) => offers.has(role) && lines[c.capture_id]?.[role] != null
+      && row.states[role] === lines[c.capture_id][role] && row.stops.includes(offers.get(role).stop_action));
+  });
+  const settled = await until('every photograph to state its rights', SETTLE_MS, async () => {
+    const now = await page.evaluate(PHOTO_RIGHTS);
+    return listedOk(now) ? now : null;
+  }).catch(async () => page.evaluate(PHOTO_RIGHTS));
+  const after = await page.evaluate(drawnOffers);
+  ctx.observe('rights-listed', listedOk(settled) && after.length === drawn.length && after.every((d) => d.checked === false),
+    { expected_lines: lines, photographs: settled, boxes_after: after.map((d) => pick(d, ['role', 'checked'])) });
+  await page.evaluate(`(() => { document.querySelector('section.personal-intake .intake-original-rights')?.scrollIntoView({ block: 'center' }); return true; })()`);
+  await ctx.screenshot('listed', "the drawer after the grant: each photograph's rights, the boxes unticked again");
+
+  // The job this grant queued is the one that sends the photographs to the models; every other
+  // job of the session is held to its end by photo-jobs-end-cleanly.
+  const granted = posted.response_body?.queued_job_id ?? null;
+  if (granted) ctx.facts.job_ids = [...(ctx.facts.job_ids ?? []), granted];
+  const terminal = granted ? await waitForJobs(ctx, [granted]) : {};
+  const metrics = (await ctx.api('GET', '/operations/derivative-jobs')).body;
+  ctx.spend(String(metrics?.cost?.usd_estimate ?? '0'));
+  ctx.observe('vision-ran', granted !== null && terminal[granted] === 'job_succeeded' && metrics?.cost?.model_calls > 0,
+    { job: granted, job_end: terminal[granted] ?? null, cost: metrics?.cost ?? null });
+  const graph = (await ctx.api('GET', '/graph')).body;
+  const places = (graph?.occurrences ?? []).filter((o) => o.occurrence_class === 'place');
+  const expected = new Set(ctx.facts.captures.filter((c) => c.arm === 'positive').map((c) => c.capture_id));
+  const found = new Set(places.map((o) => o.capture_id));
+  ctx.observe('place-proposed', expected.size > 0 && same([...expected].sort(), [...found].sort()),
+    { expected: [...expected], place_occurrences: places.map((o) => pick(o, ['occurrence_id', 'capture_id', 'entity_id'])) });
+  ctx.facts.place_occurrences = places.map((o) => pick(o, ['occurrence_id', 'capture_id']));
+}
+
+async function confirmProposedPlace(ctx) {
+  const { page } = ctx;
+  const [first, ...rest] = ctx.facts.place_occurrences ?? [];
+  if (first === undefined) throw new Error('no place occurrence was proposed');
+  const named = await ctx.api('POST', '/identity/name', { occurrence_id: first.occurrence_id, display_name: ctx.parameters.display_name });
+  const confirmed = [];
+  for (const occurrence of rest) {
+    confirmed.push(await ctx.api('POST', '/identity/confirm', { occurrence_id: occurrence.occurrence_id, entity_id: named.body?.entity_id }));
+  }
+  const graph = (await ctx.api('GET', '/graph')).body;
+  const linked = (graph?.occurrences ?? []).filter((o) => o.occurrence_class === 'place');
+  ctx.observe('place-named', named.status === 200 && confirmed.every((c) => c.status === 200)
+    && linked.every((o) => o.entity_id === named.body?.entity_id && o.link_state === 'confirmed'),
+  { named: named.status, entity_id: named.body?.entity_id ?? null, confirmed: confirmed.map((c) => c.status),
+    links: linked.map((o) => pick(o, ['occurrence_id', 'entity_id', 'link_state'])) });
+  ctx.facts.place_entity_id = named.body?.entity_id ?? null;
+  ctx.facts.place_name = ctx.parameters.display_name;
+  // The page read the graph when it opened; a person sees the new name after the next load.
+  await reload(ctx);
+  await chooseMenu(page, 'index');
+  const text = await page.waitFor(`(() => { const t = document.body.innerText; return t.toLowerCase().includes(${JSON.stringify(ctx.parameters.display_name.toLowerCase())}) ? t : null; })()`,
+    15_000, 'the Library to show the place').catch(async () => page.evaluate('document.body.innerText'));
+  const count = new RegExp(`${linked.length} occurrences?`).test(text);
+  ctx.observe('library-lists-place', text.toLowerCase().includes(ctx.parameters.display_name.toLowerCase()) && count,
+    { lists_name: text.toLowerCase().includes(ctx.parameters.display_name.toLowerCase()), occurrences_stated: count,
+      excerpt: text.slice(0, 600) });
+  await ctx.screenshot('library', 'the Library after the place was confirmed');
+  await page.key('Escape', 'Escape');
+}
+
+// -- a world from the photographs -----------------------------------------------------------------
+
+// The offer to make a world from reviewed photographs: in the drawer, and under the list of saved
+// worlds when there is more than one.
+const OFFER = `${INTAKE}?.querySelector('section.personal-world-choice')`;
+const LIST_OFFER = `document.querySelector('main.world-entry-gate section.personal-world-choice')`;
+const REVIEW_SOURCE = `document.querySelector('section.personal-intake select[aria-label="Photograph to review"]')`;
+const REVIEW_CHOICE = `document.querySelector('section.personal-intake select[aria-label="Human review of this photograph"]')`;
+const REVIEWER = `document.querySelector('section.personal-intake input[aria-label="Reviewer’s actual name"]')`;
+const RESELECT = `document.querySelector('section.personal-intake input[aria-label="Reselect exact originals for local review"]')`;
+// The attestation is the one checkbox of the drawer whose label is the person's own sentence.
+const ATTESTATION = `[...document.querySelectorAll('section.personal-intake input[type=checkbox]')].find(b => b.getAttribute('aria-label')?.startsWith('I '))`;
+
+/**
+ * The offer as a person reads it: its state, its words, its counts and its button, and, once an
+ * addition is pressed, the preview's sentences with its Cancel and Confirm.
+ */
+const offerSeen = (page, where) => page.evaluate(`(() => { const o = ${where}; if (!o) return null;
+  const shown = (e) => (e?.checkVisibility() ? e.textContent : null);
+  const b = o.querySelector('.personal-world-make');
+  const c = o.querySelector('.personal-world-confirm');
+  const ok = o.querySelector('.personal-world-confirm-add');
+  return { state: o.dataset.state ?? null, status: shown(o.querySelector('.personal-world-status')),
+    counts: shown(o.querySelector('.personal-world-counts')), button: shown(b), enabled: b ? !b.disabled : null,
+    failure: shown(o.querySelector('.personal-world-failure')),
+    preview: c?.checkVisibility() ? [...c.querySelectorAll('.personal-world-preview li')].map(li => li.textContent) : null,
+    cancel: o.querySelector('.personal-world-cancel')?.checkVisibility() ?? false,
+    confirm: ok?.checkVisibility() ? { text: ok.textContent, enabled: !ok.disabled } : null }; })()`);
+
+async function offerSettled(page, where, what) {
+  await page.waitFor(`(() => { const o = ${where}; return !!o && !!o.dataset.state && o.dataset.state !== 'unknown'; })()`,
+    SETTLE_MS, what);
+  await page.evaluate(`(() => { (${where})?.scrollIntoView({ block: 'center' }); return true; })()`);
+}
+
+/**
+ * Every way the offer a person reads departs from the server's read of it: a refusal must be
+ * shown in the server's own words with no button; an action must be offered by the button the
+ * step names for it, beside the server's counts of composed photographs and places, or, for an
+ * addition the server previews, beside the preview's first sentence as the server wrote it.
+ */
+export function offerMismatches(server, seen, buttons) {
+  if (server == null || seen == null) return ['the server or the page gave no offer'];
+  if (server.refusal != null) {
+    return [
+      seen.status !== server.refusal.detail ? "the refusal is not shown in the server's words" : null,
+      seen.button !== null ? 'a button is offered beside a refusal' : null,
+    ].filter(Boolean);
+  }
+  const { composed } = server.photographs ?? {};
+  const counts = server.preview != null
+    ? [seen.counts !== server.preview.sentences?.[0] ? "the offer's line is not the preview's first sentence" : null]
+    : [
+      !String(seen.counts ?? '').includes(`${composed} reviewed photograph`) ? "the counts do not state the server's composed photographs" : null,
+      !String(seen.counts ?? '').includes(`${server.regions} place`) ? "the counts do not state the server's places" : null,
+    ];
+  return [
+    buttons[server.action] === undefined ? `the step names no button for ${server.action}` : null,
+    seen.button !== buttons[server.action] ? `the button is not "${buttons[server.action]}"` : null,
+    seen.enabled !== true ? 'the button is not enabled' : null,
+    ...counts,
+  ].filter(Boolean);
+}
+
+/**
+ * The review the drawer posted, held to the stand-in rule and to the photographs of this run:
+ * a review operation naming every uploaded photograph with the choice the step makes, under the
+ * reviewer name, purpose and authority the stand-in states, and receipts that found each eligible.
+ */
+export function reviewMismatches(standIn, choice, captures, posted) {
+  const body = posted?.request_body ?? {};
+  const members = Array.isArray(body.members) ? body.members : [];
+  const receipts = posted?.response_body?.receipts ?? [];
+  const byCapture = new Map(receipts.map((r) => [r.capture_id, r]));
+  return [
+    posted?.status !== 202 ? `the review was answered ${posted?.status ?? 'never'}, not 202` : null,
+    body.operation !== 'review' ? 'the request is not a review' : null,
+    body.reviewed_by_name !== standIn.reviewer_name ? "the reviewer is not named as the stand-in" : null,
+    body.purpose !== standIn.purpose ? 'the purpose is not the stand-in\'s' : null,
+    body.authority?.account_authority_basis !== standIn.authority_basis ? 'the authority basis is not the stand-in\'s' : null,
+    !body.attestation ? 'no attestation was sent' : null,
+    members.length !== captures.length || !captures.every((c) => members.some((m) => m.capture_id === c.capture_id && m.review === choice))
+      ? `the review does not name every photograph as ${choice}` : null,
+    !captures.every((c) => byCapture.get(c.capture_id)?.eligibility_state === 'eligible') ? 'a receipt is not eligible' : null,
+  ].filter(Boolean);
+}
+
+/**
+ * Record the human review of every photograph in the drawer's step 3 and 4, as the stand-in the
+ * step list states: reselect the exact originals, choose the review for each, name the reviewer,
+ * tick the attestation and the rights the server offers with the review, and record it.
+ */
+async function recordReview(ctx, photographs, captureIds) {
+  const { page } = ctx;
+  const standIn = ctx.runtime.stand_ins[ctx.step.stand_in];
+  await openDrawer(page);
+  await page.setValue(`document.querySelector('input[aria-label="Purpose of this use"]')`, standIn.purpose);
+  await page.setValue(`document.querySelector('input[aria-label="Your account authority basis"]')`, standIn.authority_basis);
+  await page.setValue(`document.querySelector('input[aria-label="Authority valid until"]')`, localDateTime(ctx.parameters.valid_days));
+  await page.setFiles(RESELECT, photographs.map((p) => p.path));
+  await page.waitFor(`(() => { const o = [...(${REVIEW_SOURCE})?.options ?? []].map(o => o.value);
+    return ${JSON.stringify(captureIds)}.every(id => o.includes(id)); })()`, SETTLE_MS, 'every photograph to be offered for review');
+  const choices = [];
+  for (const capture of captureIds) {
+    await page.setValue(REVIEW_SOURCE, capture);
+    await page.waitFor(`!(${REVIEW_CHOICE}).disabled`, SETTLE_MS, `the exact original of ${capture} to be inspected`);
+    await page.setValue(REVIEW_CHOICE, ctx.parameters.review_choice);
+    choices.push({ capture_id: capture, choice: await page.evaluate(`(${REVIEW_CHOICE}).value`) });
+  }
+  await page.setValue(REVIEWER, standIn.reviewer_name);
+  const attestation = await page.click(ATTESTATION, 'the attestation').catch((error) => `not clicked: ${error.message}`);
+  const offers = (await ctx.api('GET', '/personal-admission')).body?.model_right_offers;
+  const drawn = await page.waitFor(`(() => { const d = ${drawnOffersIn(REVIEW_RIGHTS)}; return d.length > 0 ? d : null; })()`,
+    SETTLE_MS, 'the model rights offered with the review').catch(() => []);
+  const compared = compareOffers(ctx.parameters.roles, offers, drawn, 'review');
+  const clicks = [];
+  for (const role of ctx.parameters.roles) {
+    const note = await page.click(offerBox(role, REVIEW_RIGHTS), `the ${role} box`).catch((error) => `not clicked: ${error.message}`);
+    clicks.push({ role, trusted: note === null, note, checked: await page.evaluate(`(${offerBox(role, REVIEW_RIGHTS)})?.checked ?? null`) });
+  }
+  const ticked = { attestation: { trusted: attestation === null, checked: await page.evaluate(`(${ATTESTATION})?.checked ?? null`) }, clicks };
+  await page.evaluate(`(() => { (${REVIEW_RIGHTS})?.scrollIntoView({ block: 'center' }); return true; })()`);
+  await ctx.screenshot('review-ready', 'step 4 before the review is recorded: the reviewer named as the stand-in, the attestation and the offered rights ticked');
+  const reviewsBefore = (await responses(ctx, 'POST', '/api/personal-admission')).length;
+  await page.click(BUTTON('Record human review', INTAKE), 'Record human review');
+  const posted = await until('the review to be answered', SETTLE_MS, async () => {
+    const r = (await responses(ctx, 'POST', '/api/personal-admission')).slice(reviewsBefore)
+      .find((x) => x.request_body?.operation === 'review' && x.status);
+    return r ?? null;
+  });
+  return { standIn, choices, offers, drawn, compared, ticked, posted };
+}
+
+/**
+ * The photographs' human review, given by the rehearsal driver as the stand-in the step list
+ * states: the offer refuses before it in the server's words, and counts every photograph after.
+ */
+async function reviewPhotographsInApp(ctx) {
+  const { page } = ctx;
+  const captures = ctx.facts.captures;
+  await openDrawer(page);
+  await offerSettled(page, OFFER, 'the offer to read the server before the review');
+  const before = (await ctx.api('GET', '/worlds/personal-source')).body;
+  const seenBefore = await offerSeen(page, OFFER);
+  const beforeMismatches = offerMismatches(before, seenBefore, ctx.parameters.buttons);
+  ctx.observe('offer-refuses-before-review', before?.refusal?.code === ctx.parameters.refusal_before_review
+    && beforeMismatches.length === 0, { server: before, seen: seenBefore, mismatches: beforeMismatches });
+  await ctx.screenshot('offer-before', "the drawer's offer before any review, in the server's words");
+
+  const review = await recordReview(ctx, ctx.runtime.photographs, captures.map((c) => c.capture_id));
+  const { standIn, compared, ticked, posted } = review;
+  ctx.observe('review-given-in-drawer', review.choices.length === captures.length
+    && review.choices.every((c) => c.choice === ctx.parameters.review_choice)
+    && ticked.attestation.trusted && ticked.attestation.checked === true
+    && compared.mismatches.length === 0 && compared.unoffered.length === 0
+    && ticked.clicks.every((c) => c.trusted && c.checked === true),
+  { choices: review.choices, attestation: ticked.attestation, clicks: ticked.clicks,
+    offered_with_review: review.drawn.map((d) => ({ ...d, notice_equals_offer: d.notice === compared.offers.get(d.role)?.notice })),
+    mismatches: compared.mismatches, drawn_but_not_offered: compared.unoffered });
+  const mismatches = reviewMismatches(standIn, ctx.parameters.review_choice, captures, posted);
+  const sentRights = Array.isArray(posted.request_body?.model_rights) ? posted.request_body.model_rights : [];
+  const status = (await ctx.api('GET', '/personal-admission')).body;
+  const perPhoto = rightsPerPhoto(ctx.parameters.roles, compared.offers, captures, posted.request_body,
+    posted.response_body?.receipts, status?.sources);
+  const heldPurpose = (status?.sources ?? []).filter((x) => captures.some((c) => c.capture_id === x.capture_id))
+    .map((x) => x.authority?.purpose ?? null);
+  ctx.observe('review-recorded-as-stand-in', mismatches.length === 0
+    && heldPurpose.length === captures.length && heldPurpose.every((x) => x === standIn.purpose)
+    && rightsRecorded(ctx.parameters.roles, compared.offers, captures, posted, perPhoto),
+  { mismatches, reviewed_by_name: posted.request_body?.reviewed_by_name ?? null, purpose_held: heldPurpose,
+    rights_sent: sentRights.map((r) => ({ role: r.role, notice_equals_offer: compared.offers.get(r.role)?.notice === r.notice })),
+    receipts: (posted.response_body?.receipts ?? []).map((r) => pick(r, ['capture_id', 'eligibility_state'])), per_photo: perPhoto });
+  ctx.facts.review_job_id = posted.response_body?.queued_job_id ?? null;
+  if (ctx.facts.review_job_id) ctx.facts.job_ids = [...(ctx.facts.job_ids ?? []), ctx.facts.review_job_id];
+  ctx.facts.review_stand_in = ctx.step.stand_in;
+  await page.waitFor(`${INTAKE}.innerText.includes('Admission receipts recorded')`, SETTLE_MS, 'the review receipts').catch(() => null);
+  const after = (await ctx.api('GET', '/worlds/personal-source')).body;
+  ctx.observe('review-counted', after?.photographs?.reviewed === captures.length,
+    { photographs: after?.photographs ?? null, action: after?.action ?? null, refusal: after?.refusal ?? null });
+  await ctx.screenshot('reviewed', 'the drawer after the review was recorded');
+}
+
+/**
+ * The work the review starts, which a person waits for: the derivative job the review queued ends,
+ * its depth stage has made a point map of every photograph, the scene grouping that closes the job
+ * has placed every one of them, and nothing is left waiting for a worker this runtime does not run.
+ */
+async function waitForDepthAndGrouping(ctx) {
+  const captures = ctx.facts.captures;
+  const job = ctx.facts.review_job_id;
+  const terminal = job ? await waitForJobs(ctx, [job]) : {};
+  const geometry = (await ctx.api('GET', '/geometry')).body ?? [];
+  const pointMaps = captures.map((c) => ({ capture_id: c.capture_id,
+    point_map: pick(geometry.find((g) => g.capture_id === c.capture_id && g.kind === 'point_map') ?? null,
+      ['artifact_id', 'stage_key', 'state', 'reason']) }));
+  ctx.observe('depth-ran', job !== null && terminal[job] === 'job_succeeded'
+    && pointMaps.every((p) => p.point_map?.state === 'available' && p.point_map?.stage_key === ctx.parameters.depth_stage),
+  { job, job_end: terminal[job] ?? null, point_maps: pointMaps });
+  const offer = (await ctx.api('GET', '/worlds/personal-source')).body;
+  ctx.observe('photographs-grouped', offer?.action === ctx.parameters.action
+    && offer.photographs?.reviewed === captures.length && offer.photographs?.composed === captures.length
+    && offer.photographs?.outside_scene_groups === 0 && offer.regions >= 1,
+  { offer });
+  const scenes = (await ctx.api('GET', '/operations/reconstruction-scenes')).body;
+  ctx.observe('nothing-left-for-the-scene-worker', sceneWorkWaiting(scenes) === 0
+    && scenes.coordination?.state === ctx.parameters.scene_coordination,
+  { waiting: sceneWorkWaiting(scenes), coordination: scenes?.coordination ?? null, queue: scenes?.depth ?? null,
+    scenes: scenes?.scenes ?? null });
+  ctx.facts.point_maps = pointMaps;
+}
+
+/**
+ * The scene work GET /operations/reconstruction-scenes reports as left for a scene worker: scene
+ * jobs queued, running or retryable (its `depth` block counts the scene queue), and selected scene
+ * groups still waiting for point maps, which become jobs. Null when the read does not state them.
+ */
+export function sceneWorkWaiting(scenes) {
+  const queue = scenes?.depth;
+  const counts = ['queued', 'running', 'retryable', 'waiting_for_point_maps'].map((name) => queue?.[name]);
+  return counts.every(Number.isInteger) ? counts.reduce((total, n) => total + n, 0) : null;
+}
+
+/** The world-scoped requests a page made, by the world each named. */
+const worldsNamed = (traffic) => [...new Set(traffic.filter((t) => t.path.includes('world_id='))
+  .map((t) => new URL(`http://page${t.path}`).searchParams.get('world_id')))];
+
+/**
+ * What a person sees of a made world: its title, its source media drawn from the photographs
+ * composed into it, the point map of each read by the page, and every world request naming it.
+ * `traffic` is the made world's own requests; `pageTraffic` is everything this page requested,
+ * because a page keeps each point map it decoded for the life of the tab and hands it to the next
+ * world it mounts rather than asking again (GET /geometry/{artifact_id}, Cache-Control no-store).
+ */
+async function madeWorldDrawn(ctx, entry, traffic, pageTraffic = traffic) {
+  const { page } = ctx;
+  const media = (await ctx.api('GET', `/world/source-media?world_id=${encodeURIComponent(entry.world_id)}`)).body;
+  const slots = Array.isArray(media) ? media : (media?.sources ?? media?.slots ?? []);
+  const composed = ctx.facts.captures.filter((c) => slots.some((m) => (m.capture_ids ?? []).includes(c.capture_id)));
+  const pointMapReads = (ctx.facts.point_maps ?? []).map((p) => ({ capture_id: p.capture_id,
+    read: pageTraffic.filter((t) => t.method === 'GET' && t.path.startsWith(`/api/geometry/${p.point_map?.artifact_id}`)).map((t) => t.status) }));
+  const read = (prefix) => traffic.filter((t) => t.method === 'GET' && t.path.startsWith(prefix)).map((t) => t.status);
+  const listed = { geometry: read('/api/geometry?').concat(traffic.filter((t) => t.method === 'GET' && t.path === '/api/geometry').map((t) => t.status)),
+    source_media: read('/api/world/source-media?') };
+  const title = await page.evaluate(`${TITLE_FIELD}?.value ?? null`);
+  return {
+    title, saved_title: entry.title,
+    worlds_named: worldsNamed(traffic),
+    source_media: slots.map((m) => pick(m, ['slot_key', 'region_id', 'state', 'reason', 'evidence_path', 'capture_ids'])),
+    composed_captures: composed.map((c) => c.capture_id),
+    point_map_reads: pointMapReads,
+    world_reads: listed,
+    holds: title === entry.title
+      && listed.geometry.includes(200) && listed.source_media.includes(200)
+      && worldsNamed(traffic).length > 0 && worldsNamed(traffic).every((w) => w === entry.world_id)
+      && composed.length === ctx.facts.captures.length
+      && slots.length > 0 && slots.every((m) => m.state === 'available' && Boolean(m.evidence_path))
+      && pointMapReads.every((p) => p.read.includes(200)),
+  };
+}
+
+/**
+ * Lane Z's step, in this session's order: the drawer offers to make a world from the reviewed
+ * photographs, the press makes and opens it, and after a reload the list of saved worlds holds
+ * both worlds with the offer beneath it refusing in the server's words.
+ */
+async function makeWorldFromPhotographs(ctx) {
+  const { page } = ctx;
+  const captures = ctx.facts.captures;
+  // A drawer opened before the depth pass ended holds the read it made then; a person reopens it.
+  await reload(ctx);
+  await openDrawer(page);
+  await offerSettled(page, OFFER, 'the offer to read the server');
+  const server = (await ctx.api('GET', '/worlds/personal-source')).body;
+  const seen = await offerSeen(page, OFFER);
+  const mismatches = offerMismatches(server, seen, ctx.parameters.buttons);
+  ctx.observe('offer-read', server?.action === ctx.parameters.action && server.refusal === null
+    && server.photographs?.composed === captures.length && Boolean(server.topology_digest), { server });
+  ctx.observe('offer-shown', mismatches.length === 0 && seen?.button === ctx.parameters.buttons[ctx.parameters.action],
+    { seen, mismatches });
+  await ctx.screenshot('offer', 'the drawer offering to make a world from the reviewed photographs');
+
+  const entriesBefore = (await ctx.api('GET', '/world-entries')).body.map((e) => e.entry_id);
+  // The page's requests in the order it sent them; those from the press on are the made world's.
+  const pressed = (await ctx.page.traffic(ctx.step.id)).length;
+  await page.click(`(${OFFER}).querySelector('.personal-world-make')`, ctx.parameters.buttons[ctx.parameters.action]);
+  const made = await until('the made world to be saved', SETTLE_MS, async () => {
+    const listed = (await ctx.api('GET', '/world-entries')).body ?? [];
+    return listed.find((e) => !entriesBefore.includes(e.entry_id)) ?? null;
+  });
+  await page.waitFor(`${WORLD_READY} && (${TITLE_FIELD})?.value === ${JSON.stringify(made.title)}
+    && !(${DRAWER}?.checkVisibility() ?? false)`, 90_000, 'the made world to open');
+  await sleep(ctx.parameters.drawn_after_ms);
+  const traffic = await ctx.page.traffic(ctx.step.id);
+  const composedPost = [...traffic].reverse().find((t) => t.method === 'POST' && t.path.startsWith('/api/worlds/personal-source')) ?? null;
+  const worldId = composedPost?.response_body?.world_id ?? null;
+  const worlds = (await ctx.api('GET', '/worlds')).body;
+  const listedWorld = (worlds?.worlds ?? []).find((w) => w.world_id === worldId) ?? null;
+  ctx.observe('composed-as-read', composedPost?.status === 200
+    && composedPost.request_body?.topology_digest === server?.topology_digest
+    && listedWorld?.kind === ctx.parameters.world_kind,
+  { request: composedPost?.request_body ?? null, status: composedPost?.status ?? null, response: composedPost?.response_body ?? null,
+    listed: listedWorld });
+  const afterPress = traffic.slice(pressed);
+  const bootstrap = afterPress.find((t) => t.method === 'POST' && t.path.startsWith('/api/world/versions/bootstrap'));
+  const saved = afterPress.find((t) => t.method === 'POST' && t.path.split('?')[0] === '/api/world-entries');
+  ctx.observe('entry-saved', worldId !== null && bootstrap?.status === 200 && worldsNamed([bootstrap]).includes(worldId)
+    && saved?.status === 201 && saved.response_body?.world_id === worldId && made.world_id === worldId
+    && made.source_kind === ctx.parameters.entry_source_kind,
+  { bootstrap: bootstrap ? pick(bootstrap, ['path', 'status']) : null, saved: saved ? { status: saved.status, world_id: saved.response_body?.world_id } : null,
+    entry: pick(made, ['entry_id', 'world_id', 'title', 'source_kind', 'availability']) });
+  Object.assign(ctx.facts, { made_entry_id: made.entry_id, made_world_id: made.world_id, made_title: made.title,
+    made_topology_digest: composedPost?.response_body?.topology_digest ?? null, open_entry_id: made.entry_id });
+  const drawn = await madeWorldDrawn(ctx, made, afterPress.filter((t) => t !== composedPost), traffic);
+  const { holds, ...shown } = drawn;
+  ctx.observe('world-opens', holds, shown);
+  await ctx.screenshot('made', 'the world made from the photographs, open');
+
+  // A person who comes back reaches the list of both saved worlds, with the offer under it.
+  await enter(ctx, () => page.reload(), undefined, { choose: false });
+  await offerSettled(page, LIST_OFFER, 'the offer under the list of saved worlds');
+  const listed = await page.evaluate(`[...document.querySelectorAll('main.world-entry-gate .world-entry-choice-title')].map(n => n.textContent)`);
+  const again = (await ctx.api('GET', '/worlds/personal-source')).body;
+  const seenAgain = await offerSeen(page, LIST_OFFER);
+  const entries = (await ctx.api('GET', '/world-entries')).body ?? [];
+  const againMismatches = offerMismatches(again, seenAgain, ctx.parameters.buttons);
+  ctx.observe('list-offers-refusal', await page.evaluate(`!!${SAVED_WORLD_LIST}`)
+    && entries.length === 2 && entries.every((e) => listed.includes(e.title))
+    && again?.refusal?.code === ctx.parameters.refusal_once_made && againMismatches.length === 0,
+  { listed, entries: entries.map((e) => pick(e, ['entry_id', 'title', 'source_kind'])), server: again, seen: seenAgain,
+    mismatches: againMismatches });
+  await ctx.screenshot('list', 'the list of saved worlds after a reload, with the offer refusing beneath it');
+}
+
+/**
+ * Every derivative job the photos session's actions queued (the upload's, each admission's, the
+ * grant's and the review's) ends succeeded, with each failure's own words. Nothing requires this
+ * step: a job that fails is a finding about that job, and the steps after it read what the
+ * photographs hold rather than whether every job before them was clean.
+ */
+async function photoJobsEndCleanly(ctx) {
+  const jobs = [...new Set(ctx.facts.job_ids ?? [])];
+  const terminal = await waitForJobs(ctx, jobs);
+  const failures = [];
+  for (const job of jobs.filter((j) => terminal[j] !== 'job_succeeded')) {
+    const events = (await ctx.api('GET', `/operations/derivative-jobs/${job}/events`)).body ?? [];
+    failures.push({ job, end: terminal[job] ?? null,
+      failed: events.filter((e) => ['capture_failed', 'job_failed'].includes(e.event_type))
+        .map((e) => pick(e, ['event_type', 'capture_id', 'failure_class', 'message'])) });
+  }
+  ctx.observe('every-job-succeeded', jobs.length >= ctx.parameters.jobs_at_least && failures.length === 0,
+    { jobs: terminal, failures });
+}
+
+// -- companion -----------------------------------------------------------------------------------
+
+const SPEECH = `document.querySelector('aside.companion-encounter .companion-speech')`;
+// A placeholder the composer wrote without its brackets, as "place A" or "PLACE A" (measured on the
+// Companion lane's runs); "place I" is left alone because it is also English ("the place I saw").
+const BARE_PLACEHOLDER = /\b(?:place|Place|PLACE|person|Person|PERSON) (?!I\b)[A-Z]\b/;
+const COMPOSER = `[...document.querySelectorAll('aside.companion-encounter form.companion-composer input')].find(i => i.checkVisibility())`;
+
+async function openCompanion(page) {
+  if (await page.evaluate(`document.querySelector('aside.companion-encounter')?.dataset.state === 'open'`)) return;
+  await chooseMenu(page, 'companion');
+  await page.waitFor(`document.querySelector('aside.companion-encounter')?.dataset.state === 'open'`, 10_000, 'the Companion to open');
+}
+
+/** Ask in words through the Companion's own composer and wait for the answer face to settle. */
+async function ask(ctx, question) {
+  const { page } = ctx;
+  await openCompanion(page);
+  if (!await page.evaluate(`!!(${COMPOSER})`)) {
+    // A pending turn keeps the composer behind "Other…", which is how a person asks their own question.
+    await page.click(`document.querySelector('aside.companion-encounter button.companion-other-reveal')`, 'Other…');
+  }
+  await page.waitFor(`!!(${COMPOSER})`, 10_000, 'the question field');
+  const asksBefore = (await responses(ctx, 'POST', '/api/selection/ask')).length;
+  const appearanceBefore = (await responses(ctx, 'POST', '/api/selection/appearance')).length;
+  await page.typeInto(COMPOSER, question);
+  await page.key('Enter', 'Enter', { text: '\r' });
+  // This question's own reply, not the face an earlier question left: an answer from the answer
+  // route, or an appearance proposal (or a refusal of one) from the proposal route.
+  await until('the Companion to answer or fail', replyDeadlineMs(ctx), async () => {
+    const asked = (await responses(ctx, 'POST', '/api/selection/ask')).slice(asksBefore).filter((r) => r.status !== null);
+    const classified = (await responses(ctx, 'POST', '/api/selection/appearance')).slice(appearanceBefore)
+      .filter((r) => r.status !== null && (r.status !== 200 || r.response_body?.classification === 'appearance'));
+    return asked.length > 0 || classified.length > 0;
+  });
+  await page.waitFor(`['answer', 'failed'].includes((${SPEECH})?.dataset.mode) && document.querySelector('aside.companion-encounter')?.dataset.answering !== 'asking'`,
+    30_000, 'the Companion to draw its reply');
+  // The answer may be drawn before its packet is read; the chips follow the packet.
+  await sleep(1500);
+  // The answer is its clauses; the speech also echoes the question, which must not count as an answer.
+  const face = await page.evaluate(`(() => { const s = ${SPEECH};
+    return { mode: s?.dataset.mode ?? null, abstained: s?.hasAttribute('data-abstained') ?? false,
+      text: s?.innerText.trim() ?? '',
+      clauses: [...(s?.querySelectorAll('p.companion-utterance') ?? [])].map(p => p.textContent.trim()),
+      provenance: s?.querySelector('p.companion-provenance')?.textContent.trim() ?? null,
+      chips: [...document.querySelectorAll('aside.companion-encounter button.companion-evidence-chip')].map(b => ({ text: b.textContent.trim(), disabled: b.disabled })) }; })()`);
+  const asked = (await responses(ctx, 'POST', '/api/selection/ask')).slice(asksBefore);
+  const classified = (await responses(ctx, 'POST', '/api/selection/appearance')).slice(appearanceBefore);
+  const answer = asked.at(-1)?.response_body ?? null;
+  const classification = classified.at(-1)?.response_body ?? null;
+  ctx.spend(addUsd(usdOf(answer?.execution), usdOf(classification?.execution)));
+  return { face, answer, answer_status: asked.at(-1)?.status ?? null, classification, classification_status: classified.at(-1)?.status ?? null };
+}
+
+async function askGroundedQuestion(ctx) {
+  const { face, answer, answer_status: status, classification } = await ask(ctx, ctx.parameters.question);
+  const text = face.clauses.join(' ');
+  const expected = ctx.parameters.expected_words.every((word) => text.toUpperCase().includes(word));
+  ctx.observe('answer-shown', face.mode === 'answer' && !face.abstained && expected,
+    { mode: face.mode, abstained: face.abstained, clauses: face.clauses, expected_words: ctx.parameters.expected_words });
+  const placeholder = text.match(PLACEHOLDER)?.[0] ?? text.match(BARE_PLACEHOLDER)?.[0] ?? null;
+  ctx.observe('names-restored', placeholder === null, { placeholder, saved_name: ctx.facts.place_name ?? null });
+  const reasoning = (answer?.execution?.calls ?? []).filter((c) => String(c.role).startsWith('reasoning_'));
+  // The provenance line names a model as a person reads it (Manifest.model_name), not by its identifier.
+  const served = reasoning.at(-1)?.served_model_name ?? null;
+  ctx.observe('executed-model-shown', face.provenance !== null && served !== null && face.provenance.includes(served),
+    { provenance: face.provenance, served_model_name: served, served_model: reasoning.at(-1)?.served_model ?? null });
+  ctx.observe('citation-offered', face.chips.some((c) => !c.disabled), face.chips);
+  const clauses = answer?.answer?.clauses ?? [];
+  const calls = answer?.execution?.calls ?? [];
+  const composed = reasoning.at(-1) ?? null;
+  const unserved = calls.filter((c) => !c.served_model).map((c) => c.role);
+  if (unserved.length > 0) ctx.note(`calls recorded without a served model: ${unserved.join(', ')}`);
+  ctx.observe('grounded-execution', status === 200 && clauses.some((c) => (c.citations ?? []).length > 0)
+    && composed !== null && Boolean(composed.served_model) && composed.usd != null
+    && calls.every((c) => c.role && c.requested_model && c.usd != null),
+  { status, clauses, execution: answer?.execution ?? null, classification: classification?.classification ?? null });
+  await ctx.screenshot('answer', "the Companion's answer with its citation");
+}
+
+async function openCitedPhotograph(ctx) {
+  const { page } = ctx;
+  await page.click(`[...document.querySelectorAll('aside.companion-encounter button.companion-evidence-chip')].find(b => !b.disabled)`, 'the first citation');
+  const evidence = await page.waitFor(`(() => { const e = document.querySelector('aside.companion-encounter section.companion-evidence');
+    const state = e?.dataset.evidence; if (!state || state === 'opening') return null;
+    const img = e.querySelector('figure.companion-evidence-figure img');
+    return { state, drawn: !!img && img.complete && img.naturalWidth > 0, width: img?.naturalWidth ?? 0 }; })()`,
+  20_000, 'the cited photograph').catch(() => ({ state: 'nothing drawn', drawn: false }));
+  ctx.observe('photograph-shown', evidence.state === 'shown' && evidence.drawn, evidence);
+  await ctx.screenshot('evidence', 'the Companion after the citation was opened');
+  const read = (await ctx.page.traffic(ctx.step.id)).filter((r) => r.method === 'GET' && /^\/api\/evidence\/[^/]+\/masked/.test(r.path));
+  ctx.observe('evidence-served', read.some((r) => r.status === 200 && String(r.mime).startsWith('image/')),
+    read.map((r) => pick(r, ['path', 'status', 'mime', 'bytes'])));
+  const back = `[...document.querySelectorAll('aside.companion-encounter button')].find(b => b.classList.contains('companion-evidence-back') || b.classList.contains('companion-answer-back'))`;
+  if (await page.evaluate(`!!(${back})`)) await page.click(back, 'back to the answer');
+}
+
+async function unanswerableQuestionAbstains(ctx) {
+  const { face, answer } = await ask(ctx, ctx.parameters.question);
+  const clauses = answer?.answer?.clauses ?? [];
+  const cited = clauses.filter((c) => (c.citations ?? []).length > 0);
+  ctx.observe('missing-said', face.mode === 'answer' && (face.abstained || face.chips.length === 0),
+    { mode: face.mode, abstained: face.abstained, chips: face.chips, text: face.text });
+  ctx.observe('nothing-cited-for-absent-place', answer !== null && cited.length === 0, { cited_clauses: cited, clauses });
+  await ctx.screenshot('abstained', 'the Companion asked about a place no photograph shows');
+}
+
+async function companionProposesAppearanceChange(ctx) {
+  const { page } = ctx;
+  const { face, classification, classification_status: status } = await ask(ctx, ctx.parameters.utterance);
+  const proposal = classification?.proposal ?? null;
+  ctx.observe('proposal-drafted', status === 200 && classification?.classification === 'appearance' && proposal !== null,
+    { status, classification: classification?.classification ?? null, refusal: classification?.refusal ?? null,
+      proposal: proposal === null ? null : pick(proposal, ['model_id', 'prompt_version', 'spoken']) });
+  ctx.observe('proposal-offered', proposal !== null && face.text.includes(proposal.spoken), { mode: face.mode, text: face.text });
+  const drawn = await speechSeen(page);
+  const named = (classification?.execution?.calls ?? []).map((c) => c.served_model_name).filter(Boolean).at(-1) ?? null;
+  const memory = await remembered(ctx, ctx.parameters.utterance);
+  ctx.observe('proposal-provenance', named !== null && (drawn.provenance ?? '').startsWith(`${named} drew this change in `)
+    && CUSTOMIZE_WORDS.test(face.text) && memory.length === 1 && memory[0].composed === 'proposed'
+    && memory[0].answer_text === drawn.utterances.join(' '),
+  { provenance: drawn.provenance, served_model_name: named, utterances: drawn.utterances,
+    remembered: memory.map((a) => pick(a, ['answer_id', 'answer_text', 'composed', 'served_model_name'])) });
+  ctx.facts.companion_accepted = { utterance: ctx.parameters.utterance, drawn };
+  await ctx.screenshot('proposal', "the Companion's reply to the appearance request");
+  await page.key('Escape', 'Escape');
+  await openCustomize(page);
+  const review = await page.evaluate(`({ review: document.querySelector('section.options-view div.world-style-proposal-review')?.textContent.trim() ?? null,
+    lifecycle: (${LIFECYCLE})?.dataset.state ?? null })`);
+  ctx.observe('proposal-ready-in-customize', /companion/i.test(review.review ?? '') && review.lifecycle === 'ready', review);
+}
+
+// -- compare --------------------------------------------------------------------------------------
+
+const COMPARE = `document.querySelector('section.society-comparison')`;
+
+/** What the Compare view shows: the listing, the verdict, the arms, the two sides and the clock. */
+const compareSeen = (page) => page.evaluate(`(() => { const v = ${COMPARE}; if (!v || !v.checkVisibility()) return null;
+  const text = (e) => e?.textContent.trim() ?? null;
+  const verdict = v.querySelector('section.comparison-verdict');
+  return {
+    listed: [...v.querySelectorAll('nav.comparison-list button.comparison-listing')].map(b => ({ id: b.dataset.comparisonId, pressed: b.getAttribute('aria-pressed'), text: text(b) })),
+    verdict: verdict ? { code: verdict.dataset.verdict ?? null, heading: text(verdict.querySelector('h3')),
+      detail: [...verdict.querySelectorAll('p')].map(text) } : null,
+    group: text(v.querySelector('p.comparison-group')),
+    arms: [...v.querySelectorAll('table.comparison-arms tr[data-arm]')].map(r => ({ arm: r.dataset.arm, role: r.dataset.role,
+      name: text(r.querySelector('.comparison-arm-name')), cells: [...r.querySelectorAll('td')].map(text),
+      reliability: text(r.querySelector('td.comparison-reliability')) })),
+    sides: [...v.querySelectorAll('article.comparison-side')].map(s => ({ arm: s.dataset.arm, side: s.dataset.side, run: s.dataset.runId,
+      name: text(s.querySelector('.comparison-side-name')), score: text(s.querySelector('.comparison-side-score')),
+      reliability: text(s.querySelector('.comparison-reliability')),
+      people: s.querySelectorAll('svg.comparison-plan .comparison-plan-person').length,
+      in_group: s.querySelectorAll('svg.comparison-plan .comparison-plan-person[data-in-group="true"]').length })),
+    clocks: v.querySelectorAll('.comparison-clock').length,
+    minute: text(v.querySelector('output.comparison-minute')),
+    scrubber: v.querySelector('input.comparison-scrubber')?.value ?? null,
+    play: text(v.querySelector('button.comparison-play')),
+    differing_minutes: v.querySelectorAll('.comparison-strip-mark[data-differs="yes"]').length,
+  }; })()`);
+
+const minuteOf = (seen) => Number(/Minute (\d+)/.exec(seen?.minute ?? '')?.[1] ?? NaN);
+
+/**
+ * The comparison the rehearsal ran, in the application's Compare view: its verdict, each arm with
+ * how its model answered beside its score, and the two runs of one seed replayed on one clock.
+ */
+async function compareViewShowsThePair(ctx) {
+  const { page } = ctx;
+  const ran = ctx.facts.comparison;
+  if (!ran?.comparison_id) throw new Error('no comparison was recorded for the view to show');
+  const { entry } = await savedWorld(ctx);
+  const path = `/world/versions/${entry.authored_version_id}/society/comparisons`;
+  const listed = (await ctx.api('GET', `${path}?${worldQuery(ctx)}`)).body;
+  const result = (await ctx.api('GET', `${path}/${ran.comparison_id}?${worldQuery(ctx)}`)).body;
+  await chooseMenu(page, 'compare');
+  const drawn = await page.waitFor(`(() => { const v = ${COMPARE}; return v?.checkVisibility() && v.querySelector('section.comparison-verdict') ? true : null; })()`,
+    ctx.parameters.drawn_seconds * 1000, 'the Compare view with its verdict').catch(() => false);
+  await sleep(PAGE_SETTLE_MS);
+  let seen = await compareSeen(page);
+  const listing = (listed?.comparisons ?? []).find((c) => c.comparison_id === ran.comparison_id) ?? null;
+  ctx.observe('comparison-recorded', listing !== null && listing.runs_completed === listing.runs_expected && listing.phase === 'development'
+    && result?.verdict?.code === 'not_judged' && result?.verdict?.reason === 'development_seeds',
+  { listing, verdict: result?.verdict ?? null, summaries: Object.fromEntries(Object.entries(result?.summaries ?? {})
+    .map(([arm, s]) => [arm, pick(s, ['mean_score', 'interval', 'reliability', 'cost_usd_per_hour'])])) });
+  ctx.observe('verdict-shown', drawn === true && seen?.listed.some((l) => l.id === ran.comparison_id && l.pressed === 'true')
+    && seen?.verdict?.code === result?.verdict?.code && Boolean(seen?.verdict?.heading) && Boolean(seen?.group),
+  { listed: seen?.listed ?? null, verdict: seen?.verdict ?? null, group: seen?.group ?? null });
+  await ctx.screenshot('verdict', 'the Compare view: the verdict and each arm with how its model answered');
+  const candidates = (seen?.arms ?? []).filter((a) => a.role === 'candidate');
+  const served = result?.arms ?? [];
+  ctx.observe('arms-with-reliability', candidates.length === ran.models.length
+    && candidates.every((a) => {
+      const decider = served.find((s) => s.key === a.arm)?.decider;
+      return /answered \d+% of \d+ turns/.test(a.reliability ?? '') && a.cells.length > 2
+        && decider?.name !== undefined && (a.reliability ?? '').startsWith(decider.name);
+    })
+    && (seen?.arms ?? []).length === served.length,
+  { arms: seen?.arms ?? [], served_arms: served.map((s) => ({ key: s.key, role: s.role, decider: s.decider })) });
+  // The two sides, chosen as a person chooses them, each redrawn from its run's replay.
+  const [left, right] = ctx.parameters.sides;
+  await page.setValue(`${COMPARE}.querySelector('select.comparison-side-select[aria-label="Left side"]')`, left);
+  await sleep(PAGE_SETTLE_MS);
+  await page.setValue(`${COMPARE}.querySelector('select.comparison-side-select[aria-label="Right side"]')`, right);
+  await page.waitFor(`(() => { const s = [...(${COMPARE})?.querySelectorAll('article.comparison-side') ?? []];
+    return s.length === 2 && s[0].dataset.arm === ${JSON.stringify(left)} && s[1].dataset.arm === ${JSON.stringify(right)}
+      && s.every(a => a.querySelector('svg.comparison-plan')) ? true : null; })()`,
+  ctx.parameters.drawn_seconds * 1000, 'both runs drawn side by side').catch(() => null);
+  await sleep(PAGE_SETTLE_MS);
+  seen = await compareSeen(page);
+  // The clock: one for both sides; Play moves the minute both sides are drawn at.
+  const sides = seen?.sides ?? [];
+  const seed = (result?.seeds ?? [])[0] ?? {};
+  const runs = sides.map((s) => seed.runs?.[s.arm]?.run_id ?? null);
+  const before = minuteOf(seen);
+  await page.click(`${COMPARE}.querySelector('button.comparison-play')`, 'Play in the Compare view');
+  await sleep(ctx.parameters.play_seconds * 1000);
+  const playing = await compareSeen(page);
+  await page.click(`${COMPARE}.querySelector('button.comparison-play')`, 'Pause in the Compare view').catch(() => null);
+  const replays = (await responses(ctx, 'GET', `/api${path}`)).filter((r) => /\/runs\/[^/?]+/.test(r.path));
+  ctx.observe('two-runs-one-clock', sides.length === 2 && new Set(sides.map((s) => s.arm)).size === 2
+    && sides.every((s, i) => s.run === runs[i] && s.people > 0 && Boolean(s.reliability)) && playing?.clocks === 1
+    && minuteOf(playing) > before && Math.floor(Number(playing?.scrubber)) === minuteOf(playing),
+  { sides, runs_served: runs, minute_before: seen?.minute ?? null, minute_after_play: playing?.minute ?? null,
+    scrubber: playing?.scrubber ?? null, clocks: playing?.clocks ?? null, differing_minutes: playing?.differing_minutes ?? null });
+  ctx.observe('replayed-from-records', replays.length >= 2 && replays.every((r) => r.status === 200)
+    && sides.every((s) => replays.some((r) => r.path.includes(`/runs/${s.run}`))),
+  replays.map((r) => pick(r, ['path', 'status'])));
+  await page.setValue(`${COMPARE}.querySelector('input.comparison-scrubber')`, String(ctx.parameters.shown_minute));
+  await page.evaluate(`${COMPARE}.querySelector('.comparison-sides')?.scrollIntoView({ block: 'start' }) ?? null`);
+  await sleep(PAGE_SETTLE_MS);
+  await ctx.screenshot('sides', `the two runs side by side at minute ${ctx.parameters.shown_minute} of the hour`);
+}
+
+// -- the Companion's appearance answers, refused and accepted, and remembered ----------------------
+
+/** What the Companion's memory holds for one utterance, newest first. */
+const remembered = async (ctx, utterance) => ((await ctx.api('GET', '/companion/memory/recent')).body?.answers ?? [])
+  .filter((a) => a.question === utterance);
+
+/** The Companion's face as drawn: the words of its answer and its provenance line. */
+const speechSeen = (page) => page.evaluate(`(() => { const s = ${SPEECH};
+  return { mode: s?.dataset.mode ?? null, remembered: document.querySelector('aside.companion-encounter')?.getAttribute('data-remembered') ?? null,
+    utterances: [...(s?.querySelectorAll('p.companion-utterance') ?? [])].map(p => p.textContent.trim()),
+    echo: s?.querySelector('p.companion-question-echo')?.textContent.trim() ?? null,
+    provenance: s?.querySelector('p.companion-provenance')?.textContent.trim() ?? null,
+    text: s?.innerText.trim() ?? '' }; })()`);
+
+// The words of the one control the Companion's accepted proposal names, and never offers on a refusal.
+const CUSTOMIZE_WORDS = /Open Customize/;
+
+async function companionRefusesUnsupportedChange(ctx) {
+  const { page } = ctx;
+  const utterance = ctx.parameters.utterance;
+  const { face, classification, classification_status: status } = await ask(ctx, utterance);
+  const drawn = await speechSeen(page);
+  const calls = classification?.execution?.calls ?? [];
+  const named = calls.map((c) => c.served_model_name).filter(Boolean).at(-1) ?? null;
+  const memory = await remembered(ctx, utterance);
+  ctx.observe('refused-in-one-answer', face.mode === 'answer' && drawn.utterances.length > 0 && !CUSTOMIZE_WORDS.test(face.text)
+    && memory.length === 1 && drawn.utterances.join(' ') === memory[0].answer_text,
+  { drawn, remembered: memory.map((a) => pick(a, ['answer_id', 'answer_text', 'composed', 'served_model_name', 'latency_ms'])) });
+  ctx.observe('refusal-provenance', named !== null && (drawn.provenance ?? '').startsWith(`${named} read that in `),
+    { provenance: drawn.provenance, served_model_name: named });
+  ctx.observe('refusal-recorded', status === 200 && classification?.classification === 'appearance' && classification?.proposal === null
+    && classification?.refusal?.code === ctx.parameters.refusal_code && memory[0]?.composed === 'refused',
+  { status, classification: classification?.classification ?? null, refusal: classification?.refusal ?? null,
+    execution: calls.map((c) => pick(c, ['role', 'requested_model', 'served_model', 'served_model_name', 'latency_ms', 'usd'])) });
+  await ctx.screenshot('refused', 'the Companion refusing a change the reviewed design cannot make');
+  ctx.facts.companion_refused = { utterance, drawn };
+}
+
+/**
+ * After a reload the Companion redraws the answer it remembers last, with the same words and the
+ * same provenance line it drew when it answered.
+ */
+async function answerRedrawnAfterReload(ctx) {
+  const { page } = ctx;
+  const earlier = ctx.facts[ctx.parameters.answer_fact];
+  if (!earlier) throw new Error(`no answer was drawn under ${ctx.parameters.answer_fact} to compare with`);
+  await reload(ctx);
+  await openCompanion(page);
+  const drawn = await page.waitFor(`(() => { const s = ${SPEECH}; return s?.dataset.mode === 'answer'
+    && document.querySelector('aside.companion-encounter')?.getAttribute('data-remembered') === 'true' ? true : null; })()`,
+  SETTLE_MS, 'the remembered answer to be drawn').catch(() => false);
+  const now = await speechSeen(page);
+  const memory = await remembered(ctx, earlier.utterance);
+  // The words, not their paragraphs: a remembered answer is kept as one text (its memory's answer_text).
+  const words = (utterances) => utterances.join(' ').split(/\s+/).filter(Boolean).join(' ');
+  ctx.observe('same-words-redrawn', drawn === true && now.utterances.length > 0
+    && words(now.utterances) === words(earlier.drawn.utterances) && now.echo === earlier.drawn.echo,
+  { before: pick(earlier.drawn, ['utterances', 'echo']), after: pick(now, ['utterances', 'echo', 'remembered']),
+    same_paragraphs: same(now.utterances, earlier.drawn.utterances) });
+  ctx.observe('same-provenance-redrawn', drawn === true && now.provenance !== null && now.provenance === earlier.drawn.provenance,
+    { before: earlier.drawn.provenance, after: now.provenance });
+  ctx.observe('memory-holds-the-answer', memory.length >= 1 && memory[0].answer_text === earlier.drawn.utterances.join(' '),
+    memory.map((a) => pick(a, ['answer_id', 'asked_at', 'answer_text', 'composed', 'served_model_name', 'latency_ms'])));
+  await ctx.screenshot('remembered', 'the Companion after a reload, redrawing the answer it remembers');
+}
+
+// -- people in the world made from the photographs -------------------------------------------------
+
+async function madeWorldHostsPeople(ctx) {
+  const { page } = ctx;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  await page.waitFor(`['absent', 'present'].includes(${PEOPLE}?.dataset.state)`, SETTLE_MS, 'People nearby to read the society');
+  await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
+  await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the inhabitants to be present');
+  await sleep(PAGE_SETTLE_MS);
+  const seen = await peopleSeen(page);
+  const society = (await ctx.api('GET', societyPath(entry, '', '&places=true'))).body;
+  const people = society?.state?.inhabitants ?? [];
+  const area = society?.places?.walkable_area ?? null;
+  const floor = entry.declared_floor ?? null;
+  // Positions and the area's centre are ground coordinates, [x, z] in millimetres.
+  const inside = (p) => area !== null && Math.abs(p.position_mm[0] - area.centre_mm[0]) <= area.half_width_mm
+    && Math.abs(p.position_mm[1] - area.centre_mm[1]) <= area.half_depth_mm;
+  ctx.observe('people-on-the-floor', seen?.state === 'present' && people.length > 0
+    && new RegExp(`\\b${people.length}\\b`).test(seen?.summary ?? '') && (seen?.help ?? []).some((h) => /walk inside a square/.test(h)),
+  { seen, inhabitants_read: people.length });
+  await page.waitFor(`${MODELS}?.checkVisibility() ?? false`, SETTLE_MS, 'Who decides for them').catch(() => null);
+  const models = await modelsSeen(page);
+  const served = (await ctx.api('GET', societyPath(entry, '/models'))).body;
+  ctx.observe('model-panel-beside-them', models !== null && models.people.length === people.length
+    && (served?.models ?? []).every((m) => models.options.some((o) => o.value === `${m.provider} ${m.model_id}`)) && served?.takes_model_choices === true,
+  { panel: models === null ? null : pick(models, ['host', 'options', 'people']), takes_model_choices: served?.takes_model_choices ?? null });
+  ctx.observe('society-on-declared-floor', floor !== null && area?.source === 'declared' && people.length > 0
+    && people.every((p) => p.synthetic === true && Array.isArray(p.position_mm) && inside(p)),
+  { declared_floor: floor, walkable_area: area, region_id: society?.region_id ?? null, population_size: society?.population_size ?? null,
+    positions_mm: people.map((p) => ({ id: p.id, position_mm: p.position_mm })) });
+  await ctx.screenshot('people', 'people on the made world\'s declared floor, with Who decides for them beside them');
+}
+
+// -- return --------------------------------------------------------------------------------------
+
+async function returningUserReopens(ctx) {
+  const { page } = ctx;
+  const first = await open(ctx, ctx.facts.entry_id);
+  const { entries, entry, version } = await savedWorld(ctx, ctx.facts.entry_id);
+  const title = await page.evaluate(`${TITLE_FIELD}.value`);
+  const starters = entries.filter((e) => e.source_kind === 'authored');
+  ctx.observe('saved-world-opens', starters.length === 1 && entry?.entry_id === ctx.facts.entry_id && title === entry.title,
+    { first_surface: first, entries: entries.map((e) => pick(e, ['entry_id', 'title', 'source_kind'])), title_field: title,
+      saved_title: entry?.title ?? null });
+  await openObjects(page);
+  const saved = liveObjects(version);
+  const rows = await page.waitFor(`document.querySelectorAll('aside.object-placement li.object-placement-item').length === ${saved.length}
+    ? [...document.querySelectorAll('aside.object-placement li.object-placement-item .object-placement-choose strong')].map(s => s.textContent.trim()) : null`,
+  SETTLE_MS, 'the saved objects in the list').catch(async () => (await objectRows(page)).map((r) => r.title));
+  const client = ctx.facts.client_object_id ? saved.find((o) => o.object_id === ctx.facts.client_object_id) : null;
+  const bytes = (await ctx.page.traffic(ctx.step.id)).filter((r) => r.method === 'GET' && r.path.includes('/api/world/assets/') && r.path.endsWith('/bytes'));
+  ctx.observe('objects-as-saved', rows.length === saved.length
+    && (ctx.facts.client_object_id === undefined || (client !== undefined && client !== null
+      && bytes.some((r) => r.path.includes(`/assets/${client.asset.asset_key}/bytes`) && r.status === 200))),
+  { listed: rows, saved: saved.map((o) => pick(o, ['object_id', 'behaviour'])), client_object: ctx.facts.client_object_id ?? null,
+    asset_reads: bytes.map((r) => pick(r, ['path', 'status'])) });
+  await ctx.screenshot('objects', 'the saved world reopened, with its objects listed');
+  await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel');
+  await openCustomize(page);
+  const shown = await page.evaluate(`document.querySelector('section.options-view p.world-style-version')?.textContent.trim() ?? null`);
+  const current = await currentStyle(ctx);
+  const revision = Number(shown?.match(/(\d+)/)?.[1]);
+  ctx.observe('appearance-as-saved', entry.style_version_id === current?.version_id && revision === current?.revision,
+    { shown, entry_style_version_id: entry.style_version_id, current: pick(current, ['version_id', 'revision']) });
+  ctx.observe('resume-point-current', entry.authored_state_sha256 === version.state_sha256 && entry.authored_edit_seq === version.edit_seq,
+    { entry: pick(entry, ['authored_state_sha256', 'authored_edit_seq']), version: pick(version, ['state_sha256', 'edit_seq']) });
+}
+
+/** The person comes back to the world made from their photographs, choosing it in the list. */
+async function returnToMadeWorld(ctx) {
+  const { page } = ctx;
+  const first = await open(ctx, ctx.facts.made_entry_id);
+  const { entry } = await savedWorld(ctx, ctx.facts.made_entry_id);
+  await sleep(ctx.parameters.drawn_after_ms);
+  const traffic = await ctx.page.traffic(ctx.step.id);
+  const drawn = await madeWorldDrawn(ctx, entry, traffic);
+  const { holds, ...shown } = drawn;
+  ctx.observe('made-world-reopens', first === 'gate' && entry?.world_id === ctx.facts.made_world_id
+    && shown.title === ctx.facts.made_title && shown.worlds_named.length > 0
+    && shown.worlds_named.every((w) => w === ctx.facts.made_world_id),
+  { first_surface: first, title_field: shown.title, worlds_named: shown.worlds_named, entry: pick(entry, ['entry_id', 'world_id', 'title']) });
+  ctx.observe('made-world-drawn', holds, shown);
+  ctx.facts.open_entry_id = ctx.facts.made_entry_id;
+  await ctx.screenshot('made-world', 'the world made from the photographs, reopened in a new browser session');
+}
+
+/**
+ * One more photograph, uploaded, admitted and reviewed inside the made world as the stand-in
+ * states, and the job its review queued waited for. Only the new photograph is admitted and
+ * reviewed: the others are in the world already.
+ */
+async function reviewOneMorePhotograph(ctx) {
+  const { page } = ctx;
+  const drawn = ctx.runtime.photographs;
+  await openDrawer(page);
+  const before = new Set(((await ctx.api('GET', '/personal-admission')).body?.sources ?? []).map((x) => x.capture_id));
+  await page.setFiles(`document.querySelector('input[aria-label="Original HEIC or JPEG photographs"]')`, drawn.map((p) => p.path));
+  const uploadsBefore = (await responses(ctx, 'POST', '/api/intake')).length;
+  await page.click(BUTTON('Upload originals', INTAKE), 'Upload originals');
+  const intake = await until('the upload to be answered', SETTLE_MS, async () =>
+    (await responses(ctx, 'POST', '/api/intake')).slice(uploadsBefore).find((r) => r.status) ?? null);
+  const added = await until('the new photograph to be listed', SETTLE_MS, async () => {
+    const now = ((await ctx.api('GET', '/personal-admission')).body?.sources ?? []).filter((x) => !before.has(x.capture_id));
+    return now.length >= drawn.length ? now : null;
+  });
+  const captures = added.map((x) => ({ capture_id: x.capture_id }));
+  await page.evaluate(`(() => { const add = new Set(${JSON.stringify(captures.map((c) => c.capture_id))});
+    for (const box of ${INCLUDE_BOXES}) { const id = box.closest('.intake-original')?.querySelector('details p')?.textContent.match(/capture ([0-9a-f-]{36})/)?.[1];
+      if (id && box.checked !== add.has(id)) box.click(); } return true; })()`);
+  const standIn = ctx.runtime.stand_ins[ctx.step.stand_in];
+  await page.setValue(`document.querySelector('input[aria-label="Purpose of this use"]')`, standIn.purpose);
+  await page.setValue(`document.querySelector('input[aria-label="Your account authority basis"]')`, standIn.authority_basis);
+  await page.setValue(`document.querySelector('input[aria-label="Authority valid until"]')`, localDateTime(ctx.parameters.valid_days));
+  const admissionsBefore = (await responses(ctx, 'POST', '/api/personal-admission')).length;
+  await page.click(BUTTON('Authorize personal admission and request detection', INTAKE), 'Authorize personal admission');
+  const admitted = await until('the admission to be answered', SETTLE_MS, async () =>
+    (await responses(ctx, 'POST', '/api/personal-admission')).slice(admissionsBefore).find((r) => r.status) ?? null);
+  const review = await recordReview(ctx, drawn, captures.map((c) => c.capture_id));
+  const mismatches = reviewMismatches(standIn, ctx.parameters.review_choice, captures, review.posted);
+  const job = review.posted.response_body?.queued_job_id ?? null;
+  const terminal = job ? await waitForJobs(ctx, [job]) : {};
+  return {
+    captures,
+    holds: intake.status === 202 && admitted.status === 202 && mismatches.length === 0
+      && job !== null && terminal[job] === 'job_succeeded',
+    shown: { upload: intake.status, admission: admitted.status, members_admitted: (admitted.request_body?.members ?? []).map((m) => m.capture_id),
+      review_mismatches: mismatches, reviewed_by_name: review.posted.request_body?.reviewed_by_name ?? null, job, job_end: terminal[job] ?? null },
+  };
+}
+
+/** The made world as the API holds it: the saved entry, its version, and where each photograph is drawn. */
+async function madeWorldHeld(ctx) {
+  const entry = (await ctx.api('GET', `/world-entries/${ctx.facts.made_entry_id}`)).body;
+  const world = encodeURIComponent(entry?.world_id ?? '');
+  const version = (await ctx.api('GET', `/world/versions/${entry?.authored_version_id}?world_id=${world}`)).body;
+  const media = (await ctx.api('GET', `/world/source-media?world_id=${world}&source_snapshot_id=${entry?.source_snapshot_id}`)).body;
+  const slots = Array.isArray(media) ? media : [];
+  const regionOf = Object.fromEntries(slots.flatMap((m) => (m.capture_ids ?? []).map((c) => [c, m.region_id])));
+  return {
+    entry: pick(entry, ['entry_id', 'world_id', 'title', 'revision', 'source_snapshot_id', 'authored_version_id',
+      'authored_state_sha256', 'authored_edit_seq']),
+    version: pick(version, ['version_id', 'parent_version_id', 'state_sha256', 'edit_seq']),
+    live_objects: liveObjects(version).map((o) => o.object_id),
+    region_of: regionOf,
+    slots: slots.map((m) => pick(m, ['slot_key', 'region_id', 'state', 'capture_ids'])),
+  };
+}
+
+/** Every status line and object note the page shows from now on, kept for the page's life. */
+const WATCH_NOTICES = `(() => { if (window.__rehearsalNotices) return true;
+  window.__rehearsalNotices = [];
+  const seen = () => { for (const n of document.querySelectorAll('p.travel-status, .object-placement-item-note, p.object-placement-status')) {
+    const text = n.textContent.trim(); if (text && !window.__rehearsalNotices.includes(text)) window.__rehearsalNotices.push(text); } };
+  new MutationObserver(seen).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
+  seen(); return true; })()`;
+// What the page says of an object whose region the open world does not draw (regionProblem in
+// web/packages/app/src/composition/objects.ts): adding photographs must keep every region.
+const REGION_NOT_DRAWN = 'names a region this world does not draw';
+
+/**
+ * Lane Z2's step: one more photograph, reviewed inside the made world, is added to it on the
+ * person's confirmation of the server's preview. Pressing the offer writes nothing; Cancel sends
+ * nothing; Confirm sends back exactly the preview on screen, and the world reopens a version on,
+ * with the previous version kept as it was.
+ */
+async function madeWorldTakesNewPhotograph(ctx) {
+  const { page } = ctx;
+  const { buttons, confirm: confirmWords } = ctx.parameters;
+  const reviewed = await reviewOneMorePhotograph(ctx);
+  ctx.observe('new-photograph-reviewed', reviewed.holds, reviewed.shown);
+  // The person comes back to the drawer in the made world: a fresh load reads the offer afresh.
+  await reload(ctx, ctx.facts.made_entry_id);
+  await page.evaluate(WATCH_NOTICES);
+  await openDrawer(page);
+  await offerSettled(page, OFFER, 'the offer in the made world');
+  const server = (await ctx.api('GET', '/worlds/personal-source')).body;
+  const before = await madeWorldHeld(ctx);
+  const seen = await offerSeen(page, OFFER);
+  const offerWrong = offerMismatches(server, seen, buttons);
+  const counts = server?.preview?.counts ?? {};
+  ctx.observe('offer-reads-preview', server?.action === ctx.parameters.action && server.refusal === null
+    && (server.preview?.sentences ?? []).length > 0 && /^[0-9a-f]{64}$/.test(server.preview?.preview_sha256 ?? '')
+    && counts.photographs_added === reviewed.captures.length
+    && Number.isInteger(counts.photographs_joining_places) && Number.isInteger(counts.new_places)
+    && server.current_topology_digest === ctx.facts.made_topology_digest && offerWrong.length === 0,
+  { server: pick(server, ['action', 'refusal', 'world_id', 'saved_entry_id', 'photographs', 'regions', 'topology_digest',
+    'current_topology_digest', 'preview']), made_with: ctx.facts.made_topology_digest, seen, mismatches: offerWrong });
+  await ctx.screenshot('offer', 'the drawer in the made world offering to add the new photograph');
+
+  // Pressed once: the preview and a choice, nothing written.
+  await page.click(`(${OFFER}).querySelector('.personal-world-make')`, buttons[ctx.parameters.action]);
+  await page.waitFor(`${OFFER}?.querySelector('.personal-world-confirm')?.checkVisibility() ?? false`, SETTLE_MS, 'the preview');
+  const opened = await offerSeen(page, OFFER);
+  const unwritten = await madeWorldHeld(ctx);
+  ctx.observe('preview-before-write', same(opened.preview, server?.preview?.sentences) && opened.cancel === true
+    && opened.confirm?.text === confirmWords && opened.confirm?.enabled === false && same(unwritten.entry, before.entry),
+  { seen: opened, entry_before: before.entry, entry_now: unwritten.entry });
+  await ctx.screenshot('preview', "the server's preview with Cancel and a Confirm that wakes after a delay");
+
+  // Cancel: back to the offer, nothing sent.
+  const composesBefore = (await responses(ctx, 'POST', '/api/worlds/personal-source')).length;
+  await page.click(`(${OFFER}).querySelector('.personal-world-cancel')`, 'Cancel');
+  await page.waitFor(`!(${OFFER}?.querySelector('.personal-world-confirm')?.checkVisibility() ?? false)`, SETTLE_MS, 'the preview to close');
+  const cancelled = await madeWorldHeld(ctx);
+  const sentOnCancel = (await responses(ctx, 'POST', '/api/worlds/personal-source')).length - composesBefore;
+  ctx.observe('cancel-writes-nothing', sentOnCancel === 0 && same(cancelled.entry, before.entry),
+    { sent: sentOnCancel, entry_before: before.entry, entry_after: cancelled.entry, offer: await offerSeen(page, OFFER) });
+
+  // Pressed again, Confirm once it wakes: the world reopens a version on.
+  await page.click(`(${OFFER}).querySelector('.personal-world-make')`, buttons[ctx.parameters.action]);
+  await page.waitFor(`!((${OFFER})?.querySelector('.personal-world-confirm-add')?.disabled ?? true)`, SETTLE_MS, `${confirmWords} to wake`);
+  await page.click(`(${OFFER}).querySelector('.personal-world-confirm-add')`, confirmWords);
+  await page.waitFor(`${WORLD_READY} && (${TITLE_FIELD})?.value === ${JSON.stringify(ctx.facts.made_title)}
+    && !(${DRAWER}?.checkVisibility() ?? false)`, 120_000, 'the made world to reopen');
+  await sleep(REOPEN_DRAWN_MS);
+  const composed = (await responses(ctx, 'POST', '/api/worlds/personal-source')).slice(composesBefore).find((r) => r.status) ?? null;
+  ctx.observe('confirmed-with-preview', composed?.status === 200
+    && composed.request_body?.topology_digest === server?.topology_digest
+    && composed.request_body?.preview_sha256 === server?.preview?.preview_sha256
+    && composed.response_body?.action === ctx.parameters.action
+    && composed.response_body?.saved_entry_id === ctx.facts.made_entry_id,
+  { request: composed?.request_body ?? null, status: composed?.status ?? null, response: composed?.response_body ?? null });
+
+  const after = await madeWorldHeld(ctx);
+  const previous = (await ctx.api('GET', `/world/versions/${before.entry.authored_version_id}?world_id=${encodeURIComponent(before.entry.world_id)}`)).body;
+  const kept = ctx.facts.captures.filter((c) => before.region_of[c.capture_id] !== undefined
+    && after.region_of[c.capture_id] === before.region_of[c.capture_id]);
+  const placed = reviewed.captures.filter((c) => after.region_of[c.capture_id] !== undefined);
+  const personalWorlds = ((await ctx.api('GET', '/worlds')).body?.worlds ?? []).filter((w) => w.kind === ctx.parameters.world_kind);
+  ctx.observe('world-advanced', after.entry.source_snapshot_id !== before.entry.source_snapshot_id
+    && after.entry.authored_version_id !== before.entry.authored_version_id
+    && after.version.parent_version_id === before.entry.authored_version_id
+    && kept.length === ctx.facts.captures.length && placed.length === reviewed.captures.length
+    && previous?.state_sha256 === before.version.state_sha256 && previous?.edit_seq === before.version.edit_seq
+    && personalWorlds.length === 1 && personalWorlds[0].world_id === ctx.facts.made_world_id,
+  { before, after, previous_version_now: pick(previous, ['version_id', 'state_sha256', 'edit_seq']),
+    made_with_kept_in_region: kept.map((c) => c.capture_id), new_placed: placed.map((c) => c.capture_id),
+    personal_worlds: personalWorlds.map((w) => w.world_id) });
+
+  await openObjects(page);
+  const rows = await page.waitFor(`document.querySelectorAll('aside.object-placement li.object-placement-item').length === ${after.live_objects.length}
+    ? [...document.querySelectorAll('aside.object-placement li.object-placement-item .object-placement-choose strong')].map(s => s.textContent.trim()) : null`,
+  SETTLE_MS, 'the objects the world holds in the list').catch(async () => (await objectRows(page)).map((r) => r.title));
+  const notices = await page.evaluate(`window.__rehearsalNotices ?? null`);
+  const title = await page.evaluate(`${TITLE_FIELD}?.value ?? null`);
+  ctx.observe('reopened-with-edits', title === ctx.facts.made_title && rows.length === after.live_objects.length
+    && Array.isArray(notices) && !notices.some((n) => n.includes(REGION_NOT_DRAWN)),
+  { title_field: title, listed: rows, live_objects: after.live_objects, notices_seen: notices });
+  await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
+  await ctx.screenshot('reopened', 'the made world reopened with the new photograph added');
+
+  await openDrawer(page);
+  await offerSettled(page, OFFER, 'the offer after the addition');
+  const again = (await ctx.api('GET', '/worlds/personal-source')).body;
+  const seenAgain = await offerSeen(page, OFFER);
+  const againWrong = offerMismatches(again, seenAgain, buttons);
+  ctx.observe('current-after-confirm', again?.refusal?.code === ctx.parameters.refusal_after && again.action === null
+    && againWrong.length === 0, { server: pick(again, ['action', 'refusal', 'current_topology_digest']), seen: seenAgain, mismatches: againWrong });
+  await ctx.screenshot('current', 'the drawer in the made world after the addition');
+}
+// After the made world reopens, time for it to read its source media and point maps before the
+// page's requests and notices are read (return-to-made-world's drawn_after_ms, for the same reason).
+const REOPEN_DRAWN_MS = 5_000;
+
+/**
+ * A step that acts in the world: a page session starts on a blank page, so the first such step of
+ * a session opens the application and passes its gate, the way the person arrives.
+ */
+const inWorld = (handler) => async (ctx) => {
+  // Opens the world the person is working in: see openEntryId in app.mjs.
+  if (!await ctx.page.evaluate(`document.readyState === 'complete' && ${WORLD_READY}`).catch(() => false)) await open(ctx);
+  return handler(ctx);
+};
+
+/** Every runnable browser step of steps.json, by id; tests/test_rehearsal_steps.py holds the two to each other. */
+export const HANDLERS = Object.freeze({
+  // These load the application themselves: the gate and the returning person's arrival are what
+  // they observe. The wait reads only the API.
+  'access-gate': accessGate,
+  'returning-user-reopens': returningUserReopens,
+  'return-to-made-world': returnToMadeWorld,
+  'enter-owned-starter': inWorld(enterOwnedStarter),
+  'read-about-this-place': inWorld(readAboutThisPlace),
+  'start-with-small-square': inWorld(startWithSmallSquare),
+  'name-world': inWorld(nameWorld),
+  'explore-walk': inWorld(exploreWalk),
+  'place-reviewed-object': inWorld(placeReviewedObject),
+  'move-object': inWorld(moveObject),
+  'inspect-object': inWorld(inspectObject),
+  'give-bounded-motion': inWorld(giveBoundedMotion),
+  'trigger-stop-reset': inWorld(triggerStopReset),
+  'refuse-unsupported-behaviour': inWorld(refuseUnsupportedBehaviour),
+  'creation-survives-reload': inWorld(creationSurvivesReload),
+  'undo-last-change': inWorld(undoLastChange),
+  'change-appearance': inWorld(changeAppearance),
+  'appearance-survives-reload': inWorld(appearanceSurvivesReload),
+  'restore-original-appearance': inWorld(restoreOriginalAppearance),
+  'furnish-small-square': inWorld(furnishSmallSquare),
+  'bring-in-inhabitants': inWorld(bringInInhabitants),
+  'play-and-watch-walking': inWorld(playAndWatchWalking),
+  'inspect-an-inhabitant': inWorld(inspectAnInhabitant),
+  'object-in-use': inWorld(objectInUse),
+  'choose-model-for-a-group': inWorld(chooseModelForAGroup),
+  'inspect-a-model-decision': inWorld(inspectAModelDecision),
+  'model-chose-stand-or-talk': inWorld(modelChoseStandOrTalk),
+  'birds-fly-and-perch': inWorld(birdsFlyAndPerch),
+  'pause-playback': inWorld(pausePlayback),
+  'compare-view-shows-the-pair': inWorld(compareViewShowsThePair),
+  'open-close-photo-intake': inWorld(openClosePhotoIntake),
+  'upload-synthetic-photographs': inWorld(uploadSyntheticPhotographs),
+  'authorize-admission-in-app': inWorld(authorizeAdmissionInApp),
+  'grant-model-rights-in-app': inWorld(grantModelRightsInApp),
+  'confirm-proposed-place': inWorld(confirmProposedPlace),
+  'review-photographs-in-app': inWorld(reviewPhotographsInApp),
+  'wait-for-depth-and-grouping': waitForDepthAndGrouping,
+  'make-world-from-photographs': inWorld(makeWorldFromPhotographs),
+  'photo-jobs-end-cleanly': photoJobsEndCleanly,
+  'ask-grounded-question': inWorld(askGroundedQuestion),
+  'open-cited-photograph': inWorld(openCitedPhotograph),
+  'unanswerable-question-abstains': inWorld(unanswerableQuestionAbstains),
+  'companion-refuses-unsupported-change': inWorld(companionRefusesUnsupportedChange),
+  'refused-answer-redrawn-after-reload': inWorld(answerRedrawnAfterReload),
+  'companion-proposes-appearance-change': inWorld(companionProposesAppearanceChange),
+  'accepted-answer-redrawn-after-reload': inWorld(answerRedrawnAfterReload),
+  'made-world-takes-new-photograph': inWorld(madeWorldTakesNewPhotograph),
+  'furnish-made-world': inWorld(furnishSmallSquare),
+  'made-world-hosts-people': inWorld(madeWorldHostsPeople),
+});

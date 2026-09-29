@@ -53,6 +53,7 @@ Standard library only, like the launcher, so it imports nothing it measures.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import importlib.util
@@ -62,6 +63,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -567,11 +569,13 @@ class Run:
             if status == "passed" and not all(o["ok"] for o in observations):
                 status = "failed"
                 reason = "did not hold: " + ", ".join(o["id"] for o in observations if not o["ok"])
+            spend = evidence.pop("spend_usd", None)
             self.outcomes[step["id"]] = {
                 "status": status,
                 "reason": reason,
                 "observations": observations,
                 "evidence": evidence,
+                **({} if spend is None else {"spend_usd": spend}),
                 "started_at": started,
                 "finished_at": now(),
             }
@@ -932,6 +936,213 @@ def developer_client(
     run.facts["client_asset_key"] = available[0]
 
 
+def development_seed_lines(catalog: Path, seeds: Path) -> tuple[list[str], list[str]]:
+    """The lines of ``seeds`` that are development seeds of the comparison seed catalog, in the
+    catalog's order, and those seeds' catalog keys.
+
+    Only development seeds leave this function, so a file that also holds held-out seeds never
+    hands one to a comparison the rehearsal runs. The text of a seed is never printed or written
+    into the run directory; the record names each by its key and digest.
+    """
+    entries = json.loads(catalog.read_text())["entries"]
+    wanted = [e for e in entries if e["phase"] == "development"]
+    # Each line stripped, as the command reads it (development_seeds in exulanica/orchestration/compare.py).
+    stripped = [line.strip() for line in seeds.read_text(encoding="utf-8").splitlines()]
+    by_digest = {hashlib.sha256(line.encode()).hexdigest(): line for line in stripped if line}
+    found = [e for e in wanted if e["seed_digest"] in by_digest]
+    return [by_digest[e["seed_digest"]] for e in found], [e["key"] for e in found]
+
+
+def development_comparison(
+    run: Run, step: Mapping[str, Any], observe: Observe, evidence: dict[str, Any]
+) -> None:
+    """A development comparison of the rehearsal's own world, through the product's command.
+
+    The command is the application worktree's own (``python -m exulanica.orchestration.compare``),
+    over the run's database, store and workspace, for the group the owner chose a model for in the
+    living session. Its bound is the step's, or what is left of the run's when that is less, given
+    as ``EXULANICA_BUDGET_USD``; with a model configured, the key reaches it through the same child
+    process handoff as the API's. The seeds it is handed are development seeds only, written to a
+    file outside the run directory for as long as the command runs.
+    """
+    assert run.state is not None and run.token is not None
+    parameters = step["parameters"]
+    if run.arguments.comparison_seeds is None:
+        raise Refused("no --comparison-seeds file names the development seeds")
+    group = run.facts.get("model_group") or {}
+    if group.get("choice_seq") is None:
+        raise AssertionError(f"the living session recorded no owner's choice: {group}")
+    status, entries = http(f"{run.api}/world-entries", run.token)
+    named = (
+        [e for e in entries if e.get("entry_id") == run.facts.get("entry_id")]
+        if status == 200
+        else []
+    )
+    if len(named) != 1:
+        raise AssertionError(f"expected the person's saved starter, found {status} {entries}")
+    entry = named[0]
+    catalog = run.worktree / parameters["seed_catalog"]
+    lines, keys = development_seed_lines(catalog, Path(run.arguments.comparison_seeds))
+    if len(lines) < parameters["seed_count"]:
+        raise Refused(
+            f"the seeds file holds {len(lines)} development seeds; the step needs {parameters['seed_count']}"
+        )
+    remaining = run.bound - run.reported_spend()
+    bound = min(Decimal(parameters["bound_usd"]), remaining)
+    if run.model_configured and bound <= 0:
+        raise Refused(f"the run's bound leaves {remaining} USD for the comparison")
+    directory = run.out / "comparison"
+    directory.mkdir(parents=True, exist_ok=True)
+    grant = {
+        run.token: {
+            "workspace_id": run.state["workspace_id"],
+            "actor": run.state["actor"],
+            "permissions": run.state["permissions"],
+        }
+    }
+    environment = clean_environment() | {
+        "EXULANICA_DATABASE_URL": run.state["database"]["runtime_url"],
+        "EXULANICA_DATA_DIR": run.state["data_dir"],
+        "EXULANICA_DERIVATIVE_WORKER": "off",
+        "EXULANICA_API_TOKENS": json.dumps(grant),
+        "EXULANICA_BUDGET_USD": str(bound),
+    }
+    models = [f"{m['provider']}/{m['model_id']}" for m in parameters["models"]]
+    arguments = [
+        "-m",
+        "exulanica.orchestration.compare",
+        "--workspace",
+        run.state["workspace_id"],
+        "--world",
+        entry["world_id"],
+        "--version",
+        entry["authored_version_id"],
+        "--actor",
+        run.state["actor"],
+        *[a for m in models for a in ("--model", m)],
+        "--group-choice",
+        str(group["choice_seq"]),
+        "--seed-count",
+        str(parameters["seed_count"]),
+    ]
+    before = {
+        k: entry[k] for k in ("authored_version_id", "authored_state_sha256", "authored_edit_seq")
+    }
+    # The seeds live outside the run directory, and only while the command runs.
+    with tempfile.TemporaryDirectory(prefix="rehearsal-seeds-") as scratch:
+        seeds_file = Path(scratch) / "seeds.txt"
+        seeds_file.write_text("\n".join(lines) + "\n")
+        seeds_file.chmod(0o600)
+        command = [str(run.worktree / ".venv/bin/python"), *arguments, "--seeds", str(seeds_file)]
+        if run.model_configured:
+            command = [*run.key_handoff(), *command]
+        started = time.monotonic()
+        completed = subprocess.run(
+            command,
+            cwd=run.worktree,
+            capture_output=True,
+            text=True,
+            timeout=parameters["timeout_seconds"],
+            env=environment,
+        )
+        seconds = round(time.monotonic() - started, 1)
+    (directory / "compare-output.txt").write_text(
+        scrub(
+            f"exit {completed.returncode}\n# stdout\n{completed.stdout}# stderr\n{completed.stderr}"
+        )
+    )
+    summary_out: dict[str, Any] = {}
+    with contextlib.suppress(json.JSONDecodeError):  # a refusal prints no summary
+        summary_out = json.loads(completed.stdout)
+    comparison_id = summary_out.get("comparison_id")
+    query = urllib.parse.urlencode({"world_id": entry["world_id"]})
+    path = f"{run.api}/world/versions/{entry['authored_version_id']}/society/comparisons"
+    status, result = (
+        http(f"{path}/{comparison_id}?{query}", run.token) if comparison_id else (None, {})
+    )
+    evidence["command"] = {
+        "argv": ["<worktree>/.venv/bin/python", *arguments, "--seeds", "<development seeds file>"],
+        "environment": {
+            k: environment[k] for k in ("EXULANICA_BUDGET_USD", "EXULANICA_DERIVATIVE_WORKER")
+        },
+        "key": "handed to the command by the child-process handoff"
+        if run.model_configured
+        else None,
+        "exit": completed.returncode,
+        "seconds": seconds,
+        "output": "comparison/compare-output.txt",
+        "seeds": [
+            {"key": k, "seed_digest": d}
+            for k, d in zip(
+                keys[: parameters["seed_count"]],
+                [
+                    hashlib.sha256(line.encode()).hexdigest()
+                    for line in lines[: parameters["seed_count"]]
+                ],
+                strict=True,
+            )
+        ],
+    }
+    evidence["result"] = result if status == 200 else {"status": status, "body": result}
+    runs = [
+        run_ for seed in (result or {}).get("seeds", []) for run_ in seed.get("runs", {}).values()
+    ]
+    spent = Decimal(0)
+    for run_ in runs:
+        for calls in (run_.get("calls") or {}, run_.get("others_calls") or {}):
+            if calls.get("cost_usd") is not None:
+                spent += Decimal(str(calls["cost_usd"]))
+    observe(
+        "comparison-ran",
+        completed.returncode == 0
+        and status == 200
+        and bool(runs)
+        and all(r.get("status") == "completed" for r in runs),
+        {
+            "exit": completed.returncode,
+            "comparison_id": comparison_id,
+            "runs": [{k: r.get(k) for k in ("run_id", "status", "failure")} for r in runs],
+            "verdict": (result or {}).get("verdict"),
+            "stderr_tail": scrub(completed.stderr[-600:]),
+        },
+    )
+    arms = (result or {}).get("arms") or []
+    deciders = [a["decider"] for a in arms if a.get("role") == "candidate"]
+    scored = (result or {}).get("group") or {}
+    people = [p["id"] if isinstance(p, dict) else p for p in scored.get("people") or []]
+    observe(
+        "the-owners-group-swapped",
+        status == 200
+        and sorted(people) == sorted(group["people"])
+        and scored.get("source", {}).get("choice_seq") == group["choice_seq"]
+        and sorted(f"{d.get('provider')}/{d.get('model_id')}" for d in deciders) == sorted(models),
+        {"group": scored, "chosen_people": group["people"], "arms": arms},
+    )
+    status_after, entries_after = http(f"{run.api}/world-entries", run.token)
+    after = next((e for e in entries_after if e.get("entry_id") == entry["entry_id"]), {})
+    observe(
+        "saved-world-unchanged",
+        status_after == 200 and all(after.get(k) == v for k, v in before.items()),
+        {"before": before, "after": {k: after.get(k) for k in before}},
+    )
+    observe(
+        "spend-within-bound",
+        spent <= bound,
+        {
+            "spent_usd": str(spent),
+            "bound_usd": str(bound),
+            "summary_spent_usd": summary_out.get("spent_usd"),
+        },
+    )
+    evidence["spend_usd"] = str(spent)
+    run.facts["comparison"] = {
+        "comparison_id": comparison_id,
+        "models": models,
+        "group": group["people"],
+        "seed_keys": keys[: parameters["seed_count"]],
+    }
+
+
 def synthetic_photographs(run: Run, session: Mapping[str, Any], directory: Path) -> dict[str, Any]:
     """Draw the session's synthetic photographs with the application's own environment."""
     recipe = directory / "photographs-recipe.json"
@@ -965,6 +1176,7 @@ PREPARATIONS: Mapping[str, Callable[[Run, Mapping[str, Any], Path], dict[str, An
 ORCHESTRATED: Mapping[str, Callable[[Run, Mapping[str, Any], Observe, dict[str, Any]], None]] = {
     "clean-start": clean_start,
     "developer-client-walkthrough": developer_client,
+    "run-development-comparison": development_comparison,
 }
 
 
@@ -985,6 +1197,11 @@ def main() -> int:
         help="a hosted-spend bound for this run below the step list's spend.bound_usd",
     )
     parser.add_argument("--sessions", help="run only these sessions, comma separated")
+    parser.add_argument(
+        "--comparison-seeds",
+        help="a file of comparison seeds, one a line; only the seed catalog's development seeds "
+        "are taken from it",
+    )
     parser.add_argument("--reuse-database", action="store_true")
     parser.add_argument(
         "--launcher", help="the acceptance launcher (default: scripts/acceptance/launch.py here)"

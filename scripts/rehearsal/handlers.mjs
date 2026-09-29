@@ -12,9 +12,9 @@
 import { randomBytes } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-import { addUsd } from './usd.mjs';
+import { addUsd, increaseUsd } from './usd.mjs';
 import {
-  BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_LIST, TITLE_FIELD, WORLD_READY,
+  BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_LIST, TITLE_FIELD, WORLD_MENU_BUTTON, WORLD_READY,
   chooseMenu, confirm, confirmation, enter, focusCanvas, liveObjects, objectRows, objectStatus, open,
   openObjects, reload, savedWorld, waitForWorld,
 } from './app.mjs';
@@ -696,7 +696,7 @@ async function startWithSmallSquare(ctx) {
   await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
 }
 
-/** The Create panel's own square, in the starter the person built in. */
+/** The Create panel's own square, in the world the step names (the starter, or the made world). */
 async function furnishSmallSquare(ctx) {
   const { page } = ctx;
   const role = ctx.parameters.origin_role;
@@ -734,11 +734,11 @@ async function furnishSmallSquare(ctx) {
       && t.path.startsWith(`/api/world/assets/${key}/bytes`)).map((t) => t.status) }));
   });
   ctx.observe('square-drawn', kinds.length > 0 && fetched.every((r) => r.statuses.includes(200)), fetched);
-  ctx.facts.square = { object_ids: applied.added,
+  ctx.facts[ctx.parameters.facts_key] = { object_ids: applied.added,
     titles: Object.fromEntries(wouldAdd.map((o) => [o.object_id, o.title])) };
   await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
   await sleep(SQUARE_DRAWN_MS);
-  await ctx.screenshot('furnished', 'the starter furnished with the small square');
+  await ctx.screenshot('furnished', `${ctx.parameters.world_words} furnished with the small square`);
 }
 
 // People nearby: the inhabitants' panel, reached from the World menu's local navigation.
@@ -941,6 +941,326 @@ async function pausePlayback(ctx) {
     && held.control?.current_tick === paused.control?.current_tick,
   { paused: paused.control, held: held.control, held_ms: ctx.parameters.hold_intervals * interval });
   await ctx.screenshot('paused', 'People nearby after Pause');
+}
+
+// -- models deciding for people ------------------------------------------------------------------
+
+// "Who decides for them": the section beside People nearby where the owner chooses a model.
+const MODELS = `document.querySelector('section.society-models')`;
+const MODEL_SELECT = `${MODELS}?.querySelector('select[aria-label="Who decides"]')`;
+const MODEL_BOX = (id) => `${MODELS}?.querySelector('fieldset.society-models-people input[type=checkbox][value="${id}"]')`;
+
+/** What "Who decides for them" shows: its host line, the models it offers, each person's row, and its result. */
+const modelsSeen = (page) => page.evaluate(`(() => { const s = ${MODELS}; if (!s || !s.checkVisibility()) return null;
+  const text = (e) => e?.textContent.trim() ?? null;
+  return { host: text(s.querySelector('p.society-models-host')), result: text(s.querySelector('p.society-models-result')),
+    options: [...s.querySelectorAll('select[aria-label="Who decides"] option')].map(o => ({ value: o.value, text: o.textContent.trim() })),
+    people: [...s.querySelectorAll('fieldset.society-models-people label[data-subject-id]')].map(l => ({ id: l.dataset.subjectId, text: l.textContent.trim() })),
+    summaries: [...s.querySelectorAll('ul.society-models-summaries > li')].map(li => ({ model: li.dataset.modelId ?? null, text: li.textContent.trim() })) }; })()`);
+
+/** The inspector's details as pairs, by the label a person reads. */
+const inspectorDetails = (page) => page.evaluate(`(() => { const i = ${INSPECTOR}; if (!i || !i.checkVisibility()) return null;
+  const pairs = {}; const terms = [...i.querySelectorAll('details dl dt')];
+  for (const dt of terms) { const dd = dt.nextElementSibling; pairs[dt.textContent.trim()] = dd?.textContent.trim() ?? null; }
+  return pairs; })()`);
+
+/** Open the inspector's details, so a screenshot shows who decided. */
+const openInspectorDetails = (page) => page.evaluate(`(() => { const d = ${INSPECTOR}?.querySelector('details'); if (d) d.open = true; return !!d; })()`);
+
+/**
+ * What the models deciding in this world have cost so far, as the product reports it, counted into
+ * the run's spend once: each call reads the total and reports what it adds to the last reading.
+ */
+async function decisionSpend(ctx, models) {
+  const rows = models?.by_model ?? [];
+  const total = rows.reduce((sum, row) => (row.cost_usd == null ? sum : addUsd(sum, String(row.cost_usd))), '0');
+  const unknown = rows.filter((row) => row.cost_known === false).map((row) => row.name ?? row.model_id);
+  if (unknown.length > 0) ctx.note(`the cost of some decisions is not known: ${unknown.join(', ')}`);
+  const added = increaseUsd(total, ctx.facts.decision_spend_reported_usd ?? '0');
+  if (added !== '0') ctx.spend(added);
+  ctx.facts.decision_spend_reported_usd = total;
+  return total;
+}
+
+/** The newest decision a model served for `subject`, from the society's events, newest first. */
+const modelDecisionEvents = async (ctx, entry) => ((await ctx.api('GET', societyPath(entry, '/events'))).body?.events ?? [])
+  .map((e) => e.document ?? {}).filter((d) => d.origin === 'model');
+
+async function chooseModelForAGroup(ctx) {
+  const { page } = ctx;
+  const { model, group_size: size } = ctx.parameters;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const read = async () => (await ctx.api('GET', societyPath(entry, '/models'))).body;
+  const before = await read();
+  await page.waitFor(`${MODELS}?.checkVisibility() ?? false`, SETTLE_MS, 'Who decides for them');
+  const offered = await modelsSeen(page);
+  const served = (before?.models ?? []).find((m) => m.provider === model.provider && m.model_id === model.model_id) ?? null;
+  const value = `${model.provider} ${model.model_id}`;
+  const option = offered?.options.find((o) => o.value === value) ?? null;
+  ctx.observe('models-offered', served !== null && served.refusal === null && before?.takes_model_choices === true
+    && before?.host_refusal === null && option !== null && option.text === served.name && /asks the models you choose/.test(offered?.host ?? ''),
+  { host: offered?.host ?? null, offered: offered?.options ?? [], chosen_model: served,
+    takes_model_choices: before?.takes_model_choices ?? null, host_refusal: before?.host_refusal ?? null });
+  const group = (offered?.people ?? []).slice(0, size).map((p) => p.id);
+  if (group.length !== size) throw new Error(`People nearby lists ${offered?.people.length ?? 0} people; the step chooses ${size}`);
+  for (const id of group) await page.click(MODEL_BOX(id), `the box beside ${id}`);
+  await page.setValue(MODEL_SELECT, value);
+  await page.click(BUTTON('Use for the chosen people', MODELS), 'Use for the chosen people');
+  const result = await page.waitFor(`(() => { const r = ${MODELS}?.querySelector('p.society-models-result')?.textContent.trim(); return r || null; })()`,
+    SETTLE_MS, 'what the choice did');
+  await sleep(PAGE_SETTLE_MS);
+  const seen = await modelsSeen(page);
+  const rows = (seen?.people ?? []).filter((p) => group.includes(p.id));
+  ctx.observe('group-chosen-in-words', new RegExp(`^${size} people are now decided by the model you chose`).test(result)
+    && rows.length === size && rows.every((r) => r.text.endsWith(`${served?.name}, which you chose.`)),
+  { result, rows, others: (seen?.people ?? []).filter((p) => !group.includes(p.id)) });
+  await ctx.screenshot('chosen', `Who decides for them after choosing ${served?.name ?? 'a model'} for ${size} people`);
+  const posted = (await responses(ctx, 'POST', `/api/world/versions/${entry.authored_version_id}/society/models`)).at(-1) ?? null;
+  const after = await read();
+  const choices = new Map((after?.choices ?? []).map((c) => [c.subject_id, c]));
+  const document = posted?.response_body ?? {};
+  ctx.observe('choice-recorded', posted?.status === 200 && same([...(document.people ?? [])].sort(), [...group].sort())
+    && document.model?.model_id === model.model_id && document.model?.provider === model.provider
+    && group.every((id) => choices.get(id)?.model?.model_id === model.model_id && choices.get(id)?.refusal == null)
+    && [...choices.values()].filter((c) => !group.includes(c.subject_id)).every((c) => c.model === null),
+  { posted: posted === null ? null : { status: posted.status, body: pick(document, ['choice_seq', 'people', 'model', 'chosen_by', 'document_sha256', 'recorded_at']) },
+    choices: [...choices.values()].map((c) => pick(c, ['subject_id', 'model', 'choice_seq', 'refusal'])) });
+  ctx.facts.model_group = { people: group, choice_seq: document.choice_seq ?? null, model, name: served?.name ?? null };
+  await decisionSpend(ctx, after);
+}
+
+/**
+ * A person of the group whose latest decision the model served and the minute applied, read in
+ * the inspector as a person reads it, and the same decision read from the API: the request with
+ * what the person saw, the receipt naming the model that served it and the validated action.
+ */
+async function inspectAModelDecision(ctx) {
+  const { page } = ctx;
+  const group = ctx.facts.model_group;
+  const interval = ctx.facts.playback_interval_ms;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const tried = [];
+  const found = await until('a decision the chosen model served and the minute applied', ctx.parameters.wait_seconds * 1000, async () => {
+    const models = (await ctx.api('GET', societyPath(entry, '/models'))).body;
+    const nearby = await page.evaluate(`[...(${INSPECT})?.options ?? []].map(o => o.value).filter(Boolean)`);
+    for (const latest of models?.latest ?? []) {
+      if (!group.people.includes(latest.subject_id) || latest.model_id !== group.model.model_id
+        || latest.status !== 'accepted' || latest.disposition !== 'applied' || !nearby.includes(latest.subject_id)) continue;
+      await page.setValue(INSPECT, latest.subject_id);
+      await sleep(PAGE_SETTLE_MS);
+      const seen = { ...(await inspectorSeen(page)), details: await inspectorDetails(page) };
+      const attempt = { latest: pick(latest, ['subject_id', 'decision_seq', 'consumed_tick', 'name', 'status', 'disposition', 'chose']), inspector: seen };
+      const said = seen.details?.['Latest decision'] ?? '';
+      if (seen.subject === latest.subject_id && said.includes(`${group.name} chose “${latest.chose}”, and they did it.`)) return attempt;
+      tried.push(attempt);
+    }
+    await sleep(Math.max(0, interval - POLL_MS));
+    return null;
+  }).catch(() => null);
+  const details = found?.inspector.details ?? {};
+  ctx.observe('decided-by-named', found !== null && details['Decided by'] === `${group.name}, which you chose.`
+    && found.inspector.what !== null, found ?? { tried: tried.slice(-6) });
+  ctx.observe('latest-decision-in-words', found !== null && new RegExp(`^At simulated minute \\d+, `).test(details['Latest decision'] ?? '')
+    && (details['Latest decision'] ?? '').includes(group.name) && (details['Latest decision'] ?? '').match(CODE_IN_WORDS) === null,
+  { latest_decision: details['Latest decision'] ?? null, decided_by: details['Decided by'] ?? null });
+  if (found !== null) {
+    await openInspectorDetails(page);
+    await ctx.screenshot('decision', `the inspector naming ${group.name} and the decision it made`);
+  }
+  // The same decision as stored: the event the minute wrote, the request and the receipt.
+  const event = found === null ? null : (await modelDecisionEvents(ctx, entry)).find((d) => d.subject_id === found.latest.subject_id
+    && d.decision_seq === found.latest.decision_seq) ?? null;
+  const stored = event === null ? null : (await ctx.api('GET', societyPath(entry, `/decisions/${event.request_id}`))).body;
+  const receipt = stored?.decision ?? {};
+  const request = stored?.request ?? {};
+  const options = JSON.stringify(request).includes('"options"');
+  ctx.observe('decision-recorded', event !== null && event.disposition === 'applied' && event.model?.model_id === group.model.model_id
+    && stored?.status === 'completed' && receipt.provider?.model_id === group.model.model_id && Boolean(receipt.provider?.served_model_id)
+    && receipt.proposal?.option?.label === found.latest.chose && event.chose === found.latest.chose && options,
+  { event: pick(event, ['subject_id', 'tick', 'origin', 'decision_seq', 'request_id', 'disposition', 'reason', 'model', 'chose']),
+    status: stored?.status ?? null, request_names_options: options,
+    receipt: { proposal: receipt.proposal ?? null, provider: pick(receipt.provider, ['provider', 'model_id', 'served_model_id', 'mechanism', 'answers_asked', 'latency_ms', 'cost_usd']) } });
+  // Replaying the society reads the stored receipts and asks no model: its spend does not move.
+  const spentBefore = await decisionSpend(ctx, (await ctx.api('GET', societyPath(entry, '/models'))).body);
+  const replay = await ctx.api('GET', societyPath(entry, '/replay'));
+  const models = (await ctx.api('GET', societyPath(entry, '/models'))).body;
+  const asked = (rows) => (rows ?? []).reduce((n, row) => n + (row.asked ?? 0), 0);
+  const spentAfter = await decisionSpend(ctx, models);
+  ctx.observe('replayed-without-a-model', replay.status === 200 && replay.body?.replay_verified === true,
+    { status: replay.status, replay_verified: replay.body?.replay_verified ?? null, spend_before_usd: spentBefore, spend_after_usd: spentAfter,
+      asked_after: asked(models?.by_model), note: 'the society keeps playing during the read, so later minutes may ask the model again' });
+}
+
+/**
+ * A person of the group standing or talking because their model chose it (model actions v2): the
+ * decision is found in the society's events, read in the inspector, and its receipt names the kind.
+ */
+async function modelChoseStandOrTalk(ctx) {
+  const { page } = ctx;
+  const group = ctx.facts.model_group;
+  const interval = ctx.facts.playback_interval_ms;
+  const kinds = ctx.parameters.kinds;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const seenEvents = [];
+  const tried = [];
+  const found = await until('a person to stand or talk because their model chose it', ctx.parameters.wait_seconds * 1000, async () => {
+    const events = await modelDecisionEvents(ctx, entry);
+    const nearby = await page.evaluate(`[...(${INSPECT})?.options ?? []].map(o => o.value).filter(Boolean)`);
+    for (const event of events) {
+      if (event.disposition !== 'applied' || !group.people.includes(event.subject_id) || !nearby.includes(event.subject_id)) continue;
+      const stored = (await ctx.api('GET', societyPath(entry, `/decisions/${event.request_id}`))).body;
+      const option = stored?.decision?.proposal?.option ?? null;
+      if (!kinds.includes(option?.kind)) continue;
+      seenEvents.push(pick(event, ['subject_id', 'tick', 'chose', 'request_id']));
+      await page.setValue(INSPECT, event.subject_id);
+      await sleep(PAGE_SETTLE_MS);
+      const seen = { ...(await inspectorSeen(page)), details: await inspectorDetails(page) };
+      const society = (await ctx.api('GET', societyPath(entry))).body;
+      const person = (society?.state?.inhabitants ?? []).find((p) => p.id === event.subject_id) ?? null;
+      const attempt = { event: pick(event, ['subject_id', 'tick', 'decision_seq', 'request_id', 'disposition', 'model', 'chose']),
+        option, provider: pick(stored?.decision?.provider, ['provider', 'model_id', 'served_model_id']), inspector: seen,
+        person: pick(person, ['id', 'goal', 'action']), tick_now: society?.current_tick ?? null };
+      const words = `${seen.doing ?? ''} ${seen.details?.['Latest decision'] ?? ''}`;
+      if (seen.subject === event.subject_id && (seen.details?.['Latest decision'] ?? '').includes(`chose “${event.chose}”`)
+        && /stand|talk/i.test(seen.doing ?? '') && words.includes(group.name)) return attempt;
+      tried.push(attempt);
+    }
+    await sleep(Math.max(0, interval - POLL_MS));
+    return null;
+  }).catch(() => null);
+  ctx.observe('standing-or-talking-in-words', found !== null, found ?? { model_stand_or_talk_events: seenEvents.slice(-6), tried: tried.slice(-4) });
+  ctx.observe('model-chose-the-action', found !== null && kinds.includes(found.option?.kind)
+    && found.provider?.model_id === group.model.model_id && found.option?.label === found.event.chose
+    && (found.option?.kind !== 'talk' || typeof found.option?.partner_id === 'string'),
+  found === null ? { kinds } : pick(found, ['event', 'option', 'provider', 'person', 'tick_now']));
+  if (found !== null) {
+    await openInspectorDetails(page);
+    await ctx.screenshot('stand-or-talk', `someone ${found.option.kind === 'talk' ? 'talking' : 'standing'} because ${group.name} chose it`);
+  }
+  await decisionSpend(ctx, (await ctx.api('GET', societyPath(entry, '/models'))).body);
+}
+
+// -- birds ----------------------------------------------------------------------------------------
+
+const FLIGHT_CANVAS = `document.querySelector('canvas[data-flight-state]')`;
+
+/** The flight's windows from `fromStep` for `count` steps, read the way the page reads them. */
+async function flightSteps(ctx, entry, fromStep, count, windowSteps) {
+  const windows = [];
+  for (let step = fromStep; step < fromStep + count; step += windowSteps) {
+    const read = await ctx.api('GET', `/world/versions/${entry.authored_version_id}/flight?${worldQuery(ctx)}&from_step=${step}&steps=${Math.min(windowSteps, fromStep + count - step)}`);
+    if (read.status !== 200) throw new Error(`the flight route answered ${read.status} for step ${step}`);
+    windows.push(read.body);
+  }
+  return windows;
+}
+
+/** Each flyer's state at every step the windows serve, by step, and the steps a flyer is late home. */
+function flightStates(windows) {
+  const states = new Map();
+  const late = new Set();
+  for (const window of windows) {
+    for (const row of window.flyers) {
+      const byStep = states.get(row.flyer_id) ?? new Map();
+      row.state.forEach((code, i) => byStep.set(window.from_step + i, window.states[code]));
+      states.set(row.flyer_id, byStep);
+    }
+    for (const entry of window.late_home ?? []) late.add(`${entry.step}:${entry.flyer_id}`);
+  }
+  return { states, late };
+}
+
+/**
+ * Birds flying and perching on the flight's shared clock, while the page stays responsive: the
+ * page is sampled over a stretch the served flight says holds both, each drawn bird is compared
+ * with the state the server serves at that moment, and the page's own interactions are timed.
+ */
+async function birdsFlyAndPerch(ctx) {
+  const { page } = ctx;
+  const { sample_seconds: seconds, transition_margin_steps: margin, interaction_presses: presses,
+    interaction_ms_at_most: most } = ctx.parameters;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  const canvas = await page.waitFor(`(() => { const c = ${FLIGHT_CANVAS}; return c && c.dataset.flightState === 'flying'
+    ? { state: c.dataset.flightState, flyers: Number(c.dataset.flightFlyers), unplaced: c.dataset.flightUnplaced, undrawn: c.dataset.flightUndrawn, failure: c.dataset.flightFailure } : null; })()`,
+  SETTLE_MS, 'the birds to fly').catch(async () => page.evaluate(`(() => { const c = ${FLIGHT_CANVAS}; return c ? { ...c.dataset } : null; })()`));
+  const first = await ctx.api('GET', `/world/versions/${entry.authored_version_id}/flight?${worldQuery(ctx)}`);
+  const served = first.body ?? {};
+  const windowSteps = served.steps;
+  const stepMs = served.step_ms;
+  ctx.observe('birds-drawn', canvas?.state === 'flying' && first.status === 200 && canvas.flyers === (served.flyers ?? []).length
+    && canvas.flyers > 0 && !canvas.unplaced && !canvas.undrawn && !canvas.failure,
+  { canvas, flight: first.status === 200 ? { ...pick(served, ['module', 'step_ms', 'episode_steps', 'from_step', 'steps', 'clock_step', 'unplaced']),
+    flyers: (served.flyers ?? []).map((f) => pick(f, ['flyer_id', 'kind'])) } : { status: first.status, body: served } });
+  if (first.status !== 200 || !Number.isInteger(stepMs) || !Number.isInteger(windowSteps)) throw new Error('the flight route served no window');
+  // Wait, at most one episode, for a stretch of the sample's length in which some bird flies and some perches.
+  const sampleSteps = Math.ceil((seconds * 1000) / stepMs);
+  let start = null;
+  let horizon = served.clock_step;
+  const searched = [];
+  while (start === null && horizon < served.clock_step + served.episode_steps) {
+    const { states } = flightStates(await flightSteps(ctx, entry, horizon, windowSteps, windowSteps));
+    for (let step = horizon; step < horizon + windowSteps && start === null; step += 1) {
+      const at = [...states.values()].map((s) => s.get(step));
+      if (at.some((s) => s && s !== 'perching') && at.some((s) => s === 'perching')) start = step;
+    }
+    searched.push({ from_step: horizon, steps: windowSteps, found: start });
+    horizon += windowSteps;
+  }
+  if (start === null) throw new Error(`no bird left its perch in one episode: ${JSON.stringify(searched)}`);
+  const lead = Math.max(0, start * stepMs - Date.now() - 1000);
+  await sleep(lead);
+  await page.evaluate('window.__rehearsalBirdsStart()');
+  const pressed = [];
+  // Each press opens the World menu and a second one closes it, so the page ends as it began.
+  for (let i = 0; i < presses; i += 1) {
+    await sleep((seconds * 1000) / (presses + 1));
+    pressed.push(await page.click(WORLD_MENU_BUTTON, 'the World menu'));
+    await sleep(PAGE_SETTLE_MS);
+    pressed.push(await page.click(WORLD_MENU_BUTTON, 'the World menu, again'));
+  }
+  const drawn = await page.evaluate('window.__rehearsalBirdsStop()', 30_000);
+  await ctx.screenshot('birds', 'the starter while the birds fly and perch');
+  await openPeopleNearby(page);
+  // The served states over the sampled stretch, and each drawn bird compared with them.
+  const fromStep = Math.floor(drawn.first_ms / stepMs) - margin;
+  const toStep = Math.floor(drawn.last_ms / stepMs) + margin + 1;
+  const { states, late } = flightStates(await flightSteps(ctx, entry, fromStep, toStep - fromStep, windowSteps));
+  const near = (flyer, step) => {
+    const byStep = states.get(flyer);
+    for (let s = step - margin; s <= step + margin; s += 1) {
+      if (byStep?.get(s) !== byStep?.get(step) || late.has(`${s}:${flyer}`)) return true;
+    }
+    return false;
+  };
+  const compared = { agree: 0, disagree: 0, near_a_change: 0, moving_frames: 0, still_frames: 0, disagreements: [] };
+  for (const [flyer, frames] of Object.entries(drawn.flyers)) {
+    for (let i = 1; i < frames.length; i += 1) {
+      const [t, x, y, z] = frames[i];
+      const [, px, py, pz] = frames[i - 1];
+      const moved = Math.hypot(x - px, y - py, z - pz) > 0;
+      compared[moved ? 'moving_frames' : 'still_frames'] += 1;
+      const step = Math.floor(t / stepMs);
+      const state = states.get(flyer)?.get(step);
+      if (state === undefined || near(flyer, step)) { compared.near_a_change += 1; continue; }
+      if (moved === (state !== 'perching')) compared.agree += 1;
+      else {
+        compared.disagree += 1;
+        if (compared.disagreements.length < 10) compared.disagreements.push({ flyer, step, state, moved });
+      }
+    }
+  }
+  ctx.observe('fly-and-perch-on-the-clock', compared.moving_frames > 0 && compared.still_frames > 0 && compared.agree > 0 && compared.disagree === 0,
+    { ...compared, frames: drawn.frames, flyers_drawn: Object.keys(drawn.flyers).length, frame_ms: drawn.frame_ms,
+      sampled_steps: [fromStep + margin, toStep - margin - 1], transition_margin_steps: margin, sample_steps: sampleSteps, searched });
+  const interactions = drawn.interactions;
+  const worst = interactions.length ? Math.max(...interactions.map((e) => e.duration)) : null;
+  ctx.observe('page-stays-responsive', interactions.length > 0 && worst <= most,
+    { interactions, worst_ms: worst, at_most_ms: most, presses: pressed.length, pressed_notes: pressed.filter(Boolean), frame_ms: drawn.frame_ms });
+  await decisionSpend(ctx, (await ctx.api('GET', societyPath(entry, '/models'))).body);
 }
 
 // -- photos --------------------------------------------------------------------------------------
@@ -1673,9 +1993,10 @@ async function askGroundedQuestion(ctx) {
   const placeholder = text.match(PLACEHOLDER)?.[0] ?? text.match(BARE_PLACEHOLDER)?.[0] ?? null;
   ctx.observe('names-restored', placeholder === null, { placeholder, saved_name: ctx.facts.place_name ?? null });
   const reasoning = (answer?.execution?.calls ?? []).filter((c) => String(c.role).startsWith('reasoning_'));
-  const served = reasoning.at(-1)?.served_model ?? null;
+  // The provenance line names a model as a person reads it (Manifest.model_name), not by its identifier.
+  const served = reasoning.at(-1)?.served_model_name ?? null;
   ctx.observe('executed-model-shown', face.provenance !== null && served !== null && face.provenance.includes(served),
-    { provenance: face.provenance, served_model: served });
+    { provenance: face.provenance, served_model_name: served, served_model: reasoning.at(-1)?.served_model ?? null });
   ctx.observe('citation-offered', face.chips.some((c) => !c.disabled), face.chips);
   const clauses = answer?.answer?.clauses ?? [];
   const calls = answer?.execution?.calls ?? [];
@@ -1724,12 +2045,225 @@ async function companionProposesAppearanceChange(ctx) {
     { status, classification: classification?.classification ?? null, refusal: classification?.refusal ?? null,
       proposal: proposal === null ? null : pick(proposal, ['model_id', 'prompt_version', 'spoken']) });
   ctx.observe('proposal-offered', proposal !== null && face.text.includes(proposal.spoken), { mode: face.mode, text: face.text });
+  const drawn = await speechSeen(page);
+  const named = (classification?.execution?.calls ?? []).map((c) => c.served_model_name).filter(Boolean).at(-1) ?? null;
+  const memory = await remembered(ctx, ctx.parameters.utterance);
+  ctx.observe('proposal-provenance', named !== null && (drawn.provenance ?? '').startsWith(`${named} drew this change in `)
+    && CUSTOMIZE_WORDS.test(face.text) && memory.length === 1 && memory[0].composed === 'proposed'
+    && memory[0].answer_text === drawn.utterances.join(' '),
+  { provenance: drawn.provenance, served_model_name: named, utterances: drawn.utterances,
+    remembered: memory.map((a) => pick(a, ['answer_id', 'answer_text', 'composed', 'served_model_name'])) });
+  ctx.facts.companion_accepted = { utterance: ctx.parameters.utterance, drawn };
   await ctx.screenshot('proposal', "the Companion's reply to the appearance request");
   await page.key('Escape', 'Escape');
   await openCustomize(page);
   const review = await page.evaluate(`({ review: document.querySelector('section.options-view div.world-style-proposal-review')?.textContent.trim() ?? null,
     lifecycle: (${LIFECYCLE})?.dataset.state ?? null })`);
   ctx.observe('proposal-ready-in-customize', /companion/i.test(review.review ?? '') && review.lifecycle === 'ready', review);
+}
+
+// -- compare --------------------------------------------------------------------------------------
+
+const COMPARE = `document.querySelector('section.society-comparison')`;
+
+/** What the Compare view shows: the listing, the verdict, the arms, the two sides and the clock. */
+const compareSeen = (page) => page.evaluate(`(() => { const v = ${COMPARE}; if (!v || !v.checkVisibility()) return null;
+  const text = (e) => e?.textContent.trim() ?? null;
+  const verdict = v.querySelector('section.comparison-verdict');
+  return {
+    listed: [...v.querySelectorAll('nav.comparison-list button.comparison-listing')].map(b => ({ id: b.dataset.comparisonId, pressed: b.getAttribute('aria-pressed'), text: text(b) })),
+    verdict: verdict ? { code: verdict.dataset.verdict ?? null, heading: text(verdict.querySelector('h3')),
+      detail: [...verdict.querySelectorAll('p')].map(text) } : null,
+    group: text(v.querySelector('p.comparison-group')),
+    arms: [...v.querySelectorAll('table.comparison-arms tr[data-arm]')].map(r => ({ arm: r.dataset.arm, role: r.dataset.role,
+      name: text(r.querySelector('.comparison-arm-name')), cells: [...r.querySelectorAll('td')].map(text),
+      reliability: text(r.querySelector('td.comparison-reliability')) })),
+    sides: [...v.querySelectorAll('article.comparison-side')].map(s => ({ arm: s.dataset.arm, side: s.dataset.side, run: s.dataset.runId,
+      name: text(s.querySelector('.comparison-side-name')), score: text(s.querySelector('.comparison-side-score')),
+      reliability: text(s.querySelector('.comparison-reliability')),
+      people: s.querySelectorAll('svg.comparison-plan .comparison-plan-person').length,
+      in_group: s.querySelectorAll('svg.comparison-plan .comparison-plan-person[data-in-group="true"]').length })),
+    clocks: v.querySelectorAll('.comparison-clock').length,
+    minute: text(v.querySelector('output.comparison-minute')),
+    scrubber: v.querySelector('input.comparison-scrubber')?.value ?? null,
+    play: text(v.querySelector('button.comparison-play')),
+    differing_minutes: v.querySelectorAll('.comparison-strip-mark[data-differs="yes"]').length,
+  }; })()`);
+
+// How the view says what a model answered: a share with or without decimals, of a count of turns.
+const RELIABILITY_WORDS = /answered \d+(?:\.\d+)?% of \d+ turns/;
+
+const minuteOf = (seen) => Number(/Minute (\d+)/.exec(seen?.minute ?? '')?.[1] ?? NaN);
+
+/**
+ * The comparison the rehearsal ran, in the application's Compare view: its verdict, each arm with
+ * how its model answered beside its score, and the two runs of one seed replayed on one clock.
+ */
+async function compareViewShowsThePair(ctx) {
+  const { page } = ctx;
+  const ran = ctx.facts.comparison;
+  if (!ran?.comparison_id) throw new Error('no comparison was recorded for the view to show');
+  const { entry } = await savedWorld(ctx);
+  const path = `/world/versions/${entry.authored_version_id}/society/comparisons`;
+  const listed = (await ctx.api('GET', `${path}?${worldQuery(ctx)}`)).body;
+  const result = (await ctx.api('GET', `${path}/${ran.comparison_id}?${worldQuery(ctx)}`)).body;
+  await chooseMenu(page, 'compare');
+  const drawn = await page.waitFor(`(() => { const v = ${COMPARE}; return v?.checkVisibility() && v.querySelector('section.comparison-verdict') ? true : null; })()`,
+    ctx.parameters.drawn_seconds * 1000, 'the Compare view with its verdict').catch(() => false);
+  await sleep(PAGE_SETTLE_MS);
+  let seen = await compareSeen(page);
+  const listing = (listed?.comparisons ?? []).find((c) => c.comparison_id === ran.comparison_id) ?? null;
+  ctx.observe('comparison-recorded', listing !== null && listing.runs_completed === listing.runs_expected && listing.phase === 'development'
+    && result?.verdict?.code === 'not_judged' && result?.verdict?.reason === 'development_seeds',
+  { listing, verdict: result?.verdict ?? null, summaries: Object.fromEntries(Object.entries(result?.summaries ?? {})
+    .map(([arm, s]) => [arm, pick(s, ['mean_score', 'interval', 'reliability', 'cost_usd_per_hour'])])) });
+  ctx.observe('verdict-shown', drawn === true && seen?.listed.some((l) => l.id === ran.comparison_id && l.pressed === 'true')
+    && seen?.verdict?.code === result?.verdict?.code && Boolean(seen?.verdict?.heading) && Boolean(seen?.group),
+  { listed: seen?.listed ?? null, verdict: seen?.verdict ?? null, group: seen?.group ?? null });
+  await ctx.screenshot('verdict', 'the Compare view: the verdict and each arm with how its model answered');
+  const candidates = (seen?.arms ?? []).filter((a) => a.role === 'candidate');
+  const served = result?.arms ?? [];
+  ctx.observe('arms-with-reliability', candidates.length === ran.models.length
+    && candidates.every((a) => {
+      const decider = served.find((s) => s.key === a.arm)?.decider;
+      return RELIABILITY_WORDS.test(a.reliability ?? '') && a.cells.length > 2
+        && decider?.name !== undefined && (a.reliability ?? '').startsWith(decider.name);
+    })
+    && (seen?.arms ?? []).length === served.length,
+  { arms: seen?.arms ?? [], served_arms: served.map((s) => ({ key: s.key, role: s.role, decider: s.decider })) });
+  // The two sides, chosen as a person chooses them, each redrawn from its run's replay.
+  const [left, right] = ctx.parameters.sides;
+  await page.setValue(`${COMPARE}.querySelector('select.comparison-side-select[aria-label="Left side"]')`, left);
+  await sleep(PAGE_SETTLE_MS);
+  await page.setValue(`${COMPARE}.querySelector('select.comparison-side-select[aria-label="Right side"]')`, right);
+  await page.waitFor(`(() => { const s = [...(${COMPARE})?.querySelectorAll('article.comparison-side') ?? []];
+    return s.length === 2 && s[0].dataset.arm === ${JSON.stringify(left)} && s[1].dataset.arm === ${JSON.stringify(right)}
+      && s.every(a => a.querySelector('svg.comparison-plan')) ? true : null; })()`,
+  ctx.parameters.drawn_seconds * 1000, 'both runs drawn side by side').catch(() => null);
+  await sleep(PAGE_SETTLE_MS);
+  seen = await compareSeen(page);
+  // The clock: one for both sides; Play moves the minute both sides are drawn at.
+  const sides = seen?.sides ?? [];
+  const seed = (result?.seeds ?? [])[0] ?? {};
+  const runs = sides.map((s) => seed.runs?.[s.arm]?.run_id ?? null);
+  const before = minuteOf(seen);
+  await page.click(`${COMPARE}.querySelector('button.comparison-play')`, 'Play in the Compare view');
+  await sleep(ctx.parameters.play_seconds * 1000);
+  const playing = await compareSeen(page);
+  await page.click(`${COMPARE}.querySelector('button.comparison-play')`, 'Pause in the Compare view').catch(() => null);
+  const replays = (await responses(ctx, 'GET', `/api${path}`)).filter((r) => /\/runs\/[^/?]+/.test(r.path));
+  ctx.observe('two-runs-one-clock', sides.length === 2 && new Set(sides.map((s) => s.arm)).size === 2
+    && sides.every((s, i) => s.run === runs[i] && s.people > 0 && Boolean(s.reliability)) && playing?.clocks === 1
+    && minuteOf(playing) > before && Math.floor(Number(playing?.scrubber)) === minuteOf(playing),
+  { sides, runs_served: runs, minute_before: seen?.minute ?? null, minute_after_play: playing?.minute ?? null,
+    scrubber: playing?.scrubber ?? null, clocks: playing?.clocks ?? null, differing_minutes: playing?.differing_minutes ?? null });
+  ctx.observe('replayed-from-records', replays.length >= 2 && replays.every((r) => r.status === 200)
+    && sides.every((s) => replays.some((r) => r.path.includes(`/runs/${s.run}`))),
+  replays.map((r) => pick(r, ['path', 'status'])));
+  await page.setValue(`${COMPARE}.querySelector('input.comparison-scrubber')`, String(ctx.parameters.shown_minute));
+  await page.evaluate(`${COMPARE}.querySelector('.comparison-sides')?.scrollIntoView({ block: 'start' }) ?? null`);
+  await sleep(PAGE_SETTLE_MS);
+  await ctx.screenshot('sides', `the two runs side by side at minute ${ctx.parameters.shown_minute} of the hour`);
+}
+
+// -- the Companion's appearance answers, refused and accepted, and remembered ----------------------
+
+/** What the Companion's memory holds for one utterance, newest first. */
+const remembered = async (ctx, utterance) => ((await ctx.api('GET', '/companion/memory/recent')).body?.answers ?? [])
+  .filter((a) => a.question === utterance);
+
+/** The Companion's face as drawn: the words of its answer and its provenance line. */
+const speechSeen = (page) => page.evaluate(`(() => { const s = ${SPEECH};
+  return { mode: s?.dataset.mode ?? null, remembered: document.querySelector('aside.companion-encounter')?.getAttribute('data-remembered') ?? null,
+    utterances: [...(s?.querySelectorAll('p.companion-utterance') ?? [])].map(p => p.textContent.trim()),
+    echo: s?.querySelector('p.companion-question-echo')?.textContent.trim() ?? null,
+    provenance: s?.querySelector('p.companion-provenance')?.textContent.trim() ?? null,
+    text: s?.innerText.trim() ?? '' }; })()`);
+
+// The words of the one control the Companion's accepted proposal names, and never offers on a refusal.
+const CUSTOMIZE_WORDS = /Open Customize/;
+
+async function companionRefusesUnsupportedChange(ctx) {
+  const { page } = ctx;
+  const utterance = ctx.parameters.utterance;
+  const { face, classification, classification_status: status } = await ask(ctx, utterance);
+  const drawn = await speechSeen(page);
+  const calls = classification?.execution?.calls ?? [];
+  const named = calls.map((c) => c.served_model_name).filter(Boolean).at(-1) ?? null;
+  const memory = await remembered(ctx, utterance);
+  ctx.observe('refused-in-one-answer', face.mode === 'answer' && drawn.utterances.length > 0 && !CUSTOMIZE_WORDS.test(face.text)
+    && memory.length === 1 && drawn.utterances.join(' ') === memory[0].answer_text,
+  { drawn, remembered: memory.map((a) => pick(a, ['answer_id', 'answer_text', 'composed', 'served_model_name', 'latency_ms'])) });
+  ctx.observe('refusal-provenance', named !== null && (drawn.provenance ?? '').startsWith(`${named} read that in `),
+    { provenance: drawn.provenance, served_model_name: named });
+  ctx.observe('refusal-recorded', status === 200 && classification?.classification === 'appearance' && classification?.proposal === null
+    && classification?.refusal?.code === ctx.parameters.refusal_code && memory[0]?.composed === 'refused',
+  { status, classification: classification?.classification ?? null, refusal: classification?.refusal ?? null,
+    execution: calls.map((c) => pick(c, ['role', 'requested_model', 'served_model', 'served_model_name', 'latency_ms', 'usd'])) });
+  await ctx.screenshot('refused', 'the Companion refusing a change the reviewed design cannot make');
+  ctx.facts.companion_refused = { utterance, drawn };
+}
+
+/**
+ * After a reload the Companion redraws the answer it remembers last, with the same words and the
+ * same provenance line it drew when it answered.
+ */
+async function answerRedrawnAfterReload(ctx) {
+  const { page } = ctx;
+  const earlier = ctx.facts[ctx.parameters.answer_fact];
+  if (!earlier) throw new Error(`no answer was drawn under ${ctx.parameters.answer_fact} to compare with`);
+  await reload(ctx);
+  await openCompanion(page);
+  const drawn = await page.waitFor(`(() => { const s = ${SPEECH}; return s?.dataset.mode === 'answer'
+    && document.querySelector('aside.companion-encounter')?.getAttribute('data-remembered') === 'true' ? true : null; })()`,
+  SETTLE_MS, 'the remembered answer to be drawn').catch(() => false);
+  const now = await speechSeen(page);
+  const memory = await remembered(ctx, earlier.utterance);
+  // The words, not their paragraphs: a remembered answer is kept as one text (its memory's answer_text).
+  const words = (utterances) => utterances.join(' ').split(/\s+/).filter(Boolean).join(' ');
+  ctx.observe('same-words-redrawn', drawn === true && now.utterances.length > 0
+    && words(now.utterances) === words(earlier.drawn.utterances) && now.echo === earlier.drawn.echo,
+  { before: pick(earlier.drawn, ['utterances', 'echo']), after: pick(now, ['utterances', 'echo', 'remembered']),
+    same_paragraphs: same(now.utterances, earlier.drawn.utterances) });
+  ctx.observe('same-provenance-redrawn', drawn === true && now.provenance !== null && now.provenance === earlier.drawn.provenance,
+    { before: earlier.drawn.provenance, after: now.provenance });
+  ctx.observe('memory-holds-the-answer', memory.length >= 1 && memory[0].answer_text === earlier.drawn.utterances.join(' '),
+    memory.map((a) => pick(a, ['answer_id', 'asked_at', 'answer_text', 'composed', 'served_model_name', 'latency_ms'])));
+  await ctx.screenshot('remembered', 'the Companion after a reload, redrawing the answer it remembers');
+}
+
+// -- people in the world made from the photographs -------------------------------------------------
+
+async function madeWorldHostsPeople(ctx) {
+  const { page } = ctx;
+  await openPeopleNearby(page);
+  const { entry } = await savedWorld(ctx);
+  await page.waitFor(`['absent', 'present'].includes(${PEOPLE}?.dataset.state)`, SETTLE_MS, 'People nearby to read the society');
+  await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
+  await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the inhabitants to be present');
+  await sleep(PAGE_SETTLE_MS);
+  const seen = await peopleSeen(page);
+  const society = (await ctx.api('GET', societyPath(entry, '', '&places=true'))).body;
+  const people = society?.state?.inhabitants ?? [];
+  const area = society?.places?.walkable_area ?? null;
+  const floor = entry.declared_floor ?? null;
+  // Positions and the area's centre are ground coordinates, [x, z] in millimetres.
+  const inside = (p) => area !== null && Math.abs(p.position_mm[0] - area.centre_mm[0]) <= area.half_width_mm
+    && Math.abs(p.position_mm[1] - area.centre_mm[1]) <= area.half_depth_mm;
+  ctx.observe('people-on-the-floor', seen?.state === 'present' && people.length > 0
+    && new RegExp(`\\b${people.length}\\b`).test(seen?.summary ?? '') && (seen?.help ?? []).some((h) => /walk inside a square/.test(h)),
+  { seen, inhabitants_read: people.length });
+  await page.waitFor(`${MODELS}?.checkVisibility() ?? false`, SETTLE_MS, 'Who decides for them').catch(() => null);
+  const models = await modelsSeen(page);
+  const served = (await ctx.api('GET', societyPath(entry, '/models'))).body;
+  ctx.observe('model-panel-beside-them', models !== null && models.people.length === people.length
+    && (served?.models ?? []).every((m) => models.options.some((o) => o.value === `${m.provider} ${m.model_id}`)) && served?.takes_model_choices === true,
+  { panel: models === null ? null : pick(models, ['host', 'options', 'people']), takes_model_choices: served?.takes_model_choices ?? null });
+  ctx.observe('society-on-declared-floor', floor !== null && area?.source === 'declared' && people.length > 0
+    && people.every((p) => p.synthetic === true && Array.isArray(p.position_mm) && inside(p)),
+  { declared_floor: floor, walkable_area: area, region_id: society?.region_id ?? null, population_size: society?.population_size ?? null,
+    positions_mm: people.map((p) => ({ id: p.id, position_mm: p.position_mm })) });
+  await ctx.screenshot('people', 'people on the made world\'s declared floor, with Who decides for them beside them');
 }
 
 // -- return --------------------------------------------------------------------------------------
@@ -2001,7 +2535,12 @@ export const HANDLERS = Object.freeze({
   'play-and-watch-walking': inWorld(playAndWatchWalking),
   'inspect-an-inhabitant': inWorld(inspectAnInhabitant),
   'object-in-use': inWorld(objectInUse),
+  'choose-model-for-a-group': inWorld(chooseModelForAGroup),
+  'inspect-a-model-decision': inWorld(inspectAModelDecision),
+  'model-chose-stand-or-talk': inWorld(modelChoseStandOrTalk),
+  'birds-fly-and-perch': inWorld(birdsFlyAndPerch),
   'pause-playback': inWorld(pausePlayback),
+  'compare-view-shows-the-pair': inWorld(compareViewShowsThePair),
   'open-close-photo-intake': inWorld(openClosePhotoIntake),
   'upload-synthetic-photographs': inWorld(uploadSyntheticPhotographs),
   'authorize-admission-in-app': inWorld(authorizeAdmissionInApp),
@@ -2014,6 +2553,11 @@ export const HANDLERS = Object.freeze({
   'ask-grounded-question': inWorld(askGroundedQuestion),
   'open-cited-photograph': inWorld(openCitedPhotograph),
   'unanswerable-question-abstains': inWorld(unanswerableQuestionAbstains),
+  'companion-refuses-unsupported-change': inWorld(companionRefusesUnsupportedChange),
+  'refused-answer-redrawn-after-reload': inWorld(answerRedrawnAfterReload),
   'companion-proposes-appearance-change': inWorld(companionProposesAppearanceChange),
+  'accepted-answer-redrawn-after-reload': inWorld(answerRedrawnAfterReload),
   'made-world-takes-new-photograph': inWorld(madeWorldTakesNewPhotograph),
+  'furnish-made-world': inWorld(furnishSmallSquare),
+  'made-world-hosts-people': inWorld(madeWorldHostsPeople),
 });

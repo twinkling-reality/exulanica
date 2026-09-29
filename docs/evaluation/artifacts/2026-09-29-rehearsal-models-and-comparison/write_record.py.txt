@@ -1,0 +1,573 @@
+"""Write the digest-bound evaluation record of one rehearsal run on main, with its as-run driver.
+
+Lane file, published beside the record's artifacts as write_record.py.txt. Run it from the rehearsal
+tree's root with the product's environment, which supplies the canonical JSON the record's digest is
+taken over and the phrases the retained-records test refuses:
+
+    .venv/bin/python <this file> --run RUN_DIR --name NAME --earlier RECORD_JSON
+        --application-main COMMIT --delta-sha256 SHA --since COMMIT
+
+Every fact in the record is read from what the rehearsal wrote in RUN_DIR (result.json, summary.txt,
+screens/, the session logs) or computed from bytes. Machine locations are found at run time (the
+home directory, the temporary directory, the account name, this tree, the main checkout, the paths
+the run was started with) and replaced by placeholders, and nothing is written while any of them, or
+the run's own token, is still in a published text.
+
+The as-run driver is every file of scripts/rehearsal as the run recorded it: the run wrote the
+SHA-256 of each file that ran (run.rehearsal_files), and each file is published only if the tree's
+bytes still hash to that digest, so the published copies are the bytes that ran.
+"""
+
+from __future__ import annotations
+
+import argparse
+import getpass
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from decimal import Decimal
+from pathlib import Path
+
+from exulanica.canonical import canonical_json
+from exulanica.evaluation import visual_gate
+
+TREE = Path.cwd()
+REHEARSAL = TREE / "scripts" / "rehearsal"
+assert (REHEARSAL / "rehearse.py").is_file(), "run from the rehearsal tree's root"
+MAIN_CHECKOUT = Path(
+    subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        cwd=TREE, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+).parent
+#: Screenshots that carry a claim of the record, by the step that took them and what they show.
+CAPTURES = (
+    ("furnish-small-square", "furnished", "The starter furnished with the small square"),
+    ("choose-model-for-a-group", "chosen", "Who decides for them after choosing a model for four people"),
+    ("play-and-watch-walking", "watch-end", "Playing, at the end of the watch"),
+    ("inspect-a-model-decision", "decision", "The inspector naming the model the owner chose and the decision it made"),
+    ("model-chose-stand-or-talk", "stand-or-talk", "Someone standing or talking because their model chose it, in the inspector"),
+    ("birds-fly-and-perch", "birds", "The starter while the square's birds fly and perch"),
+    ("object-in-use", "in-use", "Someone using an object of the square, by the inspector's words"),
+    ("pause-playback", "paused", "People nearby after Pause"),
+    ("compare-view-shows-the-pair", "verdict", "The Compare view: the verdict and each arm with how its model answered"),
+    ("compare-view-shows-the-pair", "sides", "The two models' runs side by side on one clock"),
+    ("ask-grounded-question", "answer", "The Companion's grounded answer in the made world, with the model that composed it and its citation"),
+    ("companion-refuses-unsupported-change", "refused", "The Companion refusing a change the reviewed design cannot make, in one answer"),
+    ("refused-answer-redrawn-after-reload", "remembered", "The refusal redrawn after a reload, with the same words and provenance line"),
+    ("companion-proposes-appearance-change", "proposal", "The Companion's proposal once Customize can show it"),
+    ("accepted-answer-redrawn-after-reload", "remembered", "The proposal redrawn after a reload, with the same words and provenance line"),
+    ("made-world-takes-new-photograph", "current", "The drawer after the addition, saying the world is current"),
+    ("made-world-hosts-people", "people", "People on the made world's declared floor, with Who decides for them beside them"),
+)
+LOAD_LINE = re.compile(r"^gpu-slot: (?:slot taken|finished) at .*; load (?P<one>[0-9.]+) ")
+
+
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def session_load(run: Path) -> dict[str, str]:
+    """The one-minute load average the GPU slot logged as each browser session began and ended."""
+    loads = [
+        Decimal(match.group("one"))
+        for log in sorted(run.glob("sessions/*/session.log"))
+        for match in (LOAD_LINE.match(line) for line in log.read_text().splitlines())
+        if match is not None
+    ]
+    assert loads, "no session log records the machine's load"
+    return {"one_minute_min": str(min(loads)), "one_minute_max": str(max(loads)), "readings": str(len(loads))}
+
+
+def argument_after(argv: list[str], flag: str) -> str | None:
+    return argv[argv.index(flag) + 1] if flag in argv else None
+
+
+def scrubber(result: dict) -> tuple[list[tuple[str, str]], list[str], list[str]]:
+    """The replacements that remove every machine location; the machine fragments no published byte
+    may hold; and what no published record or run output may hold (the placeholder the run itself
+    writes for the home directory, and the phrases the retained-records test refuses)."""
+    home = str(Path.home())
+    homed = lambda path: str(path).replace(home, "<home>")  # noqa: E731 - both spellings are needed
+    command = result["run"]["command"]
+    pairs = []
+    for flag, placeholder in (("--worktree", "<application-tree>"), ("--model-env", "<model-environment-file>"), ("--out", "<run>")):
+        value = argument_after(command, flag)
+        # A relative argument (".") names no machine location, and replacing it would rewrite text.
+        if value is not None and (value.startswith("/") or value.startswith("<home>")):
+            pairs += [(value, placeholder), (homed(value), placeholder)]
+    for location, placeholder in ((MAIN_CHECKOUT, "<main-checkout>"), (TREE, "<rehearsal-tree>")):
+        pairs += [(str(location), placeholder), (homed(location), placeholder)]
+    temporary = tempfile.gettempdir()
+    for location in {temporary, os.path.realpath(temporary)}:
+        pairs.append((location.rstrip(os.sep), "<temporary>"))
+    # Longest first, so a path is replaced whole before any prefix of it.
+    pairs.sort(key=lambda pair: len(pair[0]), reverse=True)
+    machine = [home, str(Path.home().parent) + os.sep, temporary, os.path.realpath(temporary), getpass.getuser()]
+    outputs = [homed(Path.home()), *visual_gate._FORBIDDEN_TEXT]
+    return pairs, machine, outputs
+
+
+def quantised(value: object, key: str = "") -> object:
+    """The value with every duration in whole milliseconds; the record's digest refuses floats."""
+    if isinstance(value, dict):
+        out = {}
+        for name, item in value.items():
+            if (name == "seconds" or name.endswith("_seconds")) and isinstance(item, float):
+                out[name.removesuffix("seconds") + "milliseconds"] = round(item * 1000)
+            else:
+                out[name] = quantised(item, name)
+        return out
+    if isinstance(value, list):
+        return [quantised(item, key) for item in value]
+    if isinstance(value, float):
+        raise ValueError(f"a fractional {key!r} would enter the record's digest; quantise it by name")
+    return value
+
+
+def decimal_strings(value: object) -> object:
+    """The value with every fraction written as a decimal string; the record's digest refuses floats."""
+    if isinstance(value, dict):
+        return {name: decimal_strings(item) for name, item in value.items()}
+    if isinstance(value, list):
+        return [decimal_strings(item) for item in value]
+    if isinstance(value, float):
+        return repr(value)
+    return value
+
+
+def living_world(by_id: dict) -> dict:
+    """What the living session measured and read, from the observations the run recorded."""
+    def observed(step: str, observation: str) -> object:
+        found = [o for o in by_id[step].get("observations", []) if o["id"] == observation]
+        return found[0]["observed"] if found else None
+    motion = observed("play-and-watch-walking", "walking-continuously") or {}
+    return decimal_strings({
+        "statuses": {step: by_id[step]["status"] for step in (
+            "start-with-small-square", "furnish-small-square", "bring-in-inhabitants", "play-and-watch-walking",
+            "inspect-an-inhabitant", "object-in-use", "pause-playback")},
+        "measure": "lane W2's: per animation frame, the ground displacement of every outdoor walker the page draws in two consecutive frames; judged by the 95th percentile pace of the walker-frames at or above the walking floor; the moving share (walker-frames with any displacement) is reported, not judged",
+        "motion": {key: motion.get(key) for key in ("seconds", "frames", "walkers_seen", "frame_ms", "walker_frames",
+                                                    "moving_walker_frames", "moving_share", "step_m", "speed_bands", "walking",
+                                                    "pace_p95_at_most_m_per_s")},
+        "per_walker": motion.get("walkers"),
+        "host": observed("play-and-watch-walking", "host-plays"),
+        "minutes": observed("play-and-watch-walking", "minutes-pass"),
+        "inspector": observed("inspect-an-inhabitant", "who-what-why"),
+        "in_use": observed("object-in-use", "use-recorded"),
+        "paused": observed("pause-playback", "minutes-stop"),
+    })
+
+
+def observed_in(by_id: dict, step: str, observation: str) -> object:
+    found = [o for o in by_id.get(step, {}).get("observations", []) if o["id"] == observation]
+    return found[0]["observed"] if found else None
+
+
+def models_block(by_id: dict) -> dict:
+    """What the model steps read: the choice, a decision the model served, and a stand or talk."""
+    steps = ("choose-model-for-a-group", "inspect-a-model-decision", "model-chose-stand-or-talk")
+    return decimal_strings({
+        "statuses": {step: by_id[step]["status"] for step in steps},
+        "offered": observed_in(by_id, "choose-model-for-a-group", "models-offered"),
+        "chosen_in_words": observed_in(by_id, "choose-model-for-a-group", "group-chosen-in-words"),
+        "choice": observed_in(by_id, "choose-model-for-a-group", "choice-recorded"),
+        "decision_in_inspector": observed_in(by_id, "inspect-a-model-decision", "decided-by-named"),
+        "decision_recorded": observed_in(by_id, "inspect-a-model-decision", "decision-recorded"),
+        "replay": observed_in(by_id, "inspect-a-model-decision", "replayed-without-a-model"),
+        "stand_or_talk": observed_in(by_id, "model-chose-stand-or-talk", "model-chose-the-action"),
+        "stand_or_talk_in_words": observed_in(by_id, "model-chose-stand-or-talk", "standing-or-talking-in-words"),
+    })
+
+
+def birds_block(by_id: dict) -> dict:
+    return decimal_strings({
+        "status": by_id["birds-fly-and-perch"]["status"],
+        "measure": "per animation frame, each drawn bird's world position with the wall-clock moment of the frame, compared with the state the flight route serves at that step of the shared clock; frames within the step's transition margin of a change of state are not held to either. Interactions from the browser's Event Timing entries during the same minute.",
+        "drawn": observed_in(by_id, "birds-fly-and-perch", "birds-drawn"),
+        "on_the_clock": observed_in(by_id, "birds-fly-and-perch", "fly-and-perch-on-the-clock"),
+        "responsiveness": observed_in(by_id, "birds-fly-and-perch", "page-stays-responsive"),
+    })
+
+
+def comparison_block(by_id: dict) -> dict:
+    step = by_id["run-development-comparison"]
+    evidence = step.get("evidence", {})
+    view = by_id["compare-view-shows-the-pair"]
+    result = evidence.get("result") or {}
+    return decimal_strings({
+        "status": step["status"],
+        "command": evidence.get("command"),
+        "spend_usd": step.get("spend_usd"),
+        "observations": step.get("observations", []),
+        "result": {key: result.get(key) for key in ("comparison_id", "phase", "score_version", "window_ticks", "group", "others",
+                                                    "others_asked", "arms", "primary", "control", "summaries", "differences",
+                                                    "control_bound", "verdict")},
+        "seeds": [{"seed_digest": s.get("seed_digest"), "name": s.get("name"), "excluded": s.get("excluded"),
+                   "runs": s.get("runs")} for s in result.get("seeds", [])],
+        "view": {"status": view["status"], "observations": view.get("observations", [])},
+    })
+
+
+def companion_block(by_id: dict) -> dict:
+    steps = ("ask-grounded-question", "companion-refuses-unsupported-change", "refused-answer-redrawn-after-reload",
+             "companion-proposes-appearance-change", "accepted-answer-redrawn-after-reload")
+    return decimal_strings({step: {"status": by_id[step]["status"], "observations": by_id[step].get("observations", [])}
+                            for step in steps})
+
+
+def made_world_block(by_id: dict) -> dict:
+    steps = ("furnish-made-world", "made-world-hosts-people")
+    return decimal_strings({step: {"status": by_id[step]["status"], "observations": by_id[step].get("observations", [])}
+                            for step in steps})
+
+
+#: The corrected pattern for how the Compare view says what a model answered. The run's driver
+#: matched "answered 90% of 41 turns" only, and the view writes shares with decimals ("90.24%"), so
+#: arms-with-reliability failed on text that shows the reliability beside each score.
+CORRECTED_RELIABILITY = re.compile(r"answered \d+(?:\.\d+)?% of \d+ turns")
+
+
+def corrected_check(result: dict) -> dict:
+    """The one observation a driver defect failed, re-checked on the text the run recorded with the
+    corrected pattern, and the gates the rehearsal's own assembler gives with that correction. The
+    run's own outcome is reported unchanged in steps and gates; this is a second reading of it."""
+    sys.path.insert(0, str(REHEARSAL))
+    import resultdoc
+    import steplist
+
+    steps, gates = steplist.load_checked()
+    by_id = {s["id"]: s for s in result["steps"]}
+    view = by_id["compare-view-shows-the-pair"]
+    [arms] = [o for o in view["observations"] if o["id"] == "arms-with-reliability"]
+    served = {a["key"]: a["decider"] for a in arms["observed"]["served_arms"]}
+    candidates = [a for a in arms["observed"]["arms"] if a["role"] == "candidate"]
+    holds = (
+        len(candidates) == 2
+        and all(
+            CORRECTED_RELIABILITY.search(a["reliability"] or "") is not None
+            and len(a["cells"]) > 2
+            and (a["reliability"] or "").startswith(served[a["arm"]]["name"])
+            for a in candidates
+        )
+        and len(arms["observed"]["arms"]) == len(served)
+    )
+    outcomes = {}
+    for step in result["steps"]:
+        if step["status"] in ("not_available", "not_reachable"):
+            continue
+        observations = [
+            {**o, "ok": holds} if (step["id"], o["id"]) == ("compare-view-shows-the-pair", "arms-with-reliability") else o
+            for o in step["observations"]
+        ]
+        failed = [o["id"] for o in observations if not o["ok"]]
+        outcomes[step["id"]] = {"status": "failed" if failed else "passed",
+                                "reason": f"did not hold: {', '.join(failed)}" if failed else None,
+                                "observations": observations, "evidence": {}}
+    again = resultdoc.assemble(steps, gates, outcomes, {}, {})
+    return {
+        "defect": "the driver's pattern for what a model answered, /answered \\d+% of \\d+ turns/, did not allow a share with decimals; the view writes 90.24%",
+        "corrected_pattern": CORRECTED_RELIABILITY.pattern,
+        "text_rechecked": [{"arm": a["arm"], "reliability": a["reliability"]} for a in candidates],
+        "arms_with_reliability_holds": holds,
+        "summary": again["summary"],
+        "gates": [{"gate": g["gate"], "status": g["status"]} for g in again["gates"]],
+        "note": "The run's outcome stands as recorded in steps and gates; this re-reads the same recorded observation with the corrected pattern. No step was run again.",
+    }
+
+
+def git_out(*args: str) -> str:
+    return subprocess.run(["git", *args], cwd=TREE, capture_output=True, text=True, check=True).stdout.strip()
+
+
+def composition(arguments, tree: dict) -> dict:
+    """What the application tree was: main at a commit with the rehearsal's delta applied on it,
+    unstaged, and the commits main gained since the earlier record."""
+    assert tree["head"] == git_out("rev-parse", arguments.application_main), "the tree's head is not the named main"
+    since = [line.split(" ", 1) for line in git_out("log", "--format=%H %s", f"{arguments.since}..{arguments.application_main}").splitlines()]
+    return {
+        "main": tree["head"],
+        "applied_unstaged": [
+            {"delta_patch_sha256": arguments.delta_sha256, "relation": "the rehearsal's own change: step list, drivers, tests and section 5 of docs/demo-integrity.md"},
+        ],
+        "tree_diff_head_sha256": tree["diff_head_sha256"],
+        "main_commits_since_earlier_record": [{"commit": c, "subject": s} for c, s in since],
+    }
+
+
+def gates_read_from(main: str) -> dict:
+    """The document the gates were read from, by the bytes in the tree, which are main's."""
+    data = (TREE / "docs" / "product-direction.md").read_bytes()
+    held = subprocess.run(["git", "show", f"{main}:docs/product-direction.md"], cwd=TREE, capture_output=True, check=True).stdout
+    assert data == held, "the tree's product-direction.md is not main's"
+    return {"document": "docs/product-direction.md", "sha256": sha256(data), "as_on_main": git_out("rev-parse", main)}
+
+
+def scrub(text: str, pairs: list[tuple[str, str]]) -> str:
+    for local, placeholder in pairs:
+        text = text.replace(local, placeholder)
+    return text
+
+
+def run_token(result: dict) -> str | None:
+    """The run's synthetic token, from the launcher's kept run record, to prove it is published nowhere."""
+    spec = importlib.util.spec_from_file_location("acceptance_launch", TREE / "scripts" / "acceptance" / "launch.py")
+    launcher = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(launcher)
+    workspace = result["run"]["runtime"]["workspace_id"]
+    for state in launcher.runtime_root().glob("*/state.json"):
+        kept = json.loads(state.read_text())
+        if kept.get("workspace_id") == workspace and Path(kept["token_file"]).exists():
+            return Path(kept["token_file"]).read_text().strip()
+    for state in launcher.runtime_root().glob("*/*/state.json"):
+        kept = json.loads(state.read_text())
+        if kept.get("workspace_id") == workspace and Path(kept["token_file"]).exists():
+            return Path(kept["token_file"]).read_text().strip()
+    return None
+
+
+def as_run_driver(result: dict) -> tuple[dict, dict[str, bytes]]:
+    """Every rehearsal file the run recorded, checked against its recorded digest, to publish."""
+    recorded = result["run"]["rehearsal_files"]
+    files: dict[str, dict] = {}
+    published: dict[str, bytes] = {}
+    present = sorted(p.name for p in REHEARSAL.iterdir() if p.is_file())
+    assert present == sorted(recorded), f"the tree's rehearsal files {present} are not the run's {sorted(recorded)}"
+    for name, digest in sorted(recorded.items()):
+        data = (REHEARSAL / name).read_bytes()
+        assert sha256(data) == digest, f"{name} differs from the bytes the run recorded"
+        published_as = f"driver/{name}.txt"
+        files[name] = {"sha256": digest, "published_as": published_as}
+        published[published_as] = data
+    return files, published
+
+
+def predecessor(path: Path) -> dict:
+    """The earlier rehearsal record of main, bound by the digest its own record reproduces."""
+    document = json.loads(path.read_bytes())
+    digest = hashlib.sha256(canonical_json(document["record"])).hexdigest()
+    assert digest == document["record_sha256"], f"{path.name} does not reproduce its digest"
+    return {"path": str(path.relative_to(TREE)), "record_sha256": digest,
+            "relation": "the earlier recorded rehearsal of main, which watched the living world under the deterministic planner and reported every model gate not_served"}
+
+
+def earlier_record(path: Path, result: dict) -> dict:
+    """What the earlier published rehearsal record of main reported, step by step, beside this run."""
+    raw = path.read_bytes()
+    earlier = json.loads(raw)["record"]
+    before = {s["id"]: s for s in earlier["steps"]}
+    now = {s["id"]: s for s in result["steps"]}
+    return {
+        "application_head": earlier["application_tree"]["head"],
+        "summary": earlier["summary"],
+        "steps_only_there": sorted(set(before) - set(now)),
+        "steps_only_here": sorted(set(now) - set(before)),
+        "differing_steps": [
+            {"step": step_id, "earlier_status": before[step_id]["status"], "this_status": now[step_id]["status"]}
+            for step_id in before
+            if step_id in now and before[step_id]["status"] != now[step_id]["status"]
+        ],
+        # The gates each step serves as docs/product-direction.md stated them for each run.
+        "gates_moved": [
+            {"step": step_id, "earlier_gates": before[step_id]["gates"], "these_gates": now[step_id]["gates"]}
+            for step_id in before
+            if step_id in now and before[step_id]["gates"] != now[step_id]["gates"]
+        ],
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run", required=True)
+    parser.add_argument("--name", required=True)
+    parser.add_argument("--earlier", required=True)
+    parser.add_argument("--application-main", required=True, help="the main commit the application tree was made at")
+    parser.add_argument("--delta-sha256", required=True, help="the SHA-256 of the rehearsal's delta.patch the tree holds unstaged")
+    parser.add_argument("--since", required=True, help="the main commit the earlier record's application ran at")
+    arguments = parser.parse_args()
+    run = Path(arguments.run).resolve()
+    raw = (run / "result.json").read_bytes()
+    result = json.loads(raw)
+    pairs, machine, outputs = scrubber(result)
+    token = run_token(result)
+    assert token is not None, "the run's token was not found, so its absence cannot be checked"
+    machine.append(token)
+
+    artifacts_dir = TREE / "docs" / "evaluation" / "artifacts" / arguments.name
+    relative = f"docs/evaluation/artifacts/{arguments.name}"
+    if artifacts_dir.exists():
+        shutil.rmtree(artifacts_dir)
+    (artifacts_dir / "driver").mkdir(parents=True)
+    texts: dict[str, bytes] = {
+        "result.json": scrub(raw.decode(), pairs).encode(),
+        "summary.txt": scrub((run / "summary.txt").read_text(), pairs).encode(),
+        "write_record.py.txt": Path(__file__).read_bytes(),
+    }
+    files, driver = as_run_driver(result)
+    texts.update(driver)
+    for name, data in texts.items():
+        # Source copies may hold the placeholder and the refused phrases as code; data may not.
+        checked = machine if name.endswith(".txt") and name != "summary.txt" else machine + outputs
+        for fragment in checked:
+            assert fragment.encode() not in data, f"{name} would publish a machine location or credential"
+        (artifacts_dir / name).write_bytes(data)
+
+    by_id = {step["id"]: step for step in result["steps"]}
+    captures = []
+    for step_id, label, shows in CAPTURES:
+        shots = [s for s in by_id[step_id].get("evidence", {}).get("screenshots", []) if s["file"].endswith(f"-{step_id}-{label}.png")]
+        if not shots:
+            continue
+        [shot] = shots
+        data = (run / shot["file"]).read_bytes()
+        assert sha256(data) == shot["sha256"], f"{shot['file']} is not the image the run recorded"
+        target = artifacts_dir / Path(shot["file"]).name
+        target.write_bytes(data)
+        captures.append({"path": f"{relative}/{target.name}", "byte_size": len(data), "sha256": sha256(data),
+                         "step": step_id, "shows": shows})
+
+    def bound(name: str) -> dict:
+        data = (artifacts_dir / name).read_bytes()
+        return {"path": f"{relative}/{name}", "byte_size": len(data), "sha256": sha256(data)}
+
+    kept = {key: value for key, value in result["run"].items() if key != "facts"}
+    run_block = quantised(json.loads(scrub(json.dumps(kept), pairs)))
+    rights = by_id["grant-model-rights-in-app"]
+    steps_list = json.loads((REHEARSAL / "steps.json").read_bytes())
+    stand_ins = {
+        key: {**entry, "given_by_steps": [s["id"] for s in steps_list["steps"] if s.get("stand_in") == key],
+              "resting_steps": [s["id"] for s in result["steps"] if any(x["key"] == key for x in s.get("stand_ins", []))],
+              "gates": [{"gate": g["gate"], "status": g["status"]} for g in result["gates"] if key in g["stand_ins"]]}
+        for key, entry in steps_list["stand_ins"].items()
+    }
+    record = {
+        "profile": "exulanica.rehearsal-run/v1",
+        "scope": (
+            "One run of the automated rehearsal of the first demonstration (scripts/rehearsal, step list "
+            "version 7) against main in the real application: a production build in headless Chrome over the DevTools "
+            "protocol, one page per session, a fresh synthetic workspace on acceptance slot 0, and the "
+            "hosted models through the product's configured client, with main's production derivative "
+            "worker and its depth model, and the host playing the run's workspace at its shipped pace. "
+            "In the starter furnished with the small square, the owner chooses an open model for a group of four "
+            "of its eight people; the world is played and watched walking, a decision that model served is read "
+            "in the inspector and from the API, someone stands or talks because their model chose it, the square's "
+            "birds fly and perch on the flight's shared clock while the page's inputs are timed, and the world is "
+            "paused. The product's compare command then runs a development comparison of that group under two "
+            "models on one development seed, and the application's Compare view shows it. The person's path runs "
+            "from uploading synthetic photographs in the "
+            "drawer through their admission, model rights and review to the depth pass and scene grouping, "
+            "a world made from them, the Companion asked inside it (a grounded question, an absent place, a change "
+            "the design refuses and one Customize shows, each answer redrawn after a reload), and the return to it, "
+            "where one more photograph is added; people are then brought into the made world on its declared floor. "
+            "The human review is "
+            "the rehearsal driver's stand-in for a person's review, stated in stand_in_disclosure; no person "
+            "reviewed these photographs. Each step is a person's action with its declared observable results; "
+            "each gate of docs/product-direction.md is reported with its first failed step, and a gate that "
+            "rests on the stand-in never as a plain pass."
+        ),
+        "corpus_class": "synthetic",
+        "corpus": {
+            "workspace": run_block["runtime"]["workspace"],
+            "photographs": {session: inputs["photographs"] for session, inputs in run_block["prepared"].items()},
+            "photographs_reason": {session: inputs["photographs_reason"] for session, inputs in run_block["prepared"].items()},
+            "personal_media_admitted": False,
+        },
+        "stand_in_disclosure": stand_ins,
+        "application_tree": run_block["application_tree"] | {"main_at_run": arguments.application_main},
+        "rehearsal": {
+            "steps_profile": result["steps_profile"],
+            "steps_version": result["steps_version"],
+            "steps_sha256_as_run": result["run"]["steps_sha256"],
+            "rehearsal_tree": run_block["rehearsal_tree"],
+            "driver": files,
+            "driver_established": "each file's bytes hash to the SHA-256 the run recorded for it in run.rehearsal_files",
+        },
+        "runtime": run_block["runtime"],
+        "build": run_block["build"],
+        "access": run_block["access"],
+        "model": run_block["model"],
+        "browser": run_block["browser"],
+        "summary": result["summary"],
+        "steps": [
+            {"id": s["id"], "status": s["status"], "gates": s["gates"], "session": s.get("session"),
+             "owner_area": s["owner_area"], "reason": s.get("reason"), "spend_usd": s.get("spend_usd"),
+             "stand_ins": [x["key"] for x in s.get("stand_ins", [])],
+             "observations": [{"id": o["id"], "ok": o["ok"]} for o in s.get("observations", [])]}
+            for s in result["steps"]
+        ],
+        "gates": result["gates"],
+        "failures": decimal_strings([
+            {"step": s["id"], "reason": s["reason"], "observations": s["observations"]}
+            for s in result["steps"] if s["status"] == "failed"
+        ]),
+        "living_world": living_world(by_id),
+        "models_deciding": models_block(by_id),
+        "birds": birds_block(by_id),
+        "comparison": comparison_block(by_id),
+        "companion_memory": companion_block(by_id),
+        "made_world_people": made_world_block(by_id),
+        "corrected_check": corrected_check(result),
+        "application_composition": composition(arguments, run_block["application_tree"]),
+        "gates_read_from": gates_read_from(arguments.application_main),
+        "model_rights_step": quantised({
+            "status": rights["status"],
+            "observations": rights.get("observations", []),
+        }),
+        "spend": {
+            **run_block["model"]["spend"],
+            "by_step": {s["id"]: s["spend_usd"] for s in result["steps"] if s.get("spend_usd") is not None},
+        },
+        "predecessor_record": predecessor(Path(arguments.earlier).resolve()),
+        "compared_with_predecessor": earlier_record(Path(arguments.earlier).resolve(), result),
+        "captures": captures,
+        "artifacts": [bound(name) for name in sorted(texts)],
+        "result_sha256_as_written_by_the_run": sha256(raw),
+        "scrubbing": (
+            "machine locations in the published result and summary are replaced by <application-tree>, "
+            "<model-environment-file>, <run>, <main-checkout>, <rehearsal-tree> and <temporary>, and "
+            "neither holds the placeholder the run wrote for the home directory. The images are the bytes "
+            "the run captured, and each matches the SHA-256 the run recorded for it. Durations the run "
+            "wrote in seconds are given here in whole milliseconds."
+        ),
+        "what_this_does_not_show": [
+            "The human review of every photograph was recorded by the rehearsal driver through the drawer's own controls as a stand-in for a person's review; no person inspected these photographs, and every gate resting on it reports passed_on_stand_in or worse, never a plain pass.",
+            "The photographs are synthetic drawings in a synthetic workspace; no personal photograph is involved.",
+            "The depth pass ran MoGe-2 on this machine's CPU in main's production derivative worker. No multi-view reconstruction ran: no scene group held three photographs, and the scene worker was not started (reconstruct-scene-geometry states why).",
+            "The proposed place was confirmed through the identity routes rather than in the application.",
+            "Stopping a right in the drawer was not exercised by this run.",
+            "One run: the Companion's answers vary between runs.",
+            "Access used the production build's operator token gate; account sign-in was not exercised.",
+            "No person observed the run and no demonstration footage was recorded; no frame time was judged. The walking measure counts the frames in which drawn walkers moved, over one window of one run.",
+            "The living world was watched in the starter at the host's shipped pace with one population of eight; the walking threshold comes from lane W2's two measured arms, not from a pre-registered held-out set.",
+            "One group of four was decided by one open model; the people were not split into several groups under different models, and no refused proposal was required to occur.",
+            "The comparison ran one development seed, which is never judged, with no same-model control pair; its verdict claims no difference, and one seed says nothing about which model serves people better.",
+            "The comparison was started by the product's local command, not from the application.",
+            "No client other than the browser read the comparison, its runs or their decisions.",
+            "Customize's own refusal of a proposal was not exercised: no request in words produces one.",
+            "The birds' measure compares drawn motion with the served flight states; it does not judge how natural the flight looks.",
+            "Other work loaded the machine during the run (machine_load, from the GPU slot's own log lines); the times are not timing measurements.",
+        ],
+        "machine_load": session_load(run),
+        "completed_at": result["run"]["finished_at"],
+    }
+    text = json.dumps(
+        {"profile": "exulanica.digest-bound-record/v1", "record": record,
+         "record_sha256": hashlib.sha256(canonical_json(record)).hexdigest()},
+        indent=2, sort_keys=True,
+    ) + "\n"
+    for fragment in machine + outputs:
+        assert fragment not in text, "the record would publish a machine location or credential"
+    target = TREE / "docs" / "evaluation" / f"{arguments.name}.json"
+    target.write_text(text)
+    print(f"wrote {target.relative_to(TREE)}: {len(captures)} captures, {len(record['artifacts'])} artifacts, token checked")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

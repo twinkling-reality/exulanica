@@ -11,6 +11,7 @@ cannot hide behind a green run.
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -573,7 +574,7 @@ def test_the_companion_session_allows_each_utterance_every_deadline_the_page_wai
     utterances = [
         s for s in STEPS["steps"] if s.get("session") == "companion" and s.get("hosted_model")
     ]
-    assert len(utterances) == 3
+    assert len(utterances) == 4
     assert session["budget_seconds"] * 1000 >= len(utterances) * sum(deadlines.values())
     for name, ms in deadlines.items():
         assert f"{name} {ms // 1000} s" in session["budget_reason"], name
@@ -703,10 +704,24 @@ def test_every_instrument_a_session_names_is_registered_and_says_why():
 LIVING = {
     "furnish-small-square": ["enter-owned-starter"],
     "bring-in-inhabitants": ["furnish-small-square"],
+    "choose-model-for-a-group": ["bring-in-inhabitants"],
     "play-and-watch-walking": ["bring-in-inhabitants"],
     "inspect-an-inhabitant": ["play-and-watch-walking"],
+    "inspect-a-model-decision": ["choose-model-for-a-group", "play-and-watch-walking"],
+    "model-chose-stand-or-talk": ["inspect-a-model-decision"],
+    "birds-fly-and-perch": ["furnish-small-square"],
     "object-in-use": ["play-and-watch-walking"],
     "pause-playback": ["play-and-watch-walking"],
+}
+#: The living steps where a model decides, and the gates each serves beside the world's own.
+MODEL_STEPS = {
+    "choose-model-for-a-group": ["milestone:A model per group", "delivery:Models in their roles"],
+    "inspect-a-model-decision": [
+        "milestone:A model per group",
+        "milestone:Recorded decisions",
+        "delivery:Models in their roles",
+    ],
+    "model-chose-stand-or-talk": ["milestone:A model per group", "delivery:Models in their roles"],
 }
 
 
@@ -722,12 +737,18 @@ def test_the_living_session_furnishes_brings_people_in_plays_inspects_and_pauses
     assert {s["id"]: s["requires"] for s in living} == LIVING
     assert [s["id"] for s in living] == list(LIVING)
     for step in living:
-        assert step["gates"] == ["milestone:A world to run", "delivery:Usable world"], step["id"]
+        world = ["milestone:A world to run", "delivery:Usable world"]
+        expected = MODEL_STEPS.get(step["id"], world)
+        if step["id"] == "birds-fly-and-perch":
+            expected = []  # no gate of the first demonstration names flight; it says why
+        assert step["gates"] == expected, step["id"]
         assert step["gates_reason"].strip(), step["id"]
+    # Only the choice sends anything to a model; the steps after it read what the model decided.
+    assert [s["id"] for s in living if s.get("hosted_model")] == ["choose-model-for-a-group"]
     # They show part of both gates, never all of either: a town is not a starter with a square.
     assert {"milestone:A world to run", "delivery:Usable world"} <= set(STEPS["gates_in_part"])
     session = next(s for s in STEPS["sessions"] if s["id"] == "living")
-    assert session["instruments"] == ["walker-positions"]
+    assert session["instruments"] == ["walker-positions", "bird-positions"]
     ids = [s["id"] for s in STEPS["sessions"]]
     assert ids.index("appearance") < ids.index("living") < ids.index("photos")
     watch = _step(STEPS, "play-and-watch-walking")["parameters"]
@@ -738,7 +759,12 @@ def test_the_living_session_furnishes_brings_people_in_plays_inspects_and_pauses
     assert STEPS["runtime"]["society_playback"]["launcher_flags"] == ["--society-playback"]
     # The session's allowance holds its bounds: the watch and the wait for someone at the square.
     in_use = _step(STEPS, "object-in-use")["parameters"]["in_use_wait_seconds"]
-    assert session["budget_seconds"] > watch["sample_seconds"] + in_use
+    decided = _step(STEPS, "inspect-a-model-decision")["parameters"]["wait_seconds"]
+    acted = _step(STEPS, "model-chose-stand-or-talk")["parameters"]["wait_seconds"]
+    birds = _step(STEPS, "birds-fly-and-perch")["parameters"]["sample_seconds"]
+    episode = 300  # the birds may wait at most one flight episode for a stretch with both states
+    waits = watch["sample_seconds"] + in_use + decided + acted + birds + episode
+    assert session["budget_seconds"] > waits
 
 
 def test_the_first_use_square_is_taken_back_and_nothing_waits_on_it():
@@ -753,3 +779,63 @@ def test_the_first_use_square_is_taken_back_and_nothing_waits_on_it():
     card_id = card["id"]
     assert [s["id"] for s in STEPS["steps"] if card_id in s.get("requires", [])] == []
     assert "undone-newest-first" in {o["id"] for o in card["expect"]["api"]}
+
+
+def _digest(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def test_the_comparison_is_handed_development_seeds_only(tmp_path):
+    """A seeds file may hold held-out seeds too; only the catalog's development seeds leave it,
+    in the catalog's order, each line stripped as the command strips it."""
+    catalog = tmp_path / "seeds.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {"key": "development_1", "phase": "development", "seed_digest": _digest("a")},
+                    {"key": "held_out_1", "phase": "held_out", "seed_digest": _digest("held")},
+                    {"key": "development_2", "phase": "development", "seed_digest": _digest("c")},
+                ]
+            }
+        )
+    )
+    seeds = tmp_path / "seeds.txt"
+    seeds.write_text("held\n  c \nunrelated\na\n")
+    lines, keys = REHEARSE.development_seed_lines(catalog, seeds)
+    assert lines == ["a", "c"] and keys == ["development_1", "development_2"]
+    # The positive control: the held-out seed is in the file; only its phase keeps it out.
+    assert "held" in seeds.read_text()
+
+
+def test_the_comparison_runs_models_a_person_is_offered_within_its_bound():
+    """The comparison step's catalog is the one the command checks seeds against, its models are
+    offered for a person's decisions, and the most its runs can reserve at once fits its bound: the
+    two model runs play at once, each asking at most every person of the group together."""
+    from decimal import Decimal
+
+    from exulanica.api.society_person_decisions import ask_bound_usd
+    from exulanica.models.budget import BudgetGuard
+    from exulanica.models.manifest import load_manifest
+    from exulanica.world.society_catalogs import load_comparison_catalogs
+    from exulanica.world.society_decision_contract import decision_contract, person_role
+
+    step = _step(STEPS, "run-development-comparison")
+    parameters = step["parameters"]
+    entries = json.loads((ROOT / parameters["seed_catalog"]).read_text())["entries"]
+    served = load_comparison_catalogs().seeds.values()
+    assert [e["seed_digest"] for e in entries if e["phase"] == "development"] == [
+        e["seed_digest"] for e in served if e["phase"] == "development"
+    ]
+    manifest = load_manifest()
+    offered = {(m.provider, m.model_id): m for m in manifest.offered_models(person_role().chosen)}
+    chosen = _step(STEPS, "choose-model-for-a-group")["parameters"]
+    assert (chosen["model"]["provider"], chosen["model"]["model_id"]) in offered
+    assert parameters["models"][0] == chosen["model"]
+    specs = [offered[(m["provider"], m["model_id"])] for m in parameters["models"]]
+    bound = Decimal(parameters["bound_usd"])
+    budget = BudgetGuard(ceiling_usd=bound)
+    most = sum(ask_bound_usd(budget, spec, decision_contract()) for spec in specs)
+    assert most * chosen["group_size"] <= bound
+    assert step["requires"] == ["choose-model-for-a-group", "pause-playback"]
+    assert Decimal(step["spend_estimate_usd"]) == bound

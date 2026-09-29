@@ -171,6 +171,10 @@ python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <ne
 - `--bound-usd` sets a spend bound for one run below the step list's; `--sessions` runs only the
   named browser sessions; `--reuse-database` reuses the slot's database; `--gpu-slot` names the
   machine's GPU slot command.
+- `--comparison-seeds` names a file of comparison seeds, one a line. The comparison step takes
+  from it only the lines whose SHA-256 is a development seed of
+  `assets/catalogs/society/society-comparison-seeds.v2.json`, writes them to a file outside the run
+  directory for as long as the command runs, and records each seed by its key and digest.
 
 **The launcher on its own.** `scripts/acceptance/launch.py` also runs the application for a
 person, without the rehearsal:
@@ -224,10 +228,45 @@ not a failure, since people linger by design. It reads one inhabitant in the ins
 someone to use an object of the square, and pauses the world. These steps serve the first
 milestone's A world to run and the Usable world delivery gate in part: they watch people move under
 the deterministic planner in a starter furnished with one square, not in the small town those gates
-name. No step chooses a model for people, swaps one or runs a comparison, although the product does
-all three, so the result reports the gates that need them `not_served`.
+name.
 
-**What it does not do.** It does not observe a person or record demonstration footage. It judges
+**Models deciding for people.** In People nearby, under Who decides for them, the rehearsal ticks
+four of the starter's people and chooses DeepSeek V4 Flash for them before it presses Play. While the
+host plays the world it waits for a decision that model served and the minute applied, reads it in
+the inspector (Decided by, Latest decision) and reads the same decision from the API: the request
+with the options the person saw, the receipt naming the model that served it, and a replay of the
+society from its stored decisions. It then waits for one of those people to stand a while or talk
+because their model chose it. That model chose those actions most often of the models measured
+([model actions record](evaluation/2026-09-26-society-model-actions.json)). The birds of the square's tree are watched for a minute in which some fly and some
+perch: each drawn bird must be moving exactly while the flight route serves it off its perch at
+that moment of the shared clock, away from a change of state, and every press of the World menu
+meanwhile must be answered within 200 ms, the Core Web Vitals line for a good Interaction to Next
+Paint.
+
+**A comparison.** Once the world is paused, the rehearsal runs the product's own command,
+`python -m exulanica.orchestration.compare`, from the application's checkout over the run's database
+and store, for the group of the owner's choice (`--group-choice`), with that model and Nemotron 3
+Nano 30B, on one development seed, under a bound of at most 0.05 USD passed as
+`EXULANICA_BUDGET_USD`. It checks that the saved world is unchanged by it, then opens Compare models
+from the World menu and reads the verdict, each model's arm with how its model answered beside how
+the group fared, and the two runs drawn side by side under one clock, replayed from their stored
+decisions. These steps serve the model gates in part: one group under one model beside people who
+follow their routine, and one simulated hour of the starter, started from the command rather than
+the application. A development seed is never judged and no same-model control pair runs, so Honest
+difference is reported `not_served`, as is every gate that needs a client other than the browser to
+read the runs.
+
+**The Companion's memory and the made world.** In the world made from the photographs the Companion
+is asked for a change the reviewed design cannot make and must answer once, without offering to
+open Customize, with a provenance line naming the model that read the request; after a reload it
+must redraw that answer in the same words with the same provenance line. The same holds for the
+proposal it makes and Customize shows. The last session places the small square in the made world
+and brings people in: they must stand on the floor the world declares, with Who decides for them
+beside them.
+
+**What it does not do.** It does not observe a person or record demonstration footage. It does not
+ask for a change Customize itself refuses, since no request in words makes one: that refusal follows
+a proposal made stale or a design the panel cannot show. It judges
 no frame time: the walking measure reads how far walkers are drawn to move between frames, not
 how long a frame takes. The human review of its photographs is given by the rehearsal driver
 through the photo drawer's own controls, as a stand-in the step list states once (`stand_ins` in

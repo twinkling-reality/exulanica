@@ -1,6 +1,6 @@
 {
   "profile": "exulanica.rehearsal-steps/v1",
-  "version": 6,
+  "version": 7,
   "about": "The first demonstration, as a person does it in the application, one step per action. Each step names the gates of docs/product-direction.md it serves, the results that must be observable after it, and the owner area a failure routes to. scripts/rehearsal/rehearse.py runs it; tests/test_rehearsal_steps.py holds it to the gates that document states.",
   "gate_sources": [
     {"key": "milestone", "document": "docs/product-direction.md", "heading": "First milestone", "form": "table"},
@@ -13,19 +13,18 @@
     "reason": "Hosted model calls are made only by the steps marked hosted_model, through the product's configured client and its policy boundary. A run stops starting them once the spend the product reports reaches bound_usd, and a step list whose estimates add up to more than ask_before_usd is not well formed, because that run needs a decision first."
   },
   "unserved_gates": {
-    "milestone:A model per group": "The product chooses no model per group of people: the society's opt-in model decision slot exists, and docs/product-direction.md states that a model chosen per group does not.",
-    "milestone:Recorded decisions": "No model runs the rehearsal's people, so no decision a model served is recorded for a run to replay.",
-    "milestone:Swap and compare": "The product runs no mixed-model pair and shows no side-by-side view: docs/product-direction.md states that neither exists.",
-    "milestone:Honest difference": "No comparison between models exists to bound with a same-model control pair.",
-    "milestone:Independent reading": "No run or model decision exists for a client other than the browser to read.",
-    "delivery:Models in their roles": "No group's decisions come from a named model: the rehearsal's people run under the deterministic planner.",
-    "delivery:Swap and compare": "The product runs no swapped pair and shows no side-by-side view to rehearse.",
-    "delivery:Independent use": "No run or decision exists to read through the developer interface; the developer client's read and edit of a saved version serves the saved-world foundation's Developer proof."
+    "milestone:Honest difference": "The rehearsal's comparison runs on one development seed, which is never judged, and runs no same-model control pair: a verdict bounding a difference with that pair is given only on held-out seeds, which a rehearsal does not spend.",
+    "milestone:Independent reading": "No client other than the browser reads the comparison, its runs or their decisions in the rehearsal; the developer client's read and edit of a saved version serves the saved-world foundation's Developer proof.",
+    "delivery:Independent use": "No client other than the browser reads the runs and decisions through the developer interface in the rehearsal; the developer client's read and edit of a saved version serves the saved-world foundation's Developer proof."
   },
   "gates_in_part": {
     "milestone:A world to run": "the world is the starter furnished with one small square from the catalogs, not a small town built from them; its people are seen moving under the deterministic planner there.",
+    "milestone:A model per group": "one group of the starter's people is decided by one open model and the others by their routine; the people are not split into several named groups each under its own model, and a refused proposal is seen only when the model makes one.",
+    "milestone:Swap and compare": "the comparison swaps one group's model for one simulated hour of the starter on one development seed, started from the local command rather than from the application, not the town's day.",
     "delivery:Usable world": "the people are watched moving in the starter furnished with one small square, not in the town the milestone builds.",
-    "delivery:Persistence and replay": "the saved world is reopened and verified to hold what was saved, but no run exists to replay from stored decisions."
+    "delivery:Models in their roles": "one group's decisions come from its named model and the others' from their routine, in the starter rather than the town; a refused proposal is seen only when the model makes one.",
+    "delivery:Swap and compare": "the swapped pair runs one simulated hour of the starter on one development seed, started from the local command, with no same-model control pair beside it.",
+    "delivery:Persistence and replay": "the saved world is reopened and holds what was saved, the living society and the comparison's two runs replay from their stored decisions without calling a model, and the comparison leaves the saved world unchanged; the runs are one simulated hour of the starter, not the town's day."
   },
   "stand_ins": {
     "human-review": {
@@ -63,12 +62,14 @@
     {
       "id": "living",
       "runner": "browser",
-      "budget_seconds": 900,
-      "budget_reason": "The sum of its bounds with room for the pages: a minute passing on its own before the sample (at most three host intervals), the 60 s motion sample, the 240 s wait for someone to use the square, and a pause held over two host intervals; the host's base wait is 8 s a minute (docs/evaluation/2026-09-24-living-world-pace.json).",
-      "purpose": "A living world in the starter: furnished with a small square from the Create panel, inhabitants brought in, the world played by the host and watched walking, one inhabitant read in the inspector, someone using the square, and the world paused.",
-      "instruments": ["walker-positions"],
-      "instruments_reason": "The motion measure reads where the page draws each walker in every animation frame, which no control shows; the instrument is installed before the page loads (instruments.mjs)."
+      "budget_seconds": 2000,
+      "budget_reason": "The sum of its bounds with room for the pages: a minute passing on its own before the sample (at most three host intervals), the 60 s motion sample, the 240 s wait for a decision the chosen model served, the 300 s wait for someone to stand or talk because their model chose it, the birds' wait of at most one flight episode (300 s) and their 60 s sample, the 240 s wait for someone to use the square, and a pause held over two host intervals; the host's base wait is 8 s a minute (docs/evaluation/2026-09-24-living-world-pace.json).",
+      "purpose": "A living world in the starter: furnished with a small square from the Create panel, inhabitants brought in, an open model chosen for a group of them, the world played by the host and watched walking, one inhabitant read in the inspector, a decision the model made read there, someone standing or talking because their model chose it, the square's birds flying and perching, someone using the square, and the world paused.",
+      "instruments": ["walker-positions", "bird-positions"],
+      "instruments_reason": "The motion measure reads where the page draws each walker in every animation frame, and the birds' measure where it draws each bird and how long it takes to answer an input, which no control shows; both are installed before the page loads (instruments.mjs)."
     },
+    {"id": "comparison", "runner": "orchestrator", "purpose": "A development comparison of the starter's people, run by the product's local command for the group the owner chose a model for."},
+    {"id": "compare", "runner": "browser", "budget_seconds": 300, "budget_reason": "Its bounds with room for the page: the 60 s wait for both runs to be drawn and the 5 s of play, with a page load and the gate.", "purpose": "The comparison in the application's Compare view: its verdict, each arm with how its model answered, and the two runs on one clock."},
     {
       "id": "photos",
       "runner": "browser",
@@ -85,7 +86,7 @@
         "photographs_reason": "Drawings of scripts/make_place_proposal_d_photographs.py at the indices the places and Companion lanes' end-to-end runs proposed MIRELAND HALL from, plus the drawing with no text as the control. No personal photograph."
       }
     },
-    {"id": "companion", "runner": "browser", "budget_seconds": 1800, "budget_reason": "Measured 42.5 s for this session on main 209b5742 (2026-09-24, docs/evaluation/2026-09-24-rehearsal-main.json). Each of its three utterances can take as long as the page waits for it: PROPOSE_TIMEOUT_MS 170 s for the appearance request and then ASK_TIMEOUT_MS 395 s for the answer (both in web/packages/app/src/companion-ask-api.ts; 170 s is the 150 s appearance_bound_seconds in exulanica/selection/proposal.py computes on the API's client and 395 s the 375 s answer_bound_seconds in exulanica/selection/question.py computes on it, each plus the page's 20 s packet allowance, held by tests/test_companion_propose_deadline.py and tests/test_companion_ask_deadline.py), 565 s each and 1695 s for three; the rest covers opening the cited photograph and the screenshots. tests/test_rehearsal_steps.py holds this to those constants.", "purpose": "The memory interaction through the actual Companion and model path, in the world made from the photographs, where its evidence is."},
+    {"id": "companion", "runner": "browser", "budget_seconds": 2500, "budget_reason": "Measured 42.5 s for this session on main 209b5742 (2026-09-24, docs/evaluation/2026-09-24-rehearsal-main.json). Each of its four utterances can take as long as the page waits for it: PROPOSE_TIMEOUT_MS 170 s for the appearance request and then ASK_TIMEOUT_MS 395 s for the answer (both in web/packages/app/src/companion-ask-api.ts; 170 s is the 150 s appearance_bound_seconds in exulanica/selection/proposal.py computes on the API's client and 395 s the 375 s answer_bound_seconds in exulanica/selection/question.py computes on it, each plus the page's 20 s packet allowance, held by tests/test_companion_propose_deadline.py and tests/test_companion_ask_deadline.py), 565 s each and 2260 s for four; the rest covers opening the cited photograph, two reloads and the screenshots. tests/test_rehearsal_steps.py holds this to those constants.", "purpose": "The memory interaction through the actual Companion and model path, in the world made from the photographs, where its evidence is."},
     {"id": "developer-client", "runner": "orchestrator", "purpose": "The independent client reads and edits the same saved world through the authenticated API."},
     {
       "id": "return",
@@ -100,7 +101,8 @@
         ],
         "photographs_reason": "One more drawing of scripts/make_place_proposal_d_photographs.py, with no text, captured a day after the others, so it is a photograph the made world was not made with. No personal photograph."
       }
-    }
+    },
+    {"id": "made-world-people", "runner": "browser", "budget_seconds": 300, "budget_reason": "A page load and the gate, the square's confirmation and apply, and bringing people in, each with its 30 s settle; none waits on a job.", "purpose": "People brought into the world made from the photographs, on the floor it declares, with the model panel beside them."}
   ],
   "steps": [
     {
@@ -437,7 +439,11 @@
       "requires": ["enter-owned-starter"],
       "parameters": {
         "origin_role": "fictional",
-        "origin_role_reason": "The role every object this rehearsal places is given, invented for this world."
+        "origin_role_reason": "The role every object this rehearsal places is given, invented for this world.",
+        "facts_key": "square",
+        "facts_key_reason": "What later steps of this world read the square's objects under.",
+        "world_words": "the starter",
+        "world_words_reason": "The world the screenshot shows, in words."
       },
       "owner_area": "the small square: proposeArrangement in web/packages/app/src/composition/objects.ts, web/packages/app/src/arrangement-api.ts, and exulanica/world/arrangements.py with assets/catalogs/world-objects/world-arrangement.v1.json",
       "expect": {
@@ -466,6 +472,33 @@
         "api": [
           {"id": "society-of-simulated-people", "says": "GET /world/versions/{version_id}/society answers a society of as many inhabitants as the page says, every one marked synthetic."},
           {"id": "square-is-somewhere-to-go", "says": "Its read of where people can go names an enabled activity at one or more objects the square added, and gives a reason for each of the square's activities it says nobody can reach."}
+        ]
+      }
+    },
+    {
+      "id": "choose-model-for-a-group",
+      "session": "living",
+      "action": "In People nearby, under Who decides for them, tick four people, choose DeepSeek V4 Flash and press Use for the chosen people.",
+      "gates": ["milestone:A model per group", "delivery:Models in their roles"],
+      "gates_reason": "The owner chooses the open model that decides for a group, through the one hosted policy boundary; one group under one model is part of each, which gates_in_part states.",
+      "requires": ["bring-in-inhabitants"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.01",
+      "spend_estimate_source": "Measured 0.01139656 USD for DeepSeek V4 Flash deciding for 8 people over one simulated hour (docs/evaluation/2026-09-26-society-model-actions.json); four people over the living session's quarter of an hour of play is well under that.",
+      "parameters": {
+        "model": {"provider": "nebius_token_factory", "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"},
+        "model_reason": "The model the product offers a person whose own choices, in lane M4's measure, most often were to stand a while or talk (57 of 93 decisions over one simulated hour, docs/evaluation/2026-09-26-society-model-actions.json), so a person standing or talking because their model chose it is seen within the session.",
+        "group_size": 4,
+        "group_size_reason": "Half the starter's eight people: a group beside people who follow their routine, and half the per-ask cost of the comparison run for the same group."
+      },
+      "owner_area": "model choices: web/packages/app/src/ui/society-models.ts and web/packages/app/src/composition/society-models-mount.ts; exulanica/api/routes/society_models.py and exulanica/world/society_model_choice_repository.py",
+      "expect": {
+        "page": [
+          {"id": "models-offered", "says": "Who decides for them is shown beside the people, its host line says this server asks the models chosen before each simulated minute, and it offers the model by the name the server serves."},
+          {"id": "group-chosen-in-words", "says": "After the choice it says that many people are decided by the model chosen, and each chosen person's row names the model, which you chose."}
+        ],
+        "api": [
+          {"id": "choice-recorded", "says": "POST /world/versions/{version_id}/society/models answered the stored choice naming exactly the ticked people and the model; the models read holds that model for each of them and none for the others."}
         ]
       }
     },
@@ -516,6 +549,66 @@
       }
     },
     {
+      "id": "inspect-a-model-decision",
+      "session": "living",
+      "action": "Pick a person of the group in the inspector and read who decided for them and what their model last chose.",
+      "gates": ["milestone:A model per group", "milestone:Recorded decisions", "delivery:Models in their roles"],
+      "gates_reason": "A decision the chosen model served, applied by the engine, named with the model in the inspector, stored with the model that served it, the observation it saw and the validated action, and replayed without a call.",
+      "requires": ["choose-model-for-a-group", "play-and-watch-walking"],
+      "parameters": {"wait_seconds": 240, "wait_reason": "Thirty simulated minutes at the shipped 8 s a minute: DeepSeek V4 Flash answered 93 times for 8 people in one simulated hour with a p95 of 2.3 s (docs/evaluation/2026-09-26-society-model-actions.json), so four people are asked many times within it."},
+      "owner_area": "the inspector's model lines: personDetails in web/packages/app/src/composition/society-models-mount.ts and latestDecisionWords in web/packages/app/src/ui/society-models.ts; stored decisions: exulanica/api/decision_host.py and exulanica/world/society_model_decisions.py",
+      "expect": {
+        "page": [
+          {"id": "decided-by-named", "says": "The inspector's Decided by names the model the owner chose, which you chose."},
+          {"id": "latest-decision-in-words", "says": "Its Latest decision says at which simulated minute the model chose what, in words, and that they did it."}
+        ],
+        "api": [
+          {"id": "decision-recorded", "says": "The minute's decision_applied event names the model and what it chose; GET /world/versions/{version_id}/society/decisions/{request_id} holds the request with the options the person saw and the receipt naming the model that served it and the validated option."},
+          {"id": "replayed-without-a-model", "says": "GET /world/versions/{version_id}/society/replay verifies the society's replay from its stored decisions."}
+        ]
+      }
+    },
+    {
+      "id": "model-chose-stand-or-talk",
+      "session": "living",
+      "action": "Find a person of the group standing a while or talking because their model chose it, and read them in the inspector.",
+      "gates": ["milestone:A model per group", "delivery:Models in their roles"],
+      "gates_reason": "A model chooses among the actions the routine allows, standing or talking among them, and the engine applies its choice.",
+      "requires": ["inspect-a-model-decision"],
+      "parameters": {
+        "kinds": ["stand", "talk"],
+        "kinds_reason": "The two actions the decision contract's second version adds (assets/catalogs/society/society-decision-action.v2.json).",
+        "wait_seconds": 300,
+        "wait_reason": "Thirty-seven simulated minutes at 8 s a minute: in lane M4's measure DeepSeek V4 Flash chose to stand or talk 57 times in one simulated hour for 8 people (docs/evaluation/2026-09-26-society-model-actions.json)."
+      },
+      "owner_area": "model actions: exulanica/world/society_decision_contract.py, assets/catalogs/society/society-decision-action.v2.json and the inspector's activity words (assets/catalogs/society-words/society-inhabitant-words.v1.json)",
+      "expect": {
+        "page": [
+          {"id": "standing-or-talking-in-words", "says": "The inspector says the person is standing or talking, and its Latest decision names the model and what it chose."}
+        ],
+        "api": [
+          {"id": "model-chose-the-action", "says": "The applied decision's receipt names the model and an option of kind stand or talk, a talk naming its partner."}
+        ]
+      }
+    },
+    {
+      "id": "birds-fly-and-perch",
+      "session": "living",
+      "action": "Watch the square's birds for a minute in which some fly and some perch, pressing the World menu now and then.",
+      "gates": [],
+      "gates_reason": "Birds are the flight movement module in the saved world; no gate of the first demonstration names flight or an animal, so the step serves none.",
+      "requires": ["furnish-small-square"],
+      "parameters": {"sample_seconds": 60, "sample_reason": "A minute: several of the flight's take-offs and landings at the square's tree, the window the walkers are watched over too.", "transition_margin_steps": 3, "transition_margin_steps_reason": "The page's copy of the flight clock may be two steps from the server's before it is set again (CLOCK_DRIFT_STEPS in web/packages/atlas-react/src/playcanvas/flight/flock.ts), and a frame is drawn between two steps, so a bird within three steps of a change of state is not held to either.", "interaction_presses": 5, "interaction_presses_reason": "Enough inputs, spread over the minute, for the worst of them to say whether the page answers while it draws the birds and the people; each opens the World menu and a second press closes it.", "interaction_ms_at_most": 200, "interaction_ms_at_most_reason": "The Core Web Vitals line for a good Interaction to Next Paint (web.dev/inp): the longest time from an input to the frame after it."},
+      "owner_area": "flight: exulanica/world/flight_worker.py, exulanica/api/routes/world_flight.py and web/packages/atlas-react/src/playcanvas/flight/flock.ts; the saved world's flight: web/packages/app/src/composition/environment-selection.ts",
+      "expect": {
+        "page": [
+          {"id": "birds-drawn", "says": "The canvas states the flight flying, with as many flyers as the flight route serves, none unplaced, undrawn or failed."},
+          {"id": "fly-and-perch-on-the-clock", "says": "Over the minute some bird is drawn moving and some drawn still, and each is drawn moving exactly while the served flight has it off its perch at that moment of the shared clock, away from a change of state."},
+          {"id": "page-stays-responsive", "says": "Every press of the World menu is answered with a frame within the Core Web Vitals good interaction time."}
+        ]
+      }
+    },
+    {
       "id": "object-in-use",
       "session": "living",
       "action": "While the world plays, read the inspector on each nearby inhabitant in turn until one is using an object of the square.",
@@ -554,6 +647,71 @@
         ],
         "api": [
           {"id": "minutes-stop", "says": "GET /world/versions/{version_id}/society/control reads paused, and its current tick stays where it was over the hold."}
+        ]
+      }
+    },
+    {
+      "id": "run-development-comparison",
+      "session": "comparison",
+      "action": "Compare the group's chosen model with another for one simulated hour of the starter, with the product's command: python -m exulanica.orchestration.compare --group-choice <the owner's choice> on one development seed.",
+      "gates": ["milestone:Swap and compare", "delivery:Swap and compare"],
+      "gates_reason": "Two runs from the same saved version differing only in one group's model; part of each, which gates_in_part states.",
+      "requires": ["choose-model-for-a-group", "pause-playback"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.05",
+      "spend_estimate_source": "The step's own bound. Measured 0.03817782 USD for one development seed of two models deciding for all eight people (lane C2's development pair); a group of four under DeepSeek V4 Flash and Nemotron 3 Nano 30B costs less (docs/evaluation/2026-09-26-society-model-actions.json).",
+      "parameters": {
+        "models": [
+          {"provider": "nebius_token_factory", "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"},
+          {"provider": "nebius_token_factory", "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"}
+        ],
+        "models_reason": "The model the owner chose for the group, and the least costly other model the product offers a person; each ask of either reserves at most 0.0035 USD (ask_bound_usd), so the runs' reservations stay inside the bound.",
+        "seed_catalog": "assets/catalogs/society/society-comparison-seeds.v2.json",
+        "seed_catalog_reason": "The catalog the command itself checks seeds against; only its development seeds are handed to the command.",
+        "seed_count": 1,
+        "seed_count_reason": "One development seed: a development comparison is never judged, and one seed shows the pair in the Compare view.",
+        "bound_usd": "0.05",
+        "bound_usd_reason": "The rehearsal's allowance for one development comparison, given to the command as EXULANICA_BUDGET_USD, or what is left of the run's bound when that is less.",
+        "timeout_seconds": 900,
+        "timeout_reason": "Six times the 2.5 minutes lane C2's development pair of eight people took, for four runs of which two are anchors."
+      },
+      "owner_area": "comparisons: exulanica/orchestration/compare.py, exulanica/api/society_comparison_runner.py and exulanica/world/society_comparison_result.py",
+      "expect": {
+        "api": [
+          {"id": "comparison-ran", "says": "The command exits 0 and the comparison it names is served with every run completed."},
+          {"id": "the-owners-group-swapped", "says": "The comparison scores the people of the owner's choice, named by that choice, and its candidate arms are the two models the command was given."},
+          {"id": "saved-world-unchanged", "says": "The saved world's authored version, state and edit sequence are what they were before the comparison."},
+          {"id": "spend-within-bound", "says": "What every run's recorded calls cost is within the bound the command ran under."}
+        ]
+      }
+    },
+    {
+      "id": "compare-view-shows-the-pair",
+      "session": "compare",
+      "action": "Open Compare models from the World menu, read the verdict and the arms, choose the two models' runs for the left and right sides, press Play under them and move the clock.",
+      "gates": ["milestone:Swap and compare", "milestone:Recorded decisions", "delivery:Swap and compare", "delivery:Persistence and replay"],
+      "gates_reason": "The application shows the two runs side by side with what each person did, replayed from their stored decisions with no model called.",
+      "requires": ["run-development-comparison"],
+      "parameters": {
+        "drawn_seconds": 60,
+        "drawn_reason": "The view replays both runs from the API before it draws them; an allowance for a busy machine, not a measurement.",
+        "play_seconds": 5,
+        "play_reason": "Long enough for the view's clock to move several minutes at its slowest speed.",
+        "sides": ["model_a", "model_b"],
+        "sides_reason": "The two models' runs, left and right, chosen by the view's own Left and Right controls.",
+        "shown_minute": 30,
+        "shown_minute_reason": "The middle of the hour, where the two runs have had time to differ, for the screenshot."
+      },
+      "owner_area": "the Compare view: web/packages/app/src/ui/society-comparison.ts and web/packages/app/src/society-comparison-api.ts; exulanica/api/routes/society_comparisons.py",
+      "expect": {
+        "page": [
+          {"id": "verdict-shown", "says": "The Compare view lists the comparison, opens it and shows its verdict and whom each arm decides for."},
+          {"id": "arms-with-reliability", "says": "Each model's arm shows how the group fared beside what its model answered, named by the model's name, and every arm served is shown."},
+          {"id": "two-runs-one-clock", "says": "Two runs are drawn side by side, each with its people and how its model answered, under one clock whose Play moves the minute both are drawn at."}
+        ],
+        "api": [
+          {"id": "comparison-recorded", "says": "GET /world/versions/{version_id}/society/comparisons lists it with every run completed, and its result reads not judged because its seeds are development seeds."},
+          {"id": "replayed-from-records", "says": "The page read both runs it drew from GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}, which replays a run from its stored decisions and answered 200."}
         ]
       }
     },
@@ -805,6 +963,45 @@
       }
     },
     {
+      "id": "companion-refuses-unsupported-change",
+      "session": "companion",
+      "action": "In the world made from the photographs, ask the Companion, in words, for a change the reviewed design cannot make.",
+      "gates": ["foundation:Companion interaction"],
+      "requires": ["make-world-from-photographs"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.01",
+      "spend_estimate_source": "Measured 0.0001174 USD for a refused request, the classifier alone, in the rehearsal runs on main 7364a21d (2026-09-23) and 209b5742 (2026-09-24).",
+      "parameters": {"utterance": "use a serif typeface for all the menus and make the buttons square", "utterance_reason": "A change to the application's menus and buttons, which no reviewed world design controls, so the proposal route refuses it by name.", "refusal_code": "not_in_catalogue", "refusal_code_reason": "The refusal the proposal route gives a change the reviewed design has no way to make (exulanica/selection/proposal.py). A refusal by Customize itself cannot be asked for in words: it follows a proposal made stale or a design the panel cannot show."},
+      "owner_area": "Companion appearance proposals: POST /selection/appearance (exulanica/selection/proposal.py) and the Companion's answer and memory: web/packages/app/src/composition/companion.ts, web/packages/app/src/ui/companion-speech.ts and POST /companion/memory/answers",
+      "expect": {
+        "page": [
+          {"id": "refused-in-one-answer", "says": "The Companion answers once, saying the change was not proposed, never offers to open Customize, and its memory holds that one answer in the same words."},
+          {"id": "refusal-provenance", "says": "Its provenance line names the model that read the request."}
+        ],
+        "api": [
+          {"id": "refusal-recorded", "says": "POST /selection/appearance classified the request as an appearance change and refused it as not in the reviewed design, with no proposal; the memory keeps the answer as refused."}
+        ]
+      }
+    },
+    {
+      "id": "refused-answer-redrawn-after-reload",
+      "session": "companion",
+      "action": "Reload the page and open the Companion.",
+      "gates": ["foundation:Companion interaction"],
+      "requires": ["companion-refuses-unsupported-change"],
+      "parameters": {"answer_fact": "companion_refused", "answer_fact_reason": "What the refusal step saw drawn, kept to compare with."},
+      "owner_area": "the Companion's memory: web/packages/app/src/composition/companion.ts (the remembered answer) and GET /companion/memory/recent",
+      "expect": {
+        "page": [
+          {"id": "same-words-redrawn", "says": "After a reload the Companion redraws the answer it remembers with the same words it drew when it answered."},
+          {"id": "same-provenance-redrawn", "says": "It redraws the same provenance line."}
+        ],
+        "api": [
+          {"id": "memory-holds-the-answer", "says": "GET /companion/memory/recent holds the answer, newest, in the words the Companion drew."}
+        ]
+      }
+    },
+    {
       "id": "companion-proposes-appearance-change",
       "session": "companion",
       "action": "In the world made from the photographs, ask the Companion, in words, to change how the world looks, then open Customize world to review the proposal.",
@@ -812,16 +1009,35 @@
       "requires": ["make-world-from-photographs"],
       "hosted_model": true,
       "spend_estimate_usd": "0.01",
-      "spend_estimate_source": "Measured 0.0001174 USD (the classifier; the proposal was refused before drafting) in the rehearsal runs on main 7364a21d (2026-09-23) and 209b5742 (2026-09-24); a drafted proposal adds at most two calls of the same role (DRAFT_ATTEMPTS in exulanica/selection/proposal.py).",
+      "spend_estimate_source": "Measured 0.00578916 USD for the whole run on main 45feff7c (docs/evaluation/2026-09-25-rehearsal-living-world.json), this proposal drafted among its steps; a drafted proposal is the classifier and at most two drafting calls of the same role (DRAFT_ATTEMPTS in exulanica/selection/proposal.py).",
       "parameters": {"utterance": "Make the horizon softer and the colours warmer"},
-      "owner_area": "Companion appearance proposals: POST /selection/appearance (exulanica/api/routes/selection.py, exulanica/selection/proposal.py) and web/packages/app/src/composition/appearance.ts",
+      "owner_area": "Companion appearance proposals: POST /selection/appearance (exulanica/api/routes/selection.py, exulanica/selection/proposal.py) and web/packages/app/src/composition/appearance.ts; the Companion's answer and memory: web/packages/app/src/composition/companion.ts and web/packages/app/src/ui/companion-speech.ts",
       "expect": {
         "page": [
           {"id": "proposal-offered", "says": "The Companion answers with a proposed change and says nothing has changed yet."},
+          {"id": "proposal-provenance", "says": "Once Customize can show the proposal, the Companion answers once: its words say to open Customize, its provenance line names the model that drew the change, and its memory holds that one answer, in the same words, as a proposal."},
           {"id": "proposal-ready-in-customize", "says": "Customize world holds the Companion's proposal, validated and ready to apply."}
         ],
         "api": [
           {"id": "proposal-drafted", "says": "POST /selection/appearance classified the request as an appearance change and returned a proposal with its execution block."}
+        ]
+      }
+    },
+    {
+      "id": "accepted-answer-redrawn-after-reload",
+      "session": "companion",
+      "action": "Reload the page and open the Companion.",
+      "gates": ["foundation:Companion interaction"],
+      "requires": ["companion-proposes-appearance-change"],
+      "parameters": {"answer_fact": "companion_accepted", "answer_fact_reason": "What the proposal step saw drawn, kept to compare with."},
+      "owner_area": "the Companion's memory: web/packages/app/src/composition/companion.ts (the remembered answer) and GET /companion/memory/recent",
+      "expect": {
+        "page": [
+          {"id": "same-words-redrawn", "says": "After a reload the Companion redraws the answer it remembers with the same words it drew when it answered."},
+          {"id": "same-provenance-redrawn", "says": "It redraws the same provenance line."}
+        ],
+        "api": [
+          {"id": "memory-holds-the-answer", "says": "GET /companion/memory/recent holds the answer, newest, in the words the Companion drew."}
         ]
       }
     },
@@ -945,6 +1161,44 @@
       "expect": {
         "page": [
           {"id": "person-completes-journey", "says": "A person completes the journey unaided and the footage shows each gate's step."}
+        ]
+      }
+    },
+    {
+      "id": "furnish-made-world",
+      "session": "made-world-people",
+      "action": "In the world made from the photographs, open Add object, choose what the objects are to me, press Place a small square before me, read the confirmation and confirm.",
+      "gates": ["foundation:Personal-media path"],
+      "gates_reason": "Somewhere people can go in the made world, placed as authored edits on its declared floor: the made world integrates authored changes.",
+      "requires": ["return-to-made-world"],
+      "parameters": {"origin_role": "fictional", "origin_role_reason": "The role every object this rehearsal places is given, invented for this world.", "facts_key": "made_square", "facts_key_reason": "What later steps of this world read the square's objects under.", "world_words": "the world made from the photographs", "world_words_reason": "The world the screenshot shows, in words."},
+      "owner_area": "the small square: proposeArrangement in web/packages/app/src/composition/objects.ts, web/packages/app/src/arrangement-api.ts, and exulanica/world/arrangements.py with assets/catalogs/world-objects/world-arrangement.v1.json",
+      "expect": {
+        "page": [
+          {"id": "confirm-before-write", "says": "Before anything is written a confirmation states the server's preview of the square: its title, how many objects it adds and that each is its own change; Confirm is offered only once that preview is ready."},
+          {"id": "square-listed", "says": "After Confirm the objects panel lists every object the square added, and its status says the square was placed as that many changes."},
+          {"id": "square-drawn", "says": "The page fetches the reviewed bytes of every kind of object the square added."}
+        ],
+        "api": [
+          {"id": "square-added-as-edits", "says": "The preview answered ready, naming the objects; the apply added exactly those, each as its own add edit with the chosen role, and the saved world resumes at that version."}
+        ]
+      }
+    },
+    {
+      "id": "made-world-hosts-people",
+      "session": "made-world-people",
+      "action": "Open People nearby in the world made from the photographs and press Bring in inhabitants.",
+      "gates": ["foundation:Personal-media path"],
+      "gates_reason": "The made world hosts people on the floor each region declares, one society loop for every world; the gate itself is not available for want of reconstruction.",
+      "requires": ["furnish-made-world"],
+      "owner_area": "people in a made world: exulanica/world/society_authored_ground.py, assets/catalogs/society-ground/society-ground.v1.json and web/packages/app/src/composition/environment-selection.ts",
+      "expect": {
+        "page": [
+          {"id": "people-on-the-floor", "says": "People nearby shows them present, says how many, and says they walk inside a square around where the person arrives."},
+          {"id": "model-panel-beside-them", "says": "Who decides for them is shown beside them, listing each of them and offering every model the server offers."}
+        ],
+        "api": [
+          {"id": "society-on-declared-floor", "says": "The made world's entry declares a floor, its society's walkable area is the declared one, and every inhabitant, synthetic, stands inside it."}
         ]
       }
     }

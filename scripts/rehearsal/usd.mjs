@@ -31,3 +31,10 @@ export function compareUsd(a, b) {
   const difference = units(a) - units(b);
   return difference > 0n ? 1 : difference < 0n ? -1 : 0;
 }
+
+/** What `a` adds to `b`, the earlier reading of a total that only grows; a total that fell is refused. */
+export function increaseUsd(a, b) {
+  const difference = units(a) - units(b);
+  if (difference < 0n) throw new Error(`a reported total fell from ${b} to ${a}`);
+  return text(difference);
+}
