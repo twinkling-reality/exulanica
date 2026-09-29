@@ -2050,7 +2050,7 @@ async function companionProposesAppearanceChange(ctx) {
   const memory = await remembered(ctx, ctx.parameters.utterance);
   ctx.observe('proposal-provenance', named !== null && (drawn.provenance ?? '').startsWith(`${named} drew this change in `)
     && CUSTOMIZE_WORDS.test(face.text) && memory.length === 1 && memory[0].composed === 'proposed'
-    && memory[0].answer_text === drawn.utterances.join(' '),
+    && sameWords(memory[0].answer_text, drawn.utterances),
   { provenance: drawn.provenance, served_model_name: named, utterances: drawn.utterances,
     remembered: memory.map((a) => pick(a, ['answer_id', 'answer_text', 'composed', 'served_model_name'])) });
   ctx.facts.companion_accepted = { utterance: ctx.parameters.utterance, drawn };
@@ -2192,7 +2192,7 @@ async function companionRefusesUnsupportedChange(ctx) {
   const named = calls.map((c) => c.served_model_name).filter(Boolean).at(-1) ?? null;
   const memory = await remembered(ctx, utterance);
   ctx.observe('refused-in-one-answer', face.mode === 'answer' && drawn.utterances.length > 0 && !CUSTOMIZE_WORDS.test(face.text)
-    && memory.length === 1 && drawn.utterances.join(' ') === memory[0].answer_text,
+    && memory.length === 1 && sameWords(memory[0].answer_text, drawn.utterances),
   { drawn, remembered: memory.map((a) => pick(a, ['answer_id', 'answer_text', 'composed', 'served_model_name', 'latency_ms'])) });
   ctx.observe('refusal-provenance', named !== null && (drawn.provenance ?? '').startsWith(`${named} read that in `),
     { provenance: drawn.provenance, served_model_name: named });
@@ -2227,7 +2227,7 @@ async function answerRedrawnAfterReload(ctx) {
     same_paragraphs: same(now.utterances, earlier.drawn.utterances) });
   ctx.observe('same-provenance-redrawn', drawn === true && now.provenance !== null && now.provenance === earlier.drawn.provenance,
     { before: earlier.drawn.provenance, after: now.provenance });
-  ctx.observe('memory-holds-the-answer', memory.length >= 1 && memory[0].answer_text === earlier.drawn.utterances.join(' '),
+  ctx.observe('memory-holds-the-answer', memory.length >= 1 && sameWords(memory[0].answer_text, earlier.drawn.utterances),
     memory.map((a) => pick(a, ['answer_id', 'asked_at', 'answer_text', 'composed', 'served_model_name', 'latency_ms'])));
   await ctx.screenshot('remembered', 'the Companion after a reload, redrawing the answer it remembers');
 }
@@ -2561,3 +2561,11 @@ export const HANDLERS = Object.freeze({
   'furnish-made-world': inWorld(furnishSmallSquare),
   'made-world-hosts-people': inWorld(madeWorldHostsPeople),
 });
+
+/** Whether a stored answer holds the words its drawn paragraphs hold. The page stores the paragraphs it drew
+ * apart, a blank line between them, and an answer stored before that holds them joined by a space, so the
+ * two are compared with their whitespace collapsed. */
+function sameWords(stored, utterances) {
+  const collapse = (text) => String(text ?? '').split(/\s+/).filter(Boolean).join(' ');
+  return collapse(stored) === collapse(utterances.join(' '));
+}
