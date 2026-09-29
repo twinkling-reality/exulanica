@@ -62,7 +62,7 @@ How a world's people live, how open models decide for them, how runs are compare
 | [Society experiments](society-experiments.md) | contract | Comparisons of the models that decide for a world's people, and intervention experiments over a living society |
 | [Movement modules contract](movement-modules-contract.md) | contract | Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads |
 | [Character representation and movement](character-representation-contract.md) | contract | Character appearance, rigging, subject bindings, movement and how a society's people are drawn |
-| [Traffic simulation](traffic-contract.md) | contract | Traffic simulation inputs, state transitions and invariants; nothing calls it |
+| [Traffic simulation](traffic-contract.md) | contract | Traffic simulation inputs, derived road records, state transitions and invariants, and its serving for a baked city |
 
 <a id="world-state"></a>
 
