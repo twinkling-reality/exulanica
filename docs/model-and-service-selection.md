@@ -164,11 +164,12 @@ its first-ranked mechanism, unless a model's entry states an order of its own. T
 0.006226 USD.
 
 The [measurement](evaluation/2026-09-25-society-person-models.json) gave each model the eight
-people of the small square for 60 simulated minutes, on the seed the browser sends first, beside
-the routine alone on the same seed. Every minute was a claim of the playback worker the application
-builds for the workspaces it lists: the claim, the host's decision phase, then the minute. The
-harness made each claim due at once rather than waiting the host's base interval, so the worker's
-own polling and pacing were not measured.
+people of the small square for 60 simulated minutes, on one fixed development seed
+(`BROWSER_SEED` in [`measure_living_world_pace.py`](../scripts/measure_living_world_pace.py)),
+beside the routine alone on the same seed. Every minute was a claim of the playback worker the
+application builds for the workspaces it lists: the claim, the host's decision phase, then the
+minute. The harness made each claim due at once rather than waiting the host's base interval, so
+the worker's own polling and pacing were not measured.
 
 | Model | Decisions | Acted on | Not acted on | Chose to wait | Answer p50 / p95 | Cost per simulated hour |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -227,7 +228,7 @@ as one line; how much of a call's time is queueing at the provider is not separa
 The [measurement](evaluation/2026-09-26-society-model-actions.json), under its own
 [pre-registration](evaluation/2026-09-26-society-model-actions-preregistration.json) written after
 the probe, gave each model the eight people of the small square for 60 simulated minutes on the
-seed the browser sends first, beside the routine alone, played by the playback worker as above.
+same fixed development seed, beside the routine alone, played by the playback worker as above.
 
 | Model | Decisions | Chose: go / wait / stand / talk | Not acted on | Person-minutes talking / standing | Answer p50 / p95 | Cost per simulated hour |
 | --- | --- | --- | --- | --- | --- | --- |
