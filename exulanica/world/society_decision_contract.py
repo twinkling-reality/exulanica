@@ -39,12 +39,21 @@ What it does not do: say anything about another person but the number their simu
 with and how far the walk to them is, or let a model decide for anybody but the person it runs: a
 conversation it chooses happens only with somebody nobody, their own model included, decided for
 in that minute.
+
+Every option is built from the input the minute reads, whose walking graph and the spots nobody
+stands at depend on that input alone. A run of minutes over frozen inputs builds each once per
+input while :func:`input_memo` holds (a comparison's run and its replay do), keyed by the identity
+of the input's own navigation and targets and dropped when the run ends; anywhere else each is
+built where it is read, as before.
 """
 
 from __future__ import annotations
 
 import random
-from collections.abc import Container, Mapping, Sequence
+from collections import OrderedDict
+from collections.abc import Callable, Container, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -95,6 +104,7 @@ __all__ = [
     "decision_context",
     "decision_contract",
     "decision_messages",
+    "input_memo",
     "observed_context",
     "option_goal_policy",
     "person_role",
@@ -268,6 +278,63 @@ def _activity_label(routine: PurposefulRoutine, target: Mapping[str, Any]) -> tu
     return activity.key, activity.label
 
 
+class _InputMemo:
+    """What options are built from that depends on one input alone, built once per input object:
+    at most ``most`` inputs at a time, the one least recently read dropped first. An input is
+    known by its navigation and targets objects themselves, held here, so an object freed and its
+    identity reused is never taken for the input it replaced."""
+
+    def __init__(self, most: int) -> None:
+        self.most = most
+        self._held: OrderedDict[tuple[int, int], tuple[Any, Any, dict[str, Any]]] = OrderedDict()
+
+    def value(self, document: Mapping[str, Any], name: str, build: Callable[[], Any]) -> Any:
+        navigation, targets = document["navigation"], document["targets"]
+        key = (id(navigation), id(targets))
+        held = self._held.get(key)
+        if held is None or held[0] is not navigation or held[1] is not targets:
+            held = (navigation, targets, {})
+            self._held[key] = held
+            while len(self._held) > self.most:
+                self._held.popitem(last=False)
+        self._held.move_to_end(key)
+        values = held[2]
+        if name not in values:
+            values[name] = build()
+        return values[name]
+
+
+_MEMO: ContextVar[_InputMemo | None] = ContextVar("society_decision_input_memo", default=None)
+
+
+@contextmanager
+def input_memo(inputs: int) -> Iterator[None]:
+    """While the block runs, build each of at most ``inputs`` inputs' walking graph and standing
+    exclusions once, for this context alone: a run of minutes over frozen inputs, whose options
+    read the same input every minute. Nothing is kept after the block."""
+    token = _MEMO.set(_InputMemo(max(1, inputs)))
+    try:
+        yield
+    finally:
+        _MEMO.reset(token)
+
+
+def _input_graph(document: Mapping[str, Any]) -> tuple[dict, dict, dict]:
+    """The input's walking graph, as the planner reads it (read, never changed, by its callers)."""
+    memo = _MEMO.get()
+    if memo is None:
+        return _graph(dict(document))
+    return memo.value(document, "graph", lambda: _graph(dict(document)))
+
+
+def _crowded(document: Mapping[str, Any]) -> frozenset[str]:
+    """The nodes nobody waits or starts at in the input (:func:`standing_exclusions`)."""
+    memo = _MEMO.get()
+    if memo is None:
+        return standing_exclusions(dict(document))
+    return memo.value(document, "crowded", lambda: standing_exclusions(dict(document)))
+
+
 def _reachable(
     state: Mapping[str, Any], document: Mapping[str, Any], person: dict[str, Any]
 ) -> tuple[dict, dict, set[str], str | None]:
@@ -276,7 +343,7 @@ def _reachable(
     ``person`` is the state's own record of them: the planner leaves out of what is held exactly
     that record, so where they stand and are headed stays theirs, as it does in the minute.
     """
-    nodes, adjacent, edges = _graph(dict(document))
+    nodes, adjacent, edges = _input_graph(document)
     location = person["location"]
     start = location["node_id"] if location["edge"] is None else location["edge"]["to_node_id"]
     paths = _paths(start, adjacent)
@@ -325,8 +392,8 @@ def _partners(
     talk = _off_place(routine, document, "pair")
     if talk is None or person["location"]["edge"] is not None:
         return []
-    graph = _graph(dict(document))
-    crowded = standing_exclusions(dict(document))
+    graph = _input_graph(document)
+    crowded = _crowded(document)
     paths_of = _paths_from(graph[1])
     people = list(state["inhabitants"])
     found = []
@@ -369,7 +436,7 @@ def choice_options(
     if not at_choice_point(person) or not _available(document):
         return ()
     nodes, paths, held, here = _reachable(state, document, person)
-    if not _location_valid(dict(person), nodes, _graph(dict(document))[2]):
+    if not _location_valid(dict(person), nodes, _input_graph(document)[2]):
         return ()
     routine = routine_of(dict(document))
     places = document["profile"] in PLACE_INPUTS
@@ -571,7 +638,7 @@ def recheck_option(
     if current is None or not current["enabled"]:
         return "target_disabled_or_removed", None
     nodes, paths, held, here = _reachable(state, document, person)
-    if not _location_valid(dict(person), nodes, _graph(dict(document))[2]):
+    if not _location_valid(dict(person), nodes, _input_graph(document)[2]):
         return "current_position_invalidated", None
     if current["node_id"] not in paths:
         return "known_target_unreachable", None
@@ -602,8 +669,8 @@ def places_to_stand(
     return [
         spot
         for spot in stand_spots(
-            _graph(dict(document)),
-            standing_exclusions(dict(document)),
+            _input_graph(document),
+            _crowded(document),
             held,
             dict(paths),
             person,
@@ -621,7 +688,7 @@ def _recheck_stand(
 ) -> tuple[str | None, str | None]:
     """Where a person who chose to stand a while stands, drawn as the routine draws it."""
     nodes, _paths, _held, _here = _reachable(state, document, person)
-    if not _location_valid(dict(person), nodes, _graph(dict(document))[2]):
+    if not _location_valid(dict(person), nodes, _input_graph(document)[2]):
         return "current_position_invalidated", None
     spots = places_to_stand(state, document, person["id"], promised)
     if not spots:
@@ -652,7 +719,7 @@ def recheck_talk(
         return "action_in_progress"
     if not _available(document):
         return "input_unavailable"
-    graph = _graph(dict(document))
+    graph = _input_graph(document)
     if person["location"]["edge"] is not None or not _location_valid(
         dict(person), graph[0], graph[2]
     ):
@@ -674,7 +741,7 @@ def recheck_talk(
         partner,
         people,
         graph,
-        standing_exclusions(dict(document)),
+        _crowded(document),
         promised,
         _paths_from(graph[1]),
         talk,

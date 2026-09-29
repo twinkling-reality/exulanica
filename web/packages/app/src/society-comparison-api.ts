@@ -730,6 +730,20 @@ export interface PlanRole {
   readonly models: readonly PlanModel[];
 }
 
+/**
+ * For one model arm of a selection: how many people its model decides for in a run, and how many
+ * of a minute's asks the model can have answered, by the decision contract's concurrent calls and
+ * shared deadline at its measured answer time (null where none was measured). Where more people
+ * than that have a choice in one minute, the rest follow their routine.
+ */
+export interface PlanMinute {
+  readonly arm: string;
+  readonly modelId: string;
+  readonly name: string;
+  readonly decided: number;
+  readonly answersPerMinute: number | null;
+}
+
 /** What a selection would run and what it can cost: the most, derived, and the typical, measured. */
 export interface PlanFigures {
   readonly runs: number;
@@ -738,6 +752,17 @@ export interface PlanFigures {
   readonly mostUsd: Decimal;
   readonly typicalUsd: Decimal | null;
   readonly typicalRecord: string;
+  /** The most its runs played at once can hold reserved together, each ask at its model's bound. */
+  readonly heldUsd: Decimal;
+  /**
+   * The least bound that lets it finish if it spends the typical figure: that spend and room for
+   * what its runs can hold reserved at once. Derived by the server; null where the typical figure
+   * is unknown.
+   */
+  readonly suggestedUsd: Decimal | null;
+  /** Whether the typical figure was measured on the kind of ground this world's people stand on. */
+  readonly typicalMatches: boolean;
+  readonly minutes: readonly PlanMinute[];
 }
 
 export interface Refusal {
@@ -755,6 +780,11 @@ export interface ComparisonPlan {
   readonly seedsAvailable: number;
   readonly modelsMost: number;
   readonly windowTicks: number;
+  /** The society's people, the most a comparison runs, and the most of them a model may decide
+   * for in one run, both derived by the server from how long reading a run may take. */
+  readonly population: number;
+  readonly populationMost: number;
+  readonly decidedMost: number;
   readonly typicalRecord: string;
   readonly plan: PlanFigures | null;
   /** Why a start of the selection would be refused, or null. */
@@ -795,6 +825,19 @@ function planFigures(value: unknown): PlanFigures {
     mostUsd: decimal(held['most_usd']),
     typicalUsd: maybe(held['typical_usd'], decimal),
     typicalRecord: text(held['typical_record']),
+    heldUsd: decimal(held['held_usd']),
+    suggestedUsd: maybe(held['suggested_usd'], decimal),
+    typicalMatches: flag(held['typical_matches']),
+    minutes: list(held['minutes']).map((entry) => {
+      const minute = object(entry);
+      return {
+        arm: text(minute['arm']),
+        modelId: text(minute['model_id']),
+        name: text(minute['name']),
+        decided: count(minute['decided']),
+        answersPerMinute: maybe(minute['answers_per_minute'], count),
+      };
+    }),
   };
 }
 
@@ -833,6 +876,9 @@ export function parsePlan(value: unknown): ComparisonPlan {
     seedsAvailable: count(row['seeds_available']),
     modelsMost: count(row['models_most']),
     windowTicks: count(row['window_ticks']),
+    population: count(row['population']),
+    populationMost: count(row['population_most']),
+    decidedMost: count(row['decided_most']),
     typicalRecord: text(row['typical_record']),
     plan: maybe(row['plan'], planFigures),
     planRefusal: maybe(row['plan_refusal'], refusal),

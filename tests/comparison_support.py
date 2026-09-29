@@ -56,11 +56,23 @@ def seeded_catalogs(
         for index, seed in enumerate(SEEDS, 1)
     }
     protocol = dict(committed.protocol)
-    if population_maximum is not None:
+    if population_maximum is not None and "population_maximum" in protocol:
         protocol["population_maximum"] = {
             **protocol["population_maximum"],
             "value": population_maximum,
         }
+    elif population_maximum is not None:
+        # A protocol that derives its bounds from a replay line: a line under which a run of
+        # ``population_maximum`` people, every one of them decided by a model, fits the budget.
+        line = {
+            "replay_fixed_ms": 0,
+            "replay_per_person_us": 1,
+            "replay_per_decided_person_us": 1,
+            "replay_per_decided_pair_us": 0,
+            "pair_replay_budget_ms": population_maximum,
+        }
+        for key, value in line.items():
+            protocol[key] = {**protocol[key], "value": value}
     return dataclasses.replace(committed, seeds=seeds, protocol=protocol)
 
 

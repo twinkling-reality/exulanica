@@ -471,8 +471,9 @@ is, because a ground module need not state an edge.
   and 78 ms at the 95th percentile, measured with `scripts/measure_generated_world.py`), starts no
   society (`409 world_holds_no_residents`, `409 population_over_tick_budget`). The ground builder
   reads a ground by its entry's navigation and floor forms, never by the entry's name
-  (`tests/test_generated_worlds.py`). A comparison runs at most eight people, so a town's society
-  is refused by the comparison as any larger society is.
+  (`tests/test_generated_worlds.py`). A comparison of a town's society is held to how long reading
+  one of its runs may take, which bounds how many of its people a model may decide for
+  ([what a comparison can read](society-experiments.md#running-a-comparison)).
 
 The declared figure keeps the lattice at 121 nodes, which holds one tick of 128 inhabitants near a
 tenth of a second, and it equals the only bounded starter ground the product has shipped, so an
@@ -526,9 +527,9 @@ A society on a saved world's own ground starts with the population its ground's 
 states, 8 people for the built-in starter, where a district starts with 128: an area about 23
 metres across with 121 places to stand would otherwise have people standing on top of each other
 from the first minute. The repository reads the entry named by the navigation profile of the input
-it creates the society over. A comparison runs the population its society recorded, and the
-comparison protocol's `population_maximum` is at least every ground's population, so every saved
-world's society can be compared (`tests/test_society_grounds.py`, which also holds the starter's
+it creates the society over. A comparison runs the population its society recorded, and the most
+people a comparison runs, derived from how long reading a run may take, is at least every stated
+ground's population, so every saved world's society can be compared (`tests/test_society_grounds.py`, which also holds the starter's
 descriptors, inputs and first half hour to the digests they had when these figures were code). The authored
 input's `navigation` states `arrival_mm`, the point a person arrives at, read from the snapshot's
 own spawn; like the walkable area it is refused as changed by a successor. Nobody starts on it or

@@ -1,0 +1,109 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "comparison": {
+      "arms": {
+        "model_a": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "model_a_again": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "model_b": "nvidia/Nemotron-3_5-Lightning",
+        "routine": null,
+        "wait": null
+      },
+      "comparison_id": "efc4b341-c3de-4a9b-b30e-7445c9d8162b",
+      "created_at": "2026-09-29T21:28:40.038322+00:00",
+      "group_size": 4,
+      "group_source": "owner_choice",
+      "phase": "development",
+      "runs": {
+        "model_a": "completed",
+        "model_a_again": "completed",
+        "model_b": "completed",
+        "routine": "completed",
+        "wait": "completed"
+      },
+      "seeds": 1,
+      "window_ticks": 60
+    },
+    "models": {
+      "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+        "applied": 160,
+        "asks": 160,
+        "asks_per_person_minute": "0.3333",
+        "cost_usd": "0.01057812",
+        "latency_ms": {
+          "p50": 1803,
+          "p95": 3034
+        },
+        "person_hours": "8",
+        "runs": 2,
+        "typical_usd_per_person_hour": "0.00132226"
+      },
+      "nvidia/Nemotron-3_5-Lightning": {
+        "applied": 106,
+        "asks": 106,
+        "asks_per_person_minute": "0.4417",
+        "cost_usd": "0.01143204",
+        "latency_ms": {
+          "p50": 1825,
+          "p95": 3666
+        },
+        "person_hours": "4",
+        "runs": 1,
+        "typical_usd_per_person_hour": "0.00285801"
+      }
+    },
+    "navigation_profile": "city-walking-surfaces/v1",
+    "profile": "exulanica.town-comparison-cost/v1",
+    "square": {
+      "group_size": 4,
+      "record": "docs/evaluation/2026-09-26-society-group-comparison.json",
+      "seeds_scored": 12,
+      "turns_per_model_arm_over_its_seeds": {
+        "model_a": 667,
+        "model_a_again": 682,
+        "model_b": 828,
+        "model_c": 387
+      }
+    },
+    "stopped_comparison": {
+      "asks": {
+        "model_a:Qwen/Qwen3-235B-A22B-Instruct-2507": {
+          "asks": 67,
+          "last_tick": 40
+        },
+        "model_a_again:Qwen/Qwen3-235B-A22B-Instruct-2507": {
+          "asks": 66,
+          "last_tick": 34
+        },
+        "model_b:nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+          "asks": 53,
+          "last_tick": 40
+        }
+      },
+      "comparison_id": "c03baf32-2436-447b-8905-65bceda5fb20",
+      "why": "its bound stopped every model run part way; its asks up to the minute each stopped"
+    },
+    "tree": {
+      "branch": "lane/0923-comparetown",
+      "changed_paths": "37",
+      "diff_head_bytes": "108319",
+      "diff_head_sha256": "f9c35133a91dd5f6146ad8cda1bb6ae1fdf09713697b2f1179ea27b5293bdee9",
+      "head": "3d7bc30db09805ede7d5dca4d7a4e42245bedc7d",
+      "status_sha256": "b4859aa5831fd09449f949be43963158521a61d1d0f0e19e46f4e8fba0c57941"
+    },
+    "what": "What one person of a generated small town cost for a simulated hour under each model, and how often they were asked, from the stored receipts of one development comparison started from the application's Compare view on a server with no file of seeds.",
+    "what_this_does_not_show": [
+      "One town, one development seed and one comparison: a figure for planning a bound, not a judged result and not a spread over towns or seeds.",
+      "Provider answer times vary within an evening (finding #44); the figures are this run's.",
+      "Models this comparison did not run have no town figure here."
+    ],
+    "world": {
+      "input_profile": "exulanica.society-input/walking-surfaces-v1",
+      "nodes": 395,
+      "population": 48,
+      "targets": 38,
+      "world_id_kind": "generated"
+    }
+  },
+  "record_sha256": "d7017a0896518b9da43869cab287a8e21d3629780ffdae8d849434eaf32a4fc5"
+}

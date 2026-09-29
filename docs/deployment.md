@@ -280,7 +280,6 @@ stops startup on a malformed value, with a named code from `SOCIETY_SETTING_REFU
 | `EXULANICA_SOCIETY_CONTROL_WORKSPACES` | A JSON array of workspace ids whose playing societies this instance advances, with no accounts needed. Absent or `[]` plays none; a malformed or repeated id is refused |
 | `EXULANICA_SOCIETY_TICK_INTERVAL_MS` | The base wait between simulated minutes, in whole milliseconds: 1,000 to 60,000 and divisible by 4, so every speed divides it exactly. Absent means the declared default, 8,000 |
 | `EXULANICA_SOCIETY_CONTROL_WORKER` | Account-wide discovery. Absent or `off` disables it; `true`, `yes`, `on` or `1` also plays every current account-owned workspace, and needs accounts configured |
-| `EXULANICA_COMPARISON_SEEDS` | A file of development seeds, one per line, that comparisons started from the application run on; a line is used only when its digest is one the seed catalog commits to the development phase, and no seed is printed. Absent or unreadable, the server holds none, and every start is refused as `comparisons_not_set_up` |
 | `EXULANICA_COMPARISON_WORKER` | Who plays the comparisons started from the application for the listed workspaces. Absent, this process, in a thread; `process`, a process of its own (5.2.12), and this one only serves starts; `off`, nothing, and every start is refused as `comparisons_not_played`. Any other value stops startup (`comparison_worker_not_recognised`) |
 
 Listed and discovered workspaces are played together. A person's saved world needs no host

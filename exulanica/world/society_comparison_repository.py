@@ -12,9 +12,12 @@ anything is asked, their receipts are appended as they are paid for, and each ru
 outcome.
 
 Nothing here runs a minute or asks a model. :meth:`SocietyComparisonRepository.plan` gives the
-runner and the replay the same :class:`~exulanica.world.society_comparison.RunPlan`, with the
-stored inputs authorised afresh, so a run whose inputs have since lost their rights is unavailable
-rather than replayed from stale geometry. What the records say, as the routes serve them, is
+runner the :class:`~exulanica.world.society_comparison.RunPlan` it plays, with the stored inputs
+authorised afresh before anything is asked; the replay reads the same plan
+(:meth:`~SocietyComparisonRepository.read_plan`) and authorises its inputs after replaying and
+before it answers (:meth:`~SocietyComparisonRepository.authorize_inputs`), so a run whose inputs
+lost their rights before or while it was replayed is unavailable rather than drawn from stale
+geometry. What the records say, as the routes serve them, is
 :mod:`exulanica.world.society_comparison_result`. Every statement names the world. A definition
 is keyed by the caller's id within its workspace, and a run, a receipt and an outcome by ids
 derived from it. A run's seed is read here, for a runner
@@ -42,13 +45,13 @@ from exulanica.world.society import (
 )
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
 from exulanica.world.society_comparison import RunPlan
+from exulanica.world.society_comparison_reading import reading_refusal
 from exulanica.world.society_comparison_result import (
     DEFINITION_PROFILES,
     ComparisonRefused,
     check_definition_body,
     definition_role,
     definition_version,
-    protocol_value,
     scoring_binding,
 )
 from exulanica.world.society_engines import society_engine
@@ -190,12 +193,9 @@ class SocietyComparisonRepository:
             raise ComparisonRefused(
                 "role_not_hosted", f"{row['engine_version']} hosts no {role.key} decisions"
             )
-        if row["population_size"] > protocol_value(catalogs, "population_maximum"):
-            raise ComparisonRefused(
-                "population_over_comparison_bound",
-                f"{row['population_size']} people; a comparison runs at most "
-                f"{protocol_value(catalogs, 'population_maximum')}",
-            )
+        refused = reading_refusal(catalogs, int(row["population_size"]), body)
+        if refused is not None:
+            raise ComparisonRefused(*refused)
         latest = self.society._chain(row)
         frozen = self.society._inputs(row, [latest])[latest]
         # One input alone: its own stored bytes are read before the lock its authorization takes.
@@ -532,7 +532,18 @@ class SocietyComparisonRepository:
     # -- what a runner and a replay play ------------------------------------------------------
 
     def plan(self, comparison_id: uuid.UUID, run_id: uuid.UUID) -> tuple[RunPlan, dict[str, Any]]:
-        """The run's plan from its definition and the society's stored inputs, authorised now."""
+        """The run's plan from its definition and the society's stored inputs, authorised now,
+        before anything is played or asked."""
+        plan, definition = self.read_plan(comparison_id, run_id)
+        self.authorize_inputs(plan.inputs)
+        return plan, definition
+
+    def read_plan(
+        self, comparison_id: uuid.UUID, run_id: uuid.UUID
+    ) -> tuple[RunPlan, dict[str, Any]]:
+        """The run's plan from its definition and the society's stored inputs, not yet authorised:
+        for a reader that authorises them with :meth:`authorize_inputs` after its own work and
+        before it answers anything drawn from them, as the run route does after a replay."""
         definition = self._definition(comparison_id)["document"]  # type: ignore[index]
         run = self._run(run_id)
         if run["comparison_id"] != comparison_id:
@@ -545,11 +556,6 @@ class SocietyComparisonRepository:
         inputs = tuple(documents[sequence] for sequence in range(1, frozen + 1))
         if inputs[-1]["document_sha256"] != definition["input"]["document_sha256"]:
             raise UnavailableSocietyInput("the comparison's frozen input changed")
-        # Every input is announced before the first is authorized, which takes the asset read
-        # lock, so their stored bytes are all read before it.
-        with inputs_ahead(self.connection, inputs):
-            for document in inputs:
-                self.society._authorize(document)
         role = definition_role(definition)
         contract = role.contract(definition["contract"]["catalog_versions"])
         if contract.binding() != definition["contract"]:
@@ -581,3 +587,12 @@ class SocietyComparisonRepository:
             others=others,
         )
         return plan, definition
+
+    def authorize_inputs(self, inputs: Sequence[dict[str, Any]]) -> None:
+        """Authorise a run's inputs now, each through the society's authorizer
+        (:class:`~exulanica.world.society.UnavailableSocietyInput` when one has lost its rights).
+        Every input is announced before the first is authorized, which takes the asset read lock,
+        so their stored bytes are all read before it."""
+        with inputs_ahead(self.connection, inputs):
+            for document in inputs:
+                self.society._authorize(document)

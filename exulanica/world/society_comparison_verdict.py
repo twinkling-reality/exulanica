@@ -101,6 +101,21 @@ PROTOCOL_KEYS_BY_VERSION: Final = {
             "window_ticks",
         }
     ),
+    3: frozenset(
+        {
+            "bootstrap_resamples",
+            "family_alpha_per_mille",
+            "interval_per_mille",
+            "need_relief_floor_per_person",
+            "pair_replay_budget_ms",
+            "replay_fixed_ms",
+            "replay_per_decided_pair_us",
+            "replay_per_decided_person_us",
+            "replay_per_person_us",
+            "runs_at_once",
+            "window_ticks",
+        }
+    ),
 }
 #: Why a comparison is not judged, as :data:`~exulanica.world.society_comparison_claim
 #: .NOT_JUDGED_REASONS` names them.

@@ -52,7 +52,7 @@ from exulanica.api.decision_host import (
     share_kept,
 )
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
-from exulanica.api.society_comparison_start import development_seeds_in
+from exulanica.api.society_comparison_start import development_seeds
 from exulanica.api.society_comparison_worker import SocietyComparisonWorker
 from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
@@ -130,11 +130,6 @@ SOCIETY_CONTROL_WORKSPACES_ENV: Final = env_name("SOCIETY_CONTROL_WORKSPACES")
 #: ``0``, ``false``, ``off`` or ``no``, nobody, and every start is refused
 #: (``comparisons_not_played``), since a start nothing plays would hold its world until the end.
 COMPARISON_WORKER_ENV: Final = env_name("COMPARISON_WORKER")
-
-#: A file of development seeds, one per line, that comparisons started from the application run
-#: on: a line is used only when its digest is one the seed catalog commits to the development
-#: phase. Absent, this computer holds none, and no comparison can be started from the application.
-COMPARISON_SEEDS_ENV: Final = env_name("COMPARISON_SEEDS")
 
 #: The base wait between simulated minutes, in whole milliseconds, within the bounds
 #: ``exulanica.world.society_controls`` declares. Absent means its declared default.
@@ -224,7 +219,8 @@ class Services:
     #: ``build_services`` reads it from ``EXULANICA_SOCIETY_TICK_INTERVAL_MS``.
     society_base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS
     #: The development seeds comparisons started from the application run on, in the seed
-    #: catalog's order; ``build_services`` reads them from ``EXULANICA_COMPARISON_SEEDS``.
+    #: catalog's order; ``build_services`` takes them from the seed catalog a new comparison is
+    #: defined under, which commits their text.
     comparison_seeds: tuple[str, ...] = ()
     #: The catalogs a comparison is defined and scored under; None for the committed ones.
     comparison_catalogs: ComparisonCatalogs | None = None
@@ -336,9 +332,9 @@ class Services:
         )
 
     def comparison_refusal(self, workspace_id: uuid.UUID) -> str | None:
-        """Why this server starts no comparison for a workspace, or None when it may: it holds no
-        development seed (``comparisons_not_set_up``), nothing plays the comparisons started here
-        (``comparisons_not_played``), it asks no model for the workspace
+        """Why this server starts no comparison for a workspace, or None when it may: its seed
+        catalog commits no development seed's text (``comparisons_not_set_up``), nothing plays the
+        comparisons started here (``comparisons_not_played``), it asks no model for the workspace
         (``comparisons_not_run_here``), or it has no model client."""
         if not self.comparison_seeds:
             return "comparisons_not_set_up"
@@ -641,7 +637,7 @@ def build_services(
         society_base_tick_interval_ms=_society_tick_interval_ms(
             env_get("SOCIETY_TICK_INTERVAL_MS", environ)
         ),
-        comparison_seeds=_comparison_seeds(env_get("COMPARISON_SEEDS", environ)),
+        comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",
         comparisons_played_elsewhere=comparison_player == "process",
         restore_state_path=(
@@ -744,18 +740,6 @@ def _character_appearance_runtime(
         store=store,
         catalog=catalog,
     )
-
-
-def _comparison_seeds(value: str | None) -> tuple[str, ...]:
-    """The development seeds the file ``value`` names holds, or none where it names no file this
-    process can read, which ``Services.warnings`` says; never a seed in any message."""
-    if not value:
-        return ()
-    try:
-        text = Path(value).read_text(encoding="utf-8")
-    except OSError:
-        return ()
-    return development_seeds_in(text, load_comparison_catalogs())
 
 
 def _comparison_player(value: str | None) -> str:

@@ -57,6 +57,7 @@ from exulanica.world.society import SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
     DecisionContract,
     DecisionOption,
+    input_memo,
     option_goal_policy,
 )
 from exulanica.world.society_planner import (
@@ -242,23 +243,26 @@ def _minutes(
             if plan.decider_for(subject)[0]["kind"] == "wait"
         }
 
-    return play_minutes(
-        [role],
-        role,
-        start=start,
-        sources=plan.inputs,
-        seed=plan.seed,
-        ticks=plan.ticks,
-        step=lambda state, seed, consumed, policies: advance_purposeful_society(
-            dict(state), seed, [dict(document) for document in consumed], goal_policy=policies
-        ),
-        config_for=config_for,
-        request_id_for=lambda subject, tick: request_id(plan.run_id, subject, tick),
-        asking=asking,
-        seam=seam,
-        contract=plan.contract,
-        on_minute=on_minute,
-    )
+    # Every minute's options read the run's frozen inputs, so each input's graph and standing
+    # exclusions are built once for the run rather than for every person due in every minute.
+    with input_memo(len(plan.inputs)):
+        return play_minutes(
+            [role],
+            role,
+            start=start,
+            sources=plan.inputs,
+            seed=plan.seed,
+            ticks=plan.ticks,
+            step=lambda state, seed, consumed, policies: advance_purposeful_society(
+                dict(state), seed, [dict(document) for document in consumed], goal_policy=policies
+            ),
+            config_for=config_for,
+            request_id_for=lambda subject, tick: request_id(plan.run_id, subject, tick),
+            asking=asking,
+            seam=seam,
+            contract=plan.contract,
+            on_minute=on_minute,
+        )
 
 
 def _run(start: dict[str, Any], minutes: PlayedMinutes) -> PlayedRun:

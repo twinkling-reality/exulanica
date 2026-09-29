@@ -34,11 +34,15 @@ them is made under, are read from the same directory too, :func:`load_comparison
 ``society-person-score``, ``society-comparison-protocol`` and ``society-comparison-seeds``, whose
 entries commit each seed by the SHA-256 of its text and never state the seed. A comparison records
 the versions it was defined under and is read under them, so the first version of each stays beside
-the second for as long as a comparison names it.
+the second for as long as a comparison names it. From its third version the seed catalog also
+commits each development seed's text beside its digest, which its schema holds to the digest, so a
+comparison runs on development seeds with no file beside the server; a held-out seed stays
+committed by its digest alone, and an entry that states a held-out seed's text is refused.
 """
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -72,6 +76,7 @@ __all__ = [
     "COMPARISON_PROTOCOL_CATALOG",
     "COMPARISON_SEEDS_CATALOG",
     "COMPARISON_VERSIONS",
+    "HELD_OUT_SEED_TEXT",
     "LEGACY_IDENTITY_CATALOG",
     "LEGACY_IDENTITY_DIGESTS",
     "PERSON_SCORE_CATALOG",
@@ -150,11 +155,12 @@ PERSON_SCORE_CATALOG: Final = "society-person-score"
 COMPARISON_PROTOCOL_CATALOG: Final = "society-comparison-protocol"
 COMPARISON_SEEDS_CATALOG: Final = "society-comparison-seeds"
 #: The versions a new comparison is defined under: the score of how people fared with what each
-#: model answered reported apart, its protocol, and seeds held out afresh.
+#: model answered reported apart, the protocol whose population bound is derived from a measured
+#: replay, and seeds whose development text is committed.
 COMPARISON_VERSIONS: Final = {
     PERSON_SCORE_CATALOG: 2,
-    COMPARISON_PROTOCOL_CATALOG: 2,
-    COMPARISON_SEEDS_CATALOG: 2,
+    COMPARISON_PROTOCOL_CATALOG: 3,
+    COMPARISON_SEEDS_CATALOG: 3,
 }
 #: Whether a score term is weighed or only reported, and what a term reads: a run's minutes, the
 #: events the engine appended, or the host's record of each call, which only a reader outside the
@@ -167,6 +173,10 @@ RELIABILITY_PART: Final = "reliability"
 SCORE_V2_PARTS: Final = ("primary", RELIABILITY_PART, "held_out")
 #: The seeds a comparison may run: development seeds, looked at freely, and held-out seeds, judged.
 SEED_PHASES: Final = ("development", "held_out")
+#: What a third-version seed entry states as its text where it commits none: a held-out seed.
+NO_SEED_TEXT: Final = "none"
+#: Why a seed entry is refused: a held-out seed whose text is committed.
+HELD_OUT_SEED_TEXT: Final = "held_out_seed_text"
 _SHA256: Final = re.compile(r"[0-9a-f]{64}")
 #: Where a purposeful activity happens: at a place an object states, at an open spot of the
 #: ground, or at two open spots beside each other, one for each of two people.
@@ -321,6 +331,26 @@ def _score_v2_bounds(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: exactly a reliability term names the dispositions it counts")
     if values["reasons"] and part != RELIABILITY_PART:
         raise CatalogError(f"{where}: only a reliability term names reason codes")
+
+
+def _seed_text(where: str, value: object) -> FieldValue:
+    if type(value) is not str or not value or value != value.strip() or "\n" in value:
+        raise CatalogError(f"{where} is one line of seed text, or {NO_SEED_TEXT!r}")
+    return value
+
+
+def _seed_v3_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    """A development seed commits its text, which is the text of its digest; a held-out seed
+    commits its digest alone, and an entry stating a held-out seed's text is refused by name."""
+    seed = values["seed"]
+    if values["phase"] == "held_out":
+        if seed != NO_SEED_TEXT:
+            raise CatalogError(
+                f"{where}: {HELD_OUT_SEED_TEXT}: a held-out seed is committed by its digest alone"
+            )
+        return
+    if hashlib.sha256(str(seed).encode("utf-8")).hexdigest() != values["seed_digest"]:
+        raise CatalogError(f"{where}: a development seed's text is the text of its digest")
 
 
 def _sha256_text(where: str, value: object) -> FieldValue:
@@ -496,7 +526,7 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             version,
             (("value", integer_field(0, 10**9)), ("reason", text_field)),
         )
-        for version in (1, 2)
+        for version in (1, 2, 3)
     },
     **{
         (COMPARISON_SEEDS_CATALOG, version): CatalogSchema(
@@ -510,6 +540,17 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         )
         for version in (1, 2)
     },
+    (COMPARISON_SEEDS_CATALOG, 3): CatalogSchema(
+        COMPARISON_SEEDS_CATALOG,
+        3,
+        (
+            ("phase", _choice(SEED_PHASES)),
+            ("seed_digest", _sha256_text),
+            ("seed", _seed_text),
+            ("reason", text_field),
+        ),
+        entry_check=_seed_v3_bounds,
+    ),
 }
 
 

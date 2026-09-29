@@ -8,9 +8,9 @@ the group, its registered differences and the server's verdict, which is the onl
 words a page shows for it. Both name every model a decider asks by ``Manifest.model_name``, as the
 People panel's read does. ``GET .../comparisons/{comparison_id}/runs/{run_id}`` replays one
 completed run from the requests and receipts it stored, with no model call, holds the replay to
-what the run recorded, and returns what the page draws: the place, each person's minutes, who
-decides for each of them and what every turn did. A replay that differs from its record is refused
-by name (``run_replay_mismatch``), never shown.
+what the run recorded, asks its inputs' rights once the replay is done, and returns what the page
+draws: the place, each person's minutes, who decides for each of them and what every turn did. A
+replay that differs from its record is refused by name (``run_replay_mismatch``), never shown.
 
 None of these asks a model or writes anything. A comparison started from the application also
 serves its start: the bound its owner stated, what its asks spent, and where it stands. No response
@@ -49,9 +49,11 @@ from exulanica.api.society_comparison_start import (
     MODELS_MOST,
     START_REFUSALS,
     TYPICAL_RECORD,
+    TYPICAL_RECORDS,
     ComparisonCost,
     ComparisonSelection,
     StartRefused,
+    answers_per_minute,
     comparison_cost,
     definition_body,
     typical_per_person_hour,
@@ -63,6 +65,12 @@ from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_r
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
 from exulanica.world.society_catalogs import load_comparison_catalogs
 from exulanica.world.society_comparison import ReplayMismatch
+from exulanica.world.society_comparison_reading import (
+    decided_maximum,
+    decided_people,
+    population_maximum,
+    reading_refusal,
+)
 from exulanica.world.society_comparison_repository import (
     ComparisonConflict,
     SocietyComparisonRepository,
@@ -193,20 +201,24 @@ def plan_society_comparison(
     start of it would meet."""
     comparisons = _comparisons(connection, session, request, world_id)
     society = _society(comparisons, version_id)
+    navigation = _navigation(comparisons, society)
     services = get_services(request)
     refusal = services.comparison_refusal(session.workspace_id)
     running = SocietyComparisonStarts(connection, session.workspace_id).unfinished(world_id)
+    catalogs = services.comparison_catalogs or load_comparison_catalogs()
+    population = int(society["population_size"])
     document: dict[str, Any] = {
         "profile": PLAN_PROFILE,
         "refusal": None if refusal is None else {"code": refusal, "detail": _HOST_DETAIL[refusal]},
         "running": None if running is None else str(running["comparison_id"]),
-        "roles": _choices(services, connection, session, world_id, version_id, society),
+        "roles": _choices(services, connection, session, world_id, version_id, society, navigation),
         "seeds_available": len(services.comparison_seeds),
         "models_most": MODELS_MOST,
-        "window_ticks": protocol_value(
-            services.comparison_catalogs or load_comparison_catalogs(), "window_ticks"
-        ),
-        "typical_record": TYPICAL_RECORD,
+        "window_ticks": protocol_value(catalogs, "window_ticks"),
+        "population": population,
+        "population_most": population_maximum(catalogs),
+        "decided_most": decided_maximum(catalogs, population),
+        "typical_record": TYPICAL_RECORDS.get(navigation, (TYPICAL_RECORD, ""))[0],
         "plan": None,
         "plan_refusal": None,
     }
@@ -231,12 +243,41 @@ def plan_society_comparison(
             models=chosen,
             control=control,
             seed_count=seeds,
+            navigation=navigation,
         )
     except StartRefused as exc:
         document["plan_refusal"] = {"code": exc.code, "detail": exc.detail}
     else:
-        document["plan"] = prepared.cost.document()
+        document["plan"] = {
+            **prepared.cost.document(),
+            "minutes": _minutes(prepared, population, navigation),
+        }
     return document
+
+
+def _minutes(prepared: _Prepared, population: int, navigation: str) -> list[dict[str, Any]]:
+    """For each model arm of a planned comparison, how many people its model decides for in one
+    run and how many of a minute's asks the model can have answered by the decision contract's
+    concurrency and deadline at its answer time measured on the society's kind of ground, else on
+    the small square (``answers_per_minute`` in :mod:`exulanica.api.society_comparison_start`),
+    None where it has no measured time. Where more
+    people than that have a choice in one minute, the rest follow their routine."""
+    contract = prepared.role.contract()
+    decided = decided_people(prepared.body, population)
+    manifest = load_manifest()
+    return [
+        {
+            "arm": key,
+            "model_id": arm["provider_config"]["model_id"],
+            "name": manifest.model_name(arm["provider_config"]["model_id"]),
+            "decided": decided[key],
+            "answers_per_minute": answers_per_minute(
+                contract, arm["provider_config"]["model_id"], navigation
+            ),
+        }
+        for key, arm in sorted(prepared.body["arms"].items())
+        if arm["provider_config"] is not None
+    ]
 
 
 @router.get("/{comparison_id}")
@@ -276,20 +317,34 @@ def society_comparison_run(
     comparisons.definition(version_id, comparison_id)
     outcome = comparisons.outcome(run_id)
     try:
-        plan, definition = comparisons.plan(comparison_id, run_id)
+        plan, definition = comparisons.read_plan(comparison_id, run_id)
     except UnavailableSocietyInput as exc:
         return _unavailable(exc)
     except ComparisonRefused as exc:
         return _unreadable(exc)
-    if outcome is None or outcome["status"] != "completed":
+    completed = outcome is not None and outcome["status"] == "completed"
+    played = mismatch = None
+    if completed:
+        try:
+            played = verified_replay(plan, comparisons.stored(run_id), outcome)
+        except ReplayMismatch as exc:
+            mismatch = exc
+    # The inputs' rights are asked after the replay, which takes seconds for a town, and before
+    # anything drawn from them is answered, so a withdrawal made while it replayed is seen.
+    try:
+        comparisons.authorize_inputs(plan.inputs)
+    except UnavailableSocietyInput as exc:
+        return _unavailable(exc)
+    if not completed:
         return JSONResponse(
             status_code=409,
             content={"code": RUN_NOT_COMPLETED, "detail": "this run has no completed hour"},
         )
-    try:
-        played = verified_replay(plan, comparisons.stored(run_id), outcome)
-    except ReplayMismatch as exc:
-        return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
+    if mismatch is not None:
+        return JSONResponse(
+            status_code=409, content={"code": mismatch.code, "detail": str(mismatch)}
+        )
+    assert played is not None
     return replay_document(
         plan,
         definition,
@@ -353,6 +408,13 @@ def _society(comparisons: SocietyComparisonRepository, version_id: uuid.UUID) ->
     return row
 
 
+def _navigation(comparisons: SocietyComparisonRepository, society: dict[str, Any]) -> str:
+    """The kind of ground the society stands on: the navigation profile of its newest input."""
+    latest = comparisons.society._chain(society)
+    document = comparisons.society._inputs(society, [latest])[latest]
+    return str(document["navigation"]["profile"])
+
+
 class _Prepared:
     """A selection held to this server and the world's records, and what it would define."""
 
@@ -380,6 +442,7 @@ def _prepare(
     models: Sequence[ChosenModel],
     control: bool,
     seed_count: int,
+    navigation: str,
 ) -> _Prepared:
     """What a start of this selection would define, through the one definition path, or the
     refusal it would meet (:class:`StartRefused`); reads only."""
@@ -400,12 +463,9 @@ def _prepare(
     if not role.hosted_by(engine):
         raise StartRefused("role_not_hosted", f"{engine} hosts no {role.key} decisions")
     population = int(society["population_size"])
-    most_people = protocol_value(runner.catalogs, "population_maximum")
-    if population > most_people:
-        raise StartRefused(
-            "population_over_comparison_bound",
-            f"{population} people; a comparison runs at most {most_people}",
-        )
+    refused = reading_refusal(runner.catalogs, population)
+    if refused is not None:
+        raise StartRefused(*refused)
     arms = [ComparisonArm(model.provider, model.model_id) for model in models]
     if len(set(arms)) != len(arms):
         raise StartRefused("model_named_twice", "a comparison runs a model twice only as control")
@@ -454,6 +514,9 @@ def _prepare(
         if exc.code in START_REFUSALS:
             raise StartRefused(exc.code, str(exc)) from exc
         raise
+    refused = reading_refusal(runner.catalogs, population, body)
+    if refused is not None:
+        raise StartRefused(*refused)
     client = services.model_client
     cost = comparison_cost(
         body,
@@ -461,6 +524,8 @@ def _prepare(
         role,
         client.budget if client is not None else _ESTIMATOR,
         load_manifest(),
+        at_once=protocol_value(runner.catalogs, "runs_at_once"),
+        navigation_profile=navigation,
     )
     return _Prepared(runner, role, seeds, body, cost)
 
@@ -472,14 +537,15 @@ def _choices(
     world_id: str,
     version_id: uuid.UUID,
     society: dict[str, Any],
+    navigation: str,
 ) -> list[dict[str, Any]]:
     """Each role a comparison of this society may ask, with the groups and the models it offers:
     everybody and each of the owner's choices whose people are all still here, newest first, and
     every model the manifest offers the role, with why this server cannot ask it, if it cannot,
-    and what it typically cost."""
+    and what it typically cost, on the society's kind of ground where that was measured."""
     manifest = load_manifest()
     names = {person["id"]: person["display_name"] for person in society["state"]["inhabitants"]}
-    typical = typical_per_person_hour()
+    typical = typical_per_person_hour(navigation)
     roles = []
     for role in decision_roles().hosted_by(str(society["engine_version"])):
         history = SocietyModelChoiceRepository(
@@ -577,6 +643,7 @@ def start_society_comparison(
             models=body.models,
             control=body.control,
             seed_count=body.seeds,
+            navigation=_navigation(comparisons, society),
         )
         try:
             bound = Decimal(body.bound_usd)

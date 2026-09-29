@@ -14,6 +14,7 @@ import type {
   ComparisonPlan,
   ComparisonSelection,
   ComparisonStart,
+  PlanFigures,
   PlanGroup,
   PlanModel,
   PlanRole,
@@ -37,6 +38,7 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   engine_takes_no_comparison: 'The people of this world cannot be compared.',
   role_not_hosted: 'Nothing in this world is decided that way.',
   population_over_comparison_bound: 'This world holds more people than a comparison runs.',
+  decided_over_comparison_bound: 'A model can decide for fewer of this world\'s people than that in one comparison. Choose a smaller group.',
   role_not_registered: 'That is not something this server lets a model decide.',
   model_not_offered: 'That model is not offered for decisions.',
   model_named_twice: 'Choose two different models, or run the first a second time as the control.',
@@ -126,6 +128,45 @@ function modelWords(model: PlanModel): string {
   return `${model.name} (${typical})${refused}`;
 }
 
+/**
+ * How many of this world's people a model may decide for in one comparison, in words, where that is
+ * fewer than all of them: the server derives it from how long reading a run may take.
+ */
+export function decidedWords(plan: ComparisonPlan): string | null {
+  if (plan.decidedMost >= plan.population) return null;
+  return `A model can decide for at most ${plan.decidedMost} of this world's ${plan.population} people in one comparison, so that each of its hours can be replayed and shown within seconds.`;
+}
+
+/**
+ * For each model arm of a planned comparison that decides for more people than one minute's asks
+ * can have answered, in words: the rest of a busy minute follow their routine, and the comparison
+ * still runs.
+ */
+export function minuteWords(figures: PlanFigures): string {
+  const said = new Set<string>();
+  const lines: string[] = [];
+  for (const minute of figures.minutes) {
+    if (minute.answersPerMinute === null || minute.decided <= minute.answersPerMinute || said.has(minute.modelId)) continue;
+    said.add(minute.modelId);
+    lines.push(`${minute.name} can answer about ${minute.answersPerMinute} of the ${minute.decided} people it decides for in one minute; in a minute when more of them have a choice, the rest follow their routine.`);
+  }
+  return lines.join(' ');
+}
+
+/**
+ * The least bound that lets a comparison finish, in words, where the server derived one: each ask
+ * is held at its model's most until what it cost is known, so a bound near the typical spend stops
+ * its runs part way. It promises a finish only where the typical figure was measured on this
+ * world's kind of ground; elsewhere it says where it was measured and that it may stop.
+ */
+export function finishingWords(figures: PlanFigures): string {
+  if (figures.suggestedUsd === null || figures.typicalUsd === null) return '';
+  const held = 'each ask is held at its most until its cost is known';
+  return figures.typicalMatches
+    ? ` At least ${dollars(figures.suggestedUsd)} lets it finish, since ${held}.`
+    : ` At least ${dollars(figures.suggestedUsd)}, from what one like it spent on the small square, where people are asked less often than in a town; a bound that low may stop it before it finishes, as ${held}.`;
+}
+
 /** What the person has chosen so far, or null while something a start needs is not chosen. */
 export interface StartChoices {
   readonly role: PlanRole;
@@ -187,7 +228,7 @@ export function buildComparisonStartForm(handlers: {
    */
   let built: { readonly offer: string; readonly update: (plan: ComparisonPlan) => void } | null = null;
   const offerOf = (plan: ComparisonPlan): string =>
-    JSON.stringify([plan.refusal, plan.running, plan.roles, plan.seedsAvailable]);
+    JSON.stringify([plan.refusal, plan.running, plan.roles, plan.seedsAvailable, plan.population, plan.decidedMost]);
 
   const render = (plan: ComparisonPlan): void => {
     built = null;
@@ -241,6 +282,8 @@ export function buildComparisonStartForm(handlers: {
     const start = el('button', { type: 'button', class: 'comparison-start-button', text: 'Start the comparison', disabled: true });
     const note = el('p', { class: 'comparison-start-note', 'aria-live': 'polite' });
     const planLine = el('p', { class: 'comparison-start-plan' });
+    const minuteLine = el('p', { class: 'comparison-start-minutes' });
+    const decided = decidedWords(plan);
 
     /** The plan whose figures the line shows and Start is judged by: the newest answer. */
     let latest = plan;
@@ -258,9 +301,13 @@ export function buildComparisonStartForm(handlers: {
           : `${figures.runs} runs of one simulated hour. It could cost at most ${dollars(figures.mostUsd)}, if every person were asked every minute and every answer were as long as allowed. `
             + (figures.typicalUsd === null
               ? 'No recorded comparison measured what one like it typically costs.'
-              : `One like it typically costs about ${dollars(figures.typicalUsd)}, as measured in a recorded comparison.`);
+              : `One like it typically costs about ${dollars(figures.typicalUsd)}, as measured in a recorded comparison.`)
+            + finishingWords(figures);
+      bound.placeholder = figures?.suggestedUsd ?? '0.05';
       if (figures === null) planLine.removeAttribute('title');
       else planLine.title = figures.typicalRecord;
+      minuteLine.textContent = figures === null || answer.planRefusal !== null ? '' : minuteWords(figures);
+      minuteLine.hidden = minuteLine.textContent === '';
       enable();
     };
     const changed = () => {
@@ -296,7 +343,9 @@ export function buildComparisonStartForm(handlers: {
         el('label', { class: 'comparison-start-check' }, [control, el('span', { text: 'Run the first model a second time, to see how much it differs from itself' })]),
         el('label', {}, [el('span', { text: `Seeds (at most ${plan.seedsAvailable})` }), seedInput]),
       ]),
+      ...(decided === null ? [] : [el('p', { class: 'comparison-start-decided', text: decided })]),
       planLine,
+      minuteLine,
       el('div', { class: 'comparison-start-go' }, [
         el('label', {}, [el('span', { text: 'Stop spending at $' }), bound]),
         start,

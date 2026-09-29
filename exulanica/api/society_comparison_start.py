@@ -19,7 +19,10 @@ its bound (:func:`~exulanica.api.decision_host.ask_bound_usd`): every answer the
 the manifest's prices, for the longest situation and answer the contract allows. What comparisons
 typically cost is a measurement, not a bound: the judged group comparison's recorded spend per
 simulated hour of each model's arms (:data:`TYPICAL_RECORD`), divided by its group's people, is
-served beside the most as that record's figure (:func:`typical_per_person_hour`).
+served beside the most as that record's figure (:func:`typical_per_person_hour`). How many of a
+minute's asks one run can have answered is derived from the same record's answer times and the
+decision contract (:func:`answers_per_minute`): a large group leaves the rest of a busy minute to
+their routine, which the plan says rather than refuses.
 
 A comparison started from the application is recorded with the bound its owner stated, at most
 the most it can cost, and a host's comparison worker plays it under that bound
@@ -33,7 +36,7 @@ import json
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 from functools import cache
 from pathlib import Path
 from typing import Any, Final
@@ -43,7 +46,7 @@ from exulanica.api.society_comparison_runner import ComparisonArm, SocietyCompar
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import Manifest
 from exulanica.models.usage import USD_QUANTUM
-from exulanica.world.decision_roles import DecisionRole
+from exulanica.world.decision_roles import DecisionContract, DecisionRole
 from exulanica.world.society_catalogs import ComparisonCatalogs
 from exulanica.world.society_comparison_repository import seed_digest
 from exulanica.world.society_comparison_result import (
@@ -58,15 +61,23 @@ __all__ = [
     "PHASE",
     "ROUTINE_ARM",
     "START_REFUSALS",
+    "TYPICAL_NAVIGATION",
     "TYPICAL_RECORD",
+    "TYPICAL_RECORDS",
     "WAIT_ARM",
     "ComparisonCost",
     "ComparisonSelection",
     "StartRefused",
+    "TypicalFigures",
+    "answers_per_minute",
     "comparison_body",
     "comparison_cost",
     "definition_body",
+    "development_seeds",
     "development_seeds_in",
+    "figures_for",
+    "typical_figures",
+    "typical_latency_ms",
     "typical_per_person_hour",
 ]
 
@@ -83,16 +94,32 @@ EVERYBODY: Final = {"people": None, "source": {"kind": "everyone"}}
 #: the two models, or, with one, between it and the routine (:func:`comparison_body`).
 MODELS_MOST: Final = 2
 _ROOT: Final = Path(__file__).resolve().parents[2]
-#: The measurement a comparison's typical cost is read from: the judged group comparison, whose
-#: model arms each decided for four of a saved world's people for the protocol's hour over twelve
-#: held-out seeds, with every call's recorded cost.
-TYPICAL_RECORD: Final = "docs/evaluation/2026-09-26-society-group-comparison.json"
+#: The measurements a comparison's typical cost and answer times are read from, by the kind of
+#: ground its society stands on (its input's navigation profile), each with the name of its
+#: reader: the judged group comparison, whose model arms each decided for four people of the
+#: starter world's small square for the protocol's hour over twelve held-out seeds, and one
+#: development comparison of four people of a generated town, whose people are asked more often.
+#: A society on a ground with no measurement of its own is planned with the square's figures, and
+#: the least bound derived from them is not promised to finish there.
+TYPICAL_RECORDS: Final = {
+    "authored-ground-lattice/v1": (
+        "docs/evaluation/2026-09-26-society-group-comparison.json",
+        "judged_comparison",
+    ),
+    "city-walking-surfaces/v1": (
+        "docs/evaluation/2026-09-29-town-comparison-cost.json",
+        "town_comparison_cost",
+    ),
+}
+#: The small square's ground, whose measurement plans a society on a ground with none.
+TYPICAL_NAVIGATION: Final = "authored-ground-lattice/v1"
+TYPICAL_RECORD: Final = TYPICAL_RECORDS[TYPICAL_NAVIGATION][0]
 
 #: Every way a start is refused, by the code it is answered with and its status. The plan route
 #: answers the same codes in its body, and the page has words for each (``START_REFUSAL_WORDS`` in
 #: web/packages/app/src/ui/society-comparison-start.ts, held to this mapping by a parity test).
 START_REFUSALS: Final = {
-    # This server: it holds no development seed to run a comparison on (EXULANICA_COMPARISON_SEEDS).
+    # This server: the seed catalog it defines comparisons under commits no development seed's text.
     "comparisons_not_set_up": 409,
     # Nothing plays the comparisons started here (EXULANICA_COMPARISON_WORKER is off).
     "comparisons_not_played": 409,
@@ -104,11 +131,13 @@ START_REFUSALS: Final = {
     "comparison_running": 409,
     # The id: it already names another comparison of the workspace.
     "comparison_conflict": 409,
-    # The society: its engine takes no comparison, hosts no such role, or holds more people than
-    # the protocol's population_maximum.
+    # The society: its engine takes no comparison or hosts no such role; it holds more people, or
+    # a model would decide for more of them, than one run's read may take by the protocol
+    # (exulanica/world/society_comparison_reading.py).
     "engine_takes_no_comparison": 409,
     "role_not_hosted": 409,
     "population_over_comparison_bound": 409,
+    "decided_over_comparison_bound": 409,
     # The selection.
     "role_not_registered": 422,
     "model_not_offered": 422,
@@ -256,6 +285,17 @@ def definition_body(
     )
 
 
+def development_seeds(catalogs: ComparisonCatalogs) -> tuple[str, ...]:
+    """The development seeds the seed catalog commits the text of, in its order: from its third
+    version every development seed, so a comparison needs no file of seeds beside the server. A
+    held-out seed's text is never committed (the catalog's schema refuses one)."""
+    return tuple(
+        str(entry["seed"])
+        for entry in catalogs.seeds.values()
+        if entry["phase"] == PHASE and "seed" in entry
+    )
+
+
 def development_seeds_in(text: str, catalogs: ComparisonCatalogs) -> tuple[str, ...]:
     """The development seeds ``text`` holds, one per line, in the order the seed catalog commits
     them: a line is a seed only when the SHA-256 of its text is one the catalog commits to the
@@ -268,26 +308,127 @@ def development_seeds_in(text: str, catalogs: ComparisonCatalogs) -> tuple[str, 
     )
 
 
-@cache
-def typical_per_person_hour() -> dict[str, Decimal]:
-    """What one of a group's people cost for a simulated hour under each model the judged group
-    comparison measured, by model id: each of that model's arms' recorded spend per simulated
-    hour, averaged over its arms and divided by the group's people. A model it did not run has no
-    figure, and neither has any model where the record is not beside this code."""
-    path = _ROOT / TYPICAL_RECORD
-    if not path.is_file():
-        return {}
-    record = json.loads(path.read_text(encoding="utf-8"))["record"]
+def _judged_comparison(record: Mapping[str, Any]) -> tuple[dict[str, Decimal], dict[str, int]]:
+    """A judged comparison's figures: each model's arms' recorded spend per simulated hour,
+    averaged over its arms and divided by the group's people, and the slowest of its arms' 95th
+    percentile answer times."""
     size = int(record["group"]["size"])
     spent: dict[str, list[Decimal]] = {}
+    slowest: dict[str, int] = {}
     for arm in record["arms"]:
-        cost = record["summaries"][arm["key"]]["cost_usd_per_hour"]
-        if arm["decider"]["kind"] == "model" and cost is not None:
-            spent.setdefault(arm["decider"]["model_id"], []).append(Decimal(cost))
-    return {
+        if arm["decider"]["kind"] != "model":
+            continue
+        model_id = arm["decider"]["model_id"]
+        summary = record["summaries"][arm["key"]]
+        if summary["cost_usd_per_hour"] is not None:
+            spent.setdefault(model_id, []).append(Decimal(summary["cost_usd_per_hour"]))
+        if summary["latency_ms"]["p95"] is not None:
+            slowest[model_id] = max(slowest.get(model_id, 0), int(summary["latency_ms"]["p95"]))
+    per_person_hour = {
         model_id: (sum(costs, Decimal(0)) / len(costs) / size).quantize(USD_QUANTUM)
         for model_id, costs in sorted(spent.items())
     }
+    return per_person_hour, dict(sorted(slowest.items()))
+
+
+def _town_comparison_cost(record: Mapping[str, Any]) -> tuple[dict[str, Decimal], dict[str, int]]:
+    """A town's measured figures (``scripts/record_town_comparison_cost.py``): each model's cost
+    per person-hour and 95th percentile answer time, as the record states them."""
+    models = record["models"]
+    return (
+        {
+            model_id: Decimal(held["typical_usd_per_person_hour"])
+            for model_id, held in models.items()
+        },
+        {
+            model_id: int(held["latency_ms"]["p95"])
+            for model_id, held in models.items()
+            if held["latency_ms"]["p95"] is not None
+        },
+    )
+
+
+#: How each form of measurement is read, by the name :data:`TYPICAL_RECORDS` gives it.
+_TYPICAL_READERS: Final = {
+    "judged_comparison": _judged_comparison,
+    "town_comparison_cost": _town_comparison_cost,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class TypicalFigures:
+    """What one person typically cost for a simulated hour under each model, and how long each
+    model took to answer, as one measurement recorded them."""
+
+    record: str
+    per_person_hour: Mapping[str, Decimal]
+    latency_p95_ms: Mapping[str, int]
+
+
+@cache
+def typical_figures(navigation: str = TYPICAL_NAVIGATION) -> TypicalFigures | None:
+    """The typical figures measured on the kind of ground ``navigation`` names, or None where no
+    measurement states it or its record is not beside this code."""
+    entry = TYPICAL_RECORDS.get(navigation)
+    if entry is None:
+        return None
+    path, form = entry
+    file = _ROOT / path
+    if not file.is_file():
+        return None
+    per_person_hour, latency = _TYPICAL_READERS[form](
+        json.loads(file.read_text(encoding="utf-8"))["record"]
+    )
+    return TypicalFigures(path, per_person_hour, latency)
+
+
+def figures_for(
+    navigation: str | None, model_ids: Sequence[str]
+) -> tuple[TypicalFigures | None, bool]:
+    """The figures a plan of ``model_ids`` over a society on ``navigation``'s ground reads, and
+    whether they were measured on that ground: its own measurement where it states every model,
+    otherwise the small square's, which does not match any other ground."""
+    own = None if navigation is None else typical_figures(navigation)
+    if own is not None and all(model_id in own.per_person_hour for model_id in model_ids):
+        return own, True
+    return typical_figures(TYPICAL_NAVIGATION), navigation == TYPICAL_NAVIGATION
+
+
+def typical_latency_ms(navigation: str = TYPICAL_NAVIGATION) -> dict[str, int]:
+    """How long each model a measurement ran took to answer one of a group's people, by model id:
+    its 95th percentile answer time on ``navigation``'s ground, else on the small square. A model
+    neither measured has no figure."""
+    merged = dict((typical_figures(TYPICAL_NAVIGATION) or _NONE).latency_p95_ms)
+    merged.update((typical_figures(navigation) or _NONE).latency_p95_ms)
+    return dict(sorted(merged.items()))
+
+
+def answers_per_minute(
+    contract: DecisionContract, model_id: str, navigation: str = TYPICAL_NAVIGATION
+) -> int | None:
+    """How many asks one run's minute can have answered by ``model_id``: the contract's concurrent
+    calls, each answering one ask after another at the model's measured answer time on the
+    society's ground (:func:`typical_latency_ms`), within the one deadline the minute's asks share.
+    Asks past it are left to the routine. None for a model with no measured answer time."""
+    latency = typical_latency_ms(navigation).get(model_id)
+    if latency is None or latency < 1:
+        return None
+    return contract.value("concurrent_calls_maximum") * (
+        contract.value("decision_deadline_ms") // latency
+    )
+
+
+def typical_per_person_hour(navigation: str = TYPICAL_NAVIGATION) -> dict[str, Decimal]:
+    """What one of a group's people cost for a simulated hour under each model, by model id: as
+    measured on ``navigation``'s ground where it was, else on the small square. A model neither
+    measured has no figure."""
+    merged = dict((typical_figures(TYPICAL_NAVIGATION) or _NONE).per_person_hour)
+    merged.update((typical_figures(navigation) or _NONE).per_person_hour)
+    return dict(sorted(merged.items()))
+
+
+#: No measurement: no figures.
+_NONE: Final = TypicalFigures(record="", per_person_hour={}, latency_p95_ms={})
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,15 +448,37 @@ class ComparisonCost:
     #: What they would cost at the measured figures (:func:`typical_per_person_hour`), or None
     #: when a model it asks has no figure.
     typical_usd: Decimal | None
+    #: The most the asks of the runs played at once can hold reserved together: each run asks at
+    #: most the contract's concurrent calls at once, each held at its model's bound until its usage
+    #: is recorded (``BoundedBudget``).
+    held_usd: Decimal
+
+    #: Whether the typical figure was measured on the kind of ground this society stands on.
+    typical_matches: bool
+    #: The measurement the typical figure was read from.
+    typical_record: str
+
+    @property
+    def suggested_usd(self) -> Decimal | None:
+        """The least bound that lets a comparison spending the typical figure finish: that spend
+        and room for the most its runs can hold reserved at once, since a run asks a minute only
+        while what it would hold still fits. Derived, never measured; it promises a finish only
+        where the typical figure was measured on this society's kind of ground
+        (:attr:`typical_matches`), and it is None where the typical figure is unknown."""
+        return None if self.typical_usd is None else self.typical_usd + self.held_usd
 
     def document(self) -> dict[str, Any]:
+        suggested = self.suggested_usd
         return {
             "runs": self.runs,
             "asks_most": self.asks,
             "calls_most": self.calls,
             "most_usd": format(self.most_usd, "f"),
             "typical_usd": None if self.typical_usd is None else format(self.typical_usd, "f"),
-            "typical_record": TYPICAL_RECORD,
+            "typical_record": self.typical_record,
+            "held_usd": format(self.held_usd, "f"),
+            "suggested_usd": None if suggested is None else format(suggested, "f"),
+            "typical_matches": self.typical_matches,
         }
 
 
@@ -326,10 +489,15 @@ def comparison_cost(
     budget: BudgetGuard,
     manifest: Manifest,
     *,
+    at_once: int,
+    navigation_profile: str | None,
     runs_left: Sequence[tuple[str, str]] | None = None,
 ) -> ComparisonCost:
     """What the comparison ``body`` states can cost at most, over a society of ``population``
-    people, asking ``role``: every run's asks at their bound. ``runs_left`` names the runs to
+    people, asking ``role``: every run's asks at their bound. ``at_once`` is how many runs are
+    played at the same time (the protocol's ``runs_at_once``); ``navigation_profile`` is the kind
+    of ground the society stands on, which says whether the typical figure was measured there
+    (None where no reader is shown it). ``runs_left`` names the runs to
     count, by arm and seed digest; left out, every run the body plans."""
     contract = role.contract()
     window = int(body["window_ticks"])
@@ -369,7 +537,10 @@ def comparison_cost(
         model_id: offered.get(model_id, dearest)
         for model_id in {model_id for pairs in asked.values() for model_id, _ in pairs}
     }
-    typical = typical_per_person_hour()
+    figures, matches = figures_for(
+        navigation_profile, sorted({model_id for pairs in asked.values() for model_id, _ in pairs})
+    )
+    typical = dict((figures or _NONE).per_person_hour)
     asks = 0
     most = Decimal(0)
     per_hour = Decimal(0)
@@ -382,6 +553,18 @@ def comparison_cost(
                 per_hour += typical[model_id] * subjects
             else:
                 measured = False
+    # What one run of each arm can hold reserved at once: its minute's asks, at most the contract's
+    # concurrent calls of them, each at the dearest bound among the models the arm asks.
+    concurrent = contract.value("concurrent_calls_maximum")
+    held_by_arm = sorted(
+        (
+            min(concurrent, sum(subjects for _model, subjects in pairs))
+            * max((bounds[model_id] for model_id, _ in pairs), default=Decimal(0))
+            for key, pairs in asked.items()
+            if any(key == run_key for run_key, _ in runs)
+        ),
+        reverse=True,
+    )
     return ComparisonCost(
         runs=len(runs),
         asks=asks,
@@ -397,4 +580,9 @@ def comparison_cost(
         typical_usd=(per_hour * window / MINUTES_PER_HOUR).quantize(USD_QUANTUM)
         if measured
         else None,
+        held_usd=sum(held_by_arm[: max(1, at_once)], Decimal(0)).quantize(
+            USD_QUANTUM, rounding=ROUND_CEILING
+        ),
+        typical_matches=matches,
+        typical_record=TYPICAL_RECORD if figures is None else figures.record,
     )

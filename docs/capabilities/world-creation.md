@@ -83,9 +83,10 @@ A generated world has one recipe, a town of one tile, and its people follow the 
 shifts. A recipe may state up to four tiles, and a world of several is drawn only once every tile
 is baked, but no larger town is offered: the city grammar's street layout centres its blocks on the
 district's middle, so the small town's specification over two tiles makes the same two blocks with
-bare ground beside them. A comparison of models runs at most eight people, so a town's society is
-not compared. The page still offers Add photos in a generated world, which the server refuses by
-name.
+bare ground beside them. A town's people are compared from the Compare view, a model deciding for
+a group of them within the most a comparison lets it
+([what a comparison can read](../society-experiments.md#running-a-comparison)). The page still
+offers Add photos in a generated world, which the server refuses by name.
 
 Reusable real-world extraction, persistent geographic anchors, unified search
 across memories/imports/creations, geometric blending and general language-driven

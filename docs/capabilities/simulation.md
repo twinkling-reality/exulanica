@@ -81,7 +81,7 @@ comparison can be defined and run by a local command:
 ```bash
 EXULANICA_BUDGET_USD=<bound> uv run python -m exulanica.orchestration.compare \
   --workspace <uuid> --world <world id> --version <uuid> --actor <uuid> \
-  --model <provider>/<model id> --model <provider>/<model id> --control --seeds <file>
+  --model <provider>/<model id> --model <provider>/<model id> --control
 ```
 
 The bound is required, and every ask of every run stays within it. `--group` or `--group-choice`
@@ -89,9 +89,9 @@ names the group; without either, the group is everybody. The command runs develo
 its comparisons are never judged: a judged comparison is pre-registered on held-out seeds and
 recorded under `docs/evaluation/`. In the application, Compare models in the world menu shows a
 comparison's verdict and numbers, and one seed's hour from above on each side. A server starts
-comparisons only for the workspaces it asks models for, only with development seeds and only where
-something plays them (`EXULANICA_COMPARISON_SEEDS` and `EXULANICA_COMPARISON_WORKER`,
-[running a comparison](../society-experiments.md#running-a-comparison)).
+comparisons only for the workspaces it asks models for and only where something plays them
+(`EXULANICA_COMPARISON_WORKER`, [running a comparison](../society-experiments.md#running-a-comparison)),
+on the development seeds the seed catalog commits, with no file of seeds.
 
 Two judged comparisons found no measured difference in how people fared between Qwen3 235B
 Instruct and Nemotron 3.5 Lightning, first deciding for all eight people of the small square

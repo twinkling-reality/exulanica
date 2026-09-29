@@ -4,7 +4,7 @@
         --workspace <uuid> --world <world id> --version <uuid> --actor <uuid> \\
         --model <provider>/<model id> [--model <provider>/<model id>] [--control] \\
         [--group-choice <n> | --group <person id> [--group <person id> ...]] \\
-        --seeds <file> [--seed-count <n>]
+        [--seeds <file>] [--seed-count <n>]
 
 It defines a comparison over the version's purposeful society as it stands, with the routine and
 waiting as its two anchors, one arm per ``--model`` and, with ``--control``, the first model run a
@@ -16,9 +16,10 @@ keeps what the owner's latest choice for them names, a model or their routine, i
 comparison this command defines runs on development seeds and is never judged: a judged comparison
 is pre-registered, and its record is written by the measurement that registered it.
 
-``--seeds`` names a file of seeds, one per line. A seed is used only when the SHA-256 of its text
-is one the seed catalog commits to the development phase; the first ``--seed-count`` of those,
-in the catalog's order, are run. Nothing prints a seed.
+The first ``--seed-count`` development seeds, in the seed catalog's order, are run: the catalog
+commits their text. ``--seeds`` may name a file of seeds instead, one per line, of which a seed is
+used only when the SHA-256 of its text is one the seed catalog commits to the development phase.
+Nothing prints a seed.
 
 The model's key is read from the environment by the application's own client, and the bound is
 ``EXULANICA_BUDGET_USD``, which this command requires rather than defaulting: every ask of every
@@ -46,6 +47,7 @@ from exulanica.api.society_comparison_start import (
     comparison_body,
     definition_body,
 )
+from exulanica.api.society_comparison_start import development_seeds as committed_seeds
 from exulanica.models.usage import usd_string
 from exulanica.world.society_catalogs import load_comparison_catalogs
 from exulanica.world.society_comparison_repository import seed_digest
@@ -56,12 +58,18 @@ __all__ = ["comparison_body", "development_seeds", "main", "parser", "selection"
 BUDGET_VARIABLE: Final = "EXULANICA_BUDGET_USD"
 
 
-def development_seeds(path: Path, count: int) -> list[str]:
-    """The first ``count`` development seeds the catalog commits to, read from ``path``.
+def development_seeds(path: Path | None, count: int) -> list[str]:
+    """The first ``count`` development seeds the catalog commits to: their committed text, or,
+    where ``path`` names a file, read from it.
 
     Only lines whose digest the catalog commits to the development phase are used, in the
     catalog's order; a committed seed missing from the file, when it is needed, is refused.
     """
+    if path is None:
+        found_seeds = list(committed_seeds(load_comparison_catalogs())[:count])
+        if len(found_seeds) < count:
+            raise SystemExit(f"the seed catalog commits fewer than {count} development seeds")
+        return found_seeds
     committed = [
         str(entry["seed_digest"])
         for entry in load_comparison_catalogs().seeds.values()
@@ -125,7 +133,7 @@ def parser() -> argparse.ArgumentParser:
     chosen.add_argument(
         "--group", action="append", default=None, help="a person to swap, by subject id"
     )
-    held.add_argument("--seeds", type=Path, required=True)
+    held.add_argument("--seeds", type=Path, default=None)
     held.add_argument("--seed-count", type=int, default=1)
     held.add_argument("--comparison", type=uuid.UUID, default=None)
     return held

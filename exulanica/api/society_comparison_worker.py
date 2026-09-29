@@ -171,6 +171,8 @@ class SocietyComparisonWorker:
             role,
             budget if budget is not None else _ESTIMATOR,
             self.manifest,
+            at_once=protocol_value(runner.catalogs, "runs_at_once"),
+            navigation_profile=None,
             runs_left=[(run["arm"], run["seed_digest"]) for run in open_runs],
         )
         presumed = claim.presumed_usd

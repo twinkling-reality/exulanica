@@ -146,15 +146,27 @@ are `not_judged`, each by name, and one with a run missing or failed is `incompl
 registered is its binding: the first names the three catalogs and the first scorer and claim modules
 by digest; the second also names the second scorer and
 `exulanica/world/society_comparison_verdict.py`, which assembles the verdict from the scores, so a
-change to any of them leaves a comparison registered under it `scored_under_other_code`. A
+change to any of them leaves a comparison registered under it `scored_under_other_code`. That
+module also holds each protocol version's keys, so the module that reads the third protocol
+version is not the one the second binding names by digest (`7114c141...`, in the
+[group comparison's pre-registration](evaluation/2026-09-26-society-group-comparison-preregistration.json)):
+a comparison registered under the second binding and scored from a live database reads
+`not_judged`, `scored_under_other_code`, while one on development seeds reads `development_seeds`,
+as it did. The committed judged records and their outcomes stand, and the next judged comparison
+registers a binding of the modules as they are. A
 comparison is read under the catalog versions it recorded, whichever versions a later one is defined
 under, and a binding this code cannot read is refused by name. The verdict also says whether the
 primary pair's answered shares differ by more than the control pair's do, a bound that adds no
 constant of its own, and the page says so in the verdict's own sentence. Held-out seeds are
 committed by the SHA-256 of their text: `society-comparison-seeds.v2.json` keeps the first version's
 development seeds and commits twelve held-out seeds drawn afresh, none of the first version's, whose
-held-out seeds the first judged comparison spent. The seeds themselves stay outside the repository
-until a pre-registered comparison is judged on them.
+held-out seeds the first judged comparison spent. The held-out seeds themselves stay outside the
+repository until a pre-registered comparison is judged on them. The third version, which a new
+comparison is defined under, commits each development seed's text beside the digest the earlier
+versions commit it by, since a development seed is looked at freely and never judged, and its
+schema holds each text to its digest; its held-out seeds are the second version's twelve, by digest
+alone, which the second judged comparison ran on, and an entry that states a held-out seed's text
+is refused (`held_out_seed_text`).
 
 ### Judged comparisons
 
@@ -186,13 +198,13 @@ writes anything.
 | Method and path | Permission | Result |
 | --- | --- | --- |
 | `GET /world/versions/{version_id}/society/comparisons` | `world.read` | The version's comparisons, newest first, with their arms, the group they decide for, how far their runs got and, for one started from the application, its start: the bound, what its asks spent, what hosts that stopped are presumed to have spent unrecorded, and where it stands |
-| `GET /world/versions/{version_id}/society/comparisons/plan` | `world.read` | What this server offers a comparison of the version's society, the roles its engine hosts with their groups and models, and for a selection its runs, the most it can cost and what one like it typically costs, or the refusal a start of it would meet ([running a comparison](#running-a-comparison)) |
+| `GET /world/versions/{version_id}/society/comparisons/plan` | `world.read` | What this server offers a comparison of the version's society, the roles its engine hosts with their groups and models, the most people a comparison runs and the most of the society's people a model may decide for ([what it can read](#running-a-comparison)), and for a selection its runs, the most it can cost, what one like it typically costs and how many of a minute's asks each of its models can have answered, or the refusal a start of it would meet ([running a comparison](#running-a-comparison)) |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}` | `world.read` | Scores per seed and per arm with intervals and, beside each, what its arm's model answered; the group and who decides for everybody else; the registered differences and the server's verdict |
-| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run replayed from its stored requests and receipts, with no model call, held to its recorded minute digests, events and receipts, naming who decides for each person; a replay that differs is refused as `run_replay_mismatch` |
+| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run replayed from its stored requests and receipts, with no model call, held to its recorded minute digests, events and receipts, naming who decides for each person; a replay that differs is refused as `run_replay_mismatch`. Its inputs' rights are asked once the replay is done and before anything drawn from them is answered |
 
 No response carries a run's seed or a raw state. A comparison or run under another workspace or
-world is an unknown reference, and a run whose inputs have since lost their rights is unavailable
-rather than replayed from stale geometry. A comparison this code cannot read, one naming a binding,
+world is an unknown reference, and a run whose inputs lost their rights before or while it was
+replayed is unavailable (424, `unavailable_society_input`) rather than drawn from stale geometry. A comparison this code cannot read, one naming a binding,
 catalogs, a definition or a score version it does not hold, or whose outcomes scored other people
 than its group, is answered as a conflict (409) with the code it was refused by, such as
 `binding_unknown`, never as a server error.
@@ -215,11 +227,13 @@ reserves every run and records the start (migration 0119), who started it, its b
 which are never changed. The id is the caller's, keyed within its workspace: the same start sent
 again is answered with it, another start under that id is refused (`comparison_conflict`), and
 another workspace naming the same id starts its own. A world plays one started comparison at a time
-(`comparison_running`). Every other refusal is named (`START_REFUSALS`): a server that holds no
-development seed (`comparisons_not_set_up`), where nothing plays the comparisons started on it
-(`comparisons_not_played`), that does not ask models for the workspace (`comparisons_not_run_here`)
-or that holds no model key; a society whose engine takes no comparison or hosts no such role, or
-which holds more people than the protocol's `population_maximum`; a role not registered; a model the
+(`comparison_running`). Every other refusal is named (`START_REFUSALS`): a server whose seed
+catalog commits no development seed's text (`comparisons_not_set_up`), where nothing plays the
+comparisons started on it (`comparisons_not_played`), that does not ask models for the workspace
+(`comparisons_not_run_here`) or that holds no model key; a society whose engine takes no comparison
+or hosts no such role, which holds more people than a comparison runs
+(`population_over_comparison_bound`), or of whose people a model would decide for more than a
+comparison lets it (`decided_over_comparison_bound`), both below; a role not registered; a model the
 role is not offered, one named twice, or one this server cannot ask now, whether for the group or
 for somebody outside it whose owner chose it; a group naming nobody, somebody not here or a choice
 this world does not hold; more seeds than the server holds; and a bound above the most the
@@ -231,11 +245,49 @@ a minute, so its asks are at most the protocol's window times those subjects (th
 a model arm and, in every arm, anybody outside the group whose owner chose a model), and each ask
 costs at most `ask_bound_usd`, every answer the contract allows at the manifest's prices for the
 longest situation and answer the contract allows. What one like it typically costs is a
-measurement: in the [judged group comparison](evaluation/2026-09-26-society-group-comparison.json)
-each model's arms spent, per person and simulated hour, $0.0018 (Nemotron 3.5 Lightning), $0.0014
-(Qwen3 235B Instruct) and $0.00055 (Nemotron 3 Nano 30B), under 2 percent of the most. The plan
-route and the page give both, and the person states the bound, at most the most; nothing starts
-until they do.
+measurement of the kind of ground its society stands on: in the
+[judged group comparison](evaluation/2026-09-26-society-group-comparison.json), on the small
+square, each model's arms spent, per person and simulated hour, $0.0018 (Nemotron 3.5 Lightning),
+$0.0014 (Qwen3 235B Instruct) and $0.00055 (Nemotron 3 Nano 30B), under 2 percent of the most; in
+[one development comparison of a 48-person town](evaluation/2026-09-29-town-comparison-cost.json),
+whose people each model asked 1.5 to 2.5 times as often as on the square, $0.00286 (Nemotron 3.5
+Lightning) and $0.00132 (Nemotron 3 Nano 30B). A plan reads its own ground's figures where they cover every model it asks,
+and the square's otherwise. Since every ask is held at its model's most until its cost is known, a
+bound near the typical figure stops the runs part way (`comparison_bound_spent`), so the plan also
+serves the most the runs played at once can hold reserved together (`held_usd`) and, beside it,
+the least bound that lets a comparison spending the typical figure finish (`suggested_usd`), and
+whether that figure was measured on this society's kind of ground (`typical_matches`). The page
+says "at least" that bound lets it finish only where it was; elsewhere it says where the figure was
+measured and that a bound that low may stop it. The plan route and the page give all of these, and
+the person states the bound, at most the most; nothing starts until they do.
+
+**What it can read.** Every read of a run replays it ([reads](#reads)), and the page reads a
+seed's two runs at once, which one process replays one after the other, so how many people a
+comparison runs is derived from how long that takes, never stated. The protocol's third version
+(`assets/catalogs/society/society-comparison-protocol.v3.json`) states the most a pair may take,
+ten seconds (`pair_replay_budget_ms`, the longest a person keeps their attention on a wait they are
+told about), and a cost measured with
+[`scripts/measure_comparison_replay.py`](../scripts/measure_comparison_replay.py) that lies on or
+above every read it measured: 241 ms for any run, 41.6 ms for each of the society's people, 93.1 ms
+for each person a model decides for, whose turns the replay builds again and holds to what was
+stored, and 0.131 ms more for each of those for each person of the society, since building a
+decided person's options reads everybody else
+([`exulanica/world/society_comparison_reading.py`](../exulanica/world/society_comparison_reading.py)).
+Every run is held to half the pair's budget, so a comparison runs at most 114 people, fewer than the
+128 a generated town's ground allows, which makes it the bound that applies to a town; and in one
+run a model may decide for all 30 people of a 30-person town, at most 29 of 44 or 24 of 56, the
+group under a model arm and anybody outside it whose owner chose a model counted together. A larger
+society is refused by name (`population_over_comparison_bound`), and so is a comparison whose model
+would decide for more (`decided_over_comparison_bound`); the plan route serves both figures for the
+version's society, and the page states the second before Start. The first two protocol versions
+state `population_maximum`, eight, and bound nothing else. A run's minute asks every person it
+decides for within one deadline the minute's asks share, at most the contract's concurrent calls at
+once (`concurrent_calls_maximum`, `decision_deadline_ms`), so a model answers about as many of them
+as those calls can take one after another at its measured answer time; the plan gives that figure
+for each chosen model from the judged group comparison's 95th percentile answer times
+(`answers_per_minute` in `exulanica/api/society_comparison_start.py`), and where a group is larger
+the page says that in a minute when more of them have a choice the rest follow their routine. It
+does not refuse such a group.
 
 **Where it runs.** A host's comparison worker (`exulanica/api/society_comparison_worker.py`) plays
 it off the request path, for the workspaces the host asks models for
@@ -247,9 +299,9 @@ it runs is `EXULANICA_COMPARISON_WORKER`: absent, the API's process runs it in a
 `python -m exulanica.orchestration.comparison_worker` runs the same worker in a process of its own
 and the API only serves starts; off, nothing plays them, and the API refuses every start
 (`comparisons_not_played`) rather than accept one no host would ever claim, which would keep its
-world from starting another. Development seeds are read from the file `EXULANICA_COMPARISON_SEEDS`
-names: a line is used only when its digest is one the seed catalog commits to the development phase,
-and none is printed or served.
+world from starting another. Development seeds are the seed catalog's own: from its third version
+it commits their text, so a server holds them with no file beside it, and none is printed or
+served.
 
 **The bound.** Every call of a started comparison is reserved against a part of the process's model
 budget whose ceiling is the bound (`BoundedBudget` in `exulanica/models/budget.py`), which passes
@@ -289,7 +341,7 @@ EXULANICA_BUDGET_USD=<bound> python -m exulanica.orchestration.compare --workspa
   --world <world id> --version <uuid> --actor <uuid> --model <provider>/<model id> \
   [--model <provider>/<model id>] [--control] \
   [--group-choice <n> | --group <person id> [--group <person id> ...]] \
-  --seeds <file> [--seed-count <n>] [--comparison <uuid>]
+  [--seeds <file>] [--seed-count <n>] [--comparison <uuid>]
 ```
 
 It takes one or two models. `--comparison` names the comparison's id, a fresh one when it is left
@@ -299,12 +351,13 @@ everybody else keeping what the owner's latest choice for them names; reserves e
 `runs_at_once` at a time, the anchors first, with no connection held while a model is asked; and
 prints each arm's score with what its model answered, the differences and the verdict. A person
 outside the group whose owner chose a model is asked of it in every arm, the anchors included, and
-what those asks cost is reported apart from the arm's own. It uses a seed from the file only when
+what those asks cost is reported apart from the arm's own. It runs the first `--seed-count`
+development seeds the catalog commits, or, where `--seeds` names a file, a seed from it only when
 its digest is one the catalog commits to the development phase, and prints none. The whole process
 budget is the comparison's: the runner keeps none of it back, as the playback host keeps a share,
 and a live world's hourly bounds do not apply, since a comparison writes nothing the live world
-reads. A comparison runs at most the protocol's `population_maximum` people, a saved world's own
-population; a larger society is refused by name.
+reads. It is held to the same reading bound as a start from the application (what it can read,
+above), refused by the same names.
 
 ### Browser view
 
@@ -319,14 +372,23 @@ time; the registered differences; and every seed's scores, each with what its ru
 For a chosen seed and two arms it draws both runs from above on one clock (play, pause, speed and a
 minute scrubber), what each person did minute by minute on each side with a mark where the two hours
 went differently, and the inspector on a person of either side, saying who decided their latest turn
-and why, and for a person outside the group, that they keep that decider in every arm. The page
+and why, and for a person outside the group, that they keep that decider in every arm. The rows of
+what each person did come in two parts, the group the two sides decide for and then everybody else,
+each saying how many of its people's hours went differently and listing them by how many minutes
+did, most first, with each person's count. Everybody else is folded behind that summary until it is
+opened, since what the group did changes the hour around them: in a development comparison of four
+of a 48-person town's people, Nemotron 3 Nano 30B against Nemotron 3.5 Lightning, all 44 others'
+hours went differently, 42 to 60 of their 60 minutes, while they kept their routine on both sides.
+A town's page therefore opens on the group's rows. The page
 shows every number as the server wrote it and never decides whether two arms differ.
 
 Above the list, the world's owner starts a comparison from what the plan route offers: who the
 models decide for (everybody, or the people of one of their choices), a first and a second model
 with what each typically costs and why one cannot be asked now, whether the first runs a second
-time, and how many seeds. For the choice it shows the runs, the most they could cost and what one
-like it typically costs, and the bound the person types; Start stays unavailable until the bound is
+time, and how many seeds. Where a model may decide for fewer than all of the society's people, it
+says how many before Start. For the choice it shows the runs, the most they could cost and what one
+like it typically costs, where a chosen model decides for more people than one minute's asks can
+have answered, that in a busy minute the rest follow their routine, and the bound the person types; Start stays unavailable until the bound is
 above zero and at most that most. A started comparison is listed with its progress, runs finished of
 runs planned and its spend of its bound, with what a server that stopped may have spent where there
 is any, read again every four seconds while it waits or runs, and opens in the view as its runs

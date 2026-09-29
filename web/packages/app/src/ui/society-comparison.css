@@ -102,7 +102,6 @@
    keeps one decider in every arm. A selected person's ring, below, is wider and in the accent. */
 .comparison-plan-person[data-in-group='true'] circle { stroke-width: 120; }
 .comparison-plan-person[data-in-group='false'] { opacity: .7; }
-.comparison-strip[data-in-group='true'] .comparison-strip-name::before { content: '●'; margin-right: .3rem; }
 .comparison-plan-person.is-selected circle { stroke: var(--accent, #40545d); stroke-width: 200; }
 .comparison-plan-person:focus-visible circle { stroke: var(--accent, #40545d); stroke-width: 150; }
 :is(.comparison-plan-person, .comparison-strip-cell, .comparison-strip-key)[data-class='walking'] { --class-colour: var(--comparison-walking); }
@@ -125,7 +124,14 @@
 .comparison-strip-key::before { content: ''; display: inline-block; width: .75rem; height: .75rem; margin-right: .3rem; vertical-align: -.1rem; background: var(--class-colour); }
 .comparison-strip { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: .5rem; align-items: center; }
 .comparison-strip.is-selected .comparison-strip-name { font-weight: 700; }
-.comparison-strip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; }
+.comparison-strip-name { display: grid; overflow: hidden; line-height: 1.15; font-size: .8rem; }
+.comparison-strip-person { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comparison-strip-count { color: var(--ink-soft, #4e5d64); font-size: .7rem; }
+.comparison-strip-part { display: grid; gap: .35rem; }
+.comparison-strip-part-title { margin: .4rem 0 0; font-size: .82rem; font-weight: 600; }
+.comparison-strip-others { display: grid; gap: .35rem; }
+.comparison-strip-others > summary { cursor: pointer; }
+.comparison-strip-others[open] > summary { margin-bottom: .35rem; }
 .comparison-strip-track { position: relative; display: grid; gap: 1px; }
 .comparison-strip-line, .comparison-strip-marks { display: grid; grid-template-columns: repeat(var(--minutes), minmax(0, 1fr)); gap: 0; }
 .comparison-strip-cell { height: .7rem; min-width: 0; padding: 0; border: 0; background: var(--class-colour, var(--comparison-waiting)); cursor: pointer; }

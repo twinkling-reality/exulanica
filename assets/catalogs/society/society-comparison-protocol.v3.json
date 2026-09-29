@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-comparison-protocol",
+  "catalog_version": 3,
+  "entries": [
+    {
+      "key": "bootstrap_resamples",
+      "value": 10000,
+      "reason": "Resamples of the seeds, with replacement, from which an interval and a two-sided test are read: ten thousand leaves the percentile ends of a mean over eight seeds steady to well under the precision a score is shown at, and costs a fraction of a second to draw.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "family_alpha_per_mille",
+      "value": 50,
+      "reason": "The chance of calling any registered difference real when none is, held for the whole family of hypotheses a comparison registers by Holm's step-down procedure: five percent, the level the interval is read at.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "interval_per_mille",
+      "value": 950,
+      "reason": "The share of resampled means an interval holds, the middle ninety-five percent: the conventional level, stated once so every interval a comparison shows is read at the same level.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "need_relief_floor_per_person",
+      "value": 575,
+      "reason": "A seed counts only when the routine spares the scored people at least this much need above the threshold against waiting, per scored person, in need-thousandths times minutes; a comparison scores one group, of any size, so the floor is stated per person. It is the first protocol's floor of 4,600 for the small square's eight people, measured before any model was asked on the eight development seeds through the product's runner with a scripted model (the routine spared from 10,858 to 25,175, median 18,537.5; a quarter of the median, rounded down to the hundred), divided by the eight people it was measured over. A seed under it is excluded by name, never scored, so no seed on which the routine had almost nothing to spare decides a mean.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "pair_replay_budget_ms",
+      "value": 10000,
+      "reason": "The most a seed's two runs may take to be read. Every read of a run replays it from what it stored and holds it to what it recorded, and the page reads a seed's two runs at once, saying meanwhile that it is replaying them, while one process replays the two one after the other, so each run's read is held to half of this. Ten seconds is the longest a person keeps their attention on a wait they are told about (Nielsen, Usability Engineering, 1993, chapter 5). The most people a comparison runs, and the most of them a model may decide for in one run, are derived from this and the four measured figures beside it (exulanica/world/society_comparison_reading.py), never stated.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "replay_fixed_ms",
+      "value": 241,
+      "reason": "What reading one run costs whatever its people, in the cost a run's read is estimated by: fixed + per person x population + per decided person x decided + per decided pair x population x decided. Measured with scripts/measure_comparison_replay.py inside quiet-slot then gpu-slot on tree 3d7bc30d with this protocol's change, the machine 92.7 percent idle before and 95.2 after and its one-minute load under 8 before every point: one simulated hour of a small town's society played once and read five times at each of 30 points, 8 to 128 people on the median (44 people) and the largest (56) of 20 towns' graphs, a model deciding for nobody, everybody, or 4, 8 or 16 of them. Of every such cost with no negative term that lies on or above every point's 95th percentile, this is the one whose margins over the points sum to the least, rounded up: it lies 1 ms above the closest point and at most 2.4 s above any.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "replay_per_decided_pair_us",
+      "value": 131,
+      "reason": "What each person a model decides for adds for each person of the society: building a decided person's options reads where everybody else is, stands and is headed, so a decided person costs more in a larger society, about 50 ms at 8 people and 93 to 111 ms at 128, everybody decided for. Fitted with the other three figures by the measurement replay_fixed_ms names.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "replay_per_decided_person_us",
+      "value": 93133,
+      "reason": "What each person a model decides for adds to reading one run's hour, beside what they add as one of the society: the replay builds again every request the model was asked for them, with its options, and holds it and its receipt to what the run stored. With everybody decided for, 32 people read in 2.96 to 3.25 s and 64 in 6.99 to 9.40 s. Fitted with the other three figures by the measurement replay_fixed_ms names.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "replay_per_person_us",
+      "value": 41588,
+      "reason": "What each of the society's people adds to reading one run's hour, nobody decided for or not: the engine plays each person's minutes again, and every minute's state is held to its recorded digest. With nobody decided for, 8 people read in 0.49 to 0.57 s and 128 in 5.38 to 5.56 s (95th percentile of five reads). Fitted with the other three figures by the measurement replay_fixed_ms names.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "runs_at_once",
+      "value": 2,
+      "reason": "How many runs a runner plays at the same time. Each asks at most the decision policy's eight concurrent calls, so two keep a comparison inside sixteen open requests to one provider, while halving the time a comparison takes.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "window_ticks",
+      "value": 60,
+      "reason": "A comparison runs the same simulated hour with each arm: long enough for a tired person to walk to a seat, stay the three to twenty-five minutes a rest lasts and be relieved, and short enough that two models and a control run on eight seeds within a spend of cents. Every run of one comparison runs exactly this many minutes.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    }
+  ]
+}

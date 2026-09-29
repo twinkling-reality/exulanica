@@ -166,6 +166,12 @@ RELEASED_CATALOGS = {
     "society-comparison-seeds.v2.json": (
         "5f16217c62da58041b4f6695177e99bb31aee53ef8006efaaa58bd4aa9425473"
     ),
+    "society-comparison-protocol.v3.json": (
+        "a072bdd8dcc0235cf5918d41140fada94e6c5348f1423af96c7c510d714228c3"
+    ),
+    "society-comparison-seeds.v3.json": (
+        "0b48a3c0a5a331f42a548fd7d5c0c88676a1c6346c30c057b21123295723915d"
+    ),
     "society-decision-action.v1.json": (
         "900e91eabcdb60a3d373639a096a7ee3be037bfc2e80431ec6e9f37c715c823f"
     ),

@@ -21,7 +21,7 @@ from exulanica.grammar.errors import CatalogError
 from exulanica.world import society_authored_ground as ground_builder
 from exulanica.world.society_authored_ground import build_authored_ground_society_input_v3
 from exulanica.world.society_catalogs import load_comparison_catalogs
-from exulanica.world.society_comparison_verdict import protocol_value
+from exulanica.world.society_comparison_reading import population_maximum
 from exulanica.world.society_engines import COMPARISON_ENGINES, CREATES
 from exulanica.world.society_grounds import (
     CATALOG_DIRECTORY,
@@ -108,10 +108,10 @@ def test_every_stated_ground_can_be_compared_under_the_comparison_protocol():
     """A comparison runs the society its world holds, with the population that society recorded
     from its ground; the protocol refuses a larger one by name. Every ground that states its
     population therefore states one the protocol runs. A ground whose population is its world's
-    residents (a generated town) may hold more, and a comparison of it is refused by name until
-    the protocol's maximum moves on a measurement of replaying one."""
+    residents (a generated town) is held by the protocol's derived bounds on the population it
+    recorded (``tests/test_comparison_reading_bound.py``)."""
     assert society_grounds(), "the parity needs a ground to hold"
-    maximum = protocol_value(load_comparison_catalogs(), "population_maximum")
+    maximum = population_maximum(load_comparison_catalogs())
     assert CREATES["saved_world"] in COMPARISON_ENGINES
     stated = [ground for ground in society_grounds() if ground.population_rule == "stated"]
     assert stated, "the parity needs a stated ground to hold"

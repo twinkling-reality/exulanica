@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-comparison-seeds",
+  "catalog_version": 3,
+  "entries": [
+    {
+      "key": "development_1",
+      "phase": "development",
+      "seed_digest": "8a727c3b6733dda2b608360b59def8627dd4e095bddb5b3ffbfef4450c046f80",
+      "seed": "349d43ff977100b3b7bfee1d1de606aa949b5ad2ba7d1c7d8f99cf87af19ae34",
+      "reason": "A development seed, the same one the first and second versions of this catalog commit under this key by the SHA-256 of its text, and its text beside it: a development seed is looked at freely and never judged, so it is no secret, and a comparison started from the application runs on it with no file of seeds beside the server. The catalog's schema holds the text to the digest. A comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_2",
+      "phase": "development",
+      "seed_digest": "94b177f69180551d5a7103d473ae94f78535079ed413fabb3b635a99937874ca",
+      "seed": "03f48ab751c6aa1bdb6da399f1428b0c6c5b58884da5331992f6044f316d9a26",
+      "reason": "A development seed, the same one the first and second versions of this catalog commit under this key by the SHA-256 of its text, and its text beside it: a development seed is looked at freely and never judged, so it is no secret, and a comparison started from the application runs on it with no file of seeds beside the server. The catalog's schema holds the text to the digest. A comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_3",
+      "phase": "development",
+      "seed_digest": "e89a28d843b271359556d88c05843e9cbb8c610c498dec091b16ce9d2ebfc3f2",
+      "seed": "b750e9fef582e6c285dd428b3f45aea24edda06a3e0f67f827800c92e2f165dc",
+      "reason": "A development seed, the same one the first and second versions of this catalog commit under this key by the SHA-256 of its text, and its text beside it: a development seed is looked at freely and never judged, so it is no secret, and a comparison started from the application runs on it with no file of seeds beside the server. The catalog's schema holds the text to the digest. A comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_4",
+      "phase": "development",
+      "seed_digest": "d878ae8d31111b69a121822ddf1acd5f9ecfc65405ffa544395e94516cde2a19",
+      "seed": "b18a946b0ebdaaab84c178909df15371bcac5860a03360b8639713ec7f1d2c4d",
+      "reason": "A development seed, the same one the first and second versions of this catalog commit under this key by the SHA-256 of its text, and its text beside it: a development seed is looked at freely and never judged, so it is no secret, and a comparison started from the application runs on it with no file of seeds beside the server. The catalog's schema holds the text to the digest. A comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_5",
+      "phase": "development",
+      "seed_digest": "f2cab8a33596e5acd43bce83c7a8d3907d17e82d02741431210af7aebed31ea0",
+      "seed": "9c85b25834121d124ed377e15c276cdb1ff23569fdbb1687e9ebef367d1aeb47",
+      "reason": "A development seed, the same one the first and second versions of this catalog commit under this key by the SHA-256 of its text, and its text beside it: a development seed is looked at freely and never judged, so it is no secret, and a comparison started from the application runs on it with no file of seeds beside the server. The catalog's schema holds the text to the digest. A comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_6",
+      "phase": "development",
+      "seed_digest": "07b07152536a9e89cf7006c03d7982e104506954c7760fbbb4a44bd38f68b62d",
+      "seed": "5dbe51043bdaf4b1b4723fb720895dfca2e278c1cfd13da0969887e5a6e9aeec",
+      "reason": "A development seed, the same one the first and second versions of this catalog commit under this key by the SHA-256 of its text, and its text beside it: a development seed is looked at freely and never judged, so it is no secret, and a comparison started from the application runs on it with no file of seeds beside the server. The catalog's schema holds the text to the digest. A comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_7",
+      "phase": "development",
+      "seed_digest": "3e15696c109178911ce776d075c424ddaa4150215522e13e650c1a06358d1ec7",
+      "seed": "9c2d65073af454818ce05757faba148388eb27384da2dc029fdb45d32f49b49a",
+      "reason": "A development seed, the same one the first and second versions of this catalog commit under this key by the SHA-256 of its text, and its text beside it: a development seed is looked at freely and never judged, so it is no secret, and a comparison started from the application runs on it with no file of seeds beside the server. The catalog's schema holds the text to the digest. A comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_8",
+      "phase": "development",
+      "seed_digest": "ffe12999b504f4a44d053b8f56763b898fcc108a131b688f2c45d36b227e0047",
+      "seed": "f6784bba692eca5d357a645b7413acab7991219ccc83aacc107e611ff03c0ba3",
+      "reason": "A development seed, the same one the first and second versions of this catalog commit under this key by the SHA-256 of its text, and its text beside it: a development seed is looked at freely and never judged, so it is no secret, and a comparison started from the application runs on it with no file of seeds beside the server. The catalog's schema holds the text to the digest. A comparison run on it may be run and looked at any number of times, to check the runner, measure the anchors and show a pair in the browser.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_1",
+      "phase": "held_out",
+      "seed_digest": "cf4adb0a4670442b41753372aee798795c43232748f68a92acb1a74f49dc7984",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_2",
+      "phase": "held_out",
+      "seed_digest": "8a877325a663bbecfd1274ae5f60fd6253478735aaed7ae735e043f9c4e99636",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_3",
+      "phase": "held_out",
+      "seed_digest": "2b28662fc5f7b4ec74b47702646bc49d9bbbb42bde870aae2ff06b4ae819c84f",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_4",
+      "phase": "held_out",
+      "seed_digest": "08617c499e627eaf655e55be65373e66797768a2f25671e44113a2404d2a40f9",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_5",
+      "phase": "held_out",
+      "seed_digest": "56280f7efc009e221c7e89854852d1b74b61aa7737d4a1d8b2b1fbd7f378769e",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_6",
+      "phase": "held_out",
+      "seed_digest": "5d81aad2f024b3dc9cbf21dcc895d17738ac8e97713b03f6505bd39c513c2a77",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_7",
+      "phase": "held_out",
+      "seed_digest": "e9a8abe76f92468340500236c52cc354d55c271d1eb71ab65a578744994f278d",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_8",
+      "phase": "held_out",
+      "seed_digest": "c2afea1496f97e4030fc1b4d2d7aef96f1aa91f56d076ca3749c3075a13f078e",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_9",
+      "phase": "held_out",
+      "seed_digest": "2581ec232f91f6b2e9aba0ec6348bbd8e710992854a6f15c25acb191244ef102",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_10",
+      "phase": "held_out",
+      "seed_digest": "618375c5b8bec808ff361a00d90c9d57fed528a1cf5ccc25028e6158f138230a",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_11",
+      "phase": "held_out",
+      "seed_digest": "f4a32610aee743791ce5e76c7d08e429c58235da2e390d01ff780087fe4fd621",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "held_out_12",
+      "phase": "held_out",
+      "seed_digest": "c21d52dc97ec3981ca5805b6f5b183d48f33a480e13e54a7d4c28d33395a8cbb",
+      "seed": "none",
+      "reason": "A held-out seed, the same one the second version of this catalog commits under this key, by the SHA-256 of its text alone: a held-out seed's text is never committed, and the schema refuses an entry that states one. The second judged comparison ran on these twelve (docs/evaluation/2026-09-26-society-group-comparison.json), so a judged comparison is registered on seeds drawn afresh, never on these again.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    }
+  ]
+}

@@ -61,9 +61,9 @@
           "bound_usd": "0.05000000",
           "closed_reason": null,
           "finished_at": "2026-09-29T17:03:37.179705+00:00",
+          "presumed_usd": "0.00000000",
           "runs_planned": 3,
           "spent_usd": "0.01274000",
-          "presumed_usd": "0.00000000",
           "started_at": "2026-09-29T17:03:35.512035+00:00",
           "state": "finished"
         }
@@ -72,9 +72,12 @@
     "profile": "exulanica.society-comparisons/v2"
   },
   "plan": {
+    "decided_most": 8,
     "models_most": 2,
     "plan": null,
     "plan_refusal": null,
+    "population": 8,
+    "population_most": 114,
     "profile": "exulanica.society-comparison-plan/v1",
     "refusal": null,
     "roles": [
@@ -132,16 +135,31 @@
     "window_ticks": 60
   },
   "planned": {
+    "decided_most": 8,
     "models_most": 2,
     "plan": {
       "asks_most": 480,
       "calls_most": 960,
+      "held_usd": "0.04571840",
+      "minutes": [
+        {
+          "answers_per_minute": 136,
+          "arm": "model_a",
+          "decided": 8,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "name": "Qwen3 235B Instruct"
+        }
+      ],
       "most_usd": "2.74310400",
       "runs": 3,
+      "suggested_usd": "0.05691840",
+      "typical_matches": true,
       "typical_record": "docs/evaluation/2026-09-26-society-group-comparison.json",
       "typical_usd": "0.01120000"
     },
     "plan_refusal": null,
+    "population": 8,
+    "population_most": 114,
     "profile": "exulanica.society-comparison-plan/v1",
     "refusal": null,
     "roles": [
@@ -389,9 +407,9 @@
       "bound_usd": "0.05000000",
       "closed_reason": null,
       "finished_at": "2026-09-29T17:03:37.179705+00:00",
+      "presumed_usd": "0.00000000",
       "runs_planned": 3,
       "spent_usd": "0.01274000",
-      "presumed_usd": "0.00000000",
       "started_at": "2026-09-29T17:03:35.512035+00:00",
       "state": "finished"
     },
@@ -582,9 +600,9 @@
           "bound_usd": "0.05000000",
           "closed_reason": null,
           "finished_at": null,
+          "presumed_usd": "0.00000000",
           "runs_planned": 3,
           "spent_usd": "0.00000000",
-          "presumed_usd": "0.00000000",
           "started_at": "2026-09-29T17:03:35.512035+00:00",
           "state": "waiting"
         }
