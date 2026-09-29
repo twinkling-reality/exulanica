@@ -455,6 +455,8 @@ def test_a_generated_world_takes_no_photographs(objects_api, repository):
     """A photograph reaches a world's geometry only through its entry's attachments, so a world
     whose kind is never composed with photographs refuses the attachment by name."""
     entry = _make(objects_api).json()
+    # The page offers adding photographs by this served capability of the world's kind.
+    assert entry["takes_photographs"] is False
     response = objects_api.post(
         f"/world-entries/{entry['entry_id']}/source-attachments",
         {

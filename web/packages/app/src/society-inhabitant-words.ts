@@ -167,9 +167,11 @@ export function inhabitantWordsFrom(
   } else chosen = completed ? 'standing_aside' : 'deciding';
   const doing = fill(words('doing', chosen), { place: where(action.target_id), partner: met, still });
   // The goal says why a person set out. Once they are blocked, the action says why; so it does for
-  // standing and talking, under way or over, where only the action knows whether the other person
-  // is still on the way, is there, or has gone.
-  const acting = action.status === 'blocked' || (under !== undefined && under.setting !== 'object');
+  // standing and talking when it records news since they set out (the other person is still on the
+  // way, has gone, or the time is up), but not the reason that only restates the activity under
+  // way, which would hide why they set out (a model's choice, say).
+  const acting = action.status === 'blocked'
+    || (under !== undefined && under.setting !== 'object' && action.reason !== under.underWayReason);
   const code = !acting && goal !== null ? goal.reason : action.reason;
   return { who, what, doing, why: fill(words('phrase', 'because'), { reason: reasonWords(code) }) };
 }

@@ -532,6 +532,8 @@ def test_starter_creation_is_real_source_independent_and_exactly_idempotent(
     assert entry["world_id"].startswith("world:authored:")
     assert entry["source_kind"] == "authored"
     assert entry["availability"] == "available"
+    # Photographs may be added to a starter, as its kind states.
+    assert entry["takes_photographs"] is True
     assert entry["source_snapshot_id"]
     assert len(entry["source_snapshot_sha256"]) == 64
     assert entry["authored_scene"] == {

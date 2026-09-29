@@ -421,6 +421,7 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     + 'this page looks again every few seconds and opens it when they are.',
   'world.generated.failed':
     'A tile of this world could not be baked, so the world is not drawn.',
+  'world.opening': 'Opening this world and decoding its available reconstruction…',
   // A district's geographic view, with its memory layer composed over it or kept apart.
   'world.about.district-memory-shown':
     'City and memory layers are intentionally composed. Purple memory forms are not city semantics.',

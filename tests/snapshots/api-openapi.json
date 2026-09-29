@@ -22651,6 +22651,10 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "takes_photographs": {
+      "type": "boolean",
+      "title": "Takes Photographs"
      }
     },
     "additionalProperties": false,
@@ -22677,7 +22681,8 @@
      "previous_source_attachments",
      "created_by",
      "created_at",
-     "updated_at"
+     "updated_at",
+     "takes_photographs"
     ],
     "title": "SavedWorldEntryView"
    },

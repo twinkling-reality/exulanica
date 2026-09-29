@@ -33,6 +33,11 @@ export interface ActivityKindWords {
   readonly headingDoing: string;
   readonly underWayDoing: string;
   readonly finishedDoing: string;
+  /**
+   * The reason the planner records while an activity in the open is under way, which only
+   * restates the activity; null for an activity at an object, whose goal always says why.
+   */
+  readonly underWayReason: string | null;
   /** "Inhabitants can {verb} here." */
   readonly verb: string | null;
   /** "Asked to {verbAtPlace}.", with `{place}` filled. */
@@ -89,12 +94,16 @@ function kindsOf(): ReadonlyMap<string, ActivityKindWords> {
   for (const entry of entriesOf(wordsText, 'society-activity-words')) {
     const setting = settings.get(entry.key);
     if (setting === undefined) throw new Error(`words for ${entry.key}, which no activity catalog states`);
+    if ((setting === 'object') !== (optional(entry, 'under_way_reason') === null)) {
+      throw new Error(`${entry.key}: exactly an activity in the open states an under-way reason`);
+    }
     kinds.set(entry.key, {
       key: entry.key,
       setting,
       headingDoing: text(entry, 'heading_doing'),
       underWayDoing: text(entry, 'under_way_doing'),
       finishedDoing: text(entry, 'finished_doing'),
+      underWayReason: optional(entry, 'under_way_reason'),
       verb: optional(entry, 'verb'),
       verbAtPlace: optional(entry, 'verb_at_place'),
       directLabel: optional(entry, 'direct_label'),

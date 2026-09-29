@@ -115,7 +115,7 @@ describe('a Companion citation opened in the inspector', () => {
     mounted.showSimulation(cited, references);
     pick('person-1');
     pick('person-0');
-    expect(activity()).toBe('Standing a while, 3 more simulated minutes. Because they stopped to stand a while.');
+    expect(activity()).toBe('Standing a while, 3 more simulated minutes. Because they chose to stop and stand a while.');
     mounted.dispose();
   });
 });

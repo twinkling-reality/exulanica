@@ -832,7 +832,7 @@ function validateCatalog(value: unknown): void {
   if (!sameValue(catalog, expectedCatalog())) {
     throw new WorldStyleContractError(
       'catalog_contract_mismatch',
-      'The server and this Atlas do not share the same reviewed world recipe contract.',
+      'The server and this page do not share the same reviewed world recipe contract.',
     );
   }
 }
@@ -999,7 +999,7 @@ function validateBinding(
   if (!executableBinding) {
     throw new WorldStyleContractError(
       'recipe_binding_mismatch',
-      `The server recipe binding for ${profileId}@${profileVersion} is not executable by this Atlas.`,
+      `The server recipe binding for ${profileId}@${profileVersion} is not executable by this page.`,
     );
   }
 }

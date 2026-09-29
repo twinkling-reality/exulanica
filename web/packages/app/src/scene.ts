@@ -166,7 +166,7 @@ export function buildSceneFromLayout(
   for (const id of graphIds) {
     if (ordinals.has(id)) continue;
     if (next >= Number.MAX_SAFE_INTEGER) {
-      throw new RangeError('Atlas layout creation ordinals are exhausted');
+      throw new RangeError('World layout creation ordinals are exhausted');
     }
     ordinals.set(id, next);
     next += 1;
@@ -175,7 +175,7 @@ export function buildSceneFromLayout(
     ? stored.layoutVersion
     : stored.layoutVersion + 1;
   if (!Number.isSafeInteger(effectiveVersion)) {
-    throw new RangeError('Atlas layout versions are exhausted');
+    throw new RangeError('World layout versions are exhausted');
   }
   const built = buildScene(
     snapshot,
@@ -363,7 +363,7 @@ function resolveCreationOrdinals(
     const id = toIslandId(record.islandId);
     if (resolved.has(id)) continue;
     while (used.has(next)) next += 1;
-    if (!Number.isSafeInteger(next)) throw new RangeError('Atlas creation ordinals are exhausted');
+    if (!Number.isSafeInteger(next)) throw new RangeError('World creation ordinals are exhausted');
     resolved.set(id, next);
     used.add(next);
     next += 1;

@@ -173,6 +173,10 @@ class SavedWorldEntry:
     created_by: uuid.UUID
     created_at: dt.datetime
     updated_at: dt.datetime
+    #: Whether photographs may be attached to this entry's world: its kind's own
+    #: ``takes_photographs`` (:data:`exulanica.world.worlds.WORLD_KINDS`), which the attach refuses
+    #: by, served so a page offers adding photographs only where it would be taken.
+    takes_photographs: bool
     #: The floor every region of a world that states no ground has, as the society ground
     #: catalog declares it (``DeclaredFloor``); None for a world that states its own ground.
     declared_floor: object | None = None
@@ -1483,6 +1487,7 @@ class SavedWorldEntryRepository:
             created_by=row["created_by"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            takes_photographs=world_kind(str(row["world_kind"])).takes_photographs,
         )
 
     def _attachments(self, entry_id: uuid.UUID) -> tuple[SavedWorldSourceAttachment, ...]:

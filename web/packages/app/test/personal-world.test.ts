@@ -54,6 +54,7 @@ const entryWire = (overrides: Record<string, unknown> = {}) => ({
   created_by: '44444444-4444-4444-8444-444444444444',
   created_at: '2026-09-24T12:00:00Z',
   updated_at: '2026-09-24T12:00:00Z',
+  takes_photographs: true,
   ...overrides,
 });
 

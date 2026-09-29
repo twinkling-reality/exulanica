@@ -392,7 +392,32 @@
         "who": "Ari Ash 1",
         "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Standing a while, 2 more simulated minutes.",
-        "why": "Because they stopped to stand a while."
+        "why": "Because they chose to stop and stand a while."
+      }
+    },
+    {
+      "case": "standing a while, as their model chose",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "stand",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 2,
+          "reason": "standing_a_while"
+        },
+        "goal": {
+          "kind": "stand",
+          "reason": "chosen_by_their_model",
+          "target_id": null
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Standing a while, 2 more simulated minutes.",
+        "why": "Because the model you chose for them picked it."
       }
     },
     {
@@ -443,7 +468,33 @@
         "who": "Ari Ash 1",
         "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
         "doing": "Talking with Bela Ash 2, 3 more simulated minutes.",
-        "why": "Because they met and stopped to talk."
+        "why": "Because they met someone and stopped to talk."
+      }
+    },
+    {
+      "case": "talking, as their model chose",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "talk",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 3,
+          "reason": "talking"
+        },
+        "goal": {
+          "kind": "talk",
+          "reason": "chosen_by_their_model",
+          "target_id": null,
+          "partner_id": "p-b"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Talking with Bela Ash 2, 3 more simulated minutes.",
+        "why": "Because the model you chose for them picked it."
       }
     },
     {
@@ -461,6 +512,32 @@
         "goal": {
           "kind": "talk",
           "reason": "stopped_to_talk",
+          "target_id": null,
+          "partner_id": "p-b"
+        }
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Waiting for Bela Ash 2, to talk.",
+        "why": "Because the person they are meeting is still on the way."
+      }
+    },
+    {
+      "case": "waiting for the other to talk, as their model chose",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "talk",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "waiting_for_partner"
+        },
+        "goal": {
+          "kind": "talk",
+          "reason": "chosen_by_their_model",
           "target_id": null,
           "partner_id": "p-b"
         }

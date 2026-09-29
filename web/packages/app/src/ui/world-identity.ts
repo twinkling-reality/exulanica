@@ -103,7 +103,12 @@ export function buildWorldIdentity(deps: {
   addObject.addEventListener('click', deps.onAddObject);
   photos.addEventListener('click', deps.onOpenPhotos);
   close.addEventListener('click', deps.onClosePhotos);
+  // Adding photographs is offered only where the server says this world's kind takes them.
+  const offerPhotos = (): void => {
+    photos.hidden = current.takesPhotographs === false;
+  };
   reflect();
+  offerPhotos();
 
   return {
     root,
@@ -113,6 +118,7 @@ export function buildWorldIdentity(deps: {
       title.value = entry.title;
       status.textContent = '';
       reflect();
+      offerPhotos();
     },
     setPhotosVisible(visible) {
       photosDrawer.hidden = !visible;

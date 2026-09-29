@@ -1117,7 +1117,7 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
       return {
         ...base, on: true, state: 'nowhere',
         message: !begun || state.atlas === null
-          ? 'The Atlas is still forming.'
+          ? 'This world is still forming.'
           : 'You are not standing in a region that draws reconstructed geometry, so nothing is tinted.',
       };
     }
@@ -1212,14 +1212,14 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
     const binding = state.atlas?.binding;
     const segment = segmentById(segmentId);
     if (binding === undefined || segment === undefined || region === null) {
-      deps.showTravelStatus('The Atlas is still forming. Try again in a moment.', 'failure');
+      deps.showTravelStatus('This world is still forming. Try again in a moment.', 'failure');
       return;
     }
     const reduced = deps.travelUsesReducedMotion();
     const resolution = binding.navigateToIsland(region.islandId, reduced);
     if (!resolution.ok) {
       deps.showTravelStatus({
-        'unknown-target': 'That segment is not in this Atlas.',
+        'unknown-target': 'That segment is not in this world.',
         'outside-resident-field': 'That region is outside the resident field.',
         'unlocated-placement': 'That segment has no known place in this district yet, so there is nowhere here to arrive.',
         'no-safe-surface': 'No safe arrival point is available near that segment. Open Map to approach its region.',

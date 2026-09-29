@@ -161,6 +161,9 @@ class SavedWorldEntryView(BaseModel):
     created_by: uuid.UUID
     created_at: dt.datetime
     updated_at: dt.datetime
+    #: Whether photographs may be added to this world, by its kind: false for a world generated
+    #: from a recipe, which adding photographs to is refused by name.
+    takes_photographs: bool
 
 
 class CreateSavedWorldEntryBody(BaseModel):

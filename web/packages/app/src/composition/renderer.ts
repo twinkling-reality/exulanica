@@ -23,6 +23,7 @@ import {
   ownedDistrict,
 } from '../config.js';
 import { themeForPreferences } from '../theme.js';
+import { say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 import type { FirstUseGuidance } from '../ui/first-use-guidance.js';
 import type { buildRegionPlan } from '../ui/region-plan.js';
@@ -86,7 +87,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   let resolveFirstFrame: (() => void) | null = null;
   const firstFrame = new Promise<void>((resolve) => { resolveFirstFrame = resolve; });
   const rendererLoading = el('p', { class: 'reconstruction-loading', role: 'status',
-    text: 'Opening the Atlas and decoding its available reconstruction…' });
+    text: say('world.opening') });
   env.shell.append(rendererLoading);
   env.shell.setAttribute('aria-busy', 'true');
   try {

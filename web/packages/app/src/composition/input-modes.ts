@@ -83,7 +83,7 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
       // all four, including the region that has no ground here at all, which told someone to look
       // for a way in that does not exist.
       deps.showTravelStatus({
-        'unknown-target': 'That region is not in this Atlas.',
+        'unknown-target': 'That region is not in this world.',
         'outside-resident-field': 'That region sits outside this place. There is no ground under it to stand on.',
         'unlocated-placement': 'That memory has no known place in this district yet, so there is nowhere here to arrive.',
         'no-safe-surface': 'There is no ground to stand on near that region.',

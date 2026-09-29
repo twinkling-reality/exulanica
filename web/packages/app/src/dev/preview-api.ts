@@ -14,12 +14,12 @@ export function previewApiResponse(method: string, requestUrl: string): PreviewA
   if (method !== 'GET') {
     return {
       statusCode: 403,
-      body: { code: 'preview_read_only', detail: 'The Atlas preview cannot write data.' },
+      body: { code: 'preview_read_only', detail: 'The preview cannot write data.' },
     };
   }
   const missing: PreviewApiResponse = {
     statusCode: 404,
-    body: { code: 'preview_route_not_found', detail: 'That resource is not part of the Atlas preview.' },
+    body: { code: 'preview_route_not_found', detail: 'That resource is not part of the preview.' },
   };
   let path: string;
   try {

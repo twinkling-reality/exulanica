@@ -3,12 +3,17 @@ import {
   normalisePreferences,
   type AtlasPreferences,
   type ContrastPreference,
-  type TransitionPreference,
   type TransparencyPreference,
-  type VignettePreference,
 } from '../preferences.js';
+import {
+  PREFERENCE_BINDINGS,
+  preferenceValue,
+  type InteractionCapability,
+  type InteractionValue,
+} from '../interaction-settings.js';
 import { commandAction, el } from './dom.js';
 import { createModalFocus } from './modal-focus.js';
+import { DEVICE_SETTING_WORDS, deviceSelect, drawSetting, type DrawnSetting, type SettingHost } from './setting-controls.js';
 
 type SettingsSection = 'display' | 'movement' | 'controls';
 
@@ -18,6 +23,14 @@ export interface ControlsGuide {
   showSection(section: SettingsSection): void;
   setPreferences(value: AtlasPreferences): void;
   setVisible(visible: boolean): void;
+  /**
+   * Draw the movement settings from the capabilities the server serves
+   * (`GET /world/interactions/catalog`), as Customize does: one control for each the registry says
+   * the settings page offers, and none for any other.
+   */
+  showSettings(capabilities: readonly InteractionCapability[]): void;
+  /** Say the served settings could not be read, in place of controls drawn from a guess. */
+  settingsUnavailable(detail: string): void;
 }
 
 interface ControlsGuideOptions {
@@ -41,10 +54,6 @@ const controlRows: readonly (readonly [string, string])[] = [
   ['Escape', 'Release the mouse, dismiss, or step back'],
 ];
 
-function option(value: string, label: string): HTMLOptionElement {
-  return el('option', { value, text: label });
-}
-
 function settingRow(label: string, control: HTMLElement, note?: string): HTMLElement {
   return el('label', { class: 'setting-row' }, [
     el('span', { class: 'setting-copy' }, [
@@ -53,6 +62,15 @@ function settingRow(label: string, control: HTMLElement, note?: string): HTMLEle
     ]),
     control,
   ]);
+}
+
+/** A served setting laid out as this overlay lays out its own: a range in its framed well. */
+function servedRow(label: string, control: HTMLElement, note?: string): HTMLElement {
+  if (control.classList.contains('range-control')) {
+    control.classList.add('setting-range');
+    control.querySelector('output')?.classList.add('setting-value');
+  }
+  return settingRow(label, control, note);
 }
 
 export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide {
@@ -75,29 +93,14 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
   );
   customize.addEventListener('click', options.onShowCustomize);
 
-  const contrast = el('select', { 'aria-label': 'Contrast' }, [
-    option('standard', 'Standard'), option('high', 'High'),
+  const contrast = deviceSelect('contrast');
+  const transparency = deviceSelect('transparency');
+  const regionMinimap = deviceSelect('regionMinimap');
+  // The movement settings are drawn from the served catalog when it arrives (`showSettings`).
+  const servedSettings = el('div', { class: 'settings-rows' }, [
+    el('p', { class: 'setting-note', text: 'Reading the settings this world offers.' }),
   ]);
-  const transparency = el('select', { 'aria-label': 'Transparency' }, [
-    option('layered', 'Layered'), option('reduced', 'Reduced'),
-  ]);
-  const transition = el('select', { 'aria-label': 'Interface motion' }, [
-    option('system', 'Follow system'), option('motion', 'Full motion'), option('fade', 'Fade only'),
-  ]);
-  const fieldOfView = el('input', {
-    type: 'range', min: '60', max: '90', step: '1', 'aria-label': 'Field of view',
-  });
-  const fieldOfViewValue = el('output', { class: 'setting-value' });
-  const sensitivity = el('input', {
-    type: 'range', min: '0.5', max: '2', step: '0.1', 'aria-label': 'Look sensitivity',
-  });
-  const sensitivityValue = el('output', { class: 'setting-value' });
-  const vignette = el('select', { 'aria-label': 'Comfort vignette' }, [
-    option('off', 'Off'), option('subtle', 'Subtle'), option('strong', 'Strong'),
-  ]);
-  const regionMinimap = el('select', { 'aria-label': 'Region minimap' }, [
-    option('off', 'Off'), option('on', 'Shown'),
-  ]);
+  let drawn: readonly { readonly capability: InteractionCapability; readonly control: DrawnSetting }[] = [];
 
   let current = normalisePreferences(options.preferences);
   let activeSection: SettingsSection = 'display';
@@ -135,23 +138,15 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
   const displayPage = page('display', 'Display & accessibility', [
     el('p', { class: 'settings-page-intro', text: 'Reading overrides take priority over every world design.' }),
     el('div', { class: 'settings-rows' }, [
-      settingRow('Contrast', contrast, 'Strengthens edges and reading surfaces.'),
-      settingRow('Transparency', transparency, 'Removes blur and world motion beneath text.'),
-      settingRow('Interface motion', transition, 'Controls navigation and direct-travel transitions.'),
+      settingRow(DEVICE_SETTING_WORDS.contrast.label, contrast, DEVICE_SETTING_WORDS.contrast.note),
+      settingRow(DEVICE_SETTING_WORDS.transparency.label, transparency, DEVICE_SETTING_WORDS.transparency.note),
     ]),
   ]);
   const movementPage = page('movement', 'Movement', [
     el('p', { class: 'settings-page-intro', text: 'View changes never alter memory positions or evidence.' }),
+    servedSettings,
     el('div', { class: 'settings-rows' }, [
-      settingRow('Field of view', el('span', { class: 'setting-range' }, [fieldOfView, fieldOfViewValue])),
-      settingRow('Look sensitivity', el('span', { class: 'setting-range' }, [sensitivity, sensitivityValue])),
-      settingRow('Comfort vignette', vignette, 'Darkens only the periphery while traversing.'),
-      settingRow(
-        'Region minimap',
-        regionMinimap,
-        'A plan of the regions in the corner while traversing. The world is meant to orient you '
-          + 'on its own, so this stays off until you want it.',
-      ),
+      settingRow(DEVICE_SETTING_WORDS.regionMinimap.label, regionMinimap, DEVICE_SETTING_WORDS.regionMinimap.note),
     ]),
   ]);
   const controlsPage = page('controls', 'Controls', [
@@ -164,26 +159,28 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
 
   const reset = el('button', { type: 'button', class: 'text-action settings-reset', text: 'Reset category' });
 
+  /** What resetting a category writes: each of its settings at its default. */
+  const defaults = (section: SettingsSection): Partial<AtlasPreferences> => {
+    if (section === 'display') {
+      return { contrast: DEFAULT_PREFERENCES.contrast, transparency: DEFAULT_PREFERENCES.transparency };
+    }
+    if (section !== 'movement') return {};
+    const patch: Record<string, InteractionValue> = { regionMinimap: DEFAULT_PREFERENCES.regionMinimap };
+    for (const { capability } of drawn) {
+      const field = PREFERENCE_BINDINGS[capability.key]?.field;
+      const value = preferenceValue(capability.key, capability.default);
+      if (field !== undefined && value !== undefined) patch[field] = value;
+    }
+    return patch as Partial<AtlasPreferences>;
+  };
+
   const render = (): void => {
     contrast.value = current.contrast;
     transparency.value = current.transparency;
-    transition.value = current.transition;
-    fieldOfView.value = String(current.fieldOfView);
-    fieldOfViewValue.value = `${current.fieldOfView}°`;
-    sensitivity.value = String(current.mouseSensitivity);
-    sensitivityValue.value = `${current.mouseSensitivity.toFixed(1)}×`;
-    vignette.value = current.vignette;
     regionMinimap.value = current.regionMinimap ? 'on' : 'off';
-    const atDefaults = activeSection === 'display'
-      ? current.contrast === DEFAULT_PREFERENCES.contrast &&
-        current.transparency === DEFAULT_PREFERENCES.transparency &&
-        current.transition === DEFAULT_PREFERENCES.transition
-      : activeSection === 'movement'
-        ? current.fieldOfView === DEFAULT_PREFERENCES.fieldOfView &&
-          current.mouseSensitivity === DEFAULT_PREFERENCES.mouseSensitivity &&
-          current.vignette === DEFAULT_PREFERENCES.vignette
-        : true;
-    reset.disabled = atDefaults;
+    for (const { control } of drawn) control.refresh();
+    const held = current as unknown as Readonly<Record<string, unknown>>;
+    reset.disabled = Object.entries(defaults(activeSection)).every(([key, value]) => held[key] === value);
     reset.hidden = activeSection === 'controls';
   };
 
@@ -204,33 +201,21 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
     render();
   }
 
+  // A setting here applies as it is changed, a range while it is dragged.
+  const host: SettingHost = {
+    value: (key) => (current as unknown as Readonly<Record<string, unknown>>)[key] as InteractionValue,
+    preview: commit,
+    commit,
+    settle: () => undefined,
+  };
+
   contrast.addEventListener('change', () => commit({ contrast: contrast.value as ContrastPreference }));
   transparency.addEventListener('change', () =>
     commit({ transparency: transparency.value as TransparencyPreference }));
-  transition.addEventListener('change', () =>
-    commit({ transition: transition.value as TransitionPreference }));
-  fieldOfView.addEventListener('input', () => commit({ fieldOfView: fieldOfView.valueAsNumber }));
-  sensitivity.addEventListener('input', () =>
-    commit({ mouseSensitivity: sensitivity.valueAsNumber }));
-  vignette.addEventListener('change', () => commit({ vignette: vignette.value as VignettePreference }));
   regionMinimap.addEventListener('change', () => commit({ regionMinimap: regionMinimap.value === 'on' }));
   reset.addEventListener('click', () => {
-    if (activeSection === 'display') {
-      commit({
-        contrast: DEFAULT_PREFERENCES.contrast,
-        transparency: DEFAULT_PREFERENCES.transparency,
-        transition: DEFAULT_PREFERENCES.transition,
-      });
-      return;
-    }
-    if (activeSection === 'movement') {
-      commit({
-        fieldOfView: DEFAULT_PREFERENCES.fieldOfView,
-        mouseSensitivity: DEFAULT_PREFERENCES.mouseSensitivity,
-        vignette: DEFAULT_PREFERENCES.vignette,
-        regionMinimap: DEFAULT_PREFERENCES.regionMinimap,
-      });
-    }
+    const patch = defaults(activeSection);
+    if (Object.keys(patch).length > 0) commit(patch);
   });
 
   root.append(
@@ -257,6 +242,23 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
     },
     setVisible(visible) {
       modalFocus.setVisible(visible);
+    },
+    showSettings(capabilities) {
+      drawn = capabilities
+        .filter((capability) => capability.shownInSettings)
+        .flatMap((capability) => {
+          const control = drawSetting(capability, host, servedRow);
+          return control === null ? [] : [{ capability, control }];
+        });
+      servedSettings.replaceChildren(...drawn.map(({ control }) => control.element));
+      render();
+    },
+    settingsUnavailable(detail) {
+      drawn = [];
+      servedSettings.replaceChildren(
+        el('p', { class: 'setting-note', text: `The settings this world offers could not be read: ${detail}` }),
+      );
+      render();
     },
   };
 }

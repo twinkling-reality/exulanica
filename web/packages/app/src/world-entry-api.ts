@@ -135,6 +135,12 @@ export interface SavedWorldEntry {
   readonly createdAt: string;
   readonly updatedAt: string;
   /**
+   * Whether photographs may be added to this world, as the server serves it from the world's kind
+   * (`takes_photographs` in `exulanica/world/worlds.py`): false for a world generated from a
+   * recipe. Parsed entries always carry it; optional so entries built elsewhere need not name it.
+   */
+  readonly takesPhotographs?: boolean;
+  /**
    * The floor every region of a world that states no ground has, as the server declares it: a
    * square of this half extent about each region's origin, at this height in its frame. Null for
    * a world that states its own ground; optional so entries built elsewhere need not name it.
@@ -798,6 +804,7 @@ function parseEntry(value: unknown): SavedWorldEntry {
     previousSourceAttachments: Object.freeze(previousAttachments.map(parsePreviousAttachment)),
     createdAt: text(row['created_at'], 'created time'),
     updatedAt: text(row['updated_at'], 'updated time'),
+    takesPhotographs: flag(row['takes_photographs'], 'photograph capability'),
     declaredFloor: parseDeclaredFloor(row['declared_floor']),
     generatedGround,
   });
@@ -1040,6 +1047,11 @@ function text(value: unknown, name: string): string {
 
 function optionalText(value: unknown, name: string): string | null {
   return value === null ? null : text(value, name);
+}
+
+function flag(value: unknown, name: string): boolean {
+  if (typeof value !== 'boolean') throw new TypeError(`Invalid ${name}.`);
+  return value;
 }
 
 function integer(value: unknown, name: string): number {

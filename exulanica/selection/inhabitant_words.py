@@ -58,6 +58,9 @@ class ActivityWords:
     heading_doing: str
     under_way_doing: str
     finished_doing: str
+    #: The reason the planner records while an activity in the open is under way, which only
+    #: restates the activity; None for an activity at an object, whose goal always says why.
+    under_way_reason: str | None
 
 
 def _activity_words(path: Path = ACTIVITY_WORDS_PATH) -> dict[str, ActivityWords]:
@@ -72,7 +75,7 @@ def _activity_words(path: Path = ACTIVITY_WORDS_PATH) -> dict[str, ActivityWords
     schema = CatalogSchema(
         "society-activity-words",
         1,
-        tuple((name, text_field) for name in (*stages, *page, "reason")),
+        tuple((name, text_field) for name in (*stages, "under_way_reason", *page, "reason")),
     )
     catalog = load_catalog(path, schema)
     found = {}
@@ -85,7 +88,17 @@ def _activity_words(path: Path = ACTIVITY_WORDS_PATH) -> dict[str, ActivityWords
             raise WordsCatalogRefused(
                 f"{entry.key}: exactly an activity at an object has page words"
             )
-        found[entry.key] = ActivityWords(entry.key, setting, *(str(values[s]) for s in stages))
+        under_way_reason = str(values["under_way_reason"])
+        if (setting == "object") != (under_way_reason == "none"):
+            raise WordsCatalogRefused(
+                f"{entry.key}: exactly an activity in the open states an under-way reason"
+            )
+        found[entry.key] = ActivityWords(
+            entry.key,
+            setting,
+            *(str(values[s]) for s in stages),
+            None if under_way_reason == "none" else under_way_reason,
+        )
     missing = sorted(set(ACTIVITY_SETTINGS) - set(found))
     if missing:
         raise WordsCatalogRefused(f"no words for the activities {missing}")
@@ -247,12 +260,14 @@ def inhabitant_words(
         place=where(action.get("target_id")), partner=met, still=still
     )
     # The goal says why a person set out. Once they are blocked, the action says why; so it does
-    # for standing and talking, under way or over, where only the action knows whether the other
-    # person is still on the way, is there, or has gone.
+    # for standing and talking when it records news since they set out (the other person is still
+    # on the way, has gone, or the time is up), but not the reason that only restates the activity
+    # under way, which would hide why they set out (a model's choice, say).
+    under = ACTIVITY_WORDS.get(kind) if isinstance(kind, str) else None
     acting = status == "blocked" or (
-        isinstance(kind, str)
-        and kind in ACTIVITY_WORDS
-        and ACTIVITY_WORDS[kind].setting != "object"
+        under is not None
+        and under.setting != "object"
+        and action.get("reason") != under.under_way_reason
     )
     code = goal["reason"] if not acting and goal is not None else action.get("reason", "")
     return InhabitantWords(who, what, doing, phrase["because"].format(reason=words.reason(code)))

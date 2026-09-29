@@ -19,12 +19,9 @@ import {
 } from '@exulanica/presentation';
 import type { WorldStyleParameterDefinition, WorldStyleParameterValue } from '@exulanica/atlas-core';
 import type { InteractionValue } from '../interaction-policy.js';
-import {
-  PREFERENCE_BINDINGS,
-  SETTING_WORDS,
-  type InteractionCapability,
-} from '../interaction-settings.js';
+import type { InteractionCapability } from '../interaction-settings.js';
 import { commandAction, el } from './dom.js';
+import { DEVICE_SETTING_WORDS, deviceSelect, drawSetting, type SettingHost } from './setting-controls.js';
 import { createCompanionAvatar } from './companion-avatar.js';
 import { createModalFocus } from './modal-focus.js';
 
@@ -190,14 +187,8 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     'aria-label': 'Return to your world',
   }, commandAction('O', 'Return'));
 
-  const contrast = el('select', { 'aria-label': 'Contrast' }, [
-    option('standard', 'Standard'),
-    option('high', 'High'),
-  ]);
-  const transparency = el('select', { 'aria-label': 'Transparency' }, [
-    option('layered', 'Layered'),
-    option('reduced', 'Reduced'),
-  ]);
+  const contrast = deviceSelect('contrast');
+  const transparency = deviceSelect('transparency');
   // The View settings are drawn from the served catalog when it arrives (`showSettings`).
   const viewSettings = el('div', { class: 'view-settings' }, [
     el('p', { class: 'option-note', text: 'Reading the settings this world offers.' }),
@@ -437,42 +428,19 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     commit({ contrast: contrast.value as ContrastPreference }));
   transparency.addEventListener('change', () =>
     commit({ transparency: transparency.value as TransparencyPreference }));
+  /** What a served capability's control reads and writes here: a range previews while dragged. */
+  const settingHost: SettingHost = {
+    value: (key) => (current as unknown as Readonly<Record<string, unknown>>)[key] as InteractionValue,
+    preview,
+    commit,
+    settle: () => callbacks.onChange(current),
+  };
   /** One control for one served capability the settings page offers, wired to its preference. */
   const settingControl = (capability: InteractionCapability): HTMLElement | null => {
-    const binding = PREFERENCE_BINDINGS[capability.key];
-    const words = SETTING_WORDS[capability.key];
-    if (binding === null || binding === undefined || words === undefined) return null;
-    const field_ = binding.field;
-    const valueOf = (): InteractionValue =>
-      (current as unknown as Readonly<Record<string, unknown>>)[field_] as InteractionValue;
-    if (capability.kind === 'integer' && capability.minimum !== null && capability.maximum !== null) {
-      const scale = binding.scale ?? 1;
-      const input = el('input', {
-        type: 'range', min: String(capability.minimum / scale), max: String(capability.maximum / scale),
-        step: String(words.step ?? 1), 'aria-label': words.label,
-      }) as HTMLInputElement;
-      const output = el('output', { class: 'option-value' }) as HTMLOutputElement;
-      input.addEventListener('input', () => preview({ [field_]: input.valueAsNumber } as Partial<AtlasPreferences>));
-      input.addEventListener('change', () => callbacks.onChange(current));
-      settingControls.push({
-        refresh: () => {
-          input.value = String(valueOf());
-          output.value = words.shown?.(valueOf() as number) ?? String(valueOf());
-        },
-      });
-      return field(words.label, el('span', { class: 'range-control' }, [input, output]), words.note);
-    }
-    if (capability.kind === 'choice') {
-      const select = el('select', { 'aria-label': words.label },
-        capability.choices.map((choice) => option(choice, words.choices?.[choice] ?? choice))) as HTMLSelectElement;
-      select.addEventListener('change', () => commit({ [field_]: select.value } as Partial<AtlasPreferences>));
-      settingControls.push({ refresh: () => { select.value = String(valueOf()); } });
-      return field(words.label, select, words.note);
-    }
-    const toggle = el('input', { type: 'checkbox', 'aria-label': words.label }) as HTMLInputElement;
-    toggle.addEventListener('change', () => commit({ [field_]: toggle.checked } as Partial<AtlasPreferences>));
-    settingControls.push({ refresh: () => { toggle.checked = valueOf() === true; } });
-    return field(words.label, toggle, words.note);
+    const drawn = drawSetting(capability, settingHost, field);
+    if (drawn === null) return null;
+    settingControls.push(drawn);
+    return drawn.element;
   };
   companionBody.addEventListener('change', () =>
     commit({ companionBody: companionBody.value as CompanionBodyPreference }));
@@ -582,8 +550,8 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     ]),
     el('div', { class: 'option-group appearance-options' }, [
       el('h2', { text: 'Display' }),
-      field('Contrast', contrast, 'Strengthens edges and reading surfaces without changing evidence colors.'),
-      field('Transparency', transparency, 'Reduced removes glass and grain beneath reading surfaces.'),
+      field(DEVICE_SETTING_WORDS.contrast.label, contrast, DEVICE_SETTING_WORDS.contrast.note),
+      field(DEVICE_SETTING_WORDS.transparency.label, transparency, DEVICE_SETTING_WORDS.transparency.note),
     ]),
     el('div', { class: 'option-group world-style-options' }, [
       el('div', { class: 'world-style-head' }, [

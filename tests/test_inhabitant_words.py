@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 from exulanica.selection.inhabitant_words import (
+    ACTIVITY_WORDS,
     CATALOG_PATH,
     WordsCatalogRefused,
     inhabitant_words,
@@ -83,6 +84,33 @@ def test_every_outcome_the_small_square_records_has_words():
     # A positive control: the run reached the talk the words must never give content to.
     assert {"goal_selected", "talk_started"} <= seen, sorted(seen)
     assert seen <= set(catalog.tables["outcome"]), sorted(seen - set(catalog.tables["outcome"]))
+
+
+def test_the_under_way_reason_of_an_activity_in_the_open_is_the_one_the_planner_records():
+    """The reason the words let the goal's reason stand over is one the planner records on the
+    activity itself, read from the society as it runs, so a planner that renames it fails here
+    rather than bringing back words that hide why somebody set out (a model's choice, say)."""
+    under_way = {
+        kind.key: kind.under_way_reason
+        for kind in ACTIVITY_WORDS.values()
+        if kind.setting != "object"
+    }
+    assert under_way and all(under_way.values()), under_way
+    assert set(under_way.values()) <= set(REASON_CODES)
+    document = compose(square_objects())
+    recorded: dict[str, set[str]] = {kind: set() for kind in under_way}
+    for seed in DEVELOPMENT_SEEDS[:2]:
+        state = initial_purposeful_society(
+            SOCIETY, seed, document, population=AUTHORED_GROUND_POPULATION
+        )
+        for _ in range(SQUARE_MINUTES):
+            state, _events = advance_purposeful_society(state, seed, [document])
+            for person in state["inhabitants"]:
+                action = person.get("action") or {}
+                if action.get("kind") in recorded and action.get("status") == "active":
+                    recorded[action["kind"]].add(action["reason"])
+    for kind, reason in under_way.items():
+        assert reason in recorded[kind], (kind, sorted(recorded[kind]))
 
 
 def test_a_reason_with_no_words_is_named_rather_than_guessed():

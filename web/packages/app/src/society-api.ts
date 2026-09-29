@@ -71,7 +71,11 @@ export type SocietyAffordance = string;
  * holds this list to them.
  */
 export const PURPOSEFUL_ACTIVITIES = ['visit', 'rest', 'stand', 'talk'] as const;
-const ACTION_KINDS: readonly string[] = ['idle', 'move', ...PURPOSEFUL_ACTIVITIES];
+/**
+ * Every kind of action a person's recorded state may name. society-activity-words.test.ts holds
+ * the page's words for them to it.
+ */
+export const ACTION_KINDS: readonly string[] = ['idle', 'move', ...PURPOSEFUL_ACTIVITIES];
 
 /** One activity an inhabitant can be directed to, as the consumed input states it. */
 export interface SocietyPlace {

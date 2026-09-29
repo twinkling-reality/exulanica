@@ -101,13 +101,13 @@ async function inspect(held: SocietySnapshot) {
 describe('the inspector over a person talking or standing', () => {
   it('names the person they are talking with, from the state it shows', async () => {
     const { activity, details } = await inspect(society(talking('person-1'), talking('person-0')));
-    expect(activity).toBe('Talking with Bo, 2 more simulated minutes. Because they met and stopped to talk.');
+    expect(activity).toBe('Talking with Bo, 2 more simulated minutes. Because they met someone and stopped to talk.');
     expect(details).toContainEqual(['Goal / destination', 'talk: stopped_to_talk']);
   });
 
   it('never calls standing a while making room', async () => {
     const { activity, details } = await inspect(society(standing, standing));
-    expect(activity).toBe('Standing a while, 3 more simulated minutes. Because they stopped to stand a while.');
+    expect(activity).toBe('Standing a while, 3 more simulated minutes. Because they chose to stop and stand a while.');
     expect(details).toContainEqual(['Goal / destination', 'stand: stopping_a_while']);
     expect(details).not.toContainEqual(['Goal / destination', 'Making room at a busy place']);
   });

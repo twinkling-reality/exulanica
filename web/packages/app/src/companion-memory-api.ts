@@ -515,7 +515,10 @@ export function answerToRemember(answer: CompanionAnswer): AnswerToRemember {
   });
   return {
     question: answer.question,
-    answerText: answer.text,
+    // One paragraph per clause, as the person read it, so the answer is drawn again the same way.
+    answerText: answer.clauses.length === 0
+      ? answer.text
+      : answer.clauses.map((clause) => clause.text).join(PARAGRAPH_BREAK),
     abstained: answer.abstained,
     deterministic: answer.deterministic,
     repaired: answer.repaired,
@@ -546,10 +549,17 @@ function attemptsOf(unanswered: UnansweredAttempts): {
 }
 
 /**
+ * What separates the paragraphs of a remembered answer's text: a fresh answer is drawn one
+ * paragraph per clause, and `answerToRemember` keeps them apart by this, so `rememberedAsAnswer`
+ * draws the same paragraphs. A row kept before it was is one paragraph, as it always drew.
+ */
+const PARAGRAPH_BREAK = '\n\n';
+
+/**
  * A remembered answer, in the shape the surface already knows how to draw.
  *
  * The inverse of `answerToRemember`, and it is deliberately lossy in one direction: the clause
- * breakdown and the per-request citation tokens are NOT stored and are not reconstructed here.
+ * types and the per-request citation tokens are NOT stored and are not reconstructed here.
  *
  * Tokens could not be reconstructed even in principle. Their namespaces are drawn fresh per
  * request, so a token from the request that produced this answer resolves in no later one; the
@@ -557,11 +567,11 @@ function attemptsOf(unanswered: UnansweredAttempts): {
  * only thing a chip needs. The tokens minted below are local labels for the chips and are joined
  * to nothing.
  *
- * The clause breakdown is a real loss and is stated rather than hidden. A restored answer is one
- * `historical` clause carrying the whole sentence, because what was stored is the paragraph the
- * person read. Storing the clauses would let the restored copy be re-validated later, which
- * nothing does; storing the paragraph is what makes the restored answer say exactly what
- * the original said.
+ * The clause types are a real loss and are stated rather than hidden. A restored answer is one
+ * clause per paragraph the person read, each `historical` where the answer cites what it rests on,
+ * because what was stored is the paragraphs. Storing the clauses would let the restored copy be
+ * re-validated later, which nothing does; storing the paragraphs is what makes the restored answer
+ * say exactly what the original said, drawn as it was.
  *
  * The placeholder map IS carried, so the restored answer is drawn through `companionNames` exactly
  * as the fresh one was: each name from the library the page holds when it is drawn.
@@ -576,18 +586,18 @@ export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer
     captureId: citation.captureId,
     capturedAt: null,
   }));
+  const paragraphs = remembered.answerText.split(PARAGRAPH_BREAK);
   return {
     question: remembered.question,
-    clauses: [
+    clauses: paragraphs.map((text) => ({
       // Historical only where it cites what it rests on: an uncited sentence is no statement
       // about the person's past, whatever it was when it was first drawn.
-      {
-        text: remembered.answerText,
-        type: evidence.length > 0 ? 'historical' : 'meta',
-        citations: evidence.map((e) => e.token),
-      },
-    ],
-    text: remembered.answerText,
+      text,
+      type: evidence.length > 0 ? 'historical' : 'meta',
+      citations: evidence.map((e) => e.token),
+    })),
+    // The clauses as one paragraph, as a fresh answer's `text` is.
+    text: paragraphs.join(' '),
     abstained: remembered.abstained,
     deterministic: remembered.deterministic,
     repaired: remembered.repaired,

@@ -604,23 +604,6 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     onShowControls: deps.onShowControls,
   });
 
-  // The View settings are drawn from the catalog the server serves. The preview has no server, so
-  // it draws them from the same registry as the page bundles it.
-  void (async (): Promise<void> => {
-    if (env.preview) {
-      optionsView.showSettings([...INTERACTION_REGISTRY.values()]);
-      return;
-    }
-    if (state.credentials === null) {
-      optionsView.settingsUnavailable('no server is connected.');
-      return;
-    }
-    try {
-      optionsView.showSettings(await readInteractionCatalog(state.credentials));
-    } catch (error) {
-      optionsView.settingsUnavailable(error instanceof Error ? error.message : 'the request failed.');
-    }
-  })();
   presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
   /**
    * Put a preview from another origin into the panel's own controls, as the person reviews it.
@@ -777,6 +760,28 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     onClose: deps.onCloseControls,
     onShowCustomize: deps.onShowCustomize,
   });
+
+  // The settings both Customize and the Settings overlay offer are drawn from the catalog the
+  // server serves. The preview has no server, so it draws them from the same registry as the page
+  // bundles it.
+  const settingsSurfaces = [optionsView, settingsView];
+  void (async (): Promise<void> => {
+    if (env.preview) {
+      for (const surface of settingsSurfaces) surface.showSettings([...INTERACTION_REGISTRY.values()]);
+      return;
+    }
+    if (state.credentials === null) {
+      for (const surface of settingsSurfaces) surface.settingsUnavailable('no server is connected.');
+      return;
+    }
+    try {
+      const capabilities = await readInteractionCatalog(state.credentials);
+      for (const surface of settingsSurfaces) surface.showSettings(capabilities);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'the request failed.';
+      for (const surface of settingsSurfaces) surface.settingsUnavailable(detail);
+    }
+  })();
 
   let latestSettingsSave = 0;
   function applyPreferences(next: AtlasPreferences): void {
@@ -1046,7 +1051,7 @@ export function describeWorldStyleFailure(error: unknown): string {
       return 'The proposal did not match the reviewed profile, capability, or parameter contract.';
     }
     if (error.code === 'protected_topology_conflict') {
-      return 'The protected world layout changed. Reopen the design against the current Atlas.';
+      return 'The protected world layout changed. Reopen the design against the current world.';
     }
     if (error.code === 'stale_style_version') {
       return 'The saved world changed elsewhere. Refresh and review a new preview.';

@@ -467,7 +467,9 @@ their costs is unknown
 correction is recorded as `corrected` by its own route and by no other. The browser draws a
 remembered answer under the line of its kind with the same sentence about unanswered requests, so
 after a reload it reads as it did when it was first drawn, and a proposed change is never redrawn
-as an answer. An answer retained before the kind was kept takes its kind from what its row holds
+as an answer. The browser keeps each paragraph it drew apart in the text it stores, a blank line
+between them, and draws them apart again, so a remembered answer keeps its paragraphs; an answer
+stored as one paragraph is drawn as one. An answer retained before the kind was kept takes its kind from what its row holds
 (its origin, its prompt version and, for a drafter's reply, the reviewed sentence a refusal opens
 with) and claims no fallback and no unanswered request, which those rows did not keep.
 

@@ -68,6 +68,11 @@ descriptor or its catalogs changed under it, `generated_world_output_changed` wh
 came out otherwise, and `generated_world_unreadable` for any other refusal. The catalog still
 serves every other world, and the browser shows the entry and refuses to open it.
 
+Every entry states `takes_photographs`, its world kind's own rule
+([`WORLD_KINDS`](../exulanica/world/worlds.py)): false for a world generated from a recipe, whose
+entry refuses an attachment by name (`world_takes_no_photographs`). The browser offers Add photos
+only for an entry that states true (`web/packages/app/src/ui/world-identity.ts`).
+
 ## Entry and creation
 
 `GET /world-entries` is the entry catalog. A single available entry opens directly. More than one

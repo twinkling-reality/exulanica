@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { REGISTRY } from '../src/interaction-settings.js';
 import { DEFAULT_PREFERENCES } from '../src/preferences.js';
 import { buildControlsGuide } from '../src/ui/controls-guide.js';
 
@@ -17,6 +18,7 @@ describe('Settings', () => {
       onClose: vi.fn(),
       onShowCustomize: vi.fn(),
     });
+    view.showSettings([...REGISTRY.values()]);
     document.body.append(view.root);
 
     expect(view.root.textContent).toContain('Display & accessibility');
@@ -52,6 +54,7 @@ describe('Settings', () => {
       onClose: vi.fn(),
       onShowCustomize: vi.fn(),
     });
+    view.showSettings([...REGISTRY.values()]);
     document.body.append(view.root);
 
     view.root.querySelector<HTMLButtonElement>('.settings-reset')!.click();
