@@ -427,7 +427,9 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
   }, tile, world);
   stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
-  return { ...tile, start: opening.start };
+  // The city's vehicles are drawn with the tile they drive through (`tile-traffic.ts`).
+  const { withTileTraffic } = await import('./tile-traffic.js');
+  return withTileTraffic({ ...tile, start: opening.start }, access, placement.worldSeed, env);
 }
 
 /**

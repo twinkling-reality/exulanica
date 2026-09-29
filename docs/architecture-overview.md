@@ -113,8 +113,8 @@ The contract in `pyproject.toml` owns the exact order.
 | Asking the chosen models | `exulanica/api/decision_host.py` and `exulanica/api/society_person_decisions.py` |
 | Comparisons of models | The loop `exulanica/world/society_comparison.py`, the runner `exulanica/api/society_comparison_runner.py`, the one definition path `exulanica/api/society_comparison_start.py`, the start's claim and lease `exulanica/world/society_comparison_start_repository.py` played by `exulanica/api/society_comparison_worker.py`, the command `exulanica/orchestration/compare.py` and the Compare view `web/packages/app/src/ui/society-comparison.ts` with its start controls `society-comparison-start.ts` |
 | Movement | The registry `exulanica/movement/registry.py`, reading [`movement-modules.v1.json`](../exulanica/movement/movement-modules.v1.json), with `walking.py` and `flight.py` beside it |
-| Flight serving | `exulanica/world/flight_worker.py`: one worker process computes flight episodes on a clock every viewer shares |
-| Road traffic | `exulanica/traffic`, a pure deterministic simulation that nothing in the application calls |
+| Flight serving | `exulanica/world/flight_worker.py`, binding the episode worker `exulanica/world/episode_worker.py`: one worker process computes flight episodes on a clock every viewer shares |
+| Road traffic | `exulanica/traffic`, a pure deterministic simulation; `exulanica/world/traffic_host.py` serves a baked city's traffic (`GET /tiles/traffic`) for the development preview to draw |
 
 A society's engine is chosen by what the engine table says it can do, never by a list in code.
 A decision role is registry data plus one adapter module, so requests, receipts, their checks, the

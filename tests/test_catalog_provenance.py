@@ -111,7 +111,9 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # catalog's three versions and its arrangements, the flight kind catalog, the local
     # detector's vocabulary and the decision role registry.
     assert len(found[ENTRY_SHAPE]) == 48
-    assert len(found[CITED_SHAPE]) == 5
+    # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
+    # mappings and the road derivation.
+    assert len(found[CITED_SHAPE]) == 6
     assert len(found[GLYPH_SHAPE]) == 4
     # And the discovery is looking where the catalogs are: the city files are among what it found.
     assert CATALOGS / "band.v1.json" in found[ENTRY_SHAPE]

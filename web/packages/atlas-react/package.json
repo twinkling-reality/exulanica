@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./playcanvas": "./src/playcanvas/index.ts",
-    "./generated-tile": "./src/playcanvas/generated-tile/index.ts"
+    "./generated-tile": "./src/playcanvas/generated-tile/index.ts",
+    "./traffic": "./src/playcanvas/traffic/index.ts"
   },
   "dependencies": {
     "@exulanica/atlas-core": "workspace:*",

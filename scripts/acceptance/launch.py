@@ -4,6 +4,7 @@
     python3 scripts/acceptance/launch.py up     --worktree PATH [--slot N] [--reuse-database]
                                                 [--model] [--no-derivative-worker] [--production]
                                                 [--society-playback [--society-tick-interval-ms MS]]
+                                                [--tiles]
     python3 scripts/acceptance/launch.py status --worktree PATH
     python3 scripts/acceptance/launch.py down   --worktree PATH
 
@@ -21,7 +22,9 @@ imports the code it starts.
     server already running is refused unless ``--reuse-database``, and ``down`` never stops a
     reused one. The database it prints must be that server, on the port the server recorded.
 3.  Makes a fresh synthetic workspace: new workspace and actor ids and a new bearer token, granted
-    the account owner's permissions, and provisions the workspace's embedding partition.
+    the account owner's permissions, and provisions the workspace's embedding partition. With
+    ``--tiles`` the token is also granted ``tiles.materialise`` and the workspace a tile quota of
+    ``TILES_LIMIT``, declared as the owner, so the development page can walk a baked tile.
 4.  Starts the API as the non-owner runtime role with the read-only and purge URLs, a
     content-addressed store in the run directory and no Google configuration. With ``--model``
     it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST`` and ``EXULANICA_BUDGET_USD``
@@ -100,6 +103,11 @@ PERMISSIONS = (
     "operations.read",
     "operations.write",
 )
+#: What ``--tiles`` adds to the synthetic grant, which the account owner's does not carry.
+TILES_PERMISSION = "tiles.materialise"
+#: The tiles a ``--tiles`` run's workspace may be served: the development corridor's five tiles
+#: at each of the two city grammar versions it is baked at, ten, and six to spare.
+TILES_LIMIT = 16
 
 #: What ``--model`` passes from this process's environment to the API, each required.
 MODEL_VARIABLES = {
@@ -140,6 +148,7 @@ REFUSALS = {
     "runtime-role": "the application URL does not name the non-owner runtime role",
     "serve-output": "scripts/test_postgres.py serve did not print a URL the run needs",
     "workspace-partition": "the synthetic workspace has no embedding partition",
+    "tile-quota": "--tiles did not declare the synthetic workspace's tile quota",
     "model-key-missing": "--model needs NEBIUS_API_KEY in this environment",
     "model-allowlist-missing": "--model needs EXULANICA_EGRESS_ALLOWLIST in this environment",
     "budget-missing": "--model needs EXULANICA_BUDGET_USD, the bound the API enforces",
@@ -199,6 +208,18 @@ with psycopg.connect(sys.argv[1], autocommit=True) as connection:
     provision_workspace(connection, workspace)
     row = connection.execute("select to_regclass(%s)", (f"embedding_ws_{workspace.hex}",)).fetchone()
 print(row[0] if row is not None else "")
+"""
+
+#: Declare the synthetic workspace's tile quota as the owner, then print its ceiling.
+DECLARE_TILE_QUOTA = r"""
+import sys, uuid, psycopg
+from psycopg.rows import dict_row
+from exulanica.api.quotas import declare_tile_quota
+workspace, actor = uuid.UUID(sys.argv[2]), uuid.UUID(sys.argv[3])
+with psycopg.connect(sys.argv[1], autocommit=True, row_factory=dict_row) as connection:
+    connection.execute("select set_config('exulanica.workspace_id', %s, false)", (str(workspace),))
+    quota = declare_tile_quota(connection, workspace, tiles_limit=int(sys.argv[4]), declared_by=actor)
+print(quota.tiles_limit)
 """
 
 #: The checkout's test server as ``scripts/test_postgres.py`` sees it, and the PostgreSQL it uses.
@@ -282,6 +303,11 @@ def society_playback_readiness(readyz: bytes) -> dict[str, object]:
     ):
         refuse("society-playback-not-running", json.dumps(check)[:REFUSAL_EXCERPT_CHARACTERS])
     return check
+
+
+def synthetic_permissions(tiles: bool) -> list[str]:
+    """The synthetic token's permissions: the account owner's, and with ``--tiles`` the tile one."""
+    return [*PERMISSIONS, TILES_PERMISSION] if tiles else list(PERMISSIONS)
 
 
 def api_environment(
@@ -651,7 +677,11 @@ def up(arguments: argparse.Namespace) -> None:
     token_file.write_text(token)
     token_file.chmod(0o600)
     grant = {
-        token: {"workspace_id": workspace_id, "actor": actor, "permissions": list(PERMISSIONS)}
+        token: {
+            "workspace_id": workspace_id,
+            "actor": actor,
+            "permissions": synthetic_permissions(arguments.tiles),
+        }
     }
     partition = run(
         [str(python), "-c", PROVISION_WORKSPACE, exports["OWNER_URL"], workspace_id], worktree
@@ -659,6 +689,23 @@ def up(arguments: argparse.Namespace) -> None:
     if partition != f"embedding_ws_{uuid.UUID(workspace_id).hex}":
         refuse("workspace-partition", f"workspace {workspace_id} left {partition!r}")
     (logs / "workspace-provision.txt").write_text(f"{workspace_id} -> {partition}\n")
+    tiles_limit = None
+    if arguments.tiles:
+        declared = run(
+            [
+                str(python),
+                "-c",
+                DECLARE_TILE_QUOTA,
+                exports["OWNER_URL"],
+                workspace_id,
+                actor,
+                str(TILES_LIMIT),
+            ],
+            worktree,
+        ).strip()
+        if declared != str(TILES_LIMIT):
+            refuse("tile-quota", f"workspace {workspace_id} declared {declared!r}")
+        tiles_limit = TILES_LIMIT
 
     environment = api_environment(
         exports=exports,
@@ -687,7 +734,8 @@ def up(arguments: argparse.Namespace) -> None:
             "society_playback": bool(arguments.society_playback),
             "budget_usd": environment.get("EXULANICA_BUDGET_USD"),
             "actor": actor,
-            "permissions": list(PERMISSIONS),
+            "permissions": synthetic_permissions(arguments.tiles),
+            "tiles_limit": tiles_limit,
         }
     )
     state["pids"]["api"] = api_pid
@@ -913,6 +961,12 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="the API advances this run's workspace's playing societies on its own "
                 "(default: it advances nothing)",
+            )
+            command.add_argument(
+                "--tiles",
+                action="store_true",
+                help="grant the synthetic token tiles.materialise and declare its workspace a "
+                "tile quota of TILES_LIMIT (default: neither)",
             )
             command.add_argument(
                 "--society-tick-interval-ms",

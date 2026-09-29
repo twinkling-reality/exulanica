@@ -4523,6 +4523,89 @@
     }
    }
   },
+  "/tiles/traffic": {
+   "get": {
+    "tags": [
+     "tiles"
+    ],
+    "summary": "The vehicles driving a stored generated city's streets, second by second, to draw.",
+    "operationId": "tile_traffic_tiles_traffic_get",
+    "parameters": [
+     {
+      "name": "world_seed",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "World Seed"
+      }
+     },
+     {
+      "name": "from_second",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From Second"
+      }
+     },
+     {
+      "name": "seconds",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 60,
+       "title": "Seconds"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/tiles/{baked_tile_id}/bytes": {
    "get": {
     "tags": [

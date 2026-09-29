@@ -35,7 +35,7 @@
         {"path": "society-experiments.md", "role": "contract", "owns": "Comparisons of the models that decide for a world's people, and intervention experiments over a living society"},
         {"path": "movement-modules-contract.md", "role": "contract", "owns": "Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads"},
         {"path": "character-representation-contract.md", "role": "contract", "owns": "Character appearance, rigging, subject bindings, movement and how a society's people are drawn"},
-        {"path": "traffic-contract.md", "role": "contract", "owns": "Traffic simulation inputs, state transitions and invariants; nothing calls it"}
+        {"path": "traffic-contract.md", "role": "contract", "owns": "Traffic simulation inputs, derived road records, state transitions and invariants, and its serving for a baked city"}
       ]
     },
     {

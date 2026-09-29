@@ -1,7 +1,9 @@
 # Traffic simulation
 
-Status: **TRAFFIC V1 ON CITY V2 ROAD RECORDS**. Nothing in the application calls it: no runtime
-advances, stores or draws a run, and nothing feeds it the society's crossings or reads its events.
+Status: **TRAFFIC V1, SERVED FOR A BAKED CITY ON THE DEVELOPMENT PREVIEW**. `GET /tiles/traffic`
+drives a baked city's streets on shared real time and the development page draws its vehicles on the
+tile it walks ([Served traffic](#served-traffic)). No saved world's traffic is served, nothing feeds
+it the society's crossings, and nothing reads its events.
 
 In this simulation, cars, vans, buses and bicycles drive a generated city's streets second by second: they keep their lanes, stop at stop lines, take turns at junctions by the junction's rule,
 wait for people on crosswalks, and park. The same inputs always give the same bytes. This document
@@ -14,13 +16,16 @@ draws a vehicle from.
 - [In plain words](#in-plain-words)
 - [What a run reads](#what-a-run-reads)
 - [Reading the city](#reading-the-city)
+- [Derived road records](#derived-road-records)
 - [The network](#the-network)
 - [A second](#a-second)
 - [What a run writes](#what-a-run-writes)
 - [Checks](#checks)
 - [Metrics](#metrics)
 - [Vehicle presentation contract](#vehicle-presentation-contract)
+  - [The page's reader](#the-pages-reader)
 - [Catalogs](#catalogs)
+- [Served traffic](#served-traffic)
 - [The layer](#the-layer)
 - [Limits of v1](#limits-of-v1)
 - [Where to look](#where-to-look)
@@ -46,8 +51,8 @@ A vehicle here is always synthetic. No record, event or presentation of it is ev
 
 | Input | What it is |
 | --- | --- |
-| City road records | The city grammar's version 2 street and road records for one tile (below). Only `exulanica/traffic/city_roads.py` reads them. |
-| Traffic catalogs | Five versioned files under `assets/catalogs/traffic`: vehicle classes, right-of-way policies, signal plans, and two access mappings (below). |
+| City road records | The city grammar's street and road records (below), of one tile or of several merged by identity, with the connections and spaces [derived](#derived-road-records) from them. Only `exulanica/traffic/city_roads.py` and `city_derivation.py` read them. |
+| Traffic catalogs | Six versioned files under `assets/catalogs/traffic`: vehicle classes, right-of-way policies, signal plans, two access mappings and the road derivation rules (below). |
 | Seed | A string. Its SHA-256 is written into the state; the only draws are the fleet's placement, body family and colour at the start. |
 | Fleet | A count per vehicle class. Vehicles start parked in spaces that admit their class. |
 | Trip requests | `exulanica.traffic-trip-request/v1`: a vehicle, the second it wants to leave, and a destination, either a parking space by record identity or a society destination by its `destination_id` and frontage `street_segment_ordinal`. Numbered from 1 with no gaps. |
@@ -94,6 +99,46 @@ not whole seconds; a signal on a mid-block crossing; districts that drive on dif
 parking space reached from a lane that carries no traffic; a crossing or access stretch beyond its
 segment's length.
 
+## Derived road records
+
+The city grammar's streets stage lays lanes, junctions, approaches and crossings, and writes no lane
+connection, signal or parking space. `derive_road_records(records, catalogs, city_catalogs,
+city_identity=...)` in `exulanica/traffic/city_derivation.py` derives connections and spaces by rule
+from the records, the city's catalogs and the `road-derivation` catalog, and hands them to the
+conversion beside the city's own. It derives no signal. A junction the city states any connection
+for gets none derived, and a curb the city states any space on gets none. Every derived record has a
+city record's shape and identity, owned as the city owns its kind, and is synthetic. Derived records
+are not held to the city document's checks: a connection runs from its stop line, which the streets
+stage sets back before the crossing, so it reaches outside the extent its junction states (on the
+corridor at version 4, all 96 connections, by up to 6.1 m), which the city's `[owner_extent]` rule
+refuses in a tile document.
+
+- **Connections.** At every junction, each traffic lane flowing in makes each movement its `turns`
+  permits into the one traffic lane leaving by the leg that movement reaches: straight on, a quarter
+  turn right or a quarter turn left. A straight connection is the chord from the stop line to the
+  lane's start. A turn runs straight to where a tangent arc begins, round the fullest arc the corner
+  admits and straight to the lane's start, the arc drawn with the catalog's chord count in exact
+  integers. v1 derives only where legs meet along the plan axes, which is every junction the streets
+  stage lays, and refuses another leg by name, as it refuses a movement with no lane, or more than
+  one, leaving by its leg.
+- **Where a space may be.** Only on an access lane of the largest set of paths a class its kind
+  admits can drive round, so a vehicle can both reach a space and leave it; a lane that starts or
+  ends where the records stop is off that set. A parking lane off it is left out and named.
+- **Kerbside bays.** Along every lane of the catalog's bay lane use, bays of its bay parking kind
+  stand end to end, each the longest that kind admits and as wide as the lane, reached from the
+  traffic lane beside it: clear of that lane's junction region and conflict zones, the catalog's
+  crossing clearance from every crossing band on it, and its stop-line clearance before the junction
+  it runs to.
+- **Cycle spaces.** Every stand of the catalog's stand category is one footway space of its stand
+  parking kind: the kind's shortest footprint centred on the stand, holding the bicycles the city's
+  street-furniture catalog says a stand takes, reached from the traffic lane nearest its curb. A
+  stand whose access stretch meets a junction region, a zone or a crossing band is left out and
+  named.
+
+On the corridor city baked at grammar version 4 this derives 59 bays and 10 cycle spaces, the 69
+spaces `tests/test_traffic_city_derivation.py` holds, and leaves out five parking lanes whose access
+lanes are off the round network.
+
 ## The network
 
 `compile_network(road_input, catalogs)` builds the network a run drives on, named by the city record
@@ -112,6 +157,10 @@ written into every state.
 - **Regions.** Crossing a stop line means reserving the junction region: the connection and the
   start of the lane it leads to, as far as any conflict zone or junction crosswalk reaches on that
   lane. A vehicle is only admitted when there is room beyond the region for its whole body.
+  A lane that leaves a junction without that room for a class is kept for the classes it has room
+  for: the class with the longest body and gap is left off it, recorded in the network's
+  restrictions as `body and gap do not fit beyond the junction region it leaves`, and the network
+  is compiled again, until every lane fits every class it keeps.
 - **Bands.** A crosswalk is a band with an interval on every path it meets, exact on a straight lane
   piece and a corridor superset on a connection. A band at a junction belongs to its region; a band
   further along a lane is a mid-block band with its own gate.
@@ -126,7 +175,7 @@ or across a crosswalk; a signal plan that lets two conflicting movements of equa
 together, sends a straight movement through a crosswalk while it shows walk, or gives a crosswalk
 too little walking time for its length; a priority junction with more than one inbound lane on a
 major approach, or a stop or yield sign on one; an uncontrolled junction with conflicting movements; a u-turn; a mid-block signal; a lane too short to
-leave its junction region; and a path no class can drive.
+leave its junction region for the one class it has left; and a path no class can drive.
 
 ## A second
 
@@ -292,6 +341,26 @@ The body families and colours the catalog states:
 | `passenger_car` | `hatchback`, `sedan` | `black`, `blue`, `grey`, `red`, `silver`, `white` |
 | `van` | `minivan`, `panel_van` | `black`, `blue`, `grey`, `red`, `silver`, `white` |
 
+### The page's reader
+
+`@exulanica/atlas-react/traffic` (`web/packages/atlas-react/src/playcanvas/traffic/`) is the reader
+the development page uses. `TrafficLayer` draws each vehicle as the figure of boxes its looks
+(`vehicle-looks.ts`, `exulanica.vehicle-looks/v1`) state for its body family, proportioned to the
+record's own dimensions and coloured by its colour, and refuses a body family or colour the looks
+do not state (`VehicleLookError`) before it draws anything; a test holds the looks to exactly the
+families and colours the catalog names. Between two seconds it moves the front along the served
+path by distance and places the rear axle a wheelbase back along the trail the front left. It
+stands each body on the tile's walking surface at the body's centre, and keeps a vehicle it finds
+no ground for undrawn and counted. A vehicle named late at an episode's end is held where that
+episode left it. While a drawn vehicle moves, the page draws every frame rather than its idle cadence.
+
+`web/packages/app/src/composition/tile-traffic.ts` attaches the layer to the development page's
+baked tile walk, reached from one call in `composition/generated-tile.ts`. It reads windows with the
+walk's credential, first from the server's clock, then the next minute whenever fewer than 30 served
+seconds are left ahead of it; it stops on a refusal the server will keep giving, and tries again
+later on any other failure. The shell's `data-tile-traffic` attribute states the vehicles served,
+drawn and held without ground, the clock's second and that no walker's crossing is fed.
+
 ## Catalogs
 
 Every number traffic uses about a vehicle, a rule or a signal is in a versioned file under
@@ -304,6 +373,7 @@ Every number traffic uses about a vehicle, a rule or a signal is in a versioned 
 | `signal-plan.v1.json` | `fixed_two_phase_60s`: two vehicle phases of 24 seconds green, 4 amber and 2 all-red, each with a concurrent 7 second walk and 17 second clearance, and the walking speeds used to check a crosswalk's time. |
 | `lane-use-access.v1.json` | Which classes a lane of each city lane use carries. |
 | `parking-kind-access.v1.json` | Which classes a parking space of each city parking kind admits. |
+| `road-derivation.v1.json` | The [derivation](#derived-road-records) rules: a turning connection's arc chords, the lane use and parking kind of kerbside bays with their crossing and stop-line clearances, and the furniture category and parking kind of cycle stands. |
 
 **Sources.** Every entry names a source for each numeric field and each key list, exactly once:
 either `cited <reference>: <where>`, where the reference's full citation is in the file's
@@ -320,7 +390,7 @@ Section 4F.17) for walk, clearance, amber and all-red times.
 **Licence.** Entries are written for this repository: `original`, Apache-2.0. Cited facts are facts;
 the citation says where they were read.
 
-**Digest.** The catalogs' digest covers the canonical form of all five files, references and sources
+**Digest.** The catalogs' digest covers the canonical form of all six files, references and sources
 included, and is written into every state. The SHA-256 of each file's bytes is kept as well, because
 a city signal record names the signal-plan catalog by those bytes.
 
@@ -335,8 +405,56 @@ which no source read gives (for the bicycle: overhangs, height, jam gap, turning
 envelope, turning speed, wheelbase and stand times); parking manoeuvre times from a study summary
 whose primary paper could not be read; class speed caps set above any urban limit, so the lane's
 posted limit governs; arrival orders, and the uncontrolled continuation's rule and turn priority;
-the two remaining intervals of the fixed signal plan; and the lane-use and parking-kind access
-mappings.
+the two remaining intervals of the fixed signal plan; the lane-use and parking-kind access
+mappings; and the road derivation rules, whose kerbside clearances follow the *Uniform Vehicle
+Code*'s 20 feet from a crosswalk and 30 feet before a stop sign or signal without quoting it.
+
+## Served traffic
+
+`exulanica/world/traffic_host.py` and `traffic_episodes.py` sit above the traffic simulation and
+the movement package and run the roads module, `exulanica-movement/roads/v1`
+([movement modules](movement-modules-contract.md#roads)), for a generated city.
+
+- **The road source.** `generated_tile_roads(repository, world_seed)` reads the current bake of
+  every tile of a city seed from the tile store, holds each container to the digest its row records
+  and checks it again under the final read check, and merges by identity the records every header
+  carries; two copies of one record must agree. The city must be of a grammar version the city
+  grammar generates. The input's version is the SHA-256 over the tiles' coordinates and container
+  digests, so a rebake is a new input. Tiles are read, never delivered, so no tile quota is spent.
+  No reader serves a saved world's roads.
+- **The clock.** Second `n` is the `n`th second since the Unix epoch, so every page showing a city
+  shows its vehicles in the same places.
+- **The fleet**, by rule from the home places the derived network holds: in every parking kind, the
+  roads module's `fleet_share_permille` of its places, divided among the classes the kind admits in
+  the catalog's order, any remainder one each to the first. No rule gives a bus a route or a layover, so no
+  bus has a home and none is in a fleet. A city whose places would host more than `max_vehicles` is
+  refused as `roads_world_too_large`.
+- **Episodes.** Time is cut into episodes of `episode_steps` seconds, each computed whole from the
+  input and its number alone, from the genesis `initial_traffic` places the fleet in, each vehicle
+  at home. Every vehicle leaves home once, at a second of the first `departure_steps` drawn from the
+  seed, for a space of its class that is nobody's home, has a free place and can be driven to and
+  back from; stays there for a dwell drawn from the seed; and drives home. The trip requests are
+  decided second by second by that rule and recorded as the run's inputs, so an episode replays
+  exactly. A vehicle not home at an episode's end is named in the window's `late_home`. The seed is
+  the SHA-256 of the city's world and version keys, and the draws are `traffic_host.departure`,
+  `traffic_host.destination` and `traffic_host.dwell`.
+- **The worker.** Episodes are computed in a worker process of their own by the episode worker the
+  flight shares (`exulanica/world/episode_worker.py`), kept by the input's digest, with the episode
+  after the last one read asked for ahead of need. A request's own work is its window, cut from
+  them.
+
+`GET /tiles/traffic?world_seed=<64 hex>&from_second=<n>&seconds=<1 to 60>` answers a window,
+`exulanica.traffic-window/v1`: for every vehicle its class, body family, colour and dimensions and,
+for every second, its front and rear axle plan points, mode (`parked`, `leaving`, `driving`,
+`arriving`), speed, slot and the path its front followed during that second, with `crossings_fed`
+false, `late_home`, and the clock's second when it answered. Without `from_second` the window starts
+at the clock. It requires `tiles.materialise` and charges no tile (`SELF_CHARGING_TILE_ROUTES`).
+It refuses a second before the epoch or more than `clock_reach_steps` from the clock
+(`traffic_second_out_of_range`) and a window of more than 60 seconds (`traffic_window_too_long`)
+with 422, a seed with no stored tiles with 404 `roads_not_stated`, roads traffic cannot drive with
+409 `roads_unavailable` and the compiler's reason, and an unavailable worker with 503
+`traffic_worker_unavailable`. The development page draws the answer on the tile it walks with
+[the page's reader](#the-pages-reader).
 
 ## The layer
 
@@ -344,9 +462,9 @@ mappings.
 layers, and a forbidden contract keeps it from `psycopg`, the database and store, the evidence spine,
 ingest, migrations, identity, selection, reconstruction, capture, the world package, models, the API,
 `numpy` and `torch`. It may import the grammar, because the road records are grammar records, and only
-`exulanica/traffic/city_roads.py` does. A composition above both would pass the society's crossing
-events down as data; none does. A test holds that no other traffic module imports the city grammar,
-so a new city version changes one file.
+`exulanica/traffic/city_roads.py` and `city_derivation.py` do. A composition above both would pass the
+society's crossing events down as data; none does. A test holds that no other traffic module imports
+the city grammar, so a new city version changes those two files.
 
 ## Limits of v1
 
@@ -363,22 +481,28 @@ so a new city version changes one file.
 - **Parking manoeuvres are stops on the lane**, with no path between the lane and the bay.
 - **Society destinations are frontage by segment ordinal**: a trip to a society destination parks in
   the first free space on that segment, in identity order, that admits its class, not the nearest.
-- **Nothing calls it.** No runtime advances it, no store keeps its states, no renderer draws its
-  presentation records, and nothing feeds it the society's crossings or reads its events.
+- **Served for a baked city only.** A generated city's stored tiles are the one road source; no
+  saved world's traffic is served, no store keeps a run's states, and nothing feeds traffic the
+  society's crossings or reads its events. A vehicle never waits for a walker the page shows.
+- **Connections are derived only where legs meet along the plan axes**, and spaces only as kerbside
+  bays and cycle stands; no signal, loading bay or bus layover is derived.
 
 ## Where to look
 
 | Module | What it is |
 | --- | --- |
 | `exulanica/traffic/city_roads.py`, `road_input.py` | The converter from city records and what it produces. |
-| `exulanica/traffic/catalogs.py` | Loading and checking the five catalogs. |
+| `exulanica/traffic/city_derivation.py` | The connections and spaces derived from a city's records. |
+| `exulanica/traffic/catalogs.py` | Loading and checking the six catalogs. |
 | `exulanica/traffic/network.py` | The compiler and its refusals. |
 | `exulanica/traffic/geometry.py`, `kinematics.py`, `signals.py`, `routing.py` | Integer geometry, the safety rule, signal indications and routing. |
 | `exulanica/traffic/inputs.py`, `simulation.py` | The input contracts and the step. |
 | `exulanica/traffic/checks.py` | The transition checker. |
 | `exulanica/traffic/metrics.py`, `presentation.py` | The metrics report and the presentation records. |
+| `exulanica/world/traffic_host.py`, `traffic_episodes.py`, `episode_worker.py` | The road source, clock, fleet, trip rule, episodes, windows and their worker. |
+| `exulanica/api/routes/tiles.py` | `GET /tiles/traffic`. |
 
-Tests are `tests/test_traffic_*.py`, with the test network in `tests/traffic_network_fixture.py` and
+Tests are `tests/test_traffic_*.py` and `tests/test_tile_traffic_route.py`, with the test network in `tests/traffic_network_fixture.py` and
 its scenarios in `tests/traffic_scenarios.py`. `tests/test_traffic_city_roads.py` also reads the city
 vocabulary's fixture tile, `tests/fixtures/city-v2/tile-document.json`, and records what traffic
 refuses in it and why.

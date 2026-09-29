@@ -159,6 +159,7 @@ from exulanica.world import (
 )
 from exulanica.world.flight_input import close_flight_worker
 from exulanica.world.society import SocietyBytesNotRead
+from exulanica.world.traffic_host import close_traffic_worker
 
 __all__ = ["create_app"]
 
@@ -290,6 +291,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             worker.stop()
         # The flight's worker process starts at the first flight read; it stops with the server.
         await asyncio.to_thread(close_flight_worker)
+        # So does the traffic's, at the first traffic read.
+        await asyncio.to_thread(close_traffic_worker)
 
 
 def create_app(services: Services | None = None, *, verify: bool = True) -> FastAPI:

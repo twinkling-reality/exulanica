@@ -2,7 +2,7 @@
 
 What is pinned here, and why.
 
-*   The five catalogs **load**, and hold the classes, policies and plan the simulation names, and
+*   The six catalogs **load**, and hold the classes, policies and plan the simulation names, and
     the vehicle classes each of the city's lane uses and parking kinds admits.
 *   Every numeric field names **exactly one source**, either a citation of a reference the file
     lists or a declared reason, and the **declared values are the listed ones**: adding a declared
@@ -92,6 +92,13 @@ DECLARED = (
     ("parking-kind-access", "cycle_stand", "classes"),
     ("parking-kind-access", "general", "classes"),
     ("parking-kind-access", "loading", "classes"),
+    ("road-derivation", "city_streets", "arc_chords_per_quarter_turn"),
+    ("road-derivation", "city_streets", "bay_crossing_clearance_mm"),
+    ("road-derivation", "city_streets", "bay_lane_use"),
+    ("road-derivation", "city_streets", "bay_parking_kind"),
+    ("road-derivation", "city_streets", "bay_stop_line_clearance_mm"),
+    ("road-derivation", "city_streets", "stand_furniture_category"),
+    ("road-derivation", "city_streets", "stand_parking_kind"),
 )
 
 _VEHICLE_NUMBERS = (
@@ -146,6 +153,7 @@ def test_the_catalogs_live_in_their_own_directory_under_the_catalog_root():
         "lane-use-access.v1.json",
         "parking-kind-access.v1.json",
         "right-of-way-policy.v1.json",
+        "road-derivation.v1.json",
         "signal-plan.v1.json",
         "vehicle-class.v1.json",
     ]

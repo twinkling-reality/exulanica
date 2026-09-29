@@ -157,6 +157,10 @@ class Permission(StrEnum):
 SELF_CHARGING_TILE_ROUTES: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
     {
         ("GET", "/tiles"): "metadata only: listing what is stored materialises no tile",
+        ("GET", "/tiles/traffic"): (
+            "a window reads the stored tiles' containers for the records their roads state and "
+            "delivers no tile, so it materialises none"
+        ),
         ("GET", "/tiles/{baked_tile_id}/bytes"): (
             "migration 0072's ledger spends one tile the first time a workspace is served one, in "
             "the same statement as the delivery row; a reload of a tile already delivered is free"
@@ -516,6 +520,7 @@ _WORLD_READS: Final = _every(
 _TILES: Final = _every(
     _requires(_P.TILES_MATERIALISE),
     "GET /tiles",
+    "GET /tiles/traffic",
     "GET /tiles/{baked_tile_id}/bytes",
     "POST /world-generation/worlds",
 )

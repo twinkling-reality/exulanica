@@ -1,11 +1,13 @@
-"""The traffic catalogs: vehicle classes, right-of-way policies, signal plans and access mappings.
+"""The traffic catalogs: vehicle classes, right-of-way policies, signal plans, access mappings and
+the road derivation.
 
 Every number the simulation uses about a vehicle, a rule or a signal comes from one of the
 versioned files under ``assets/catalogs/traffic``. None is a constant in code. Two of the files
 map the city's own keys to vehicle classes: ``lane-use-access`` says which classes a lane of each
 lane use carries (none for a lane that carries no traffic), and ``parking-kind-access`` which
 classes a parking space of each kind admits. The city records carry the keys; traffic owns what
-they admit.
+they admit. ``road-derivation`` states how traffic derives the lane connections and parking
+spaces a city's streets imply and write none of (:mod:`exulanica.traffic.city_derivation`).
 
 **Envelope.** ``schema_version`` (1), ``catalog_id``, ``catalog_version``, ``references`` and
 ``entries``, and nothing else. The id and version match the file name, the same rule the grammar
@@ -21,7 +23,7 @@ or unparseable source is refused, so a number cannot be added without saying whe
 catalogs. Entries are authored here, so they are ``original`` and Apache-2.0; the facts they
 cite are facts, and the citation says where they were read.
 
-**Digest.** :func:`catalogs_digest` covers the canonical form of all five catalogs, references
+**Digest.** :func:`catalogs_digest` covers the canonical form of all six catalogs, references
 and sources included, so changing a citation changes the digest. :attr:`TrafficCatalogs.file_sha256`
 keeps the SHA-256 of each file's bytes, because a city signal record names the signal-plan catalog
 by that byte digest.
@@ -52,6 +54,7 @@ __all__ = [
     "TURNS",
     "AccessMapping",
     "RightOfWayPolicy",
+    "RoadDerivation",
     "SignalGroupSpec",
     "SignalInterval",
     "SignalPlan",
@@ -102,6 +105,7 @@ _FILES: Final = {
     "signal-plan": "signal-plan.v1.json",
     "lane-use-access": "lane-use-access.v1.json",
     "parking-kind-access": "parking-kind-access.v1.json",
+    "road-derivation": "road-derivation.v1.json",
 }
 
 
@@ -293,12 +297,37 @@ class AccessMapping:
 
 
 @dataclass(frozen=True, slots=True)
+class RoadDerivation:
+    """How traffic derives, from a city's streets, the road records the city writes none of.
+
+    ``arc_chords_per_quarter_turn`` is how many chords a turning connection's arc is drawn with.
+    A kerbside bay of ``bay_parking_kind`` is laid along a lane of ``bay_lane_use``, clear of a
+    crossing by ``bay_crossing_clearance_mm`` and of the stop line its access lane runs to by
+    ``bay_stop_line_clearance_mm``. A stand of ``stand_furniture_category`` holds a
+    ``stand_parking_kind`` space. The keys are the city's vocabulary, which only
+    :mod:`exulanica.traffic.city_derivation` reads.
+    """
+
+    key: str
+    label: str
+    arc_chords_per_quarter_turn: int
+    bay_lane_use: str
+    bay_parking_kind: str
+    bay_crossing_clearance_mm: int
+    bay_stop_line_clearance_mm: int
+    stand_furniture_category: str
+    stand_parking_kind: str
+    sources: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class TrafficCatalogs:
     vehicle_classes: tuple[VehicleClass, ...]
     policies: tuple[RightOfWayPolicy, ...]
     plans: tuple[SignalPlan, ...]
     lane_uses: tuple[AccessMapping, ...]
     parking_kinds: tuple[AccessMapping, ...]
+    derivations: tuple[RoadDerivation, ...]
     #: ``(catalog_id, canonical payload)`` for each file, which is what the digest covers.
     payloads: tuple[tuple[str, Mapping[str, Any]], ...]
     #: ``(catalog_id, sha256 of the file bytes)``, the digest a city signal record carries.
@@ -336,6 +365,12 @@ class TrafficCatalogs:
             if entry.key == key:
                 return entry
         raise TrafficCatalogError(f"no parking kind {key!r} in parking-kind-access")
+
+    def derivation(self, key: str) -> RoadDerivation:
+        for entry in self.derivations:
+            if entry.key == key:
+                return entry
+        raise TrafficCatalogError(f"no road derivation {key!r} in road-derivation")
 
     def file_digest(self, catalog_id: str) -> str:
         return dict(self.file_sha256)[catalog_id]
@@ -582,6 +617,41 @@ def _access(
     )
 
 
+_DERIVATION_INTS: Final = {
+    "arc_chords_per_quarter_turn": (1, 64),
+    "bay_crossing_clearance_mm": (0, 50_000),
+    "bay_stop_line_clearance_mm": (0, 50_000),
+}
+_DERIVATION_KEYS: Final = (
+    "bay_lane_use",
+    "bay_parking_kind",
+    "stand_furniture_category",
+    "stand_parking_kind",
+)
+
+
+def _derivation(where: str, raw: object, references: Mapping[str, str]) -> RoadDerivation:
+    entry = _object(
+        where,
+        raw,
+        frozenset({"key", "label", "sources", "licence", *_DERIVATION_INTS, *_DERIVATION_KEYS}),
+    )
+    ints = {
+        name: _int(f"{where}.{name}", entry[name], low, high)
+        for name, (low, high) in _DERIVATION_INTS.items()
+    }
+    keys = {name: _key(f"{where}.{name}", entry[name]) for name in _DERIVATION_KEYS}
+    return RoadDerivation(
+        key=_key(f"{where}.key", entry["key"]),
+        label=_text(f"{where}.label", entry["label"]),
+        **ints,
+        **keys,
+        sources=_sources(
+            f"{where}.sources", entry["sources"], {*_DERIVATION_INTS, *_DERIVATION_KEYS}, references
+        ),
+    )
+
+
 def _lane_use(where: str, raw: object, references: Mapping[str, str]) -> AccessMapping:
     # A lane use may carry no traffic at all: a parking lane or a buffer.
     return _access(where, raw, references, empty=True)
@@ -681,6 +751,11 @@ def load_traffic_catalogs(directory: Path = CATALOG_DIRECTORY) -> TrafficCatalog
             envelopes["parking-kind-access"],
             _parking_kind,
         ),
+        derivations=_entries(
+            directory.joinpath(_FILES["road-derivation"]),
+            envelopes["road-derivation"],
+            _derivation,
+        ),
         payloads=payloads,
         file_sha256=tuple(digests),
         digest=_payloads_digest(payloads),
@@ -706,7 +781,7 @@ def _payloads_digest(payloads: tuple[tuple[str, Mapping[str, Any]], ...]) -> str
 
 
 def catalogs_digest(catalogs: TrafficCatalogs) -> str:
-    """SHA-256 over the canonical JSON of the three catalogs, ordered by id. Hex."""
+    """SHA-256 over the canonical JSON of every traffic catalog, ordered by id. Hex."""
     return _payloads_digest(catalogs.payloads)
 
 
@@ -719,6 +794,7 @@ def declared_values(catalogs: TrafficCatalogs) -> tuple[tuple[str, str, str, str
         ("signal-plan", catalogs.plans),
         ("lane-use-access", catalogs.lane_uses),
         ("parking-kind-access", catalogs.parking_kinds),
+        ("road-derivation", catalogs.derivations),
     ):
         for entry in entries:
             for field, text in entry.sources:

@@ -1,13 +1,13 @@
 # Movement modules contract
 
-Status: **WALKING AND FLIGHT BUILT; ROADS STATED AND NOT CONNECTED**.
+Status: **WALKING, FLIGHT AND ROADS BUILT; ROADS SERVED FOR A BAKED CITY ON THE DEVELOPMENT PREVIEW**.
 
 Movement in a world is one engine module per kind of movement, chosen by data. A module states the
-space it moves in, the catalog its agents come from, its clock, the bounded parameters every
-agent's figures are checked against, and what it hands a renderer. Walking moves the people of a
-society over a route graph; flight moves flying kinds through a saved world's air; roads are stated
-and refused by name until a world has roads. A bird, a dragon and a plane are kinds of the flight
-kind catalog, never code of their own.
+space it moves in, the catalog its agents come from, its clock, the bounded parameters every agent's
+figures are checked against, and what it hands a renderer. Walking moves the people of a society
+over a route graph; flight moves flying kinds through a saved world's air; roads drive vehicles over
+a generated city's streets, served for a baked city on the development preview. A bird, a dragon and
+a plane are kinds of the flight kind catalog, never code of their own.
 
 This contract owns the module registry and its dispatch, the walking and flight steps, the air a
 flight happens in, the flight kind catalog, the flight route and the flight renderer. The society's
@@ -47,13 +47,16 @@ order. A row states:
 Every module lookup goes through `movement_module`, which refuses an identity the table does not
 state with `UnknownMovementModule` naming it, and `built_module`, which also refuses a row that is
 not built with `MovementModuleNotConnected` carrying the row's refusal. The code each built module
-runs is one table in [`steps.py`](../exulanica/movement/steps.py), held to the built rows by a test;
-a caller asks `step_of(module)` for it and never imports a step by hand. A kind's figure outside its
-module's bounds is refused with `ParameterOutOfBounds` naming the module, the parameter and the
-value. A row's status is a switch: whether a row is built is asked where the module is used, never
-when it is imported, so the flight row is read at import and making or serving a flight asks for it
-built; stated `not_connected`, it refuses there with its own refusal, which the flight route answers
-as a 409, and the flying kinds and their reviewed parts still load.
+runs is one table in [`steps.py`](../exulanica/movement/steps.py); a built module whose step runs in
+a host above this package, as roads' does, is named in its `HOSTED` table with that host instead,
+and a test holds the two tables together to exactly the built rows. A caller asks `step_of(module)`
+for a step and never imports one by hand; a hosted module is refused there by name,
+`movement_step_hosted`, with its host. A kind's figure outside its module's bounds is refused with
+`ParameterOutOfBounds` naming the module, the parameter and the value. A row's status is a switch:
+whether a row is built is asked where the module is used, never when it is imported, so the flight
+row is read at import and making or serving a flight asks for it built; stated `not_connected`, it
+refuses there with its own refusal, which the flight route answers as a 409, and the flying kinds
+and their reviewed parts still load.
 
 The package is pure: it opens no database or store and imports neither the world, the traffic
 simulation nor a model client, which an import contract in `pyproject.toml` holds. The world
@@ -231,8 +234,9 @@ The input is composed once for each version state, source snapshot, reviewed reg
 and kept in process, the 16 most recent, shared between request threads under one lock and never
 composed under it. No step is computed on a request's thread: Python runs one thread at a time, so
 a flight computed there would make every other request the server answers wait. One worker process
-([`flight_worker.py`](../exulanica/world/flight_worker.py)), started by a server's first flight
-read (the standard library's process pool, spawned, importing the movement package and nothing of
+(the episode worker, [`episode_worker.py`](../exulanica/world/episode_worker.py), bound to the
+flight in [`flight_worker.py`](../exulanica/world/flight_worker.py)), started by a server's first
+flight read (the standard library's process pool, spawned, importing the movement package and nothing of
 the server), computes whole episodes from their genesis and hands them back packed as 32-bit
 integers ([`flight_episodes.py`](../exulanica/movement/flight_episodes.py)); it rebuilds each input
 from a plain wire form and refuses one whose digest differs from the server's, and ends itself when
@@ -310,17 +314,33 @@ not in storage is named in `data-flight-undrawn` and not drawn.
 
 ## Roads
 
-`exulanica-movement/roads/v1` is stated with status `not_connected` and refusal
-`roads_not_connected`. Road movement exists as the traffic simulation
-([`exulanica/traffic`](../exulanica/traffic), [traffic contract](traffic-contract.md)), which nothing
-in the application calls. Connected, its space is the compiled road network, its agents the vehicle
-classes of `assets/catalogs/traffic/vehicle-class.v1.json` with their cited bounds, its step
-`advance_traffic`, one simulated second a call, and its output the traffic presentation frame. The
-traffic package may not import the world or this package, so the adapter that connects it sits above
-both. Before vehicles appear in a world, it needs road records with lane connections, parking spaces
-and signals, which no generator writes and no saved world holds; a host that owns the fleet, trip
-requests, states and receipts; the society's crossing feed; a vehicle renderer; and a stated relation
-between the traffic's one-second step and the society's one-minute tick.
+`exulanica-movement/roads/v1` is built. Its space is the road network the traffic simulation
+([`exulanica/traffic`](../exulanica/traffic), [traffic contract](traffic-contract.md)) compiles from a
+city's street and road records and the connections and spaces it derives from them; its agents are
+the vehicle classes of `assets/catalogs/traffic/vehicle-class.v1.json` with their cited bounds; its
+clock is shared real time, one second a step; and its output is `exulanica.traffic-window/v1`, the
+traffic presentation frames of a window's seconds grouped by vehicle. Its step is the simulation's
+`advance_traffic`, which this package may not import, so the step runs in its host,
+[`traffic_episodes.py`](../exulanica/world/traffic_episodes.py), named in `steps.HOSTED`.
+
+Each parameter holds one value:
+
+| Parameter | Value | What it bounds |
+| --- | --- | --- |
+| `episode_steps` | 1,200 | Seconds in an episode, each computed whole from the fleet parked at home |
+| `departure_steps` | 300 | The first seconds of an episode, in which each vehicle leaves home once |
+| `dwell_steps_minimum`, `dwell_steps_maximum` | 30, 90 | How long a vehicle stays where it drove before it drives home |
+| `fleet_share_permille` | 500 | The share of each parking kind's places that hosts a vehicle |
+| `max_vehicles` | 120 | The most vehicles one city's traffic drives; more is refused, never trimmed |
+| `max_steps_per_request` | 60 | The longest window a read answers |
+| `clock_reach_steps` | 1,200 | How far from the clock, either way, a window may start |
+
+The host, its road source, fleet and trip rules, the route and the page's reader are the traffic
+contract's ([served traffic](traffic-contract.md#served-traffic)). Its episodes are computed in a
+worker process by the episode worker the flight's serving uses
+([`episode_worker.py`](../exulanica/world/episode_worker.py)). No saved world's roads are served,
+the society's crossings are not fed to traffic, and vehicles keep driving at normal speed while the
+people are paused or sped up.
 
 ## A model choosing for a flyer
 
@@ -347,6 +367,8 @@ viewers could share them.
   or for a world made from photographs, which has no authored scene.
 - The flight renderer draws a kind's body and one wing turned for each side; there is no skeleton or
   animation clip.
+- Roads are served for a baked city on the development preview only, and vehicles do not see people:
+  no walker's crossing is fed to traffic.
 
 ## Implementation and evidence
 
@@ -356,12 +378,13 @@ viewers could share them.
 | Walking | `exulanica/movement/walking.py` | `tests/test_movement_modules.py`, the society replay pins above, `tests/test_society_living_crossings_unchanged.py` |
 | Air, grid, perches | `exulanica/movement/air.py`, `fixed.py` | `tests/test_flight.py` |
 | Flight step, choices, episodes, search bounds | `exulanica/movement/flight.py` | `tests/test_flight.py`, `tests/test_flight_search_bounds.py` |
-| Episodes and their worker | `exulanica/movement/flight_episodes.py`, `exulanica/world/flight_worker.py` | `tests/test_flight_worker.py` (a real worker process, killed), `tests/test_world_flight_api.py` |
+| Episodes and their worker | `exulanica/movement/flight_episodes.py`, `exulanica/world/episode_worker.py`, `exulanica/world/flight_worker.py` | `tests/test_flight_worker.py` (a real worker process, killed), `tests/test_world_flight_api.py` |
 | Independent check | `exulanica/world/flight_checks.py` | `tests/test_flight_checks.py` (positive controls, the moves that join one window to the next, a placement error planted in the flight's composer, the rule that it imports nothing of the flight, and the two placements' parity) |
 | Flight kinds, assets | `exulanica/world/flight_kinds.py`, migration 0114 | `tests/test_flight_kinds.py`, `tests/test_reviewed_asset_placeability.py` |
 | Perches and hosts | `exulanica/world/object_catalog.py`, `world-object.v3.json` | `tests/test_world_object_perches.py` |
 | Composition, route | `exulanica/world/flight_input.py`, `exulanica/api/routes/world_flight.py` | `tests/test_world_flight_api.py` |
 | Page and renderer | `web/packages/app/src/flight-api.ts`, `composition/saved-world-flight.ts`, `web/packages/atlas-react/src/playcanvas/flight/` | `flight-api.test.ts`, `saved-world-flight.test.ts`, `environment-selection-flight.test.ts`, `flight-flock.test.ts`, `authored-society-flight-assets.test.ts`, `tests/test_flight_page_words.py` (the page's words against the server's codes) |
+| Roads host, route and page | `exulanica/world/traffic_episodes.py`, `traffic_host.py`, `exulanica/api/routes/tiles.py`, `web/packages/app/src/traffic-api.ts`, `composition/tile-traffic.ts`, `web/packages/atlas-react/src/playcanvas/traffic/` | `tests/test_traffic_episodes.py` (a real worker process), `tests/test_tile_traffic_route.py`, `traffic-api.test.ts`, `tile-traffic.test.ts`, `traffic-layer.test.ts`, `traffic-looks.test.ts`, `binding/tile-animating.test.ts` |
 | Measurement | `scripts/measure_flight_bounds.py` | `tests/test_flight_bounds_record.py`, `tests/test_flight_worker_record.py` |
 
 **Evidence.** Each flight record was pre-registered before its seeds were run:

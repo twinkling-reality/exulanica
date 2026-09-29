@@ -382,8 +382,33 @@ def _band_on_straight_piece(
     return (low, high) if low <= high else None
 
 
+#: Why a class is left off a lane it would not fit beyond the junction region it leaves.
+_SHORT_LANE: Final = "body and gap do not fit beyond the junction region it leaves"
+
+
 def compile_network(road: RoadInput, catalogs: TrafficCatalogs) -> RoadNetwork:
-    """Check the road input and build the network, or raise :class:`UnsupportedNetworkError`."""
+    """Check the road input and build the network, or raise :class:`UnsupportedNetworkError`.
+
+    **A lane too short for a class.** A vehicle is admitted into a junction region only with room
+    beyond it for its whole body and gap, so a lane that leaves a junction must be at least its
+    exit extent plus that much long for every class it carries. Where it is not, the class with the
+    longest body and gap is left off the lane, recorded among the restrictions, and the network is
+    compiled again, since narrower corridors can shorten the region; this repeats until every lane
+    fits every class it keeps. A lane too short for the one class it has left is refused.
+    """
+    left_off: dict[str, frozenset[str]] = {}
+    while True:
+        compiled = _compile(road, catalogs, left_off)
+        if isinstance(compiled, RoadNetwork):
+            return compiled
+        for lane_identity, key in compiled.items():
+            left_off[lane_identity] = left_off.get(lane_identity, frozenset()) | {key}
+
+
+def _compile(
+    road: RoadInput, catalogs: TrafficCatalogs, left_off: Mapping[str, frozenset[str]]
+) -> RoadNetwork | dict[str, str]:
+    """The network, or for each lane too short for its longest class, the class to leave off."""
     require_identity("city", road.city)
     if road.driving_side != "right":
         raise _refuse(
@@ -456,6 +481,9 @@ def compile_network(road: RoadInput, catalogs: TrafficCatalogs) -> RoadNetwork:
         fitting = []
         for key in lane.classes:
             vehicle = classes_by_key[key]
+            if key in left_off.get(lane.identity, ()):
+                restrictions.append((path_id, vehicle.key, _SHORT_LANE))
+                continue
             if vehicle.width_mm > lane.width_mm:
                 restrictions.append((path_id, vehicle.key, "body wider than the lane"))
                 continue
@@ -1128,12 +1156,24 @@ def compile_network(road: RoadInput, catalogs: TrafficCatalogs) -> RoadNetwork:
                 < paths[path_id].longest_body_mm + paths[path_id].widest_gap_mm
             ):
                 raise _refuse(f"two gates on {path_id} are closer than one vehicle and its gap")
+    too_short: dict[str, str] = {}
     for lane_id in lane_ids:
         path = paths[lane_id]
         if path.start_junction is None:
             continue
-        if exit_extent[lane_id] + path.longest_body_mm + path.widest_gap_mm > path.length:
-            raise _refuse(f"lane {path.identity} is too short to leave its junction region")
+        if exit_extent[lane_id] + path.longest_body_mm + path.widest_gap_mm <= path.length:
+            continue
+        kept = [classes_by_key[key] for key in path.classes]
+        if len(kept) == 1:
+            raise _refuse(
+                f"lane {path.identity} is too short to leave its junction region for any class"
+            )
+        longest = max(
+            kept, key=lambda vehicle: (vehicle.length_mm + vehicle.minimum_gap_mm, vehicle.key)
+        )
+        too_short[path.identity] = longest.key
+    if too_short:
+        return too_short
 
     catalog_sha256 = catalogs.digest
     # Sorted before the document is built, so the digest does not depend on input order.

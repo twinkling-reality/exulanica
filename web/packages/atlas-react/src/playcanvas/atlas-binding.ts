@@ -1686,7 +1686,7 @@ export class AtlasBinding {
     const s = this.controls.state;
     const r = this.renderedPose;
     return shouldDrawFrame({
-      dirty: this.dirty || this.objects.animating || (this.ownedDistrict?.societyAnimating ?? false) || (this.authoredSociety?.societyAnimating ?? false) || (this.playerCameraMode==='third-person' && !this.reducedMotion),
+      dirty: this.dirty || this.objects.animating || (this.ownedDistrict?.societyAnimating ?? false) || (this.authoredSociety?.societyAnimating ?? false) || (this.generatedTile?.animating ?? false) || (this.playerCameraMode==='third-person' && !this.reducedMotion),
       navigating: this.navigationTransition !== null,
       poseChanged:
         s.x !== r.x || s.y !== r.y || s.z !== r.z ||

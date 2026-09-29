@@ -68,6 +68,12 @@ export interface GeneratedTileMetrics {
 
 export interface GeneratedTileAttachment {
   readonly metrics: GeneratedTileMetrics;
+  /**
+   * Whether something the attachment draws is moving, such as the vehicles a tile's traffic
+   * drives: the binding draws every frame while it is, and at its settled rate when it is not.
+   * Absent is still.
+   */
+  readonly animating?: boolean;
   /** Removes everything `attach` added and restores the scene it changed. */
   dispose(): void;
 }

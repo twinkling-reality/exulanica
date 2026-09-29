@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "catalog_id": "road-derivation",
+  "catalog_version": 1,
+  "references": {},
+  "entries": [
+    {
+      "key": "city_streets",
+      "label": "Road records a city's streets imply",
+      "arc_chords_per_quarter_turn": 12,
+      "bay_lane_use": "parking",
+      "bay_parking_kind": "general",
+      "bay_crossing_clearance_mm": 6096,
+      "bay_stop_line_clearance_mm": 9144,
+      "stand_furniture_category": "cycle_parking",
+      "stand_parking_kind": "cycle_stand",
+      "sources": {
+        "arc_chords_per_quarter_turn": "declared: the chords a turning connection's quarter arc is drawn with, the test network's own count; drawn by the rational parametrisation the test network uses, the longest chord turns through 9.5 degrees and stays within 3.5 thousandths of the arc's radius of the arc, 52 mm at 15 m",
+        "bay_lane_use": "declared: the city lane use a kerbside bay is laid along, the one lane use the city's lane-use catalog says is bays along the kerb",
+        "bay_parking_kind": "declared: the city's parking kind for one car at the kerb, which parking-kind-access maps to the passenger car and the van",
+        "bay_crossing_clearance_mm": "declared: 20 feet from a crossing, after the Uniform Vehicle Code (2000), Section 11-1003, which forbids standing within 20 feet of a crosswalk at an intersection; declared rather than cited because the section's wording is not quoted",
+        "bay_stop_line_clearance_mm": "declared: 30 feet before a stop line, after the same section's 30 feet on the approach to a stop sign, a yield sign or a traffic-control signal; declared for the same reason",
+        "stand_furniture_category": "declared: the street furniture category a cycle stand is, in the city's street-furniture catalog",
+        "stand_parking_kind": "declared: the city's parking kind for cycle stands on the footway, which parking-kind-access maps to the bicycle"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    }
+  ]
+}

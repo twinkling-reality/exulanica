@@ -401,6 +401,14 @@ digest; `atlas-react/test/generated-tile-route-live.test.ts` runs against a RUNN
 itself unless one is named in the environment, so no credential can ever reach a suite. The live
 proof is retained in `evidence/tile-route-loader.log.txt`.
 
+### 7.2 The city's traffic
+
+On the second entry the page also draws the city's vehicles on the tile it walks:
+`composition/tile-traffic.ts` wraps the loaded tile, reads `GET /tiles/traffic` with the walk's
+credential and draws each window with `@exulanica/atlas-react/traffic`, and the shell's
+`data-tile-traffic` attribute says what it served and drew. The golden path draws none. The route,
+its windows and the page's reader are the [traffic contract](traffic-contract.md#served-traffic)'s.
+
 ## 8. Budget
 
 Measured against the accepted Melbourne envelope per corridor: about 227,000 faces, 28 MB

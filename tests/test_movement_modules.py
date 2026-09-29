@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-import inspect
 import json
 from dataclasses import fields
 from pathlib import Path
@@ -76,12 +75,32 @@ def test_an_unknown_module_is_refused_by_name():
         movement_module(None)
 
 
-def test_roads_are_stated_and_refused_with_their_own_refusal():
-    roads = movement_module(ROADS)
-    assert (roads.status, roads.refusal, roads.space_kind) == (
-        "not_connected",
-        "roads_not_connected",
-        "road-graph",
+def test_roads_are_built_on_the_wall_clock_and_run_in_their_host():
+    import importlib
+
+    roads = built_module(ROADS)
+    assert (roads.status, roads.refusal, roads.space_kind) == ("built", None, "road-graph")
+    assert (roads.clock_kind, roads.step_ms) == ("wall", 1000)
+    with pytest.raises(steps.MovementStepHosted) as refused:
+        steps.step_of(ROADS)
+    assert (refused.value.code, refused.value.host) == (
+        "movement_step_hosted",
+        "exulanica.world.traffic_episodes",
+    )
+    host = importlib.import_module(steps.HOSTED[ROADS])
+    assert callable(host.compute_episode) and roads.value("episode_steps") == host.EPISODE
+
+
+def test_a_module_not_connected_is_refused_with_its_own_refusal(tmp_path, monkeypatch):
+    """No shipped row is unbuilt, so the refusal is asked of a table whose roads row is."""
+    from exulanica.movement import registry
+
+    document = _table()
+    roads = next(row for row in document["modules"] if row["module"] == ROADS)
+    roads.update(status="not_connected", refusal="roads_not_connected")
+    unbuilt = _load(tmp_path, document)
+    monkeypatch.setattr(
+        registry, "_BY_NAME", MappingProxyType({row.module: row for row in unbuilt})
     )
     for lookup in (built_module, steps.step_of):
         with pytest.raises(MovementModuleNotConnected) as refused:
@@ -89,8 +108,10 @@ def test_roads_are_stated_and_refused_with_their_own_refusal():
         assert refused.value.code == "roads_not_connected"
 
 
-def test_the_step_table_holds_exactly_the_built_modules():
-    assert set(steps.STEPS) == {module.module for module in MODULES if module.status == "built"}
+def test_the_step_table_and_the_hosted_table_hold_exactly_the_built_modules():
+    built = {module.module for module in MODULES if module.status == "built"}
+    assert set(steps.STEPS) | set(steps.HOSTED) == built
+    assert not set(steps.STEPS) & set(steps.HOSTED)
     assert steps.step_of(WALKING) is walking.traverse
 
 
@@ -111,7 +132,7 @@ def _mutated(change):
         (lambda d: d["modules"].reverse(), "once each, in order"),
         (lambda d: d["modules"].append(copy.deepcopy(d["modules"][0])), "once each, in order"),
         (lambda d: d["modules"][0].update(refusal="not_needed"), "no refusal"),
-        (lambda d: d["modules"][1].update(refusal=None), "no refusal"),
+        (lambda d: d["modules"][1].update(status="not_connected"), "no refusal"),
         (lambda d: d["modules"][0]["space"].update(kind="water"), "space states its kind"),
         (lambda d: d["modules"][0]["clock"].update(kind="sundial"), "clock states its kind"),
         (lambda d: d["modules"][0].pop("output"), "states exactly"),
@@ -280,16 +301,15 @@ def test_both_societies_find_routes_by_the_walking_module():
 def test_every_profile_a_row_declares_is_the_one_its_code_reads_or_writes():
     from exulanica.movement.air import AIR_VOLUME_PROFILE, AirVolume
     from exulanica.traffic.network import NETWORK_PROFILE
-    from exulanica.traffic.presentation import presentation_frame
+    from exulanica.world.traffic_episodes import WINDOW_PROFILE
 
     rows = {row.module: row for row in MODULES}
     flight_row, roads_row, walking_row = rows[FLIGHT], rows[ROADS], rows[WALKING]
     volume = AirVolume("declared", 0, 500, 0, 500, 0, 500, 500)
     assert tuple(flight_row.space_profiles) == (AIR_VOLUME_PROFILE,)
     assert volume.document()["profile"] == AIR_VOLUME_PROFILE
-    # The traffic package writes its frame's profile as a literal, not a constant.
     assert tuple(roads_row.space_profiles) == (NETWORK_PROFILE,)
-    assert f'"profile": "{roads_row.output_profile}"' in inspect.getsource(presentation_frame)
+    assert WINDOW_PROFILE == roads_row.output_profile == "exulanica.traffic-window/v1"
     assert walking_row.output_profile == walking.MOTION_PATH_PROFILE
     assert set(walking_row.space_profiles) == set(NAVIGATION_PROFILES.values()) | set(
         PLACE_PROFILES

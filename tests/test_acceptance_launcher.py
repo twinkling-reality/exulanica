@@ -25,7 +25,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
-from exulanica.api.permissions import ACCOUNT_OWNER_PERMISSIONS
+from exulanica.api.permissions import ACCOUNT_OWNER_PERMISSIONS, Permission
 
 ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = ROOT / "scripts" / "acceptance" / "launch.py"
@@ -436,6 +436,16 @@ def test_a_playback_run_needs_readiness_to_report_its_one_workspace_played():
 def test_the_synthetic_grant_is_the_account_owners():
     assert set(LAUNCH.PERMISSIONS) == {permission.value for permission in ACCOUNT_OWNER_PERMISSIONS}
     assert len(LAUNCH.PERMISSIONS) == len(set(LAUNCH.PERMISSIONS))
+
+
+def test_tiles_add_the_tile_permission_to_the_synthetic_grant_only_when_asked():
+    parser = LAUNCH.build_parser()
+    assert parser.parse_args(["up", "--worktree", "w"]).tiles is False
+    assert parser.parse_args(["up", "--worktree", "w", "--tiles"]).tiles is True
+    assert Permission.TILES_MATERIALISE.value == LAUNCH.TILES_PERMISSION
+    assert LAUNCH.TILES_PERMISSION not in LAUNCH.PERMISSIONS
+    assert LAUNCH.synthetic_permissions(False) == list(LAUNCH.PERMISSIONS)
+    assert LAUNCH.synthetic_permissions(True) == [*LAUNCH.PERMISSIONS, LAUNCH.TILES_PERMISSION]
 
 
 def test_every_refusal_it_raises_is_registered_and_every_registered_one_is_raised():

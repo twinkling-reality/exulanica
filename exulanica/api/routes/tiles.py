@@ -1,4 +1,4 @@
-"""Baked tiles of a generated city, over HTTP. Two routes, and neither of them bakes.
+"""Baked tiles of a generated city, over HTTP. Three routes, and none of them bakes.
 
 *   ``GET /tiles?city_seed=<64 hex>[&lod=<int>]`` lists what is stored for one WORLD: each tile's
     key, coordinate, level of detail, container digest and size, its two triangle digests and its
@@ -11,7 +11,13 @@
     the ceiling limits how many distinct tiles a workspace materialises, not how often a walk
     reloads one.
 
-Both routes require ``tiles.materialise``. Nothing is granted that permission by default: a
+*   ``GET /tiles/traffic?world_seed=<64 hex>[&from_second=<int>][&seconds=<int>]`` serves a window
+    of the city's traffic: its vehicles, second by second, driving the roads its stored tiles state
+    (:mod:`exulanica.world.traffic_host`). It reads the tiles' stored containers for their records
+    and delivers no tile, so no tile quota is spent on it; without ``from_second`` the window starts
+    at the traffic's shared clock.
+
+All three routes require ``tiles.materialise``. Nothing is granted that permission by default: a
 generated world reaches no person's world until the governance decision is accepted in writing, so
 only a token whose grant names the permission is served a generated tile.
 
@@ -43,6 +49,7 @@ release in a package this change does not touch. The response's own top-level ke
 and is kept for the same reason rather than a weaker one: nothing reads it at all, since the
 client takes ten keys out of each ``tiles`` entry and never looks at the body's own key, so
 renaming it would have been free and half a renamed wire is harder to read than either whole one.
+The traffic route has no earlier reader, so its wire says ``world_seed`` in query and answer.
 
 The route was NOT made to accept both spellings. A parameter admitting two names is a gate that
 enumerates, and a reader here refuses an unrecognised name rather than widening to admit it.
@@ -60,13 +67,15 @@ found exactly that.
 
 from __future__ import annotations
 
+import json
 import uuid
-from typing import Annotated
+from typing import Annotated, Final
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.traffic.errors import UnsupportedNetworkError
 from exulanica.world.baked_tiles import (
     TILE_MEDIA_TYPE,
     BakedTileError,
@@ -75,6 +84,13 @@ from exulanica.world.baked_tiles import (
     TileBytesMissing,
     TileQuotaRefused,
     UnknownBakedTile,
+)
+from exulanica.world.traffic_episodes import TrafficRefused, check_clock, check_request
+from exulanica.world.traffic_host import (
+    TrafficWorkerUnavailable,
+    generated_tile_roads,
+    served_window,
+    traffic_clock,
 )
 
 __all__ = ["router"]
@@ -137,6 +153,70 @@ def list_tiles(
         content={"city_seed": world_seed, "tiles": [tile.document() for tile in tiles]},
         headers=_HEADERS,
     )
+
+
+#: A window a request did not bound: the roads module's refusals, a caller's to correct.
+_TRAFFIC_REQUEST_REFUSALS: Final = frozenset(
+    {"traffic_second_out_of_range", "traffic_window_too_long"}
+)
+
+
+def _traffic_refusal(error: TrafficRefused) -> JSONResponse:
+    if isinstance(error, TrafficWorkerUnavailable):
+        return _problem(503, error.code, error.detail)
+    if error.code == "roads_not_stated":
+        return _problem(404, error.code, error.detail)
+    status = 422 if error.code in _TRAFFIC_REQUEST_REFUSALS else 409
+    return _problem(status, error.code, error.detail)
+
+
+def _vehicles_encoded(answer: dict[str, object]) -> bytes:
+    """The answer as JSON, a vehicle at a time, so a request answered beside this one waits for at
+    most one vehicle's seconds rather than the whole window's."""
+
+    def encode(value: object) -> bytes:
+        return json.dumps(
+            value, ensure_ascii=False, allow_nan=False, separators=(",", ":")
+        ).encode()
+
+    rest = encode({key: value for key, value in answer.items() if key != "vehicles"})
+    vehicles = b",".join(encode(row) for row in answer["vehicles"])  # type: ignore[attr-defined]
+    return b'{"vehicles":[' + vehicles + b"]," + rest[1:]
+
+
+@router.get(
+    "/traffic",
+    summary="The vehicles driving a stored generated city's streets, second by second, to draw.",
+)
+def tile_traffic(
+    request: Request,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_seed: Annotated[str, Query(pattern=r"^[0-9a-f]{64}$")],
+    from_second: Annotated[int | None, Query()] = None,
+    seconds: Annotated[int, Query()] = 60,
+) -> Response:
+    clock = traffic_clock()
+    start = clock if from_second is None else from_second
+    try:
+        check_request(start, seconds)
+        check_clock(start, clock)
+        repository = _repository(request, connection)
+        value = generated_tile_roads(repository, world_seed)
+        window = served_window(value, start, seconds)
+    except TrafficRefused as error:
+        return _traffic_refusal(error)
+    except UnsupportedNetworkError as error:
+        return _problem(409, "roads_unavailable", str(error))
+    except (BakedTileError, _Unavailable) as error:
+        return _refused(error)
+    answer = {
+        **window,
+        "clock_second": traffic_clock(),
+        "world_seed": world_seed,
+        "version_id": value.version_id,
+    }
+    return Response(_vehicles_encoded(answer), media_type="application/json", headers=_HEADERS)
 
 
 def _revalidates(header: str | None, digest: str) -> bool:

@@ -151,8 +151,9 @@ def test_traffic_imports_nothing_first_party_but_grammar_canonical_and_errors():
                     ), f"{path.name} imports {module}"
 
 
-def test_traffic_reads_the_city_in_one_module():
-    """Only the converter names the city grammar, so a new city version changes one file."""
+def test_traffic_reads_the_city_in_two_modules():
+    """Only the converter and the derivation name the city grammar, so a new city version changes
+    what traffic reads of it in two files: the records it converts and the ones it derives."""
     readers = []
     for path in _sources():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -164,7 +165,7 @@ def test_traffic_reads_the_city_in_one_module():
                 modules.extend(alias.name for alias in node.names)
             if any(module.startswith("exulanica.grammar.grammars") for module in modules):
                 readers.append(path.name)
-    assert sorted(set(readers)) == ["city_roads.py"]
+    assert sorted(set(readers)) == ["city_derivation.py", "city_roads.py"]
     assert not _PACKAGE.joinpath("provisional_records.py").exists()
 
 

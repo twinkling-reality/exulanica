@@ -71,24 +71,33 @@
         "reason": "The traffic simulation's vehicle classes (assets/catalogs/traffic/vehicle-class.v1.json), each bounded by that catalog's own integer fields and their cited sources."
       },
       "clock": {
-        "kind": "host",
-        "reason": "The traffic step advances one simulated second a call, where the society advances a minute; a host that runs both must state how the two clocks meet before either is connected.",
+        "kind": "wall",
+        "reason": "Shared real time: second n is the nth second since the Unix epoch, read from the server's clock, as the flight's step n is its nth 100 ms, so every page showing a world shows its vehicles in the same places at the same moment, and one computation of an episode serves them all. Nothing is stored: traffic is derived from a world's road records and version, with every choice drawn from the seed. The society's one-minute tick is not this clock and does not move it: vehicles keep driving at normal speed while the people are paused or sped up, and no crossing a walker makes is fed to traffic.",
         "step_ms": 1000
       },
       "module": "exulanica-movement/roads/v1",
       "output": {
-        "profile": "exulanica.traffic-presentation-frame/v1",
-        "reason": "The traffic presentation frame: each vehicle's axles, recorded path, dimensions, body family and colour."
+        "profile": "exulanica.traffic-window/v1",
+        "reason": "The traffic presentation frame (exulanica.traffic-presentation-frame/v1) of every second of a window, grouped by vehicle: its axles, the path its front passed, its mode, speed and place each second, and its class, body family, colour and dimensions once. A renderer draws the body from these and moves it along the path, never across its corners."
       },
-      "parameters": [],
-      "reason": "Road movement exists as exulanica/traffic, a complete deterministic simulation that nothing in the application calls. A world needs lane connections, parking spaces and signals, which nothing writes, a host that owns the fleet, trips and receipts, the society's crossing feed and a vehicle renderer before vehicles appear in it.",
-      "refusal": "roads_not_connected",
+      "parameters": [
+        {"maximum": 1200, "minimum": 1200, "name": "clock_reach_steps", "reason": "How far from the clock, either way, a window may start: one episode. A page reads the minute ahead of the clock, so a window further off is refused by name (traffic_second_out_of_range) and a server computes only the episodes around the clock.", "unit": "step", "value": 1200},
+        {"maximum": 300, "minimum": 300, "name": "departure_steps", "reason": "The first five minutes of an episode, in which each vehicle leaves home once, at a second drawn from the seed; the rest of the episode is for its stay and its drive home.", "unit": "step", "value": 300},
+        {"maximum": 90, "minimum": 90, "name": "dwell_steps_maximum", "reason": "The longest a vehicle stays where it drove to before it drives home, drawn from the seed.", "unit": "step", "value": 90},
+        {"maximum": 30, "minimum": 30, "name": "dwell_steps_minimum", "reason": "The shortest a vehicle stays where it drove to before it drives home.", "unit": "step", "value": 30},
+        {"maximum": 1200, "minimum": 1200, "name": "episode_steps", "reason": "Twenty minutes an episode. Every vehicle starts an episode parked at home, where the fleet's genesis places it, and a vehicle not parked at home at the episode's last second is named in the window, not moved.", "unit": "step", "value": 1200},
+        {"maximum": 500, "minimum": 500, "name": "fleet_share_permille", "reason": "The share, in thousandths, of each parking kind's places that hold a vehicle when an episode starts: half, so every vehicle has a place free to drive to and none takes another's home.", "unit": "permille", "value": 500},
+        {"maximum": 60, "minimum": 60, "name": "max_steps_per_request", "reason": "One minute a request: a page asks for the next minute while it plays the current one.", "unit": "step", "value": 60},
+        {"maximum": 120, "minimum": 120, "name": "max_vehicles", "reason": "The most vehicles one world's traffic drives: a world whose home places would host more is refused by name (roads_world_too_large), never trimmed.", "unit": "vehicle", "value": 120}
+      ],
+      "reason": "Road movement: the traffic simulation (exulanica/traffic) driving a world's road records second by second: cars, vans, buses and bicycles keep their lanes, stop at stop lines, take turns at junctions by the junction's rule and park. A host above this package (exulanica/world/traffic_host.py) composes a world's records and has a worker process compute whole episodes, deriving the lane connections and parking spaces the records imply; the step is advance_traffic, one simulated second a call.",
+      "refusal": null,
       "space": {
         "kind": "road-graph",
         "profiles": ["exulanica.traffic-network/v2"],
-        "reason": "A compiled road network: lanes, directional connections, conflict zones, crossings and parking, from road records no world holds."
+        "reason": "A compiled road network: a world's city road records with the lane connections and parking spaces traffic derives from them (exulanica/traffic/city_derivation.py): lanes, directional connections, conflict zones, crossings and parking."
       },
-      "status": "not_connected"
+      "status": "built"
     },
     {
       "agents": {
