@@ -215,14 +215,27 @@ def plan_society_comparison(
     navigation = comparisons.navigation_profile(society)
     services = get_services(request)
     refusal = services.comparison_refusal(session.workspace_id)
+    # A society whose engine takes no comparison is answered with the start's own refusal, and
+    # none of its people are read: its state need not name them the way a compared one does.
+    engine = str(society["engine_version"])
+    compared = society_engine(engine).comparisons
+    refused = (
+        {"code": refusal, "detail": _HOST_DETAIL[refusal]}
+        if refusal is not None
+        else None
+        if compared
+        else {"code": "engine_takes_no_comparison", "detail": f"{engine} takes no comparison"}
+    )
     running = SocietyComparisonStarts(connection, session.workspace_id).unfinished(world_id)
     catalogs = services.comparison_catalogs or load_comparison_catalogs()
     population = int(society["population_size"])
     document: dict[str, Any] = {
         "profile": PLAN_PROFILE,
-        "refusal": None if refusal is None else {"code": refusal, "detail": _HOST_DETAIL[refusal]},
+        "refusal": refused,
         "running": None if running is None else str(running["comparison_id"]),
-        "roles": _choices(services, connection, session, world_id, version_id, society, navigation),
+        "roles": _choices(services, connection, session, world_id, version_id, society, navigation)
+        if compared
+        else [],
         "seeds_available": len(services.comparison_seeds),
         "models_most": MODELS_MOST,
         "window_ticks": protocol_value(catalogs, "window_ticks"),
@@ -237,7 +250,9 @@ def plan_society_comparison(
                 for person in society["state"]["inhabitants"]
             ),
             key=lambda person: (person["name"], person["id"]),
-        ),
+        )
+        if compared
+        else [],
         "typical_record": TYPICAL_RECORDS.get(navigation, (TYPICAL_RECORD, ""))[0],
         "plan": None,
         "plan_refusal": None,
