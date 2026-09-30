@@ -122,6 +122,7 @@ def test_the_step_and_the_served_codes_use_the_same_sealed_extension():
     from exulanica.traffic.inputs import CrossingFeed, TrafficInputs
     from exulanica.traffic.presentation import signal_codes
     from exulanica.traffic.simulation import advance_traffic, initial_traffic
+
     from traffic_scenarios import fixture, seed_for, traffic_id_for
 
     network, catalogs = fixture()
@@ -137,13 +138,15 @@ def test_the_step_and_the_served_codes_use_the_same_sealed_extension():
     )
     inputs = TrafficInputs(trips=(), feeds=(CrossingFeed(1, 1300, ()),))
     for _ in range(25):
-        step = advance_traffic(
-            state, seed, network, catalogs, inputs, signal_timelines=timelines
-        )
+        step = advance_traffic(state, seed, network, catalogs, inputs, signal_timelines=timelines)
         state = step.state
-    changes = [event["document"] for event in step.events if event["document"]["kind"] == "signal_interval"]
+    changes = [
+        event["document"] for event in step.events if event["document"]["kind"] == "signal_interval"
+    ]
     assert any(event["interval"] == 8 for event in changes)
-    heads = [j.signal for j in sorted(network.junctions.values(), key=lambda j: j.identity) if j.signal]
+    heads = [
+        j.signal for j in sorted(network.junctions.values(), key=lambda j: j.identity) if j.signal
+    ]
     index = next(index for index, item in enumerate(heads) if item.identity == signal.identity)
     groups = catalogs.plan(signal.plan).groups
     codes = signal_codes(network, catalogs, 24, signal_timelines=timelines)[index]
