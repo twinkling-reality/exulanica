@@ -12,18 +12,24 @@ narrowest shopfront and its glazing's height; the depth is narrowed to hold the 
 
 **The fitout's parts.** As many whole units as the vitrine's width holds, side by side, the row
 centred along the run; every part is the catalog's, moved along the run only.
+
+**Stage version 3** (:data:`STAGE_V3`, which city grammar version 5 runs after the premises stage)
+dresses a building's windows for the use its shops already have: the fitout is derived among
+those that fit (:func:`fitting_fitouts`) and serve that use, so the use a district's weights drew
+chooses the window, not the other way round.
 """
 
 from __future__ import annotations
 
 import dataclasses
 from collections.abc import Iterator
+from functools import partial
 from typing import Final
 
 from exulanica.grammar.contract import StageContext
 from exulanica.grammar.errors import InvalidRecordError
 from exulanica.grammar.geometry import Extent
-from exulanica.grammar.grammars.city import facade, massing, parcels, streets, vitrine
+from exulanica.grammar.grammars.city import facade, massing, parcels, premises, streets, vitrine
 from exulanica.grammar.grammars.city.catalogs import form_parts
 from exulanica.grammar.grammars.city.common import FormPart
 from exulanica.grammar.grammars.city.generation.facade import building_shop_units
@@ -35,9 +41,12 @@ from exulanica.grammar.grammars.city.generation.stage import (
     prior_records,
 )
 
-__all__ = ["STAGE", "unit_width_mm"]
+__all__ = ["STAGE", "STAGE_V3", "STAGE_VERSION_3", "fitting_fitouts", "unit_width_mm"]
 
 _LOTS_PER_BLOCK: Final = 10_000
+#: The stage version that dresses a window for its shop's use (the docstring's last section).
+#: Version 2 is :data:`~exulanica.grammar.grammars.city.vitrine.STAGE_VERSION`.
+STAGE_VERSION_3: Final = 3
 
 
 def unit_width_mm(parts: tuple[FormPart, ...]) -> int:
@@ -51,6 +60,21 @@ def _unit_depth_mm(parts: tuple[FormPart, ...]) -> int:
 
 def _unit_height_mm(parts: tuple[FormPart, ...]) -> int:
     return max(part.offset_z_mm + part.size_z_mm for part in parts)
+
+
+def fitting_fitouts(shopfronts: list[facade.GroundBayRecord]) -> list[str]:
+    """Every fitout whose unit fits the narrowest of these shopfronts and their lowest glazing, in
+    the catalog's order: ONE STATEMENT of what a building's windows can hold, which the premises
+    stage reads too when it draws a use before the windows are dressed."""
+    glazing = [panel for bay in shopfronts for panel in bay.panels if panel.role == "glazing"]
+    height = min(panel.z_top_mm - panel.z_bottom_mm for panel in glazing)
+    narrowest = min(bay.width_mm for bay in shopfronts)
+    fitting = []
+    for item in catalog("fitout").entries:
+        parts = form_parts(entry("fitout", item.key)["parts"])
+        if unit_width_mm(parts) <= narrowest and _unit_height_mm(parts) <= height:
+            fitting.append(item.key)
+    return fitting
 
 
 def _face_frame(
@@ -129,8 +153,18 @@ def _backings(
         )
 
 
-def _generate(context: StageContext) -> Iterator[object]:
+def _generate(context: StageContext, for_use: bool = False) -> Iterator[object]:
     buildings = prior_records(context, massing.STAGE_ID, massing.MassingRecord)
+    # With ``for_use``, the premises stage has run: each shopfront bay's shop states its use.
+    use_of_bay = (
+        {
+            bay: record.use_class
+            for record in prior_records(context, premises.STAGE_ID, premises.PremisesRecord)
+            for bay in record.bay_identities
+        }
+        if for_use
+        else {}
+    )
     lots = {
         record.identity: record
         for record in prior_records(context, parcels.STAGE_ID, parcels.ParcelRecord)
@@ -160,20 +194,15 @@ def _generate(context: StageContext) -> Iterator[object]:
         if not shopfronts:
             continue
         ordinal = block_ordinals[lot.block_identity] * _LOTS_PER_BLOCK + lot.parcel_ordinal
-        glazing = [panel for bay in shopfronts for panel in bay.panels if panel.role == "glazing"]
-        height = min(panel.z_top_mm - panel.z_bottom_mm for panel in glazing)
-        narrowest = min(bay.width_mm for bay in shopfronts)
-        uses = set(entry("typology", building.typology)["ground_floor_uses"])
-        options = []
-        for item in catalog("fitout").entries:
-            fields = entry("fitout", item.key)
-            parts = form_parts(fields["parts"])
-            if (
-                uses & set(fields["use_classes"])
-                and unit_width_mm(parts) <= narrowest
-                and _unit_height_mm(parts) <= height
-            ):
-                options.append(item.key)
+        if for_use:
+            uses = {use_of_bay[shopfronts[0].identity]}
+        else:
+            uses = set(entry("typology", building.typology)["ground_floor_uses"])
+        options = [
+            key
+            for key in fitting_fitouts(shopfronts)
+            if uses & set(entry("fitout", key)["use_classes"])
+        ]
         if not options:
             raise InvalidRecordError(f"no fitout fits building {building.identity}'s shopfronts")
         fitout = derived(context, "fitout", ordinal, options=sorted(options))
@@ -237,4 +266,11 @@ STAGE: Final = GeneratorStage(
     vitrine.STAGE_VERSION,
     (vitrine.SHAPE, vitrine.BACKING_SHAPE),
     _generate,
+)
+#: Stage version 3: the same records, each window dressed for its shop's use.
+STAGE_V3: Final = GeneratorStage(
+    vitrine.STAGE_ID,
+    STAGE_VERSION_3,
+    STAGE.shapes,
+    partial(_generate, for_use=True),
 )

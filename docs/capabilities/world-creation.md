@@ -116,11 +116,12 @@ specified in [owned district and source admission](../owned-district-and-admissi
 
 A generated town is one tile deep and at most three long, and its streets and uses are mixed as
 version 4 of the city grammar mixes them: no value sets how many of its streets are high streets or
-what share of its buildings are homes, shops or workplaces, because the grammar declares no such
-parameter. A town two tiles long takes cross streets at most 120 m apart because a tile's document
-does not carry the kerb that a kerb it carries continues into when that kerb lies beyond the tile's
-64 m margin, and the tessellator refuses such a tile; a later version of the specification lifts the
-rule once a tile carries every such kerb. Its people follow the purposeful routine (visiting shops,
+what share of its buildings are homes, shops or workplaces, because the specification offers no such
+value, although version 5 of the grammar declares them ([generator system](../grammar-package.md#7-the-city-stages)).
+A town two tiles long takes cross streets at most 120 m apart, a rule measured when the tessellator
+refused a tile that did not carry the kerb a straight kerb it owns runs on into beyond the tile's
+64 m margin; the tessellator draws such a straight join without that kerb, and a later version of the
+specification lifts the rule. Its people follow the purposeful routine (visiting shops,
 resting on benches, standing and talking), not the living society's homes and shifts. Traffic drove
 20 of 20 small towns and 17 of 20 market towns measured; a town whose roads it cannot drive is still
 made, without vehicles, and the page says why by the refusal's name. A town's people are compared

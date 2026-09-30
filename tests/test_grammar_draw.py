@@ -105,8 +105,16 @@ _CITY_BINDINGS = (CascadeBinding.of("city", _CITY_VALUES),)
 #: crossing and a stop line before it; each is refused by name. 44 m is the least depth tried
 #: (in steps of 2 m) at which the city generates.
 _CITY_V4_BINDINGS = (CascadeBinding.of("city", {**_CITY_VALUES, "block_depth_mm": 44_000}),)
+#: Version 5 reads the street mix and the use mix, left unset here so each is derived or drawn
+#: from the seed: the emitted set then holds what version 5 lays by itself.
+_CITY_V5_BINDINGS = _CITY_V4_BINDINGS
 #: What generating each registered grammar needs besides a seed and a subject.
-_BINDINGS = {("box", 1): (), ("city", 3): _CITY_BINDINGS, ("city", 4): _CITY_V4_BINDINGS}
+_BINDINGS = {
+    ("box", 1): (),
+    ("city", 3): _CITY_BINDINGS,
+    ("city", 4): _CITY_V4_BINDINGS,
+    ("city", 5): _CITY_V5_BINDINGS,
+}
 
 
 def _stage_for(kind: str):
@@ -300,6 +308,7 @@ bindings = {
     ("box", 1): (),
     ("city", 3): (CascadeBinding.of("city", values),),
     ("city", 4): (CascadeBinding.of("city", {**values, "block_depth_mm": 44000}),),
+    ("city", 5): (CascadeBinding.of("city", {**values, "block_depth_mm": 44000}),),
 }
 spec = importlib.util.spec_from_file_location("city_v2_fixture_builder", builder_path)
 fixture = importlib.util.module_from_spec(spec)

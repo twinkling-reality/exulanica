@@ -11,6 +11,11 @@ and otherwise draws within the declared range narrowed by whatever catalog range
 domain named for the parameter and the subject. The narrowing never widens the declared range: a
 catalog range that does not meet it is refused, not clamped.
 
+**Weights.** A choice may be derived in proportion to weights (:func:`weighted_pick`): a subject
+draws among the options it admits in proportion to each one's weight, and evenly among them when
+every one weighs 0, so a weight states a preference among what fits and never leaves a subject with
+nothing. A version that states no weights draws evenly, exactly as before weights existed.
+
 **Earlier stages.** :func:`prior_records` returns what an earlier stage emitted, by kind, and
 refuses a stage that has not run.
 """
@@ -41,6 +46,7 @@ __all__ = [
     "entry",
     "pick",
     "prior_records",
+    "weighted_pick",
 ]
 
 #: Every bounded draw's span is below this, so a choice among catalog keys is always one draw.
@@ -128,6 +134,30 @@ def pick(context: StageContext, decision: str, ordinal: int, options: Sequence[A
     return options[draw(context, decision, ordinal, 0, len(options) - 1)]
 
 
+def weighted_pick(
+    context: StageContext,
+    decision: str,
+    ordinal: int,
+    options: Sequence[str],
+    weights: Mapping[str, int],
+) -> str:
+    """One of ``options`` in proportion to its weight, by one bounded draw; evenly when every
+    option weighs 0. Every option must have a weight: an option with none is refused by name
+    rather than read as 0."""
+    missing = [option for option in options if option not in weights]
+    if missing:
+        raise InvalidParameterError(f"{decision}: no weight states {missing}")
+    total = sum(weights[option] for option in options)
+    if total == 0:
+        return pick(context, decision, ordinal, options)  # type: ignore[no-any-return]
+    point = draw(context, decision, ordinal, 0, total - 1)
+    for option in options:
+        if point < weights[option]:
+            return option
+        point -= weights[option]
+    raise InvalidParameterError(f"{decision}: a draw of {point} fell past its {total} weights")
+
+
 def derived(
     context: StageContext,
     name: str,
@@ -136,13 +166,15 @@ def derived(
     minimum: int | None = None,
     maximum: int | None = None,
     options: Sequence[str] | None = None,
+    weights: Mapping[str, int] | None = None,
 ) -> ParameterValue:
     """A parameter's value for the subject ``ordinal``: the bound value, or a derivation.
 
     The draw is in the parameter's own decision domain, ``city.<stage>.<name>``. ``minimum`` and
     ``maximum`` narrow an integer's declared range, and ``options`` narrow a choice's, when a
     catalog entry the subject already has says so; a narrowing that misses the declared range is
-    refused. A bound value outside the narrowed range is refused too, never clamped.
+    refused. A bound value outside the narrowed range is refused too, never clamped. ``weights``
+    make a choice's draw proportional (:func:`weighted_pick`); without them it is even.
     """
     spec = CITY_SURFACES[context.grammar_version].parameters.get(name)
     if spec.stage != context.stage_id:
@@ -168,6 +200,8 @@ def derived(
         if bound not in allowed:
             raise InvalidParameterError(f"{name} is bound to {bound!r}, not one of {allowed}")
         return bound
+    if weights is not None:
+        return weighted_pick(context, name, ordinal, allowed, weights)
     return pick(context, name, ordinal, allowed)
 
 

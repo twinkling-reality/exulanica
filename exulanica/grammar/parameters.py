@@ -65,7 +65,17 @@ DRAWN: Final = "draw"
 #: The source recorded for a parameter whose value each reading stage derives per subject.
 DERIVED: Final = "derive"
 #: The units a declared parameter may state. ``key`` is the unit of every choice and only of one.
-PARAMETER_UNITS: Final = ("mm", "count", "millionths", "urad", "ms", "mm_per_s", "key")
+#: ``permille`` is a share in thousandths, the unit of a weight among options.
+PARAMETER_UNITS: Final = (
+    "mm",
+    "count",
+    "millionths",
+    "permille",
+    "urad",
+    "ms",
+    "mm_per_s",
+    "key",
+)
 #: The vocabulary of a choice whose options exist only in the descriptor that lists them.
 CLOSED_VOCABULARY: Final = "closed"
 

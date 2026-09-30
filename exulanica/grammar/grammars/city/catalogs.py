@@ -80,7 +80,12 @@ KERBSIDE_PARKING: Final = ("both_sides", "none")
 #: The street hierarchy edition each generating grammar version reads. Version 4's streets stage
 #: reads ``kerbside_parking``, which edition 3 adds; every field edition 2 states, edition 3
 #: states with the same value, and ``tests/test_city_grammar_v4.py`` holds the two to that.
-_STREET_HIERARCHY_EDITION: Final = MappingProxyType({3: 2, 4: 3})
+_STREET_HIERARCHY_EDITION: Final = MappingProxyType({3: 2, 4: 3, 5: 3})
+#: The material edition each generating grammar version reads. Edition 5 adds ``terrain`` to the
+#: surfaces the tree pit soil dresses, which version 5's material stage dresses the bare ground
+#: with; every other field is edition 4's, and ``tests/test_city_grammar_v5.py`` holds the two to
+#: that.
+_MATERIAL_EDITION: Final = MappingProxyType({3: 4, 4: 4, 5: 5})
 _MILLIMETRES: Final = integer_field(0, 100_000_000)
 _BAND_TOP: Final = integer_field(1, 100_000)
 _FORM_PART_FIELDS: Final = tuple(field.name for field in dataclasses.fields(FormPart))
@@ -299,7 +304,7 @@ def city_catalog_schemas(
         ),
         CatalogSchema(
             "material",
-            4,
+            _MATERIAL_EDITION[grammar_version],
             (
                 ("label", text_field),
                 (

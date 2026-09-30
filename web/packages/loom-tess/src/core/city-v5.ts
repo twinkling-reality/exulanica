@@ -1,9 +1,9 @@
 /**
- * THE CITY GRAMMAR, VERSION 4, AS DATA. GENERATED: do not edit by hand.
+ * THE CITY GRAMMAR, VERSION 5, AS DATA. GENERATED: do not edit by hand.
  *
  * Written by `test/write-grammar-table.ts` from the grammar's own record shape table
- * (`exulanica/grammar/grammars/city/city-shapes.v4.json`) and the frame, contract measures and navigation table of
- * `exulanica/grammar/grammars/city/city.v4.json`.
+ * (`tests/fixtures/city-v2/record-shapes.json`) and the frame, contract measures and navigation table of
+ * `exulanica/grammar/grammars/city/city.v5.json`.
  * `test/grammar-table.test.ts` and `tests/test_bake_determinism.py` hold it equal to both.
  *
  * It is one of the files in `src/core` that spells grammar vocabulary: field names, bounds and
@@ -11,10 +11,10 @@
  */
 import type { GrammarTable } from './grammar-table.js';
 
-export const CITY_V4: GrammarTable = {
+export const CITY_V5: GrammarTable = {
   "grammar_id": "city",
-  "grammar_version": 4,
-  "descriptor_sha256": "a11af93a79d33d13dc656e66dd8e38215061920e2fce4f751c0df1e1db7bcf20",
+  "grammar_version": 5,
+  "descriptor_sha256": "fb3f6a70c4b95882f3a0f5973a0af205d7a752bb75bc217c5ad4a72d00780dc1",
   "frame": {
     "name": "city_local",
     "units": "mm",
@@ -1109,7 +1109,7 @@ export const CITY_V4: GrammarTable = {
           },
           {
             "kind": "integer",
-            "maximum": 4,
+            "maximum": 5,
             "minimum": 3,
             "name": "grammar_version"
           },

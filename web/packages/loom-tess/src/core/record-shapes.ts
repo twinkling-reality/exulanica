@@ -35,6 +35,7 @@
 import { CITY_V2 } from './city-v2.js';
 import { CITY_V3 } from './city-v3.js';
 import { CITY_V4 } from './city-v4.js';
+import { CITY_V5 } from './city-v5.js';
 import { FIELD_KINDS } from './grammar-table.js';
 import type { FieldShape, GrammarTable, NavigationRow, RecordShape } from './grammar-table.js';
 
@@ -62,7 +63,7 @@ export const TEXTURE_SET_ID_PATTERN = /^[a-z][a-z0-9.-]*$/;
  * fault is a version. `document.tileTableOf` is what resolves it, and the order here decides
  * nothing.
  */
-export const GRAMMAR_TABLES: readonly GrammarTable[] = [CITY_V2, CITY_V3, CITY_V4];
+export const GRAMMAR_TABLES: readonly GrammarTable[] = [CITY_V2, CITY_V3, CITY_V4, CITY_V5];
 
 export class ShapeTableError extends Error {}
 

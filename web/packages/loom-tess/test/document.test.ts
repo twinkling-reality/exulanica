@@ -109,11 +109,11 @@ describe('the tile document reader', () => {
       ['a tile with another ownership rule', (d: any) => { d.tile.fields.ownership_rule = 'nearest'; }, /ownership_rule: is not one of/],
       ['a grammar the tile does not pin', (d: any) => { d.grammars[0].grammar_id = 'town'; }, /grammar_id: is not the tile's pin/],
       ['a descriptor the tile does not pin', (d: any) => { d.grammars[0].descriptor_sha256 = '0'.repeat(64); }, /descriptor_sha256: is not the tile's pin/],
-      ['a grammar version this tessellator does not read', (d: any) => { d.grammars[0].grammar_version = 1; d.tile.fields.grammar_versions[0].grammar_version = 1; }, /pins city version 1, and this tessellator reads \[2,3,4\]/],
+      ['a grammar version this tessellator does not read', (d: any) => { d.grammars[0].grammar_version = 1; d.tile.fields.grammar_versions[0].grammar_version = 1; }, /pins city version 1, and this tessellator reads \[2,3,4,5\]/],
       // The version a tile record pins decides which shape that record is read against, so it is
       // answered before any field of it. A document at an unread version must say THAT, and must
       // never report a field of some other version's shape as the thing that is wrong with it.
-      ['a tile record at an unread version, with a field of it missing too', (d: any) => { d.grammars[0].grammar_version = 9; d.tile.fields.grammar_versions[0].grammar_version = 9; delete d.tile.fields.lod; }, /pins city version 9, and this tessellator reads \[2,3,4\]/],
+      ['a tile record at an unread version, with a field of it missing too', (d: any) => { d.grammars[0].grammar_version = 9; d.tile.fields.grammar_versions[0].grammar_version = 9; delete d.tile.fields.lod; }, /pins city version 9, and this tessellator reads \[2,3,4,5\]/],
       ['a plane that is not invented', (d: any) => { d.grammars[0].declared_semantics.plane = 'recorded'; }, /plane: is not one of/],
       ['a use that is not a projection', (d: any) => { d.grammars[0].declared_semantics.admissible_uses = ['display']; }, /is not one of/],
       ['uses out of order', (d: any) => { d.grammars[0].declared_semantics.admissible_uses = ['nav_envelope', 'render_batch']; }, /in the order/],
@@ -329,7 +329,7 @@ describe('the coordinate unit a tile document states (ADR-0024)', () => {
       d.tile.fields.grammar_versions[0].grammar_version = 99;
       d.grammars[0].grammar_version = 99;
     });
-    refuses(unread, /pins city version 99, and this tessellator reads \[2,3,4\]/);
+    refuses(unread, /pins city version 99, and this tessellator reads \[2,3,4,5\]/);
   });
 
   it('refuses to BAKE a unit this build does not write, which no shipped grammar can yet produce', () => {

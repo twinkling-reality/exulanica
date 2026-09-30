@@ -44,11 +44,19 @@ derived per building so one building's shopfronts are dirty alike, and stated on
 surfaces only: every other role states 0, which the record's ``soil_band_role`` rule holds. No
 published set dresses glazing yet, so this version writes no glazing record at all and the bands
 reach the document the moment one does.
+
+**Stage version 3** (:data:`STAGE_V3`, which city grammar version 5 runs) dresses what version 2
+leaves undressed. Every face's ground band takes a material, a party wall's included: version 2
+skips a party wall's band, which the tessellator draws on every ground storey face, so a band
+behind a neighbour showed through shop glass as the unavailable pattern. And every terrain patch
+takes the first material in its role's order that dresses terrain, which edition 5 of the material
+catalog gives the tree pit soil: a city's bare ground where no street, block or lot is drawn.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
+from functools import partial
 from typing import Final
 
 from exulanica.grammar.contract import StageContext
@@ -61,9 +69,11 @@ from exulanica.grammar.grammars.city import (
     roads,
     streetlife,
     streets,
+    terrain,
     vitrine,
 )
 from exulanica.grammar.grammars.city.common import SURFACE_ROLE_CODES
+from exulanica.grammar.grammars.city.descriptor import CITY_GRAMMAR_VERSION
 from exulanica.grammar.grammars.city.generation.stage import (
     GeneratorStage,
     catalog,
@@ -72,7 +82,7 @@ from exulanica.grammar.grammars.city.generation.stage import (
     prior_records,
 )
 
-__all__ = ["ROLE_MATERIALS", "STAGE"]
+__all__ = ["ROLE_MATERIALS", "STAGE", "STAGE_V3", "STAGE_VERSION_3"]
 
 #: For each role, ``wall`` (the building's wall material, if it dresses the role) and then the
 #: materials to try, in order. Authored; awaiting generated appearance.
@@ -104,6 +114,9 @@ ROLE_MATERIALS: Final = {
     "crossing": ("road_paint_white",),
     "trunk": ("tree_bark",),
     "canopy": ("broadleaf_foliage",),
+    # Bare ground, dressed from stage version 3 on: the material catalog's edition 5 names the one
+    # material that dresses it.
+    "terrain": ("tree_pit_soil",),
 }
 #: An interior backing takes the ``wall`` role and this order, not the building's wall material:
 #: the finish inside a room is not what the street front is built of, and brick reads wrong.
@@ -114,17 +127,30 @@ _LOTS_PER_BLOCK: Final = 10_000
 #: Draw ordinals for surfaces no building owns, clear of every building's ordinal.
 _STREETS: Final = 1 << 30
 _GROUNDS: Final = 1 << 31
+#: Draw ordinals for terrain patches, clear of every ground's: a ground's ordinal is below
+#: ``_GROUNDS`` plus a lot's, which stays under ``1 << 30`` more.
+_TERRAIN: Final = 3 << 30
+#: The stage version that dresses every ground band and the bare ground (the docstring's last
+#: section). Version 2 is :data:`~exulanica.grammar.grammars.city.material.STAGE_VERSION`.
+STAGE_VERSION_3: Final = 3
 
 
-def _material_for(role: str, wall: str | None, order: tuple[str, ...] | None = None) -> str:
+def _material_for(
+    role: str,
+    wall: str | None,
+    order: tuple[str, ...] | None = None,
+    grammar_version: int = CITY_GRAMMAR_VERSION,
+) -> str:
     for choice in order or ROLE_MATERIALS[role]:
         key = wall if choice == "wall" else choice
-        if key is not None and role in entry("material", key)["surfaces"]:
+        if key is not None and role in entry("material", key, grammar_version)["surfaces"]:
             return key
     raise InvalidRecordError(f"no material in the role table dresses a {role} surface")
 
 
-def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]:
+def _generate(
+    context: StageContext, dress_all: bool = False
+) -> Iterator[material.SurfaceMaterialRecord]:
     buildings = prior_records(context, massing.STAGE_ID, massing.MassingRecord)
     lots = {
         record.identity: record
@@ -226,7 +252,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
                 facade.PANEL_SURFACE_ROLES[panel.role] for bay in face_bays for panel in bay.panels
             }
             roles = ["wall"]
-            if face.first_storey == 0 and face.exposure != "party_wall":
+            if face.first_storey == 0 and (dress_all or face.exposure != "party_wall"):
                 roles.append("ground_band")
             roles += [
                 role
@@ -413,8 +439,27 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             (repeat, 0, 0, 0, 0, 0),  # type: ignore[arg-type]
             _GROUNDS + _LOTS_PER_BLOCK + ordinal,
         )
+    if not dress_all:
+        return
+    for patch in prior_records(context, terrain.STAGE_ID, terrain.TerrainRecord):
+        repeat = derived(context, "repeat_size_millionths", _TERRAIN + patch.tile_ordinal)
+        yield record(
+            patch.identity,
+            "city.terrain",
+            "terrain",
+            _material_for("terrain", None, grammar_version=context.grammar_version),
+            (repeat, 0, 0, 0, 0, 0),  # type: ignore[arg-type]
+            _TERRAIN + patch.tile_ordinal,
+        )
 
 
 STAGE: Final = GeneratorStage(
     material.STAGE_ID, material.STAGE_VERSION, (material.SHAPE,), _generate
+)
+#: Stage version 3: every ground band and the bare ground dressed as well.
+STAGE_V3: Final = GeneratorStage(
+    material.STAGE_ID,
+    STAGE_VERSION_3,
+    (material.SHAPE,),
+    partial(_generate, dress_all=True),
 )

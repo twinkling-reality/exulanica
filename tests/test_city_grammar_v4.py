@@ -30,6 +30,7 @@ from exulanica.grammar.grammars.city.catalogs import (
 )
 from exulanica.grammar.grammars.city.corners import corner_box, strip_box
 from exulanica.grammar.grammars.city.descriptor import (
+    CITY_GENERATING_VERSIONS,
     CITY_MIGRATION_PATHS,
     CITY_SURFACE,
     CITY_V4_DESCRIPTOR_PATH,
@@ -449,7 +450,7 @@ def test_a_facade_states_the_version_that_generated_it_and_is_held_to_its_tile()
 
 
 def test_a_version_the_city_does_not_generate_is_refused_by_name():
-    for version in (2, 5):
+    for version in (2, max(CITY_GENERATING_VERSIONS) + 1):
         with pytest.raises(GrammarError, match=f"version {version} is not one"):
             city_grammar(version)
         with pytest.raises(CatalogError, match=f"version {version} reads no catalog set"):

@@ -31,12 +31,19 @@ up to how many fit. A record's ``clearance_mm`` is the clearance the placement a
 **Base and extent.** A building stands at its lot's grade. Its extent is its lot's, in plan (the
 lot's ring grown by the largest facade projection), and in height from its base to the highest of
 its roof, its parapet and its rooftop objects.
+
+**Stage version 3** (:data:`STAGE_V3`, which city grammar version 5 runs) draws a building's
+typology first, in proportion to the district's ``typology_weight_<key>_permille`` among the
+typologies its lot admits (evenly when every one weighs 0), and then its era among that typology's
+eras. One weight is declared per terraced typology (:func:`weighted_typologies`), the typologies a
+lot can take.
 """
 
 from __future__ import annotations
 
 import dataclasses
 from collections.abc import Iterator, Sequence
+from functools import partial
 from typing import Final
 
 from exulanica.grammar.contract import StageContext
@@ -53,7 +60,7 @@ from exulanica.grammar.grammars.city.generation.stage import (
     prior_records,
 )
 
-__all__ = ["STAGE", "parts_extent"]
+__all__ = ["STAGE", "STAGE_V3", "STAGE_VERSION_3", "parts_extent", "weighted_typologies"]
 
 _EAST: Final = (1, 0)
 #: A block holds fewer lots than this, so a lot's draw ordinal is its block's times this
@@ -61,6 +68,20 @@ _EAST: Final = (1, 0)
 _LOTS_PER_BLOCK: Final = 10_000
 #: The one district this version lays out, as the districts stage numbers it.
 _DISTRICT: Final = 0
+#: The stage version that draws a typology by the district's weights (the docstring's last
+#: section). Version 2 is :data:`~exulanica.grammar.grammars.city.massing.STAGE_VERSION`.
+STAGE_VERSION_3: Final = 3
+#: The attachment every typology this version lays has: it builds to every lot line.
+_TERRACED: Final = "terraced"
+
+
+def weighted_typologies() -> list[str]:
+    """The typologies a lot can take, each with its own weight parameter: the terraced ones."""
+    return sorted(
+        item.key
+        for item in catalog("typology").entries
+        if entry("typology", item.key)["attachment"] == _TERRACED
+    )
 
 
 def parts_extent(x: int, y: int, z: int, parts: Sequence[FormPart]) -> Extent:
@@ -90,7 +111,7 @@ def _typologies(frontage: int, high_street: bool) -> list[str]:
     fitting = []
     for item in catalog("typology").entries:
         fields = entry("typology", item.key)
-        if fields["attachment"] != "terraced":
+        if fields["attachment"] != _TERRACED:
             continue
         if not fields["frontage_minimum_mm"] <= frontage <= fields["frontage_maximum_mm"]:
             continue
@@ -149,8 +170,16 @@ def _storey_reach(typologies: Sequence[str]) -> tuple[int, int]:
     )
 
 
-def _generate(context: StageContext) -> Iterator[object]:
+def _generate(context: StageContext, weighted: bool = False) -> Iterator[object]:
     lots = prior_records(context, parcels.STAGE_ID, parcels.ParcelRecord)
+    weights = (
+        {
+            key: derived(context, f"typology_weight_{key}_permille", _DISTRICT)
+            for key in weighted_typologies()
+        }
+        if weighted
+        else None
+    )
     curbs = {
         record.identity: record
         for record in prior_records(context, streets.STAGE_ID, streets.CurbEdgeRecord)
@@ -205,14 +234,29 @@ def _generate(context: StageContext) -> Iterator[object]:
                 f"no terraced typology fits lot {lot.identity}'s "
                 f"{primary.run_length_mm} mm frontage"
             )
-        eras = sorted({era for key in typologies for era in entry("typology", key)["eras"]})
-        era = derived(context, "era", ordinal, options=eras)
-        typology = derived(
-            context,
-            "typology",
-            ordinal,
-            options=[key for key in typologies if era in entry("typology", key)["eras"]],
-        )
+        if weights is not None:
+            typology = derived(
+                context,
+                "typology",
+                ordinal,
+                options=typologies,
+                weights=weights,  # type: ignore[arg-type]
+            )
+            era = derived(
+                context,
+                "era",
+                ordinal,
+                options=entry("typology", typology)["eras"],  # type: ignore[arg-type]
+            )
+        else:
+            eras = sorted({era for key in typologies for era in entry("typology", key)["eras"]})
+            era = derived(context, "era", ordinal, options=eras)
+            typology = derived(
+                context,
+                "typology",
+                ordinal,
+                options=[key for key in typologies if era in entry("typology", key)["eras"]],
+            )
         kind = entry("typology", typology)  # type: ignore[arg-type]
         period = entry("era", era)  # type: ignore[arg-type]
         storeys = derived(
@@ -376,4 +420,11 @@ STAGE: Final = GeneratorStage(
     massing.STAGE_VERSION,
     (massing.MASSING_SHAPE, massing.ROOFTOP_SHAPE),
     _generate,
+)
+#: Stage version 3: the same records, a building's typology drawn by the district's weights.
+STAGE_V3: Final = GeneratorStage(
+    massing.STAGE_ID,
+    STAGE_VERSION_3,
+    STAGE.shapes,
+    partial(_generate, weighted=True),
 )

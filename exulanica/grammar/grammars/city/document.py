@@ -774,6 +774,7 @@ class _Checker:
 
     def _check_curbs(self) -> None:
         followers: Counter[str] = Counter()
+        owned = {record.identity for record in self.grammar.owned}  # type: ignore[attr-defined]
         for curb in self.of(CurbEdgeRecord):
             self.report.kerb_heights_mm += (curb.kerb_height_mm,)
             segment = self.get(curb.segment_identity)
@@ -792,6 +793,20 @@ class _Checker:
                 followers[next_identity] += 1
                 follower = self.carried(next_identity)
                 if follower is None:
+                    # A tile draws the corner each curb it owns turns, and a rounded corner's arc
+                    # ends on its follower: from version 5 a tile that owns such a curb and does
+                    # not carry its follower is refused here rather than by the tessellator. A
+                    # straight join (radius 0) reads nothing from its follower.
+                    if (
+                        self.grammar.grammar_version >= _CORNER_FOLLOWER_FROM_VERSION
+                        and curb.identity in owned
+                        and curb.corner_radius_mm > 0
+                    ):
+                        raise _fail(
+                            "corner_follower",
+                            f"curb {curb.identity} turns a {curb.corner_radius_mm} mm corner "
+                            f"into curb {next_identity}, which the tile does not carry",
+                        )
                     continue
                 ends = {segment.start_node_identity, segment.end_node_identity}
                 other = self.get(follower.segment_identity)
@@ -1854,6 +1869,11 @@ class _Checker:
             ):
                 raise _fail("terrain", f"terrain {terrain.identity} is another tile's")
 
+
+#: The first city grammar version whose tiles are refused here when they own a curb turning a
+#: rounded corner into a follower they do not carry (``[corner_follower]``); earlier versions'
+#: documents are held to what they were written under, and the tessellator refuses such a tile.
+_CORNER_FOLLOWER_FROM_VERSION: Final = 5
 
 _CHECKS: Final[tuple[Callable[[_Checker], None], ...]] = (
     _Checker.check_owners,

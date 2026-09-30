@@ -1,13 +1,16 @@
 """The city grammar this package registers.
 
 Eleven stages, in the order they run: terrain, districts, streets, parcels, massing, facade,
-streetlife, vitrine, premises, material, tile. Material runs last but one, so every record
-whose surfaces it dresses already exists. Each has a version and record shapes whose
-validators hold every field. Two versions are registered. ``city.v3.json`` states the frame,
-the stages and the record kinds each validates, 91 declared parameters and the representation
-contract of each admitted projection; ``city.v4.json`` states the same with the streets stage at
-its version 3 (stop lines set back before crossings, kerbside parking lanes) and the two
-parameters it adds, 93 in all. A caller names the version it generates (:func:`city_grammar`).
+streetlife, vitrine, premises, material, tile; version 5 runs premises before vitrine. Material
+runs last but one, so every record whose surfaces it dresses already exists. Each has a version
+and record shapes whose validators hold every field. Three versions are registered.
+``city.v3.json`` states the frame, the stages and the record kinds each validates, 91 declared
+parameters and the representation contract of each admitted projection; ``city.v4.json`` states
+the same with the streets stage at its version 3 (stop lines set back before crossings, kerbside
+parking lanes) and the two parameters it adds, 93 in all; ``city.v5.json`` reads a district's
+street mix and use mix (streets stage version 4, massing, premises and vitrine version 3) and
+dresses every ground band and the bare ground (material version 3), with the fifteen parameters
+it adds, 108 in all. A caller names the version it generates (:func:`city_grammar`).
 Ten stages have generators under :mod:`exulanica.grammar.grammars.city.generation`. The
 registered ``tile`` stage remains a record-shape and ownership contract
 (:data:`~exulanica.grammar.grammars.city.tile.STAGE` is an
@@ -55,6 +58,7 @@ from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATH,
     CITY_GENERATING_VERSIONS,
     CITY_V4_DESCRIPTOR_PATH,
+    CITY_V5_DESCRIPTOR_PATH,
 )
 from exulanica.grammar.grammars.city.generation import districts as districts_generator
 from exulanica.grammar.grammars.city.generation import facade as facade_generator
@@ -72,10 +76,12 @@ __all__ = [
     "CITY_GRAMMAR",
     "CITY_GRAMMARS",
     "CITY_GRAMMAR_V4",
+    "CITY_GRAMMAR_V5",
     "CITY_SHAPES",
     "CITY_SHAPES_BY_TYPE",
     "CITY_STAGES",
     "CITY_V4_STAGES",
+    "CITY_V5_STAGES",
     "city_grammar",
 ]
 
@@ -128,8 +134,25 @@ CITY_V4_STAGES: Final = tuple(
     for stage in CITY_STAGES
 )
 CITY_GRAMMAR_V4: Final = Grammar.from_descriptor(CITY_V4_DESCRIPTOR_PATH, stages=CITY_V4_STAGES)
+#: Version 5's stages: the street mix (streets at its version 4), the use mix (massing, premises and
+#: vitrine at their version 3, premises before vitrine so a shop's use chooses its window) and every
+#: surface dressed (material at its version 3).
+CITY_V5_STAGES: Final = (
+    terrain_generator.STAGE,
+    districts_generator.STAGE,
+    streets_generator.STAGE_V4,
+    parcels_generator.STAGE,
+    massing_generator.STAGE_V3,
+    facade_generator.STAGE,
+    streetlife_generator.STAGE,
+    premises_generator.STAGE_V3,
+    vitrine_generator.STAGE_V3,
+    material_generator.STAGE_V3,
+    tile.STAGE,
+)
+CITY_GRAMMAR_V5: Final = Grammar.from_descriptor(CITY_V5_DESCRIPTOR_PATH, stages=CITY_V5_STAGES)
 #: Every city grammar version this package generates, by version.
-CITY_GRAMMARS: Final = MappingProxyType({3: CITY_GRAMMAR, 4: CITY_GRAMMAR_V4})
+CITY_GRAMMARS: Final = MappingProxyType({3: CITY_GRAMMAR, 4: CITY_GRAMMAR_V4, 5: CITY_GRAMMAR_V5})
 if tuple(CITY_GRAMMARS) != CITY_GENERATING_VERSIONS:
     raise GrammarError(
         f"the city generates versions {tuple(CITY_GRAMMARS)} and states {CITY_GENERATING_VERSIONS}"

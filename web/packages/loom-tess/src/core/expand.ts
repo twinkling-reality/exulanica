@@ -532,9 +532,12 @@ function approachesOf(fields: Fields, context: ExpandContext): ApproachContext[]
 
 /**
  * The corner a curb owns for each curb it names as its follower, with the rings of the blocks it
- * names. A curb that names no follower turns no corner; one that names a follower the tile does
- * not carry is refused rather than drawn short, since the corner is its own geometry and half of a
- * record is not a record.
+ * names. A curb that names no follower turns no corner; one that turns a rounded corner into a
+ * follower the tile does not carry is refused rather than drawn short, since the corner is its own
+ * geometry and half of a record is not a record. A STRAIGHT JOIN (a corner radius of 0) reads
+ * nothing from its follower: `curbCorner` and `cornerMitre` return before they look at it, so its
+ * context adds no vertex, and a follower the tile does not carry is left to the tile that owns it.
+ * Every tile that drew such a curb before draws the same bytes.
  */
 function cornersOf(fields: Fields, context: ExpandContext, where: string): CornerContext[] {
   const blocks: Plan[][] = [];
@@ -544,12 +547,18 @@ function cornersOf(fields: Fields, context: ExpandContext, where: string): Corne
     if (block.kind !== 'city.block') throw new TessellationError(`${where} names ${block.kind} as a block`);
     blocks.push(block.fields.boundary_mm as Plan[]);
   }
-  return (fields.next_curb_identity as readonly string[]).map((identity) => {
+  const straightJoin = (fields.corner_radius_mm as number) === 0;
+  const corners: CornerContext[] = [];
+  for (const identity of fields.next_curb_identity as readonly string[]) {
     const follower = context.carried.get(identity);
-    if (follower === undefined) throw new TessellationError(`${where} names a following curb the tile does not carry`);
+    if (follower === undefined) {
+      if (straightJoin) continue;
+      throw new TessellationError(`${where} names a following curb the tile does not carry`);
+    }
     if (follower.kind !== 'city.curb_edge') throw new TessellationError(`${where} names ${follower.kind} as its following curb`);
-    return { follower: follower.fields, blocks, resolutionMm: context.resolutionMm };
-  });
+    corners.push({ follower: follower.fields, blocks, resolutionMm: context.resolutionMm });
+  }
+  return corners;
 }
 
 /** How the street rules find the records a junction names: the tile's carried records only. */

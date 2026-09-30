@@ -69,6 +69,26 @@ and changes two rules, each read from data:
   both, so every kerb, footway and block stands that much further out. A parking lane runs between
   the crossings at its segment's ends: nothing stands on a crossing. Bays are not laid here; a
   reader derives them from the lane.
+
+**Stage version 4** (:data:`STAGE_V4`, which city grammar version 5 runs) lays everything stage
+version 3 lays and reads the district's street mix:
+
+* **Which streets are high streets.** ``high_street_count`` streets are high streets: the street
+  along x through the district's middle, then the cross streets nearest the middle, the western of
+  two equally near first, so a second high street crosses the first. It is narrowed to one more
+  than the cross streets the layout lays. Every other cross street takes
+  ``cross_street_hierarchy``, and every other street along x is local, as before.
+* **Every street carries traffic both ways,** on the fewest lanes its hierarchy admits that split
+  evenly between the two directions, so a narrow street, whose catalog admits one lane, takes two.
+* **A speed limit per street hierarchy.** ``speed_limit_mm_s`` is derived once for each hierarchy
+  the district lays, within that hierarchy's range, since a narrow street's range and a high
+  street's do not meet; a bound value must lie in every one of them.
+* **Priority** at a junction goes to the street that runs on through it; where both run on, to the
+  busier by the hierarchy catalog's rank; where both are as busy, to the street along x. On every
+  layout stage version 3 lays this is the priority it gives, and no junction gives every approach
+  priority.
+* A line's own widest section, at its hierarchy, must fit the district, or the district is refused
+  by name.
 """
 
 from __future__ import annotations
@@ -108,7 +128,9 @@ __all__ = [
     "DIMENSION_MODULE_MM",
     "STAGE",
     "STAGE_V3",
+    "STAGE_V4",
     "STAGE_VERSION_3",
+    "STAGE_VERSION_4",
     "narrowest_reach",
     "street_hierarchies",
     "street_name_demand",
@@ -119,9 +141,11 @@ __all__ = [
 
 #: The module every street dimension this stage derives is a multiple of.
 DIMENSION_MODULE_MM: Final = 50
-#: The stage version that sets stop lines back and lays kerbside parking (the docstring's last
-#: section). Version 2 is :data:`~exulanica.grammar.grammars.city.streets.STAGE_VERSION`.
+#: The stage version that sets stop lines back and lays kerbside parking (the docstring's stage
+#: version 3 section). Version 2 is :data:`~exulanica.grammar.grammars.city.streets.STAGE_VERSION`.
 STAGE_VERSION_3: Final = 3
+#: The stage version that reads the district's street mix (the docstring's last section).
+STAGE_VERSION_4: Final = 4
 #: The lane-use keys this stage lays: every traffic lane is general, every kerbside lane parking.
 _GENERAL_USE: Final = "general"
 _PARKING_USE: Final = "parking"
@@ -146,13 +170,29 @@ class _Rules:
     #: differ in width (a high street with parking lanes, a local street without), their kerb
     #: lines stand at other heights under the camber, and the mitre rises past the curb's strip.
     followers_cover_met_corners: bool
+    #: Whether the district's street mix is read: which streets are high streets, what the other
+    #: cross streets are, two-way lanes on every street, a speed limit per hierarchy and priority
+    #: by through street, rank and axis (the docstring's stage version 4 section).
+    street_mix: bool
 
 
 _VERSION_2_RULES: Final = _Rules(
-    stop_line_setback=False, kerbside_parking=False, followers_cover_met_corners=False
+    stop_line_setback=False,
+    kerbside_parking=False,
+    followers_cover_met_corners=False,
+    street_mix=False,
 )
 _VERSION_3_RULES: Final = _Rules(
-    stop_line_setback=True, kerbside_parking=True, followers_cover_met_corners=True
+    stop_line_setback=True,
+    kerbside_parking=True,
+    followers_cover_met_corners=True,
+    street_mix=False,
+)
+_VERSION_4_RULES: Final = _Rules(
+    stop_line_setback=True,
+    kerbside_parking=True,
+    followers_cover_met_corners=True,
+    street_mix=True,
 )
 
 
@@ -239,15 +279,25 @@ def _section(
     lane_width_mm: int,
     gutter_width_mm: int,
     parking_mm: tuple[int, int] = (0, 0),
+    two_way: bool = False,
 ) -> tuple[int, int, int]:
     """Lanes, carriageway width, and the room a line of this hierarchy needs clear of the edge.
 
     ONE STATEMENT OF THE FORMULA. The layout reads it with the widths this city derived, and the
     two reaches below read it with the narrowest and widest the declared ranges admit.
     ``parking_mm`` is how many kerbside parking lanes the street keeps and how wide each is.
+    ``two_way`` takes the fewest lanes the hierarchy admits that split evenly between the two
+    directions, rather than its fewest.
     """
     fields = entry("street-hierarchy", hierarchy)
     lanes = fields["lanes_minimum"]
+    if two_way:
+        lanes += lanes % 2
+        if lanes > fields["lanes_maximum"]:
+            raise InvalidParameterError(
+                f"a {hierarchy} admits {fields['lanes_minimum']} to {fields['lanes_maximum']} "
+                "lanes, no even number of them, so it cannot carry traffic both ways"
+            )
     parking_lanes, parking_width = parking_mm
     carriageway = lanes * lane_width_mm + parking_lanes * parking_width + 2 * gutter_width_mm
     reach = (
@@ -297,33 +347,67 @@ def widest_reach(hierarchy: str) -> int:
 
 
 def street_hierarchies(
-    along_positions: Sequence[int], across_positions: Sequence[int], middle_y: int
+    along_positions: Sequence[int],
+    across_positions: Sequence[int],
+    middle_y: int,
+    *,
+    middle_x: int = 0,
+    high_street_count: int = 1,
+    cross_hierarchy: str = _LOCAL,
 ) -> list[str]:
     """Every street's hierarchy, in the order this stage numbers streets.
 
     THE ONE STATEMENT of which street is which: the high street is the line along x through the
-    district's middle and every other street is local. The layout below builds its streets from
-    this and the vocabulary check counts it, so a version that assigns hierarchies differently
-    moves both rather than leaving a check measuring a rule nobody follows any more.
+    district's middle and every other street along x is local. The cross streets nearest
+    ``middle_x`` are high streets too, ``high_street_count`` less one of them, the western of two
+    equally near first, and every other cross street is ``cross_hierarchy``. The defaults are stage
+    versions 2 and 3's rule: one high street, every other street local. The layout below builds
+    its streets from this and the vocabulary check counts it, so a version that assigns
+    hierarchies differently moves both rather than leaving a check measuring a rule nobody follows
+    any more.
     """
     along = [_HIGH if position == middle_y else _LOCAL for position in along_positions]
-    return along + [_LOCAL] * len(across_positions)
+    nearest = sorted(
+        range(len(across_positions)),
+        key=lambda index: (abs(across_positions[index] - middle_x), across_positions[index]),
+    )
+    high = set(nearest[: high_street_count - 1])
+    return along + [
+        _HIGH if index in high else cross_hierarchy for index in range(len(across_positions))
+    ]
 
 
 def street_name_demand(
-    span_x_mm: int, span_y_mm: int, block_length_mm: int, block_depth_mm: int, reach_mm: int
+    span_x_mm: int,
+    span_y_mm: int,
+    block_length_mm: int,
+    block_depth_mm: int,
+    reach_mm: int,
+    *,
+    high_street_count: int = 1,
+    cross_hierarchy: str = _LOCAL,
 ) -> Mapping[str, int]:
     """How many streets of each hierarchy a district of this shape lays out.
 
     A district's offset does not move how many lines fit inside it, so a span is enough and a
     caller need not know where it starts. ``reach_mm`` decides the rest: pass
     :func:`narrowest_reach` for the most streets the shape can lay and :func:`widest_reach` for
-    the fewest.
+    the fewest. ``high_street_count`` and ``cross_hierarchy`` are the street mix stage version 4
+    reads, narrowed as the layout narrows it.
     """
     middle_x, middle_y = span_x_mm // 2, span_y_mm // 2
     along = _lay_out(0, span_y_mm, middle_y, block_depth_mm, reach_mm, centred=True)
     across = _lay_out(0, span_x_mm, middle_x, block_length_mm, reach_mm, centred=False)
-    return Counter(street_hierarchies(along, across, middle_y))
+    return Counter(
+        street_hierarchies(
+            along,
+            across,
+            middle_y,
+            middle_x=middle_x,
+            high_street_count=min(high_street_count, 1 + len(across)),
+            cross_hierarchy=cross_hierarchy,
+        )
+    )
 
 
 def street_names_by_hierarchy() -> Mapping[str, frozenset[str]]:
@@ -568,17 +652,28 @@ def _generate(context: StageContext, rules: _Rules = _VERSION_2_RULES) -> Iterat
             "streets stage version reads it bound for the district or the city"
         )
     gutter = _modular(context, "gutter_width_mm", _DISTRICT, 0, 1_000_000)
-    lane_low, lane_high = _ranges((_HIGH, _LOCAL), "lane_width_minimum_mm", "lane_width_maximum_mm")
+    # The hierarchies this district can lay, which one lane width serves: with the street mix, the
+    # cross streets' too, whether or not every one of them ends up a high street.
+    laid: tuple[str, ...] = (_HIGH, _LOCAL)
+    cross = _LOCAL
+    if rules.street_mix:
+        cross = derived(context, "cross_street_hierarchy", _DISTRICT)  # type: ignore[assignment]
+        laid = tuple(sorted({_HIGH, _LOCAL, cross}))
+    lane_low, lane_high = _ranges(laid, "lane_width_minimum_mm", "lane_width_maximum_mm")
     lane_width = _modular(context, "lane_width_mm", _DISTRICT, lane_low, lane_high)
     if lane_width % 2:
         raise InvalidParameterError(
             "a lane width is even, so a lane's centre is a whole millimetre"
         )
     camber = derived(context, "camber_millionths", _DISTRICT)
-    speed_low, speed_high = _ranges(
-        (_HIGH, _LOCAL), "speed_limit_minimum_mm_s", "speed_limit_maximum_mm_s"
-    )
-    speed = derived(context, "speed_limit_mm_s", _DISTRICT, minimum=speed_low, maximum=speed_high)
+    speed = 0
+    if not rules.street_mix:
+        speed_low, speed_high = _ranges(
+            (_HIGH, _LOCAL), "speed_limit_minimum_mm_s", "speed_limit_maximum_mm_s"
+        )
+        speed = derived(  # type: ignore[assignment]
+            context, "speed_limit_mm_s", _DISTRICT, minimum=speed_low, maximum=speed_high
+        )
     parking_width = 0
     if rules.kerbside_parking:
         parking = entry("lane-use", _PARKING_USE)
@@ -600,7 +695,13 @@ def _generate(context: StageContext, rules: _Rules = _VERSION_2_RULES) -> Iterat
         return _parking_lanes(hierarchy, context.grammar_version) if rules.kerbside_parking else 0
 
     def section(hierarchy: str) -> tuple[int, int, int]:
-        return _section(hierarchy, lane_width, gutter, (parking_lanes(hierarchy), parking_width))
+        return _section(
+            hierarchy,
+            lane_width,
+            gutter,
+            (parking_lanes(hierarchy), parking_width),
+            two_way=rules.street_mix,
+        )
 
     middle_x, middle_y = (min_x + max_x) // 2, (min_y + max_y) // 2
     _lanes, _width, local_reach = section(_LOCAL)
@@ -611,7 +712,43 @@ def _generate(context: StageContext, rules: _Rules = _VERSION_2_RULES) -> Iterat
     if len(along_positions) < 2 or not across_positions:
         raise InvalidRecordError("the district is too small for a block between four streets")
 
-    hierarchies = street_hierarchies(along_positions, across_positions, middle_y)
+    high_count = 1
+    if rules.street_mix:
+        high_count = derived(  # type: ignore[assignment]
+            context, "high_street_count", _DISTRICT, maximum=1 + len(across_positions)
+        )
+    hierarchies = street_hierarchies(
+        along_positions,
+        across_positions,
+        middle_y,
+        middle_x=middle_x,
+        high_street_count=high_count,
+        cross_hierarchy=cross,
+    )
+    speeds: dict[str, int] = {}
+    if rules.street_mix:
+        lines = [(position, min_y, max_y) for position in along_positions] + [
+            (position, min_x, max_x) for position in across_positions
+        ]
+        for (position, low, high), hierarchy in zip(lines, hierarchies, strict=True):
+            reach = section(hierarchy)[2]
+            if not low + reach <= position <= high - reach:
+                raise InvalidRecordError(
+                    f"a {hierarchy} at {position} mm needs {reach} mm each side of its centreline "
+                    f"and the district's edges stand {position - low} and {high - position} mm "
+                    "from it"
+                )
+        # One speed limit per hierarchy laid, within that hierarchy's own range: a narrow
+        # street's range and a high street's do not meet, so no one district value serves both.
+        for hierarchy in sorted(set(hierarchies)):
+            fields = entry("street-hierarchy", hierarchy, context.grammar_version)
+            speeds[hierarchy] = derived(  # type: ignore[assignment]
+                context,
+                "speed_limit_mm_s",
+                fields["rank"],
+                minimum=fields["speed_limit_minimum_mm_s"],
+                maximum=fields["speed_limit_maximum_mm_s"],
+            )
     # BEFORE ANY RECORD EXISTS, and on the hierarchies this layout actually lays rather than on
     # the widest-street estimate `street_name_shortfall` gives a caller, so it refuses exactly
     # the cities no naming could serve.
@@ -940,7 +1077,7 @@ def _generate(context: StageContext, rules: _Rules = _VERSION_2_RULES) -> Iterat
             hierarchy=street.hierarchy,
             carriageway_width_mm=street.carriageway_mm,
             camber_millionths=camber,  # type: ignore[arg-type]
-            speed_limit_mm_s=speed,  # type: ignore[arg-type]
+            speed_limit_mm_s=speeds[street.hierarchy] if rules.street_mix else speed,
             extent=covering(
                 Extent(*start_point, DATUM_MM, *end_point, DATUM_MM)
                 if start_point <= end_point
@@ -976,6 +1113,7 @@ def _generate(context: StageContext, rules: _Rules = _VERSION_2_RULES) -> Iterat
         every_street,
         segments,
         lane_records,
+        street_mix=rules.street_mix,
     )
     crossings = _crossings(
         context,
@@ -1159,6 +1297,8 @@ def _junctions(
     every_street: list[_Street],
     segments: dict[tuple[int, int], _Segment],
     lanes: list[roads.LaneRecord],
+    *,
+    street_mix: bool = False,
 ) -> tuple[list[roads.JunctionRecord], list[roads.JunctionApproachRecord]]:
     street_of = {item.identity: item.street for item in segments.values()}
     curbs_by_segment: dict[str, dict[str, streets.CurbEdgeRecord]] = {}
@@ -1197,10 +1337,14 @@ def _junctions(
             street_of[record.identity].ordinal: street_of[record.identity] for record in legs
         }
         on_high = high.ordinal in streets_here
+        priority = _priority_street(legs, street_of) if street_mix else None
         for ordinal, record in enumerate(legs):
             street = street_of[record.identity]
             count = sum(1 for leg in legs if street_of[leg.identity] is street)
-            major = street is high if on_high else count == 2
+            if priority is not None:
+                major = street is priority
+            else:
+                major = street is high if on_high else count == 2
             approaches.append(
                 roads.JunctionApproachRecord(
                     identity=context.identity("junction_approach", identity, ordinal),
@@ -1224,6 +1368,27 @@ def _junctions(
     return junctions, approaches
 
 
+def _priority_street(
+    legs: Sequence[streets.StreetSegmentRecord], street_of: Mapping[str, _Street]
+) -> _Street:
+    """The one street a junction gives priority, by stage version 4's rule: the street that runs
+    on through the junction, then the busier by the hierarchy catalog's rank, then the street
+    along x. Two streets along x never meet, so the rule always names one."""
+
+    def runs_through(street: _Street) -> bool:
+        return sum(1 for leg in legs if street_of[leg.identity] is street) == 2
+
+    here = {street_of[leg.identity].ordinal: street_of[leg.identity] for leg in legs}
+    return min(
+        here.values(),
+        key=lambda street: (
+            not runs_through(street),
+            entry("street-hierarchy", street.hierarchy)["rank"],
+            street.axis != _EAST,
+        ),
+    )
+
+
 STAGE: Final = GeneratorStage(
     streets.STAGE_ID,
     streets.STAGE_VERSION,
@@ -1244,4 +1409,11 @@ STAGE_V3: Final = GeneratorStage(
     STAGE_VERSION_3,
     STAGE.shapes,
     partial(_generate, rules=_VERSION_3_RULES),
+)
+#: Stage version 4: stage version 3's records, laid by the district's street mix.
+STAGE_V4: Final = GeneratorStage(
+    streets.STAGE_ID,
+    STAGE_VERSION_4,
+    STAGE.shapes,
+    partial(_generate, rules=_VERSION_4_RULES),
 )

@@ -17,11 +17,20 @@ the building's own door, or by the first shop's when the building has no door of
 since nothing above a shop carries a fascia for one. A building whose ground floor is a dwelling is
 one premises from its ground storey to its top, entered by its door, of a use that takes no sign.
 ``units_per_storey`` is the number of premises on the ground storey, derived within exactly that.
+
+**Stage version 3** (:data:`STAGE_V3`, which city grammar version 5 runs before the vitrine stage)
+draws a building's shop use before its windows are dressed, in proportion to the district's
+``ground_floor_use_weight_<key>_permille`` (evenly when every one weighs 0), among the uses its
+typology admits on the ground floor that a fitout fitting its shopfronts serves
+(:func:`~exulanica.grammar.grammars.city.generation.vitrine.fitting_fitouts`); the vitrine stage
+then dresses the windows for that use. One weight is declared per use a shop can take
+(:func:`shop_uses`).
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
+from functools import partial
 from typing import Final
 
 from exulanica.grammar.contract import StageContext
@@ -37,10 +46,33 @@ from exulanica.grammar.grammars.city.generation.stage import (
     entry,
     prior_records,
 )
+from exulanica.grammar.grammars.city.generation.vitrine import fitting_fitouts
 
-__all__ = ["STAGE"]
+__all__ = ["STAGE", "STAGE_V3", "STAGE_VERSION_3", "shop_uses"]
 
 _LOTS_PER_BLOCK: Final = 10_000
+#: The one district this version lays out, as the districts stage numbers it.
+_DISTRICT: Final = 0
+#: The stage version that draws a shop's use by the district's weights before its windows are
+#: dressed (the docstring's last section). Version 2 is
+#: :data:`~exulanica.grammar.grammars.city.premises.STAGE_VERSION`.
+STAGE_VERSION_3: Final = 3
+_DWELLING: Final = "residential"
+_TERRACED: Final = "terraced"
+
+
+def shop_uses() -> list[str]:
+    """The uses a shop can take, each with its own weight parameter: every use a terraced typology
+    admits on its ground floor whose use class takes a sign."""
+    return sorted(
+        {
+            use
+            for item in catalog("typology").entries
+            if entry("typology", item.key)["attachment"] == _TERRACED
+            for use in entry("typology", item.key)["ground_floor_uses"]
+            if entry("use-class", use)["signage"] != "none"
+        }
+    )
 
 
 def _unsigned(uses: list[str]) -> list[str]:
@@ -61,8 +93,16 @@ def _area(tier: massing.Tier) -> int:
     return ring_twice_area(tier.ring_mm) // 2
 
 
-def _generate(context: StageContext) -> Iterator[premises.PremisesRecord]:
+def _generate(context: StageContext, weighted: bool = False) -> Iterator[premises.PremisesRecord]:
     buildings = prior_records(context, massing.STAGE_ID, massing.MassingRecord)
+    weights = (
+        {
+            use: derived(context, f"ground_floor_use_weight_{use}_permille", _DISTRICT)
+            for use in shop_uses()
+        }
+        if weighted
+        else None
+    )
     lots = {
         record.identity: record
         for record in prior_records(context, parcels.STAGE_ID, parcels.ParcelRecord)
@@ -74,7 +114,9 @@ def _generate(context: StageContext) -> Iterator[premises.PremisesRecord]:
     faces = prior_records(context, facade.STAGE_ID, facade.FacadeRecord)
     bays = prior_records(context, facade.STAGE_ID, facade.GroundBayRecord)
     entrances = prior_records(context, facade.STAGE_ID, facade.EntranceRecord)
-    vitrines = prior_records(context, vitrine.STAGE_ID, vitrine.VitrineRecord)
+    # Before stage version 3 the windows are dressed first and a shop takes a use its fitout
+    # serves; from version 3 this stage runs first and the windows follow the use.
+    vitrines = [] if weighted else prior_records(context, vitrine.STAGE_ID, vitrine.VitrineRecord)
     faces_of: dict[str, list[facade.FacadeRecord]] = {}
     for face in faces:
         faces_of.setdefault(face.building_identity, []).append(face)
@@ -117,17 +159,30 @@ def _generate(context: StageContext) -> Iterator[premises.PremisesRecord]:
         units = building_shop_units(lot, own, bays_of.get(building.identity, []))
         unit_ordinal = 0
         if units:
-            fitout = fitout_of.get(building.identity)
-            served = (
-                set(entry("fitout", fitout)["use_classes"])
-                if fitout
-                else set(kind["ground_floor_uses"])
-            )
+            if weighted:
+                shopfronts = [bay for unit in units for bay in unit if bay.bay_kind == "shopfront"]
+                served = (
+                    {
+                        use
+                        for key in fitting_fitouts(shopfronts)
+                        for use in entry("fitout", key)["use_classes"]
+                    }
+                    if shopfronts
+                    else set(kind["ground_floor_uses"])
+                )
+            else:
+                fitout = fitout_of.get(building.identity)
+                served = (
+                    set(entry("fitout", fitout)["use_classes"])
+                    if fitout
+                    else set(kind["ground_floor_uses"])
+                )
             use = derived(
                 context,
                 "ground_floor_use",
                 ordinal,
-                options=sorted(served & set(kind["ground_floor_uses"]) - {"residential"}),
+                options=sorted(served & set(kind["ground_floor_uses"]) - {_DWELLING}),
+                weights=weights,
             )
             derived(context, "units_per_storey", ordinal, minimum=len(units), maximum=len(units))
             for unit in units:
@@ -199,4 +254,9 @@ def _generate(context: StageContext) -> Iterator[premises.PremisesRecord]:
 
 STAGE: Final = GeneratorStage(
     premises.STAGE_ID, premises.STAGE_VERSION, (premises.SHAPE,), _generate
+)
+#: Stage version 3: the same records, a shop's use drawn by the district's weights before its
+#: windows are dressed.
+STAGE_V3: Final = GeneratorStage(
+    premises.STAGE_ID, STAGE_VERSION_3, (premises.SHAPE,), partial(_generate, weighted=True)
 )

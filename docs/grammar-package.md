@@ -1,7 +1,7 @@
 # The generator system: `exulanica.grammar`
 
-Status: **CITY GRAMMAR VERSION 3 REGISTERED**. Ten stages emit records. The tile stage is a
-record-shape contract.
+Status: **CITY GRAMMAR VERSIONS 3, 4 AND 5 REGISTERED**. Ten stages emit records. The tile stage
+is a record-shape contract.
 
 `exulanica.grammar` is a generator system. It holds a generic contract (grammar id and version, a
 closed parameter schema, a parameter cascade, a seed, an output digest and declared semantics)
@@ -9,10 +9,12 @@ and the grammars that implement it. The city is the first and largest grammar. A
 `box`, ships beside it and uses the same contract.
 
 The package emits integer records, never meshes or vertices. Turning records into triangles is
-the tessellator's. A generator cannot construct a citation. Two city descriptors are registered.
+the tessellator's. A generator cannot construct a citation. Three city descriptors are registered.
 `city.v3.json` states 28 record kinds with integer geometry, 91 declared parameters (80 integer, 11
 choice), four projection contracts, licensed catalogs, and one identity rule; `city.v4.json` states
-the same with the streets stage at its version 3 and 93 parameters (section 7).
+the same with the streets stage at its version 3 and 93 parameters; `city.v5.json` states the same
+with a district's street mix and use mix and every surface dressed, and 108 parameters (section
+7).
 [generated-corridor-street](generated-corridor-street.md) records the street those stages make
 together and what it measures. `city.v1.json` and `city.v2.json` remain as pinned migration
 source schemas; they are not registered.
@@ -255,9 +257,9 @@ other rule, refuses (`tests/test_grammar_city_records.py`).
 
 ## 7. The city stages
 
-City grammar versions 3 and 4 are registered (`city.v3.json`, `city.v4.json`), and a caller names
-the version it generates; one that names none generates version 3, which every specification
-written before version 4 states. `city.v1.json` and `city.v2.json` remain as pinned migration
+City grammar versions 3, 4 and 5 are registered (`city.v3.json`, `city.v4.json`, `city.v5.json`),
+and a caller names the version it generates; one that names none generates version 3, which every
+specification written before version 4 states. `city.v1.json` and `city.v2.json` remain as pinned migration
 source schemas; they are not registered. Stage versions below are the `stage_version` values on
 `city.v3.json`, not the grammar version. Ten stages emit records
 through `exulanica.grammar.grammars.city.generation`. The registered `tile` stage is an
@@ -295,9 +297,45 @@ from 7,100 to 11,600 mm and keeps its 98 buildings; a city whose kerb runs are t
 and a stop line before it, or whose blocks lose the footway room, is refused by name, so some
 specifications version 3 lays are not worlds at version 4 (`tests/test_city_grammar_v4.py`).
 
+**Version 5** reads a district's street mix and use mix and dresses every surface a town draws. It
+runs the streets stage at stage version 4, the massing, premises and vitrine stages at stage version
+3, with premises before vitrine, and the material stage at stage version 3; every other stage runs
+as version 4 runs it. Fifteen district parameters are added, each with its range and reason:
+
+- `high_street_count`, 1 to 8: the street along x through the district's middle is a high street,
+  and each further one is the cross street nearest the middle, the western of two equally near
+  first, so a second high street crosses the first. It is narrowed to one more than the cross
+  streets the layout lays. A town one tile deep has no room for a second high street along x: its
+  widest section reaches 12.85 m from its centreline, and the outer street along x stands 8 m inside
+  the district.
+- `cross_street_hierarchy`, a local or a narrow street: the street-hierarchy catalog's keys ranked
+  below the high street, which every other cross street takes.
+- `typology_weight_<key>_permille`, one for each terraced typology (the typologies a lot can take),
+  and `ground_floor_use_weight_<key>_permille`, one for each use a terraced typology admits on its
+  ground floor that takes a sign (the uses a shop can take), each 0 to 1,000 in the unit `permille`.
+  A lot draws its typology, and a shop its use, in proportion to the weights of what it admits, and
+  evenly among them when every one weighs 0, so a weight states a preference and never leaves a lot
+  or a shop with nothing. An unset weight is drawn from the seed (`when_unset` `draw`), so the
+  receipt records the mix a town was made with.
+
+Every street carries traffic both ways, on the fewest lanes its hierarchy admits that split evenly
+between the two directions: a narrow street, whose catalog entry admits one lane, takes two. The
+speed limit is derived once for each hierarchy the district lays, within that hierarchy's range,
+because a narrow street's range and a high street's do not meet. A junction gives priority to the
+street that runs on through it, then to the busier by the hierarchy catalog's rank, then to the
+street along x; on every layout version 4 lays this is the priority version 4 gives, and no junction
+gives every approach priority. A shop's use is drawn before its windows are dressed, among the uses
+its typology admits that a fitout fitting its shopfronts serves, and the vitrine stage then dresses
+the windows for that use. The material stage dresses every ground storey face's ground band, a
+party wall's included, which version 4 leaves undressed where the tessellator draws it, and every
+terrain patch, with the tree pit soil, which the material catalog's edition 5 lets dress terrain.
+Measured on a town two tiles long with cross streets 140 m apart, its two tiles baked with 649 and
+1,124 drawn surfaces, none undressed, where a version 4 town's first tile left 33 of 571 undressed:
+32 party wall ground bands and its terrain (`tests/test_city_grammar_v5.py`).
+
 The record shapes are in `exulanica/grammar/grammars/city/` (`common.py` holds what every record
-shares), and `tests/fixtures/city-v2/record-shapes.json` is the whole table as data. Both versions
-declare the same record kinds at the same versions; a facade's own `grammar_version` states the
+shares), and `tests/fixtures/city-v2/record-shapes.json` is the whole table as data. Every version
+declares the same record kinds at the same versions; a facade's own `grammar_version` states the
 version that generated it, and the document check holds it to the tile's pin.
 
 **Records carry integer geometry sufficient for a deterministic tessellation.** Everything a
@@ -350,7 +388,10 @@ identity version 2 derived for it, and each of the 91 parameters is carried or m
 (`city-migration.v3.json`). The version 3 to 4 migration carries or maps every one of them
 unchanged and introduces `parking_lane_width_mm` and `stop_line_setback_mm`; its identity policy is
 `rekeyed`, because a lane's index counts every lane of its segment, parking lanes included, and a
-narrower block holds other lots under the same ordinals (`city-migration.v4.json`).
+narrower block holds other lots under the same ordinals (`city-migration.v4.json`). The version 4
+to 5 migration carries or maps every version 4 parameter unchanged and introduces the fifteen
+version 5 adds; its identity policy is `rekeyed`, because a high or narrow cross street's other
+widths leave a block other lots under the same ordinals (`city-migration.v5.json`).
 
 **The tile document** (`exulanica.tile-document/v2`, `document.py`) is one tile's records as a bake
 reads them: canonical JSON of the tile record, and per grammar its descriptor digest, declared
@@ -438,6 +479,16 @@ furniture), `parking_curb`, `parking_access` and `parking_lane`, `cycle_parking`
 capacity sum when every stand is carried), `stop_line` (the releasing signal), `parcel_in_block` and
 `frontage_curb`, `facade_frontage`, `entrance` against its bay, `placement` against the curb,
 `vitrine` against its bay and facade, and `premises` against its bays and entrances.
+
+**A curb's follower.** A tile draws the corner every curb it owns turns, and a rounded corner's arc
+ends on its follower's kerb line, so from version 5 a tile that owns a curb turning a rounded corner
+into a follower it does not carry is refused (`[corner_follower]`). A straight join (a corner radius
+of 0) reads nothing from its follower: the tessellator draws the curb to its own last point and
+leaves the follower to the tile that carries it (`cornersOf` in
+`web/packages/loom-tess/src/core/expand.ts`), which is where a straight kerb along a district's edge
+runs on past a tile's 64 m margin. Measured by baking the corridor specification's ten tiles at
+versions 3 and 4 with the tessellator before and after it stopped asking a straight join for its
+follower: 10 of 10 containers identical (`tests/test_city_grammar_v5.py`).
 
 **Rules that count an owner's parts run only when the tile owns the owner,** because a halo owner's
 parts are carried only where their own extents reach: `lane_indices` and `carriageway_width` (every
@@ -533,6 +584,7 @@ exist, a sign for a use class that takes none, and a signed use class with no si
 | `junction-control.v1.json` | 4 | Right-of-way classes; the keys equal traffic's right-of-way policy keys. |
 | `lane-use.v2.json` | 6 | General, bus, bus layover, cycle, parking and buffer, with width ranges and the tightest turn each must admit; traffic maps them to vehicle classes. |
 | `material.v4.json` | 16 | One material per pinned texture set it dresses with, with the surface roles it dresses, its baked modules and whether its texture runs one way. |
+| `material.v5.json` | 16 | Version 5's edition: edition 4 with the tree pit soil also dressing terrain, a city's bare ground. |
 | `parking-kind.v1.json` | 5 | General, loading, accessible, bus layover and cycle stand, with placement and size. |
 | `roof-family.v2.json` | 3 | Flat with parapet, flat with eaves, and gable: form, rise, parapet and rooftop objects. |
 | `rooftop-object.v1.json` | 4 | HVAC unit, water tank, lift overrun and stair bulkhead as explicit parts. |
@@ -581,10 +633,11 @@ means an origin the map does not know. `tests/test_selection_packet_invented.py`
 
 Each of these is known and not built.
 
-- **Terrain has no published texture set.** A terrain surface has no material record and draws as
-  the unavailable surface rather than being painted with something else; the corridor's counts,
-  including the facade ground bands its tile leaves undressed, are in
-  [generated-corridor-street](generated-corridor-street.md).
+- **Terrain has no texture set of its own.** Versions 3 and 4 give a terrain surface no material
+  record, so it draws as the unavailable surface rather than being painted with something else; the
+  corridor's counts, including the facade ground bands its tile leaves undressed, are in
+  [generated-corridor-street](generated-corridor-street.md). Version 5 dresses terrain with the tree
+  pit soil, the one bare earth set the texture package publishes.
 - **Tree roles.** A street tree's parts take surface roles 25 `canopy` and 26 `trunk`, appended
   so foliage and bark are dressed apart; every other object's parts take object roles, and a
   catalog part may take only an object role.

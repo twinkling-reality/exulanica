@@ -83,6 +83,8 @@ EXPECTED_CATALOGS = {
 }
 #: The editions city version 4 reads in place of version 3's, with their entry counts.
 EXPECTED_V4_EDITIONS = {"street-hierarchy": (3, 4)}
+#: The editions version 5 reads beside them: the material catalog with terrain dressed.
+EXPECTED_V5_EDITIONS = {"material": (5, 16)}
 
 _ORIGINAL = {
     "spdx": "Apache-2.0",
@@ -159,6 +161,7 @@ def test_every_shipped_entry_carries_a_licence():
         for catalog_id, (version, _count) in (
             *EXPECTED_CATALOGS.items(),
             *EXPECTED_V4_EDITIONS.items(),
+            *EXPECTED_V5_EDITIONS.items(),
         )
     )
     entries = 0
@@ -176,7 +179,12 @@ def test_every_shipped_entry_carries_a_licence():
                 assert licence["licence_source"] != "LICENSE"
                 assert licence["content_source"].startswith("assets/catalogs/sources/")
     assert entries == sum(
-        count for _version, count in (*EXPECTED_CATALOGS.values(), *EXPECTED_V4_EDITIONS.values())
+        count
+        for _version, count in (
+            *EXPECTED_CATALOGS.values(),
+            *EXPECTED_V4_EDITIONS.values(),
+            *EXPECTED_V5_EDITIONS.values(),
+        )
     )
     for catalog in load_city_catalogs():
         for entry in catalog.entries:
