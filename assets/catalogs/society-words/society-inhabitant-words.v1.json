@@ -3,7 +3,8 @@
   "catalog_id": "society-inhabitant-words",
   "catalog_version": 1,
   "profiles": [
-    "exulanica-society/v2"
+    "exulanica-society/v2",
+    "exulanica-society/v5"
   ],
   "entries": [
     {
@@ -957,6 +958,223 @@
       "code": "partner_not_free",
       "words": "the person it chose to talk with could not stop to talk",
       "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "doing.living_idle",
+      "kind": "doing",
+      "code": "living_idle",
+      "words": "waiting for the next choice",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_eat_at_home",
+      "kind": "doing",
+      "code": "living_eat_at_home",
+      "words": "eating at home",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_eat_out",
+      "kind": "doing",
+      "code": "living_eat_out",
+      "words": "eating out",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_rest",
+      "kind": "doing",
+      "code": "living_rest",
+      "words": "resting",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_shop",
+      "kind": "doing",
+      "code": "living_shop",
+      "words": "shopping",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_sleep",
+      "kind": "doing",
+      "code": "living_sleep",
+      "words": "sleeping at home",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_stay_home",
+      "kind": "doing",
+      "code": "living_stay_home",
+      "words": "spending time at home",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_stroll",
+      "kind": "doing",
+      "code": "living_stroll",
+      "words": "taking a walk",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_visit",
+      "kind": "doing",
+      "code": "living_visit",
+      "words": "visiting a place",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_work",
+      "kind": "doing",
+      "code": "living_work",
+      "words": "working",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_unknown",
+      "kind": "doing",
+      "code": "living_unknown",
+      "words": "carrying out an activity",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_who",
+      "kind": "phrase",
+      "code": "living_who",
+      "words": "Resident {number}",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_need",
+      "kind": "phrase",
+      "code": "living_why_need",
+      "words": "Their routine chose this to meet a need.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_shift",
+      "kind": "phrase",
+      "code": "living_why_shift",
+      "words": "Their work shift is due.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_wait",
+      "kind": "phrase",
+      "code": "living_why_wait",
+      "words": "They are waiting for the next choice.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_home",
+      "kind": "phrase",
+      "code": "living_why_home",
+      "words": "They began this simulated day at home.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_other",
+      "kind": "phrase",
+      "code": "living_why_other",
+      "words": "Their recorded routine chose this action.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_heading_eat_at_home",
+      "kind": "doing",
+      "code": "living_heading_eat_at_home",
+      "words": "walking home to eat",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_eat_out",
+      "kind": "doing",
+      "code": "living_heading_eat_out",
+      "words": "walking to a meal",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_rest",
+      "kind": "doing",
+      "code": "living_heading_rest",
+      "words": "walking to a place to rest",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_shop",
+      "kind": "doing",
+      "code": "living_heading_shop",
+      "words": "walking to shop",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_sleep",
+      "kind": "doing",
+      "code": "living_heading_sleep",
+      "words": "walking home to sleep",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_stay_home",
+      "kind": "doing",
+      "code": "living_heading_stay_home",
+      "words": "going home",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_stroll",
+      "kind": "doing",
+      "code": "living_heading_stroll",
+      "words": "taking a walk",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_visit",
+      "kind": "doing",
+      "code": "living_heading_visit",
+      "words": "walking to visit a place",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_work",
+      "kind": "doing",
+      "code": "living_heading_work",
+      "words": "walking to work",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_unknown",
+      "kind": "doing",
+      "code": "living_heading_unknown",
+      "words": "walking through town",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "phrase.living_what_home_work",
+      "kind": "phrase",
+      "code": "living_what_home_work",
+      "words": "A simulated {role} in this town. They have a home and an assigned workplace.",
+      "reason": "Words for a living resident’s recorded home and workplace availability."
+    },
+    {
+      "key": "phrase.living_what_home",
+      "kind": "phrase",
+      "code": "living_what_home",
+      "words": "A simulated {role} in this town. They have a home and no assigned workplace.",
+      "reason": "Words for a living resident’s recorded home and workplace availability."
+    },
+    {
+      "key": "phrase.living_what_work",
+      "kind": "phrase",
+      "code": "living_what_work",
+      "words": "A simulated {role} in this town. They have an assigned workplace and no recorded home.",
+      "reason": "Words for a living resident’s recorded home and workplace availability."
+    },
+    {
+      "key": "phrase.living_what_neither",
+      "kind": "phrase",
+      "code": "living_what_neither",
+      "words": "A simulated {role} in this town. No home or workplace is recorded for them.",
+      "reason": "Words for a living resident’s recorded home and workplace availability."
     }
   ]
 }

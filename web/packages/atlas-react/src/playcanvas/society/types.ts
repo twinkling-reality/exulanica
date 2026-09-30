@@ -27,6 +27,7 @@ export interface RoutineGoal {
   readonly activity: string;
   readonly destination_id: string | null;
   readonly because: string;
+  readonly reason?: string;
 }
 
 export interface SocietyInhabitantSnapshot {
@@ -36,6 +37,8 @@ export interface SocietyInhabitantSnapshot {
   /** v1 and v2 carry a label; v4 carries a role only where the place's premises supply one. */
   readonly role?: string | null;
   readonly role_reason?: string;
+  readonly has_home?: boolean;
+  readonly has_work?: boolean;
   readonly position_mm: readonly [number, number];
   readonly goal?: null | PurposefulGoal | RoutineGoal;
   readonly action?: {

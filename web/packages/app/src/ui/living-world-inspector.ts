@@ -2,6 +2,7 @@ import { el } from './dom.js';
 
 export interface InspectionNote {
   readonly subject: string;
+  readonly showSubject?: boolean;
   readonly title: string;
   readonly description: string;
   readonly activity: string;
@@ -46,7 +47,7 @@ export function createLivingWorldInspector() {
       description.textContent = note.description;
       activity.textContent = note.activity;
       fields.replaceChildren(
-        ...[['Subject', note.subject], ...note.details].flatMap(
+        ...[...(note.showSubject === false ? [] : [['Subject', note.subject]]), ...note.details].flatMap(
           ([label, value]) => [
             el('dt', { text: label! }),
             el('dd', { text: value! }),

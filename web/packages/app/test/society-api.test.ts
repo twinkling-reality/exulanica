@@ -174,7 +174,7 @@ describe('living society snapshots', () => {
     expect(snapshot.state.inhabitants.map((p) => [p.role, p.indoors, p.walk_speed_mm_per_tick])).toEqual([
       [null, false, 70000], ['baker', true, 70000],
     ]);
-    expect(snapshot.state.inhabitants[0]!.goal).toEqual({activity: 'stroll', destination_id: null, because: 'leisure at 300 of 1000'});
+    expect(snapshot.state.inhabitants[0]!.goal).toEqual({activity: 'stroll', destination_id: null, reason: 'most_pressing_need', because: 'leisure at 300 of 1000'});
   });
   it('shows a canonical day rollover without reinterpreting another timestamp', () => {
     const document = row([person(0), person(1)]);

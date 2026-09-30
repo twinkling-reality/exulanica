@@ -4,9 +4,9 @@ A society experiment runs one society's simulated time more than once, changing 
 records what each run did. There are two record families:
 
 - **Comparisons of models** run the same simulated hour of a saved world's purposeful society
-  (`exulanica-society/v2`) once for each model that could decide for a group of its people, beside
-  their routine and waiting, and score how the group's people fared. This is how a world's owner
-  sees the difference a model makes.
+  (`exulanica-society/v2`) or living town (`exulanica-society/v5`) once for each model that could
+  decide for a group of its people, beside their routine and waiting, and score how the group's
+  people fared. This is how a world's owner sees the difference a model makes.
 - **Intervention experiments** freeze two input histories of a living society
   (`exulanica-society/v4`), a baseline and a treatment such as one more rest amenity, and record
   paired development attempts over them.
@@ -40,8 +40,8 @@ How a model decides for a person, and what that spends, is the
 ## Comparisons of models
 
 A comparison runs the same simulated hour of a saved world's purposeful society
-(`exulanica-society/v2`, the one engine whose table row states `comparisons`) once for each of its
-arms, and scores each run from what the engine recorded. Every run starts from the same place: the
+(`exulanica-society/v2`) or living town (`exulanica-society/v5`) once for each of its arms, and
+scores each run from what the engine recorded. Every run starts from the same place: the
 society's genesis over its first input with a seed, its later inputs up to the one the comparison
 froze consumed in the first minute, and all of its people, by identity. A comparison names one group
 of those people, everybody or some of them, and an arm names who decides for the group: their
@@ -96,8 +96,17 @@ its models otherwise (`provider_configuration_changed`).
 
 ### Score
 
-A comparison is scored under the score version it was defined under. A new one is defined under the
-third, declared in `assets/catalogs/society/society-person-score.v3.json` and computed exactly by
+A comparison is scored under the score version it was defined under. A living town is defined
+under the fourth score, declared in `assets/catalogs/society/society-person-score.v4.json` and
+computed by [`exulanica/world/society_score_v4.py`](../exulanica/world/society_score_v4.py).
+It keeps the half need-relief and half variety weights, same-seed routine and waiting anchors,
+floor, exclusions and reliability classes of the third score. Living urgency adds the excess over
+each recorded routine threshold for every supported need of each scored person in each minute;
+its raw unit is a sum of need-thousandths times person-minutes, so a raw urgency from the third
+score cannot be compared directly with it. Missing, extra or malformed needs refuse the run, and
+the stored terms record the need keys, thresholds and unit. Variety counts only performed
+catalogued actions, never travel or a selected goal. A purposeful society is defined under the
+third score, declared in `assets/catalogs/society/society-person-score.v3.json` and computed by
 [`exulanica/world/society_score_v3.py`](../exulanica/world/society_score_v3.py): half need relief,
 the second version's term described next, and half variety, how many different kinds of thing each
 of the group's people did in the hour (resting, visiting, standing and talking, the routine's own
@@ -284,8 +293,13 @@ square, each model's arms spent, per person and simulated hour, $0.0018 (Nemotro
 $0.0014 (Qwen3 235B Instruct) and $0.00055 (Nemotron 3 Nano 30B), under 2 percent of the most; in
 [one development comparison of a 48-person town](evaluation/2026-09-29-town-comparison-cost.json),
 whose people each model asked 1.5 to 2.5 times as often as on the square, $0.00286 (Nemotron 3.5
-Lightning) and $0.00132 (Nemotron 3 Nano 30B). A plan reads its own ground's figures where they cover every model it asks,
-and the square's otherwise. Since every ask is held at its model's most until its cost is known, a
+Lightning) and $0.00132 (Nemotron 3 Nano 30B). The deployed server reads these figures from
+`assets/catalogs/society-comparison-cost/society-comparison-typical-cost.v1.json`, which records
+each source file's digest and extraction method. A plan reads its own ground's figures where they
+cover every model it asks. For an unmeasured ground or model combination, including the living
+town, it uses that model's greatest measured cost and answer time across the catalog's grounds,
+names the conservative fallback and does not claim a town measurement. Since every ask is held at
+its model's most until its cost is known, a
 bound near the typical figure stops the runs part way (`comparison_bound_spent`), so the plan also
 serves the most the runs played at once can hold reserved together (`held_usd`) and, beside it,
 the least bound that lets a comparison spending the typical figure finish (`suggested_usd`), and

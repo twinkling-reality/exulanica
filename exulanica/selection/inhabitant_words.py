@@ -187,6 +187,57 @@ class InhabitantWords:
     why: str
 
 
+def _living_inhabitant_words(
+    person: Mapping[str, Any], catalog: InhabitantWordsCatalog
+) -> InhabitantWords:
+    """Read a living resident's performed action, never a raw need level or stored because."""
+    phrase = catalog.tables["phrase"]
+    ordinal = person["ordinal"]
+    role = person.get("role")
+    role_label = role.get("label", "resident") if isinstance(role, Mapping) else "resident"
+    home = person.get("home") is not None
+    work = person.get("work") is not None
+    what_key = (
+        "living_what_home_work"
+        if home and work
+        else "living_what_home"
+        if home
+        else "living_what_work"
+        if work
+        else "living_what_neither"
+    )
+    action = person.get("action") or {}
+    kind = action.get("kind", "idle")
+    goal = person.get("goal")
+    goal_activity = goal.get("activity") if isinstance(goal, Mapping) else None
+    if kind == "move":
+        doing = catalog.tables["doing"].get(
+            f"living_heading_{goal_activity}", catalog.words("doing", "living_heading_unknown")
+        )
+    else:
+        doing = catalog.tables["doing"].get(kind and f"living_{kind}") or catalog.words(
+            "doing", "living_unknown"
+        )
+    reason = goal.get("reason") if isinstance(goal, Mapping) else action.get("reason")
+    reason_key = (
+        "living_why_shift"
+        if reason == "shift_due"
+        else "living_why_need"
+        if reason == "most_pressing_need"
+        else "living_why_wait"
+        if reason == "waiting_a_minute"
+        else "living_why_home"
+        if reason == "starting_at_home"
+        else "living_why_other"
+    )
+    return InhabitantWords(
+        who=phrase["living_who"].format(number=ordinal + 1),
+        what=phrase[what_key].format(role=role_label),
+        doing=doing,
+        why=phrase[reason_key],
+    )
+
+
 def inhabitant_words(
     person: Mapping[str, Any],
     place: Callable[[str], str | None],
@@ -201,6 +252,8 @@ def inhabitant_words(
     Talking has no content, so nothing here says what anybody talked about.
     """
     words = catalog or inhabitant_words_catalog()
+    if "ordinal" in person:
+        return _living_inhabitant_words(person, words)
     phrase = words.tables["phrase"]
     doing_words = words.tables["doing"]
     who = person.get("display_name") or phrase["who_unnamed"]

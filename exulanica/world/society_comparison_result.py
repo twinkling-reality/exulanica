@@ -38,10 +38,13 @@ from exulanica.grammar.errors import CatalogError
 from exulanica.models.manifest import AnsweringMechanism
 from exulanica.world import (
     society_comparison_claim,
+    society_comparison_living_drawing,
     society_comparison_verdict,
+    society_comparison_verdict_v4,
     society_score,
     society_score_v2,
     society_score_v3,
+    society_score_v4,
 )
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society_catalogs import (
@@ -71,6 +74,8 @@ from exulanica.world.society_comparison_verdict import (
     score_version,
 )
 from exulanica.world.society_decisions import PERSON_PROVIDER_CONFIG
+from exulanica.world.society_engines import society_engine
+from exulanica.world.society_living import input_routine
 from exulanica.world.society_planner import routine_of
 
 __all__ = [
@@ -100,6 +105,7 @@ __all__ = [
     "protocol_value",
     "protocol_values",
     "replay_document",
+    "replay_profile",
     "run_outcome",
     "scoring_binding",
     "verified_replay",
@@ -120,12 +126,24 @@ FAILURE_PROFILE: Final = "exulanica.society-comparison-failure/v1"
 LISTING_PROFILE: Final = "exulanica.society-comparisons/v2"
 RESULT_PROFILE: Final = "exulanica.society-comparison-result/v2"
 REPLAY_PROFILE: Final = "exulanica.society-comparison-run-replay/v2"
+
+
+def replay_profile(plan: RunPlan) -> str:
+    """The drawing contract recorded by the state family of this run's engine."""
+    return (
+        society_comparison_living_drawing.REPLAY_PROFILE
+        if society_engine(plan.engine_profile).state_family == "living"
+        else REPLAY_PROFILE
+    )
+
+
 #: The binding a comparison registers by the version of the score it is scored under, naming every
 #: module it is scored and judged by. The first version's binding has no profile: it names its
 #: scorer and claim by digest alone. The third also names the third score's module.
 BINDING_PROFILES: Final = {
     2: "exulanica.society-comparison-binding/v2",
     3: "exulanica.society-comparison-binding/v3",
+    4: "exulanica.society-comparison-binding/v4",
 }
 BINDING_PROFILE: Final = BINDING_PROFILES[3]
 #: What an arm is to its comparison, in the order a reader lists them: a model compared, the same
@@ -154,7 +172,7 @@ _DEFINED_VERSION: Final = 2
 #: The score versions a definition of that version is scored under: both group the people they
 #: score and report what each model answered apart, the second weighing need relief alone and the
 #: third need relief and variety.
-_DEFINED_SCORES: Final = (2, society_score_v3.CATALOG_VERSION)
+_DEFINED_SCORES: Final = (2, society_score_v3.CATALOG_VERSION, society_score_v4.CATALOG_VERSION)
 #: Places a decimal the server writes carries. A score is exact until it is written; four places
 #: tell apart seeds whose relief differs by a ten-thousandth of what the routine spares, which is
 #: finer than any difference a comparison of eight seeds can claim.
@@ -183,6 +201,18 @@ _BOUND_MODULES: Final[dict[int, dict[str, ModuleType]]] = {
             society_score_v3,
             society_comparison_claim,
             society_comparison_verdict,
+        )
+    },
+    4: {
+        module.__name__: module
+        for module in (
+            society_score,
+            society_score_v2,
+            society_score_v3,
+            society_score_v4,
+            society_comparison_claim,
+            society_comparison_verdict,
+            society_comparison_verdict_v4,
         )
     },
 }
@@ -481,7 +511,15 @@ def run_outcome(
     integer terms over the people it scores and what its asking took, in the form of its
     definition's version."""
     version = definition_version(definition)
-    threshold = society_score.need_threshold(routine_of(plan.inputs[-1]))
+    score_version_now = score_version(catalogs)
+    family = society_engine(plan.engine_profile).state_family
+    if (family == "living") != (score_version_now == society_score_v4.CATALOG_VERSION):
+        raise ComparisonRefused(
+            "score_engine_mismatch", "a living run uses the fourth score, other runs keep theirs"
+        )
+    threshold = (
+        0 if family == "living" else society_score.need_threshold(routine_of(plan.inputs[-1]))
+    )
     everybody = [person["id"] for person in played.start["inhabitants"]]
     if version == 1:
         terms = society_score.run_terms(
@@ -494,14 +532,26 @@ def run_outcome(
         extra: dict[str, Any] = {}
     else:
         people = everybody if plan.group is None else sorted(plan.group)
-        terms = society_score_v2.run_terms(
-            played.states,
-            played.events,
-            people=people,
-            threshold=threshold,
-            choice_points=sum(played.choice_points[subject] for subject in people),
-            score=_turn_classes(catalogs),
-        ).document()
+        points = sum(played.choice_points[subject] for subject in people)
+        terms = (
+            society_score_v4.run_terms(
+                played.states,
+                played.events,
+                people=people,
+                choice_points=points,
+                routine=input_routine(plan.inputs[-1]),
+                score=_turn_classes(catalogs),
+            )
+            if family == "living"
+            else society_score_v2.run_terms(
+                played.states,
+                played.events,
+                people=people,
+                threshold=threshold,
+                choice_points=points,
+                score=_turn_classes(catalogs),
+            ).document()
+        )
         extra = {"others_calls": None if others_calls is None else dict(others_calls)}
     return {
         "profile": RUN_PROFILES[version],
@@ -521,7 +571,10 @@ def run_outcome(
 def _turn_classes(catalogs: ComparisonCatalogs) -> society_score_v2.PersonScore:
     """The classes a group's turns are counted in, as the score the catalogs hold declares them:
     the second's own, or the third's, which reports the second's unchanged."""
-    if score_version(catalogs) == society_score_v3.CATALOG_VERSION:
+    if score_version(catalogs) in (
+        society_score_v3.CATALOG_VERSION,
+        society_score_v4.CATALOG_VERSION,
+    ):
         return society_score_v3.person_score(catalogs.score).reliability
     return society_score_v2.person_score(catalogs.score)
 
@@ -690,7 +743,12 @@ def comparison_result(
     definition = row["document"]
     recorded = definition["scoring"]
     found_catalogs = _recorded_catalogs(recorded) if catalogs is None else catalogs
-    reading = read_comparison(
+    verdict_reader = (
+        society_comparison_verdict_v4.read_comparison
+        if score_version(found_catalogs) == society_score_v4.CATALOG_VERSION
+        else read_comparison
+    )
+    reading = verdict_reader(
         definition, runs, found_catalogs, binding_held=binding_holds(recorded, catalogs)
     )
     protocol = protocol_for(found_catalogs)
@@ -831,6 +889,9 @@ def _terms_document(terms: Mapping[str, Any]) -> dict[str, Any]:
     for key in ("classes", "reasons", "person_minutes", "minutes_by_activity"):
         if key in terms:
             served[key] = terms[key]
+    for key in ("need_thresholds", "need_unit"):
+        if key in terms:
+            served[key] = terms[key]
     return served
 
 
@@ -903,6 +964,10 @@ def replay_document(
     """One replayed run as the page draws it: the place from the frozen input, each person's
     minute by minute, who decides for each of them in this run, and what each turn's receipt and
     minute did. No seed, no raw state."""
+    if replay_profile(plan) == society_comparison_living_drawing.REPLAY_PROFILE:
+        return society_comparison_living_drawing.replay_document(
+            plan, arm, digest, played, model_name=model_name
+        )
     document = plan.inputs[-1]
     routine = routine_of(document)
     positions = {node["node_id"]: node["position_mm"] for node in document["navigation"]["nodes"]}

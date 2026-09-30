@@ -17,6 +17,7 @@ from pathlib import Path
 
 from exulanica.api.decision_host import ask_bound_usd
 from exulanica.api.society_comparison_start import (
+    TYPICAL_FALLBACK,
     TYPICAL_NAVIGATION,
     TYPICAL_RECORDS,
     comparison_cost,
@@ -154,7 +155,7 @@ def test_a_society_is_planned_with_its_own_grounds_figures_or_promised_nothing()
         _body(QWEN, NANO, 4), 48, ROLE, ESTIMATOR, MANIFEST, at_once=2, navigation_profile=TOWN
     )
     assert unmeasured.typical_matches is False
-    assert unmeasured.typical_record == TYPICAL_RECORDS[TYPICAL_NAVIGATION][0]
+    assert unmeasured.typical_record == TYPICAL_FALLBACK
     assert unmeasured.document()["typical_matches"] is False
 
 

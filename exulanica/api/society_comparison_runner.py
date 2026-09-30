@@ -86,11 +86,11 @@ from exulanica.world.society_comparison_repository import (
 )
 from exulanica.world.society_comparison_result import (
     FAILURE_PROFILE,
-    REPLAY_PROFILE,
     ComparisonRefused,
     definition_version,
     protocol_value,
     replay_document,
+    replay_profile,
     run_outcome,
     verified_replay,
 )
@@ -857,7 +857,6 @@ class SocietyComparisonRunner:
         first, as a run's are: a run whose inputs lost their rights is not drawn. A replay that
         differs from its record is logged and nothing is stored, so a read replays it and refuses
         it by name. The run's outcome stands whatever happens here."""
-        drawing = drawing_sha256(REPLAY_PROFILE)
         try:
             with (
                 self.database.session(self.workspace_id) as connection,
@@ -867,6 +866,8 @@ class SocietyComparisonRunner:
                 outcome = repository.outcome(run_id)
                 if outcome is None or outcome["status"] != "completed":
                     return False
+                plan, definition = repository.plan(comparison_id, run_id)
+                drawing = drawing_sha256(replay_profile(plan))
                 found = repository.drawing(run_id, drawing)
                 if found is not None:
                     try:
@@ -876,7 +877,6 @@ class SocietyComparisonRunner:
                         _LOG.error("A comparison run's stored drawing is not the drawing it names")
                         return False
                     return True
-                plan, definition = repository.plan(comparison_id, run_id)
                 stored = repository.stored(run_id)
         except UnavailableSocietyInput:
             return False

@@ -51,7 +51,7 @@ from exulanica.api.society_comparison_runner import ComparisonArm, SocietyCompar
 from exulanica.api.society_comparison_start import (
     MODELS_MOST,
     START_REFUSALS,
-    TYPICAL_RECORD,
+    TYPICAL_FALLBACK,
     TYPICAL_RECORDS,
     ComparisonCost,
     ComparisonSelection,
@@ -85,12 +85,12 @@ from exulanica.world.society_comparison_repository import (
     SocietyComparisonRepository,
 )
 from exulanica.world.society_comparison_result import (
-    REPLAY_PROFILE,
     ComparisonRefused,
     comparison_result,
     listing_document,
     protocol_value,
     replay_document,
+    replay_profile,
     verified_replay,
 )
 from exulanica.world.society_comparison_start_repository import (
@@ -101,6 +101,7 @@ from exulanica.world.society_comparison_start_repository import (
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+from exulanica.world.society_person_label import person_label
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_score import ScoreRefused
 from exulanica.world.worlds import require_world
@@ -246,14 +247,14 @@ def plan_society_comparison(
         # names them: a group of more people than one owner's choice holds is chosen from these.
         "people": sorted(
             (
-                {"id": person["id"], "name": person["display_name"]}
+                {"id": person["id"], "name": person_label(person)}
                 for person in society["state"]["inhabitants"]
             ),
             key=lambda person: (person["name"], person["id"]),
         )
         if compared
         else [],
-        "typical_record": TYPICAL_RECORDS.get(navigation, (TYPICAL_RECORD, ""))[0],
+        "typical_record": TYPICAL_RECORDS.get(navigation, (TYPICAL_FALLBACK, ""))[0],
         "plan": None,
         "plan_refusal": None,
     }
@@ -362,7 +363,7 @@ def society_comparison_run(
     if completed:
         # The drawing the host stored once it verified the run, under the digest of the code
         # reading it; where there is none, the run is replayed and verified here.
-        stored = comparisons.drawing(run_id, drawing_sha256(REPLAY_PROFILE))
+        stored = comparisons.drawing(run_id, drawing_sha256(replay_profile(plan)))
         if stored is not None:
             try:
                 drawn = decode(stored)
@@ -587,7 +588,7 @@ def _choices(
     every model the manifest offers the role, with why this server cannot ask it, if it cannot,
     and what it typically cost, on the society's kind of ground where that was measured."""
     manifest = load_manifest()
-    names = {person["id"]: person["display_name"] for person in society["state"]["inhabitants"]}
+    names = {person["id"]: person_label(person) for person in society["state"]["inhabitants"]}
     typical = typical_per_person_hour(navigation)
     roles = []
     for role in decision_roles().hosted_by(str(society["engine_version"])):

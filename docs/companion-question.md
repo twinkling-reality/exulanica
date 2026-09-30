@@ -412,9 +412,10 @@ about the world's people is the inspector's words, a recorded line's own words, 
 nothing the simulation did not record, what anybody said above all, can reach an answer, whichever
 lines the composer chooses. The notes an answer leads with are the code's and cost it no clause.
 
-What it does not do: it answers for the purposeful profile the words catalog names, and refuses any
-other society by name (`society_profile_has_no_words`); and an answer about the world's people is
-not kept in the Companion's memory,
+It answers for the purposeful society and the living town profiles named by the words catalog,
+using the living resident's recorded home, work, activity and model decision events without
+exposing need levels or place identifiers. It refuses any other society by name
+(`society_profile_has_no_words`). An answer about the world's people is not kept in the Companion's memory,
 which holds photograph citations and saved names only. A remembered answer that cites nothing is
 drawn as a statement about the search, never as the person's past.
 

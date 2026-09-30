@@ -86,6 +86,36 @@ def test_the_digest_covers_every_module_a_verified_replay_and_its_drawing_execut
     assert executed <= set(DRAWING_MODULES), sorted(executed - set(DRAWING_MODULES))
 
 
+def test_living_drawing_trace_is_covered_by_its_digest():
+    from test_society_living_comparison import _Choosing, _plan
+
+    plan = _plan("model")
+    played = play(plan, _Choosing())
+    stored = list(zip(played.requests, played.receipts, strict=True))
+    outcome = {
+        "status": "completed",
+        "minutes": {"state_sha256": played.minute_digests},
+        "events_sha256": played.events_sha256,
+        "receipts": {"count": len(played.receipts), "sha256": played.receipts_sha256},
+    }
+    executed: set[str] = set()
+
+    def traced(frame, event, _arg):
+        if event == "call":
+            found = Path(frame.f_code.co_filename)
+            if found.is_relative_to(PACKAGE):
+                executed.add(".".join(found.relative_to(PACKAGE.parent).with_suffix("").parts))
+
+    sys.setprofile(traced)
+    try:
+        replayed = verified_replay(plan, stored, outcome)
+        drawing = replay_document(plan, {}, "model", "0" * 64, replayed, model_name=str)
+    finally:
+        sys.setprofile(None)
+    assert drawing["profile"] == "exulanica.society-comparison-run-replay/v3"
+    assert executed <= set(DRAWING_MODULES), sorted(executed - set(DRAWING_MODULES))
+
+
 def test_the_digest_covers_the_data_a_replay_reads_as_well_as_its_code():
     data = set(drawing_data())
     assert {MODULES_PATH, ENGINES_PATH} <= data
@@ -187,6 +217,30 @@ def _drawn_routine_run(client, world):
     assert not _drawings(world["connection"], run_id), "playing a run draws nothing"
     assert _runner(client, world).draw_all(comparison_id) == 1
     return comparison_id, run_id
+
+
+@pytest.mark.postgres
+@route_support.CURRENT_GROUND
+def test_draw_all_continues_after_one_run_cannot_be_drawn(runtime_app, monkeypatch):
+    world, make_app = runtime_app
+    with TestClient(make_app()) as client:
+        comparison_id, routine_id = route_support._completed_routine_run(client, world)
+        runner = _runner(client, world)
+        with runner.database.session(world["workspace"]) as connection:
+            runs = runner._repository(connection).runs(comparison_id)
+            wait_id = next(run["run_id"] for run in runs if run["arm"] == "wait")
+        assert runner.run(comparison_id, wait_id)["status"] == "completed"
+        tried = []
+
+        def draw(_runner, _comparison_id, run_id):
+            tried.append(run_id)
+            if run_id == routine_id:
+                raise RuntimeError("one drawing failed")
+            return True
+
+        monkeypatch.setattr(SocietyComparisonRunner, "draw", draw)
+        assert runner.draw_all(comparison_id) == 1
+        assert set(tried) == {routine_id, wait_id}
 
 
 def _drawings(connection, run_id) -> list[dict]:

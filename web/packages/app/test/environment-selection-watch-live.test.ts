@@ -193,10 +193,25 @@ describe('watching a saved world live', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(controlClient.configure).toHaveBeenCalledWith(expect.anything(), 'paused', 2);
     expect(server.mode).toBe('paused');
-    // Paused, nothing is read on its own any more.
+    // The control is still read while paused: another client may start this world.
     const reads = controlClient.read.mock.calls.length;
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(controlClient.read.mock.calls.length).toBe(reads);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(controlClient.read.mock.calls.length).toBe(reads + 1);
+    mounted.dispose();
+  });
+
+  it('follows a town another client starts and advances', async () => {
+    const { mounted, server, societyClient, controlClient, drawnTicks, panel } = mount({ mode: 'paused', host: RUNNING });
+    await mounted.begin();
+    const initialReads = controlClient.read.mock.calls.length;
+    expect(drawnTicks()).toEqual([5]);
+    server.mode = 'playing';
+    server.tick = 6;
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(controlClient.read.mock.calls.length).toBe(initialReads + 1);
+    expect(societyClient.read).toHaveBeenCalled();
+    expect(drawnTicks()).toEqual([5, 6]);
+    expect(panel().textContent).toContain('Pause');
     mounted.dispose();
   });
 

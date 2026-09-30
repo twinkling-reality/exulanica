@@ -69,6 +69,7 @@ from exulanica.selection.prompts import _SOCIETY_COMPOSER_SYSTEM, PROMPT_VERSION
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
 from exulanica.world.society_engines import INPUT_ENGINES
 from exulanica.world.society_model_decisions import DECISION_EVENT_KIND
+from exulanica.world.society_person_label import person_label
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
@@ -446,6 +447,7 @@ class SocietyScene:
     #: The event each person's state names as its explanation, by id, however long ago it was.
     explaining: Mapping[str, Mapping[str, Any]]
     selected: str | None
+    selected_events: tuple[Mapping[str, Any], ...] = ()
     labels: _Labels = field(default_factory=_Labels)
     #: Inhabitants the question names by a name only they carry, by id.
     named: tuple[str, ...] = ()
@@ -524,7 +526,32 @@ def read_scene(
         return SocietyRefusal.UNAVAILABLE
     try:
         events = _authorized_events(
-            connection, workspace_id, world_id, snapshot, repository, once, latest=EVENT_LINES
+            connection,
+            workspace_id,
+            world_id,
+            snapshot,
+            repository,
+            once,
+            latest=EVENT_LINES,
+            include_decisions=any(
+                "ordinal" in person for person in snapshot["state"]["inhabitants"]
+            ),
+        )
+        living = any("ordinal" in person for person in snapshot["state"]["inhabitants"])
+        selected_events = (
+            _authorized_events(
+                connection,
+                workspace_id,
+                world_id,
+                snapshot,
+                repository,
+                once,
+                latest=EVENT_LINES,
+                include_decisions=True,
+                subject_id=str(context.inhabitant_id),
+            )
+            if living and context.inhabitant_id is not None
+            else []
         )
         shown = {str(event["event_id"]) for event in events}
         wanted = sorted(
@@ -545,8 +572,24 @@ def read_scene(
                 if (event.get("document") or {}).get("reason") == _CHOSEN_BY_THEIR_MODEL
             }
         )
-        decisions = _authorized_events(
-            connection, workspace_id, world_id, snapshot, repository, once, decisions_at=chosen_at
+        decisions = (
+            list(
+                {
+                    str(event["event_id"]): event
+                    for event in (*events, *selected_events)
+                    if event["event_kind"] == DECISION_EVENT_KIND
+                }.values()
+            )
+            if living
+            else _authorized_events(
+                connection,
+                workspace_id,
+                world_id,
+                snapshot,
+                repository,
+                once,
+                decisions_at=chosen_at,
+            )
         )
     except (UnavailableSocietyInput, ValueError):
         # Authorization not configured, or a stored input that does not verify: the society
@@ -555,8 +598,15 @@ def read_scene(
     places = snapshot.get("places") or {}
     scene = build_scene(
         snapshot,
-        targets=places.get("targets", []),
+        targets=[
+            *places.get("targets", []),
+            *(
+                {"target_id": destination["destination_id"]}
+                for destination in places.get("living_destinations", [])
+            ),
+        ],
         events=events,
+        selected_events=selected_events,
         explaining=[*events, *older],
         selected=context.inhabitant_id,
         question=question,
@@ -605,6 +655,8 @@ def _authorized_events(
     latest: int | None = None,
     event_ids: Sequence[str] = (),
     decisions_at: Sequence[tuple[int, str]] = (),
+    include_decisions: bool = False,
+    subject_id: str | None = None,
 ) -> list[Mapping[str, Any]]:
     """This world's society's ``latest`` events, newest first, or the named ones however long ago,
     or the decision events recorded at ``decisions_at``'s minutes for its people, each only while
@@ -626,10 +678,15 @@ def _authorized_events(
     values: tuple[Any, ...]
     if latest is not None:
         chosen = (
-            "and e.event_kind<>%s "
-            "order by e.tick desc,(e.document->>'order')::integer nulls last,e.event_id limit %s"
+            ("and e.subject_id=%s " if subject_id is not None else "")
+            + ("" if include_decisions else "and e.event_kind<>%s ")
+            + "order by e.tick desc,(e.document->>'order')::integer nulls last,e.event_id limit %s"
         )
-        values = (DECISION_EVENT_KIND, latest)
+        values = (
+            *((subject_id,) if subject_id is not None else ()),
+            *((DECISION_EVENT_KIND,) if not include_decisions else ()),
+            latest,
+        )
     elif event_ids:
         chosen = "and e.event_kind<>%s and e.event_id=any(%s::uuid[])"
         values = (DECISION_EVENT_KIND, list(event_ids))
@@ -674,6 +731,7 @@ def build_scene(
     targets: Iterable[Mapping[str, Any]],
     events: Iterable[Mapping[str, Any]],
     explaining: Iterable[Mapping[str, Any]] = (),
+    selected_events: Iterable[Mapping[str, Any]] = (),
     selected: uuid.UUID | None,
     question: str,
     saved: Sequence[SavedName],
@@ -699,6 +757,7 @@ def build_scene(
             str(target["target_id"]) for target in targets if target.get("enabled", True)
         ),
         events=tuple(events)[:EVENT_LINES],
+        selected_events=tuple(selected_events)[:EVENT_LINES],
         explaining={str(event["event_id"]): event for event in explaining},
         selected=chosen,
     )
@@ -754,7 +813,7 @@ def _read_names(scene: SocietyScene, question: str, saved: Sequence[SavedName]) 
     scene.typed_label = _TYPED_LABEL.search(question) is not None
     owners: dict[str, set[str]] = {}
     for inhabitant_id, person in scene.people.items():
-        for form in _name_forms(str(person.get("display_name") or "")):
+        for form in _name_forms(person_label(person)):
             owners.setdefault(form.casefold(), set()).add(inhabitant_id)
     everyone = set(scene.people)
     #: (start, end, kind, owners): kind 0 is a typed placeholder, 1 a saved name, 2 an
@@ -865,6 +924,44 @@ class _Builder:
         document = event["document"]
         subject = str(event["subject_id"])
         tick = int(event["tick"])
+        if (
+            self.scene.profile in self.catalog.profiles
+            and subject in self.scene.people
+            and ("ordinal" in self.scene.people[subject])
+        ):
+            past = {
+                **self.scene.people[subject],
+                "action": document.get("action"),
+                "goal": document.get("goal"),
+            }
+            said = inhabitant_words(past, lambda _target: None, lambda _other: None, self.catalog)
+            label = self.scene.labels.person(subject)
+            minute = self.minute(tick)
+            if event.get("event_kind") == DECISION_EVENT_KIND:
+                model = self.scene.deciding_models.get((tick, subject))
+                named = f"The model {model} " if model else "A model "
+                if document.get("disposition") == _APPLIED:
+                    line = (
+                        f"At simulated minute {minute.text}, {named}chose for {label}; "
+                        f"they were {said.doing}."
+                    )
+                else:
+                    line = (
+                        f"At simulated minute {minute.text}, {named}proposed a choice for "
+                        f"{label}, but it was not applied."
+                    )
+            else:
+                line = f"At simulated minute {minute.text}, {label} was {said.doing}. {said.why}"
+            item = SocietyEvidenceItem(
+                token=_token(self.taken),
+                result_kind="simulation_event",
+                inhabitant_id=uuid.UUID(subject),
+                event_id=uuid.UUID(str(event["event_id"])),
+                tick=tick,
+                line=line,
+            )
+            self.items.append(item)
+            return item
         outcome = str(document.get("outcome") or "")
         outcome_words = self.catalog.tables["outcome"].get(outcome) or self.catalog.words(
             "line", "outcome_unknown"
@@ -985,7 +1082,15 @@ def _person_answer(
             clauses.append(_cited(said.why, state, *because))
         return clauses
     if aspect is SocietyAspect.RECENT:
-        theirs = [event for event in scene.events if str(event["subject_id"]) == subject]
+        theirs = [
+            event
+            for event in (scene.selected_events or scene.events)
+            if str(event["subject_id"]) == subject
+        ]
+        if re.search(r"\bmodel\b", scene.question, re.IGNORECASE):
+            decisions = [event for event in theirs if event["event_kind"] == DECISION_EVENT_KIND]
+            if decisions:
+                theirs = decisions
         if not theirs:
             item = builder.state(subject, f"{label}: {said.doing}")
             return [

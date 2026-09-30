@@ -126,6 +126,7 @@ export interface SocietyPlaces {
   readonly clearanceMm: number;
   readonly targets: readonly SocietyPlace[];
   readonly unreachable: readonly SocietyUnreachablePlace[];
+  readonly livingDestinations?: ReadonlyMap<string, { readonly useClass: string | null; readonly label: string | null }>;
 }
 
 const record = (value: unknown): Readonly<Record<string, unknown>> => {
@@ -202,7 +203,7 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
     ids.add(person['id']);
     const role = person['role'] === null ? null : record(person['role']);
     const goal = person['goal'] === null ? null : record(person['goal']);
-    if ((role && !textValue(role['label'])) || (goal && (!textValue(goal['activity']) || !textValue(goal['because'])))) {
+    if ((role && !textValue(role['label'])) || (goal && (!textValue(goal['activity']) || !textValue(goal['because']) || !textValue(goal['reason'])))) {
       throw new Error('Invalid living society role or goal');
     }
     return {
@@ -210,13 +211,15 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
       synthetic: true as const,
       role: role ? role['label'] as string : null,
       role_reason: String(person['role_reason']),
+      has_home: person['home'] != null,
+      has_work: person['work'] != null,
       position_mm: person['position_mm'],
       motion_path_mm: path as readonly (readonly [number, number])[],
       indoors: location['indoors'],
       walk_speed_mm_per_tick: person['walk_speed_mm_per_tick'],
       needs: record(person['needs']) as Readonly<Record<string, number>>,
       action: action as unknown as NonNullable<OwnedSocietyState['inhabitants'][number]['action']>,
-      goal: goal ? { activity: goal['activity'] as string, destination_id: (goal['destination_id'] ?? null) as string | null, because: goal['because'] as string } : null,
+      goal: goal ? { activity: goal['activity'] as string, destination_id: (goal['destination_id'] ?? null) as string | null, because: goal['because'] as string, reason: goal['reason'] as string } : null,
       explanation: explanation as unknown as { summary: string; event_ids: readonly string[] },
     };
   });
@@ -273,6 +276,13 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
     unavailableReason: places['unavailable_reason'] as string | null,
     walkableArea,
     clearanceMm: places['clearance_mm'] as number,
+    livingDestinations: new Map((Array.isArray(places['living_destinations']) ? places['living_destinations'] : []).map((value) => {
+      const destination = record(value);
+      if (!textValue(destination['destination_id']) ||
+          !(destination['use_class'] === null || textValue(destination['use_class'])) ||
+          !(destination['label'] === null || textValue(destination['label']))) throw new Error('Invalid living destination');
+      return [destination['destination_id'], { useClass: destination['use_class'], label: destination['label'] }] as const;
+    })),
     targets: Object.freeze(targets.map((value) => {
       const target = record(value);
       const places = target['place_node_ids'];

@@ -75,7 +75,7 @@ describe('the bounds a town\'s comparison states before Start', () => {
 
   it('never promises a finish where the typical figure was measured on another kind of ground', () => {
     const words = finishingWords(figures([], '0.0277', false));
-    expect(words).toContain('from what one like it spent on the small square');
+    expect(words).toContain('based on recorded comparisons on other grounds');
     expect(words).toContain('may stop it before it finishes');
     expect(words).not.toContain('lets it finish');
   });

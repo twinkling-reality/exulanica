@@ -1,0 +1,50 @@
+{
+  "catalog_id": "society-comparison-typical-cost",
+  "catalog_version": 1,
+  "default_navigation": "authored-ground-lattice/v1",
+  "source_build": "Derived from the immutable evaluation records named in each entry by exulanica.api.society_comparison_start extraction readers. No living-town measurement is claimed.",
+  "fallback": "For an unmeasured engine or model combination, use the greatest measured per-person-hour cost and p95 latency for that model; if a model has no measurement, show no typical estimate.",
+  "entries": [
+    {
+      "navigation": "authored-ground-lattice/v1",
+      "source": "docs/evaluation/2026-09-26-society-group-comparison.json",
+      "source_sha256": "09f595843474872db8e0985667fbea0775aa644ef0c2fbccca6262d4d7dfb455",
+      "extraction": "judged_comparison",
+      "models": {
+        "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+          "usd_per_person_hour": "0.00140000",
+          "latency_p95_ms": 1136
+        },
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+          "usd_per_person_hour": "0.00055000",
+          "latency_p95_ms": 3213
+        },
+        "nvidia/Nemotron-3_5-Lightning": {
+          "usd_per_person_hour": "0.00182500",
+          "latency_p95_ms": 4619
+        }
+      },
+      "key": "authored-ground-lattice/v1",
+      "reason": "Derived: the per-person-hour costs and answer times are extracted from the immutable source record whose path, digest and reader this entry states."
+    },
+    {
+      "navigation": "city-walking-surfaces/v1",
+      "source": "docs/evaluation/2026-09-29-town-comparison-cost.json",
+      "source_sha256": "abb6b6def4285e31ae01f4454ace75b52de6ec01db28b9b51b084eaef8960ea2",
+      "extraction": "town_comparison_cost",
+      "models": {
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+          "usd_per_person_hour": "0.00132226",
+          "latency_p95_ms": 3034
+        },
+        "nvidia/Nemotron-3_5-Lightning": {
+          "usd_per_person_hour": "0.00285801",
+          "latency_p95_ms": 3666
+        }
+      },
+      "key": "city-walking-surfaces/v1",
+      "reason": "Derived: the per-person-hour costs and answer times are extracted from the immutable source record whose path, digest and reader this entry states."
+    }
+  ],
+  "schema_version": 1
+}

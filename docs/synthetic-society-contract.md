@@ -153,7 +153,7 @@ held to this one's rows by a test.
 | `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | no | yes | yes | 1 to 512 |
 | `exulanica-society/v3` | no (retired) | yes | yes | yes | yes | no | no | no | no | yes | 1 to 512 |
 | `exulanica-society/v4` | yes | yes | yes | no | no | no | no | yes | no | no | 1 to 65,536 |
-| `exulanica-society/v5` | yes | yes | yes | no | yes | yes | no | no | no | yes | 1 to 512 |
+| `exulanica-society/v5` | yes | yes | yes | no | yes | yes | yes | no | no | yes | 1 to 512 |
 
 The browser reads the same file: `pnpm run society-engines:sync` writes it byte for byte, with the
 union of its profiles, into `web/packages/app/src/society-engines.generated.ts`, which
@@ -1381,9 +1381,10 @@ minute applies the stored receipt through the engine's choice seam
 (`AppliedChoices` in `exulanica/world/society_choice.py`): the people a model decided for act
 first, in decision order, each taking what their model chose where their turn still offers it;
 otherwise the rule decides for them and the receipt is recorded as rejected, with the reason. A
-minute with no receipt is the rule's alone. A comparison of models does not run the living town
-(its row states no comparisons); a comparison would step it through `living_step` and
-`LivingSeam` in the same module.
+minute with no receipt is the rule's alone. A comparison of models replays the living town from
+its frozen input and runs each arm through `living_step` and `LivingSeam`, scoring the supported
+needs and performed activities under the fourth person score
+([comparisons of models](society-experiments.md#comparisons-of-models)).
 
 It takes no directed actions, its people are not sent away, and it runs no experiments.
 

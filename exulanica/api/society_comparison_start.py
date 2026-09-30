@@ -17,9 +17,9 @@ the protocol's window times the subjects a model decides for in it, the arm's gr
 arm and, in every arm, anybody outside the group whose owner chose a model. Each ask costs at most
 its bound (:func:`~exulanica.api.decision_host.ask_bound_usd`): every answer the contract allows, at
 the manifest's prices, for the longest situation and answer the contract allows. What comparisons
-typically cost is a measurement, not a bound: the judged group comparison's recorded spend per
-simulated hour of each model's arms (:data:`TYPICAL_RECORD`), divided by its group's people, is
-served beside the most as that record's figure (:func:`typical_per_person_hour`). How many of a
+typically cost is a measurement, not a bound: a shipped catalog binds its source records and
+their per-person-hour figures (:data:`TYPICAL_CATALOG`), served beside the most as that source's
+figure (:func:`typical_per_person_hour`). How many of a
 minute's asks one run can have answered is derived from the same record's answer times and the
 decision contract (:func:`answers_per_minute`): a large group leaves the rest of a busy minute to
 their routine, which the plan says rather than refuses.
@@ -61,6 +61,7 @@ __all__ = [
     "PHASE",
     "ROUTINE_ARM",
     "START_REFUSALS",
+    "TYPICAL_FALLBACK",
     "TYPICAL_NAVIGATION",
     "TYPICAL_RECORD",
     "TYPICAL_RECORDS",
@@ -99,21 +100,26 @@ _ROOT: Final = Path(__file__).resolve().parents[2]
 #: reader: the judged group comparison, whose model arms each decided for four people of the
 #: starter world's small square for the protocol's hour over twelve held-out seeds, and one
 #: development comparison of four people of a generated town, whose people are asked more often.
-#: A society on a ground with no measurement of its own is planned with the square's figures, and
-#: the least bound derived from them is not promised to finish there.
+TYPICAL_CATALOG: Final = (
+    _ROOT / "assets/catalogs/society-comparison-cost/society-comparison-typical-cost.v1.json"
+)
+_TYPICAL_DOCUMENT: Final = json.loads(TYPICAL_CATALOG.read_text(encoding="utf-8"))
+if (
+    _TYPICAL_DOCUMENT.get("catalog_id") != "society-comparison-typical-cost"
+    or _TYPICAL_DOCUMENT.get("catalog_version") != 1
+):
+    raise ValueError("invalid comparison typical-cost catalog")
+#: The shipped catalog owns each ground's source and extraction form.
 TYPICAL_RECORDS: Final = {
-    "authored-ground-lattice/v1": (
-        "docs/evaluation/2026-09-26-society-group-comparison.json",
-        "judged_comparison",
-    ),
-    "city-walking-surfaces/v1": (
-        "docs/evaluation/2026-09-29-town-comparison-cost.json",
-        "town_comparison_cost",
-    ),
+    entry["navigation"]: (entry["source"], entry["extraction"])
+    for entry in _TYPICAL_DOCUMENT["entries"]
 }
-#: The small square's ground, whose measurement plans a society on a ground with none.
-TYPICAL_NAVIGATION: Final = "authored-ground-lattice/v1"
+TYPICAL_NAVIGATION: Final = _TYPICAL_DOCUMENT["default_navigation"]
 TYPICAL_RECORD: Final = TYPICAL_RECORDS[TYPICAL_NAVIGATION][0]
+TYPICAL_FALLBACK: Final = (
+    "assets/catalogs/society-comparison-cost/society-comparison-typical-cost.v1.json"
+    "#conservative-unmeasured"
+)
 
 #: Every way a start is refused, by the code it is answered with and its status. The plan route
 #: answers the same codes in its body, and the page has words for each (``START_REFUSAL_WORDS`` in
@@ -369,19 +375,41 @@ class TypicalFigures:
 @cache
 def typical_figures(navigation: str | None = TYPICAL_NAVIGATION) -> TypicalFigures | None:
     """The typical figures measured on the kind of ground ``navigation`` names, or None where no
-    measurement states it, its record is not beside this code, or ``navigation`` is None (a
+    measurement states it, or ``navigation`` is None (a
     society whose engine takes no inputs stands on no ground a measurement names)."""
     entry = TYPICAL_RECORDS.get(navigation)
     if entry is None:
         return None
     path, form = entry
-    file = _ROOT / path
-    if not file.is_file():
-        return None
-    per_person_hour, latency = _TYPICAL_READERS[form](
-        json.loads(file.read_text(encoding="utf-8"))["record"]
+    found = next(
+        (row for row in _TYPICAL_DOCUMENT["entries"] if row["navigation"] == navigation), None
     )
+    if found is None or found["source"] != path or found["extraction"] != form:
+        raise ValueError("typical-cost catalog source binding changed")
+    models = found["models"]
+    per_person_hour = {
+        model_id: Decimal(value["usd_per_person_hour"]) for model_id, value in models.items()
+    }
+    latency = {
+        model_id: int(value["latency_p95_ms"])
+        for model_id, value in models.items()
+        if value["latency_p95_ms"] is not None
+    }
     return TypicalFigures(path, per_person_hour, latency)
+
+
+def _conservative_figures() -> TypicalFigures:
+    cost: dict[str, Decimal] = {}
+    latency: dict[str, int] = {}
+    for navigation in TYPICAL_RECORDS:
+        measured = typical_figures(navigation)
+        if measured is None:
+            continue
+        for model, value in measured.per_person_hour.items():
+            cost[model] = max(cost.get(model, value), value)
+        for model, value in measured.latency_p95_ms.items():
+            latency[model] = max(latency.get(model, value), value)
+    return TypicalFigures(TYPICAL_FALLBACK, cost, latency)
 
 
 def figures_for(
@@ -393,14 +421,14 @@ def figures_for(
     own = None if navigation is None else typical_figures(navigation)
     if own is not None and all(model_id in own.per_person_hour for model_id in model_ids):
         return own, True
-    return typical_figures(TYPICAL_NAVIGATION), navigation == TYPICAL_NAVIGATION
+    return _conservative_figures(), False
 
 
 def typical_latency_ms(navigation: str | None = TYPICAL_NAVIGATION) -> dict[str, int]:
     """How long each model a measurement ran took to answer one of a group's people, by model id:
     its 95th percentile answer time on ``navigation``'s ground, else on the small square. A model
     neither measured has no figure."""
-    merged = dict((typical_figures(TYPICAL_NAVIGATION) or _NONE).latency_p95_ms)
+    merged = dict(_conservative_figures().latency_p95_ms)
     merged.update((typical_figures(navigation) or _NONE).latency_p95_ms)
     return dict(sorted(merged.items()))
 
@@ -424,7 +452,7 @@ def typical_per_person_hour(navigation: str | None = TYPICAL_NAVIGATION) -> dict
     """What one of a group's people cost for a simulated hour under each model, by model id: as
     measured on ``navigation``'s ground where it was, else on the small square. A model neither
     measured has no figure."""
-    merged = dict((typical_figures(TYPICAL_NAVIGATION) or _NONE).per_person_hour)
+    merged = dict(_conservative_figures().per_person_hour)
     merged.update((typical_figures(navigation) or _NONE).per_person_hour)
     return dict(sorted(merged.items()))
 

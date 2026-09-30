@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from decimal import Decimal
 from typing import Any, Final
 
@@ -43,7 +44,12 @@ from exulanica.world.society import (
     seed_digest,
     society_state_sha256,
 )
-from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
+from exulanica.world.society_catalogs import (
+    COMPARISON_SCORE_BY_FAMILY,
+    PERSON_SCORE_CATALOG,
+    ComparisonCatalogs,
+    load_comparison_catalogs,
+)
 from exulanica.world.society_comparison import RunPlan
 from exulanica.world.society_comparison_drawing import StoredDrawing
 from exulanica.world.society_comparison_reading import reading_refusal
@@ -57,6 +63,7 @@ from exulanica.world.society_comparison_result import (
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+from exulanica.world.society_person_label import person_label
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
@@ -180,11 +187,20 @@ class SocietyComparisonRepository:
         (:meth:`_people`). The same id with the same body returns the stored definition; with
         another body it is a conflict.
         """
-        catalogs = load_comparison_catalogs() if catalogs is None else catalogs
-        check_definition_body(body, catalogs)
         row = self.society._row(version_id)
         if row is None:
             raise UnknownSociety("society is unavailable")
+        catalogs = load_comparison_catalogs() if catalogs is None else catalogs
+        family = society_engine(row["engine_version"]).state_family
+        required_score = COMPARISON_SCORE_BY_FAMILY.get(family)
+        if required_score == 4 and catalogs.versions[PERSON_SCORE_CATALOG] == 3:
+            scored = load_comparison_catalogs(
+                versions={**catalogs.versions, PERSON_SCORE_CATALOG: required_score}
+            )
+            catalogs = replace(
+                catalogs, score=scored.score, versions=scored.versions, sha256=scored.sha256
+            )
+        check_definition_body(body, catalogs)
         if not society_engine(row["engine_version"]).comparisons:
             raise ComparisonRefused(
                 "engine_takes_no_comparison",
@@ -270,7 +286,7 @@ class SocietyComparisonRepository:
         records: each person one of the society's, named as its state names them; a group from an
         owner's choice exactly that choice's people; and each other person's decider exactly what
         the owner's latest choice for them names, or their routine where none does."""
-        names = {person["id"]: person["display_name"] for person in row["state"]["inhabitants"]}
+        names = {person["id"]: person_label(person) for person in row["state"]["inhabitants"]}
         group, source = body["group"]["people"], dict(body["group"]["source"])
         people = sorted(names) if group is None else list(group)
         if not set(people) <= set(names):
@@ -661,6 +677,11 @@ class SocietyComparisonRepository:
             contract=contract,
             group=group,
             others=others,
+            # A definition is bound to this society by society_id and version_id. The engine is
+            # read from that stored society, so historical v2 definitions keep v2 semantics.
+            engine_profile=str(
+                self.society._row(uuid.UUID(definition["version_id"]))["engine_version"]
+            ),
         )
 
     def authorize_inputs(self, inputs: Sequence[dict[str, Any]]) -> None:

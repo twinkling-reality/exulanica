@@ -641,6 +641,615 @@
         "doing": "Standing, deciding where to go.",
         "why": "Because of a reason this page has no words for (a_reason_nobody_wrote)."
       }
+    },
+    {
+      "case": "living idle",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "idle",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "idle",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "waiting for the next choice",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living eat at home",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "eat_at_home",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "eat_at_home",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "eating at home",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living eat out",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "eat_out",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "eat_out",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "eating out",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living rest",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "rest",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "rest",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "resting",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living shop",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "shop",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "shop",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "shopping",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living sleep",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "sleep",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "sleep",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "sleeping at home",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living stay home",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "stay_home",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "stay_home",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "spending time at home",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living stroll",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "stroll",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "stroll",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "taking a walk",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living visit",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "visit",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "visit",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "visiting a place",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living work",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "work",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "work",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "working",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living unknown",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "unknown",
+          "reason": "most_pressing_need"
+        },
+        "goal": {
+          "activity": "unknown",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "carrying out an activity",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading eat at home",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "eat_at_home",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "walking home to eat",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading eat out",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "eat_out",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "walking to a meal",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading rest",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "rest",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "walking to a place to rest",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading shop",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "shop",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "walking to shop",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading sleep",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "sleep",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "walking home to sleep",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading stay home",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "stay_home",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "going home",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading stroll",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "stroll",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "taking a walk",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading visit",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "visit",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "walking to visit a place",
+        "why": "Their routine chose this to meet a need."
+      }
+    },
+    {
+      "case": "living heading work",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "work",
+          "reason": "shift_due"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "walking to work",
+        "why": "Their work shift is due."
+      }
+    },
+    {
+      "case": "living heading unknown",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "baker"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "unknown",
+          "reason": "most_pressing_need"
+        }
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated baker in this town. They have a home and an assigned workplace.",
+        "doing": "walking through town",
+        "why": "Their routine chose this to meet a need."
+      }
     }
   ]
 }

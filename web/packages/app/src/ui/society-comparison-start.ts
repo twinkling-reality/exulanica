@@ -167,7 +167,7 @@ export function finishingWords(figures: PlanFigures): string {
   const held = 'each ask is held at its most until its cost is known';
   return figures.typicalMatches
     ? ` At least ${dollars(figures.suggestedUsd)} lets it finish, since ${held}.`
-    : ` At least ${dollars(figures.suggestedUsd)}, from what one like it spent on the small square, where people are asked less often than in a town; a bound that low may stop it before it finishes, as ${held}.`;
+    : ` At least ${dollars(figures.suggestedUsd)}, based on recorded comparisons on other grounds; this kind of world has no matching measurement, so that bound may stop it before it finishes, as ${held}.`;
 }
 
 /** What the person has chosen so far, or null while something a start needs is not chosen. */
@@ -343,7 +343,9 @@ export function buildComparisonStartForm(handlers: {
           : `${figures.runs} runs of one simulated hour. It could cost at most ${dollars(figures.mostUsd)}, if every person were asked every minute and every answer were as long as allowed. `
             + (figures.typicalUsd === null
               ? 'No recorded comparison measured what one like it typically costs.'
-              : `One like it typically costs about ${dollars(figures.typicalUsd)}, as measured in a recorded comparison.`)
+              : figures.typicalMatches
+                ? `One like it typically costs about ${dollars(figures.typicalUsd)}, as measured in a recorded comparison.`
+                : `The reference cost is about ${dollars(figures.typicalUsd)}, using the highest measured per-person-hour cost for each model on other grounds. This kind of world has no matching cost measurement.`)
             + finishingWords(figures);
       bound.placeholder = figures?.suggestedUsd ?? '0.05';
       // Until the person types a bound, it is the least that lets one like it finish.

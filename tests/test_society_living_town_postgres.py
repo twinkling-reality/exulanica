@@ -110,6 +110,92 @@ def test_a_town_s_society_is_the_living_town_its_people_at_home_and_it_replays(m
     assert again.json()["society_id"] == body["society_id"]
 
 
+def test_living_town_comparison_records_a_fourth_score_and_rereads_its_verdict(made):
+    import hashlib
+
+    from exulanica.api.society_comparison_start import development_seeds
+    from exulanica.models.manifest import load_manifest
+    from exulanica.world.society_catalogs import comparison_catalogs_for_engine
+    from exulanica.world.society_comparison import play
+    from exulanica.world.society_comparison_repository import SocietyComparisonRepository
+    from exulanica.world.society_comparison_result import comparison_result, run_outcome
+    from exulanica.world.society_decision_contract import person_role
+
+    from comparison_support import development_body
+    from test_society_living_comparison import _Choosing
+
+    api = made
+    entry, _society, town = _town_society(api)
+    version_id = uuid.UUID(entry["authored_version_id"])
+    comparison_id = uuid.uuid4()
+    catalogs = comparison_catalogs_for_engine(TOWN)
+    seeds = development_seeds(catalogs)[:2]
+    body = development_body(catalogs)
+    body["seeds"] = [hashlib.sha256(seed.encode()).hexdigest() for seed in seeds]
+    body["group"] = {
+        "people": sorted(person["id"] for person in town["state"]["inhabitants"][:4]),
+        "source": {"kind": "named"},
+    }
+    body["others"] = [
+        {
+            "id": person["id"],
+            "decider": {"kind": "routine"},
+            "provider_config": None,
+            "choice": None,
+            "answering": None,
+        }
+        for person in sorted(town["state"]["inhabitants"][4:], key=lambda person: person["id"])
+    ]
+    with api.database.session(api.repository.workspace_id) as connection, connection.transaction():
+        repository = SocietyComparisonRepository(_repository(api, connection, entry))
+        definition = repository.define(
+            version_id,
+            comparison_id=comparison_id,
+            body=body,
+            created_by=api.actor,
+            role=person_role(),
+            catalogs=catalogs,
+        )
+        assert definition["scoring"]["catalogs"]["versions"]["society-person-score"] == 4
+        for seed in seeds:
+            for arm in body["arms"]:
+                run_id = repository.reserve(comparison_id, arm=arm, seed=seed, created_by=api.actor)
+                plan, recorded = repository.plan(comparison_id, run_id)
+                played = play(plan, _Choosing())
+                repository.append(comparison_id, run_id, played.requests, played.receipts)
+                outcome = run_outcome(
+                    plan,
+                    recorded,
+                    arm,
+                    hashlib.sha256(seed.encode()).hexdigest(),
+                    played,
+                    None,
+                    catalogs,
+                )
+                repository.finish(comparison_id, run_id, outcome)
+    with api.database.session(api.repository.workspace_id) as connection:
+        repository = SocietyComparisonRepository(_repository(api, connection, entry))
+        row = repository.definition(version_id, comparison_id)
+        result = comparison_result(
+            row, repository.runs(comparison_id), catalogs, model_name=load_manifest().model_name
+        )
+        assert result["score_version"] == 4
+        assert result["seeds"]
+        assert result["verdict"]["code"]
+        assert all(
+            run["terms"]["need_thresholds"]
+            for seed in result["seeds"]
+            for run in seed["runs"].values()
+        )
+    reread = api.get(
+        f"/world/versions/{entry['authored_version_id']}/society/comparisons/"
+        f"{comparison_id}?world_id={entry['world_id']}"
+    )
+    assert reread.status_code == 200, reread.text
+    assert reread.json()["score_version"] == 4
+    assert reread.json()["verdict"] == result["verdict"]
+
+
 def test_a_saved_world_whose_input_carries_no_homes_gets_no_living_town(made):
     api = made
     starter = api.post("/world-entries/starter", {"title": "No town here"})
@@ -233,6 +319,43 @@ def test_a_chosen_model_s_receipt_decides_for_a_town_person_and_the_minute_repla
     ]
     assert selected["document"]["decision"]["decided_by"] == "model"
     assert selected["document"]["goal"]["activity"] == chosen["activity"]
+    from exulanica.selection.calls import CallLog
+    from exulanica.selection.plan import SocietyAspect, SocietyScope, SocietySelector
+    from exulanica.selection.society_question import (
+        SocietyContext,
+        answer_about_society,
+        read_scene,
+    )
+
+    with made.database.session(made.repository.workspace_id) as connection:
+        runtime = made.client.app.state.services.society_runtime
+        session = Session(workspace_id=made.repository.workspace_id, actor=made.actor)
+        scene = read_scene(
+            connection,
+            made.repository.workspace_id,
+            entry["world_id"],
+            SocietyContext(uuid.UUID(entry["authored_version_id"]), uuid.UUID(subject)),
+            authorize=lambda document: runtime.authorize(connection, session, document),
+            question="What did their model decide?",
+            saved=(),
+        )
+        answer = answer_about_society(
+            scene,
+            SocietySelector(scope=SocietyScope.SELECTED, aspect=SocietyAspect.RECENT),
+            client=None,
+            saved=(),
+            log=CallLog(),
+            max_tokens=1000,
+        )
+    assert answer.answer is not None
+    assert any(event["event_kind"] == "decision_applied" for event in scene.selected_events), [
+        event["event_kind"] for event in scene.selected_events
+    ]
+    said = " ".join(clause.text for clause in answer.answer.clauses)
+    assert "model" in said.lower() and "[inhabitant A]" in said, [
+        event["event_kind"] for event in scene.events
+    ]
+    assert "of 1000" not in said and "premises:" not in said
 
 
 def test_a_chosen_model_s_wait_is_stored_and_replayed(made):

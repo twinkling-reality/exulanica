@@ -703,6 +703,10 @@ function liveSnapshot(tick = 0, absent: string | null = null): SocietySnapshot {
         explanation:{summary:tick?'The target was removed.':'Awaiting a goal.',event_ids:tick?['event','outside-window']:[]}}))}});
 }
 function livingSnapshot(): SocietySnapshot { return parseSociety(producerLivingResponse); }
+function livingTownSnapshot(): SocietySnapshot {
+  const state = producerLivingResponse as unknown as { readonly state: Record<string, unknown> };
+  return parseSociety({ ...producerLivingResponse, state: { ...state.state, profile: 'exulanica-society/v5' } });
+}
 /** One declared rest destination, the shape the district interpretation publishes. */
 const restInterpretation = {
   producer:'test interpretation',document_sha256:'d'.repeat(64),unsupported:[],
@@ -726,10 +730,10 @@ const servedModels = (engine: string, takes: boolean) => parseSocietyModels({
   contract: { versions: {}, sha256: 'c'.repeat(64), model_people_maximum: 8 },
   models: [], choices: [], latest: [], by_model: [], decisions_read: { counted: 0, maximum: 2000 },
 });
-function liveMount(preview = false, living = false, interpretation: unknown = undefined, takesModelChoices = false) {
+function liveMount(preview = false, living = false, interpretation: unknown = undefined, takesModelChoices = false, town = false) {
   const canvas = document.createElement('canvas');
   const controls = {state:{x:0,y:1.68,z:0},onInteract:null as (()=>void)|null};
-  const snapshot = living ? livingSnapshot : liveSnapshot;
+  const snapshot = town ? livingTownSnapshot : living ? livingSnapshot : liveSnapshot;
   const initialSnapshot = snapshot();
   const inhabitantId = initialSnapshot.state.inhabitants[0]!.id;
   const connectedCatalog = living ? { ...catalog, placeId: initialSnapshot.placeId } : catalog;
@@ -789,6 +793,19 @@ describe('who decides for a district\'s people',()=>{
 });
 
 describe('persisted living world controls',()=>{
+  it('shows a living town resident without engine identifiers or need levels', async () => {
+    const {mount, controls} = liveMount(false, true, undefined, true, true);
+    await mount.begin();
+    controls.onInteract?.();
+    const inspector = mount.root.querySelector<HTMLElement>('.living-world-inspector')!;
+    const nearby = mount.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect nearby inhabitant"]')!;
+    expect(nearby.options[1]?.textContent).toBe('Resident 1');
+    expect(nearby.options[1]?.textContent).not.toMatch(/[0-9a-f]{8}-|f2343140/);
+    expect(inspector.textContent).toContain('Resident 1');
+    expect(inspector.textContent).toContain('Needs tracked');
+    expect(inspector.textContent).not.toMatch(/of 1000|district:marker|f2343140-4293-5eb0-b94b-d26c426ef252/);
+    mount.dispose();
+  });
   it('renders the canonical population and advances only on explicit user action',async()=>{
     const {mount,client,district,button,canvas}=liveMount();await mount.begin();
     expect(client.advance).not.toHaveBeenCalled();expect(district.setSociety).toHaveBeenCalledTimes(1);

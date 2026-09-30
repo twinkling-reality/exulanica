@@ -93,6 +93,21 @@ def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
         "unavailable_affordances": [
             dict(record) for record in document.get("unavailable_affordances", [])
         ],
+        **(
+            {
+                "living_destinations": [
+                    {
+                        "destination_id": destination["destination_id"],
+                        "use_class": destination["use_class"],
+                        "label": destination["label"],
+                    }
+                    for destination in document["living"]["place"]["destinations"]
+                    if destination["enabled"]
+                ]
+            }
+            if "living" in document
+            else {}
+        ),
     }
 
 

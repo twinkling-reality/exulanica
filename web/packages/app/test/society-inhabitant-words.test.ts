@@ -3,7 +3,7 @@
 // (tests/test_inhabitant_words.py). A change to either side's choice fails one of the two.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { inhabitantWordsFrom, REASON_WORDS, type WordedPerson } from '../src/society-inhabitant-words.js';
+import { inhabitantWordsFrom, livingInhabitantWords, livingNeedLabel, REASON_WORDS, type WordedPerson } from '../src/society-inhabitant-words.js';
 import { inhabitantWords } from '../src/ui/world-inhabitants.js';
 
 interface Case {
@@ -20,6 +20,28 @@ const CATALOG = JSON.parse(
 ) as { readonly entries: readonly { readonly kind: string; readonly code: string; readonly words: string }[] };
 
 describe('a simulated person in words, as the server says them', () => {
+  it('describes a living resident without an identifier or a need level', () => {
+    const said = livingInhabitantWords({
+      role: 'shopkeeper',
+      has_home: true,
+      has_work: true,
+      action: { kind: 'move', reason: 'following_route' },
+      goal: { activity: 'work', reason: 'shift_due' },
+    }, 6);
+    expect(said).toEqual({
+      who: 'Resident 7', what: 'A simulated shopkeeper in this town. They have a home and an assigned workplace.',
+      doing: 'walking to work', why: 'Their work shift is due.',
+    });
+    expect(JSON.stringify(said)).not.toMatch(/of 1000|premises:|[0-9a-f]{8}-[0-9a-f]{4}/);
+  });
+  it('takes each living need label from the engine catalog', () => {
+    const needs = JSON.parse(readFileSync(new URL('../../../../assets/catalogs/society/society-need.v1.json', import.meta.url), 'utf8')) as {
+      readonly entries: readonly { readonly key: string; readonly label: string }[];
+    };
+    expect(needs.entries.length).toBeGreaterThan(0);
+    for (const entry of needs.entries) expect(livingNeedLabel(entry.key)).toBe(entry.label);
+    expect(livingNeedLabel('unrecognized_code')).toBe('another need');
+  });
   it('says what every shared case expects', () => {
     // A positive control: the cases were read, and they reach every branch below.
     expect(CASES.cases.length).toBeGreaterThan(20);

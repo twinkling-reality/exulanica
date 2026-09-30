@@ -27,7 +27,7 @@ import type {
   RunReplay,
   VerdictCode,
 } from '../society-comparison-api.js';
-import { DECISION_WORDS } from '../society-inhabitant-words.js';
+import { DECISION_WORDS, livingNeedLabel } from '../society-inhabitant-words.js';
 import { el, replace } from './dom.js';
 import { createLivingWorldInspector } from './living-world-inspector.js';
 import { buildComparisonPlan, classWords, minuteAt, minuteClass } from './society-comparison-plan.js';
@@ -572,6 +572,12 @@ export function buildSocietyComparisonView(handlers: {
         if (person === undefined) { inspector.clear(); return; }
         const name = run!.people.find((p) => p.id === person.id)?.name ?? 'Someone';
         const doing = classWords(run!, minuteClass(run!, person));
+        const livingNeeds = run!.needThresholds && person.needs
+          ? Object.entries(person.needs).map(([key, value]) => {
+            const threshold = run!.needThresholds?.[key];
+            return `${livingNeedLabel(key)}: ${threshold === undefined ? 'recorded' : value >= threshold ? 'needs attention' : 'comfortable'}`;
+          }).join(', ')
+          : null;
         inspectorSide.textContent = `${selected.side === 0 ? 'Left' : 'Right'}: ${armName(arm)}, minute ${minute.tick}`;
         inspector.show({
           subject: person.id,
@@ -579,11 +585,11 @@ export function buildSocietyComparisonView(handlers: {
           description: 'A simulated person in this recorded run: invented for this world, and nothing they do is a memory.',
           activity: `${doing.slice(0, 1).toUpperCase()}${doing.slice(1)}. ${decidedWords(run!, arm, person.id, minute.tick)}`,
           details: [
-            ['Tiredness', `${person.needMilli} of 1000; they prefer to rest from ${run!.threshold}`],
-            ['Doing', `${person.action} (${person.status}), ${person.reason.replaceAll('_', ' ')}`],
+            [livingNeeds === null ? 'Tiredness' : 'Needs', livingNeeds ?? `${person.needMilli} of 1000; they prefer to rest from ${run!.threshold}`],
+            ['Doing', livingNeeds === null ? `${person.action} (${person.status}), ${person.reason.replaceAll('_', ' ')}` : doing],
             ['Heading for', person.goal === null ? 'nowhere yet'
               : run!.targets.find((t) => t.targetId === person.goal!.targetId)?.label ?? person.goal.kind],
-            ['Run', `${run!.runId} (${arm.key})`],
+            ['Run', livingNeeds === null ? `${run!.runId} (${arm.key})` : armName(arm)],
           ],
         });
       };

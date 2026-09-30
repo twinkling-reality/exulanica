@@ -9,6 +9,7 @@
  */
 
 import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v1.json?raw';
+import livingNeedsText from '../../../../assets/catalogs/society/society-need.v1.json?raw';
 import { ACTIVITY_KINDS } from './society-activity-words.js';
 
 /** The entry kinds the catalog holds; a kind outside these is refused when the page loads. */
@@ -53,6 +54,21 @@ function readTables(entries: readonly CatalogEntry[]): Readonly<Record<Kind, Rea
 
 const TABLES = readCatalog(catalogText);
 const PROFILES = readProfiles(catalogText);
+const LIVING_NEED_LABELS: Readonly<Record<string, string>> = (() => {
+  const catalog = JSON.parse(livingNeedsText) as {
+    readonly catalog_id?: string;
+    readonly entries?: readonly { readonly key: string; readonly label: string }[];
+  };
+  if (catalog.catalog_id !== 'society-need' || !Array.isArray(catalog.entries)) {
+    throw new Error('not the living society need catalog');
+  }
+  return Object.fromEntries(catalog.entries.map(({ key, label }) => [key, label]));
+})();
+
+/** A living need's own catalog label, or a neutral phrase for a code this catalog does not name. */
+export function livingNeedLabel(code: string): string {
+  return LIVING_NEED_LABELS[code] ?? 'another need';
+}
 
 /**
  * Whether a society's engine has words: the catalog's own `profiles`, the list the server's
@@ -135,6 +151,23 @@ export function inhabitantWordsFrom(
   place: (targetId: string) => string | null,
   partner: (inhabitantId: string) => string | null,
 ): InhabitantWords {
+  const living = person as unknown as {
+    readonly ordinal?: number;
+    readonly role?: { readonly label?: string } | null;
+    readonly home?: unknown;
+    readonly work?: unknown;
+    readonly action?: { readonly kind: string; readonly reason: string } | null;
+    readonly goal?: { readonly activity: string; readonly reason?: string } | null;
+  };
+  if (typeof living.ordinal === 'number') {
+    return livingInhabitantWords({
+      role: living.role?.label ?? null,
+      has_home: living.home != null,
+      has_work: living.work != null,
+      action: living.action ?? null,
+      goal: living.goal ?? null,
+    }, living.ordinal);
+  }
   const who = person.display_name ?? words('phrase', 'who_unnamed');
   const what = fill(words('phrase', 'what'), { role: person.role ?? words('phrase', 'role_unknown') });
   const action = person.action ?? undefined;
@@ -174,6 +207,40 @@ export function inhabitantWordsFrom(
     || (under !== undefined && under.setting !== 'object' && action.reason !== under.underWayReason);
   const code = !acting && goal !== null ? goal.reason : action.reason;
   return { who, what, doing, why: fill(words('phrase', 'because'), { reason: reasonWords(code) }) };
+}
+
+/** The living inspector reads the same activity and reason phrases as the Companion. */
+export function livingInhabitantWords(
+  person: {
+    readonly role?: string | null;
+    readonly has_home?: boolean;
+    readonly has_work?: boolean;
+    readonly action?: { readonly kind: string; readonly reason: string } | null;
+    readonly goal?: { readonly activity: string; readonly reason?: string } | null;
+  },
+  ordinal: number,
+): InhabitantWords {
+  const kind = person.action?.kind ?? 'idle';
+  const activity = person.goal?.activity;
+  const doing = kind === 'move'
+    ? TABLES.doing[`living_heading_${activity}`] ?? words('doing', 'living_heading_unknown')
+    : TABLES.doing[`living_${kind}`] ?? words('doing', 'living_unknown');
+  const reason = person.goal?.reason ?? person.action?.reason;
+  const home = person.has_home === true;
+  const work = person.has_work === true;
+  const whatKey = home && work ? 'living_what_home_work'
+    : home ? 'living_what_home' : work ? 'living_what_work' : 'living_what_neither';
+  const key = reason === 'shift_due' ? 'living_why_shift'
+    : reason === 'most_pressing_need' ? 'living_why_need'
+    : reason === 'waiting_a_minute' ? 'living_why_wait'
+    : reason === 'starting_at_home' ? 'living_why_home'
+    : 'living_why_other';
+  return {
+    who: fill(words('phrase', 'living_who'), { number: ordinal + 1 }),
+    what: fill(words('phrase', whatKey), { role: person.role ?? 'resident' }),
+    doing,
+    why: words('phrase', key),
+  };
 }
 
 /** One phrase of the catalog, with its `{name}` slots filled. */

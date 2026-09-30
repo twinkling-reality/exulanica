@@ -70,7 +70,7 @@ import { aboutWorld, aboutWorldLayers } from '../world-about.js';
 import '../ui/living-world-inspector.css';
 import type { CompanionSocietyContext, SimulationCitation, SocietyQuestion } from '../companion-ask-api.js';
 import { drawSimulated, type SimulatedReferences, type SocietyNames } from '../companion-simulated.js';
-import { hasInhabitantWords, outcomeWords, phrase } from '../society-inhabitant-words.js';
+import { hasInhabitantWords, livingInhabitantWords, livingNeedLabel, outcomeWords, phrase } from '../society-inhabitant-words.js';
 import { ACTION_LABELS, ACTIVITY_LABELS, filled, objectActivity } from '../society-activity-words.js';
 import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
 import {
@@ -564,8 +564,15 @@ export function mountEnvironmentSelection(
     // In a saved world nobody lives in yet, the inhabitants section says so; this line would repeat it.
     workspace.setNearby(state ? visible.size : 0, savedWorld !== null && state === null);
     inhabitantsList.replaceChildren(el('option', {value: '', text: 'Inspect a nearby inhabitant'}));
-    for (const inhabitant of state?.inhabitants ?? []) {
-      if (visible.has(inhabitant.id)) inhabitantsList.append(el('option', {value: inhabitant.id, text: `${inhabitantLabel(inhabitant)} · ${inhabitant.id.slice(0, 8)}`}));
+    for (const [index, inhabitant] of (state?.inhabitants ?? []).entries()) {
+      if (visible.has(inhabitant.id)) {
+        const label = state?.profile === engineCreatedOver('town')
+          ? livingInhabitantWords({ role: inhabitant.role ?? null, has_home: inhabitant.has_home === true,
+            has_work: inhabitant.has_work === true, action: inhabitant.action ?? null,
+            goal: inhabitant.goal && 'activity' in inhabitant.goal ? inhabitant.goal : null }, index).who
+          : `${inhabitantLabel(inhabitant)} · ${inhabitant.id.slice(0, 8)}`;
+        inhabitantsList.append(el('option', {value: inhabitant.id, text: label}));
+      }
     }
     if (selectedInhabitant && visible.has(selectedInhabitant)) inhabitantsList.value = selectedInhabitant;
     reflectCrowd();
@@ -766,7 +773,7 @@ export function mountEnvironmentSelection(
     for (const targetId of [...savedWorldActions.keys()]) if (!usable.has(targetId)) savedWorldActions.delete(targetId);
   }
 
-  function inspectLivingInhabitant(
+  function inspectEarlierLivingInhabitant(
     inhabitant: OwnedSocietyState['inhabitants'][number],
     state: OwnedSocietyState,
   ): void {
@@ -842,6 +849,54 @@ export function mountEnvironmentSelection(
         ['Unavailable dependencies', recording
           ? [...recording.unsupported, ...Object.entries(recording.environment).map(([key, value]) => `${key}: ${value.reason}`)].join('; ')
           : 'Personal evidence and model explanation are not established by this view.'],
+      ],
+    });
+  }
+
+  function inspectLivingInhabitant(
+    inhabitant: OwnedSocietyState['inhabitants'][number],
+    state: OwnedSocietyState,
+  ): void {
+    if (state.profile !== engineCreatedOver('town')) {
+      inspectEarlierLivingInhabitant(inhabitant, state);
+      return;
+    }
+    const runtime = crowd();
+    const goal = inhabitant.goal && 'activity' in inhabitant.goal ? inhabitant.goal : null;
+    const detail = runtime?.inhabitantDetail(inhabitant.id) ?? 'not-drawn';
+    const shown = { near: 'A full character near you', far: 'A simple distant figure of the same person',
+      indoors: 'Inside premises; interiors are not drawn', 'not-drawn': 'Too far away to draw; identity is retained' }[detail];
+    const where = (destination: string | null | undefined) => {
+      if (!destination) return 'an open spot';
+      const place = society?.places?.livingDestinations?.get(destination);
+      if (place?.useClass === 'residential') return 'home';
+      if (place?.useClass === 'bench') return 'a bench';
+      if (place?.label && place.label !== place.useClass) return place.label;
+      if (place?.useClass) return 'a place in town';
+      return 'a place in town';
+    };
+    const live = liveSociety?.inspect(inhabitant.id);
+    const ordinal = state.inhabitants.findIndex((person) => person.id === inhabitant.id);
+    const words = livingInhabitantWords({ role: inhabitant.role ?? null, has_home: inhabitant.has_home === true, has_work: inhabitant.has_work === true, action: inhabitant.action ?? null, goal }, ordinal);
+    const needs = Object.keys(inhabitant.needs ?? {}).map(livingNeedLabel).join(', ');
+    const simulationClock = state.day === undefined || state.minute_of_day === undefined
+      ? 'Unavailable'
+      : `Day ${state.day} · ${clockText(state.minute_of_day)}`;
+    inspector.show({
+      subject: inhabitant.id,
+      title: words.who,
+      showSubject: false,
+      description: words.what,
+      activity: `${words.doing}${goal?.destination_id ? ` at ${where(goal.destination_id)}` : ''}. ${words.why}`,
+      details: [
+        ['Origin', 'Simulated person; not a memory'],
+        ['Shown as', shown],
+        ['Role', inhabitant.role ?? 'Resident'],
+        ['Destination', goal ? where(goal.destination_id) : 'No destination chosen'],
+        ['Needs tracked', needs || 'None available'],
+        ['Recent events', live?.events.length ? `${live.events.length} recorded events available` : 'No recent events available'],
+        ['Simulation clock', simulationClock],
+        ['Population', `${state.inhabitants.length} simulated residents`],
       ],
     });
   }
@@ -1329,9 +1384,10 @@ export function mountEnvironmentSelection(
 
   function scheduleControlPoll(): void {
     stopControlPoll();
-    if (phase === 'disposed' || societyControl?.mode !== 'playing') return;
-    // A saved world is read on its own only where its host plays it; a district as before.
+    if (phase === 'disposed' || societyControl === null) return;
+    // Keep reading a saved world's control while paused: another client may start its host.
     if (savedWorld !== null && societyControl.hostPlayback?.running !== true) return;
+    if (savedWorld === null && societyControl.mode !== 'playing') return;
     controlTimer = window.setTimeout(() => void (savedWorld !== null ? pollPlayback() : refreshPlayback(true)),
       savedWorld !== null ? pollDelayMs() : Math.max(CONTROL_POLL_FLOOR_MS, societyControl.tickIntervalMs));
   }

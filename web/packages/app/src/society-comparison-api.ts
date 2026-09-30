@@ -297,6 +297,7 @@ export interface RunPerson {
   readonly reason: string;
   readonly goal: { readonly kind: string; readonly targetId: string | null; readonly reason: string } | null;
   readonly needMilli: number;
+  readonly needs?: Readonly<Record<string, number>> | null;
 }
 
 export interface RunDecision {
@@ -326,6 +327,7 @@ export interface RunReplay {
   readonly arm: string;
   readonly seedDigest: string;
   readonly threshold: number;
+  readonly needThresholds?: Readonly<Record<string, number>> | null;
   readonly nodes: readonly PlanNode[];
   readonly edges: readonly (readonly [string, string])[];
   readonly targets: readonly PlanTarget[];
@@ -610,7 +612,8 @@ export function parseComparison(value: unknown): ComparisonResult {
 
 export function parseRunReplay(value: unknown): RunReplay {
   const row = object(value);
-  if (row['profile'] !== 'exulanica.society-comparison-run-replay/v2') invalid();
+  const living = row['profile'] === 'exulanica.society-comparison-run-replay/v3';
+  if (!living && row['profile'] !== 'exulanica.society-comparison-run-replay/v2') invalid();
   // The server replays a run from its record and says so; a read that could not is an error.
   if (row['replay_verified'] !== true) invalid();
   const place = object(row['place']);
@@ -619,6 +622,7 @@ export function parseRunReplay(value: unknown): RunReplay {
     arm: text(row['arm']),
     seedDigest: text(row['seed_digest']),
     threshold: count(row['threshold']),
+    needThresholds: living ? Object.fromEntries(Object.entries(object(row['need_thresholds'])).map(([key, value]) => [text(key), count(value)])) : null,
     nodes: list(place['nodes']).map((entry) => {
       const held = object(entry);
       return { id: text(held['id']), x: integer(held['x']), z: integer(held['z']) };
@@ -667,6 +671,7 @@ export function parseRunReplay(value: unknown): RunReplay {
               };
             }),
             needMilli: count(found['need_milli']),
+            needs: living ? Object.fromEntries(Object.entries(object(found['needs'])).map(([key, value]) => [text(key), count(value)])) : null,
           };
         }),
       };

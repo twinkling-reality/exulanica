@@ -87,7 +87,7 @@ export const SOCIETY_ENGINES_V2_JSON = String.raw`{
       "takes_inputs": true
     },
     {
-      "comparisons": false,
+      "comparisons": true,
       "creatable": true,
       "directed_actions": false,
       "engine": "exulanica-society/v5",
@@ -98,7 +98,7 @@ export const SOCIETY_ENGINES_V2_JSON = String.raw`{
       "playback_refusal": null,
       "population": {"maximum": 512, "minimum": 1},
       "presence": false,
-      "reason": "The living town: the living society's catalogued needs, routines and occupancy over a saved world whose own records state its walking surfaces and homes. Its input carries the town's living place, so it walks the town's footways, corners, crossings and doors across tile seams and replays from its stored inputs alone; one inhabitant lives in each place in a home, a share of them work the shifts their workplace's use class names, and a premises admits visitors in its opening hours while one of its workers is there. The world's owner may choose a model for a person: that person takes, at the engine's own choice point, the model's validated choice among the options the engine itself offers, applied before anybody else acts in that minute and replayed from a stored receipt without a call; with no choice nothing changes. It takes no directed actions, its people are not sent away, and a comparison does not run it. Its population is the town's homes, which the ground's own rule bounds, so its floor is one.",
+      "reason": "The living town: the living society's catalogued needs, routines and occupancy over a saved world whose own records state its walking surfaces and homes. Its input carries the town's living place, so it walks the town's footways, corners, crossings and doors across tile seams and replays from its stored inputs alone; one inhabitant lives in each place in a home, a share of them work the shifts their workplace's use class names, and a premises admits visitors in its opening hours while one of its workers is there. The world's owner may choose a model for a person: that person takes, at the engine's own choice point, the model's validated choice among the options the engine itself offers, applied before anybody else acts in that minute and replayed from a stored receipt without a call; with no choice nothing changes. It takes no directed actions, its people are not sent away, and a comparison replays its recorded inputs under the fourth person score. Its population is the town's homes, which the ground's own rule bounds, so its floor is one.",
       "saved_world": true,
       "state_family": "living",
       "takes_inputs": true

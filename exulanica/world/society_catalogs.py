@@ -64,6 +64,7 @@ from exulanica.grammar.catalogs import (
 from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.records import KEY_PATTERN
 from exulanica.world.role_catalogs import role_action_schema, role_policy_schema
+from exulanica.world.society_engines import society_engine
 
 if TYPE_CHECKING:
     from exulanica.world.object_catalog import WorldObjectCatalog
@@ -74,6 +75,7 @@ __all__ = [
     "AFFORDANCE_DIGESTS",
     "AFFORDANCE_REASON_CODES",
     "COMPARISON_PROTOCOL_CATALOG",
+    "COMPARISON_SCORE_BY_FAMILY",
     "COMPARISON_SEEDS_CATALOG",
     "COMPARISON_VERSIONS",
     "HELD_OUT_SEED_TEXT",
@@ -101,6 +103,7 @@ __all__ = [
     "Shift",
     "UseClass",
     "check_object_kinds",
+    "comparison_catalogs_for_engine",
     "legacy_identity",
     "load_comparison_catalogs",
     "load_purposeful_routine",
@@ -201,6 +204,9 @@ COMPARISON_VERSIONS: Final = {
     COMPARISON_PROTOCOL_CATALOG: 3,
     COMPARISON_SEEDS_CATALOG: 5,
 }
+#: A run keeps the score semantics for the state family its stored engine writes. The
+#: comparison protocol and seed catalog remain the same for both families.
+COMPARISON_SCORE_BY_FAMILY: Final = {"purposeful": 3, "living": 4}
 #: Whether a score term is weighed or only reported, and what a term reads: a run's minutes, the
 #: events the engine appended, or the host's record of each call, which only a reader outside the
 #: score reads.
@@ -623,7 +629,7 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             ),
             entry_check=_score_v2_bounds,
         )
-        for version in (2, 3)
+        for version in (2, 3, 4)
     },
     **{
         (COMPARISON_PROTOCOL_CATALOG, version): CatalogSchema(
@@ -1201,6 +1207,15 @@ def load_comparison_catalogs(
         versions=chosen,
         sha256=catalog_digest([catalogs[key] for key in sorted(catalogs)]),
     )
+
+
+def comparison_catalogs_for_engine(engine_profile: str) -> ComparisonCatalogs:
+    """The score version a new comparison of this stored engine's state family uses."""
+    family = society_engine(engine_profile).state_family
+    score = COMPARISON_SCORE_BY_FAMILY.get(family)
+    if score is None:
+        raise CatalogError(f"no comparison score for {family} society")
+    return load_comparison_catalogs(versions={**COMPARISON_VERSIONS, PERSON_SCORE_CATALOG: score})
 
 
 def check_object_kinds(

@@ -39,10 +39,12 @@ ran over is unchanged by it.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from contextlib import nullcontext
+from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
 from exulanica.world.decision_roles import DecisionRole, decision_roles
@@ -54,12 +56,16 @@ from exulanica.world.role_decisions import (
     replay_minutes,
 )
 from exulanica.world.society import SocietyEvent, society_state_sha256
+from exulanica.world.society_choice import WAIT_KEY
 from exulanica.world.society_decision_contract import (
     DecisionContract,
     DecisionOption,
     input_memo,
     option_goal_policy,
 )
+from exulanica.world.society_engines import society_engine
+from exulanica.world.society_living import initial_living_society, input_routine, living_places
+from exulanica.world.society_living_decisions import LivingSeam, living_seam, living_step
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,
@@ -112,6 +118,8 @@ class RunPlan:
     #: world's owner chose (``{"decider": ..., "provider_config": ...}``) or their routine. Anybody
     #: outside the group and not named here follows their routine.
     others: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    #: The engine of the stored society. Existing comparison definitions belong to v2.
+    engine_profile: str = PURPOSEFUL_PROFILE
 
     def __post_init__(self) -> None:
         if not self.inputs or self.inputs[0]["input_seq"] != 1:
@@ -120,6 +128,8 @@ class RunPlan:
             raise ValueError("a run consumes the society's inputs in order, none left out")
         if self.ticks < 1:
             raise ValueError("a run takes at least one minute")
+        if society_engine(self.engine_profile).state_family not in RUN_FAMILIES:
+            raise ValueError("comparison_engine_family_unsupported")
         _check_decider(self.decider, self.provider_config, kinds=DECIDER_KINDS, who="arm")
         if self.group is not None and not self.group:
             raise ValueError("a group holds at least one person")
@@ -192,15 +202,117 @@ class PlayedRun:
         return society_state_sha256([receipt["document_sha256"] for receipt in self.receipts])
 
 
-def genesis(plan: RunPlan) -> dict[str, Any]:
-    """The run's first state: the society's genesis over its first input with the run's seed."""
+def _purposeful_genesis(plan: RunPlan) -> dict[str, Any]:
     return initial_purposeful_society(
         plan.society_id,
         plan.seed,
         plan.inputs[0],
         population=plan.population,
-        engine_profile=PURPOSEFUL_PROFILE,
+        engine_profile=plan.engine_profile,
     )
+
+
+def _living_genesis(plan: RunPlan) -> dict[str, Any]:
+    source = plan.inputs[0]
+    routine = input_routine(source)
+    [place] = living_places([source], routine)
+    return initial_living_society(
+        plan.society_id,
+        _run_seed(plan),
+        place,
+        routine,
+        branch_id=str(source["version_id"]),
+        population=plan.population,
+        profile=plan.engine_profile,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _RunFamily:
+    genesis: Callable[[RunPlan], dict[str, Any]]
+    seam: Callable[
+        [Mapping[str, Any], str, Sequence[dict[str, Any]], Sequence[str], RunPlan, dict[str, Any]],
+        Any,
+    ]
+    step: Callable[
+        [Mapping[str, Any], str, list[Mapping[str, Any]], Any], tuple[Any, tuple[Any, ...]]
+    ]
+    memo: Callable[[int], Any]
+
+
+def _purposeful_seam(
+    _state: Mapping[str, Any],
+    _seed: str,
+    _sources: Sequence[dict[str, Any]],
+    due: Sequence[str],
+    plan: RunPlan,
+    waiting: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    return {
+        subject: dict(waiting) for subject in due if plan.decider_for(subject)[0]["kind"] == "wait"
+    }
+
+
+def _living_wait_seam(
+    state: Mapping[str, Any],
+    seed: str,
+    sources: Sequence[dict[str, Any]],
+    due: Sequence[str],
+    plan: RunPlan,
+    _waiting: dict[str, Any],
+) -> LivingSeam:
+    base = living_seam(state, seed, sources)
+    ordinals = {person["id"]: person["ordinal"] for person in state["inhabitants"]}
+    held = tuple(subject for subject in due if plan.decider_for(subject)[0]["kind"] == "wait")
+    return replace(
+        base, chosen={ordinals[subject]: WAIT_KEY for subject in held}, acting_first=held
+    )
+
+
+def _purposeful_step(
+    state: Mapping[str, Any],
+    seed: str,
+    consumed: list[Mapping[str, Any]],
+    policies: Any,
+) -> tuple[Any, tuple[Any, ...]]:
+    return advance_purposeful_society(
+        dict(state), seed, [dict(document) for document in consumed], goal_policy=policies
+    )
+
+
+def _living_step(
+    state: Mapping[str, Any],
+    seed: str,
+    _consumed: list[Mapping[str, Any]],
+    seam: LivingSeam,
+) -> tuple[Any, tuple[Any, ...]]:
+    return living_step(dict(state), seed, seam)
+
+
+RUN_FAMILIES: Final = {
+    "purposeful": _RunFamily(_purposeful_genesis, _purposeful_seam, _purposeful_step, input_memo),
+    "living": _RunFamily(
+        _living_genesis, _living_wait_seam, _living_step, lambda _n: nullcontext()
+    ),
+}
+
+
+def _family(plan: RunPlan) -> _RunFamily:
+    return RUN_FAMILIES[society_engine(plan.engine_profile).state_family]
+
+
+def _run_seed(plan: RunPlan) -> str:
+    """The living engine's SHA-256 seed; purposeful runs retain their historical seed text."""
+    return (
+        hashlib.sha256(plan.seed.encode("utf-8")).hexdigest()
+        if society_engine(plan.engine_profile).state_family == "living"
+        else plan.seed
+    )
+
+
+def genesis(plan: RunPlan) -> dict[str, Any]:
+    """The stored society engine family's genesis over its first input and the run's seed."""
+    return _family(plan).genesis(plan)
 
 
 def _wait_policy(contract: DecisionContract) -> dict[str, Any]:
@@ -231,31 +343,28 @@ def _minutes(
     seam each minute begins from, the routine for the rest."""
     role = plan_role(plan)
     waiting = _wait_policy(plan.contract)
+    family = _family(plan)
+    seed = _run_seed(plan)
 
     def config_for(subject: str) -> Mapping[str, Any] | None:
         decider, config = plan.decider_for(subject)
         return config if decider["kind"] == "model" else None
 
-    def seam(_state: Mapping[str, Any], due: Sequence[str]) -> dict[str, dict[str, Any]]:
-        return {
-            subject: dict(waiting)
-            for subject in due
-            if plan.decider_for(subject)[0]["kind"] == "wait"
-        }
+    def seam(state: Mapping[str, Any], due: Sequence[str]) -> Any:
+        sources = plan.inputs if state["tick"] == 0 else plan.inputs[-1:]
+        return family.seam(state, seed, sources, due, plan, waiting)
 
     # Every minute's options read the run's frozen inputs, so each input's graph and standing
     # exclusions are built once for the run rather than for every person due in every minute.
-    with input_memo(len(plan.inputs)):
+    with family.memo(len(plan.inputs)):
         return play_minutes(
             [role],
             role,
             start=start,
             sources=plan.inputs,
-            seed=plan.seed,
+            seed=seed,
             ticks=plan.ticks,
-            step=lambda state, seed, consumed, policies: advance_purposeful_society(
-                dict(state), seed, [dict(document) for document in consumed], goal_policy=policies
-            ),
+            step=family.step,
             config_for=config_for,
             request_id_for=lambda subject, tick: request_id(plan.run_id, subject, tick),
             asking=asking,
