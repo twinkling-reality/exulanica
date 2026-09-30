@@ -899,11 +899,11 @@ export function mountEnvironmentSelection(
     const atlas = deps.state.atlas?.binding;
     const runtime = atlas?.ownedDistrict;
     if (!runtime) return;
-    const panel = el('details', { open: true }, [
-      el('summary', { text: 'Living society (recorded preview)' }),
+    const panel = el('details', { class: 'world-recording-disclosure' }, [
+      el('summary', { text: 'Living society' }),
       crowdStatus, recordingStatus, recordingPlay, recordingNext, recordingRestart, recordingSpeedSelect,
     ]);
-    workspace.details.prepend(panel);
+    workspace.details.insertBefore(panel, workspace.details.children[1] ?? null);
     fixture.textContent = 'Recorded preview';
     if (!runtime.interpretation) {
       recordingStatus.textContent = 'Living society unavailable: this district publishes no interpretation to walk on.';

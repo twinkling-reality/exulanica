@@ -86,6 +86,15 @@
   --ui-companion-unavailable: #70586d;
   --ui-shadow: #041418;
   --ui-vignette: #000000;
+  /* Decorative chromatic roles are replaced together by the active world profile. */
+  --ui-spectrum-rose: #ed6b9d;
+  --ui-spectrum-orange: #f6a65b;
+  --ui-spectrum-violet: #ae7bd1;
+  --ui-spectrum-blue: #65a9e2;
+  --ui-spectrum-green: #83cf9a;
+  --ui-chromatic-ink: #242033;
+  --ui-chromatic-paper: #fbf9fc;
+  --ui-chromatic-accent: #475687;
   --ui-font-body: "Avenir Next", "Segoe UI Variable", ui-sans-serif, system-ui, sans-serif;
   --ui-font-display: "Avenir Next", "Segoe UI Variable Display", ui-sans-serif, system-ui, sans-serif;
   --ui-font-utility: ui-monospace, "SFMono-Regular", Consolas, monospace;
@@ -104,6 +113,11 @@
   --radius-label: 3px;
   --radius-control: 8px;
   --radius-panel: 6px;
+  --radius-chromatic: 18px;
+  --radius-menu: 18px;
+  --ui-plane-depth: 1400px;
+  --ui-plane-yaw: 5deg;
+  --ui-plane-right: 5vw;
   --radius-pill: 999px;
   /*
    * The Companion's surfaces are captions over a live world, not cards. A caption is square: the

@@ -6,6 +6,7 @@ import {
   SURVEY_RELIEF,
   WORLD_ART_PROFILES,
   contrastRatio,
+  deriveWorldUiChromatic,
   deriveWorldUiColors,
   mixHex,
   perceptualColour,
@@ -44,6 +45,25 @@ describe('world art profiles', () => {
     expect(SURVEY_RELIEF.ui.texture.kind).toBe('contour-grid');
     expect(ORIGIN_LANDSCAPE.ui.motion).not.toEqual(SURVEY_RELIEF.ui.motion);
     expect(ORIGIN_LANDSCAPE.compatibilityKey).toBe(SURVEY_RELIEF.compatibilityKey);
+  });
+
+  it('derives decorative pigment from interface identity, separately from provenance', () => {
+    const origin = ORIGIN_LANDSCAPE.ui.chromatic;
+    expect(origin).toEqual(deriveWorldUiChromatic(
+      ORIGIN_LANDSCAPE.palette, ORIGIN_LANDSCAPE.interfacePalette,
+    ));
+    expect(origin).not.toEqual(SURVEY_RELIEF.ui.chromatic);
+    expect(contrastRatio(origin.ink, origin.paper)).toBeGreaterThanOrEqual(7);
+    expect(contrastRatio(origin.accent, origin.paper)).toBeGreaterThanOrEqual(4.5);
+    const provenanceOnly = {
+      ...ORIGIN_LANDSCAPE.interfacePalette!,
+      evidence: '#f44f37',
+      uncertain: '#5952ba',
+    };
+    expect(deriveWorldUiChromatic(ORIGIN_LANDSCAPE.palette, provenanceOnly)).toEqual(origin);
+    expect(deriveWorldUiChromatic(ORIGIN_LANDSCAPE.palette, {
+      ...provenanceOnly, structure: '#537ac4',
+    })).not.toEqual(origin);
   });
 
   it('does not accept an independently authored interface palette and guarantees readable roles', () => {
@@ -215,6 +235,7 @@ describe('world art profiles', () => {
     const resting = worldArtProfile('origin-landscape', 1, defaults);
     const recoloured = worldArtProfile('origin-landscape', 1, { ...defaults, 'source-hue': 0.1 });
     expect(recoloured.interfacePalette).not.toEqual(resting.interfacePalette);
+    expect(recoloured.ui.chromatic).not.toEqual(resting.ui.chromatic);
     expect(recoloured.palette).toEqual(resting.palette);
     // Reading a recipe with no parameters and reading it at its own defaults are the same world.
     expect(resting.palette).toEqual(ORIGIN_LANDSCAPE.palette);

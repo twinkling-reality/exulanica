@@ -1,4 +1,4 @@
-/** Two clear outcomes: an explorable world and context for personal agents. */
+/** Two supported paths through a world: make it, then run and compare it. */
 
 import { el } from './dom.js';
 
@@ -12,17 +12,17 @@ export function buildCapabilities(): HTMLElement {
     el('article', { class: 'reading-space' }, [
       el('h1', { id: 'capabilities-title', class: 'sr-only', text: 'Capabilities' }),
       el('section', { class: 'capability-section', 'aria-labelledby': 'capability-world' }, [
-        el('h2', { id: 'capability-world', class: 'capability-heading', text: 'Explore your memories in a connected world' }),
+        el('h2', { id: 'capability-world', class: 'capability-heading', text: 'Build a world' }),
         el('p', {
           class: 'reading-copy',
-          text: 'Exulanica brings your personal media into an interactive world. It connects memories of the same people, places, and events, and reconstructs places in 3D where your images support it. Your companion helps you find memories and understand their connections.',
+          text: 'Start with a saved place or a town recipe. Add supported objects, shape its appearance, and inspect what exists and where it came from.',
         }),
       ]),
       el('section', { class: 'capability-section', 'aria-labelledby': 'capability-agents' }, [
-        el('h2', { id: 'capability-agents', class: 'capability-heading', text: 'Power your personal agents with context from your life' }),
+        el('h2', { id: 'capability-agents', class: 'capability-heading', text: 'Run and compare models' }),
         el('p', {
           class: 'reading-copy',
-          text: 'Export a World Memory Package that organizes your memories, relationships, and the context you add into a format software can read. It provides the foundation for personal agents to use that history when helping you, with references to the original sources. The same package describes a real place rather than a plausible one, which is what a world model needs if it is to render somewhere you have actually been.',
+          text: 'Choose an available open model for a person or group. Exulanica validates and records its decisions. Paired runs begin from the same saved version, so you can inspect what each model did differently.',
         }),
       ]),
     ]),

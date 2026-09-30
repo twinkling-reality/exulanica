@@ -76,12 +76,16 @@ export function buildWorldWorkspace(parts: {
     'aria-label': 'World camera controls',
     hidden: parts.camera.length === 0,
   }, [...parts.camera]);
-  const details = addPanel('details', 'About this place', [
-    previewNotice,
+  const sourceContext = el('details', { class: 'world-panel-source-disclosure' }, [
+    el('summary', { text: 'Source and limits' }),
     parts.source,
     parts.reason,
+  ]);
+  const details = addPanel('details', 'About this place', [
+    previewNotice,
     camera,
     ...parts.tools,
+    sourceContext,
   ]);
   const authoring = addPanel('authoring', say('worldControls.create'), [
     el('p', { text: 'Select a source building with E, then preview an edit before applying it.' }), parts.authoring,

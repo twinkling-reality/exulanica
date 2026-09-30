@@ -13,7 +13,7 @@
   box-sizing: border-box;
   padding: 14px 16px;
   color: var(--ui-companion-text);
-  background: color-mix(in srgb, var(--ui-companion-surface) 64%, transparent);
+  background: color-mix(in srgb, var(--ui-companion-surface) 92%, transparent);
   border: 1px solid color-mix(in srgb, var(--ui-companion-text) 22%, transparent);
   border-radius: var(--radius-panel);
   box-shadow: 0 14px 36px color-mix(in srgb, var(--ui-shadow) 18%, transparent);
@@ -101,28 +101,21 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  width: min(520px, 46vw);
+  width: min(540px, 46vw);
   max-height: 87vh;
   box-sizing: border-box;
   padding: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding-block: 104px 20px;
   color: var(--ink);
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--ink) 5%, transparent) 0%,
-      transparent 32%
-    ),
-    color-mix(in srgb, var(--atlas-plane) 94%, transparent);
+  background: var(--atlas-plane);
   border: 1px solid var(--edge);
   border-radius: var(--radius-panel);
   box-shadow: var(--app-shadow);
-  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
   pointer-events: auto;
   translate: none;
-  transform: perspective(1400px) rotateY(-3deg);
-  transform-origin: right center;
+  transform: none;
   animation: diegetic-plane-arrive var(--motion-standard) var(--motion-easing);
 }
 
@@ -134,12 +127,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  min-height: 104px;
+  min-height: 92px;
   box-sizing: border-box;
-  padding: 24px 22px 18px 126px;
-  background: color-mix(in srgb, var(--raised) 96%, transparent);
-  /* The encounter scrolls under this bar; without a blur a long answer reads through it. */
-  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
+  padding: 18px 20px 16px 112px;
+  background: var(--raised);
   border-bottom: 1px solid var(--edge);
 }
 
@@ -184,7 +175,7 @@
 
 #shell .companion-surface-kicker {
   color: var(--accent);
-  font: 600 10px/1.2 var(--ui-font-utility);
+  font: 600 11px/1.3 var(--ui-font-utility);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -244,7 +235,7 @@
   margin: 0 0 7px;
   overflow: visible;
   color: var(--accent);
-  font: 600 10px/1.2 var(--ui-font-utility);
+  font: 600 11px/1.3 var(--ui-font-utility);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 1;
@@ -262,7 +253,7 @@
 #shell .companion-encounter[data-state='open'] .companion-starter-title {
   margin: 0 0 7px;
   color: var(--accent);
-  font: 600 10px/1.2 var(--ui-font-utility);
+  font: 600 11px/1.3 var(--ui-font-utility);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -287,22 +278,22 @@
   padding-left: 12px;
   color: var(--ink-soft);
   border-left: 1px solid var(--accent);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
 #shell .companion-encounter[data-state='open'] .companion-provenance {
   margin: 18px 0 0;
   padding-top: 12px;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   border-top: 1px solid var(--edge);
-  font: 500 10px/1.45 var(--ui-font-utility);
+  font: 500 12px/1.45 var(--ui-font-utility);
 }
 
 #shell .companion-encounter[data-state='open'] .companion-content-heading {
   margin: 16px 0 8px;
   color: var(--accent);
-  font: 600 10px/1.2 var(--ui-font-utility);
+  font: 600 11px/1.3 var(--ui-font-utility);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -338,13 +329,13 @@
 #shell .companion-encounter[data-state='open'] .companion-content-fields dt {
   margin: 0;
   color: var(--ink-faint);
-  font: 500 10px/1.35 var(--ui-font-utility);
+  font: 500 12px/1.4 var(--ui-font-utility);
 }
 
 #shell .companion-encounter[data-state='open'] .companion-content-fields dd {
   margin: 0;
   color: var(--ink);
-  font: 420 13px/1.35 var(--ui-font-body);
+  font: 420 14px/1.45 var(--ui-font-body);
 }
 
 #shell .companion-refusal {
@@ -475,7 +466,7 @@
   background: color-mix(in srgb, var(--ui-companion-text) 4%, transparent);
   border: 1px solid var(--edge);
   border-radius: var(--radius-panel);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.35;
   text-align: left;
   cursor: pointer;
@@ -582,12 +573,12 @@
 }
 
 #shell .companion-encounter[data-state='open'] .companion-escapes .companion-choice {
-  min-height: 36px;
+  min-height: 40px;
   justify-content: center;
   padding: 7px 8px;
   color: var(--ink-soft);
   background: transparent;
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
 }
 
@@ -606,12 +597,12 @@
 }
 
 #shell .companion-encounter[data-state='open'] .companion-evidence-action {
-  min-height: 2rem;
+  min-height: 40px;
   color: var(--ink);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 46%, transparent);
   border-radius: var(--radius-pill);
-  font: 600 0.75rem/1 var(--ui-font-companion);
+  font: 600 12px/1.3 var(--ui-font-companion);
   letter-spacing: 0.03em;
 }
 
@@ -630,7 +621,7 @@
 #shell .companion-encounter[data-state='open'] .companion-composer {
   min-height: 46px;
   color: var(--ink);
-  background: color-mix(in srgb, var(--ui-shadow) 32%, transparent);
+  background: var(--surface);
   border: 1px solid var(--edge);
 }
 
@@ -646,7 +637,7 @@
 }
 
 #shell .companion-reply-input::placeholder {
-  color: var(--ink-faint);
+  color: var(--ink-soft);
 }
 
 #shell .companion-reply-input:focus {
@@ -696,8 +687,8 @@
   right: auto;
   left: 18px;
   z-index: 36;
-  width: 96px;
-  height: 96px;
+  width: 88px;
+  height: 88px;
   opacity: 0;
   pointer-events: none;
   filter: drop-shadow(0 12px 18px color-mix(in srgb, var(--ui-shadow) 50%, transparent));

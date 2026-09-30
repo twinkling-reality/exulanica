@@ -2,6 +2,7 @@ import type { WorldStyleParameterDefinition } from '@exulanica/atlas-core';
 import {
   MIN_SURFACE_PRESENCE,
   contrastRatio,
+  deriveWorldUiChromatic,
   deriveWorldUiColors,
   interfacePaletteFromWorld,
   mixHex,
@@ -14,6 +15,7 @@ import {
   type WorldPalette,
   type WorldSurfaceForm,
   type WorldUiColors,
+  type WorldUiChromatic,
   type WorldUiRecipe,
   type WorldUiStyle,
 } from './world-style-model.js';
@@ -53,6 +55,7 @@ export type {
   WorldStyleRecipeV1,
   WorldStyleRegistryDocument,
   WorldUiColors,
+  WorldUiChromatic,
   WorldUiRecipe,
   WorldUiStyle,
 };
@@ -64,6 +67,7 @@ export {
   WORLD_STYLE_REGISTRY_DOCUMENT,
   WorldStyleRegistry,
   contrastRatio,
+  deriveWorldUiChromatic,
   deriveWorldUiColors,
   interfacePaletteFromWorld,
   mixHex,

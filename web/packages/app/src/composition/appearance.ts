@@ -148,7 +148,20 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       candidate.worldArtProfileVersion !== state.preferences.worldArtProfileVersion ||
       JSON.stringify(candidate.worldStyleParameters) !==
         JSON.stringify(state.preferences.worldStyleParameters);
-    if (!styleChanged) return false;
+    if (!styleChanged) {
+      // Moving the last changed control back to its saved value ends the local renderer preview.
+      // Restore the document skin too, or the world resets while the menu keeps its draft hues.
+      if (state.settingsStylePreviewId !== null) {
+        state.atlas.binding.discardArtProfilePreview(state.settingsStylePreviewId);
+        state.settingsStylePreviewId = null;
+        applyDocumentWorldStyle(env.previewArtProfile ?? worldArtProfile(
+          state.preferences.worldArtProfile,
+          state.preferences.worldArtProfileVersion,
+          state.preferences.worldStyleParameters,
+        ));
+      }
+      return false;
+    }
     if (state.settingsStylePreviewId !== null) {
       state.atlas.binding.discardArtProfilePreview(state.settingsStylePreviewId);
       state.settingsStylePreviewId = null;
@@ -1091,4 +1104,3 @@ export function describeWorldStyleFailure(error: unknown): string {
   }
   return error instanceof Error ? error.message : 'The world style request failed.';
 }
-

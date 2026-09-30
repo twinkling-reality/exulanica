@@ -286,7 +286,13 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     const control = output === undefined
       ? input
       : el('span', { class: 'range-control' }, [input, output]);
-    return field(definition.label, control, definition.description);
+    return el('div', { class: 'world-style-field' }, [
+      field(definition.label, control),
+      el('details', { class: 'world-style-field-help' }, [
+        el('summary', { text: 'What this changes' }),
+        el('p', { text: definition.description }),
+      ]),
+    ]);
   });
 
   let applied = callbacks.preferences;
@@ -333,9 +339,14 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     callbacks.onChange(applied);
   };
   const preview = (patch: Partial<AtlasPreferences>): void => {
+    const hadWorldDraft = !sameWorldStyle(current, applied);
     current = normalisePreferences({ ...current, ...patch });
     render();
-    callbacks.onPreview?.(current);
+    if (hadWorldDraft && sameWorldStyle(current, applied) && callbacks.onWorldDiscard !== undefined) {
+      callbacks.onWorldDiscard(applied);
+    } else {
+      callbacks.onPreview?.(current);
+    }
   };
   const applyWorld = el('button', {
     type: 'button', class: 'world-style-apply', text: 'Apply world design',
@@ -571,28 +582,22 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
         class: 'world-dna-strip', role: 'img',
         'aria-label': 'Colors shared by the world and its interface',
       }, styleSwatches),
-      el('p', {
-        class: 'world-style-explanation',
-        text: 'These controls belong to this world design. Color, finish, and cadence flow into the world and its interface together.',
-      }),
       ...styleFields,
       el('div', { class: 'world-style-assurance' }, [
-        el('strong', { text: 'Always protected' }),
+        el('strong', { text: 'Preserved' }),
         el('span', {
-          text: 'Your memories and evidence · certainty and provenance · navigation · command placement · Companion identity · readable contrast',
+          text: 'Sources and simulated decisions stay labelled. Navigation and contrast remain readable.',
         }),
       ]),
-      el('p', {
-        class: 'world-style-future',
-        text: 'Companion designs can be reviewed here when an upstream proposal service supplies bounded profile values. Exulanica does not generate recipes or execute model output in the browser.',
-      }),
       proposalReview,
       el('div', { class: 'world-style-source-action' }, [readSource, readSourceNote]),
       el('div', { class: 'world-style-actions' }, [undoWorld, resetWorld, applyWorld]),
-      el('div', { class: 'world-style-history' }, [
-        el('h3', { text: 'Version history' }),
-        field('Saved version', history, 'Restoring creates a new immutable version; it never rewrites history.'),
-        rollbackWorld,
+      el('details', { class: 'world-style-history' }, [
+        el('summary', { text: 'Version history' }),
+        el('div', { class: 'world-style-history-body' }, [
+          field('Saved version', history, 'Restoring creates a new version; earlier versions remain.'),
+          rollbackWorld,
+        ]),
       ]),
     ]),
     el('div', { class: 'option-group view-options' }, [

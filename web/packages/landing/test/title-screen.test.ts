@@ -15,7 +15,7 @@ describe('the Exulanica title screen', () => {
     expect(title.querySelector('h1')?.textContent).toBe('Exulanica');
     expect(title.getAttribute('aria-labelledby')).toBe('title-wordmark');
     expect(title.querySelector('.proposition')?.textContent).toBe(
-      'A personal world memory model',
+      'Worlds for AI Agents',
     );
     expect(title.querySelectorAll('.title-artwork')).toHaveLength(1);
     expect(title.querySelector('.title-artwork')?.getAttribute('aria-hidden')).toBe('true');

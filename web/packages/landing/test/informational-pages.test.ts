@@ -34,7 +34,7 @@ describe('the signed-out reading surfaces', () => {
       expect(section.getAttribute('aria-labelledby')).toBe(heading?.id);
       expect(section.querySelectorAll('p')).toHaveLength(1);
     }
-    expect(capabilities.textContent).toContain('World Memory Package');
+    expect(capabilities.textContent).toContain('Run and compare models');
     expect(`${purpose.textContent} ${capabilities.textContent}`).not.toMatch(/[\u2014\u2013]/);
     expect(buildResearch().textContent).not.toMatch(/[\u2014\u2013]/);
   });

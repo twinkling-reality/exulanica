@@ -40,9 +40,8 @@ describe('Options', () => {
       worldStyleParameters: expect.objectContaining({ vitality: 0.4 }),
     }));
     expect(view.root.textContent).toContain('Previewing · not saved');
-    expect(view.root.textContent).toContain('Always protected');
-    expect(view.root.textContent).toContain('upstream proposal service');
-    expect(view.root.textContent).toContain('does not generate recipes');
+    expect(view.root.textContent).toContain('Sources and simulated decisions stay labelled');
+    expect(view.root.querySelector('.world-style-field-help summary')?.textContent).toBe('What this changes');
     expect(view.root.querySelector('[aria-label="Surface finish"]')).not.toBeNull();
     [...view.root.querySelectorAll('button')]
       .find((button) => button.textContent === 'Apply world design')!
@@ -99,6 +98,28 @@ describe('Options', () => {
       .click();
     expect(onWorldDiscard).toHaveBeenCalledWith(DEFAULT_PREFERENCES);
     expect(view.preferences().worldStyleParameters['surface-finish']).toBe('source-paper');
+    expect(view.root.textContent).toContain('Authored default');
+  });
+
+  it('discards a world preview when its last control returns to the saved value', () => {
+    const onWorldDiscard = vi.fn();
+    const view = buildOptions({
+      preferences: DEFAULT_PREFERENCES,
+      onChange: vi.fn(),
+      onPreview: vi.fn(),
+      onWorldDiscard,
+      onClose: vi.fn(),
+      onShowControls: vi.fn(),
+    });
+    document.body.append(view.root);
+    const hue = view.root.querySelector<HTMLInputElement>('[aria-label="Interface hue"]')!;
+    hue.value = '0.2';
+    hue.dispatchEvent(new Event('input'));
+    expect(view.root.textContent).toContain('Previewing · not saved');
+    hue.value = String(DEFAULT_PREFERENCES.worldStyleParameters['source-hue']);
+    hue.dispatchEvent(new Event('input'));
+    expect(onWorldDiscard).toHaveBeenCalledOnce();
+    expect(onWorldDiscard).toHaveBeenCalledWith(DEFAULT_PREFERENCES);
     expect(view.root.textContent).toContain('Authored default');
   });
 

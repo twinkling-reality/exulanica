@@ -31,7 +31,7 @@ export function applyDocumentWorldStyle(
   profile: WorldArtProfile,
   root: HTMLElement = document.documentElement,
 ): WorldArtProfile {
-  const { colors, typography, material, texture, motion } = profile.ui;
+  const { colors, chromatic, typography, material, texture, motion } = profile.ui;
   root.dataset['worldStyle'] = profile.profileId;
   root.dataset['uiTexture'] = texture.kind;
 
@@ -75,6 +75,14 @@ export function applyDocumentWorldStyle(
     '--ui-companion-unavailable': colors.companionUnavailable,
     '--ui-shadow': colors.shadow,
     '--ui-vignette': colors.vignette,
+    '--ui-spectrum-rose': chromatic.rose,
+    '--ui-spectrum-orange': chromatic.orange,
+    '--ui-spectrum-violet': chromatic.violet,
+    '--ui-spectrum-blue': chromatic.blue,
+    '--ui-spectrum-green': chromatic.green,
+    '--ui-chromatic-ink': chromatic.ink,
+    '--ui-chromatic-paper': chromatic.paper,
+    '--ui-chromatic-accent': chromatic.accent,
     '--ui-font-body': typography.body,
     '--ui-font-display': typography.display,
     '--ui-font-utility': typography.utility,

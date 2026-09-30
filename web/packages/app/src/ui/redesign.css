@@ -15,6 +15,7 @@
 #shell :is(
   .world-menu,
   .world-panel,
+  .world-recipes,
   .index-workspace.rail,
   .detail,
   .settings-view.system-overlay,
@@ -23,19 +24,20 @@
   .character-studio
 ) {
   --ink: #edf5f2;
-  --ink-soft: #b3c2bd;
-  --ink-faint: #84958f;
+  --ink-soft: #d2ded9;
+  --ink-faint: #b5c5bf;
   --accent: #b9d9cc;
   --focus: #d8fff0;
-  --edge: #dcebe536;
-  --surface: #eef8f413;
-  --raised: #17232bea;
-  --atlas-plane: #111b21dc;
+  --edge: #dcebe55c;
+  --surface: #2b3c40;
+  --raised: #17232b;
+  --atlas-plane: #111b21;
   --app-shadow: 0 18px 58px #07101470, inset 0 1px 0 #ffffff12;
 }
 :root[data-contrast='high'] #shell :is(
   .world-menu,
   .world-panel,
+  .world-recipes,
   .index-workspace.rail,
   .detail,
   .settings-view.system-overlay,
@@ -60,16 +62,17 @@
 #shell .world-heading h2 { margin: 0; max-width: 18ch; font: 300 21px/1.12 var(--ui-font-display); letter-spacing: -.035em; }
 .world-source-label, #shell .world-heading .living-world-fixture { width: max-content; margin: 0; padding: 2px 6px; border: 1px solid var(--edge); border-radius: 999px; color: var(--ink-soft); background: color-mix(in srgb, var(--surface) 72%, transparent); font: 600 9px/1.35 var(--ui-font-body); letter-spacing: .03em; }
 .world-local-nav { display: none; gap: 4px; width: max-content; padding: 4px; border: 1px solid color-mix(in srgb, var(--edge) 76%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--atlas-plane) 91%, transparent); box-shadow: var(--app-shadow); backdrop-filter: blur(16px); }
-.world-workspace[data-panel] .world-local-nav { position: fixed; display: flex; top: 5vh; right: 5vw; z-index: 14; transform: perspective(1400px) rotateY(-4deg); transform-origin: right center; }
+.world-workspace[data-panel] .world-local-nav { position: fixed; display: flex; top: 5vh; right: var(--ui-plane-right); z-index: 14; transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw)); transform-origin: right center; }
 #shell .world-workspace button { min-height: 34px; padding: 7px 11px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 5px; font-size: 12px; font-weight: 550; }
 #shell .world-workspace button:hover { background: var(--surface); border-color: var(--accent); }
 #shell .world-workspace button[aria-expanded='true'] { color: var(--ink); background: color-mix(in srgb, var(--raised) 72%, transparent); border-color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--raised) 78%, transparent); }
 #shell .world-workspace button:disabled { color: var(--ink-faint); background: var(--surface); opacity: .75; }
-.world-panel { position: fixed; right: 5vw; top: 12vh; bottom: 8vh; z-index: 12; width: min(430px, 42vw); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; color: var(--ink); background: color-mix(in srgb, var(--raised) 68%, transparent); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); backdrop-filter: blur(22px) saturate(106%); transform: perspective(1400px) rotateY(-4deg); transform-origin: right center; }
+.world-panel { position: fixed; right: var(--ui-plane-right); top: 12vh; z-index: 12; width: min(440px, 42vw); max-height: calc(100dvh - 20vh); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw)); transform-origin: right center; --inspector-ink: var(--ink); --inspector-muted: var(--ink-soft); }
 #shell .world-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
-#shell .world-panel-heading h2 { margin: 0; font: 300 21px/1.2 var(--ui-font-display); letter-spacing: -.025em; }
+#shell .world-panel-heading h2 { margin: 0; color: var(--ink); font: 450 21px/1.2 var(--ui-font-display); letter-spacing: -.025em; }
 #shell .world-panel-close { font-size: 12px; min-height: 34px; padding: 7px 10px; }
-#shell .world-panel p { margin: 0 0 16px; font-size: 13px; line-height: 1.6; }
+#shell .world-panel p { margin: 0 0 16px; font-size: 14px; line-height: 1.55; }
+#shell .world-panel :is(.environment-selection-source, .environment-selection-reason) { color: var(--ink-soft); }
 #shell .world-panel :is(select, input[type='text']) { width: 100%; box-sizing: border-box; min-height: 42px; border: 1px solid var(--edge); border-radius: 4px; padding: 10px; color: var(--ink); background: var(--raised); font-size: 13px; }
 #shell .world-panel summary { padding: 8px 0; font-size: 13px; line-height: 1.5; }
 #shell .world-panel details { margin-top: 18px; padding-top: 10px; }
@@ -107,7 +110,7 @@
 #shell .personal-intake label { margin-block: 14px; font-size: 13px; }
 #shell .personal-intake input:not([type='checkbox']), #shell .personal-intake select { padding: 10px; border: 1px solid var(--edge); background: var(--raised); border-radius: 4px; margin-top: 6px; }
 #shell .personal-intake button { margin: 8px 8px 8px 0; padding: 10px 14px; border-radius: 4px; }
-#shell .settings-view.system-overlay, #shell .atlas-instrument.options-view.system-overlay { top: 100px; bottom: 48px; max-height: calc(100dvh - 148px); }
+#shell .settings-view.system-overlay, #shell .atlas-instrument.options-view.system-overlay { top: 6vh; bottom: 7vh; max-height: 87dvh; }
 #shell .settings-page-head h2 { font-weight: 300; font-size: 28px; }
 #shell .setting-row { padding: 16px; border-radius: 4px; }
 #shell .setting-row select { border-radius: 4px; min-height: 42px; background: var(--raised); }
@@ -117,7 +120,6 @@
 @media (max-width: 1100px) and (min-width: 960px) { #shell .atlas-commands button { padding: 0 9px; } #shell .atlas-command-icon { display: none; } .world-heading { width: 250px; } }
 @media (max-width: 959px) { #shell .viewport-boundary { color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; } }
 @media (prefers-reduced-motion: reduce) { #shell *, #shell *::before, #shell *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
-#shell .world-panel { bottom: auto; max-height: calc(100dvh - 214px); min-height: 200px; }
 #shell .world-heading h2 { overflow-wrap: anywhere; }
 #shell .world-heading { max-height: 162px; overflow: auto; }
 #shell[data-primary='index'] .index-workspace.rail {
@@ -127,10 +129,8 @@
   max-width: none;
   margin: 0;
   translate: none;
-  transform: perspective(1400px) rotateY(-4deg);
-  transform-origin: right center;
-  background: color-mix(in srgb, var(--raised) 62%, transparent);
-  backdrop-filter: blur(22px) saturate(106%);
+  transform: none;
+  background: var(--atlas-plane);
 }
 #shell[data-primary='index'] .index-workspace.rail[data-detail-open='true'] {
   right: calc(5vw + min(330px, 31vw));
@@ -142,14 +142,12 @@
   height: auto;
   max-height: none;
   translate: none;
-  transform: perspective(1400px) rotateY(-4deg);
-  transform-origin: right center;
+  transform: none;
   border: 1px solid var(--edge);
   border-radius: 4px;
-  background: color-mix(in srgb, var(--raised) 68%, transparent);
+  background: var(--atlas-plane);
   padding: 24px;
   box-shadow: var(--app-shadow);
-  backdrop-filter: blur(22px) saturate(106%);
 }
 #shell[data-primary='index'] .companion-encounter { visibility: hidden; }
 #shell[data-primary='index'] .index-workspace .index-plan { display: none; }
@@ -163,10 +161,9 @@
   max-height: none;
   margin: 0;
   translate: none;
-  transform: perspective(1400px) rotateY(-4deg);
+  transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw));
   transform-origin: right center;
-  background: color-mix(in srgb, var(--raised) 62%, transparent);
-  backdrop-filter: blur(22px) saturate(106%);
+  background: var(--atlas-plane);
 }
 #shell .settings-category { border-radius: 4px; }
 #shell .settings-view button, #shell .atlas-instrument button { border-radius: 4px; }
@@ -508,39 +505,135 @@
 
 #shell .world-panel:not([hidden]) {
   animation: world-tool-arrive .18s ease-out;
-  backdrop-filter: blur(14px);
 }
-:root[data-transparency='reduced'] #shell .world-panel { backdrop-filter: none; }
 
 /* A single quiet settings field: category first, controls second, world still visible beneath. */
 #shell .settings-view.system-overlay {
-  inset: 6vh 5vw 7vh auto;
+  inset: 6vh var(--ui-plane-right) auto auto;
   width: min(720px, 58vw);
   max-width: none;
   height: auto;
-  max-height: none;
+  max-height: 87dvh;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, auto) auto;
   color: var(--ink);
-  background: color-mix(in srgb, var(--raised) 62%, transparent);
+  background: var(--atlas-plane);
   border: 1px solid var(--edge);
   border-radius: 4px;
   box-shadow: var(--app-shadow);
-  backdrop-filter: blur(22px) saturate(106%);
-  transform: perspective(1400px) rotateY(-4deg);
+  transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw));
   transform-origin: right center;
 }
+#shell .atlas-instrument.options-view.system-overlay {
+  --ink: var(--ui-chromatic-ink);
+  --ink-soft: var(--chromatic-ink-soft);
+  --ink-faint: var(--chromatic-ink-faint);
+  --accent: var(--ui-chromatic-accent);
+  --edge: var(--chromatic-edge);
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --atlas-plane: var(--ui-chromatic-paper);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  padding: 0;
+  border-radius: var(--radius-chromatic);
+  backdrop-filter: none;
+}
+#shell .atlas-instrument.options-view.system-overlay[hidden] { display: none; }
+#shell .options-view > .overlay-head,
+#shell .options-view > .overlay-actions {
+  flex: 0 0 auto;
+  background: var(--atlas-plane);
+}
+#shell .options-view > .option-group { flex: 0 0 auto; }
+#shell .options-view > .overlay-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  align-items: center;
+  margin: 0;
+  padding: 22px 28px;
+  border-bottom: 1px solid var(--edge);
+  background: var(--chromatic-head);
+}
+#shell .options-view .overlay-head h1 { color: var(--ink); font: 300 44px/1 "Helvetica Neue", var(--ui-font-display); letter-spacing: -.055em; }
+#shell .options-view .overlay-head .overlay-kicker { color: var(--ink); }
+#shell .options-view .overlay-close {
+  min-height: 44px;
+  padding: 9px 14px;
+  color: var(--ink);
+  background: #ffffffd9;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 650;
+}
+#shell .options-view .overlay-close:hover,
+#shell .options-view .overlay-close:focus-visible { color: var(--ink); background: #fff; }
+#shell .options-view > .option-group { padding: 18px 28px 24px; }
+#shell .options-view .world-style-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+#shell .options-view .world-style-head { grid-template-columns: minmax(0, 1fr) auto; margin-bottom: 0; }
+#shell .options-view .world-style-head :is(p, span):empty { display: none; }
+#shell .options-view .world-style-head :is(.option-note, .world-style-authority, .world-style-lifecycle) {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+#shell .options-view .world-style-head :is(.world-style-authority, .world-style-lifecycle) {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+#shell .options-view .world-style-head :is(
+  .world-style-authority[data-state='failed'],
+  .world-style-lifecycle[data-state='failed'],
+  .world-style-lifecycle[data-state='stale']
+) {
+  margin: 7px 0 2px;
+  padding: 10px 13px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--warning) 9%, var(--ui-chromatic-paper));
+  border-inline-start: 3px solid var(--warning);
+  border-radius: 0 9px 9px 0;
+  font-size: 13px;
+}
+#shell .options-view[data-world-dirty='true'] .world-style-state {
+  font-size: 12px;
+  font-weight: 700;
+}
+#shell .options-view .world-dna-strip { height: 14px; margin: 0; }
+#shell .options-view .world-style-field {
+  min-width: 0;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  box-shadow: 0 3px 16px #3d285912;
+}
+#shell .options-view .world-style-field .option-field { min-height: 0; gap: 10px; }
+#shell .options-view .world-style-field .option-label { font-size: 14px; font-weight: 600; }
+#shell .options-view .world-style-field-help { margin-top: 10px; color: var(--ink-soft); font-size: 12px; }
+#shell .options-view .world-style-field-help summary { color: var(--accent); cursor: pointer; }
+#shell .options-view .world-style-field-help p { margin: 8px 0 0; line-height: 1.5; }
+#shell .options-view .world-style-assurance { margin: 0; padding-top: 14px; font-size: 12px; }
+#shell .options-view .world-style-history { display: block; margin: 0; padding-top: 14px; }
+#shell .options-view .world-style-history > summary { color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 650; }
+#shell .options-view .world-style-history-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; margin-top: 12px; }
+#shell .options-view .world-style-history-body .option-field { grid-template-columns: minmax(0, 1fr); }
+#shell .options-view .world-style-history-body .option-note { grid-column: 1; }
+#shell .options-view > .overlay-actions { margin-top: auto; }
 #shell .settings-head {
   grid-column: 1;
   grid-row: 1;
-  padding: clamp(22px, 4vh, 42px) clamp(22px, 4vw, 46px) 16px;
+  padding: 22px 28px 18px;
   border: 0;
 }
 #shell .settings-head .overlay-kicker { display: none; }
 #shell .settings-head h1 {
-  font-size: clamp(22px, 3vw, 36px);
+  font-size: clamp(27px, 3vw, 37px);
   font-weight: 300;
-  letter-spacing: .08em;
+  letter-spacing: .065em;
   text-transform: uppercase;
 }
 #shell .settings-categories {
@@ -548,21 +641,21 @@
   grid-row: 2;
   display: flex;
   gap: clamp(18px, 3vw, 38px);
-  padding: 0 clamp(22px, 4vw, 46px);
+  padding: 0 28px;
   background: transparent;
   border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--edge) 68%, transparent);
 }
 #shell .settings-category {
-  min-height: 48px;
-  padding: 0 0 12px;
+  min-height: 44px;
+  padding: 0 0 10px;
   color: var(--ink-soft);
   background: transparent;
   border: 0;
   border-bottom: 1px solid transparent;
   border-radius: 0;
-  font-size: 11px;
-  font-weight: 400;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: .09em;
 }
 #shell .settings-category:hover,
@@ -576,18 +669,18 @@
 #shell .settings-pages {
   grid-column: 1;
   grid-row: 3;
-  width: calc(100% - clamp(44px, 8vw, 92px));
+  width: calc(100% - 56px);
   margin-inline: auto;
-  padding: clamp(34px, 7vh, 76px) 0;
+  padding: 24px 0 30px;
 }
 #shell .settings-page-head { padding: 0 0 16px; border-color: color-mix(in srgb, var(--edge) 68%, transparent); }
 #shell .settings-page-head .overlay-kicker { display: none; }
 #shell .settings-page-head h2 {
-  font-size: clamp(24px, 4vw, 42px);
-  font-weight: 300;
+  font-size: clamp(28px, 3.4vw, 36px);
+  font-weight: 400;
   letter-spacing: -.025em;
 }
-#shell .settings-page-intro { font-size: 12px; font-weight: 300; }
+#shell .settings-page-intro { font-size: 14px; font-weight: 400; }
 #shell .settings-rows { border-color: color-mix(in srgb, var(--edge) 68%, transparent); }
 #shell .setting-row {
   min-height: 62px;
@@ -600,17 +693,30 @@
   background: color-mix(in srgb, var(--raised) 24%, transparent);
   box-shadow: none;
 }
-#shell .setting-copy strong { font-size: 13px; font-weight: 400; }
-#shell .setting-note { font-size: 10px; font-weight: 300; }
+#shell .setting-copy strong { font-size: 14px; font-weight: 600; }
+#shell .setting-note { font-size: 12px; font-weight: 400; line-height: 1.45; }
 #shell .settings-control-list :is(dt, dd) { background: transparent; border-color: color-mix(in srgb, var(--edge) 68%, transparent); }
 #shell .settings-actions {
   grid-column: 1;
   grid-row: 4;
-  padding: 14px clamp(22px, 4vw, 46px) 18px;
+  padding: 14px 28px 18px;
   background: transparent;
   border-color: color-mix(in srgb, var(--edge) 68%, transparent);
 }
+#shell .settings-actions button { min-height: 38px; font-size: 13px; }
+#shell .settings-actions .command-action-label { color: var(--ink); font-size: 13px; font-weight: 600; }
+#shell .settings-actions kbd { color: var(--ink); border-color: var(--edge); background: #fff; font-size: 12px; }
 
+#shell {
+  /* The world profile supplies decorative pigment separately from provenance marks. */
+  --chromatic-ink-soft: color-mix(in srgb, var(--ui-chromatic-ink) 82%, var(--ui-chromatic-paper));
+  --chromatic-ink-faint: color-mix(in srgb, var(--ui-chromatic-ink) 67%, var(--ui-chromatic-paper));
+  --chromatic-edge: color-mix(in srgb, var(--ui-chromatic-ink) 26%, transparent);
+  --chromatic-head:
+    radial-gradient(ellipse 80% 120% at 90% 5%, var(--ui-spectrum-orange), transparent 72%),
+    radial-gradient(ellipse 110% 100% at 15% 100%, var(--ui-spectrum-rose), transparent 68%),
+    linear-gradient(115deg, color-mix(in oklch, var(--ui-spectrum-violet) 45%, white), var(--ui-spectrum-violet));
+}
 #shell .world-menu {
   position: fixed;
   inset: 0;
@@ -628,63 +734,124 @@
 #shell .world-menu-plane {
   display: grid;
   gap: 12px;
-  width: min(720px, 58vw);
+  width: min(760px, 58vw);
   pointer-events: auto;
-  transform: perspective(1400px) rotateY(-5deg);
+  transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw));
   transform-origin: right center;
 }
 #shell .world-menu-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(92px, 1fr));
-  gap: 7px;
+  grid-auto-flow: dense;
+  grid-auto-rows: minmax(106px, auto);
+  align-content: start;
+  gap: 8px;
   width: 100%;
-  height: min(500px, 66vh);
+  max-height: min(520px, 72dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 4px;
 }
 #shell .world-menu-entry {
+  --field-main: var(--ui-chromatic-paper);
+  --field-counter: var(--ui-chromatic-paper);
+  --entry-background: var(--ui-chromatic-paper);
+  --light-x: 8%;
+  --light-y: 115%;
+  --pigment-x: 88%;
+  --pigment-y: 4%;
   position: relative;
-  overflow: hidden;
   display: grid;
   align-content: end;
   justify-items: start;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
-  padding: clamp(16px, 2.5vw, 28px);
-  color: var(--ink);
-  background: color-mix(in srgb, var(--raised) 58%, transparent);
-  border: 1px solid color-mix(in srgb, var(--raised) 64%, var(--edge));
-  border-radius: 3px;
+  min-height: 106px;
+  padding: clamp(15px, 1.7vw, 22px);
+  color: var(--ui-chromatic-ink);
+  background: var(--entry-background);
+  border: 1px solid color-mix(in srgb, var(--ui-chromatic-ink) 17%, white);
+  border-radius: var(--radius-menu);
   text-align: left;
-  box-shadow: 0 10px 30px color-mix(in srgb, #10121a 10%, transparent);
-  backdrop-filter: blur(18px) saturate(108%);
+  overflow-wrap: anywhere;
+  isolation: isolate;
+  box-shadow: inset 0 1px 0 #ffffff9c, 0 7px 26px #192b4924;
+  transition: transform var(--motion-standard) var(--motion-easing), box-shadow var(--motion-standard) var(--motion-easing), border-color var(--motion-standard) var(--motion-easing);
+}
+#shell .world-menu-entry::before,
+#shell .world-menu-entry::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+#shell .world-menu-entry > * { position: relative; z-index: 1; }
+/* Fine grain sits over each color field without a repeated directional pattern. */
+#shell .world-menu-entry::before {
+  opacity: clamp(0, calc(var(--grain-opacity) * 1.15), .14);
+  mix-blend-mode: var(--grain-blend);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+}
+#shell .world-menu-entry::after {
+  background: linear-gradient(180deg, #ffffff43, transparent 38%, #ffffff21);
+  mix-blend-mode: soft-light;
+}
+#shell :is(.world-menu-world, .world-menu-character, .world-menu-library, .world-menu-map) {
+  --entry-background:
+    radial-gradient(ellipse 105% 150% at var(--light-x) var(--light-y), color-mix(in oklch, var(--field-main) 30%, white), transparent 68%),
+    radial-gradient(ellipse 110% 115% at var(--pigment-x) var(--pigment-y), var(--field-counter), transparent 70%),
+    linear-gradient(135deg, color-mix(in oklch, var(--field-main) 70%, white), var(--field-main));
+  border-color: #ffffffa8;
+}
+#shell .world-menu-companion {
+  --entry-background:
+    radial-gradient(ellipse 90% 150% at 95% 0%, color-mix(in srgb, var(--ui-spectrum-green) 54%, transparent), transparent 72%),
+    var(--ui-chromatic-ink);
+  color: var(--ui-chromatic-paper);
+  border-color: color-mix(in srgb, var(--ui-spectrum-green) 52%, var(--ui-chromatic-ink));
+}
+#shell .world-menu-companion :is(.world-menu-entry-detail, kbd) { color: var(--ui-chromatic-paper); }
+#shell :is(.world-menu-customize, .world-menu-settings) .atlas-command-icon { color: var(--ui-chromatic-accent); }
+#shell :is(.world-menu-experiment, .world-menu-compare, .world-menu-make) {
+  border-block-start: 3px solid var(--ui-chromatic-accent);
 }
 #shell .world-menu-entry:hover,
 #shell .world-menu-entry:focus-visible {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--raised) 62%, transparent);
-  border-color: color-mix(in srgb, var(--ink-soft) 56%, transparent);
-  transform: translateY(-1px);
-  outline: 0;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 82%, transparent), 0 12px 32px color-mix(in srgb, #101b20 14%, transparent);
+  border-color: var(--ui-chromatic-ink);
+  box-shadow: inset 0 1px 0 #ffffffcb, 0 14px 38px #192b4950;
+  transform: translateY(-3px);
+}
+#shell .world-menu-companion:is(:hover, :focus-visible) { color: var(--ui-chromatic-paper); border-color: var(--ui-spectrum-green); }
+#shell .world-menu-entry:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus);
+  outline-offset: calc(-1 * var(--focus-ring-width));
 }
 #shell .world-menu-entry-label {
-  font: 400 clamp(15px, 1.6vw, 21px)/1.2 var(--ui-font-display);
+  font: 400 clamp(27px, 2.6vw, 34px)/1.04 "Helvetica Neue", var(--ui-font-display);
+  letter-spacing: -.05em;
 }
+#shell .world-menu-world .world-menu-entry-label { font-size: clamp(54px, 5vw, 70px); font-weight: 300; letter-spacing: -.072em; }
+#shell :is(.world-menu-character, .world-menu-companion) .world-menu-entry-label { font-size: clamp(37px, 3.25vw, 44px); font-weight: 300; letter-spacing: -.062em; }
+#shell .world-menu-settings .world-menu-entry-label { font-size: clamp(29px, 2.75vw, 36px); }
+#shell :is(.world-menu-customize, .world-menu-settings) .world-menu-entry-label { font-weight: 300; }
 #shell .world-menu-entry-detail {
-  max-width: 30ch;
-  color: var(--ink-soft);
-  font-size: 10px;
-  font-weight: 300;
+  max-width: 22ch;
+  color: var(--chromatic-ink-soft);
+  font: 450 12px/1.32 var(--ui-font-body);
+  letter-spacing: .01em;
 }
+#shell .world-menu-world .world-menu-entry-detail { font-size: 14px; }
 #shell .world-menu-entry kbd {
   position: absolute;
-  top: 13px;
-  right: 14px;
-  color: var(--ink-soft);
+  top: 15px;
+  right: 18px;
+  color: var(--ui-chromatic-ink);
   background: transparent;
   border: 0;
-  font-size: 9px;
+  font: 600 11px/1 var(--ui-font-utility);
 }
+#shell .world-menu-companion kbd { color: var(--ui-chromatic-paper); }
 /* The recipes a new world can be generated from: one choice per recipe, over the world. */
 #shell .world-recipes {
   position: fixed;
@@ -693,39 +860,71 @@
   z-index: 41;
   display: grid;
   gap: 12px;
-  width: min(460px, 86vw);
+  width: min(560px, calc(100vw - 48px));
   padding: 24px 28px;
   box-sizing: border-box;
   color: var(--ink);
-  background: color-mix(in srgb, var(--raised) 88%, transparent);
-  border: 1px solid color-mix(in srgb, var(--raised) 64%, var(--edge));
+  background: var(--atlas-plane);
+  border: 1px solid var(--edge);
   border-radius: 3px;
   transform: translate(-50%, -50%);
-  backdrop-filter: blur(18px) saturate(108%);
 }
-#shell .world-recipes h2 { margin: 0; font: 400 21px/1.2 var(--ui-font-display); }
-#shell .world-recipes p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+#shell .world-recipes h2 { margin: 0; color: var(--ink); font: 450 25px/1.2 var(--ui-font-display); }
+#shell .world-recipes p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
 #shell .world-recipes-list { display: grid; gap: 7px; }
 #shell .world-recipes-choice,
 #shell .world-recipes-close { justify-self: start; }
-/* A preset's values: a control per adjustable value, its reason beneath in two lines at most. */
+/* Preset reasons stay available when requested, while the controls remain scannable. */
 #shell .world-recipes { max-height: 86vh; overflow: auto; }
 #shell .world-recipes-choice[aria-pressed='true'] { border-color: var(--ink); }
 #shell .world-recipes-values { display: grid; gap: 10px; }
+#shell .world-recipes-parameter { padding: 14px; background: var(--surface); border: 1px solid var(--edge); border-radius: 4px; }
 #shell .world-recipes-value { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13px; }
-#shell .world-recipes-value > span,
-#shell .world-recipes-reason { grid-column: 1 / -1; }
+#shell .world-recipes-value > span { grid-column: 1 / -1; font-size: 14px; font-weight: 600; }
 #shell .world-recipes-value output { font-variant-numeric: tabular-nums; }
 #shell .world-recipes-reason {
-  display: -webkit-box;
-  overflow: hidden;
+  margin-top: 10px;
   color: var(--ink-soft);
-  font-size: 11px;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
-#shell .world-recipes-actions { display: flex; gap: 8px; }
+#shell .world-recipes-reason summary { color: var(--accent); cursor: pointer; }
+#shell .world-recipes-reason p { margin-top: 8px; }
+#shell .world-recipes-actions { position: sticky; bottom: -24px; display: flex; gap: 8px; padding: 12px 0; background: var(--atlas-plane); border-top: 1px solid var(--edge); }
+/* Reading surfaces share the menu's pigment roles while keeping their controls on paper. */
+#shell :is(.settings-view.system-overlay, .atlas-instrument.options-view.system-overlay, .world-recipes, .world-panel) {
+  --ink: var(--ui-chromatic-ink);
+  --ink-soft: var(--chromatic-ink-soft);
+  --ink-faint: var(--chromatic-ink-faint);
+  --accent: var(--ui-chromatic-accent);
+  --edge: var(--chromatic-edge);
+  --surface: #fff;
+  --raised: #fff;
+  --atlas-plane: var(--ui-chromatic-paper);
+  color: var(--ink);
+  background: var(--atlas-plane);
+  border-radius: var(--radius-chromatic);
+  backdrop-filter: none;
+}
+#shell .settings-view.system-overlay .settings-head { background: var(--chromatic-head); }
+#shell .world-recipes-parameter { border-radius: 16px; }
+#shell .world-panel { border-radius: var(--radius-chromatic); }
+#shell .world-panel > .world-panel-heading {
+  margin: -22px -22px 18px;
+  padding: 18px 22px;
+  background: var(--chromatic-head);
+  border-radius: var(--radius-chromatic) var(--radius-chromatic) 0 0;
+}
+#shell .world-panel-heading h2 { font: 300 30px/1 "Helvetica Neue", var(--ui-font-display); letter-spacing: -.055em; }
+#shell .world-panel > details {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+}
+#shell .world-panel > details > summary { color: var(--ink); font-weight: 600; cursor: pointer; }
 /* Why a generated world shows no vehicles, said over the world's lower left edge. */
 #shell .world-traffic-note {
   position: fixed;
@@ -741,34 +940,31 @@
   border: 1px solid color-mix(in srgb, var(--raised) 64%, var(--edge));
   border-radius: 3px;
 }
-#shell .world-menu-world { grid-column: span 2; }
-#shell .world-menu-character { grid-column: span 2; grid-row: span 2; }
+#shell .world-menu-world { grid-column: span 2; grid-row: span 2; --field-main: var(--ui-spectrum-rose); --field-counter: var(--ui-spectrum-orange); --light-x: 10%; --light-y: 115%; --pigment-x: 95%; --pigment-y: 5%; }
+#shell .world-menu-character { grid-column: span 2; --field-main: var(--ui-spectrum-violet); --field-counter: var(--ui-spectrum-violet); --light-x: 12%; --light-y: 105%; --pigment-x: 90%; --pigment-y: -10%; }
+#shell .world-menu-library { --field-main: var(--ui-spectrum-blue); --field-counter: var(--ui-spectrum-blue); --pigment-x: 96%; --pigment-y: 0%; }
+#shell .world-menu-map { --field-main: var(--ui-spectrum-green); --field-counter: var(--ui-spectrum-green); --pigment-x: 92%; --pigment-y: 4%; }
+#shell .world-menu-experiment,
+#shell .world-menu-compare { --field-main: var(--ui-spectrum-orange); --field-counter: var(--ui-spectrum-rose); --pigment-x: 90%; --pigment-y: 0%; }
+#shell .world-menu-make { --field-main: var(--ui-spectrum-rose); --field-counter: var(--ui-spectrum-orange); --light-x: 88%; --light-y: 125%; --pigment-x: 0%; --pigment-y: -10%; }
+#shell .world-menu-companion { grid-column: span 2; }
 #shell .world-menu-settings { grid-column: span 2; }
-#shell .world-menu-entry::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(108deg, transparent 34%, color-mix(in srgb, white 24%, transparent) 49%, transparent 64%);
-  translate: -145% 0;
-  animation: world-menu-gloss 680ms cubic-bezier(.2,.7,.2,1) both;
-}
-#shell .world-menu-entry:nth-child(2)::after { animation-delay: 35ms; }
-#shell .world-menu-entry:nth-child(3)::after { animation-delay: 70ms; }
-#shell .world-menu-entry:nth-child(4)::after { animation-delay: 105ms; }
-#shell .world-menu-entry:nth-child(5)::after { animation-delay: 140ms; }
-#shell .world-menu-entry:nth-child(6)::after { animation-delay: 175ms; }
-@keyframes world-menu-gloss { to { translate: 145% 0; } }
-
+#shell .world-menu-grid:has(> .world-menu-entry:nth-child(7):last-child) .world-menu-settings { grid-column: span 1; }
 #shell .world-menu-rail {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 22px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px 18px;
   width: 100%;
-  min-height: 30px;
-  color: var(--ink-soft);
-  font-size: 10px;
+  min-height: 54px;
+  box-sizing: border-box;
+  padding: 8px 0;
+  color: #132b36;
+  background: transparent;
+  border: 0;
+  font-size: 14px;
+  text-shadow: 0 1px 4px #f5fcff, 0 0 12px #f5fcff;
 }
 #shell .world-menu-rail-action,
 #shell .world-menu-rail-hint {
@@ -777,25 +973,24 @@
   gap: 7px;
 }
 #shell .world-menu-rail-action {
-  min-height: 28px;
-  padding: 0;
-  color: var(--ink-soft);
+  min-height: 40px;
+  padding: 0 8px;
+  color: #132b36;
   background: transparent;
   border: 0;
-  font-size: 10px;
+  font-size: 14px;
 }
-#shell .world-menu-rail-action:hover { color: var(--ink); background: transparent; }
+#shell .world-menu-rail-action:hover { color: #061c28; background: transparent; text-decoration: underline; }
 #shell .world-menu-rail :is(kbd) {
-  padding: 2px 5px;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--raised) 58%, transparent);
-  border: 1px solid color-mix(in srgb, var(--edge) 68%, transparent);
+  padding: 4px 6px;
+  color: #ecfff6;
+  background: #30454a;
+  border: 1px solid #a7c8bb;
   border-radius: 2px;
-  font-size: 9px;
+  font-size: 12px;
 }
-#shell .world-menu-session { margin-left: auto; letter-spacing: .04em; }
+#shell .world-menu-session { margin-left: auto; color: #132b36; font-size: 13px; letter-spacing: .04em; }
 @media (prefers-reduced-motion: reduce) {
-  #shell .world-menu-entry::after { animation: none; display: none; }
   #shell .world-arrival[data-shown] {
     animation-name: world-arrival-title !important;
     animation-duration: 4.8s !important;

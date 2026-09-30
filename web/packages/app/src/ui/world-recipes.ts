@@ -157,9 +157,14 @@ export function buildWorldRecipes(options: {
         narrow(true);
         check();
       });
-      controls.append(el('label', { class: 'world-recipes-value', title: value.reason }, [
-        el('span', { text: value.label }), input, output,
-        el('small', { class: 'world-recipes-reason', text: value.reason }),
+      controls.append(el('div', { class: 'world-recipes-parameter' }, [
+        el('label', { class: 'world-recipes-value' }, [
+          el('span', { text: value.label }), input, output,
+        ]),
+        el('details', { class: 'world-recipes-reason' }, [
+          el('summary', { text: 'Why this range?' }),
+          el('p', { text: value.reason }),
+        ]),
       ]));
     }
   };

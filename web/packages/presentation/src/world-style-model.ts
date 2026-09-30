@@ -114,6 +114,18 @@ export interface WorldUiColors {
   readonly vignette: string;
 }
 
+/** Decorative pigment belongs to the interface's structural hue, never to evidence marks. */
+export interface WorldUiChromatic {
+  readonly rose: string;
+  readonly orange: string;
+  readonly violet: string;
+  readonly blue: string;
+  readonly green: string;
+  readonly ink: string;
+  readonly paper: string;
+  readonly accent: string;
+}
+
 export interface WorldUiRecipe {
   readonly typography: {
     readonly body: string;
@@ -148,6 +160,7 @@ export interface WorldUiRecipe {
 export interface WorldUiStyle extends WorldUiRecipe {
   /** Derived from the world palette. A recipe cannot supply an unrelated component palette. */
   readonly colors: WorldUiColors;
+  readonly chromatic: WorldUiChromatic;
 }
 
 export interface WorldArtProfileSource {
@@ -496,8 +509,8 @@ export function deriveWorldUiColors(
     ink: accessibleTone(structural(INTERFACE_LIGHTNESS.ink), raised, 7),
     body: accessibleTone(structural(INTERFACE_LIGHTNESS.body), surface, READING_FLOOR),
     muted: accessibleTone(structural(INTERFACE_LIGHTNESS.muted), surface, READING_FLOOR),
-    // The single accent. Focus, active state and the one control worth pointing at, and nothing
-    // else: it is the interface's only decorative hue and it is spent in very few places.
+    // The semantic accent serves focus, active state and selection. Broad navigation pigment is
+    // derived separately from the structural hue and never borrows provenance colours.
     accent: accessibleTone(toneAt(face.structure, INTERFACE_LIGHTNESS.accent), surface, READING_FLOOR),
     secondary: accessibleTone(toneAt(face.evidence, INTERFACE_LIGHTNESS.secondary), surface, READING_FLOOR),
     focus: accessibleTone(toneAt(face.structure, INTERFACE_LIGHTNESS.focus), ground, 3),
@@ -540,6 +553,28 @@ export function deriveWorldUiColors(
       READING_FLOOR),
     shadow: structural(INTERFACE_LIGHTNESS.shadow),
     vignette: structural(INTERFACE_LIGHTNESS.vignette),
+  });
+}
+
+/** A coherent five-field navigation spectrum rotated with the world's interface identity. */
+export function deriveWorldUiChromatic(
+  palette: WorldPalette,
+  authored?: WorldInterfacePalette,
+): WorldUiChromatic {
+  const face = authored ?? interfacePaletteFromWorld(palette);
+  const hue = toOklch(face.structure).h;
+  const pigment = (degrees: number, lightness: number, chroma: number): string =>
+    oklchHex(lightness, chroma, hue + degrees * Math.PI / 180);
+  const paper = toneAt(face.plate, 0.978, 0, 0.025);
+  return Object.freeze({
+    rose: pigment(150, 0.72, 0.19),
+    orange: pigment(-140, 0.78, 0.16),
+    violet: pigment(105, 0.68, 0.18),
+    blue: pigment(35, 0.70, 0.16),
+    green: pigment(-55, 0.77, 0.16),
+    ink: accessibleTone(toneAt(face.ink, 0.25, 0.035), paper, 7),
+    paper,
+    accent: accessibleTone(toneAt(face.structure, 0.42, 0.10), paper, READING_FLOOR),
   });
 }
 
@@ -666,9 +701,10 @@ export function createWorldArtProfile(source: WorldArtProfileSource): WorldArtPr
   validateWorldArtProfileSource(source);
   const frozen = freezeSource(source);
   const colors = deriveWorldUiColors(frozen.palette, frozen.interfacePalette);
+  const chromatic = deriveWorldUiChromatic(frozen.palette, frozen.interfacePalette);
   return Object.freeze({
     ...frozen,
-    ui: Object.freeze({ ...frozen.ui, colors }),
+    ui: Object.freeze({ ...frozen.ui, colors, chromatic }),
   });
 }
 

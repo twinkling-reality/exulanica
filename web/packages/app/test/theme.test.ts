@@ -65,6 +65,9 @@ describe('Atlas presentation theme', () => {
     expect(root.style.getPropertyValue('--ui-companion-surface')).toBe(
       ORIGIN_LANDSCAPE.ui.colors.companionSurface,
     );
+    expect(root.style.getPropertyValue('--ui-spectrum-rose')).toBe(
+      ORIGIN_LANDSCAPE.ui.chromatic.rose,
+    );
     expect(root.style.getPropertyValue('--ui-font-body')).toBe(ORIGIN_LANDSCAPE.ui.typography.body);
     expect(root.style.getPropertyValue('--radius-panel')).toBe('');
     expect(root.style.getPropertyValue('--ui-choice-radius')).toBe('');
@@ -76,6 +79,9 @@ describe('Atlas presentation theme', () => {
     expect(root.dataset['uiTexture']).toBe('contour-grid');
     expect(root.style.getPropertyValue('--ui-companion-surface')).toBe(
       SURVEY_RELIEF.ui.colors.companionSurface,
+    );
+    expect(root.style.getPropertyValue('--ui-spectrum-rose')).toBe(
+      SURVEY_RELIEF.ui.chromatic.rose,
     );
     expect(root.style.getPropertyValue('--ui-font-body')).toBe(SURVEY_RELIEF.ui.typography.body);
     expect(root.style.getPropertyValue('--radius-panel')).toBe('');

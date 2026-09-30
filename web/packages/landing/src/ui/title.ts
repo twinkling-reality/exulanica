@@ -17,7 +17,7 @@ export function buildTitle(): HTMLElement {
   const stack = el('div', { class: 'title' });
   stack.append(
     el('h1', { class: 'wordmark', id: 'title-wordmark', text: 'Exulanica' }),
-    el('p', { class: 'proposition', text: 'A personal world memory model' }),
+    el('p', { class: 'proposition', text: 'Worlds for AI Agents' }),
   );
 
   const publisher = el('p', { class: 'publisher-mark' }, [

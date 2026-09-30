@@ -346,7 +346,11 @@ preceding surface. Closing Settings returns to its prior surface and detail.
 renderer regression fixture and is not offered as a product choice
 ([customization contract](atlas-world-customization-contract.md#4-profile-compatibility-and-programmable-controls)).
 The atmosphere has its own non-semantic colours; evidence and provenance colours are never reused
-as decoration. The palette roots are authored in
+as decoration. Navigation pigment is derived from the interface's structural hue as a separate
+five-field spectrum. The warm World field leads a cool progression through Character, Library and
+Map; the Companion sits on ink and utility commands sit on paper. A protected right-anchored plane,
+one card silhouette and the profile's texture and motion roles hold these colors together. Reading
+surfaces use the same derived ink and paper roles. The palette roots are authored in
 `web/packages/presentation/src/world-style-recipes.ts`, and the landscape is a real world shader and
 geometry composition rather than a viewport-wide CSS gradient. Colour is never the only carrier of
 provenance or confirmation state.
