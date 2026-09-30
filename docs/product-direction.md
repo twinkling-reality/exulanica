@@ -157,8 +157,9 @@ what accepts it and where the implementation stands.
 | Independent reading | The runs, their decisions and the models that served them can be read through the authenticated API by a client other than the browser. | Recorded. The [developer client](capabilities/developer-client.md#reading-a-comparison-of-models) reads a comparison started from the application, its runs and every stored decision through the authenticated API with `world.read` alone ([record](evaluation/2026-09-29-developer-client-comparison.json)). |
 
 The gap between the implementation and the milestone as stated: a town's people are compared from
-the Compare view, but in one comparison a model decides for only part of a large town (at most 23
-of 58 people, derived from how long reading a run may take;
+the Compare view, but in one comparison a model decides for only part of a large town (at most 24
+of a 56-person small town and 11 of an 86-person market town, fewer the more people a town holds,
+derived from how long reading a run may take;
 [what a comparison can read](society-experiments.md#running-a-comparison)), the judged comparisons
 ran over the small square, and a comparison covers one simulated hour rather than a day.
 

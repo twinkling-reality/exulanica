@@ -276,8 +276,9 @@ decided person's options reads everybody else
 Every run is held to half the pair's budget, so a comparison runs at most 111 people, the most for
 which a run where a model decides for one of them still fits, fewer than the 128 a generated town's
 ground allows, which makes it the bound that applies to a town; and in one
-run a model may decide for all 30 people of a 30-person town, at most 29 of 44 or 24 of 56, the
-group under a model arm and anybody outside it whose owner chose a model counted together. A larger
+run a model may decide for all 30 people of a 30-person town, at most 29 of 44, 24 of 56 or 11 of
+86, the group under a model arm and anybody outside it whose owner chose a model counted together.
+A larger
 society is refused by name (`population_over_comparison_bound`), and so is a comparison whose model
 would decide for more (`decided_over_comparison_bound`); the plan route serves both figures for the
 version's society, and the page states the second before Start. The first two protocol versions
