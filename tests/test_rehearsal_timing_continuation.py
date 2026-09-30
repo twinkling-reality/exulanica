@@ -203,9 +203,20 @@ def test_timing_phase_signal_stops_only_its_session_and_writes_receipt(tmp_path,
         [sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True
     )
     children = []
+    ready = tmp_path / "timing-child-ready"
 
     def open_session(*_args, **kwargs):
-        child = actual_popen([sys.executable, "-c", "import time; time.sleep(30)"], **kwargs)
+        child = actual_popen(
+            [
+                sys.executable,
+                "-c",
+                "import pathlib, signal, sys, time; "
+                "signal.signal(signal.SIGTERM, lambda *_: (time.sleep(6), sys.exit(0))); "
+                "pathlib.Path(sys.argv[1]).write_text('ready'); time.sleep(30)",
+                str(ready),
+            ],
+            **kwargs,
+        )
         children.append(child)
         return child
 
@@ -216,7 +227,10 @@ def test_timing_phase_signal_stops_only_its_session_and_writes_receipt(tmp_path,
         samples += 1
         if samples == 1:
             return Decimal("80")
-        assert children and children[0].poll() is None
+        deadline = time.monotonic() + 10
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert ready.exists() and children[0].poll() is None
         os.kill(os.getpid(), signal.SIGTERM)
         time.sleep(1)  # The handler interrupts before this line.
         raise AssertionError("SIGTERM did not interrupt the timing phase")
@@ -240,7 +254,7 @@ def test_timing_phase_signal_stops_only_its_session_and_writes_receipt(tmp_path,
         assert timing_phase.main() == 128 + signal.SIGTERM
         document = json.loads(receipt.read_text())
         assert document["status"] == "interrupted"
-        assert document["session_exit"] is not None
+        assert document["session_exit"] == 0  # Six-second cleanup beat the TERM grace.
         assert children[0].poll() is not None
         assert preview.poll() is None
     finally:

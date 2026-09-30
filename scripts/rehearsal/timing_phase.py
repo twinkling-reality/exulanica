@@ -64,13 +64,13 @@ def interrupt(signum: int, _frame: object) -> None:
 
 
 def stop_owned_session(child: subprocess.Popen[bytes]) -> None:
-    """Stop only the session group spawned by this timing phase, within ten seconds."""
+    """Stop only this session group, allowing Chrome's 5.3 s close path before KILL."""
     if child.poll() is not None:
         return
     with contextlib.suppress(ProcessLookupError):
         os.killpg(child.pid, signal.SIGTERM)
     try:
-        child.wait(timeout=5)
+        child.wait(timeout=10)
     except subprocess.TimeoutExpired:
         with contextlib.suppress(ProcessLookupError):
             os.killpg(child.pid, signal.SIGKILL)
