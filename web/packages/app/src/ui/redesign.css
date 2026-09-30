@@ -830,6 +830,12 @@
 #shell .world-menu-entry-label {
   font: 400 clamp(27px, 2.6vw, 34px)/1.04 "Helvetica Neue", var(--ui-font-display);
   letter-spacing: -.05em;
+  white-space: nowrap;
+}
+@media (min-width: 60.0625rem) and (max-width: 68rem) {
+  #shell :is(.world-menu-experiment, .world-menu-compare) .world-menu-entry-label {
+    font-size: clamp(21px, 2.2vw, 24px);
+  }
 }
 #shell .world-menu-world .world-menu-entry-label { font-size: clamp(54px, 5vw, 70px); font-weight: 300; letter-spacing: -.072em; }
 #shell :is(.world-menu-character, .world-menu-companion) .world-menu-entry-label { font-size: clamp(37px, 3.25vw, 44px); font-weight: 300; letter-spacing: -.062em; }
@@ -906,6 +912,14 @@
   background: var(--atlas-plane);
   border-radius: var(--radius-chromatic);
   backdrop-filter: none;
+}
+:root[data-contrast='high'] #shell :is(.settings-view.system-overlay, .atlas-instrument.options-view.system-overlay, .world-recipes, .world-panel) {
+  --ink: #09262d;
+  --ink-soft: #263f47;
+  --ink-faint: #3c555c;
+  --edge: #4a6870;
+  --focus: #005767;
+  color: var(--ink);
 }
 #shell .settings-view.system-overlay .settings-head { background: var(--chromatic-head); }
 #shell .world-recipes-parameter { border-radius: 16px; }

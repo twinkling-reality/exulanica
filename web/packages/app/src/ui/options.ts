@@ -237,7 +237,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     class: 'option-note world-style-authority', role: 'status', 'aria-live': 'polite',
   });
   const worldLifecycle = el('p', {
-    class: 'option-note world-style-lifecycle', role: 'status', 'aria-live': 'polite',
+    class: 'option-note world-style-lifecycle', role: 'status', 'aria-live': 'polite', tabindex: '-1',
   });
   const worldVersion = el('p', { class: 'option-note world-style-version' });
   const worldProvenance = el('p', { class: 'option-note world-style-provenance' });
@@ -741,6 +741,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
       }
     },
     reportWorldLifecycle(state, detail = '') {
+      const newlyFailed = state === 'failed' && worldLifecycle.dataset['state'] !== 'failed';
       worldLifecycle.dataset['state'] = state;
       worldLifecycle.textContent = detail.length > 0
         ? detail
@@ -755,6 +756,13 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
                 : state === 'failed'
                   ? 'The preview could not be validated or saved.'
                   : '';
+      if (newlyFailed && shown) {
+        requestAnimationFrame(() => {
+          if (!shown || worldLifecycle.dataset['state'] !== 'failed') return;
+          worldLifecycle.scrollIntoView({ block: 'center', behavior: 'auto' });
+          worldLifecycle.focus({ preventScroll: true });
+        });
+      }
     },
   };
 }

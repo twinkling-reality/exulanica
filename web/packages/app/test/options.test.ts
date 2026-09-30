@@ -159,6 +159,31 @@ describe('Options', () => {
     expect(view.root.textContent).toContain('Previewing · not saved');
   });
 
+  it('brings a new save refusal into view without stealing focus on repeated status updates', async () => {
+    const view = buildOptions({
+      preferences: DEFAULT_PREFERENCES,
+      onChange: vi.fn(),
+      onClose: vi.fn(),
+      onShowControls: vi.fn(),
+    });
+    document.body.append(view.root);
+    view.setVisible(true);
+    const warning = view.root.querySelector<HTMLElement>('.world-style-lifecycle')!;
+    warning.scrollIntoView = vi.fn();
+
+    view.reportWorldLifecycle('checking');
+    view.reportWorldLifecycle('failed', 'The saved world changed elsewhere. Reload before trying again.');
+    await vi.waitFor(() => expect(document.activeElement).toBe(warning));
+    expect(warning.scrollIntoView).toHaveBeenCalledOnce();
+
+    const close = view.root.querySelector<HTMLButtonElement>('.overlay-close')!;
+    close.focus();
+    view.reportWorldLifecycle('failed', 'The saved world changed elsewhere. Reload before trying again.');
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(document.activeElement).toBe(close);
+    expect(warning.scrollIntoView).toHaveBeenCalledOnce();
+  });
+
   it('renders immutable history, proposal provenance, and rollback as explicit actions', async () => {
     const onWorldRollback = vi.fn(async () => ({
       ...DEFAULT_PREFERENCES,
