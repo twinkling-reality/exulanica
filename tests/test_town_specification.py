@@ -84,8 +84,9 @@ def test_the_served_specification_states_every_value_its_range_its_reason_and_th
     document = answer.json()
     assert document == json.loads(json.dumps(specification_document()))
     assert document["profile"] == "exulanica.world-specification/v1"
-    assert document["grammar"] == {"grammar_id": "city", "grammar_version": 4}
-    grammar = REGISTRY.get("city", 4)
+    assert document["grammar"] == {"grammar_id": "city", "grammar_version": 5}
+    assert document["schema"]["catalog_version"] == 2
+    grammar = REGISTRY.get("city", 5)
     values = {value["key"]: value for value in document["values"]}
     for key, value in values.items():
         assert value["label"] and len(value["reason"].split()) >= 5, key
@@ -108,17 +109,39 @@ def test_the_served_specification_states_every_value_its_range_its_reason_and_th
             assert set(value["choices"]) <= set(declared.options)
         assert value["adjustable"] == ("value" not in value), key
     adjustable = {key for key, value in values.items() if value["adjustable"]}
+    shares = {
+        spec.name
+        for spec in grammar.parameters.parameters
+        if spec.unit == "permille" and spec.when_unset == "draw"
+    }
+    assert len(shares) == 13
     assert adjustable == {
         "city_extent_x_mm",
         "block_length_mm",
         "storey_band_low",
         "storey_band_high",
+        "high_street_count",
+        "cross_street_hierarchy",
+        *shares,
     }
+    # A choice is served with each key's words from the catalog its vocabulary names.
+    cross = values["cross_street_hierarchy"]
+    assert cross["choices"] == ["local_street", "narrow_street"]
+    assert cross["choice_labels"] == ["Local street", "Narrow street"]
+    assert "choice_labels" not in values["driving_side"]
+    # One corner radius for the whole town, fixed with its measurement.
+    assert (values["corner_radius_mm"]["adjustable"], values["corner_radius_mm"]["value"]) == (
+        False,
+        4000,
+    )
     assert [preset["key"] for preset in document["presets"]] == ["small_town", "market_town"]
     for preset in document["presets"]:
         assert set(preset["values"]) == adjustable
         for key, chosen in preset["values"].items():
             value = values[key]
+            if value["kind"] == "choice":
+                assert chosen in value["choices"]
+                continue
             assert value["minimum"] <= chosen <= value["maximum"]
             assert (chosen - value["minimum"]) % value["step"] == 0
     assert {row["code"] for row in document["refusals"]} == {
@@ -129,14 +152,9 @@ def test_the_served_specification_states_every_value_its_range_its_reason_and_th
         "generated_world_refused",
         "world_limit_reached",
     }
-    # A town two tiles long takes cross streets at most 120 m apart, and one three tiles long at
-    # least 130 m apart: two spans of one value, never in force together.
-    two_tiles, three_tiles = values["block_length_mm"]["requires"]
-    assert (two_tiles["when"], two_tiles["from"], two_tiles["maximum"]) == (
-        "city_extent_x_mm",
-        256_000,
-        120_000,
-    )
+    # A town three tiles long takes cross streets at least 130 m apart; a town two tiles long takes
+    # every distance offered, the rule version 1 of the schema states for it being gone.
+    [three_tiles] = values["block_length_mm"]["requires"]
     assert (three_tiles["when"], three_tiles["from"], three_tiles["minimum"]) == (
         "city_extent_x_mm",
         384_000,
@@ -165,6 +183,19 @@ def test_a_value_the_schema_does_not_offer_is_refused_by_name_and_nothing_is_wri
         ({"driving_side": "left"}, "specification_value_unknown", 'fixes it at "right"'),
         ({"grammar_version": 3}, "specification_value_unknown", "states no value"),
         ({"lamp_spacing_mm": 20_000}, "specification_value_unknown", "states no value"),
+        ({"high_street_count": 4}, "specification_value_out_of_range", "1 to 3 count"),
+        ({"typology_weight_rowhouse_permille": 1_025}, "specification_value_out_of_range", "0 to"),
+        (
+            {"typology_weight_rowhouse_permille": 25},
+            "specification_value_out_of_range",
+            "steps of 50",
+        ),
+        (
+            {"cross_street_hierarchy": "avenue"},
+            "specification_value_out_of_range",
+            "one of local_street, narrow_street",
+        ),
+        ({"corner_radius_mm": 6_000}, "specification_value_unknown", "fixes it at 4000"),
     ]
     for values, code, words in cases:
         answer = objects_api.post(
@@ -176,7 +207,7 @@ def test_a_value_the_schema_does_not_offer_is_refused_by_name_and_nothing_is_wri
         assert (body["code"], body["key"], body["value"]) == (code, key, values[key]), values
         assert words in body["detail"], (values, body["detail"])
         if code == "specification_value_out_of_range":
-            assert set(body["range"]) == {"minimum", "maximum", "step"}
+            assert set(body["range"]) in ({"minimum", "maximum", "step"}, {"choices"})
     # Two values the schema does not admit together: the small town's 90 m blocks with a town three
     # tiles long. Named by both keys, before anything is generated.
     answer = objects_api.post(
@@ -214,7 +245,7 @@ def test_a_preset_with_values_makes_a_town_of_those_values_and_its_own_seed(
     bound = receipt["specification"]["bindings"][0]["values"]
     assert bound["block_length_mm"] == 120_000
     assert bound["city_extent_x_mm"] == world_recipe("small_town").values["city_extent_x_mm"]
-    assert receipt["grammar"]["grammar_version"] == 4
+    assert receipt["grammar"]["grammar_version"] == 5
     assert receipt["recipe"]["values"]["block_length_mm"] == 120_000
     # The values are part of what the seed is drawn from: the same identity with the preset's own
     # values is another world.
@@ -244,9 +275,18 @@ def test_the_gate_and_the_composition_entry_are_pure_and_refuse_as_the_route_doe
         ("city_extent_x_mm", 384_000),
     )
     assert town_recipe("small_town", {"city_extent_x_mm": 384_000, "block_length_mm": 130_000})
-    # Two tiles with blocks too long for the tile that carries the far end of a cross street.
+    # Two tiles with blocks 130 or 140 m apart: version 2 of the schema admits them, since the
+    # tessellator draws a straight join without the kerb it runs on into; version 1 still refuses.
+    for length in (130_000, 140_000):
+        assert (
+            town_recipe("small_town", {"block_length_mm": length}).specification["grammar_version"]
+            == 5
+        )
+    version_1 = load_specification_schemas()["world-specification.v1"]
     with pytest.raises(SpecificationRefused) as two_tiles:
-        town_recipe("small_town", {"block_length_mm": 130_000})
+        version_1.check_together(
+            {"city_extent_x_mm": 256_000, "block_length_mm": 130_000, "storey_band_low": 2}
+        )
     assert (two_tiles.value.code, two_tiles.value.other) == (
         "specification_values_disagree",
         ("city_extent_x_mm", 256_000),
@@ -258,17 +298,22 @@ def test_the_gate_and_the_composition_entry_are_pure_and_refuse_as_the_route_doe
     }
 
 
-def test_a_town_made_under_version_3_is_read_again_under_version_3_and_a_version_4_one_under_4():
+def test_a_town_is_read_again_at_the_grammar_version_its_receipt_records():
     """Each receipt is read at the grammar version it records, with that version's catalogs and
-    descriptor, so a version 3 town regenerates the records it recorded after version 4 is the one
-    offered; a receipt naming a version this server does not generate is refused by name."""
+    descriptor, so a version 3 or version 4 town regenerates the records it recorded after version
+    5 is the one offered; a receipt naming a version this server does not generate is refused by
+    name."""
     [version_1] = [r for r in load_world_recipes(catalog_version=1) if r.key == "small_town"]
+    [version_2] = [r for r in load_world_recipes(catalog_version=2) if r.key == "small_town"]
     old = compose_generated_world(
         dataclasses.replace(version_1, candidates=CANDIDATES_MAXIMUM), "world:generated:old"
     )
+    middle = compose_generated_world(
+        dataclasses.replace(version_2, candidates=CANDIDATES_MAXIMUM), "world:generated:middle"
+    )
     new = compose_generated_world(world_recipe("small_town"), "world:generated:new")
     module = composer_module(town_composer.COMPOSER_KEY, 1)
-    for composed, version in ((old, 3), (new, 4)):
+    for composed, version in ((old, 3), (middle, 4), (new, 5)):
         grammar = composed.receipt["grammar"]
         assert grammar["grammar_version"] == version
         assert grammar["descriptor_sha256"] == descriptor_sha256(CITY_DESCRIPTOR_PATHS[version])
@@ -279,7 +324,7 @@ def test_a_town_made_under_version_3_is_read_again_under_version_3_and_a_version
         assert stated == {version}
     elsewhere = {
         **new.receipt,
-        "grammar": {**new.receipt["grammar"], "grammar_version": 5},
+        "grammar": {**new.receipt["grammar"], "grammar_version": 6},
     }
     with pytest.raises(InvalidStructuralData, match="generated_world_grammar_changed"):
         module.records(elsewhere)
@@ -397,7 +442,7 @@ def test_a_schema_is_read_only_when_its_ranges_lie_inside_the_grammar_and_preset
         load_world_recipes(
             directory(
                 edit(
-                    "world-recipe.v2.json",
+                    "world-recipe.v3.json",
                     "small_town",
                     "values",
                     {

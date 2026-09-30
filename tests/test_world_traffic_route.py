@@ -24,7 +24,12 @@ from exulanica.world import traffic_host
 from exulanica.world import world_recipes as recipe_catalog
 from exulanica.world.generated_worlds import compose_specified_world, generation_receipt
 from exulanica.world.traffic_episodes import EPISODE, prepared, traffic_input
-from exulanica.world.world_recipes import CANDIDATES_MAXIMUM, load_world_recipes, world_recipes
+from exulanica.world.world_recipes import (
+    CANDIDATES_MAXIMUM,
+    load_world_recipes,
+    specification_document,
+    world_recipes,
+)
 from exulanica.world.worlds import GENERATED
 
 from personal_world_support import STRANGER_TOKEN
@@ -135,7 +140,10 @@ def test_a_saved_towns_traffic_is_served_to_its_world_from_its_own_records(made,
         uuid.UUID(entry["source_snapshot_id"]),
     )
     assert body["roads_version"] == digest
-    assert receipt["grammar"]["grammar_version"] == 4
+    assert (
+        receipt["grammar"]["grammar_version"]
+        == specification_document()["grammar"]["grammar_version"]
+    )
     assert len(body["vehicles"]) == fleet
     assert all(len(row["mode"]) == 5 for row in body["vehicles"])
     assert 0 <= body["clock_second"] - body["from_second"] <= 30

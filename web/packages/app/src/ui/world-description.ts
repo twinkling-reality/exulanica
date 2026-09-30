@@ -31,6 +31,8 @@ export interface SpecificationValueWords {
   readonly minimum: number;
   readonly maximum: number;
   readonly step: number;
+  /** A choice's keys, each with its words; null for a number. */
+  readonly choices: readonly { readonly key: string; readonly label: string }[] | null;
 }
 
 /** What the panel words a draft with, read from the served specification. */
@@ -59,11 +61,20 @@ export const REFUSAL_WORDS: Readonly<Record<DraftRefusalCode, string>> = Object.
 export const UNIT_WORDS: Readonly<Record<string, (value: number) => string>> = Object.freeze({
   mm: (value: number) => fill('worldDescription.unit.mm', { metres: String(value / 1000) }),
   count: (value: number) => fill('worldDescription.unit.count', { count: String(value) }),
+  permille: (value: number) => fill('worldDescription.unit.permille', { thousandths: String(value) }),
 });
 
 export function valueWords(value: number | string, unit: string): string {
   const words = UNIT_WORDS[unit];
   return words === undefined || typeof value === 'string' ? `${value} ${unit}`.trim() : words(value);
+}
+
+/** A value in words: a choice by its label, a number by its unit. */
+function worded(value: SpecificationValueWords, chosen: number | string): string {
+  if (typeof chosen === 'string') {
+    return value.choices?.find((choice) => choice.key === chosen)?.label ?? chosen;
+  }
+  return valueWords(chosen, value.unit);
 }
 
 function listed(kinds: TownSample['streets']): string {
@@ -103,11 +114,15 @@ export function draftLines(draft: WorldDraft, words: SpecificationWords): readon
     if (code === 'description_not_supported') {
       lines.push(say('worldDescription.supported'));
       for (const value of words.values) {
-        lines.push(fill('worldDescription.range', {
-          label: value.label,
-          minimum: valueWords(value.minimum, value.unit),
-          maximum: valueWords(value.maximum, value.unit),
-        }));
+        lines.push(value.choices !== null
+          ? fill('worldDescription.choices', {
+            label: value.label, choices: value.choices.map((choice) => choice.label).join(', '),
+          })
+          : fill('worldDescription.range', {
+            label: value.label,
+            minimum: valueWords(value.minimum, value.unit),
+            maximum: valueWords(value.maximum, value.unit),
+          }));
       }
     }
     return lines;
@@ -128,7 +143,7 @@ export function draftLines(draft: WorldDraft, words: SpecificationWords): readon
     lines.push(fill(proposal.setByWords.includes(key)
       ? 'worldDescription.valueFromWords' : 'worldDescription.value', {
       label: value?.label ?? key,
-      value: value === undefined ? String(number) : valueWords(number, value.unit),
+      value: value === undefined ? String(number) : worded(value, number),
     }));
   }
   const refused = proposal.valueRefusal;

@@ -69,6 +69,7 @@ from exulanica.grammar.grammars.city.roads import (
     JunctionRecord,
     LaneRecord,
 )
+from exulanica.grammar.grammars.city.streetlife import StreetTreeRecord as StreetTree
 from exulanica.grammar.grammars.city.streets import CurbEdgeRecord, StreetSegmentRecord
 from exulanica.grammar.grammars.city.terrain import TerrainRecord
 from exulanica.grammar.grammars.city.vitrine import VitrineRecord
@@ -248,7 +249,14 @@ def test_version_5_runs_premises_before_vitrine_at_the_stage_versions_it_states(
         stage_id for stage_id, _version in stages
     ].index("vitrine")
     moved = {stage_id: version for stage_id, version in stages if v4[stage_id] != version}
-    assert moved == {"streets": 4, "massing": 3, "premises": 3, "vitrine": 3, "material": 3}
+    assert moved == {
+        "streets": 4,
+        "massing": 3,
+        "streetlife": 3,
+        "premises": 3,
+        "vitrine": 3,
+        "material": 3,
+    }
 
 
 def test_the_material_edition_5_differs_from_4_in_what_the_tree_pit_soil_dresses_alone():
@@ -495,6 +503,76 @@ def test_version_5_dresses_the_bare_ground_and_every_ground_band_where_version_4
             for face in bands
             if face.exposure != "party_wall"
         )
+        # A bay's panels stepping in depth draw trim on a face with no opening or moulding.
+        bayed = {bay.facade_identity for bay in _of(records, GroundBayRecord)}
+        plain = [
+            face
+            for face in bands
+            if face.identity in bayed and not (face.string_courses or face.cornice or face.openings)
+        ]
+        assert all(((face.identity, "trim") in materials) == dressed for face in plain)
+
+
+def test_a_ground_storey_with_bays_and_no_opening_or_moulding_is_dressed_for_its_trim():
+    # A small town the specification makes, 140 m blocks, whose ground storeys include two faces
+    # carrying bays and no opening, string course or cornice: the tessellator draws trim where
+    # their panels step in depth, and material stage 3 dresses it.
+    from exulanica.world.generated_worlds import compose_specified_world
+
+    values = {
+        "city_extent_x_mm": 256_000,
+        "block_length_mm": 140_000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+    }
+    composed = compose_specified_world(
+        "small_town", values, "world:generated:sweep-A-140-256-local-1-4-2-w1"
+    )
+    records = composed.records
+    materials = {(m.surface_identity, m.role) for m in _of(records, SurfaceMaterialRecord)}
+    bayed = {bay.facade_identity for bay in _of(records, GroundBayRecord)}
+    plain = [
+        face
+        for face in _of(records, FacadeRecord)
+        if face.first_storey == 0
+        and face.identity in bayed
+        and not (face.string_courses or face.cornice or face.openings)
+    ]
+    assert len(plain) >= 1, "this town no longer has such a face; choose another identity"
+    assert all((face.identity, "trim") in materials for face in plain)
+
+
+def test_no_street_tree_reaches_outside_its_segment_at_version_5():
+    """Issue #71's refusal: version 4 can place a tree whose crown reaches outside its street
+    segment's extent, and the tile documents refuse the city. Version 5's streetlife stage skips
+    such a tree, at the 4 m corner the town specification fixes, where the refusal was most
+    frequent. A candidate the grammar refuses for another reason (a rooftop clearance past its
+    record's bound, version 4's own) is passed over, as the composer passes it over."""
+    values = _mix(corner_radius_mm=4_000, storey_band_low=3, storey_band_high=5)
+    generated = 0
+    for candidate in range(8):
+        try:
+            generation = generate_city(
+                seed=f"{candidate:064x}",
+                subject_identity=_IDENTITY,
+                bindings=(CascadeBinding.of("city", values),),
+                grammar_version=5,
+            )
+        except GrammarError as error:
+            assert "street_tree" not in str(error)
+            continue
+        generated += 1
+        records = city_records(generation)
+        segments = {record.identity: record for record in _of(records, StreetSegmentRecord)}
+        trees = _of(records, StreetTree)
+        assert trees
+        for tree in trees:
+            owner = segments[tree.segment_identity].extent
+            assert owner.min_x_mm <= tree.extent.min_x_mm <= tree.extent.max_x_mm <= owner.max_x_mm
+            assert owner.min_y_mm <= tree.extent.min_y_mm <= tree.extent.max_y_mm <= owner.max_y_mm
+    assert generated >= 6
 
 
 # -------------------------------------------------------------------------------------------------

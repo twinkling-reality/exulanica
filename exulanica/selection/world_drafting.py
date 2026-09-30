@@ -25,7 +25,7 @@ of that specification's values. What comes back is a proposal and nothing more:
     (``exulanica/consent/place-name-uses.v1.json``), so no place's name is left for the boundary
     to release. The request still passes the one policy boundary every hosted request passes.
 
-The words the model is asked with are data (``world-drafting.v1.json`` beside this module): each
+The words the model is asked with are data (``world-drafting.v2.json`` beside this module): each
 draft records the prompt's version and the file's SHA-256. Pure apart from the model client: no
 connection is read here except by :func:`sendable`, and nothing is written.
 """
@@ -87,7 +87,9 @@ __all__ = [
 
 #: The manifest role that drafts a specification from words, named by its job.
 DRAFTER_ROLE: Final = Role.SPECIFICATION_DRAFTER
-PROMPT_PATH: Final = Path(__file__).with_name("world-drafting.v1.json")
+#: The words the drafter asks with: version 2, which says what a share is and names no value;
+#: version 1 stays beside it, byte for byte, as the words the judged comparison asked with.
+PROMPT_PATH: Final = Path(__file__).with_name("world-drafting.v2.json")
 _PROMPT_PROFILE: Final = "exulanica.world-drafting-prompt/v1"
 #: The served specification document's profile, the one shape this module reads.
 SPECIFICATION_PROFILE: Final = "exulanica.world-specification/v1"
@@ -136,7 +138,7 @@ class DraftRefusal:
 
 @dataclass(frozen=True, slots=True)
 class DraftingPrompt:
-    """The words the drafter is asked with, read from ``world-drafting.v1.json``."""
+    """The words the drafter is asked with, read from a ``world-drafting.v<N>.json`` file."""
 
     version: int
     sha256: str

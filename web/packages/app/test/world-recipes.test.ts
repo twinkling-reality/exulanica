@@ -11,12 +11,12 @@ import { servedSpecification } from './world-specification-document.js';
  * and values from elsewhere and checks them as a person's edit is checked.
  */
 
-function panel() {
+function panel(served: Record<string, unknown> = servedSpecification()) {
   const made: { preset: string; values: Record<string, number | string> }[] = [];
   const opened: SavedWorldEntry[] = [];
   const entry = { entryId: 'made' } as SavedWorldEntry;
   const built = buildWorldRecipes({
-    specification: async () => parseWorldSpecification(servedSpecification()),
+    specification: async () => parseWorldSpecification(served),
     make: vi.fn(async (preset, values) => {
       made.push({ preset: preset.key, values: { ...values } });
       return entry;
@@ -94,5 +94,38 @@ describe('the panel that makes a world', () => {
     make.click();
     await settle();
     expect(made).toEqual([{ preset: 'market_town', values: { city_extent_x_mm: 384000, block_length_mm: 130000 } }]);
+  });
+
+  it('words a choice by the label the server states and a share out of a thousand', async () => {
+    const served = servedSpecification();
+    const values = served['values'] as Record<string, unknown>[];
+    values.push(
+      { key: 'cross_street_hierarchy', label: 'The other cross streets', kind: 'choice', unit: 'key', adjustable: true,
+        choices: ['local_street', 'narrow_street'], choice_labels: ['Local street', 'Narrow street'], requires: [],
+        reason: 'Measured: local or narrow.' },
+      { key: 'typology_weight_shophouse_permille', label: 'Share of shophouses', kind: 'integer', unit: 'permille',
+        adjustable: true, minimum: 0, maximum: 1000, step: 50, requires: [], reason: 'Authored: a weight among kinds.' },
+    );
+    for (const preset of served['presets'] as { values: Record<string, unknown> }[]) {
+      preset.values['cross_street_hierarchy'] = 'local_street';
+      preset.values['typology_weight_shophouse_permille'] = 500;
+    }
+    const { built } = panel(served);
+    await settle();
+    built.root.querySelector<HTMLButtonElement>('[data-recipe="small_town"]')!.click();
+    const select = built.root.querySelector<HTMLSelectElement>('[data-parameter="cross_street_hierarchy"]')!;
+    expect([...select.options].map((option) => [option.value, option.textContent])).toEqual([
+      ['local_street', 'Local street'], ['narrow_street', 'Narrow street'],
+    ]);
+    const output = (key: string) => built.root.querySelector(`[data-parameter="${key}"]`)!.parentElement!.querySelector('output')!.textContent;
+    expect(output('cross_street_hierarchy')).toBe('Local street');
+    select.value = 'narrow_street';
+    select.dispatchEvent(new Event('input'));
+    expect(output('cross_street_hierarchy')).toBe('Narrow street');
+    expect(output('typology_weight_shophouse_permille')).toBe('500 of 1,000');
+    // A choice's labels must match its choices one for one, or the document is refused.
+    const broken = servedSpecification();
+    (broken['values'] as Record<string, unknown>[]).push({ ...values.at(-2)!, choice_labels: ['Local street'] });
+    expect(() => parseWorldSpecification(broken)).toThrow('choice labels');
   });
 });

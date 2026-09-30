@@ -196,7 +196,7 @@ def test_a_description_becomes_a_proposal_the_specification_judges_and_a_sample(
     assert "Estrada" not in response.text and "Lantern House" not in response.text
     assert body["model_id"] == DRAFTER
     assert body["model_name"] == load_manifest().model_name(DRAFTER)
-    assert body["prompt_version"] == "world-drafting-1"
+    assert body["prompt_version"] == "world-drafting-2"
     assert [call["role"] for call in body["execution"]["calls"]] == [str(DRAFTER_ROLE)]
     # No saved name left the server, a place's included.
     sent = json.dumps(transport.requests[0]["payload"]).lower()

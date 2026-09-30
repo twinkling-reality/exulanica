@@ -45,12 +45,23 @@ export interface WorldRecipesPanel {
   ): Promise<WorldRecipesRefusal | null>;
 }
 
-/** A value as a person reads it: millimetres in metres, anything else as its number or key. */
+/** A value as a person reads it: millimetres in metres, a share in thousandths out of a thousand, a
+ * key by its words where the server states them, anything else as its number or key. */
 function shown(value: SpecificationValue, chosen: number | string): string {
   if (value.unit === 'mm' && typeof chosen === 'number') {
     return fill('worldRecipes.metres', { metres: String(chosen / 1000) });
   }
+  if (value.unit === 'permille' && typeof chosen === 'number') {
+    return fill('worldRecipes.permille', { thousandths: String(chosen) });
+  }
+  if (typeof chosen === 'string') return choiceWords(value, chosen);
   return String(chosen);
+}
+
+/** A choice in words: its label where the server states one, else its key. */
+function choiceWords(value: SpecificationValue, choice: string): string {
+  const index = value.choices?.indexOf(choice) ?? -1;
+  return index >= 0 && value.choiceLabels !== null ? value.choiceLabels[index]! : choice;
 }
 
 export function buildWorldRecipes(options: {
@@ -128,7 +139,9 @@ export function buildWorldRecipes(options: {
       let input: HTMLInputElement | HTMLSelectElement;
       if (value.kind === 'choice') {
         input = el('select', { 'aria-label': value.label, 'data-parameter': value.key },
-          value.choices!.map((choice) => el('option', { value: choice, text: choice, selected: choice === current })));
+          value.choices!.map((choice) => el('option', {
+            value: choice, text: choiceWords(value, choice), selected: choice === current,
+          })));
       } else {
         const range = effectiveRange(value, chosen);
         input = el('input', {

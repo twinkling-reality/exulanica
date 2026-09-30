@@ -67,7 +67,9 @@ from exulanica.grammar.errors import (
     InvalidParameterError,
     UnregisteredGrammarError,
 )
+from exulanica.grammar.grammars.city.catalogs import entry_fields, load_city_catalogs
 from exulanica.grammar.grammars.specified import REGISTRY, Specification, specification
+from exulanica.grammar.parameters import CLOSED_VOCABULARY
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS, SPEEDS
 
 __all__ = [
@@ -99,11 +101,11 @@ __all__ = [
 
 CATALOG_ID: Final = "world-recipe"
 #: The presets a running server offers.
-CATALOG_VERSION: Final = 2
+CATALOG_VERSION: Final = 3
 #: The specification schemas' catalog: what a preset's values, and a person's, are checked against.
 SCHEMA_ID: Final = "world-specification"
 #: The newest schema the directory holds; every earlier one stays for the presets that name it.
-SCHEMA_VERSION: Final = 1
+SCHEMA_VERSION: Final = 2
 #: The profile of the document :func:`specification_document` builds.
 SPECIFICATION_PROFILE: Final = "exulanica.world-specification/v1"
 CATALOG_DIRECTORY: Final = (
@@ -143,11 +145,12 @@ TICK_SHARE_DIVISOR: Final = 10
 #: Why the specification's ranges hold every town inside the tick budget, as measured.
 TICK_BUDGET_REASON: Final = (
     "Measured with scripts/measure_generated_world.py inside the machine-wide quiet slot, over 8 "
-    "towns three tiles long with cross streets 140 m apart and three to five storeys, the values "
-    "with the largest walking graphs this schema admits (up to 936 places in those towns): one "
-    "purposeful tick of the most people its society ground admits took 136 ms at the median and "
-    "171 ms at the 95th percentile on the largest graph, and the most people any of those towns "
-    "held, 82, took 87 and 120 ms."
+    "market towns three tiles long with cross streets 140 m apart, two to four storeys, one high "
+    "street, local cross streets and every share even, the values whose towns held the most places "
+    "over this schema's sweep (walking graphs of up to 962 nodes in those towns): one purposeful "
+    "tick of the most people its society ground admits, 128, took 130 ms at the median and 159 ms "
+    "at the 95th percentile on the largest graph, and the most people any of those towns held, "
+    "90, took 90 and 131 ms."
 )
 #: Every refusal a request for a world can meet, with its status and what it means: the codes a
 #: page, a model and an API client act on, served in :func:`specification_document`.
@@ -291,6 +294,9 @@ class SpecificationValue:
     reason: str
     #: When another value narrows this one's range, and why.
     requires: tuple[Requirement, ...] = ()
+    #: Each choice in words, in the choices' order: its label in the catalog the grammar's
+    #: vocabulary for it names; empty for a choice whose options only its descriptor lists.
+    choice_labels: tuple[str, ...] = ()
 
     @property
     def adjustable(self) -> bool:
@@ -351,9 +357,33 @@ class SpecificationValue:
             "requires": [requirement.document() for requirement in self.requires],
             "reason": self.reason,
         }
+        if self.choice_labels:
+            stated["choice_labels"] = list(self.choice_labels)
         if not self.adjustable:
             stated["value"] = self.fixed()
         return stated
+
+
+#: How each grammar's vocabularies are read, by grammar id: every catalog a version reads, by
+#: catalog id. A choice whose vocabulary is a catalog is served with each key's label from it.
+_VOCABULARY_CATALOGS: Final = {
+    "city": lambda version: {
+        catalog.catalog_id: catalog for catalog in load_city_catalogs(grammar_version=version)
+    },
+}
+
+
+def _choice_labels(
+    grammar_id: str, grammar_version: int, vocabulary: str, choices: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Each choice's label in the catalog ``vocabulary`` names, or none for a closed one."""
+    if vocabulary == CLOSED_VOCABULARY or not choices:
+        return ()
+    reader = _VOCABULARY_CATALOGS.get(grammar_id)
+    if reader is None:
+        raise CatalogError(f"no reader states the words for {grammar_id}'s vocabulary {vocabulary}")
+    catalog = reader(grammar_version)[vocabulary]
+    return tuple(str(entry_fields(catalog, choice)["label"]) for choice in choices)
 
 
 @dataclass(frozen=True, slots=True)
@@ -716,7 +746,18 @@ def _read_schema(directory: Path, version: int, sha256: str) -> SpecificationSch
             )
         values.append(
             SpecificationValue(
-                key, label, declared.kind, declared.unit, minimum, maximum, step, choices, reason
+                key,
+                label,
+                declared.kind,
+                declared.unit,
+                minimum,
+                maximum,
+                step,
+                choices,
+                reason,
+                choice_labels=_choice_labels(
+                    grammar_id, grammar_version, declared.vocabulary, choices
+                ),
             )
         )
     by_key = {value.key: value for value in values}

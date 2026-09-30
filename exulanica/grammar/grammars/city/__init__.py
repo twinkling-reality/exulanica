@@ -135,8 +135,9 @@ CITY_V4_STAGES: Final = tuple(
 )
 CITY_GRAMMAR_V4: Final = Grammar.from_descriptor(CITY_V4_DESCRIPTOR_PATH, stages=CITY_V4_STAGES)
 #: Version 5's stages: the street mix (streets at its version 4), the use mix (massing, premises and
-#: vitrine at their version 3, premises before vitrine so a shop's use chooses its window) and every
-#: surface dressed (material at its version 3).
+#: vitrine at their version 3, premises before vitrine so a shop's use chooses its window), street
+#: trees kept inside their segment's extent (streetlife at its version 3) and every surface dressed
+#: (material at its version 3).
 CITY_V5_STAGES: Final = (
     terrain_generator.STAGE,
     districts_generator.STAGE,
@@ -144,7 +145,7 @@ CITY_V5_STAGES: Final = (
     parcels_generator.STAGE,
     massing_generator.STAGE_V3,
     facade_generator.STAGE,
-    streetlife_generator.STAGE,
+    streetlife_generator.STAGE_V3,
     premises_generator.STAGE_V3,
     vitrine_generator.STAGE_V3,
     material_generator.STAGE_V3,

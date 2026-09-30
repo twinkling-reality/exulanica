@@ -23,11 +23,21 @@ carriageway so its arm reaches over the road. A lamp stands at the kerb, clear o
 frontage behind it. A curb and its face share one spacing and offset.
 
 **Exclusion.** A lamp keeps its class's exclusion radius plus ``exclusion_clearance_mm`` clear.
+
+**Stage version 3** (:data:`STAGE_V3`, which city grammar version 5 runs) keeps every tree inside
+its street segment's extent in plan, the extent the tile documents hold every record owned through a
+segment to (``[owner_extent]``); version 2 lets a crown reach past the frontage line, and the city
+is refused. A crown reaches toward the frontage no further than the footway: the tree's offset from
+the kerb face leaves room behind it for the least crown the declared range admits, and the crown
+radius is narrowed to that room. A face whose footway holds no such room carries no tree, and a
+tree whose crown would still leave the extent near the end of its curb is skipped, as a crowded
+position is.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
+from functools import partial
 from typing import Final
 
 from exulanica.grammar.contract import StageContext
@@ -36,6 +46,7 @@ from exulanica.grammar.grammars.city import parcels, streetlife, streets
 from exulanica.grammar.grammars.city.catalogs import form_parts
 from exulanica.grammar.grammars.city.common import MILLIONTHS, FormPart
 from exulanica.grammar.grammars.city.corners import along, walk_round_face
+from exulanica.grammar.grammars.city.descriptor import CITY_SURFACES
 from exulanica.grammar.grammars.city.generation.stage import (
     GeneratorStage,
     catalog,
@@ -45,7 +56,7 @@ from exulanica.grammar.grammars.city.generation.stage import (
 )
 from exulanica.grammar.grammars.city.generation.terrain import DATUM_MM
 
-__all__ = ["STAGE"]
+__all__ = ["STAGE", "STAGE_V3", "STAGE_VERSION_3"]
 
 _LAMP: Final = "street_lamp"
 #: A pit never touches the kerb or the frontage: this is what it keeps clear of each.
@@ -56,6 +67,18 @@ _CLEAR_LOW_MM: Final = 2_200
 _CAPSULE_HEIGHT_MM: Final = 1_900
 #: How far apart one block's furniture classes draw, so each class has its own rhythm and offset.
 _CLASS_STRIDE: Final = 100
+#: The stage version that places no tree reaching outside its segment's extent (the docstring's
+#: last section). Version 2 is :data:`~exulanica.grammar.grammars.city.streetlife.STAGE_VERSION`.
+STAGE_VERSION_3: Final = 3
+
+
+def _inside_plan(inner: Extent, outer: Extent) -> bool:
+    return (
+        outer.min_x_mm <= inner.min_x_mm
+        and inner.max_x_mm <= outer.max_x_mm
+        and outer.min_y_mm <= inner.min_y_mm
+        and inner.max_y_mm <= outer.max_y_mm
+    )
 
 
 def _turned(facing: tuple[int, int], local_x: int, local_y: int) -> tuple[int, int]:
@@ -114,6 +137,7 @@ def _trees(
     segment: streets.StreetSegmentRecord,
     grounds: list,
     taken: list[tuple[int, int, int]],
+    fit_owner: bool = False,
 ) -> Iterator[streetlife.StreetTreeRecord]:
     """Street trees along one curb, at the block's spacing, wherever one does not crowd its
     neighbours.
@@ -129,12 +153,19 @@ def _trees(
     spacing = derived(context, "tree_spacing_mm", face)
     clearance = derived(context, "exclusion_clearance_mm", face)
     reach = curb.kerb_width_mm + curb.footway_width_mm
+    behind = _PIT_MARGIN_MM
+    if fit_owner:
+        # Room behind the tree for the least crown, so the crown stops at the frontage line.
+        least = CITY_SURFACES[context.grammar_version].parameters.get("tree_crown_radius_mm")
+        behind = max(_PIT_MARGIN_MM, least.minimum)
+        if reach - behind < curb.kerb_width_mm + _PIT_MARGIN_MM:
+            return
     offset = derived(
         context,
         "furniture_kerb_offset_mm",
         face,
         minimum=curb.kerb_width_mm + _PIT_MARGIN_MM,
-        maximum=reach - _PIT_MARGIN_MM,
+        maximum=reach - behind,
     )
     pit = _even(
         derived(
@@ -145,7 +176,12 @@ def _trees(
         )
     )
     diameter = _even(derived(context, "tree_trunk_diameter_mm", face))
-    radius = derived(context, "tree_crown_radius_mm", face)
+    radius = derived(
+        context,
+        "tree_crown_radius_mm",
+        face,
+        maximum=reach - offset if fit_owner else None,  # type: ignore[operator]
+    )
     crown = derived(context, "tree_crown_height_mm", face)
     species = derived(context, "tree_species", face)
     walk = walk_round_face(curb)
@@ -186,6 +222,16 @@ def _trees(
             minimum=max(_CLEAR_LOW_MM, highest + _CAPSULE_HEIGHT_MM - z),
         )
         half = pit // 2
+        extent = Extent(
+            min(x - half, x - radius),  # type: ignore[operator]
+            min(y - half, y - radius),  # type: ignore[operator]
+            z,
+            max(x + half, x + radius),  # type: ignore[operator]
+            max(y + half, y + radius),  # type: ignore[operator]
+            z + clear + crown,  # type: ignore[operator]
+        )
+        if fit_owner and not _inside_plan(extent, segment.extent):
+            continue
         parts = (
             FormPart("prism", "trunk", 0, 0, 0, diameter, diameter, clear, 800_000, 8, 1),  # type: ignore[arg-type]
             FormPart(
@@ -221,20 +267,13 @@ def _trees(
             ),
             parts=parts,
             exclusion_radius_mm=keep,
-            extent=Extent(
-                min(x - half, x - radius),  # type: ignore[operator]
-                min(y - half, y - radius),  # type: ignore[operator]
-                z,
-                max(x + half, x + radius),  # type: ignore[operator]
-                max(y + half, y + radius),  # type: ignore[operator]
-                z + clear + crown,  # type: ignore[operator]
-            ),
+            extent=extent,
         )
         taken.append((x, y, keep))
         ordinal += 1
 
 
-def _generate(context: StageContext) -> Iterator[object]:
+def _generate(context: StageContext, fit_owner: bool = False) -> Iterator[object]:
     curbs = prior_records(context, streets.STAGE_ID, streets.CurbEdgeRecord)
     blocks = {
         record.identity: record
@@ -265,7 +304,7 @@ def _generate(context: StageContext) -> Iterator[object]:
             for record in _furniture(context, curb, face, segment, key, index, taken, ordinal):
                 ordinal += 1
                 yield record
-        yield from _trees(context, curb, face, segment, grounds, taken)
+        yield from _trees(context, curb, face, segment, grounds, taken, fit_owner)
 
 
 def _furniture(
@@ -394,4 +433,11 @@ STAGE: Final = GeneratorStage(
     streetlife.STAGE_VERSION,
     (streetlife.FURNITURE_SHAPE, streetlife.TREE_SHAPE),
     _generate,
+)
+#: Stage version 3: the same records, with no tree reaching outside its segment's extent.
+STAGE_V3: Final = GeneratorStage(
+    streetlife.STAGE_ID,
+    STAGE_VERSION_3,
+    STAGE.shapes,
+    partial(_generate, fit_owner=True),
 )

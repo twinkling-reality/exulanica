@@ -413,6 +413,7 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldRecipes.loading': 'Reading what a world can be made from…',
   'worldRecipes.make': 'Make this town',
   'worldRecipes.metres': '{metres} m',
+  'worldRecipes.permille': '{thousandths} of 1,000',
   'worldRecipes.refused': 'Not offered: {reason}',
   'worldRecipes.making': 'Making {recipe}…',
   'worldRecipes.close': 'Close',
@@ -481,6 +482,8 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     'These values are in the controls below. Change any of them, then make the town.',
   'worldDescription.unit.mm': '{metres} m',
   'worldDescription.unit.count': '{count}',
+  'worldDescription.unit.permille': '{thousandths} of 1,000',
+  'worldDescription.choices': '{label}: {choices}',
   'worldDescription.sample.sampled':
     'One sample town of these values: {tiles} tiles, {people} people, {buildings} buildings '
     + 'and {vehicles}.',

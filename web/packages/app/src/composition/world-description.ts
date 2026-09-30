@@ -10,11 +10,15 @@
  */
 
 import type { TransportOptions } from '@exulanica/graph-client';
-import { buildWorldDescription, type SpecificationWords } from '../ui/world-description.js';
+import {
+  buildWorldDescription,
+  type SpecificationValueWords,
+  type SpecificationWords,
+} from '../ui/world-description.js';
 import { WorldDraftClient } from '../world-draft-api.js';
 
 /**
- * The longest description the server reads: the ceiling `exulanica/selection/world-drafting.v1.json`
+ * The longest description the server reads: the ceiling `exulanica/selection/world-drafting.v2.json`
  * states, which `world-description.test.ts` holds this to.
  */
 export const DESCRIPTION_CHARACTERS = 1000;
@@ -30,6 +34,9 @@ export interface ServedSpecification {
     readonly minimum: number | null;
     readonly maximum: number | null;
     readonly step: number | null;
+    /** A choice's keys, and each in words where the server states them. */
+    readonly choices?: readonly string[] | null;
+    readonly choiceLabels?: readonly string[] | null;
   }[];
   readonly presets: readonly { readonly key: string; readonly label: string }[];
 }
@@ -43,16 +50,24 @@ export interface SpecificationPanel {
   ): Promise<unknown>;
 }
 
-/** The words the description panel shows values in: every adjustable number the served
- * specification states, with its range, and every preset's label. */
+/** The words the description panel shows values in: every adjustable value the served
+ * specification states, a number with its range and a choice with its words, and every preset's
+ * label. */
 export function specificationWords(specification: ServedSpecification): SpecificationWords {
   return {
-    values: specification.values.flatMap((value) => (
-      value.adjustable && value.kind === 'integer' && value.minimum !== null
-        && value.maximum !== null && value.step !== null
+    values: specification.values.flatMap((value): SpecificationValueWords[] => {
+      if (!value.adjustable) return [];
+      if (value.kind === 'choice' && value.choices) {
+        return [{ key: value.key, label: value.label, unit: value.unit, minimum: 0, maximum: 0, step: 0,
+          choices: value.choices.map((choice, index) => ({
+            key: choice, label: value.choiceLabels?.[index] ?? choice,
+          })) }];
+      }
+      return value.minimum !== null && value.maximum !== null && value.step !== null
         ? [{ key: value.key, label: value.label, unit: value.unit,
-          minimum: value.minimum, maximum: value.maximum, step: value.step }]
-        : [])),
+          minimum: value.minimum, maximum: value.maximum, step: value.step, choices: null }]
+        : [];
+    }),
     presets: specification.presets.map((preset) => ({ key: preset.key, label: preset.label })),
   };
 }

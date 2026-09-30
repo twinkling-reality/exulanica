@@ -45,6 +45,8 @@ export interface SpecificationValue {
   readonly step: number | null;
   /** A key's range. */
   readonly choices: readonly string[] | null;
+  /** Each choice in words, in the choices' order, where the server states them; else null. */
+  readonly choiceLabels: readonly string[] | null;
   /** The one value a fixed range holds; null for an adjustable one. */
   readonly value: number | string | null;
   /** When another value narrows this one's range, and why. */
@@ -112,6 +114,11 @@ function parseValue(raw: unknown): SpecificationValue {
   if (choices !== null && (!Array.isArray(choices) || choices.length === 0)) {
     throw new TypeError('The server returned a choice with no choices.');
   }
+  const labels = row['choice_labels'];
+  if (labels !== undefined
+    && (choices === null || !Array.isArray(labels) || labels.length !== (choices as unknown[]).length)) {
+    throw new TypeError('The server returned choice labels that do not match the choices.');
+  }
   const fixed = adjustable ? null : row['value'];
   if (!adjustable && typeof fixed !== 'string' && !Number.isSafeInteger(fixed)) {
     throw new TypeError('The server returned a fixed value that states no value.');
@@ -128,6 +135,8 @@ function parseValue(raw: unknown): SpecificationValue {
     maximum: kind === 'integer' ? whole(row['maximum'], 'value maximum') : null,
     step: kind === 'integer' ? whole(row['step'], 'value step') : null,
     choices: choices === null ? null : Object.freeze(choices.map((choice) => text(choice, 'choice'))),
+    choiceLabels: labels === undefined
+      ? null : Object.freeze((labels as unknown[]).map((label) => text(label, 'choice label'))),
     value: fixed as number | string | null,
     requires: Object.freeze(requires.map((raw) => {
       const item = object(raw, 'requirement');

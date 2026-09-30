@@ -48,9 +48,11 @@ reach the document the moment one does.
 **Stage version 3** (:data:`STAGE_V3`, which city grammar version 5 runs) dresses what version 2
 leaves undressed. Every face's ground band takes a material, a party wall's included: version 2
 skips a party wall's band, which the tessellator draws on every ground storey face, so a band
-behind a neighbour showed through shop glass as the unavailable pattern. And every terrain patch
-takes the first material in its role's order that dresses terrain, which edition 5 of the material
-catalog gives the tree pit soil: a city's bare ground where no street, block or lot is drawn.
+behind a neighbour showed through shop glass as the unavailable pattern. Every ground storey face
+with bays takes a trim material, for the wall where its bays' panels step in depth. And every
+terrain patch takes the first material in its role's order that dresses terrain, which edition 5
+of the material catalog gives the tree pit soil: a city's bare ground where no street, block or
+lot is drawn.
 """
 
 from __future__ import annotations
@@ -259,7 +261,15 @@ def _generate(
                 for role in ("stall_riser", "fascia", "shopfront_frame", "glazing", "door")
                 if role in panel_roles
             ]
-            if face.string_courses or face.cornice or face.openings:
+            # A ground storey's bays draw trim where their panels step in depth (a recessed door):
+            # stage version 3 dresses it on every such face, which version 2 leaves undressed
+            # unless the face also has openings or mouldings.
+            if (
+                face.string_courses
+                or face.cornice
+                or face.openings
+                or (dress_all and face.first_storey == 0 and face_bays)
+            ):
                 roles.append("trim")
             height = massing.tier_top_mm(building, building.tiers[face.tier_ordinal]) - (
                 building.base_elevation_mm

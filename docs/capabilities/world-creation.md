@@ -21,23 +21,29 @@ Reference photographs can be attached without replacing authored edits; attachme
 reconstruct or place scene geometry. A world can also be made from the person's reviewed
 photographs ([scene reconstruction](scene-reconstruction.md)), or generated as a town from a
 specification. World menu, Make a world, offers the presets of the [world recipe
-catalog](../../assets/catalogs/world-recipes/world-recipe.v2.json), a small town two 128 m tiles
+catalog](../../assets/catalogs/world-recipes/world-recipe.v3.json), a small town two 128 m tiles
 long and a market town three long, and lets a person change a preset's values within the ranges the
-[world specification](../../assets/catalogs/world-recipes/world-specification.v1.json) states: how
-many tiles long the town is, how far apart its cross streets are, and the fewest and most storeys of
-its buildings, each with its unit, a plain label and the measurement that set its range. The server
+[world specification](../../assets/catalogs/world-recipes/world-specification.v2.json) states: how
+many tiles long the town is, how far apart its cross streets are, the fewest and most storeys of its
+buildings, how many of its streets are high streets and whether its other cross streets are local or
+narrow, and the share of each kind of building (apartment blocks, loft buildings, mansion blocks,
+rowhouses and shophouses) and of each kind of shop (bakeries, bookshops, cafes, groceries, offices,
+pharmacies, restaurants and workshops), each with its unit, a plain label and the measurement that
+set its range. A share weighs a kind against the others a lot or a shop can take: a larger share
+makes it more common where it fits, and 0 leaves it only where nothing else fits. The server
 serves that schema, the same document the page renders (`GET /worlds/specification`), and holds
 every value asked for to it before anything is generated
 ([`exulanica/world/world_recipes.py`](../../exulanica/world/world_recipes.py)): a value the schema
-does not offer, one outside its range, and two values the schema says do not go together (a town two
-tiles long needs cross streets at most 120 m apart, and one three tiles long at least 130 m) are
-each refused by name with the range broken, and the page offers only what the schema allows. The
+does not offer, one outside its range, and two values the schema says do not go together (a town
+three tiles long needs cross streets at least 130 m apart) are each refused by name with the range
+broken, and the page offers only what the schema allows. The
 server generates the town from the city grammar for the world's own identity (`POST
 /worlds/generated`,
 [`exulanica/world/generated_worlds.py`](../../exulanica/world/generated_worlds.py)), keeping a seed
 candidate only if its homes hold a society that can start, saves it with a receipt of how, and bakes
 its tiles off the request. The application draws the town once its tiles are baked ([generated tile
-runtime](../generated-tile-runtime.md#73-a-saved-worlds-own-tiles)), with its people walking from
+runtime](../generated-tile-runtime.md#73-a-saved-worlds-own-tiles)), every surface it draws dressed,
+the ground beyond its blocks as bare soil, with its people walking from
 tile to tile and its vehicles driving its streets ([served
 traffic](../traffic-contract.md#served-traffic)). A generated world takes no photographs, and a
 workspace holds at most three. Every kind of saved world can host people, whose choices the world's
@@ -48,7 +54,8 @@ Traffic refused all 23 towns two tiles deep that were measured, most of them for
 every approach has priority; towns four tiles long held more people than a town's society ground
 admits; and the specification states the town's tick budget, 200 ms at the 95th percentile, a tenth
 of the fastest play interval, within which one tick of the most people the ground admits took
-171 ms on the largest walking graph the schema allows. Each bound is a range in the served schema,
+159 ms on the largest walking graph measured, in the market towns whose values held the most places
+over the schema's sweep. Each bound is a range in the served schema,
 so a larger town is a later version of it, waiting on what its bounds name: a society whose tick
 holds more people within that budget, or a larger budget for a host that runs outside the
 application's process, and a city grammar version whose towns two tiles deep lay junctions traffic
@@ -65,7 +72,10 @@ no value can say in the person's own words. "Use these values" puts them in the 
 where the person can change any of them; nothing is made until they make the town. A description
 that asks for nothing a town can be is refused in words, with the values a town here is set by. An
 agent calling the API receives the same proposal. The drafting model was chosen by a pre-registered
-comparison ([record](../evaluation/2026-09-29-world-drafting-models-v2.json)).
+comparison on version 1 of the specification and of the drafter's words
+([record](../evaluation/2026-09-29-world-drafting-models-v2.json)); version 2 of the words says what a
+share is and names no value, so a description's street mix and kinds of building and shop become the
+specification's values.
 
 Reviewed appearance controls and bounded language-driven appearance proposals
 have preview/apply/rollback contracts. Source snapshots, alternate versions,
@@ -114,25 +124,29 @@ specified in [owned district and source admission](../owned-district-and-admissi
 
 ## Gaps
 
-A generated town is one tile deep and at most three long, and its streets and uses are mixed as
-version 4 of the city grammar mixes them: no value sets how many of its streets are high streets or
-what share of its buildings are homes, shops or workplaces, because the specification offers no such
-value, although version 5 of the grammar declares them ([generator system](../grammar-package.md#7-the-city-stages)).
-A town two tiles long takes cross streets at most 120 m apart, a rule measured when the tessellator
-refused a tile that did not carry the kerb a straight kerb it owns runs on into beyond the tile's
-64 m margin; the tessellator draws such a straight join without that kerb, and a later version of the
-specification lifts the rule. Its people follow the purposeful routine (visiting shops,
-resting on benches, standing and talking), not the living society's homes and shifts. Traffic drove
-20 of 20 small towns and 17 of 20 market towns measured; a town whose roads it cannot drive is still
-made, without vehicles, and the page says why by the refusal's name. A town's people are compared
+A generated town is one tile deep and at most three long. Its second and third high streets are
+cross streets, since a town one tile deep has no room for a second high street along its length
+([generator system](../grammar-package.md#7-the-city-stages)). A share changes only the lots and
+shops its kind fits: a rowhouse or a shophouse fits a narrower lot than most a town lays, a high
+street's ground floors are shops whatever the shares say, and upper floors are homes. Every corner
+is one 4 m radius, because radii drawn per block left some towns' roads refused by traffic or a cross
+street too short for a car. Its people follow the purposeful routine (visiting shops,
+resting on benches, standing and talking), not the living society's homes and shifts. Traffic
+compiled the roads of every one of the 720 towns the specification's sweep made (two towns at every
+point of its lengths, storeys, high streets and cross streets with every share even, and at 24 of
+those points one town with each share alone at its most and one with every share at none), and in
+the 192 driven for an episode 7 to 29 vehicles made 6,566 of 6,567 trips; a town whose roads
+traffic cannot drive is still made, without vehicles, and the page says why by the refusal's name.
+A town's people are compared
 from the Compare view, a model deciding for a group of them within the most a comparison lets it
 ([what a comparison can read](../society-experiments.md#running-a-comparison)). The page still
 offers Add photos in a generated world, which the server refuses by name.
 
-A description sets only the values the specification offers; a street or shop mix, water, hills,
-a particular building or a value past its range is named back as not in the town rather than
-approximated. The sample's counts describe one town of the values, not the town a person makes, and
-the drafting model's choice rests on twelve fixed descriptions of one specification.
+A description sets only the values the specification offers; water, hills, a particular building
+or a value past its range is named back as not in the town rather than approximated. The sample's
+counts describe one town of the values, not the town a person makes, and the drafting model's choice
+rests on twelve fixed descriptions of version 1 of the specification; version 2's street mix and
+shares were checked on four fixed descriptions, not compared.
 
 Reusable real-world extraction, persistent geographic anchors, unified search
 across memories/imports/creations, geometric blending and general language-driven

@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-recipe",
+  "catalog_version": 3,
+  "entries": [
+    {
+      "key": "small_town",
+      "label": "A small town",
+      "composer": "city-grammar-town",
+      "composer_version": 1,
+      "specification": "world-specification.v2",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "candidates": 4,
+      "candidates_reason": "A world's seed is drawn from this preset, the values it is made with and the world's own identity, trying candidates 0, 1, 2 and 3 in that order and keeping the first that generates, whose tile documents pass the grammar's own checks and whose homes hold people a society can start with; a world none of them makes is refused by name rather than given a seed chosen any other way. Measured over 20 world identities, the first candidate was kept for every one. Four is also the request's bound: generation runs inside the request that makes a world.",
+      "tiles": 2,
+      "reason": "Measured: two 128 m tiles of city grammar version 5 with cross streets 90 m apart, buildings of two to four storeys, one high street, local cross streets and every share even, the smallest town whose streets hold traffic. Over 20 world identities every one was made, holding 30 to 56 people, and the traffic of every one drove, with 7 to 15 vehicles, and all 420 of their trips arrived.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    },
+    {
+      "key": "market_town",
+      "label": "A market town",
+      "composer": "city-grammar-town",
+      "composer_version": 1,
+      "specification": "world-specification.v2",
+      "values": {
+        "city_extent_x_mm": 384000,
+        "block_length_mm": 140000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "candidates": 4,
+      "candidates_reason": "A world's seed is drawn from this preset, the values it is made with and the world's own identity, trying candidates 0, 1, 2 and 3 in that order and keeping the first that generates, whose tile documents pass the grammar's own checks and whose homes hold people a society can start with; a world none of them makes is refused by name rather than given a seed chosen any other way. Measured over 20 world identities, every one was made from its first two candidates, the first for 17 and the second for 3, whose first placed a rooftop object whose clearance was above its record's range. Four is also the request's bound: generation runs inside the request that makes a world.",
+      "tiles": 3,
+      "reason": "Measured: three 128 m tiles of city grammar version 5 with cross streets 140 m apart along a high street, buildings of two to four storeys, local cross streets and every share even, the largest town offered whose homes stay within the people one tick of its society was measured to hold. Over 20 world identities every one was made, holding 56 to 98 people, and the traffic of every one drove, with 16 to 30 vehicles, and all 804 of their trips arrived.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    }
+  ]
+}

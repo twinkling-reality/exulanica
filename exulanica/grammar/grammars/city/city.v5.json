@@ -146,7 +146,7 @@
     },
     {
       "stage_id": "streetlife",
-      "stage_version": 2,
+      "stage_version": 3,
       "records": [
         {
           "kind": "city.street_furniture",

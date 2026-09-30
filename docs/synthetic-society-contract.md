@@ -479,9 +479,10 @@ is, because a ground module need not state an edge.
   per place in a home the world's premises offer (each premises' use class's resident capacity),
   recorded in the input, and a world whose homes hold nobody, or more than the entry's figure of
   128 (the town's tick budget, 200 ms at the 95th percentile, a tenth of the 2,000 ms fastest play
-  interval, within which one tick of 128 people on the largest walking graph the world
-  specification admits, 936 places, took 135.8 ms at the median and 171.0 ms at the 95th
-  percentile, measured with `scripts/measure_generated_world.py`), starts no
+  interval, within which one tick of 128 people on the largest walking graph measured for the
+  world specification, 962 nodes in a market town at the values whose towns hold the most places,
+  took 130.4 ms at the median and 159.4 ms at the 95th percentile, measured with
+  `scripts/measure_generated_world.py`), starts no
   society (`409 world_holds_no_residents`, `409 population_over_tick_budget`). The town's composer
   holds each seed candidate to the same rule before it keeps one (`refuse_population`), so a town
   is made only if its society can start. A town of several tiles is one walking graph, read from

@@ -298,9 +298,10 @@ and a stop line before it, or whose blocks lose the footway room, is refused by 
 specifications version 3 lays are not worlds at version 4 (`tests/test_city_grammar_v4.py`).
 
 **Version 5** reads a district's street mix and use mix and dresses every surface a town draws. It
-runs the streets stage at stage version 4, the massing, premises and vitrine stages at stage version
-3, with premises before vitrine, and the material stage at stage version 3; every other stage runs
-as version 4 runs it. Fifteen district parameters are added, each with its range and reason:
+runs the streets stage at stage version 4, the massing, streetlife, premises and vitrine stages at
+stage version 3, with premises before vitrine, and the material stage at stage version 3; every
+other stage runs as version 4 runs it. Fifteen district parameters are added, each with its range
+and reason:
 
 - `high_street_count`, 1 to 8: the street along x through the district's middle is a high street,
   and each further one is the cross street nearest the middle, the western of two equally near
@@ -326,7 +327,11 @@ street that runs on through it, then to the busier by the hierarchy catalog's ra
 street along x; on every layout version 4 lays this is the priority version 4 gives, and no junction
 gives every approach priority. A shop's use is drawn before its windows are dressed, among the uses
 its typology admits that a fitout fitting its shopfronts serves, and the vitrine stage then dresses
-the windows for that use. The material stage dresses every ground storey face's ground band, a
+the windows for that use. A street tree stays inside its segment's extent, which version 4 leaves
+a crown free to leave past the frontage line, so the city is refused: the tree's offset from the kerb
+leaves room behind it for the least crown the declared range admits, the crown is narrowed to that
+room, a face whose footway holds no such room carries no tree, and a tree whose crown would still
+leave the extent near the end of its curb is skipped. The material stage dresses every ground storey face's ground band, a
 party wall's included, which version 4 leaves undressed where the tessellator draws it, and every
 terrain patch, with the tree pit soil, which the material catalog's edition 5 lets dress terrain.
 Measured on a town two tiles long with cross streets 140 m apart, its two tiles baked with 649 and

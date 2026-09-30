@@ -32,10 +32,11 @@ const python = (path: string): string => readFileSync(new FileUrl(path, REPOSITO
 const WORDS: SpecificationWords = {
   values: [
     { key: 'city_extent_x_mm', label: 'Length of the town', unit: 'mm',
-      minimum: 256000, maximum: 384000, step: 128000 },
+      minimum: 256000, maximum: 384000, step: 128000, choices: null },
     { key: 'block_length_mm', label: 'Length of a block', unit: 'mm',
-      minimum: 90000, maximum: 140000, step: 10000 },
-    { key: 'storey_band_high', label: 'Most storeys', unit: 'count', minimum: 4, maximum: 5, step: 1 },
+      minimum: 90000, maximum: 140000, step: 10000, choices: null },
+    { key: 'storey_band_high', label: 'Most storeys', unit: 'count', minimum: 4, maximum: 5, step: 1,
+      choices: null },
   ],
   presets: [{ key: 'market_town', label: 'A market town' }],
 };
@@ -93,11 +94,11 @@ describe('the drafting route document', () => {
   });
 
   it('holds the page to the description ceiling the server reads', () => {
-    const prompt = JSON.parse(python('exulanica/selection/world-drafting.v1.json')) as Record<string, unknown>;
+    const prompt = JSON.parse(python('exulanica/selection/world-drafting.v2.json')) as Record<string, unknown>;
     expect(DESCRIPTION_CHARACTERS).toBe(prompt['description_characters_maximum']);
   });
 
-  it('words only the adjustable numbers of the served specification', () => {
+  it('words every adjustable value of the served specification, a choice by its words', () => {
     const words = specificationWords({
       values: [
         { key: 'block_length_mm', label: 'Distance between cross streets', kind: 'integer', unit: 'mm',
@@ -106,10 +107,17 @@ describe('the drafting route document', () => {
           adjustable: false, minimum: 56000, maximum: 56000, step: 1000 },
         { key: 'driving_side', label: 'Side', kind: 'choice', unit: 'key',
           adjustable: false, minimum: null, maximum: null, step: null },
+        { key: 'cross_street_hierarchy', label: 'The other cross streets', kind: 'choice', unit: 'key',
+          adjustable: true, minimum: null, maximum: null, step: null,
+          choices: ['local_street', 'narrow_street'], choiceLabels: ['Local street', 'Narrow street'] },
       ],
       presets: [{ key: 'small_town', label: 'A small town' }],
     });
-    expect(words.values.map((value) => value.key)).toEqual(['block_length_mm']);
+    expect(words.values.map((value) => value.key)).toEqual(['block_length_mm', 'cross_street_hierarchy']);
+    expect(words.values[1]!.choices).toEqual([
+      { key: 'local_street', label: 'Local street' },
+      { key: 'narrow_street', label: 'Narrow street' },
+    ]);
     expect(words.presets).toEqual([{ key: 'small_town', label: 'A small town' }]);
   });
 
@@ -117,6 +125,7 @@ describe('the drafting route document', () => {
     for (const status of SAMPLE_STATUSES) expect(say(SAMPLE_WORDS[status])).not.toBe(SAMPLE_WORDS[status]);
     for (const code of DRAFT_REFUSALS) expect(say(REFUSAL_WORDS[code])).not.toBe(REFUSAL_WORDS[code]);
     expect(UNIT_WORDS['mm']!(128000)).toBe('128 m');
+    expect(UNIT_WORDS['permille']!(750)).toBe('750 of 1,000');
   });
 });
 
