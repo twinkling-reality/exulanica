@@ -109,7 +109,7 @@ def test_up_parses_every_flag_and_defaults_to_slot_zero_without_them():
 
 def test_every_command_needs_a_worktree_and_status_and_down_take_no_run_flags():
     parser = LAUNCH.build_parser()
-    for command in ("up", "status", "down"):
+    for command in ("up", "status", "down", "restart-api"):
         with pytest.raises(SystemExit), redirect_stderr(io.StringIO()):
             parser.parse_args([command])
     for command in ("status", "down"):
@@ -137,6 +137,172 @@ def test_each_slot_owns_five_consecutive_ports_inside_the_table():
 def test_a_slot_outside_the_table_is_refused_by_name():
     assert _refusal(LAUNCH.ports, LAUNCH.SLOT_COUNT) == "slot-out-of-range"
     assert _refusal(LAUNCH.ports, -1) == "slot-out-of-range"
+
+
+def test_the_multi_client_options_are_off_by_default_so_a_plain_run_is_unchanged():
+    plain = LAUNCH.build_parser().parse_args(["up", "--worktree", "w"])
+
+    assert (plain.port_base, plain.workspaces, plain.read_only_token) == (None, 1, False)
+    for slot in range(LAUNCH.SLOT_COUNT):
+        assert LAUNCH.ports(slot, None) == LAUNCH.ports(slot)
+    assert LAUNCH.token_file_name(1) == "token"
+
+
+def test_a_moved_table_starts_at_the_port_base_and_keeps_five_ports_a_slot():
+    parser = LAUNCH.build_parser()
+    moved = parser.parse_args(["up", "--worktree", "w", "--port-base", "19430", "--slot", "1"])
+
+    assert moved.port_base == 19430
+    assert list(LAUNCH.ports(0, 19430).values()) == list(range(19430, 19435))
+    assert list(LAUNCH.ports(1, 19430).values()) == list(range(19435, 19440))
+    assert list(LAUNCH.ports(1, 19430)) == list(LAUNCH.PORT_ROLES)
+
+
+def test_a_port_base_that_puts_a_port_outside_the_unprivileged_range_is_refused():
+    assert _refusal(LAUNCH.ports, 0, LAUNCH.PORT_MINIMUM - 1) == "port-base-out-of-range"
+    assert _refusal(LAUNCH.ports, 0, LAUNCH.PORT_MAXIMUM - 3) == "port-base-out-of-range"
+    assert _refusal(LAUNCH.ports, LAUNCH.SLOT_COUNT, 19430) == "slot-out-of-range"
+    assert LAUNCH.ports(0, LAUNCH.PORT_MAXIMUM - 4)["spare"] == LAUNCH.PORT_MAXIMUM
+
+
+def test_workspaces_are_counted_from_one_to_the_maximum_and_each_later_one_has_its_own_file():
+    assert LAUNCH.workspace_count(1) == 1
+    assert LAUNCH.workspace_count(LAUNCH.WORKSPACES_MAXIMUM) == LAUNCH.WORKSPACES_MAXIMUM
+    assert _refusal(LAUNCH.workspace_count, 0) == "workspaces-out-of-range"
+    assert _refusal(LAUNCH.workspace_count, LAUNCH.WORKSPACES_MAXIMUM + 1) == (
+        "workspaces-out-of-range"
+    )
+    names = [LAUNCH.token_file_name(index) for index in range(1, LAUNCH.WORKSPACES_MAXIMUM + 1)]
+    assert names[:2] == ["token", "token-2"]
+    assert len(set(names)) == len(names)
+    assert "token-read" not in names
+
+
+def test_the_read_only_token_grants_world_read_alone():
+    parser = LAUNCH.build_parser()
+    assert parser.parse_args(["up", "--worktree", "w", "--read-only-token"]).read_only_token
+    assert (Permission.WORLD_READ.value,) == LAUNCH.READ_ONLY_PERMISSIONS
+    assert set(LAUNCH.READ_ONLY_PERMISSIONS) < set(LAUNCH.PERMISSIONS)
+
+
+def test_up_refuses_a_workspace_count_out_of_range_before_it_starts_anything(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(
+        ["up", "--worktree", str(worktree), "--workspaces", "0"]
+    )
+
+    assert _refusal(LAUNCH.up, arguments) == "workspaces-out-of-range"
+    assert not LAUNCH.state_dir(worktree).exists()
+
+
+def _recorded_run(run_dir: Path, *, others: int = 0, read_only: bool = False) -> dict:
+    """A run's state as ``up`` records it, with its token files written."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "token").write_text("primary-token")
+    state: dict = {
+        "workspace_id": "w1",
+        "actor": "a1",
+        "permissions": list(LAUNCH.PERMISSIONS),
+    }
+    if others:
+        state["other_workspaces"] = []
+        for index in range(2, others + 2):
+            name = LAUNCH.token_file_name(index)
+            (run_dir / name).write_text(f"token-of-{index}")
+            state["other_workspaces"].append(
+                {
+                    "workspace_id": f"w{index}",
+                    "actor": f"a{index}",
+                    "token_file": str(run_dir / name),
+                }
+            )
+    if read_only:
+        (run_dir / "token-read").write_text("read-token")
+        state["read_only_token"] = {
+            "token_file": str(run_dir / "token-read"),
+            "workspace_id": "w1",
+            "actor": "r1",
+            "permissions": list(LAUNCH.READ_ONLY_PERMISSIONS),
+        }
+    return state
+
+
+def test_restart_rebuilds_every_grant_the_run_started_with_by_token_file(tmp_path):
+    state = _recorded_run(tmp_path / "run", others=1, read_only=True)
+
+    grants = LAUNCH.recorded_grants(state, tmp_path / "run")
+
+    assert sorted(grants) == ["token", "token-2", "token-read"]
+    assert grants["token"] == {
+        "workspace_id": "w1",
+        "actor": "a1",
+        "permissions": list(LAUNCH.PERMISSIONS),
+    }
+    assert grants["token-2"]["workspace_id"] == "w2"
+    assert grants["token-read"]["permissions"] == list(LAUNCH.READ_ONLY_PERMISSIONS)
+
+
+def test_a_plain_run_restarts_with_its_one_grant(tmp_path):
+    grants = LAUNCH.recorded_grants(_recorded_run(tmp_path / "run"), tmp_path / "run")
+    assert list(grants) == ["token"]
+
+
+def test_a_recorded_token_file_that_is_gone_is_refused_rather_than_dropped(tmp_path):
+    state = _recorded_run(tmp_path / "run", others=1)
+    (tmp_path / "run" / "token-2").unlink()
+
+    assert _refusal(LAUNCH.recorded_grants, state, tmp_path / "run") == "token-file-unknown"
+
+
+def test_restart_api_takes_a_revoked_token_file_and_no_run_flags():
+    parser = LAUNCH.build_parser()
+    plain = parser.parse_args(["restart-api", "--worktree", "w"])
+    revoking = parser.parse_args(["restart-api", "--worktree", "w", "--revoke", "token-2"])
+
+    assert (plain.revoke, revoking.revoke) == (None, "token-2")
+    with pytest.raises(SystemExit), redirect_stderr(io.StringIO()):
+        parser.parse_args(["restart-api", "--worktree", "w", "--production"])
+    with pytest.raises(SystemExit), redirect_stderr(io.StringIO()):
+        parser.parse_args(["up", "--worktree", "w", "--revoke", "token-2"])
+
+
+def test_restart_api_with_nothing_recorded_is_refused(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(["restart-api", "--worktree", str(worktree)])
+
+    assert _refusal(LAUNCH.restart_api, arguments) == "no-state"
+
+
+def test_the_api_command_is_unchanged_without_a_plan_and_scripted_with_one(tmp_path):
+    python, worktree = tmp_path / "python", tmp_path / "tree"
+    plain = LAUNCH.api_command(python, worktree, 19431, None)
+    scripted = LAUNCH.api_command(python, worktree, 19431, tmp_path / "plan.json")
+
+    assert plain == [str(python), "-c", LAUNCH.API_WRAPPER, str(worktree), "19431"]
+    assert scripted[:2] == [str(python), "-c"]
+    assert scripted[2] == LAUNCH.SCRIPTED_API_WRAPPER
+    assert scripted[3:] == [str(worktree), "19431", str(tmp_path / "plan.json")]
+    # ``down`` and ``restart-api`` stop an API by this marker in its command line.
+    assert LAUNCH.API_MARKER in LAUNCH.SCRIPTED_API_WRAPPER
+
+
+def test_a_scripted_run_is_refused_with_a_model_or_without_its_plan(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    plan = tmp_path / "plan.json"
+    plan.write_text("{}")
+    parser = LAUNCH.build_parser()
+
+    both = parser.parse_args(
+        ["up", "--worktree", str(worktree), "--model", "--scripted-model", str(plan)]
+    )
+    missing = parser.parse_args(
+        ["up", "--worktree", str(worktree), "--scripted-model", str(tmp_path / "absent.json")]
+    )
+
+    assert _refusal(LAUNCH.up, both) == "scripted-with-model"
+    assert _refusal(LAUNCH.up, missing) == "scripted-plan-missing"
+    assert parser.parse_args(["up", "--worktree", "w"]).scripted_model is None
+    assert not LAUNCH.state_dir(worktree).exists()
 
 
 # -- refusals before anything starts ---------------------------------------------------------------
@@ -509,4 +675,10 @@ def test_the_launcher_states_nothing_that_belongs_to_one_machine():
     assert [text for text in strings if any(marker in text for marker in machine_paths)] == []
     assert [text for text in strings if fixed_hosts.search(text)] == []
     assert unnamed == []
-    assert named_port_sized == {"PORT_BASE", "RECORD_EXCERPT_CHARACTERS", "LOG_TAIL_CHARACTERS"}
+    assert named_port_sized == {
+        "PORT_BASE",
+        "PORT_MINIMUM",
+        "PORT_MAXIMUM",
+        "RECORD_EXCERPT_CHARACTERS",
+        "LOG_TAIL_CHARACTERS",
+    }

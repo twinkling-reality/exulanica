@@ -199,6 +199,30 @@ state and records stay in the system temporary directory. `status` names the til
 state and its successful and failed bake events; `down` stops only what `up` started, and
 every refusal prints `refused (<name>)` and exits 2.
 
+Runs with more than one client use four further options, each off by default so a run without them
+starts what it always did. `--port-base` moves the slot table to start at another port, for a run
+that must sit inside a port block leased elsewhere. `--workspaces K` makes K synthetic workspaces,
+each with its own actor, token file (`token`, then `token-2` onward) and embedding partition, served
+by the one API; tiles, the tile worker and playback serve the first alone. `--read-only-token`
+writes `token-read`, which grants the first workspace `world.read` alone. `--scripted-model PLAN`
+serves the API through `scripts/acceptance/scripted_model.py`, whose model transport answers from
+the plan while the model client, hosted-request policy, budget and receipts run as they do with a
+provider; it refuses to start when any provider credential, provider variable or egress allowlist
+is set, labels itself in `/readyz` with the plan's digest, and establishes mechanics only, never
+model quality. The wheel and every image leave `scripts/` out, which
+`tests/test_acceptance_scripted_model.py` checks. `restart-api` stops the recorded API and starts
+it again on the same port, database, store and grants, and with `--revoke <token file>` leaves that
+grant out, so a client can reopen its work from a fresh process or be shown a withdrawn credential
+refused.
+
+`scripts/acceptance/foundation.py baseline` checks a finite set of acceptance rows against such a
+stack as an independent client: world creation for each world kind, the no-model mode, workspace
+isolation with two client processes at once, the edit lifecycle, and the observable part of a
+connected journey in which a bench placed in a saved starter world becomes a place its people rest.
+Each row ends passed, failed or blocked with the missing prerequisite named; there is no skipped
+state. A claim that an operation writes nothing is checked by dumping the run's database and
+listing its store around it, after a plain read has shown the same check sees no change.
+
 **Reading the result.** The run directory holds `result.json`, described by
 `scripts/rehearsal/result.schema.json`, a `summary.txt` table, a JPEG screenshot of every observed
 moment and at least one of every browser step, and each browser session's log. A step's evidence

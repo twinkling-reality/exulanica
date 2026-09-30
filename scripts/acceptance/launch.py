@@ -4,8 +4,10 @@
     python3 scripts/acceptance/launch.py up     --worktree PATH [--slot N] [--reuse-database]
                                                 [--model] [--no-derivative-worker] [--production]
                                                 [--society-playback [--society-tick-interval-ms MS]]
-                                                [--tiles]
+                                                [--tiles] [--port-base PORT] [--workspaces K]
+                                                [--read-only-token] [--scripted-model PLAN]
     python3 scripts/acceptance/launch.py status --worktree PATH
+    python3 scripts/acceptance/launch.py restart-api --worktree PATH [--revoke TOKEN_FILE]
     python3 scripts/acceptance/launch.py down   --worktree PATH
 
 ``--worktree`` names any checkout of this repository, a linked worktree or a plain clone, with its
@@ -47,6 +49,27 @@ imports the code it starts.
 With ``--society-playback``, ``up`` refuses unless the API's readiness says its playback worker runs
 for exactly one listed workspace, and records the base wait that readiness states.
 
+Three options serve runs that need more than one client, each off by default so a run without them
+starts exactly what it always did:
+
+- ``--port-base PORT`` moves the slot table to start at ``PORT`` instead of ``PORT_BASE``, so a run
+  can sit inside a port block another table leases; ``--slot`` still counts slots of five from it.
+- ``--workspaces K`` makes K synthetic workspaces instead of one, each with its own actor, token
+  file (``token``, then ``token-2`` to ``token-K``) and embedding partition, all granted the same
+  permissions and served by the one API. The first is the run's workspace: tiles, the tile worker
+  and playback serve it alone.
+- ``--scripted-model PLAN`` serves the API through ``scripted_model.py``, whose model transport
+  answers from the plan and which refuses to start if a provider could be reached. The plan is
+  copied into the run directory and its digest recorded; every model request is logged beside it.
+- ``--read-only-token`` adds one more token, ``token-read``, for the first workspace with
+  ``world.read`` alone, so a client can be shown a refusal its grant earns.
+
+``restart-api`` stops the recorded API and starts it again on the same port, database, store and
+grants, rebuilt from the run's token files and recorded state, so a client can reopen its work from a
+fresh process. ``--revoke NAME`` leaves the named token file's grant out of the restarted API, so a
+client can be shown that a withdrawn credential is refused while the rest of the run continues.
+Each restart is recorded in the run state with its time, process and any revoked grant.
+
 ``down`` stops only what this launcher started, checked by process id and command line, and never
 deletes a database cluster or a run record. Run state lives in the system temporary directory.
 
@@ -85,6 +108,14 @@ SLOT_WIDTH = 5
 SLOT_COUNT = 7
 PORT_ROLES = ("database", "api", "vite", "browser", "spare")
 PORT_LIMIT = PORT_BASE + SLOT_WIDTH * SLOT_COUNT - 1
+
+#: The ports a moved slot table may use: unprivileged ones, the whole run inside the port range.
+PORT_MINIMUM = 1024
+PORT_MAXIMUM = 65535
+#: How many synthetic workspaces ``--workspaces`` may make.
+WORKSPACES_MAXIMUM = 8
+#: The one permission ``--read-only-token`` grants.
+READ_ONLY_PERMISSIONS = ("world.read",)
 
 #: Where run state and run records live, under the system temporary directory: disposable, and
 #: never inside a checkout.
@@ -172,6 +203,11 @@ REFUSALS = {
     "command-failed": "a command the run needs exited non-zero",
     "society-interval-without-playback": "--society-tick-interval-ms needs --society-playback",
     "society-playback-not-running": "the API's readiness does not report playback of the workspace",
+    "port-base-out-of-range": "--port-base puts a port of the slot outside the unprivileged range",
+    "workspaces-out-of-range": "--workspaces is outside 1 to WORKSPACES_MAXIMUM",
+    "token-file-unknown": "--revoke names no token file this run wrote",
+    "scripted-with-model": "--scripted-model and --model cannot both be given",
+    "scripted-plan-missing": "--scripted-model names no readable plan file",
 }
 
 
@@ -206,6 +242,33 @@ uvicorn.run("exulanica.api.app:create_app", factory=True, host="127.0.0.1",
 
 #: The marker the API wrapper prints, and that ``down`` requires in the command line it stops.
 API_MARKER = "ACCEPTANCE-EXULANICA"
+
+#: The same checks, then the scripted-model API instead of the plain one
+#: (``scripts/acceptance/scripted_model.py``, which binds loopback itself).
+SCRIPTED_API_WRAPPER = r"""
+import pathlib, runpy, sys
+root = pathlib.Path(sys.argv[1]).resolve()
+import exulanica
+where = pathlib.Path(exulanica.__file__).resolve()
+if not where.is_relative_to(root):
+    print(f"ACCEPTANCE-REFUSED exulanica imported from {where}, not {root}", flush=True)
+    raise SystemExit(3)
+print(f"ACCEPTANCE-EXULANICA {where}", flush=True)
+script = root / "scripts" / "acceptance" / "scripted_model.py"
+sys.argv = [str(script), sys.argv[3], sys.argv[2]]
+runpy.run_path(str(script), run_name="__main__")
+"""
+#: Where a scripted run keeps its plan and its log of every model request, in the run directory.
+SCRIPTED_PLAN_NAME = "scripted-model-plan.json"
+SCRIPTED_LOG_NAME = "scripted-model-calls.jsonl"
+
+
+def api_command(python: Path, worktree: Path, port: int, plan: Path | None) -> list[str]:
+    """The API's command line: the plain application, or with a plan the scripted-model one."""
+    if plan is None:
+        return [str(python), "-c", API_WRAPPER, str(worktree), str(port)]
+    return [str(python), "-c", SCRIPTED_API_WRAPPER, str(worktree), str(port), str(plan)]
+
 
 #: Provision the workspace's embedding partition as the owner, then print the partition. Without
 #: one, the first embedding write fails with "no partition of relation embedding found".
@@ -243,12 +306,29 @@ LANE_SERVER_PROBE = (
 # -- slots, locations and environments ------------------------------------------------------------
 
 
-def ports(slot: int) -> dict[str, int]:
-    """The five ports of ``slot``, by role."""
+def ports(slot: int, port_base: int | None = None) -> dict[str, int]:
+    """The five ports of ``slot``, by role, in the table starting at ``port_base`` when one is
+    given and at ``PORT_BASE`` otherwise."""
     if not 0 <= slot < SLOT_COUNT:
         refuse("slot-out-of-range", f"slot {slot}; slots are 0 to {SLOT_COUNT - 1}")
-    base = PORT_BASE + SLOT_WIDTH * slot
+    table = PORT_BASE if port_base is None else port_base
+    base = table + SLOT_WIDTH * slot
+    if not (base >= PORT_MINIMUM and base + SLOT_WIDTH - 1 <= PORT_MAXIMUM):
+        refuse("port-base-out-of-range", f"slot {slot} from {table} starts at {base}")
     return {role: base + offset for offset, role in enumerate(PORT_ROLES)}
+
+
+def workspace_count(requested: int) -> int:
+    """How many synthetic workspaces a run makes, or a refusal."""
+    if not 1 <= requested <= WORKSPACES_MAXIMUM:
+        refuse("workspaces-out-of-range", f"{requested}; 1 to {WORKSPACES_MAXIMUM}")
+    return requested
+
+
+def token_file_name(index: int) -> str:
+    """The token file of the run's ``index``-th workspace, counted from 1: ``token`` for the first,
+    as a run of one has always had."""
+    return "token" if index == 1 else f"token-{index}"
 
 
 def runtime_root() -> Path:
@@ -710,6 +790,11 @@ def write_state(state_file: Path, state: Mapping[str, object]) -> None:
 def up(arguments: argparse.Namespace) -> None:
     worktree = checkout(arguments.worktree)
     python = check_toolchain(worktree)
+    if arguments.scripted_model is not None:
+        if arguments.model:
+            refuse("scripted-with-model", REFUSALS["scripted-with-model"])
+        if not Path(arguments.scripted_model).is_file():
+            refuse("scripted-plan-missing", str(arguments.scripted_model))
     if arguments.model:
         model_environment()  # refuse before anything starts, not after the database has
     if not arguments.society_playback:
@@ -718,7 +803,8 @@ def up(arguments: argparse.Namespace) -> None:
     state_file = directory / "state.json"
     if state_file.exists():
         refuse("state-exists", str(state_file))
-    chosen = ports(arguments.slot)
+    chosen = ports(arguments.slot, arguments.port_base)
+    count = workspace_count(arguments.workspaces)
     for role in ("api", "vite", "browser"):
         if listening(chosen[role]):
             refuse("port-in-use", f"port {chosen[role]} ({role})")
@@ -838,6 +924,48 @@ def up(arguments: argparse.Namespace) -> None:
         if declared != str(TILES_LIMIT):
             refuse("tile-quota", f"workspace {workspace_id} declared {declared!r}")
         tiles_limit = TILES_LIMIT
+    # Further synthetic workspaces, each its own tenant under the one API, and a read-only token.
+    others = []
+    for index in range(2, count + 1):
+        other_workspace, other_actor = str(uuid.uuid4()), str(uuid.uuid4())
+        other_token = secrets.token_urlsafe(48)
+        other_file = run_dir / token_file_name(index)
+        other_file.write_text(other_token)
+        other_file.chmod(0o600)
+        grant[other_token] = {
+            "workspace_id": other_workspace,
+            "actor": other_actor,
+            "permissions": synthetic_permissions(arguments.tiles),
+        }
+        other_partition = run(
+            [str(python), "-c", PROVISION_WORKSPACE, exports["OWNER_URL"], other_workspace],
+            worktree,
+        ).strip()
+        if other_partition != f"embedding_ws_{uuid.UUID(other_workspace).hex}":
+            refuse("workspace-partition", f"workspace {other_workspace} left {other_partition!r}")
+        with (logs / "workspace-provision.txt").open("a") as provisioned:
+            provisioned.write(f"{other_workspace} -> {other_partition}\n")
+        others.append(
+            {
+                "index": index,
+                "workspace_id": other_workspace,
+                "actor": other_actor,
+                "token_file": str(other_file),
+                "embedding_partition": other_partition,
+            }
+        )
+    read_only_grant = None
+    if arguments.read_only_token:
+        read_only = secrets.token_urlsafe(48)
+        read_only_file = run_dir / "token-read"
+        read_only_file.write_text(read_only)
+        read_only_file.chmod(0o600)
+        grant[read_only] = {
+            "workspace_id": workspace_id,
+            "actor": str(uuid.uuid4()),
+            "permissions": list(READ_ONLY_PERMISSIONS),
+        }
+        read_only_grant = {"token_file": str(read_only_file), **grant[read_only]}
 
     environment = api_environment(
         exports=exports,
@@ -850,9 +978,19 @@ def up(arguments: argparse.Namespace) -> None:
             arguments.society_tick_interval_ms,
         ),
     )
+    plan = None
+    if arguments.scripted_model is not None:
+        plan = run_dir / SCRIPTED_PLAN_NAME
+        plan.write_bytes(Path(arguments.scripted_model).read_bytes())
+        environment["EXULANICA_SCRIPTED_MODEL_LOG"] = str(logs / SCRIPTED_LOG_NAME)
+        state["scripted_model"] = {
+            "plan": str(plan),
+            "plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(),
+            "log": str(logs / SCRIPTED_LOG_NAME),
+        }
     api_log = logs / "api.log"
     api_pid = spawn(
-        [str(python), "-c", API_WRAPPER, str(worktree), str(chosen["api"])],
+        api_command(python, worktree, chosen["api"], plan),
         worktree,
         environment,
         api_log,
@@ -870,6 +1008,12 @@ def up(arguments: argparse.Namespace) -> None:
             "tiles_limit": tiles_limit,
         }
     )
+    if arguments.port_base is not None:
+        state["port_base"] = arguments.port_base
+    if others:
+        state["other_workspaces"] = others
+    if read_only_grant is not None:
+        state["read_only_token"] = read_only_grant
     state["pids"]["api"] = api_pid
     write_state(state_file, state)
 
@@ -913,6 +1057,7 @@ def up(arguments: argparse.Namespace) -> None:
         serve_development(worktree, chosen, token, logs, state, state_file)
     shown = ("worktree", "tree", "ports", "run_dir", "workspace_id", "api_imported_exulanica_from")
     extra = ("society_playback",) if arguments.society_playback else ()
+    extra += tuple(key for key in ("other_workspaces", "read_only_token") if key in state)
     print(json.dumps({key: state[key] for key in (*shown, "api_health", "app", *extra)}, indent=2))
     print(f"app: http://localhost:{chosen['vite']}/  token file: {token_file}")
 
@@ -1043,6 +1188,98 @@ def status(arguments: argparse.Namespace) -> None:
     print(json.dumps({key: state.get(key) for key in shown}, indent=2))
 
 
+def recorded_grants(state: Mapping[str, object], run_dir: Path) -> dict[str, dict[str, object]]:
+    """Every grant the run's API was started with, by token file name, rebuilt from the token
+    files and the state that recorded whom each token names."""
+    grants: dict[str, dict[str, object]] = {
+        token_file_name(1): {
+            "workspace_id": state["workspace_id"],
+            "actor": state["actor"],
+            "permissions": list(state["permissions"]),
+        }
+    }
+    for other in state.get("other_workspaces", []):
+        grants[Path(other["token_file"]).name] = {
+            "workspace_id": other["workspace_id"],
+            "actor": other["actor"],
+            "permissions": list(state["permissions"]),
+        }
+    read_only = state.get("read_only_token")
+    if isinstance(read_only, Mapping):
+        grants[Path(read_only["token_file"]).name] = {
+            "workspace_id": read_only["workspace_id"],
+            "actor": read_only["actor"],
+            "permissions": list(read_only["permissions"]),
+        }
+    for name in grants:
+        if not (run_dir / name).is_file():
+            refuse("token-file-unknown", f"{name} is recorded but absent from {run_dir}")
+    return grants
+
+
+def restart_api(arguments: argparse.Namespace) -> None:
+    worktree = recorded_checkout(arguments.worktree)
+    state_file = state_dir(worktree) / "state.json"
+    if not state_file.exists():
+        refuse("no-state", str(state_file))
+    state = json.loads(state_file.read_text())
+    run_dir = Path(state["run_dir"])
+    logs = run_dir / "logs"
+    grants = recorded_grants(state, run_dir)
+    revoked = arguments.revoke
+    if revoked is not None:
+        if revoked not in grants:
+            refuse("token-file-unknown", f"{revoked}; this run wrote {', '.join(sorted(grants))}")
+        grants.pop(revoked)
+    if state.get("model"):
+        model_environment()  # refuse before the running API is stopped, not after
+    exports = served_exports((logs / "database-serve.txt").read_text())
+    grant = {(run_dir / name).read_text(): granted for name, granted in grants.items()}
+    playback = state.get("society_playback")
+    environment = api_environment(
+        exports=exports,
+        grant=grant,
+        data_dir=Path(state["data_dir"]),
+        model=bool(state.get("model")),
+        derivative_worker=state.get("derivative_worker") != "off",
+        society_playback=society_playback_environment(
+            state["workspace_id"] if playback else None,
+            playback.get("base_tick_interval_ms") if isinstance(playback, Mapping) else None,
+        ),
+    )
+    scripted = state.get("scripted_model")
+    if isinstance(scripted, Mapping):
+        environment["EXULANICA_SCRIPTED_MODEL_LOG"] = scripted["log"]
+    stop(state["pids"]["api"], API_MARKER, "api")
+    chosen = state["ports"]
+    if listening(chosen["api"]):
+        refuse("port-in-use", f"port {chosen['api']} (api) is still held after the stop")
+    api_pid = spawn(
+        api_command(
+            worktree / ".venv" / "bin" / "python",
+            worktree,
+            chosen["api"],
+            Path(scripted["plan"]) if isinstance(scripted, Mapping) else None,
+        ),
+        worktree,
+        environment,
+        logs / "api.log",
+    )
+    state["pids"]["api"] = api_pid
+    restart = {
+        "at": dt.datetime.now(dt.UTC).isoformat(),
+        "pid": api_pid,
+        "revoked_token_file": revoked,
+        "grants": sorted(grants),
+    }
+    state.setdefault("restarts", []).append(restart)
+    write_state(state_file, state)
+    healthz, _ = wait_http(f"{api_url(chosen)}/healthz", API_START_SECONDS)
+    restart["healthz"] = healthz
+    write_state(state_file, state)
+    print(json.dumps(restart, indent=2))
+
+
 def recorded_checkout(path: str) -> Path:
     """The checkout ``up`` recorded: its top as git finds it, or the path once it is gone."""
     if Path(path).exists():
@@ -1086,9 +1323,15 @@ def down(arguments: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("up", "status", "down"):
+    for name in ("up", "status", "down", "restart-api"):
         command = commands.add_parser(name)
         command.add_argument("--worktree", required=True, help="the checkout to run")
+        if name == "restart-api":
+            command.add_argument(
+                "--revoke",
+                metavar="TOKEN_FILE",
+                help="leave this token file's grant out of the restarted API (default: none)",
+            )
         if name == "up":
             command.add_argument("--slot", type=int, default=0, help="the port slot, 0 to 6")
             command.add_argument("--reuse-database", action="store_true")
@@ -1122,6 +1365,29 @@ def build_parser() -> argparse.ArgumentParser:
                 "tile quota of TILES_LIMIT (default: neither)",
             )
             command.add_argument(
+                "--port-base",
+                type=int,
+                help="start the slot table at this port instead of PORT_BASE (default: PORT_BASE)",
+            )
+            command.add_argument(
+                "--workspaces",
+                type=int,
+                default=1,
+                help="how many synthetic workspaces to make, each with its own token file, "
+                "1 to WORKSPACES_MAXIMUM (default: 1)",
+            )
+            command.add_argument(
+                "--scripted-model",
+                metavar="PLAN",
+                help="serve the API with scripts/acceptance/scripted_model.py answering model "
+                "requests from PLAN; refused with --model (default: no model)",
+            )
+            command.add_argument(
+                "--read-only-token",
+                action="store_true",
+                help="also write token-read, granting the first workspace world.read alone",
+            )
+            command.add_argument(
                 "--society-tick-interval-ms",
                 type=int,
                 help="with --society-playback, the host's base wait between simulated minutes "
@@ -1135,7 +1401,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if shutil.which("lsof") is None:
             refuse("lsof-missing", REFUSALS["lsof-missing"])
-        {"up": up, "status": status, "down": down}[arguments.command](arguments)
+        commands = {"up": up, "status": status, "down": down, "restart-api": restart_api}
+        commands[arguments.command](arguments)
     except Refused as refused:
         print(f"refused ({refused.name}): {refused.detail}", file=sys.stderr)
         return 2
