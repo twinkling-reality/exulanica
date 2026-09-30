@@ -254,14 +254,17 @@ syntax trees, requires each to be a registered path with a scripted run, and run
 code the product runs over a person and a place saved through `name_occurrence` and written on a
 photograph's sign. No request carries either name, system messages included; every request the
 transport recorded was admitted by the policy, text for text; and the paths whose call site
-prepares names itself (the planner, the composer, the request classifier and the two drafters) hold
-with that preparation disabled.
+prepares names itself (the planner, the composer, the request classifier and the appearance,
+environment and specification drafters) hold with that preparation disabled.
 
 **Which requests honour a place right.** Every request of a role the uses file offers
 (`exulanica/consent/place-name-uses.v1.json`) leaves a place's name to the boundary, and the file
 names each such request path by module and function: the caption-vector pass and the embedding of a
 question's query for the embedding role, the composer for `reasoning_cheap`, and the planner, the
 request classifier, the appearance drafter and the environment drafter for `structured_extraction`.
+The specification drafter, which drafts a world's specification from a person's description
+([`exulanica/selection/world_drafting.py`](../exulanica/selection/world_drafting.py)), is no use:
+it replaces every saved name, a place's included, before the description is sent.
 A place whose right names a role's whole chain at its endpoint reaches that role's requests by name,
 and a stop holds it back from the next request; a person's name reaches none of them, with or
 without a right. The caption pass sends a photograph's text as it is stored, so a sign naming an

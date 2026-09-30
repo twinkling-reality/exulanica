@@ -12773,6 +12773,66 @@
      }
     }
    }
+  },
+  "/worlds/specification/drafts": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Draft a world's specification from a description; nothing is made.",
+    "description": "Ask the specification drafter for a proposal of ``body.description``, validate it as a\nperson's own values are validated, and sample one town of it when it is valid; make nothing.\n\nAnswered 503 where the instance has no model credential, before the specification is read.",
+    "operationId": "draft_world_worlds_specification_drafts_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DraftBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WorldDraftView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -16088,6 +16148,30 @@
     "title": "CorrectionBody",
     "description": "The person's own words. `answer_text` is what stands afterwards.\n\n`correction_note` is why they corrected it, which is a different sentence from the correction\nand is the one a later reader needs to understand what the system got wrong."
    },
+   "CountedView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "count"
+    ],
+    "title": "CountedView"
+   },
    "CreateGeneratedWorldBody": {
     "properties": {
      "recipe": {
@@ -16616,6 +16700,45 @@
      "attachment_id"
     ],
     "title": "DetachSelectionBody"
+   },
+   "DraftBody": {
+    "properties": {
+     "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Description"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "description"
+    ],
+    "title": "DraftBody"
+   },
+   "DraftRefusalView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "enum": [
+       "description_not_supported",
+       "not_drafted"
+      ],
+      "title": "Code"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "code",
+     "detail"
+    ],
+    "title": "DraftRefusalView"
    },
    "Edit": {
     "properties": {
@@ -21325,6 +21448,79 @@
     ],
     "title": "ProposalRow"
    },
+   "ProposalView": {
+    "properties": {
+     "preset": {
+      "type": "string",
+      "title": "Preset"
+     },
+     "values": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "string"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Values"
+     },
+     "set_by_words": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Set By Words"
+     },
+     "fit": {
+      "type": "string",
+      "enum": [
+       "all",
+       "part"
+      ],
+      "title": "Fit"
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid"
+     },
+     "value_refusal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ValueRefusalView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "sample": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SampleView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "preset",
+     "values",
+     "set_by_words",
+     "fit",
+     "valid",
+     "value_refusal",
+     "sample"
+    ],
+    "title": "ProposalView"
+   },
    "ProvenanceView": {
     "properties": {
      "origin": {
@@ -22540,6 +22736,116 @@
      "minimum_distinct_positions"
     ],
     "title": "SafetySummary"
+   },
+   "SampleView": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "enum": [
+       "sampled",
+       "refused",
+       "overran",
+       "busy",
+       "unavailable"
+      ],
+      "title": "Status"
+     },
+     "tiles": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tiles"
+     },
+     "people": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "People"
+     },
+     "vehicles": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vehicles"
+     },
+     "vehicles_refused": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vehicles Refused"
+     },
+     "streets": {
+      "items": {
+       "$ref": "#/components/schemas/CountedView"
+      },
+      "type": "array",
+      "title": "Streets"
+     },
+     "premises": {
+      "items": {
+       "$ref": "#/components/schemas/CountedView"
+      },
+      "type": "array",
+      "title": "Premises"
+     },
+     "buildings": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Buildings"
+     },
+     "refused": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refused"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "status",
+     "tiles",
+     "people",
+     "vehicles",
+     "vehicles_refused",
+     "streets",
+     "premises",
+     "buildings",
+     "refused"
+    ],
+    "title": "SampleView",
+    "description": "One sample town of the proposed values, or why there is none. A made town draws its own\nidentity, so its counts differ from the sample's."
    },
    "SaveBody": {
     "properties": {
@@ -26275,6 +26581,117 @@
     ],
     "title": "ValidationError"
    },
+   "ValueRefusalView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     },
+     "key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Key"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     },
+     "minimum": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minimum"
+     },
+     "maximum": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Maximum"
+     },
+     "step": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step"
+     },
+     "choices": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Choices",
+      "default": []
+     },
+     "with_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "With Key"
+     },
+     "with_value": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "With Value"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "code",
+     "detail"
+    ],
+    "title": "ValueRefusalView",
+    "description": "The validation's refusal of a proposed value, by name, with what it broke."
+   },
    "VersionEditView": {
     "properties": {
      "edit_id": {
@@ -26464,6 +26881,99 @@
      "limits"
     ],
     "title": "WorldCountPolicyView"
+   },
+   "WorldDraftView": {
+    "properties": {
+     "description": {
+      "type": "string",
+      "title": "Description"
+     },
+     "proposal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ProposalView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "not_supported": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Not Supported"
+     },
+     "refusal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DraftRefusalView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "specification_version": {
+      "type": "integer",
+      "title": "Specification Version"
+     },
+     "specification_sha256": {
+      "type": "string",
+      "title": "Specification Sha256"
+     },
+     "prompt_version": {
+      "type": "string",
+      "title": "Prompt Version"
+     },
+     "prompt_sha256": {
+      "type": "string",
+      "title": "Prompt Sha256"
+     },
+     "model_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Id"
+     },
+     "model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Name"
+     },
+     "execution": {
+      "$ref": "#/components/schemas/ExecutionView"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "description",
+     "proposal",
+     "not_supported",
+     "refusal",
+     "specification_version",
+     "specification_sha256",
+     "prompt_version",
+     "prompt_sha256",
+     "model_id",
+     "model_name",
+     "execution"
+    ],
+    "title": "WorldDraftView",
+    "description": "What a description drafted: a proposal to confirm, or a refusal, and how it was made."
    },
    "WorldRecipeView": {
     "properties": {

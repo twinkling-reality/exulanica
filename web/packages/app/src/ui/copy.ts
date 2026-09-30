@@ -442,6 +442,59 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     'City and memory layers are intentionally composed. Purple memory forms are not city semantics.',
   'world.about.district-memory-hidden':
     'Official BUILDING footprints. Memory and fantasy layers are separate from the geographic view.',
+  // Describing a town in the person's own words: an open model drafts its values, the server
+  // checks them and samples one town of them, and nothing is made until the person makes it.
+  'worldDescription.heading': 'Describe it',
+  'worldDescription.introduction':
+    'Say what town you want in your own words. An open model drafts its values from them; the '
+    + 'server checks them, and nothing is made until you make the town.',
+  'worldDescription.label': 'Your description of the town',
+  'worldDescription.placeholder': 'A quiet town with short blocks and low buildings',
+  'worldDescription.draft': 'Draft the values',
+  'worldDescription.drafting': 'Drafting the values from your words…',
+  'worldDescription.empty': 'Say what town you want first.',
+  'worldDescription.failed': 'No draft was made: {reason}',
+  'worldDescription.yourWords': 'You asked for: \u201c{words}\u201d',
+  'worldDescription.refused': 'Nothing in that is a town this server can make.',
+  'worldDescription.notDrafted':
+    'The model could not fill in the town\'s values. Try saying it another way.',
+  'worldDescription.supported': 'A town here is set by these values:',
+  'worldDescription.range': '{label}: {minimum} to {maximum}',
+  'worldDescription.proposed': '{model} drafted these values, starting from {preset}:',
+  'worldDescription.unknownModel': 'The model',
+  'worldDescription.value': '{label}: {value}',
+  'worldDescription.valueFromWords': '{label}: {value}, from your words',
+  'worldDescription.valueRefused':
+    'The server refuses {label} at {value} with these values: it takes {minimum} to {maximum}, '
+    + 'in steps of {step}. Change a value, or describe it again.',
+  'worldDescription.valuesDisagree':
+    'The server refuses {label} at {value} while {other} is {otherValue}: with that it takes '
+    + '{minimum} to {maximum}, in steps of {step}. Change a value, or describe it again.',
+  'worldDescription.notSupported': 'Not in this town, because no value here makes it: {phrases}',
+  'worldDescription.quoted': '\u201c{phrase}\u201d',
+  'worldDescription.use': 'Use these values',
+  'worldDescription.used':
+    'These values are in the controls below. Change any of them, then make the town.',
+  'worldDescription.unit.mm': '{metres} m',
+  'worldDescription.unit.count': '{count}',
+  'worldDescription.sample.sampled':
+    'One sample town of these values: {tiles} tiles, {people} people, {buildings} buildings '
+    + 'and {vehicles}.',
+  'worldDescription.sample.vehicles': '{count} vehicles',
+  'worldDescription.sample.noVehicles': 'no vehicles, because its roads give none ({code})',
+  'worldDescription.sample.streets': 'Streets: {list}',
+  'worldDescription.sample.premises': 'Premises: {list}',
+  'worldDescription.sample.counted': '{label} {count}',
+  'worldDescription.sample.differs':
+    'A town made from these values draws its own streets, so its numbers will differ.',
+  'worldDescription.sample.refused':
+    'A town of these values could not be generated ({code}). Change a value, or describe it again.',
+  'worldDescription.sample.overran':
+    'The sample town took too long to make, so there are no numbers to show. The values are valid.',
+  'worldDescription.sample.busy':
+    'The server is making other sample towns. Draft again in a moment for numbers.',
+  'worldDescription.sample.unavailable':
+    'No sample town could be made just now. The values are valid.',
 });
 
 /**

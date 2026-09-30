@@ -96,6 +96,7 @@ from exulanica.api.routes import (
     world_assets,
     world_behaviours,
     world_compositions,
+    world_drafts,
     world_entries,
     world_environments,
     world_flight,
@@ -161,6 +162,7 @@ from exulanica.world import (
 )
 from exulanica.world.flight_input import close_flight_worker
 from exulanica.world.society import SocietyBytesNotRead
+from exulanica.world.specification_samples import close_sample_worker
 from exulanica.world.traffic_host import close_traffic_worker
 
 __all__ = ["create_app"]
@@ -295,6 +297,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         await asyncio.to_thread(close_flight_worker)
         # So does the traffic's, at the first traffic read.
         await asyncio.to_thread(close_traffic_worker)
+        # And the samples', at the first drafted specification.
+        await asyncio.to_thread(close_sample_worker)
 
 
 def create_app(services: Services | None = None, *, verify: bool = True) -> FastAPI:
@@ -376,6 +380,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(worlds.router)
     app.include_router(generated_worlds.router)
     app.include_router(generated_worlds.tiles_router)
+    app.include_router(world_drafts.router)
     # After the last router and before the application is handed to anybody: a route nobody
     # declared, or a declaration for a route that is gone, is a build failure with its name in it.
     require_complete_declaration(app)

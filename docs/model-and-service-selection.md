@@ -28,6 +28,7 @@ checked again before an execution campaign.
 | --- | --- | --- |
 | Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. A pre-registered held-out comparison kept Nano against Super and Ultra: neither cleared the margin on hard grounded questions ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). |
 | Choosing the lines of an answer about what happened among a world's simulated people | Nebius Token Factory: Nemotron 3 Super 120B; Lightning fallback | `exulanica/selection/society_question.py::compose_society_answer` asks `ANSWER_COMPOSER` once, and once more after a refused choice while its 10 s deadline leaves time; it chooses recorded lines and writes no text. A pre-registered comparison of the five text models whose licence entries are resolved chose it by answer time: 8 of 8 choices accepted, median 6.5 s, slowest of 8 44.2 s, in a window when the provider was slow ([record](evaluation/2026-09-29-society-composer-models.json)). Eight questions over one simulated square do not establish quality on other worlds. |
+| Drafting a world's specification from a person's description | Nebius Token Factory: Nemotron 3 Super 120B; Qwen3-235B-A22B-Instruct-2507 fallback | `exulanica/selection/world_drafting.py::draft_world_specification` asks `SPECIFICATION_DRAFTER` for a form built from the served specification: a preset, the values it allows, and the parts of the description it cannot say, copied word for word. The server's gate judges the draft and nothing is made until the person makes the world. A pre-registered comparison of the five text models whose licence entries are resolved chose it: 12 of 12 drafts the gate would make on the first try, 11 of 12 matching the words by rule, median 3.6 s, slowest of 12 7.8 s ([record](evaluation/2026-09-29-world-drafting-models-v2.json)). Twelve descriptions of one specification do not establish quality on other words or other specifications. |
 | Request classification, search planning, appearance drafts and environment drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request`, `draft_appearance` and `draft_environment_operation` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
 | Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. On synthetic held-out photographs M3 omitted and misplaced fewer objects than MiniCPM, which also reported people who were not there ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). Synthetic drawings do not establish accuracy on real photographs. |
 | A person's decisions in a world | The open model the world's owner chose for that person, among those the manifest offers the person's decision role (`society_decision`, declared by the decision role registry); none unless chosen | `exulanica/api/decision_host.py` asks through `ModelClient.choose` before a minute of play, and the planner takes only a validated answer ([below](#providers-chosen-roles-and-a-persons-decisions)). Each offered model's mechanism was verified by a pre-registered probe ([record](evaluation/2026-09-25-society-person-models-probe.json)); measurements compare what four models decide, and two judged comparisons found no measured difference between the models they compared ([below](#judged-comparisons-of-models-deciding-for-people)). |
@@ -50,9 +51,10 @@ whose world's owner chose a model, asked by the host's playback before a minute.
 against the offered choice and replayed from stored receipts rather than recalled during stepping,
 as are the explicitly requested proposals a v3 society stored before that engine was retired.
 
-Nemotron Super and Ultra are configured roles but have no production caller in the reviewed
-Python code. Fallback in the hosted client is provider-error handling, not a quality escalation
-policy. DINOv2 appearance embeddings, YuNet/SFace biometric recognition, speech models, a learned
+Nemotron Ultra is a configured role with no production caller in the reviewed Python code;
+Nemotron Super's production callers are the answer composer and the specification drafter.
+Fallback in the hosted client is provider-error handling, not a quality escalation policy.
+DINOv2 appearance embeddings, YuNet/SFace biometric recognition, speech models, a learned
 reranker and MapAnything appear in earlier plans or candidate discussions, not in implemented
 model paths found by this review. Do not count them as delivered capabilities.
 
@@ -66,12 +68,14 @@ rule does not produce, and refuses a basis measured on a model other than the pr
 is read from the retained evaluation records by
 [`scripts/survey_hosted_call_latency.py`](../scripts/survey_hosted_call_latency.py) and recorded in
 [the latency record](evaluation/2026-09-24-hosted-call-latency.json); the answer composer's is its
-own comparison's record ([record](evaluation/2026-09-29-society-composer-models.json)).
+own comparison's record ([record](evaluation/2026-09-29-society-composer-models.json)), and so is the
+specification drafter's ([record](evaluation/2026-09-29-world-drafting-models-v2.json)).
 
 | Role | Primary's longest measured call | Timeout |
 | --- | --- | --- |
 | `reasoning_cheap` (Companion answers) | 28,031 ms of 217 calls | 60 s |
 | `answer_composer` (lines of an answer about simulated people) | 44,181 ms of 8 calls | 90 s |
+| `specification_drafter` (drafts of a world's specification) | 7,771 ms of 12 calls | 20 s |
 | `structured_extraction` (classification, planning, drafts) | 12,326 ms of 217 calls | 25 s |
 | `embedding` (query and caption vectors) | 16,676 ms of 19 calls | 35 s |
 | `vision` (photograph observations) | 11,001 ms of 137 rows, each an upper bound | 25 s |

@@ -1,0 +1,179 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "bound_usd": "0.12",
+    "decision": {
+      "eligible": [
+        "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "nvidia/Nemotron-3_5-Lightning",
+        "nvidia/nemotron-3-super-120b-a12b"
+      ],
+      "fallback": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "order": [
+        "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "nvidia/Nemotron-3_5-Lightning",
+        "deepseek-ai/DeepSeek-V4-Flash-0731"
+      ],
+      "primary": "nvidia/nemotron-3-super-120b-a12b"
+    },
+    "head": "6a70cb65730bd9a8d89b121445fd7047b62d06f1",
+    "manifest_sha256": "d29f5c122f61488a64cd7418c87317045883a7cfdab501977a21debfd5e6c1d7",
+    "measured": {
+      "roles": {
+        "specification_drafter": {
+          "primary": "nvidia/nemotron-3-super-120b-a12b",
+          "primary_measured": {
+            "longest_ms": 8177,
+            "p50_ms": 3632,
+            "p99_ms": 8177,
+            "rows": 12
+          }
+        }
+      }
+    },
+    "preregistration": "docs/evaluation/2026-09-29-world-drafting-models-preregistration.json",
+    "preregistration_record_sha256": "04f19d5d42619efc82481f9090efc98a474c34d5ef45af850c1e46c5db62a5e1",
+    "rule": {
+      "choice": "the eligible NVIDIA model (identifier beginning nvidia/) with the lowest p95 draft time is chosen when that p95 is at most speed_bound_ms; otherwise the eligible model with the lowest p95 draft time. Ties go to more matched, then to the lower total cost.",
+      "draft_time": "one description's draft time is the sum of its drafter attempts' latencies, as the client measured each",
+      "eligible": "a candidate is eligible when at least 10 of the 12 descriptions were valid on the first try and at least 10 of the 12 matched",
+      "fallback": "the fallback is the next eligible model in the same order (NVIDIA first when within speed_bound_ms, then by p95), or none when no other model is eligible",
+      "matched": "every pre-registered check of the description holds, after at most one repair",
+      "p95_with_twelve": "with 12 descriptions per model the p95 by nearest rank is the slowest of 12",
+      "speed_bound_ms": 15000,
+      "speed_bound_reason": "a person waits on the page for a draft and then for a sample town of it (about 1 to 3 s more); an NVIDIA default must draft within 15 s at its slowest to be worth preferring. Through the manifest's timeout rule (twice the longest, rounded up to 5 s) a 15 s longest call gives a 30 s timeout, and a draft with its repair a 60 s wait",
+      "valid_first_try": "the first form the model returned was accepted by the drafter (inside the schema, every copied phrase found in the description) and, where it drafted a town, the gate a person's values pass would make it: the specification's own check accepted its preset and values (town_recipe), and a sample town of them generated (the drafting route's own sample, compute_sample, for the identity it derives from the values), since some values the check accepts no candidate generates",
+      "why_nvidia_first": "AGENTS.md prefers NVIDIA models where they meet the task; meeting it here is being eligible and drafting within speed_bound_ms at the 95th percentile"
+    },
+    "run_artifact": "docs/evaluation/artifacts/2026-09-29-world-drafting-models/run.json",
+    "run_sha256": "b42a9c8ea3e77d94778b77968635a43186cecd3fd8e44b0d145f6d9d9a9d295c",
+    "script_as_run": "docs/evaluation/artifacts/2026-09-29-world-drafting-models/measure_world_drafting_models-as-run.py.txt",
+    "script_sha256": "bc022a14ca65959b1bc65515d1ce2185f4a94e69735d42ec89f8a6dbc9c7e0a9",
+    "specification_sha256": "d716dabc6f93deb6fbfb2d33f667eb174ecace94413b8bd0d492abffebcc2856",
+    "spent_usd": "0.05520078",
+    "summaries": [
+      {
+        "calls": {
+          "longest_ms": 8580,
+          "p50_ms": 1580,
+          "p99_ms": 8580,
+          "rows": 12,
+          "timed_out": 0
+        },
+        "cost_known": true,
+        "cost_usd": "0.00542380",
+        "descriptions": 12,
+        "draft_ms": {
+          "longest": 8580,
+          "p50": 1580,
+          "p95_slowest_of_12": 8580
+        },
+        "matched": 8,
+        "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "not_drafted": 0,
+        "repaired": 0,
+        "valid_first_try": 12
+      },
+      {
+        "calls": {
+          "longest_ms": 60002,
+          "p50_ms": 13310,
+          "p99_ms": 60002,
+          "rows": 12,
+          "timed_out": 1
+        },
+        "cost_known": false,
+        "cost_usd": "0.01165598",
+        "descriptions": 12,
+        "draft_ms": {
+          "longest": 60002,
+          "p50": 13310,
+          "p95_slowest_of_12": 60002
+        },
+        "matched": 10,
+        "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "not_drafted": 0,
+        "repaired": 0,
+        "valid_first_try": 11
+      },
+      {
+        "calls": {
+          "longest_ms": 28772,
+          "p50_ms": 8994,
+          "p99_ms": 28772,
+          "rows": 12,
+          "timed_out": 0
+        },
+        "cost_known": true,
+        "cost_usd": "0.00472074",
+        "descriptions": 12,
+        "draft_ms": {
+          "longest": 28772,
+          "p50": 8994,
+          "p95_slowest_of_12": 28772
+        },
+        "matched": 10,
+        "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "not_drafted": 0,
+        "repaired": 0,
+        "valid_first_try": 11
+      },
+      {
+        "calls": {
+          "longest_ms": 58130,
+          "p50_ms": 18389,
+          "p99_ms": 58130,
+          "rows": 12,
+          "timed_out": 0
+        },
+        "cost_known": true,
+        "cost_usd": "0.01709346",
+        "descriptions": 12,
+        "draft_ms": {
+          "longest": 58130,
+          "p50": 18389,
+          "p95_slowest_of_12": 58130
+        },
+        "matched": 11,
+        "model_id": "nvidia/Nemotron-3_5-Lightning",
+        "not_drafted": 0,
+        "repaired": 0,
+        "valid_first_try": 12
+      },
+      {
+        "calls": {
+          "longest_ms": 8177,
+          "p50_ms": 3632,
+          "p99_ms": 8177,
+          "rows": 12,
+          "timed_out": 0
+        },
+        "cost_known": true,
+        "cost_usd": "0.01630680",
+        "descriptions": 12,
+        "draft_ms": {
+          "longest": 8177,
+          "p50": 3632,
+          "p95_slowest_of_12": 8177
+        },
+        "matched": 11,
+        "model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "not_drafted": 0,
+        "repaired": 0,
+        "valid_first_try": 12
+      }
+    ],
+    "tree": {
+      "diff_head_sha256": "da9b55c69176890b8ca9d2982900f6f9fc3251920d019c686ece4b999141728c",
+      "head": "6a70cb65730bd9a8d89b121445fd7047b62d06f1"
+    },
+    "window": {
+      "ended": "2026-09-29T18:47:09-0400",
+      "started": "2026-09-29T18:34:35-0400"
+    },
+    "within_bound": true
+  },
+  "record_sha256": "abf51784c0d217a3e88993e62364789d0cf82921d67dc23a0063b8620603a9a4"
+}

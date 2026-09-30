@@ -50,6 +50,7 @@ import type { AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { buildWorldMenu } from './ui/world-menu.js';
 import { buildWorldRecipes } from './ui/world-recipes.js';
+import { attachWorldDescription } from './composition/world-description.js';
 import { WorldSpecificationClient } from './world-specification.js';
 import { GENERATED_WORLD_READY_EVENT, type GeneratedWorldReady } from './composition/generated-world-ready.js';
 import { buildWorldIdentity } from './ui/world-identity.js';
@@ -386,6 +387,7 @@ function showWorldRecipes(): void {
     onClose: () => panel.root.remove(),
   });
   shell.append(panel.root);
+  attachWorldDescription(panel, { credentials, specification: () => specification.specification() });
 }
 
 /** Show the list. Only `mountNoWorld` calls this, and only when there is a choice to make. */

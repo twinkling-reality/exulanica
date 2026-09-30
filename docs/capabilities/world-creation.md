@@ -54,6 +54,19 @@ holds more people within that budget, or a larger budget for a host that runs ou
 application's process, and a city grammar version whose towns two tiles deep lay junctions traffic
 can drive.
 
+A person can also describe the town they want in their own words: Make a world, Describe it. An
+open model reads the specification the server serves and drafts a preset and values from the words
+(`POST /worlds/specification/drafts`,
+[`exulanica/selection/world_drafting.py`](../../exulanica/selection/world_drafting.py)). The server
+checks them with the gate a person's own values pass, generates one sample town of them off the
+request and says what it holds (its people, vehicles, streets and premises, labelled a sample,
+because a town made from the same values draws its own identity), and names each part of the words
+no value can say in the person's own words. "Use these values" puts them in the panel's controls,
+where the person can change any of them; nothing is made until they make the town. A description
+that asks for nothing a town can be is refused in words, with the values a town here is set by. An
+agent calling the API receives the same proposal. The drafting model was chosen by a pre-registered
+comparison ([record](../evaluation/2026-09-29-world-drafting-models-v2.json)).
+
 Reviewed appearance controls and bounded language-driven appearance proposals
 have preview/apply/rollback contracts. Source snapshots, alternate versions,
 authored object add/move/remove/undo, bounded motion and reload/conflict recovery
@@ -110,11 +123,15 @@ does not carry the kerb that a kerb it carries continues into when that kerb lie
 rule once a tile carries every such kerb. Its people follow the purposeful routine (visiting shops,
 resting on benches, standing and talking), not the living society's homes and shifts. Traffic drove
 20 of 20 small towns and 17 of 20 market towns measured; a town whose roads it cannot drive is still
-made, without vehicles, and the page says why by the refusal's name. No model proposes a
-specification yet. A town's people are compared from the Compare view, a model deciding for a group
-of them within the most a comparison lets it ([what a comparison can
-read](../society-experiments.md#running-a-comparison)). The page still offers Add photos in a
-generated world, which the server refuses by name.
+made, without vehicles, and the page says why by the refusal's name. A town's people are compared
+from the Compare view, a model deciding for a group of them within the most a comparison lets it
+([what a comparison can read](../society-experiments.md#running-a-comparison)). The page still
+offers Add photos in a generated world, which the server refuses by name.
+
+A description sets only the values the specification offers; a street or shop mix, water, hills,
+a particular building or a value past its range is named back as not in the town rather than
+approximated. The sample's counts describe one town of the values, not the town a person makes, and
+the drafting model's choice rests on twelve fixed descriptions of one specification.
 
 Reusable real-world extraction, persistent geographic anchors, unified search
 across memories/imports/creations, geometric blending and general language-driven

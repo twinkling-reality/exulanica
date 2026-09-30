@@ -828,3 +828,16 @@
 #shell .composition-verdict-retry { margin-top: 10px; }
 #shell .confirm .confirm-actions button:disabled { opacity: .55; }
 /* -- end composition verdict -- */
+/* Describing a town in the person's own words, inside the Make a world panel. */
+#shell .world-description { display: grid; gap: 8px; }
+#shell .world-description h3 { margin: 0; font: 400 16px/1.25 var(--ui-font-display); }
+#shell .world-description-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  font-size: 13px;
+}
+#shell .world-description-draft,
+#shell .world-description-use { justify-self: start; }
+#shell .world-description-result { display: grid; gap: 4px; }

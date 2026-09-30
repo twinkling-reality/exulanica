@@ -1,0 +1,222 @@
+/**
+ * "Describe it": a town asked for in the person's own words, drafted into values they confirm.
+ *
+ * The person types what they want; the server's specification drafter proposes a preset and
+ * values (`POST /worlds/specification/drafts`), judges them by the specification's own
+ * validation and samples one town of them. This panel shows the words back, the proposal in plain
+ * words, the sample's people, vehicles, streets and premises, and the parts of the words no value
+ * can say, each in the person's own words. "Use these values" hands the preset and values to the
+ * specification panel (its `setValues` hook), where the person can change any value and make the
+ * town; nothing is made here. A description that asks for nothing a town can be is refused in
+ * words, with what a town here is set by, read from the served specification.
+ *
+ * Every word is in `copy.ts`; the tables below map each status and unit the server names to a key
+ * there, and `world-description.test.ts` holds them to the server's own lists.
+ */
+
+import type {
+  DraftRefusalCode,
+  SampleStatus,
+  TownSample,
+  WorldDraft,
+} from '../world-draft-api.js';
+import { fill, say } from './copy.js';
+import { el, replace } from './dom.js';
+
+/** A value a person may set, as the served specification states it, for its words. */
+export interface SpecificationValueWords {
+  readonly key: string;
+  readonly label: string;
+  readonly unit: string;
+  readonly minimum: number;
+  readonly maximum: number;
+  readonly step: number;
+}
+
+/** What the panel words a draft with, read from the served specification. */
+export interface SpecificationWords {
+  readonly values: readonly SpecificationValueWords[];
+  readonly presets: readonly { readonly key: string; readonly label: string }[];
+}
+
+/** The words for each sample status the server names. */
+export const SAMPLE_WORDS: Readonly<Record<SampleStatus, string>> = Object.freeze({
+  sampled: 'worldDescription.sample.sampled',
+  refused: 'worldDescription.sample.refused',
+  overran: 'worldDescription.sample.overran',
+  busy: 'worldDescription.sample.busy',
+  unavailable: 'worldDescription.sample.unavailable',
+});
+
+/** The words for each reason a description gave no proposal. */
+export const REFUSAL_WORDS: Readonly<Record<DraftRefusalCode, string>> = Object.freeze({
+  description_not_supported: 'worldDescription.refused',
+  not_drafted: 'worldDescription.notDrafted',
+});
+
+/** How a value of each unit the specification states is written; a unit with no entry is
+ * written as the served specification spells it. */
+export const UNIT_WORDS: Readonly<Record<string, (value: number) => string>> = Object.freeze({
+  mm: (value: number) => fill('worldDescription.unit.mm', { metres: String(value / 1000) }),
+  count: (value: number) => fill('worldDescription.unit.count', { count: String(value) }),
+});
+
+export function valueWords(value: number | string, unit: string): string {
+  const words = UNIT_WORDS[unit];
+  return words === undefined || typeof value === 'string' ? `${value} ${unit}`.trim() : words(value);
+}
+
+function listed(kinds: TownSample['streets']): string {
+  return kinds.map((kind) => fill('worldDescription.sample.counted', {
+    label: kind.label, count: String(kind.count),
+  })).join(', ');
+}
+
+/** The sample's sentences: its numbers when there is a town, else why there is none. */
+export function sampleLines(sample: TownSample): readonly string[] {
+  if (sample.status !== 'sampled') {
+    return [fill(SAMPLE_WORDS[sample.status], { code: sample.refused ?? '' })];
+  }
+  const vehicles = sample.vehicles !== null
+    ? fill('worldDescription.sample.vehicles', { count: String(sample.vehicles) })
+    : fill('worldDescription.sample.noVehicles', { code: sample.vehiclesRefused ?? '' });
+  return [
+    fill(SAMPLE_WORDS.sampled, {
+      tiles: String(sample.tiles ?? 0),
+      people: String(sample.people ?? 0),
+      buildings: String(sample.buildings ?? 0),
+      vehicles,
+    }),
+    fill('worldDescription.sample.streets', { list: listed(sample.streets) }),
+    fill('worldDescription.sample.premises', { list: listed(sample.premises) }),
+    say('worldDescription.sample.differs'),
+  ];
+}
+
+/** The sentences a draft is shown in, from the words the person typed to the sample. */
+export function draftLines(draft: WorldDraft, words: SpecificationWords): readonly string[] {
+  const lines = [fill('worldDescription.yourWords', { words: draft.description })];
+  const byKey = new Map(words.values.map((value) => [value.key, value]));
+  if (draft.proposal === null) {
+    const code = draft.refusal?.code ?? 'not_drafted';
+    lines.push(say(REFUSAL_WORDS[code]));
+    if (code === 'description_not_supported') {
+      lines.push(say('worldDescription.supported'));
+      for (const value of words.values) {
+        lines.push(fill('worldDescription.range', {
+          label: value.label,
+          minimum: valueWords(value.minimum, value.unit),
+          maximum: valueWords(value.maximum, value.unit),
+        }));
+      }
+    }
+    return lines;
+  }
+  const proposal = draft.proposal;
+  const preset = words.presets.find((one) => one.key === proposal.preset)?.label ?? proposal.preset;
+  lines.push(fill('worldDescription.proposed', {
+    model: draft.modelName ?? say('worldDescription.unknownModel'), preset,
+  }));
+  // In the specification's own order, then any key it did not word.
+  const ordered = [
+    ...words.values.map((value) => value.key).filter((key) => key in proposal.values),
+    ...Object.keys(proposal.values).filter((key) => !byKey.has(key)),
+  ];
+  for (const key of ordered) {
+    const number = proposal.values[key]!;
+    const value = byKey.get(key);
+    lines.push(fill(proposal.setByWords.includes(key)
+      ? 'worldDescription.valueFromWords' : 'worldDescription.value', {
+      label: value?.label ?? key,
+      value: value === undefined ? String(number) : valueWords(number, value.unit),
+    }));
+  }
+  const refused = proposal.valueRefusal;
+  if (refused !== null) {
+    const value = refused.key === null ? undefined : byKey.get(refused.key);
+    const other = refused.withKey === null ? undefined : byKey.get(refused.withKey);
+    const unit = value?.unit ?? '';
+    lines.push(fill(refused.withKey === null
+      ? 'worldDescription.valueRefused' : 'worldDescription.valuesDisagree', {
+      label: value?.label ?? refused.key ?? '',
+      value: refused.value === null ? '' : valueWords(refused.value, unit),
+      other: other?.label ?? refused.withKey ?? '',
+      otherValue: refused.withValue === null ? '' : valueWords(refused.withValue, other?.unit ?? ''),
+      minimum: refused.minimum === null ? '' : valueWords(refused.minimum, unit),
+      maximum: refused.maximum === null ? '' : valueWords(refused.maximum, unit),
+      step: refused.step === null ? '' : valueWords(refused.step, unit),
+    }));
+  }
+  if (proposal.sample !== null) lines.push(...sampleLines(proposal.sample));
+  return lines;
+}
+
+export interface WorldDescriptionPanel {
+  readonly root: HTMLElement;
+}
+
+export function buildWorldDescription(options: {
+  readonly draft: (description: string) => Promise<WorldDraft>;
+  /** The specification panel's hook: its values become these, for the person to change. */
+  readonly useValues: (preset: string, values: Readonly<Record<string, number | string>>) => void;
+  readonly words: SpecificationWords;
+  /** The longest description the server reads. */
+  readonly maximumCharacters: number;
+}): WorldDescriptionPanel {
+  const input = el('textarea', {
+    class: 'world-description-input', rows: 3, maxlength: options.maximumCharacters,
+    'aria-label': say('worldDescription.label'), placeholder: say('worldDescription.placeholder'),
+  });
+  const ask = el('button', { type: 'button', class: 'world-description-draft',
+    text: say('worldDescription.draft') });
+  const status = el('p', { class: 'world-description-status', role: 'status', 'aria-live': 'polite' });
+  const result = el('div', { class: 'world-description-result' });
+  const root = el('section', { class: 'world-description', 'aria-label': say('worldDescription.heading') }, [
+    el('h3', { text: say('worldDescription.heading') }),
+    el('p', { text: say('worldDescription.introduction') }),
+    input,
+    ask,
+    status,
+    result,
+  ]);
+  const show = (draft: WorldDraft): void => {
+    const children: Node[] = draftLines(draft, options.words).map((line) => el('p', { text: line }));
+    if (draft.notSupported.length > 0) {
+      children.push(el('p', { class: 'world-description-not-supported', text: fill(
+        'worldDescription.notSupported',
+        { phrases: draft.notSupported.map((phrase) => fill('worldDescription.quoted', { phrase })).join(', ') },
+      ) }));
+    }
+    const proposal = draft.proposal;
+    if (proposal !== null && proposal.valid) {
+      const use = el('button', { type: 'button', class: 'world-description-use',
+        text: say('worldDescription.use') });
+      use.addEventListener('click', () => {
+        options.useValues(proposal.preset, proposal.values);
+        status.textContent = say('worldDescription.used');
+      });
+      children.push(use);
+    }
+    replace(result, children);
+  };
+  ask.addEventListener('click', () => {
+    const description = input.value.trim();
+    if (description === '') {
+      status.textContent = say('worldDescription.empty');
+      return;
+    }
+    ask.disabled = true;
+    status.textContent = say('worldDescription.drafting');
+    void options.draft(description).then((draft) => {
+      status.textContent = '';
+      show(draft);
+    }).catch((error: unknown) => {
+      status.textContent = fill('worldDescription.failed', {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }).finally(() => {
+      ask.disabled = false;
+    });
+  });
+  return { root };
+}

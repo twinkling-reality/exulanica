@@ -65,7 +65,7 @@
       "catalog_use_cases": ["dedicated-endpoint", "text", "summarization", "context_and_rag", "code", "reasoning", "function_calling", "complex_writing"],
       "catalog_license": "nvidia-open-model-license",
       "region_informational": "us-central1",
-      "note": "The answer_composer primary, and configured as the reasoning_mid primary and reasoning_hard fallback. No production caller selects reasoning_mid. The callable identifier uses lowercase letters as listed."
+      "note": "The answer_composer and specification_drafter primary, and configured as the reasoning_mid primary and reasoning_hard fallback. No production caller selects reasoning_mid. The callable identifier uses lowercase letters as listed."
     },
     "nvidia/Nemotron-3-Ultra-550b-a55b": {
       "provider": "nebius_token_factory",
@@ -131,7 +131,7 @@
       "catalog_use_cases": ["text", "code", "function_calling", "context_and_rag", "fine_tune", "responses_api"],
       "catalog_license": "Apache 2.0 License",
       "region_informational": "eu-north1",
-      "note": "Primary for structured_extraction, used for request classification, query planning, appearance drafts and environment-operation drafts. Structured output is validated by the client and the calling feature."
+      "note": "Primary for structured_extraction, used for request classification, query planning, appearance drafts and environment-operation drafts, and the specification_drafter fallback. Structured output is validated by the client and the calling feature."
     },
     "deepseek-ai/DeepSeek-V4-Flash-0731": {
       "provider": "nebius_token_factory",
@@ -337,6 +337,23 @@
       },
       "required_use_cases": ["text"],
       "rationale": "Used by classify_request, propose_plan, draft_appearance and draft_environment_operation for structured intent, query and authored-change proposals. Callers validate these outputs before execution or presentation. The declared DeepSeek fallback handles model-unavailability errors, not failed quality checks or an automatic transfer of work from the reasoning role."
+    },
+    "specification_drafter": {
+      "primary": "nvidia/nemotron-3-super-120b-a12b",
+      "fallback": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "timeout_seconds": 20,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-29-world-drafting-models-v2.json",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "rows": 12,
+        "p50_ms": 3614,
+        "p99_ms": 7771,
+        "longest_ms": 7771,
+        "note": "One call per description, twelve fixed descriptions of towns in the pre-registered comparison of the licence-resolved text models over the final specification; every draft was accepted on its first form. The fallback's slowest draft in the same run was 15,792 ms, inside this timeout."
+      },
+      "max_tokens": {"value": 16384, "basis": "The ceiling every candidate was asked with in the comparison the timeout names, one for all so none was truncated by a choice made for another; the primary drafted every description within it using at most 1521 completion tokens, and the fallback at most 103. A ceiling is not a spend; a low one costs a failed draft."},
+      "required_use_cases": ["text"],
+      "rationale": "Drafts a world's specification from a person's description (exulanica/selection/world_drafting.py): a preset and the values the served specification allows, and the parts of the description it cannot say copied word for word; the server's gate judges the draft and nothing is made until the person makes the world. Chosen by the rule pre-registered in docs/evaluation/2026-09-29-world-drafting-models-v2-preregistration.json over the five text models whose licence entry is resolved: a model was eligible at 10 of 12 drafts the gate would make on the first try and 10 of 12 matching the words by rule; Super, Qwen3 235B, Nano and Lightning were eligible (DeepSeek V4 Flash drafted 9 and timed out 3 times), Super was the NVIDIA model with the lowest slowest-of-12 draft time within 15 s, and the next in that order, Qwen3 235B, is the fallback. Model-unavailability errors select the fallback; a refused form is repaired once and then refused, never escalated to a larger model."
     },
     "embedding": {
       "primary": "Qwen/Qwen3-Embedding-8B",

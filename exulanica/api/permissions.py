@@ -383,6 +383,7 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_READ, _P.MODEL_INVOKE),
     "POST /selection/appearance",
     "POST /selection/environment",
+    "POST /worlds/specification/drafts",
 )
 
 #: World writes that commit the world to a model: a choice of the model that runs a world's

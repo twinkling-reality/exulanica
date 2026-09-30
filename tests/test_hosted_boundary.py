@@ -80,6 +80,7 @@ from exulanica.selection.plan import (
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import answer_question
 from exulanica.selection.society_question import answer_about_society, build_scene
+from exulanica.selection.world_drafting import propose_world_specification, specification_view
 from exulanica.world.society_decision_contract import decision_contract, person_role
 
 from conftest import ingest_observed, write_photo
@@ -98,6 +99,7 @@ from test_companion_saved_names import (
 from test_selection_proposal import WORLD, _seed_world, current_reference, draft
 from test_society_question import EVENTS, SNAPSHOT, TARGETS
 from test_vision_contract import VALID as OBSERVATION
+from world_specification_standin import specification_document
 
 pytestmark = pytest.mark.postgres
 
@@ -118,6 +120,10 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "environment drafter": (
         "exulanica.selection.environment_proposal",
         "draft_environment_operation",
+    ),
+    "specification drafter": (
+        "exulanica.selection.world_drafting",
+        "draft_world_specification",
     ),
     "query embedding": ("exulanica.selection.embeddings", "embed_query"),
     "caption embedding": ("exulanica.epistemics.caption_embeddings", "embed_capture"),
@@ -460,6 +466,28 @@ def run_environment(world: World) -> Witness:
     return transport
 
 
+def run_specification(world: World) -> Witness:
+    """The specification drafter, handed a description as its route hands it."""
+    form = {
+        "preset": "small_town",
+        "fit": "part",
+        "not_supported": [],
+        "city_extent_x_mm": None,
+        "block_length_mm": None,
+        "storey_band_low": None,
+        "storey_band_high": None,
+    }
+    client, transport = world.hosted([_json_reply(form, Role.SPECIFICATION_DRAFTER)])
+    propose_world_specification(
+        world.connection,
+        client,
+        f"a harbour town where {PERSON} lives beside {PLACE}",
+        world.repository.workspace_id,
+        specification_view(specification_document()),
+    )
+    return transport
+
+
 def run_caption(world: World) -> Witness:
     """The derivative worker's caption pass over the process's client."""
     transport = Witness([_vector_reply()])
@@ -604,6 +632,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "request classifier": (run_appearance, "make the horizon softer"),
     "appearance drafter": (run_appearance, "THE REVIEWED CATALOGUE"),
     "environment drafter": (run_environment, "put the selected tree"),
+    "specification drafter": (run_specification, "a harbour town"),
     "caption embedding": (run_caption, "RUNNING CLUB"),
     "vision": (run_vision, "Describe this photograph"),
     "role decision": (run_person, "wait here a minute"),
@@ -616,6 +645,7 @@ CALL_SITE_REPLACES: Mapping[str, tuple[str, ...]] = {
     "request classifier": ("exulanica.selection.request_names",),
     "appearance drafter": ("exulanica.selection.request_names",),
     "environment drafter": ("exulanica.selection.request_names",),
+    "specification drafter": ("exulanica.selection.world_drafting",),
 }
 
 

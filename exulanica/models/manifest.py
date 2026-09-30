@@ -118,6 +118,7 @@ class Role(StrEnum):
     REASONING_HARD = "reasoning_hard"
     VISION = "vision"
     STRUCTURED_EXTRACTION = "structured_extraction"
+    SPECIFICATION_DRAFTER = "specification_drafter"
     EMBEDDING = "embedding"
 
 

@@ -1,0 +1,2805 @@
+{
+  "asks": [
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        true,
+        true
+      ],
+      "description": 1,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 1305
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        true,
+        true
+      ],
+      "description": 1,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 649
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        true,
+        true
+      ],
+      "description": 1,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 635
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        true,
+        true
+      ],
+      "description": 1,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 642
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        true,
+        true
+      ],
+      "description": 1,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 642
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 2,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 635
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 2,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 641
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 2,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 642
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 2,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 636
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 2,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 643
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 3,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 648
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 3,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 649
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 3,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 647
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 3,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 646
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 3,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 640
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 4,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 644
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 4,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 644
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 4,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 634
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 4,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 642
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 4,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 643
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 5,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 639
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 5,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 1198
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 5,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 732
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 5,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 692
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 5,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 667
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 6,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 688
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 6,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 648
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 6,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 693
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 6,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 706
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 6,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 686
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 7,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 672
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 7,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 680
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 7,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 694
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 7,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 685
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        false,
+        false
+      ],
+      "description": 7,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 706
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 8,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 652
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 8,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 654
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 8,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 686
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 8,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 662
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 8,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 659
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 9,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 659
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 9,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 651
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 9,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 654
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 9,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 665
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        true
+      ],
+      "description": 9,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": true,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 647
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 10,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 657
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 10,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 669
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 10,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 657
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 10,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 667
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        false,
+        true
+      ],
+      "description": 10,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 659
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 11,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 651
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 11,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 662
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 11,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 1054
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 11,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 966
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        false
+      ],
+      "description": 11,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 860
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00014000"
+        }
+      ],
+      "checks": [
+        true,
+        false
+      ],
+      "description": 12,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 831
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00007000"
+        }
+      ],
+      "checks": [
+        true,
+        false
+      ],
+      "description": 12,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 754
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        true,
+        false
+      ],
+      "description": 12,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 665
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/Nemotron-3_5-Lightning",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00005400"
+        }
+      ],
+      "checks": [
+        true,
+        false
+      ],
+      "description": 12,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 695
+    },
+    {
+      "attempts": [
+        {
+          "completion_tokens": 200,
+          "cost_basis": "reported",
+          "failure": "",
+          "latency_ms": 0,
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "outcome": "completed",
+          "prompt_tokens": 100,
+          "provider": "nebius_token_factory",
+          "reasoning_tokens": 150,
+          "usd": "0.00021000"
+        }
+      ],
+      "checks": [
+        true,
+        false
+      ],
+      "description": 12,
+      "draft": {
+        "fit": "all",
+        "not_supported": [],
+        "preset": "small_town",
+        "set_by_words": [],
+        "values": {
+          "block_length_mm": 90000,
+          "city_extent_x_mm": 256000,
+          "storey_band_high": 4,
+          "storey_band_low": 2
+        }
+      },
+      "matched": false,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "refusal": null,
+      "sample": {
+        "people": 50,
+        "refused": null,
+        "status": "sampled",
+        "vehicles": 5
+      },
+      "valid_first_try": true,
+      "validation": null,
+      "wall_ms": 749
+    }
+  ],
+  "decision": {
+    "eligible": [],
+    "fallback": null,
+    "order": [],
+    "primary": null
+  },
+  "dry_run": true,
+  "head": "6a70cb65730bd9a8d89b121445fd7047b62d06f1",
+  "manifest_sha256": "d29f5c122f61488a64cd7418c87317045883a7cfdab501977a21debfd5e6c1d7",
+  "specification_sha256": "d716dabc6f93deb6fbfb2d33f667eb174ecace94413b8bd0d492abffebcc2856",
+  "spent_usd": "0.00633600",
+  "summaries": [
+    {
+      "calls": {
+        "longest_ms": 0,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "rows": 12,
+        "timed_out": 0
+      },
+      "cost_known": true,
+      "cost_usd": "0.00168000",
+      "descriptions": 12,
+      "draft_ms": {
+        "longest": 0,
+        "p50": 0,
+        "p95_slowest_of_12": 0
+      },
+      "matched": 3,
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "not_drafted": 0,
+      "repaired": 0,
+      "valid_first_try": 12
+    },
+    {
+      "calls": {
+        "longest_ms": 0,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "rows": 12,
+        "timed_out": 0
+      },
+      "cost_known": true,
+      "cost_usd": "0.00084000",
+      "descriptions": 12,
+      "draft_ms": {
+        "longest": 0,
+        "p50": 0,
+        "p95_slowest_of_12": 0
+      },
+      "matched": 3,
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "not_drafted": 0,
+      "repaired": 0,
+      "valid_first_try": 12
+    },
+    {
+      "calls": {
+        "longest_ms": 0,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "rows": 12,
+        "timed_out": 0
+      },
+      "cost_known": true,
+      "cost_usd": "0.00064800",
+      "descriptions": 12,
+      "draft_ms": {
+        "longest": 0,
+        "p50": 0,
+        "p95_slowest_of_12": 0
+      },
+      "matched": 3,
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "not_drafted": 0,
+      "repaired": 0,
+      "valid_first_try": 12
+    },
+    {
+      "calls": {
+        "longest_ms": 0,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "rows": 12,
+        "timed_out": 0
+      },
+      "cost_known": true,
+      "cost_usd": "0.00064800",
+      "descriptions": 12,
+      "draft_ms": {
+        "longest": 0,
+        "p50": 0,
+        "p95_slowest_of_12": 0
+      },
+      "matched": 3,
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "not_drafted": 0,
+      "repaired": 0,
+      "valid_first_try": 12
+    },
+    {
+      "calls": {
+        "longest_ms": 0,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "rows": 12,
+        "timed_out": 0
+      },
+      "cost_known": true,
+      "cost_usd": "0.00252000",
+      "descriptions": 12,
+      "draft_ms": {
+        "longest": 0,
+        "p50": 0,
+        "p95_slowest_of_12": 0
+      },
+      "matched": 3,
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "not_drafted": 0,
+      "repaired": 0,
+      "valid_first_try": 12
+    }
+  ],
+  "tree": {
+    "diff_head_sha256": "da9b55c69176890b8ca9d2982900f6f9fc3251920d019c686ece4b999141728c",
+    "head": "6a70cb65730bd9a8d89b121445fd7047b62d06f1"
+  },
+  "window": {
+    "ended": "2026-09-29T18:34:28-0400",
+    "started": "2026-09-29T18:33:46-0400"
+  }
+}

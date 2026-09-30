@@ -279,6 +279,7 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
         ("POST", "/selection/ask"),
         ("POST", "/selection/environment"),
         ("POST", "/selection/plan"),
+        ("POST", "/worlds/specification/drafts"),
     ]
     assert found <= set(SWEPT)
     for key in found:
