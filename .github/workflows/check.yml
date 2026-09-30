@@ -108,12 +108,102 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      # Built and not pushed. There is no registry because there is no deployment target, and
-      # naming one here would be deciding something that belongs to a human. What this proves is
-      # that the image builds, which is the half that can rot without anybody noticing.
-      - uses: docker/build-push-action@v6
+      # Keep the general API image's pose dependency build under CI as well.
+      - name: build default API image
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=default-api
+          cache-to: type=gha,scope=default-api,mode=max
+      # These are the two images the judge stack loads. Loading them lets the next step exercise
+      # the API image, including its startup catalog and schema checks. Nothing is published.
+      - name: build judge backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: EXULANICA_SYNC_EXTRAS=--extra server
+          tags: exulanica-judge-backend:ci
+          load: true
+          push: false
+          cache-from: type=gha,scope=judge-backend
+          cache-to: type=gha,scope=judge-backend,mode=max
+      - name: build judge web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/judge/web.Dockerfile
+          platforms: linux/amd64
+          tags: exulanica-judge-web:ci
+          load: true
+          push: false
+          cache-from: type=gha,scope=judge-web
+          cache-to: type=gha,scope=judge-web,mode=max
+      - name: start judge API image and check liveness
+        shell: bash
+        env:
+          POSTGRES_PASSWORD: ci-disposable-postgres
+          EXULANICA_APP_ROLE_PASSWORD: ci-disposable-app
+          EXULANICA_EXECUTOR_ROLE_PASSWORD: ci-disposable-executor
+          EXULANICA_JUDGE_ROLE_PASSWORD: ci-disposable-judge
+        run: |
+          set -euo pipefail
+          docker network create judge-ci
+          # shellcheck disable=SC2329
+          cleanup() {
+            docker rm -f judge-ci-api judge-ci-postgres >/dev/null 2>&1 || true
+            docker network rm judge-ci >/dev/null 2>&1 || true
+            rm -f "$token_file"
+          }
+          token_file="$RUNNER_TEMP/judge-ci-token.json"
+          trap cleanup EXIT
+          docker image inspect --format '{{.Id}}' exulanica-judge-backend:ci
+          docker image inspect --format '{{.Id}}' exulanica-judge-web:ci
+          docker run --detach --name judge-ci-postgres --network judge-ci \
+            --env POSTGRES_PASSWORD --env POSTGRES_USER=exulanica --env POSTGRES_DB=exulanica \
+            --health-cmd 'pg_isready -U exulanica -d exulanica' \
+            --health-interval 2s --health-retries 30 \
+            pgvector/pgvector:0.8.6-pg18
+          for attempt in {1..60}; do
+            if [ "$(docker inspect --format '{{.State.Health.Status}}' judge-ci-postgres)" = healthy ]; then
+              break
+            fi
+            echo "waiting for PostgreSQL ($attempt/60)"
+            sleep 2
+          done
+          test "$(docker inspect --format '{{.State.Health.Status}}' judge-ci-postgres)" = healthy
+          owner_url="postgresql://exulanica:${POSTGRES_PASSWORD}@judge-ci-postgres:5432/exulanica"
+          docker run --rm --network judge-ci \
+            --env EXULANICA_DATABASE_URL="$owner_url" \
+            --env EXULANICA_APP_ROLE_PASSWORD --env EXULANICA_EXECUTOR_ROLE_PASSWORD \
+            exulanica-judge-backend:ci exulanica-db
+          docker run --rm --network judge-ci \
+            --env EXULANICA_DATABASE_URL="$owner_url" --env EXULANICA_JUDGE_ROLE_PASSWORD \
+            exulanica-judge-backend:ci exulanica-seed role
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$RUNNER_TEMP,target=/tokens" \
+            exulanica-judge-backend:ci exulanica-seed token \
+            --workspace 00000000-0000-4000-8000-000000000001 --out /tokens/judge-ci-token.json
+          EXULANICA_API_TOKENS="$(cat "$token_file")"
+          export EXULANICA_API_TOKENS
+          docker run --detach --name judge-ci-api --network judge-ci \
+            --publish 127.0.0.1:18080:8000 \
+            --env EXULANICA_DATABASE_URL="postgresql://exulanica_judge:${EXULANICA_JUDGE_ROLE_PASSWORD}@judge-ci-postgres:5432/exulanica" \
+            --env EXULANICA_READONLY_DATABASE_URL="postgresql://exulanica_ro:${EXULANICA_EXECUTOR_ROLE_PASSWORD}@judge-ci-postgres:5432/exulanica" \
+            --env EXULANICA_API_TOKENS --env EXULANICA_DERIVATIVE_WORKER=off \
+            --env EXULANICA_COMPARISON_WORKER=none \
+            exulanica-judge-backend:ci
+          for attempt in {1..60}; do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:18080/healthz; then
+              echo 'judge API /healthz answered 200 after verified startup'
+              exit 0
+            fi
+            if [ "$(docker inspect --format '{{.State.Running}}' judge-ci-api)" != true ]; then
+              break
+            fi
+            echo "waiting for judge API ($attempt/60)"
+            sleep 2
+          done
+          docker logs judge-ci-api
+          exit 1
