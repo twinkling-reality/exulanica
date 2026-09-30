@@ -689,6 +689,143 @@
     },
     "society_packet": null
   },
+  "the composer did not answer in time": {
+    "abstention": null,
+    "answer": [
+      {
+        "citations": [],
+        "text": "The model that writes this answer did not answer within 25 seconds, so here is what was found.",
+        "type": "meta",
+        "value_refs": []
+      },
+      {
+        "citations": [],
+        "text": "1 captures match, and I can show you 1.",
+        "type": "meta",
+        "value_refs": [
+          "capture_count",
+          "shown_count"
+        ]
+      },
+      {
+        "citations": [
+          "TOKEN00001",
+          "TOKEN00002",
+          "TOKEN00003",
+          "TOKEN00004"
+        ],
+        "text": "One of them is this photograph.",
+        "type": "historical",
+        "value_refs": []
+      }
+    ],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": null,
+        "cost_basis": "unknown",
+        "outcome": "deadline_ended",
+        "prompt_tokens": null,
+        "reasoning_tokens": null,
+        "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "role": "reasoning_cheap",
+        "served_model": null,
+        "served_model_unavailable": "result_not_returned",
+        "usd": null,
+        "used_fallback": false
+      }
+    ],
+    "content_packet": null,
+    "deterministic": true,
+    "names": [
+      [
+        "[person A]",
+        "<id 2>"
+      ],
+      [
+        "[place A]",
+        "<id 3>"
+      ]
+    ],
+    "packet": {
+      "citable": true,
+      "items": [
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "A person in a running shirt in front of a building.",
+          "token": "TOKEN00001",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "MARIA ESTRADA RUNNING CLUB",
+          "token": "TOKEN00002",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "LANTERN HOUSE",
+          "token": "TOKEN00003",
+          "trust": "model_inference"
+        },
+        {
+          "capture_id": "<id 1>",
+          "confirmed_places": [],
+          "text": "Gullfoss",
+          "token": "TOKEN00004",
+          "trust": "model_inference"
+        }
+      ],
+      "total_matched": 1,
+      "values": [
+        [
+          "capture_count",
+          "1"
+        ],
+        [
+          "shown_count",
+          "1"
+        ],
+        [
+          "date_0",
+          "2026-08-27"
+        ],
+        [
+          "today",
+          "2026-09-23"
+        ]
+      ]
+    },
+    "plan": {
+      "capture": null,
+      "content": null,
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "captures",
+      "limit": 24,
+      "place": null,
+      "semantic_query": "running club",
+      "society": null,
+      "time": []
+    },
+    "rejections": [
+      "composer_unanswered: TransportError"
+    ],
+    "repaired": false,
+    "result": {
+      "captures": [
+        "<id 1>"
+      ],
+      "content": [],
+      "includes_proposals": false,
+      "intent": "captures",
+      "total_matched": 1
+    },
+    "society_packet": null
+  },
   "the composer failed twice": {
     "abstention": null,
     "answer": [

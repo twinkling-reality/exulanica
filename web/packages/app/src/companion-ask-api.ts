@@ -38,16 +38,17 @@ import { parseContentSurface, type CompanionContentSurface } from './companion-c
 import { worldPath } from './world-scope.js';
 
 /**
- * How long the page waits for an answer: the server's bound on one answer's model calls, then the
- * allowance for the answer path's own reads, which is `PACKET_TIMEOUT_MS` below.
+ * How long the page waits for an answer: the server's bound on one answer's model calls, in whole
+ * seconds, then the allowance for the answer path's own reads, which is `PACKET_TIMEOUT_MS` below.
  *
- * The bound is `answer_bound_seconds` in `exulanica/selection/question.py`: each hosted call the
- * answer path can make (the planner and its repair, the query vector, the composer and its repair)
- * times the longest one call to its role can take, its manifest timeout over its chain. A page that
- * gave up sooner reported a failure for a question the server was still answering.
- * `tests/test_companion_ask_deadline.py` fails when this is less than that bound plus the allowance.
+ * The bound is `answer_bound_seconds` in `exulanica/selection/question.py`: each required hosted
+ * call the answer path can make (the planner and its repair, the query vector) times the longest
+ * one call to its role can take, its manifest timeout over its chain, then the composer's deadline,
+ * after which the answer is given in fixed words. A page that gave up sooner reported a failure for
+ * a question the server was still answering. The two are one fact:
+ * `tests/test_companion_ask_deadline.py` fails when this differs from that bound plus the allowance.
  */
-const ASK_TIMEOUT_MS = 395_000;
+const ASK_TIMEOUT_MS = 180_000;
 
 /** Locating the cited photographs is a second question; it must not hold the answer hostage. */
 const PACKET_TIMEOUT_MS = 20_000;

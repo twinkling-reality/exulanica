@@ -1,11 +1,12 @@
 """The page waits for an answer at least as long as the server may take to write one.
 
 ``answer_bound_seconds`` in ``exulanica/selection/question.py`` is the server's bound on one
-answer's model calls: each call site of the answer path, as ``ANSWER_PATH_CALLS`` states it, times
-what the client says one call to its role can take at worst. The page's deadline,
-``ASK_TIMEOUT_MS`` in ``web/packages/app/src/companion-ask-api.ts``, must be at least that bound
-plus the page's allowance for an ordinary read, ``PACKET_TIMEOUT_MS`` beside it. A deadline must
-exist before the first request, so the page states it and this test holds it to the server's.
+answer's model calls: each required call site of the answer path, as ``ANSWER_PATH_CALLS`` states
+it, times what the client says one call to its role can take at worst, then the composer's
+deadline. The page's deadline, ``ASK_TIMEOUT_MS`` in ``web/packages/app/src/companion-ask-api.ts``,
+is that bound in whole seconds plus the page's allowance for an ordinary read,
+``PACKET_TIMEOUT_MS`` beside it. A deadline must exist before the first request, so the page states
+it and this test holds it equal to the server's: one fact, stated twice, with this parity.
 
 The other half is that ``ANSWER_PATH_CALLS`` is true: each call site is driven to its worst case
 here, through the real functions over a scripted transport, and the roles and counts it sends must
@@ -18,6 +19,7 @@ import ast
 import dataclasses
 import inspect
 import json
+import math
 import re
 from pathlib import Path
 
@@ -32,9 +34,12 @@ from exulanica.selection.embeddings import embed_query
 from exulanica.selection.planner import propose_plan
 from exulanica.selection.question import (
     ANSWER_PATH_CALLS,
+    LIBRARY_COMPOSER_ROLE,
     SOCIETY_ANSWER_PATH_CALLS,
     answer_bound_seconds,
     compose_answer,
+    library_answer_bound_seconds,
+    library_composer_wait_seconds,
     society_answer_bound_seconds,
 )
 from exulanica.selection.request_names import RequestNames
@@ -72,11 +77,13 @@ def test_the_api_builds_its_client_with_the_defaults_the_bound_is_read_from():
     assert all(not call.args and not call.keywords for call in calls)
 
 
-def test_the_page_waits_at_least_the_answer_bound_and_its_read_allowance():
+def test_the_page_waits_the_answer_bound_and_its_read_allowance_and_no_longer():
     client, _ = _api_client()
-    bound_ms = answer_bound_seconds(client) * 1000
-    assert bound_ms > 0
-    assert _milliseconds("ASK_TIMEOUT_MS") >= bound_ms + _milliseconds("PACKET_TIMEOUT_MS")
+    bound_s = answer_bound_seconds(client)
+    assert bound_s > 0
+    assert _milliseconds("ASK_TIMEOUT_MS") == (
+        math.ceil(bound_s) * 1000 + _milliseconds("PACKET_TIMEOUT_MS")
+    )
 
 
 def _sent(transport: FakeTransport) -> list[str]:
@@ -201,15 +208,31 @@ def test_the_society_path_is_its_required_calls_and_the_composer_s_deadline():
         )
 
 
+def test_the_photograph_path_is_its_required_calls_and_the_composer_s_deadline():
+    """The composer's calls share one deadline, so the photograph path is the planner's and the
+    query vector's worst case and that deadline, whatever the composer role's timeout."""
+    manifest = load_manifest()
+    for held in (manifest, _with_timeouts(manifest, reasoning_cheap=1000)):
+        client = _client_for(held)
+        required = sum(
+            count * client.worst_case_seconds(role)
+            for role, count in ANSWER_PATH_CALLS
+            if role is not LIBRARY_COMPOSER_ROLE
+        )
+        assert library_answer_bound_seconds(client) == required + library_composer_wait_seconds(
+            held
+        )
+        assert library_answer_bound_seconds(client) < required + client.worst_case_seconds(
+            LIBRARY_COMPOSER_ROLE
+        )
+
+
 def test_the_bound_is_the_longer_path_and_the_society_path_is_inside_it():
     """Each path's sum is inside the bound, and the bound is one of them, not their total: with
     the photograph composer and the query vector made quick, the society path is the bound."""
     manifest = load_manifest()
     for held in (manifest, _with_timeouts(manifest, reasoning_cheap=1, embedding=1)):
         client = _client_for(held)
-        paths = [
-            sum(count * client.worst_case_seconds(role) for role, count in ANSWER_PATH_CALLS),
-            society_answer_bound_seconds(client),
-        ]
+        paths = [library_answer_bound_seconds(client), society_answer_bound_seconds(client)]
         assert answer_bound_seconds(client) == max(paths)
     assert paths[1] > paths[0], "the positive control: the society path is the longer one"

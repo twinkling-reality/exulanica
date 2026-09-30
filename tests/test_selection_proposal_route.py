@@ -91,7 +91,6 @@ class ProposalApi:
     def draft(self, **overrides) -> dict:
         body = {
             "profile": "origin-landscape@1",
-            "modules": ["aeroheart-optics-v1"],
             "parameters": {
                 **{
                     key.replace("-", "_"): None

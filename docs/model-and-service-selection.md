@@ -89,20 +89,23 @@ out. A fallback serves under its role's timeout, and no retained record measures
 latency. The vision rows are synthetic drawings, and none of the records measures latency under
 concurrent load.
 
-The API client makes one attempt per call, so a question to `/selection/ask` waits on its model
-calls for at most the sum of their timeouts. A planner call and its repair
-([planner](../exulanica/selection/planner.py)), the query vector, and a composer call and its
-repair ([question](../exulanica/selection/question.py)) come to 205 seconds. A withdrawn primary
-adds the time its refusal took before the fallback is asked, which the bound counts as one more
-timeout for each call whose role has a fallback: 375 seconds on the API's client.
+The API client makes one attempt per call, so a question to `/selection/ask` about photographs
+waits on its model calls for at most the sum of their timeouts and the composer's deadline. A
+planner call and its repair ([planner](../exulanica/selection/planner.py)) and the query vector
+come to 85 seconds; the composer's calls, a repair among them, share one deadline read from the
+manifest, the 99th percentile its role's timeout rests on (`library_composer_wait_seconds` in
+[question](../exulanica/selection/question.py)), after which the answer is given in fixed words:
+at most 110 seconds. A withdrawn primary adds the time its refusal took before the fallback is
+asked, which the bound counts as one more timeout for each call whose role has a fallback: 160
+seconds on the API's client.
 A question about what happened among a world's simulated people takes the planner and its repair
 and then the answer composer, whose calls, a repair among them, share one 10 second deadline
 (`COMPOSER_WAIT_SECONDS` in [society question](../exulanica/selection/society_question.py)) far
 shorter than the role's 90 second timeout: 110 seconds on the API's client by the same count.
 `answer_bound_seconds` in [question](../exulanica/selection/question.py) computes the longer of the
 two paths from `ModelClient.worst_case_seconds` and each path's own call counts, and the page waits for an
-answer that long plus its allowance for an ordinary read;
-`tests/test_companion_ask_deadline.py` holds the page's `ASK_TIMEOUT_MS` to it.
+answer that long, in whole seconds, plus its allowance for an ordinary read;
+`tests/test_companion_ask_deadline.py` fails when the page's `ASK_TIMEOUT_MS` differs from it.
 
 Every attempt enters the process's cost ledger, failed ones included
 ([usage](../exulanica/models/usage.py)). A completed call is priced from the provider's usage

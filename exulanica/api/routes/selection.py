@@ -922,7 +922,7 @@ class AppearanceProfileView(BaseModel):
     profile_id: str
     profile_version: int
     parameters: dict[str, Any]
-    #: The reviewed modules that own the changed controls. Named by the draft, checked here.
+    #: The reviewed modules that own the changed controls, read from the registry, never the draft.
     modules: list[str]
     #: Only the controls whose value moved.
     changed: list[str]

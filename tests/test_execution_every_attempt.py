@@ -118,24 +118,47 @@ def _no_provider_words(calls) -> None:
 # -- one question ------------------------------------------------------------------------------
 
 
-def test_a_timed_out_composer_is_carried_on_the_error_with_its_cost_unknown(named):
+def test_a_timed_out_planner_is_carried_on_the_error_with_its_cost_unknown(named):
+    """A question with no plan fails when its planner times out; the error carries the record."""
     transport = FakeTransport([_timed_out()])
     client = _client(named[0], transport)
 
     with pytest.raises(TransportError) as raised:
-        _ask(named, client)
+        _ask(named, client, plan=None)
 
     noted = noted_calls(raised.value)
     assert noted is not None, "the error that ended the question carries no execution record"
     assert noted.prompt_version
     assert _shape(noted.calls) == [
-        ("reasoning_cheap", COMPOSER.primary.model_id, "timed_out", "unknown")
+        ("structured_extraction", PLANNER.primary.model_id, "timed_out", "unknown")
     ]
     (call,) = noted.calls
     assert call.usd is None and call.served_model is None and call.attempts == 1
     _no_provider_words(noted.calls)
     # The process ledger still charges it, at the most it can have cost.
     assert client.ledger.unknown_cost_calls == 1
+
+
+def test_a_composer_that_timed_out_or_was_refused_is_carried_in_the_answer_s_record(named):
+    """The composer's answer is optional beside the fixed words, so a question whose composer times
+    out, or whose reply is refused, is answered in them, and the answer's own record lists the
+    attempt: its outcome, and whether its cost is known."""
+    empty = chat_body("", model=COMPOSER.primary.model_id)
+    empty["choices"] = []
+    for reply, shape in (
+        (_timed_out(), ("reasoning_cheap", COMPOSER.primary.model_id, "deadline_ended", "unknown")),
+        (
+            HttpResponse(status_code=200, text=json.dumps(empty)),
+            ("reasoning_cheap", COMPOSER.primary.model_id, "reply_refused", "known"),
+        ),
+    ):
+        client = _client(named[0], FakeTransport([reply]))
+        answered = _ask(named, client)
+        assert answered.deterministic
+        assert _shape(answered.calls) == [shape]
+        assert answered.rejections == ("composer_unanswered: TransportError",)
+        _no_provider_words(answered.calls)
+        assert len(client.ledger.calls) == 1
 
 
 def test_a_failed_attempt_then_a_retry_that_succeeded_are_both_listed(named):
@@ -368,17 +391,14 @@ def test_two_questions_in_flight_at_once_each_list_only_their_own_attempts(ask_a
 
     assert len(transport.requests) == 2, "both questions reached the composer"
     slow, fast = (responses[q] for q in questions)
-    assert slow.status_code == 502, slow.text
-    problem = slow.json()
-    # An extension member beside the problem's own two, which keep their meaning.
-    assert set(problem) == {"code", "detail", "execution"}
-    assert problem["code"] == "model_refused"
-    assert problem["detail"] == "a model request timed out before its reply arrived"
-    assert PROVIDER_WORDS not in json.dumps(problem)
+    # The slow one's composer did not answer, so it is answered in the fixed words.
+    assert slow.status_code == 200, slow.text
+    assert slow.json()["deterministic"] is True
+    assert PROVIDER_WORDS not in json.dumps(slow.json())
     assert [
-        (c["role"], c["outcome"], c["cost_basis"], c["usd"]) for c in problem["execution"]["calls"]
-    ] == [("reasoning_cheap", "timed_out", "unknown", None)]
-    assert PROVIDER_WORDS not in json.dumps(problem["execution"])
+        (c["role"], c["outcome"], c["cost_basis"], c["usd"])
+        for c in slow.json()["execution"]["calls"]
+    ] == [("reasoning_cheap", "deadline_ended", "unknown", None)]
 
     assert fast.status_code == 200, fast.text
     assert [
@@ -397,13 +417,19 @@ def test_the_problem_detail_says_what_happened_in_product_words(app_for):
         FakeTransport([HttpResponse(status_code=503, text=json.dumps({"error": PROVIDER_WORDS}))])
     )
 
-    response = _ask_route(http, "What do my photographs show?")
+    # No plan, so the planner is asked, and a question it cannot plan fails.
+    response = _ask_route(http, "What do my photographs show?", plan=None)
 
     assert response.status_code == 502, response.text
     body = response.json()
+    # An extension member beside the problem's own two, which keep their meaning.
+    assert set(body) == {"code", "detail", "execution"}
+    assert body["code"] == "model_refused"
     assert body["detail"] == "the model endpoint could not answer a request"
     assert PROVIDER_WORDS not in json.dumps(body)
-    assert [c["outcome"] for c in body["execution"]["calls"]] == ["failed"]
+    assert [(c["role"], c["outcome"]) for c in body["execution"]["calls"]] == [
+        ("structured_extraction", "failed")
+    ]
 
 
 class _RefusesTheComposer:
@@ -436,18 +462,18 @@ def test_a_policy_refusal_after_a_paid_planner_carries_the_record(app_for, monke
 
 
 def test_a_reply_with_no_choices_is_recorded_as_refused(named):
-    empty = chat_body("", model=COMPOSER.primary.model_id)
+    empty = chat_body("", model=PLANNER.primary.model_id)
     empty["choices"] = []
     transport = FakeTransport([HttpResponse(status_code=200, text=json.dumps(empty))])
     client = _client(named[0], transport)
 
     with pytest.raises(TransportError) as raised:
-        _ask(named, client)
+        _ask(named, client, plan=None)
 
     noted = noted_calls(raised.value)
     assert noted is not None
     assert _shape(noted.calls) == [
-        ("reasoning_cheap", COMPOSER.primary.model_id, "reply_refused", "known")
+        ("structured_extraction", PLANNER.primary.model_id, "reply_refused", "known")
     ]
     assert len(client.ledger.calls) == 1
 
@@ -460,12 +486,14 @@ def test_a_failure_after_a_refused_answer_carries_the_validator_s_reasons(named)
         [_reply(uncited.model_dump_json(), model=COMPOSER.primary.model_id), _timed_out()]
     )
 
-    with pytest.raises(TransportError) as raised:
-        _ask(named, _client(named[0], transport))
+    answered = _ask(named, _client(named[0], transport))
 
-    noted = noted_calls(raised.value)
-    assert noted is not None and noted.rejections
-    assert [c.outcome.value for c in noted.calls] == ["completed", "timed_out"]
+    # Answered in the fixed words, with the refused answer's reasons and then why no repair came.
+    assert answered.deterministic
+    assert len(answered.rejections) == 2
+    assert "no citation" in answered.rejections[0]
+    assert answered.rejections[1] == "composer_unanswered: TransportError"
+    assert [c.outcome.value for c in answered.calls] == ["completed", "deadline_ended"]
 
 
 def test_an_environment_proposal_lists_every_attempt_and_carries_it_on_failure(named):
@@ -500,22 +528,41 @@ def test_an_environment_proposal_lists_every_attempt_and_carries_it_on_failure(n
     assert noted is not None and [c.outcome.value for c in noted.calls] == ["timed_out"]
 
 
-def test_the_problem_body_carries_the_rejections_noted_before_the_failure(app_for):
+def test_the_problem_body_carries_the_rejections_noted_before_the_failure(app_for, monkeypatch):
+    """A refused answer, its repair, and then a failure that still ends the question: the evidence
+    re-check refusing the plan after composing. The problem body keeps the refused answer's
+    reasons."""
+    from exulanica.selection import question as question_module
+    from exulanica.selection.validation import RejectionCode, SelectionRejected
+
     uncited = Answer(
         clauses=[AnswerClause(text="You were at the running club.", type=ClauseType.HISTORICAL)]
     )
     http, _ = app_for(
         FakeTransport(
-            [_reply(uncited.model_dump_json(), model=COMPOSER.primary.model_id), _timed_out()]
+            [
+                _reply(uncited.model_dump_json(), model=COMPOSER.primary.model_id),
+                _reply(ANSWER.model_dump_json(), model=COMPOSER.primary.model_id),
+            ]
         )
     )
+    validated = question_module.validate
+    calls = {"n": 0}
+
+    def refuse_the_second(connection, plan, session):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise SelectionRejected(RejectionCode.NOT_AUTHORISED, "withdrawn while composing")
+        return validated(connection, plan, session)
+
+    monkeypatch.setattr(question_module, "validate", refuse_the_second)
 
     response = _ask_route(http, "What do my photographs of the running club show?")
 
-    assert response.status_code == 502, response.text
+    assert response.status_code != 200, response.text
     execution = response.json()["execution"]
     assert execution["rejections"], "the validator's reasons were dropped from the failure"
-    assert [c["outcome"] for c in execution["calls"]] == ["completed", "timed_out"]
+    assert [c["outcome"] for c in execution["calls"]] == ["completed", "completed"]
 
 
 def test_a_selection_refused_after_composition_carries_what_was_paid_for(app_for, monkeypatch):

@@ -41,6 +41,8 @@ The planner and its catalogue are :mod:`exulanica.selection.planner`, both syste
 from __future__ import annotations
 
 import datetime as dt
+import math
+import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import suppress
@@ -59,7 +61,7 @@ from exulanica.models.errors import (
     TruncatedResponseError,
 )
 from exulanica.models.handoff import ModelHandoff
-from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.manifest import Manifest, Role, load_manifest
 from exulanica.selection.answer import (
     MAX_NOTES,
     Abstention,
@@ -106,6 +108,7 @@ from exulanica.selection.society_question import (
     planner_line,
     read_scene,
     refused,
+    repair_needs_seconds,
     still_readable,
 )
 from exulanica.selection.validation import (
@@ -119,6 +122,7 @@ from exulanica.store.base import ContentAddressedStore
 __all__ = [
     "ANSWER_PATH_CALLS",
     "COMPOSER_ATTEMPTS",
+    "LIBRARY_COMPOSER_ROLE",
     "PROMPT_VERSION",
     "QUERY_VECTORS",
     "SOCIETY_ANSWER_PATH_CALLS",
@@ -130,6 +134,8 @@ __all__ = [
     "answer_question",
     "compose_answer",
     "entity_catalogue",
+    "library_answer_bound_seconds",
+    "library_composer_wait_seconds",
     "propose_plan",
     "render_content_answer",
     "requires_model",
@@ -156,8 +162,12 @@ COMPOSER_MAX_TOKENS: Final = _composer_max_tokens()
 #: The society composer's token budget, the ``max_tokens`` its own role declares, as above.
 SOCIETY_COMPOSER_MAX_TOKENS: Final = _composer_max_tokens(COMPOSER_ROLE)
 
-#: How many times the composer may be asked for one answer: one try and one repair. The loop in
-#: :func:`compose_answer` runs to it, and :data:`ANSWER_PATH_CALLS` counts it.
+#: The role an answer about photographs is composed by (:func:`compose_answer`).
+LIBRARY_COMPOSER_ROLE: Final = Role.REASONING_CHEAP
+
+#: How many times the composer may be asked for one answer: one try, and one repair only while the
+#: deadline leaves time for it (:func:`compose_answer`). :data:`ANSWER_PATH_CALLS` counts it; the
+#: wait both share is one deadline (:func:`library_composer_wait_seconds`).
 COMPOSER_ATTEMPTS: Final = 2
 
 #: How many query vectors one question asks for: :func:`answer_question` embeds the plan's
@@ -167,11 +177,12 @@ QUERY_VECTORS: Final = 1
 #: Every hosted call one answer can make, as the role it is sent to and the most times its call
 #: site may send it: the planner and its repair, the query vector, the composer and its repair.
 #: ``tests/test_companion_ask_deadline.py`` drives each call site to its worst case and fails when
-#: it sends a role, or a count, this does not state.
+#: it sends a role, or a count, this does not state. The composer's calls share one deadline
+#: (:func:`library_answer_bound_seconds`).
 ANSWER_PATH_CALLS: Final[tuple[tuple[Role, int], ...]] = (
     (Role.STRUCTURED_EXTRACTION, PLANNER_ATTEMPTS),
     (Role.EMBEDDING, QUERY_VECTORS),
-    (Role.REASONING_CHEAP, COMPOSER_ATTEMPTS),
+    (LIBRARY_COMPOSER_ROLE, COMPOSER_ATTEMPTS),
 )
 
 #: Every hosted call an answer about a world's simulated people can make, in the same form: the
@@ -200,20 +211,58 @@ def society_answer_bound_seconds(client: ModelClient) -> float:
     ) + composer_wait_seconds(client.manifest)
 
 
+def library_composer_wait_seconds(manifest: Manifest) -> float:
+    """The longest a person waits for the composer of an answer about photographs, in seconds,
+    from the moment its fixed words are ready: one deadline over its primary, any fallback and its
+    repair (:func:`compose_answer`).
+
+    Read from the manifest, never typed: the 99th percentile of the role's primary in the
+    measurement its timeout rests on (``timeout_basis.p99_ms``), so about 99 in 100 composed
+    answers come back within it, while the fixed words already answer the question and a longer
+    wait buys little. Never longer than the role's timeout, since a caller's deadline may only
+    shorten a role's wait. The society composer's wait is a declared figure instead
+    (:func:`~exulanica.selection.society_question.composer_wait_seconds`), because its model
+    answers well within it; this role's model does not, since its median call is most of that
+    figure (``timeout_basis.p50_ms``), and so a wait that short would give many answers in fixed
+    words that a composer would have written. Refused by name when the basis records no 99th
+    percentile.
+    """
+    role = manifest[LIBRARY_COMPOSER_ROLE]
+    p99 = role.timeout_basis.get("p99_ms")
+    if isinstance(p99, bool) or not isinstance(p99, int) or p99 <= 0:
+        raise ManifestError(
+            f"{LIBRARY_COMPOSER_ROLE} records no p99_ms in its timeout_basis, which the deadline "
+            "of the composer of an answer about photographs is read from"
+        )
+    return float(min(p99 / 1000, role.timeout_seconds))
+
+
+def library_answer_bound_seconds(client: ModelClient) -> float:
+    """The longest the model calls of one answer about photographs can take on ``client``.
+
+    Each required call site's count times what the client says one call to its role can take at
+    worst (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`: the manifest's timeout
+    for the role, its chain and the client's retries), which is the planner and its repair and the
+    query vector; then the composer's deadline (:func:`library_composer_wait_seconds`), which
+    bounds all of its calls together, because its answer is optional beside the fixed words.
+    """
+    return sum(
+        count * client.worst_case_seconds(role)
+        for role, count in ANSWER_PATH_CALLS
+        if role is not LIBRARY_COMPOSER_ROLE
+    ) + library_composer_wait_seconds(client.manifest)
+
+
 def answer_bound_seconds(client: ModelClient) -> float:
     """The longest the model calls of one answer can take on ``client``, retries and fallbacks in.
 
-    For an answer about photographs, each call site's count times what the client says one call to
-    that role can take at worst (:meth:`~exulanica.models.client.ModelClient.worst_case_seconds`:
-    the manifest's timeout for the role, its chain and the client's retries); for one about a
-    world's simulated people, :func:`society_answer_bound_seconds`; then the longer path. The
-    browser waits for an answer at least this long; ``tests/test_companion_ask_deadline.py`` holds
-    its deadline to it.
+    For an answer about photographs, :func:`library_answer_bound_seconds`; for one about a world's
+    simulated people, :func:`society_answer_bound_seconds`; then the longer path. The browser waits
+    for an answer this long and the allowance for its own reads, as a whole number of seconds
+    (``ASK_TIMEOUT_MS`` in ``web/packages/app/src/companion-ask-api.ts``);
+    ``tests/test_companion_ask_deadline.py`` fails when the two differ.
     """
-    return max(
-        sum(count * client.worst_case_seconds(role) for role, count in ANSWER_PATH_CALLS),
-        society_answer_bound_seconds(client),
-    )
+    return max(library_answer_bound_seconds(client), society_answer_bound_seconds(client))
 
 
 #: What the three candidates did on one 24-item packet, recorded because the choice is not
@@ -380,6 +429,20 @@ class AnsweredQuestion:
     names: tuple[tuple[str, uuid.UUID], ...] = ()
 
 
+#: Said before the fixed words when the composer gave no answer in time, by what happened to its
+#: last call. ``deadline_ended`` is formatted with the deadline it was given, in whole seconds.
+_COMPOSER_UNANSWERED: Final[Mapping[str, str]] = {
+    "deadline_ended": (
+        "The model that writes this answer did not answer within {seconds} seconds, so here is "
+        "what was found."
+    ),
+    "timed_out": (
+        "The model that writes this answer did not answer in time, so here is what was found."
+    ),
+    "failed": "The model that writes this answer did not answer, so here is what was found.",
+}
+
+
 def compose_answer(
     client: ModelClient,
     question: str,
@@ -387,13 +450,24 @@ def compose_answer(
     *,
     log: CallLog | None = None,
     placeholders: Mapping[uuid.UUID, str] | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> tuple[Answer, bool, tuple[str, ...]]:
     """Ask the model for an answer, validate it, allow exactly one repair.
 
-    Returns ``(answer, repaired, rejections)``. Raises nothing: a second failure returns the
+    Returns ``(answer, deterministic, rejections)``. Raises nothing: a second failure returns the
     deterministic answer, because section 5.3's third mechanism is that "the model output is
     discarded entirely and a deterministic templated answer is rendered from the query result
     and its citations", and that path "is a first-class output, not an error page".
+
+    **It is waited for at most** :func:`library_composer_wait_seconds`, counted from this call,
+    which is made once the fixed words are ready: the answer is already in hand, so composing is
+    worth only a bounded wait. That is the client's deadline for the call (``deadline_s``), over
+    the primary, any fallback and the repair together. A refused answer is asked again once, with
+    its reasons, only while at least the role's median call
+    (:func:`~exulanica.selection.society_question.repair_needs_seconds`) of the deadline is left,
+    and within what is left; otherwise the fixed words come at once. A call the deadline ends, a
+    timeout or any other failed call ends composition, and the fixed words are led by a sentence
+    saying the model did not answer. Every attempt is recorded in ``log``.
 
     ``placeholders`` is the request's record, handed to the boundary with each request, so a
     place's name it withholds is written as the question and the packet write that place.
@@ -402,8 +476,15 @@ def compose_answer(
         {"role": "system", "content": _COMPOSER_SYSTEM},
         {"role": "user", "content": f"{_render_packet(packet)}\n\nQuestion: {question}"},
     ]
+    wait = library_composer_wait_seconds(client.manifest)
+    ends = clock() + wait
+    repair_needs = repair_needs_seconds(client.manifest, LIBRARY_COMPOSER_ROLE)
     rejections: tuple[str, ...] = ()
     for attempt in range(1, COMPOSER_ATTEMPTS + 1):
+        left = ends - clock()
+        if attempt > 1 and (repair_needs is None or left < repair_needs):
+            # Too little of the deadline is left for a repair likely to come back in it.
+            break
         try:
             composed = client.structured(
                 # **The NVIDIA reasoning core, doing the reasoning.** `reasoning_cheap`'s own
@@ -411,13 +492,14 @@ def compose_answer(
                 # turn and every cross-scene continuity decision. Context length, not parameter
                 # count, is the binding constraint on a long shallow reasoning task over an
                 # evidence packet." Writing a cited answer from a bounded packet IS that task.
-                Role.REASONING_CHEAP,
+                LIBRARY_COMPOSER_ROLE,
                 messages,
                 ComposedAnswer,
                 prompt_version=PROMPT_VERSION,
                 max_tokens=COMPOSER_MAX_TOKENS,
                 photographs=(item.capture_id for item in packet.items),
                 placeholders=placeholders,
+                deadline_s=left,
             )
             # Recorded BEFORE the validator runs. An answer the validator refuses was still a
             # call the endpoint served and billed, and a record that dropped it would report the
@@ -456,6 +538,27 @@ def compose_answer(
             # the floor that exists so a question always gets an answer.
             rejections = (str(exc),)
             break
+        except ModelError as exc:
+            # Ended by the deadline, timed out, failed or refused by the budget: no answer came,
+            # and the fixed words say so before they answer. Before this was caught, a timeout
+            # went out of `answer_question` and failed a question whose answer was in hand.
+            late = (
+                "deadline_ended"
+                if getattr(exc, "deadline_ended", False)
+                else "timed_out"
+                if getattr(exc, "timed_out", False)
+                else "failed"
+            )
+            note = AnswerClause(
+                text=_COMPOSER_UNANSWERED[late].format(seconds=math.ceil(wait)),
+                type=ClauseType.META,
+            )
+            fixed = render_deterministic_answer(packet)
+            return (
+                fixed.model_copy(update={"clauses": [note, *fixed.clauses]}),
+                True,
+                (*rejections, f"composer_unanswered: {type(exc).__name__}"),
+            )
     return render_deterministic_answer(packet), True, rejections
 
 

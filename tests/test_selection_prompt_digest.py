@@ -24,6 +24,7 @@ PINNED = {
     "proposal-2": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
     # The same texts: `proposal-3` changed the draft schema's construction and no prompt.
     "proposal-3": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
+    "proposal-4": "c5d95ac33e52e9a22fe41d4056788b18a05588260506499ac91a2792b4e005ae",
     "environment-proposal-1": "88314630219bea7f6571a54fff583920ac765581a25efa581e20f4b04e9e0a92",
 }
 

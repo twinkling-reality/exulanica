@@ -24,7 +24,14 @@ evidence packets and appearance proposals, and the
 environment panel's typed edits. The [question implementation](../exulanica/selection/question.py)
 sequences the path: the [planner](../exulanica/selection/planner.py) proposes a Selection from the
 question, and the question implementation validates and executes it, builds a bounded packet,
-composes and validates the answer, with the supported repair path. The system prompts and the
+composes and validates the answer, with the supported repair path. The composer is waited for one
+deadline from the moment the answer's fixed words are ready, over its primary, any fallback and its
+repair: the 99th percentile of its role's calls in the measurement the role's timeout rests on
+(`timeout_basis.p99_ms` in the model manifest, read by `library_composer_wait_seconds`). A repair is
+asked only while the role's median call still fits in what is left. When the composer does not
+answer within the deadline, times out or fails, the answer is the fixed words, led by a sentence
+saying the model that writes the answer did not answer, and the question never fails for it. The
+system prompts and the
 version they are recorded under are in [prompts](../exulanica/selection/prompts.py). The path
 records per-question model execution with [calls](../exulanica/selection/calls.py) rather than
 inferring execution from the manifest.
@@ -516,7 +523,10 @@ The drafter's schema derives from the registry's profiles, controls, ranges and 
 each range control as the values on its grid rather than as a number between two bounds: as a
 number, the endpoint's constrained decoding wrote 1.25 as `1` and `25` on two lines, a reply that is
 not JSON ([measured before and after](evaluation/2026-09-24-appearance-draft-grid-outcome.json)).
-An invalid value is refused, not silently converted into a different proposed value.
+An invalid value is refused, not silently converted into a different proposed value. The draft
+names the controls it changes and never the modules that own them: the proposal's modules are the
+ones the registry says own a control that moved, so a change is never refused for a module the
+draft left out.
 
 When no draft can be read after its repair, or a draft is cut at its token limit, the request is
 refused as `not_drafted`. The page says that a model's reply could not be read

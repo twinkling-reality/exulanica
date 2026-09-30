@@ -154,12 +154,13 @@ def composer_wait_seconds(manifest: Manifest) -> float:
     return float(min(COMPOSER_WAIT_SECONDS, manifest[COMPOSER_ROLE].timeout_seconds))
 
 
-def repair_needs_seconds(manifest: Manifest) -> float | None:
+def repair_needs_seconds(manifest: Manifest, role: Role = COMPOSER_ROLE) -> float | None:
     """How much of the deadline a refused choice must leave for the composer to be asked again:
     the median call of the role's primary in the measurement its timeout rests on
     (``timeout_basis.p50_ms`` in the manifest), so a repair likely to be cut short is not paid for.
-    None when the basis records no median, and then no repair is asked."""
-    median = manifest[COMPOSER_ROLE].timeout_basis.get("p50_ms")
+    None when the basis records no median, and then no repair is asked. ``role`` is the composer's:
+    this one's, or the library composer's (``exulanica/selection/question.py``)."""
+    median = manifest[role].timeout_basis.get("p50_ms")
     if isinstance(median, bool) or not isinstance(median, int) or median <= 0:
         return None
     return median / 1000

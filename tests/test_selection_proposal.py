@@ -104,7 +104,6 @@ def draft(**overrides) -> dict:
     """A well-formed draft that moves exactly one control, before any override is applied."""
     body = {
         "profile": PROFILE_KEY,
-        "modules": ["aeroheart-optics-v1"],
         "parameters": {key.replace("-", "_"): None for key in PROFILE.controls},
         "references": [str(catalogue()[0].source_id)],
         "spoken": "The horizon will sit softer, so the far edge reads as distance.",
@@ -276,10 +275,7 @@ def test_a_tempo_outside_its_narrower_range_is_refused_even_though_it_is_inside_
     for six of this profile's seven controls and an illegal one for the seventh.
     """
     outcome = validated(
-        draft(
-            modules=["bounded-tempo-v1"],
-            parameters={"horizon_softness": None, "world_tempo": 0.5},
-        )
+        draft(parameters={"horizon_softness": None, "world_tempo": 0.5})
     )
 
     assert isinstance(outcome, ProposalRefusal)
@@ -304,10 +300,7 @@ def test_an_out_of_range_draft_is_refused_by_the_schema_before_it_is_ever_a_pyth
 
 def test_a_choice_outside_its_registered_options_is_refused():
     outcome = validated(
-        draft(
-            modules=["registered-surface-v1"],
-            parameters={"horizon_softness": None, "surface_finish": "brushed-steel"},
-        )
+        draft(parameters={"horizon_softness": None, "surface_finish": "brushed-steel"})
     )
 
     assert isinstance(outcome, ProposalRefusal)
@@ -337,28 +330,24 @@ def test_an_experimental_profile_cannot_be_proposed_against_even_by_name():
     assert outcome.code is RefusalCode.UNREGISTERED
 
 
-def test_a_module_outside_the_profiles_reviewed_recipe_is_refused():
-    outcome = validated(draft(modules=["aeroheart-optics-v1", "survey-relief-response-v1"]))
+def test_the_form_has_no_module_field_and_a_module_a_draft_names_is_not_read():
+    """Which modules a change touches is the registry's to say, so the form does not ask."""
+    schema = _draft_model(_proposable_profiles(STYLE_REGISTRY), catalogue())
+    assert "modules" not in schema.model_fields
+    outcome = validated(draft(modules=["survey-relief-response-v1"]))
+    assert isinstance(outcome, AppearanceProposal)
+    assert outcome.modules == ("aeroheart-optics-v1",)
 
-    assert isinstance(outcome, ProposalRefusal)
-    assert outcome.code is RefusalCode.UNREGISTERED
-    assert "survey-relief-response-v1" in outcome.detail
 
+def test_a_moved_control_s_module_is_the_one_the_registry_says_owns_it():
+    """`world-tempo` belongs to `bounded-tempo-v1`, whatever the draft said, and the proposal names
+    each module that owns a control which moved, in the profile's recipe order. The drafter was
+    measured leaving one out of a list it was asked to write, and the change was then refused."""
+    outcome = validated(draft(parameters={"world_tempo": 1.1}))
 
-def test_a_control_whose_owning_module_the_draft_did_not_name_is_refused():
-    """The module list is not decoration and this is the test that makes it load-bearing.
-
-    `world-tempo` belongs to `bounded-tempo-v1`. A draft that moves it while naming only the
-    optics module is proposing a change to a module it never claimed to touch, and the recipe
-    binding the backend derives would say so.
-    """
-    outcome = validated(
-        draft(modules=["aeroheart-optics-v1"], parameters={"world_tempo": 1.1})
-    )
-
-    assert isinstance(outcome, ProposalRefusal)
-    assert outcome.code is RefusalCode.UNREGISTERED
-    assert "motion.tempo" in outcome.detail
+    assert isinstance(outcome, AppearanceProposal)
+    assert outcome.changed == ("horizon-softness", "world-tempo")
+    assert outcome.modules == ("aeroheart-optics-v1", "bounded-tempo-v1")
 
 
 def test_a_control_the_profile_does_not_declare_is_refused_by_name():
@@ -401,7 +390,7 @@ def test_a_draft_that_restates_the_value_the_world_already_has_is_not_a_proposal
 
 
 def test_a_draft_that_moves_nothing_at_all_is_refused():
-    outcome = validated(draft(modules=[], parameters={"horizon_softness": None}))
+    outcome = validated(draft(parameters={"horizon_softness": None}))
 
     assert isinstance(outcome, ProposalRefusal)
     assert outcome.code is RefusalCode.NO_CHANGE
@@ -476,7 +465,7 @@ def test_the_prompt_version_is_this_paths_own_and_not_the_question_paths():
     # Pinned as a literal on purpose. It is stored on every world style proposal this path
     # creates and it keys the response cache, so a bump has to be a decision somebody made
     # rather than a constant that drifted.
-    assert PROMPT_VERSION == "proposal-3"
+    assert PROMPT_VERSION == "proposal-4"
     assert PROMPT_VERSION != QUESTION_PROMPT_VERSION
 
 
@@ -771,14 +760,11 @@ def test_a_stray_key_on_the_current_style_is_dropped_rather_than_turned_into_a_r
 def test_a_module_whose_only_control_was_restated_is_not_named_as_touched():
     """`modules` and `changed` may not contradict each other.
 
-    The draft names two modules and moves one control belonging to each, but restates the tempo
-    at the value the world already has. One control moved, so one module was touched.
+    The draft sets one control of each of two modules, but restates the tempo at the value the
+    world already has. One control moved, so one module was touched.
     """
     outcome = validated(
-        draft(
-            modules=["aeroheart-optics-v1", "bounded-tempo-v1"],
-            parameters={"world_tempo": current_reference().parameters["world-tempo"]},
-        )
+        draft(parameters={"world_tempo": current_reference().parameters["world-tempo"]})
     )
 
     assert isinstance(outcome, AppearanceProposal)
@@ -862,35 +848,31 @@ def test_the_schema_states_each_range_as_the_values_its_grid_holds():
 
 
 def test_the_module_lookup_uses_the_registry_it_was_given():
-    """A narrowed registry must narrow the answer, or the injection point is decoration."""
+    """A registry that gives a capability to another module must move the answer, or the injection
+    point is decoration."""
     document = json.loads(
         (
             __import__("pathlib").Path("exulanica/world/style-registry.v1.json")
         ).read_text(encoding="utf-8")
     )
-    for profile in document["profiles"]:
-        if profile["profile_id"] == "origin-landscape":
-            profile["recipe"]["modules"] = [
-                "aeroheart-optics-v1", "registered-surface-v1", "source-light-v1"
-            ]
-            profile["controls"] = [
-                control
-                for control in profile["controls"]
-                if control["capability"] != "motion.tempo"
-            ]
-    narrowed = _registry(document)
+    for module in document["modules"]:
+        if module["module_id"] == "aeroheart-optics-v1":
+            module["capabilities"].remove("atmosphere.softness")
+        if module["module_id"] == "registered-surface-v1":
+            module["capabilities"].append("atmosphere.softness")
+    moved = _registry(document)
 
-    # `bounded-tempo-v1` is no longer in this profile's recipe, so naming it is unregistered.
     outcome = _validate_draft(
-        draft(modules=["aeroheart-optics-v1", "bounded-tempo-v1"]),
-        narrowed.validate_reference(StyleReference(PROFILE.profile_id, 1, {})),
+        draft(),
+        moved.validate_reference(StyleReference(PROFILE.profile_id, 1, {})),
         catalogue(),
-        registry=narrowed,
+        registry=moved,
     )
 
-    assert isinstance(outcome, ProposalRefusal)
-    assert outcome.code is RefusalCode.UNREGISTERED
-    assert "bounded-tempo-v1" in outcome.detail
+    assert isinstance(outcome, AppearanceProposal)
+    assert outcome.modules == ("registered-surface-v1",)
+    # The positive control: the shipped registry says the optics module owns it.
+    assert validated(draft()).modules == ("aeroheart-optics-v1",)
 
 
 def test_the_evidence_catalogue_offers_only_the_current_topologys_slots(

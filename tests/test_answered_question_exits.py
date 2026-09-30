@@ -1,6 +1,6 @@
 """What ``answer_question`` returns on every one of its exits, held whole to a golden document.
 
-``answer_question`` has eighteen ways to return an :class:`AnsweredQuestion` and three to raise, and
+``answer_question`` has nineteen ways to return an :class:`AnsweredQuestion` and three to raise, and
 the answer path's split keeps it where it is because tests replace its module globals. Each exit
 is driven here through the product's own code over a workspace with a person and a place saved on
 a photograph's sign, and what it returns is reduced to a document: the answer, the plan, what the
@@ -33,6 +33,7 @@ from exulanica.api.composer_rights import composer_rights_check
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.epistemics.saved_names import SavedName
 from exulanica.errors import PrivacyAdmissionError
+from exulanica.models.errors import TransportError
 from exulanica.models.transport import HttpResponse
 from exulanica.selection import packet as packet_module
 from exulanica.selection import question as question_module
@@ -308,6 +309,11 @@ EXITS: dict[str, Callable[[Context], AnsweredQuestion]] = {
         [_answer(_UNCITED), _answer(_UNCITED)], plan=_captures("running club")
     ),
     "the evidence changed while composing": _changed_during_composition,
+    # The composer's deadline ended its wait: the fixed words, led by a sentence saying so.
+    "the composer did not answer in time": lambda c: c.ask(
+        [TransportError("no whole response", timed_out=True, reached_provider=None)],
+        plan=_captures("running club"),
+    ),
     "raises: no before_compose check": lambda c: c.ask([], before_compose="not callable"),
     "raises: no client for a question in words": lambda c: c.ask([], client=None),
     "raises: a supplied plan names an entity nobody has": lambda c: c.ask(

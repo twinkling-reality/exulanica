@@ -140,7 +140,10 @@ __all__ = [
 #: values on its grid rather than a bounded number (:func:`_control_type` says why). The drafter's
 #: "knife edge" above was, in its measured failures on this form, the endpoint writing 1.25 as
 #: ``1`` and ``25`` on two lines; that is the one control whose range runs above 1.
-PROMPT_VERSION: Final = "proposal-3"
+#:
+#: ``proposal-4`` takes the module list off the form and its one instruction out of the drafter's
+#: prompt: which modules a change touches is the registry's to say (:func:`_validate_draft`).
+PROMPT_VERSION: Final = "proposal-4"
 
 #: How many evidence references the drafter may be shown, and therefore how many it may name.
 #: A bound for the same reason :data:`~exulanica.selection.planner.MAX_CATALOGUE` is one: the
@@ -410,8 +413,6 @@ asked for, and the person has to notice it and undo it.
 - Move a value by an amount that matches the words. "A little softer" is a small step from where \
 it is now; "much brighter" is a large one. The current value of every control is listed below. \
 Never write the value it already has: that is not a change and the form is refused.
-- Name every module that owns a control you changed, and no others. The catalogue says which \
-module owns which control. A control whose module you did not name is refused.
 - Name at least one evidence reference. These are the photographs this world is drawn over, \
 listed by id. They are what the change is being made to, and a proposal that names none of them \
 cannot be reviewed. Name the ones the request is about when it is about particular ones, and \
@@ -753,7 +754,6 @@ def _draft_model(
     """
     parameters = _parameter_model(proposable)
     profile_keys = tuple(_profile_key(profile) for profile in proposable)
-    module_ids = tuple(sorted({module for profile in proposable for module in profile.modules}))
     reference_ids = tuple(str(choice.source_id) for choice in catalogue)
     return create_model(
         "AppearanceDraft",
@@ -765,18 +765,6 @@ def _draft_model(
         profile=(
             Literal[profile_keys],  # type: ignore[valid-type]
             Field(description="The reviewed design this change is made against."),
-        ),
-        modules=(
-            Annotated[
-                list[Literal[module_ids]],  # type: ignore[valid-type]
-                Field(max_length=len(module_ids)),
-            ],
-            Field(
-                description=(
-                    "Every module that owns a control you changed, and no others. Empty when "
-                    "you changed nothing."
-                )
-            ),
         ),
         parameters=(
             parameters,
@@ -990,23 +978,10 @@ def _validate_draft(
             f"draft named a profile the registry does not offer: {draft.get('profile')!r}",
         )
 
-    named_modules = tuple(dict.fromkeys(str(value) for value in draft.get("modules") or ()))
-    outside = [module for module in named_modules if module not in profile.modules]
-    if outside:
-        return ProposalRefusal(
-            RefusalCode.UNREGISTERED,
-            f"draft named modules outside {_profile_key(profile)}: {', '.join(sorted(outside))}",
-        )
-
     supplied = draft.get("parameters") or {}
     if not isinstance(supplied, Mapping):
         return ProposalRefusal(RefusalCode.UNREGISTERED, "draft parameters are not an object")
 
-    owned = (
-        frozenset().union(*(_module_capabilities(registry, module) for module in named_modules))
-        if named_modules
-        else frozenset()
-    )
     changed: dict[str, Any] = {}
     for field_name, value in supplied.items():
         if value is None:
@@ -1017,14 +992,6 @@ def _validate_draft(
             return ProposalRefusal(
                 RefusalCode.UNREGISTERED,
                 f"draft set {key!r}, which {_profile_key(profile)} does not declare",
-            )
-        if definition.capability not in owned:
-            # The module list is not decoration. A control whose module the draft did not name
-            # is a change the draft did not account for, and the recipe binding the backend
-            # derives would name a module this proposal never claimed to touch.
-            return ProposalRefusal(
-                RefusalCode.UNREGISTERED,
-                f"draft set {key!r} without naming the module that owns {definition.capability}",
             )
         changed[key] = value
 
@@ -1107,18 +1074,29 @@ def _validate_draft(
             RefusalCode.NOT_DRAFTED, "draft said nothing about the change it proposes"
         )
 
-    # Only the modules that own a control which actually MOVED. A module whose sole control the
-    # draft restated at the value it already had owns nothing that changed, and naming it would
-    # make the field say something the `changed` list beside it contradicts.
+    # **The modules are the registry's to say, never the draft's.** Each is the module of the
+    # profile's recipe that owns a control which actually MOVED, so a module whose sole control
+    # the draft restated at the value it already had is not named, and the field cannot say
+    # something the `changed` list beside it contradicts. The draft was once asked to name them
+    # too, and measured on fixed requests it left one out often enough to refuse about one draft
+    # in five for a change it had accounted for (`docs/companion-question.md`).
     moved = tuple(sorted(key for key in changed if key not in unmoved))
     moved_capabilities = {profile.controls[key].capability for key in moved}
+    modules = tuple(
+        module
+        for module in profile.modules
+        if _module_capabilities(registry, module) & moved_capabilities
+    )
+    owned = frozenset().union(*(_module_capabilities(registry, module) for module in modules))
+    unowned = sorted(moved_capabilities - owned)
+    if unowned:
+        return ProposalRefusal(
+            RefusalCode.UNREGISTERED,
+            f"no module of {_profile_key(profile)} owns {', '.join(unowned)}",
+        )
     return AppearanceProposal(
         profile=validated,
-        modules=tuple(
-            module
-            for module in named_modules
-            if _module_capabilities(registry, module) & moved_capabilities
-        ),
+        modules=modules,
         changed=moved,
         reference_ids=references,
         spoken=spoken,
