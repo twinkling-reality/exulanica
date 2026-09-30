@@ -3,6 +3,7 @@ import {
   isNavigationPositionClear,
   localDirectionToAtlas,
   localToAtlas,
+  localVec3,
   type AtlasScene,
   type Island,
   type LocalVec3,
@@ -10,7 +11,7 @@ import {
   type OwnedDistrict,
 } from '@exulanica/atlas-core';
 import type { CameraHold, CameraState } from './controls.js';
-import { openingIsland } from './opening-region.js';
+import { openingIsland, type ServedArrivalPose } from './opening-region.js';
 import { worldViews, type WorldKind } from './world-kind.js';
 
 /** The binding's option for the opening rule, beside the views it decides. */
@@ -70,8 +71,9 @@ export function worldStart(
   scene: AtlasScene,
   navigationWorld: NavigationWorld,
   placementRegionIds: readonly string[] = [],
+  servedArrival?: ServedArrivalPose,
 ): HeldView {
-  const pose = groundEntry(kind, scene, navigationWorld, placementRegionIds);
+  const pose = groundEntry(kind, scene, navigationWorld, placementRegionIds, servedArrival);
   return Object.freeze({ pose, hold: CITY_VIEW_HOLD.street });
 }
 
@@ -89,6 +91,7 @@ export function groundEntry(
   scene: AtlasScene,
   navigationWorld: NavigationWorld,
   placementRegionIds: readonly string[] = [],
+  servedArrival?: ServedArrivalPose,
 ): CameraState {
   const ground = kind.ground;
   switch (ground.form) {
@@ -108,9 +111,28 @@ export function groundEntry(
       };
     }
     case 'scene-regions':
-      return initialAtlasCameraState(scene, navigationWorld, placementRegionIds);
+      return servedArrival === undefined
+        ? initialAtlasCameraState(scene, navigationWorld, placementRegionIds)
+        : servedArrivalCameraState(scene, servedArrival);
   }
   throw new TypeError(`No ground entry for a world standing on ${(ground as { form: string }).form}`);
+}
+
+/** Transform the v4 region-local pose with the same island placement as its pinned geometry. */
+export function servedArrivalCameraState(scene: AtlasScene, arrival: ServedArrivalPose): CameraState {
+  const island = scene.islands.find((candidate) => candidate.islandId === arrival.regionId);
+  if (island === undefined) throw new Error('arrival_source_unavailable');
+  const position = localVec3(
+    arrival.positionLocalMm[0] / 1000,
+    arrival.positionLocalMm[1] / 1000,
+    arrival.positionLocalMm[2] / 1000,
+  );
+  const forward = localVec3(
+    arrival.forwardLocalMillionths[0] / 1_000_000,
+    arrival.forwardLocalMillionths[1] / 1_000_000,
+    arrival.forwardLocalMillionths[2] / 1_000_000,
+  );
+  return recoveredCameraState(island, position, forward);
 }
 
 /**

@@ -26,7 +26,7 @@ import threading
 import uuid
 import weakref
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Annotated, Any, Final, Literal
 
 import psycopg
@@ -34,6 +34,12 @@ from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
+from exulanica.api.arrival_source import (
+    ArrivalAuthority,
+    arrival_authority_under_lock,
+    buffer_arrival_authority,
+    current_arrival_descriptor,
+)
 from exulanica.canonical import canonical_json
 from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.db.session import set_workspace
@@ -45,6 +51,7 @@ from exulanica.evidence.blob import BlobId
 from exulanica.grammar.errors import CatalogError
 from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
 from exulanica.world.generated_worlds import generation_receipt, town_records
@@ -60,6 +67,7 @@ from exulanica.world.society_authored_ground import (
     StandingPolicy,
     authored_input_region,
     build_authored_ground_society_input_v3,
+    build_authored_ground_society_input_v4,
     objects_in_region,
     read_authored_ground,
 )
@@ -148,6 +156,7 @@ class _ReadFirst:
     rows: dict[str, ReviewedRow] = field(default_factory=dict)
     read: set[tuple[str, str]] = field(default_factory=set)
     towns: dict[tuple[str, uuid.UUID], _TownRead] = field(default_factory=dict)
+    arrivals: dict[str, ArrivalAuthority] = field(default_factory=dict)
     locked: bool = False
 
 
@@ -905,11 +914,13 @@ class SocietyRuntime:
             self._read_composition_ahead(connection, session, composing, read)
         for document in documents:
             self._read_input_ahead(connection, session, read, document, binding)
+            self._read_arrival_ahead(connection, session, read, document)
         if not announced:
             return
         announced_documents, assets = announced_inputs(connection)
         for document in announced_documents:
             self._read_input_ahead(connection, session, read, document)
+            self._read_arrival_ahead(connection, session, read, document)
         if assets:
             self._read_assets_ahead(
                 connection,
@@ -923,6 +934,28 @@ class SocietyRuntime:
                     ).fetchall()
                 ),
             )
+
+    def _read_arrival_ahead(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        read: _ReadFirst,
+        document: dict,
+    ) -> None:
+        if document.get("profile") != "exulanica.society-input/authored-ground-v4":
+            return
+        try:
+            descriptor = ArrivalDescriptor.model_validate(document["arrival"])
+        except (KeyError, ValueError):
+            return
+        key = society_state_sha256(descriptor.model_dump(mode="json"))
+        if key in read.arrivals:
+            return
+        authority = buffer_arrival_authority(
+            connection, session.workspace_id, descriptor, self.store
+        )
+        if authority is not None:
+            read.arrivals[key] = authority
 
     def _refs(self, binding: SocietyRuntimeBinding) -> list[dict[str, str]]:
         refs = [
@@ -1330,6 +1363,7 @@ class SocietyRuntime:
         read: _ReadFirst,
         composition: str | None = None,
         living_routine: RoutineModel | None = None,
+        arrival: ArrivalDescriptor | None = None,
     ) -> dict:
         """Compose a saved world's input under the asset read lock, from rows and ``read``.
 
@@ -1355,6 +1389,24 @@ class SocietyRuntime:
         # the area the ground states or declares, or the walking surfaces the world's own records
         # state. A form with no composition is refused by name.
         if ground.navigation_form == "lattice":
+            if arrival is not None:
+                arrived_ground = replace(
+                    ground,
+                    arrival_x_mm=arrival.position_local_mm[0],
+                    arrival_z_mm=arrival.position_local_mm[2],
+                )
+                return build_authored_ground_society_input_v4(
+                    ground=ground,
+                    version=version,
+                    arrival=arrival,
+                    input_seq=seq,
+                    dependency_refs=self._authored_refs(binding, arrived_ground),
+                    availability="available" if reason is None else "unavailable",
+                    unavailable_reason=reason,
+                    reviewed_affordances=registry,
+                    segment_blocked=segment_blocked,
+                    standing=self._standing,
+                )
             return build_authored_ground_society_input_v3(
                 ground=ground,
                 version=version,
@@ -1436,7 +1488,31 @@ class SocietyRuntime:
                 raise UnavailableSocietyInput("requested place/region has no configured binding")
             read = self._transaction_read(connection)
             self._read_ahead(connection, session, read, composing=binding)
+            arrival_authority: ArrivalAuthority | None = None
+            if ground.ground_kind == "unstated":
+                arrival = current_arrival_descriptor(
+                    connection,
+                    session.workspace_id,
+                    binding.world_id,
+                    binding.version_id,
+                    binding.source_snapshot_id,
+                    self.store,
+                )
+                if arrival is None or arrival.region_id != binding.region_id:
+                    raise UnavailableSocietyInput("arrival_source_unavailable")
+                arrival_authority = buffer_arrival_authority(
+                    connection, session.workspace_id, arrival, self.store
+                )
+                if arrival_authority is None:
+                    raise UnavailableSocietyInput("arrival_source_unavailable")
+                read.arrivals[society_state_sha256(arrival.model_dump(mode="json"))] = (
+                    arrival_authority
+                )
             self._lock_assets(connection, read)
+            if arrival_authority is not None and not arrival_authority_under_lock(
+                connection, session.workspace_id, arrival_authority
+            ):
+                raise UnavailableSocietyInput("arrival_source_unavailable")
             version = self._authored_version(connection, session, binding)
             composition = None
             if engine is not None and ground.navigation_form == "walking_surfaces":
@@ -1448,7 +1524,14 @@ class SocietyRuntime:
                         f"no composition of a world's own surfaces is read by a {family} engine"
                     )
             return self._authored_compose(
-                connection, binding, ground, version, 1, read, composition
+                connection,
+                binding,
+                ground,
+                version,
+                1,
+                read,
+                composition,
+                arrival=None if arrival_authority is None else arrival_authority.descriptor,
             )
 
     def _stored_input(
@@ -1493,10 +1576,54 @@ class SocietyRuntime:
                 authored_input_region(document),
             )
             read = self._transaction_read(connection)
+            already_locked = read.locked
             self._read_ahead(
                 connection, session, read, document, announced=not alone, binding=binding
             )
+            arrival_authority: ArrivalAuthority | None = None
+            arrival = None
+            if document["profile"] == "exulanica.society-input/authored-ground-v4":
+                try:
+                    arrival = ArrivalDescriptor.model_validate(document["arrival"])
+                except (KeyError, ValueError) as exc:
+                    raise UnavailableSocietyInput("arrival descriptor is invalid") from exc
+                if (
+                    not already_locked
+                    and document["input_seq"] == 1
+                    and self._stored_input(connection, session, binding, document["input_seq"])
+                    is None
+                ):
+                    chosen = current_arrival_descriptor(
+                        connection,
+                        session.workspace_id,
+                        binding.world_id,
+                        binding.version_id,
+                        binding.source_snapshot_id,
+                        self.store,
+                    )
+                    if chosen != arrival:
+                        raise UnavailableSocietyInput("arrival_source_unavailable")
+                key = society_state_sha256(arrival.model_dump(mode="json"))
+                arrival_authority = read.arrivals.get(key)
+                if arrival_authority is None and not already_locked:
+                    arrival_authority = buffer_arrival_authority(
+                        connection, session.workspace_id, arrival, self.store
+                    )
+                    if arrival_authority is not None:
+                        read.arrivals[key] = arrival_authority
+                if arrival_authority is None:
+                    raise UnavailableSocietyInput("arrival_source_unavailable")
             self._lock_assets(connection, read)
+            if arrival_authority is not None and not arrival_authority_under_lock(
+                connection, session.workspace_id, arrival_authority
+            ):
+                raise UnavailableSocietyInput("arrival_source_unavailable")
+            if arrival is not None:
+                ground = replace(
+                    ground,
+                    arrival_x_mm=arrival.position_local_mm[0],
+                    arrival_z_mm=arrival.position_local_mm[2],
+                )
             if document["world_id"] != binding.world_id:
                 raise UnavailableSocietyInput("society input scope binding drift")
             if (
@@ -1521,7 +1648,7 @@ class SocietyRuntime:
                 expected = self._authored_compose(
                     connection,
                     binding,
-                    ground,
+                    self._authored_ground(connection, session, binding),
                     version,
                     document["input_seq"],
                     read,
@@ -1531,6 +1658,7 @@ class SocietyRuntime:
                     if ground.navigation_form == "walking_surfaces"
                     else None,
                     input_routine(document) if document["profile"] in LIVING_INPUTS else None,
+                    arrival=arrival,
                 )
                 if document != expected:
                     raise UnavailableSocietyInput(
@@ -1613,18 +1741,37 @@ class SocietyRuntime:
             ).fetchone()["seq"]
             if last is None:
                 raise UnavailableSocietyInput("society input history is unavailable")
-            read = self._transaction_read(connection)
-            self._read_ahead(connection, session, read, composing=binding)
-            self._lock_assets(connection, read)
-            version = self._authored_version(connection, session, binding)
             previous = connection.execute(
                 "select document from world_society_input where workspace_id=%s and "
                 "society_id=%s and input_seq=%s",
                 (session.workspace_id, row["society_id"], last),
             ).fetchone()
+            if previous is None:
+                raise UnavailableSocietyInput("society input history is unavailable")
+            last_document = previous["document"]
+            read = self._transaction_read(connection)
+            self._read_ahead(connection, session, read, composing=binding)
+            arrival_authority: ArrivalAuthority | None = None
+            if last_document["profile"] == "exulanica.society-input/authored-ground-v4":
+                arrival = ArrivalDescriptor.model_validate(last_document["arrival"])
+                key = society_state_sha256(arrival.model_dump(mode="json"))
+                arrival_authority = read.arrivals.get(key)
+                if arrival_authority is None and not read.locked:
+                    arrival_authority = buffer_arrival_authority(
+                        connection, session.workspace_id, arrival, self.store
+                    )
+                    if arrival_authority is not None:
+                        read.arrivals[key] = arrival_authority
+                if arrival_authority is None:
+                    raise UnavailableSocietyInput("arrival_source_unavailable")
+            self._lock_assets(connection, read)
+            if arrival_authority is not None and not arrival_authority_under_lock(
+                connection, session.workspace_id, arrival_authority
+            ):
+                raise UnavailableSocietyInput("arrival_source_unavailable")
+            version = self._authored_version(connection, session, binding)
             # A society's next input is composed as its last was: a living town's carries its
             # living place again, made under the routine its inputs record, never a newer one.
-            last_document = None if previous is None else previous["document"]
             document = self._authored_compose(
                 connection,
                 binding,
@@ -1638,6 +1785,7 @@ class SocietyRuntime:
                 input_routine(last_document)
                 if last_document is not None and last_document["profile"] in LIVING_INPUTS
                 else None,
+                arrival=None if arrival_authority is None else arrival_authority.descriptor,
             )
             if previous is not None and _reads_the_same(previous["document"], document):
                 # The edit changed nothing this society reads, such as an object in another

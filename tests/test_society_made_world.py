@@ -15,8 +15,13 @@ import json
 import uuid
 from collections.abc import Iterator
 
+import exulanica.api.society_runtime as society_runtime_module
 import pytest
 from exulanica.api.app import create_app
+from exulanica.api.arrival_source import (
+    authorized_arrival_descriptor,
+    current_arrival_descriptor,
+)
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
 from exulanica.api.society_runtime import SocietyRuntime
@@ -24,6 +29,7 @@ from exulanica.db.roles import provision_runtime_role
 from exulanica.environment.district_geometry import segment_blocked
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world.arrangements import arrangement_catalog
+from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.assets import reviewed_assets, seed_reviewed_assets
 from exulanica.world.authored_delta import AlternateVersion, delta_sha256
 from exulanica.world.composed import composed_candidate
@@ -38,6 +44,7 @@ from exulanica.world.society_authored_ground import (
     authored_ground_from_snapshot,
     authored_input_region,
     build_authored_ground_society_input_v3,
+    build_authored_ground_society_input_v4,
     ground_navigation,
 )
 from exulanica.world.society_composition import reviewed_affordance_registry
@@ -128,6 +135,47 @@ def _compose(ground, version):
         segment_blocked=segment_blocked,
         standing=square.STANDING,
     )
+
+
+def test_new_made_world_input_records_the_served_local_arrival_without_rewriting_v3():
+    ground = _read(_made_candidate(), "region-a")
+    version = _version()
+    before = _compose(ground, version)
+    arrival = ArrivalDescriptor.model_validate(
+        {
+            "profile": "exulanica.arrival-descriptor/v1",
+            "presentation_policy": "exulanica.arrival-presentation/v1",
+            "region_id": "region-a",
+            "position_local_mm": [5000, 1600, 7000],
+            "forward_local_millionths": [0, 0, -1000000],
+            "source": {
+                "profile": "exulanica.arrival-photograph-pin/v1",
+                "world_id": WORLD,
+                "version_id": str(VERSION),
+                "source_snapshot_id": str(SNAPSHOT),
+                "region_id": "region-a",
+                "capture_id": str(uuid.uuid4()),
+            },
+        }
+    )
+    after = build_authored_ground_society_input_v4(
+        ground=ground,
+        version=version,
+        arrival=arrival,
+        input_seq=1,
+        dependency_refs=(),
+        availability="available",
+        unavailable_reason=None,
+        reviewed_affordances=reviewed_affordance_registry(),
+        segment_blocked=segment_blocked,
+        standing=square.STANDING,
+    )
+    assert before == _compose(ground, version)
+    assert before["navigation"]["arrival_mm"] == [0, 0]
+    assert after["navigation"]["arrival_mm"] == [5000, 7000]
+    assert after["arrival"] == arrival.model_dump(mode="json")
+    assert before["profile"] == "exulanica.society-input/authored-ground-v3"
+    assert after["profile"] == "exulanica.society-input/authored-ground-v4"
 
 
 def test_a_made_worlds_ground_is_its_catalog_entry_about_the_named_region():
@@ -326,6 +374,57 @@ def _place(api, entry: dict, object_id: str, region: str, asset=PLATE, x_mm=3_00
     return api.entry(entry["entry_id"])
 
 
+def _opening_regions(api, entry: dict) -> tuple[str, str]:
+    descriptor = current_arrival_descriptor(
+        api.repository.connection,
+        api.repository.workspace_id,
+        entry["world_id"],
+        uuid.UUID(entry["authored_version_id"]),
+        uuid.UUID(entry["source_snapshot_id"]),
+        api.store,
+    )
+    assert descriptor is not None
+    others = {source["region_id"] for source in personal.source_media(api, entry)} - {
+        descriptor.region_id
+    }
+    assert len(others) == 1
+    return descriptor.region_id, others.pop()
+
+
+@pytest.mark.postgres
+def test_current_made_world_arrival_is_owned_by_its_saved_source(made):
+    api = made
+    personal.photograph(api, minute=0)
+    personal.photograph(api, minute=0, hour=15)
+    personal.group(api)
+    entry = personal.make_world(api)
+    descriptor = current_arrival_descriptor(
+        api.repository.connection,
+        api.repository.workspace_id,
+        entry["world_id"],
+        uuid.UUID(entry["authored_version_id"]),
+        uuid.UUID(entry["source_snapshot_id"]),
+        api.store,
+    )
+    assert descriptor is not None
+    assert descriptor.source.world_id == entry["world_id"]
+    assert descriptor.region_id in {
+        source["region_id"] for source in personal.source_media(api, entry)
+    }
+    assert authorized_arrival_descriptor(
+        api.repository.connection, api.repository.workspace_id, descriptor, api.store
+    )
+    api.repository.insert_tombstone(
+        scope="capture",
+        capture_id=descriptor.source.capture_id,
+        requested_by=api.actor,
+        reason="source withdrawn after arrival pin",
+    )
+    assert not authorized_arrival_descriptor(
+        api.repository.connection, api.repository.workspace_id, descriptor, api.store
+    )
+
+
 @pytest.mark.postgres
 def test_people_live_in_one_place_of_a_made_world_and_replay(made):
     api = made
@@ -333,9 +432,7 @@ def test_people_live_in_one_place_of_a_made_world_and_replay(made):
     personal.photograph(api, minute=0, hour=15)
     personal.group(api)
     entry = personal.make_world(api)
-    regions = sorted({slot["region_id"] for slot in personal.source_media(api, entry)})
-    assert len(regions) == 2, regions
-    here, there = regions
+    here, there = _opening_regions(api, entry)
     entry = _place(api, entry, "object:bench-here", here)
     entry = _place(api, entry, "object:bench-there", there)
     society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
@@ -348,6 +445,26 @@ def test_people_live_in_one_place_of_a_made_world_and_replay(made):
     assert created.status_code == 200, created.text
     snapshot = created.json()
     assert snapshot["region_id"] == here and snapshot["population_size"] == 8
+    input_row = api.repository.connection.execute(
+        "select i.document from world_society_input i join world_society s "
+        "on s.workspace_id=i.workspace_id and s.society_id=i.society_id "
+        "where s.workspace_id=%s and s.version_id=%s and i.input_seq=1",
+        (api.repository.workspace_id, uuid.UUID(entry["authored_version_id"])),
+    ).fetchone()
+    genesis = input_row["document"]
+    assert genesis["profile"] == "exulanica.society-input/authored-ground-v4"
+    assert genesis["arrival"]["region_id"] == here
+    opened = api.entry(entry["entry_id"])
+    assert opened["arrival"] == genesis["arrival"]
+    assert opened["arrival_unavailable_reason"] is None
+    ax, _, az = genesis["arrival"]["position_local_mm"]
+    assert (
+        min(
+            ((person["position_mm"][0] - ax) ** 2 + (person["position_mm"][1] - az) ** 2) ** 0.5
+            for person in snapshot["state"]["inhabitants"]
+        )
+        >= 2_000
+    )
     places = api.get(society + "&places=true").json()["places"]
     assert [target["object_id"] for target in places["targets"]] == ["object:bench-here"]
     assert places["walkable_area"]["source"] == "declared"
@@ -376,6 +493,22 @@ def test_people_live_in_one_place_of_a_made_world_and_replay(made):
     replay = api.get(society.replace("/society?", "/society/replay?"))
     assert replay.status_code == 200, replay.text
     assert replay.json()["replay_verified"]
+    pinned_capture = uuid.UUID(genesis["arrival"]["source"]["capture_id"])
+    api.repository.insert_tombstone(
+        scope="capture",
+        capture_id=pinned_capture,
+        requested_by=api.actor,
+        reason="saved arrival source withdrawn",
+    )
+    unavailable = api.entry(entry["entry_id"])
+    assert unavailable["arrival"] is None
+    assert unavailable["arrival_unavailable_reason"] == "arrival_source_unavailable"
+    held = api.repository.connection.execute(
+        "select document from world_society_input where workspace_id=%s and society_id=%s "
+        "and input_seq=1",
+        (api.repository.workspace_id, uuid.UUID(snapshot["society_id"])),
+    ).fetchone()
+    assert held["document"] == genesis, "withdrawal does not rewrite immutable input"
     assert replay.json()["state_sha256"] == after["state_sha256"]
 
 
@@ -389,7 +522,7 @@ def test_another_place_never_reaches_this_society_and_one_version_holds_one(made
     personal.photograph(api, minute=0, hour=15)
     personal.group(api)
     entry = personal.make_world(api)
-    here, there = sorted({slot["region_id"] for slot in personal.source_media(api, entry)})
+    here, there = _opening_regions(api, entry)
     entry = _place(api, entry, "object:bench-here", here)
     society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
     created = api.post(society, {"region_id": here, "profile": "exulanica-society/v2"})
@@ -537,3 +670,47 @@ def test_a_made_world_serves_its_floor_and_takes_the_small_square_on_it(made):
     assert created.status_code == 200, created.text
     targets = api.get(society + "&places=true").json()["places"]["targets"]
     assert {target["object_id"] for target in targets} & set(added)
+
+
+@pytest.mark.postgres
+def test_two_object_arrangement_reuses_arrival_bytes_before_the_asset_lock(made, monkeypatch):
+    api = made
+    personal.photograph(api, minute=0)
+    personal.photograph(api, minute=0, hour=15)
+    personal.group(api)
+    entry = personal.make_world(api)
+    here, _there = _opening_regions(api, entry)
+    entry = _place(api, entry, "object:home", here, x_mm=-8_000, z_mm=-8_000)
+    society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
+    created = api.post(society, {"region_id": here, "profile": "exulanica-society/v2"})
+    assert created.status_code == 200, created.text
+
+    runtime = api.client.app.state.services.society_runtime
+    original = society_runtime_module.buffer_arrival_authority
+    buffers = 0
+
+    def before_lock(connection, workspace, descriptor, store):
+        nonlocal buffers
+        assert not runtime._transaction_read(connection).locked, "store read under asset lock"
+        buffers += 1
+        return original(connection, workspace, descriptor, store)
+
+    monkeypatch.setattr(society_runtime_module, "buffer_arrival_authority", before_lock)
+    square = arrangement_catalog().by_key()["small_square"]
+    version = f"/world/versions/{entry['authored_version_id']}"
+    scope = f"?world_id={entry['world_id']}"
+    request = {
+        "base_state_sha256": api.version(entry)["state_sha256"],
+        "arrangement_key": square.key,
+        "arrangement_version": square.version,
+        "viewer": {"x_mm": 0, "z_mm": 4_000, "yaw_microradians": 3_141_593, "region_id": here},
+        "origin_role": "fictional",
+    }
+    preview = api.post(version + "/arrangements/preview" + scope, request)
+    assert preview.status_code == 200 and preview.json()["availability"] == "ready", preview.text
+    applied = api.post(
+        version + "/arrangements/apply" + scope, {**request, "saved_entry": personal.binding(entry)}
+    )
+    assert applied.status_code == 201, applied.text
+    assert len(applied.json()["added_object_ids"]) >= 2
+    assert buffers >= 1

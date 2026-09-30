@@ -1,0 +1,13 @@
+{
+  "profile": "exulanica.arrival-presentation/v1",
+  "layout_scale_milli": 1000,
+  "scale_is_metric": false,
+  "max_drawn_regions": 5,
+  "position_unit": "millimetre",
+  "forward_unit": "millionth",
+  "eye_height_mm": 1600,
+  "fallback_min_distance_mm": 3600,
+  "fallback_max_distance_mm": 4400,
+  "fallback_radius_fraction_millionths": 220000,
+  "fallback_pitch_microradians": -85000
+}

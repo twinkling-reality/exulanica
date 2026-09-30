@@ -477,6 +477,7 @@ _WORLD_READS: Final = _every(
     "GET /world-entries",
     "GET /world-entries/candidates",
     "GET /world-entries/{entry_id}",
+    "GET /world-entries/{entry_id}/arrival/scene-geometry/{artifact_id}",
     "GET /world-generation/grammars",
     "GET /world/assets",
     "GET /world/assets/{asset_key}",

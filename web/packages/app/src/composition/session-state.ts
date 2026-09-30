@@ -174,6 +174,9 @@ export interface SessionState {
   worldEntries: WorldEntryClient | null;
   savedWorldEntries: readonly SavedWorldEntry[];
   activeWorldEntry: SavedWorldEntry | null;
+  /** A v4 pose is used only after its exact pinned source was loaded for this mount. */
+  arrivalVerified: boolean;
+  arrivalUnavailableReason: string | null;
   /**
    * What was thrown when the one available saved world would not open, kept whole so the surface
    * that has to explain it can tell a dropped connection from a refusal.
@@ -273,6 +276,8 @@ export function createSessionState(): SessionState {
     worldEntries: null,
     savedWorldEntries: Object.freeze([]),
     activeWorldEntry: null,
+    arrivalVerified: false,
+    arrivalUnavailableReason: null,
     worldEntryError: null,
 
     preferences: readPreferences(window.localStorage),

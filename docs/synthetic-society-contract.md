@@ -397,7 +397,10 @@ structural snapshot states: one authored region, an elevation, a spawn point and
 the ground module version, either a horizontal extent or an explicit statement that it has none.
 `exulanica.society-composition/authored-ground-v3` projects that ground, and the reviewed objects
 the person placed on it, into `exulanica.society-input/authored-ground-v3`, which the same v2
-policy, persistence and replay consume. Every input composed for a saved world uses it. It is the
+policy, persistence and replay consume. A society created over a world made from photographs uses
+`exulanica.society-input/authored-ground-v4`: its input also pins the entry's authorized opening
+region, source revision and region-local camera pose. Stored v3 inputs keep their profile and
+arrival rule through later edits. The v3 projection is the
 second profile's projection, which also records the purposeful routine it was composed under and
 names each activity's routine entry in place of a fixed duration. The earlier saved-world pairs,
 `authored-ground-v1` and `authored-ground-v2`, are never composed again and never rewritten: a
@@ -425,8 +428,13 @@ is, because a ground module need not state an edge.
   society stands in one of its regions, the one the creation names (`region_id`), on the plane at
   height 0 in that region's frame (an object standing at another height offers no activity, as on
   the starter), and declares the same square about the region's origin, marked
-  `source: "declared"`. A person arrives at the region origin: the rule its entry in the society
-  ground catalog states (`arrival: region_origin`), which needs nothing authored per world, where
+  `source: "declared"`. A v4 society starts around the saved entry's pinned opening pose, with at
+  least 2,000 mm between that pose and each resident at genesis. The server selects a drawable,
+  authorized region from the world's own saved source membership, by authored placement count
+  then capture order, before the page's five-region display limit. It pins either a retained scene
+  build, a standalone point map, or an authorized photograph and serves the pose in millimetres
+  and millionths of a direction under the versioned arrival presentation policy. Earlier v3
+  societies retain the region-origin arrival rule in the society ground catalog, where
   the starter's entry reads the spawn its snapshot states (`arrival: spawn`). Objects in the world's
   other regions are in another place (`objects_in_region`): they are no obstacle, activity,
   dependency or asset of this society's input, so a missing asset there leaves this region's input
@@ -445,7 +453,12 @@ is, because a ground module need not state an edge.
   Objects and the small square are placed on it in the region the person stands in.
 - In the app, People nearby brings a made world's people into the region their society already
   lives in, else the region the world opens in (`openingIsland`, the region holding most of the
-  person's placements, else the first), and hangs the crowd under that region's root, which every
+  person's placements, else the first). A v4 society's pinned region is drawn before the display
+  limit and its pinned source and camera pose are checked against the geometry the page loaded.
+  If the source is withdrawn or the bytes fail verification, the page names
+  `arrival_source_unavailable`, draws only currently authorized geometry and withholds the society
+  until its pinned source is readable again. The stored input and history are unchanged. The app
+  hangs the crowd under that region's root, which every
   drawn region has whether or not anything in it was reconstructed (`hostRegionSociety`), with who
   decides for them offered as on the starter. Where this open does not draw the society's region
   the panel says nobody can be shown, where reading the society fails it says why, and the page

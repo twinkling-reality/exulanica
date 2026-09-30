@@ -340,6 +340,19 @@ export function buildScene(
   };
 }
 
+/** Make a server-selected owned arrival drawable before the five-region presentation cut. */
+export function prioritizeOwnedArrival(
+  snapshot: GraphSnapshot,
+  regionId: string,
+): GraphSnapshot {
+  const chosen = snapshot.islands.find((island) => island.islandId === regionId);
+  if (chosen === undefined) throw new Error('arrival_source_unavailable');
+  return Object.freeze({
+    ...snapshot,
+    islands: Object.freeze([chosen, ...snapshot.islands.filter((island) => island !== chosen)]),
+  });
+}
+
 function resolveCreationOrdinals(
   records: readonly IslandRecord[],
   supplied: ReadonlyMap<IslandId, number>,

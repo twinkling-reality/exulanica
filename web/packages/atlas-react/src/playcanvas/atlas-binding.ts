@@ -1076,7 +1076,7 @@ export class AtlasBinding {
       }
     }
 
-    const start = worldStart(kind, options.scene, navigationWorld, options.placementRegionIds);
+    const start = worldStart(kind, options.scene, navigationWorld, options.placementRegionIds, options.servedArrival);
     const controls = new FirstPersonControls(
       options.canvas,
       start.pose,

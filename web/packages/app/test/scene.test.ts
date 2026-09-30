@@ -10,7 +10,7 @@ import {
   rendersAsPresenceMarker,
 } from '@exulanica/atlas-core';
 
-import { buildScene, buildSceneFromLayout } from '../src/scene.js';
+import { buildScene, buildSceneFromLayout, prioritizeOwnedArrival } from '../src/scene.js';
 
 /**
  * The adapter from graph data to the scene graph, which is where three product rules stop being
@@ -72,6 +72,20 @@ function snapshotOf(
 }
 
 describe('graph data becomes a scene', () => {
+  it('draws the owned v4 arrival even when older workspace regions fill the display limit', () => {
+    const source = snapshotOf(
+      ['outside-0', 'outside-1', 'outside-2', 'outside-3', 'outside-4', 'owned']
+        .map((id) => island(id)),
+      [],
+    );
+    const selected = prioritizeOwnedArrival(source, 'owned');
+    const built = buildScene(selected);
+    expect(built.scene.islands[0]!.islandId).toBe('owned');
+    expect(built.scene.islands).toHaveLength(5);
+    expect(source.islands[0]!.islandId).toBe('outside-0');
+    expect(() => prioritizeOwnedArrival(source, 'absent')).toThrow('arrival_source_unavailable');
+  });
+
   it('preserves a persisted full transform across a scene rebuild', () => {
     const input = snapshotOf([island('a')], [occurrence('o1', 'a')]);
     const pinned = placement(atlasVec3(42, 0.5, -18), 0.75, 1.4);

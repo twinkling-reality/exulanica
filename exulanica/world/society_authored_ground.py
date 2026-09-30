@@ -23,12 +23,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Final, Literal
 
 import psycopg
 from psycopg.rows import dict_row
 
+from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.object_catalog import world_object_catalog
@@ -66,6 +67,7 @@ from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_COMPOSITION,
     AUTHORED_GROUND_COMPOSITION_V2,
     AUTHORED_GROUND_COMPOSITION_V3,
+    AUTHORED_GROUND_COMPOSITION_V4,
     MOVES,
     NO_AUTHORED_FRAME,
     OFF_GROUND,
@@ -831,6 +833,76 @@ def build_authored_ground_society_input_v3(
     catalog does not state, or states with another affordance, is refused by name here, before any
     input records it; an input that recorded a routine is never read against that catalog.
     """
+    return _authored_ground_with_routine(
+        AUTHORED_GROUND_COMPOSITION_V3,
+        ground=ground,
+        version=version,
+        input_seq=input_seq,
+        dependency_refs=dependency_refs,
+        availability=availability,
+        unavailable_reason=unavailable_reason,
+        reviewed_affordances=reviewed_affordances,
+        segment_blocked=segment_blocked,
+        standing=standing,
+        routine=routine,
+    )
+
+
+def build_authored_ground_society_input_v4(
+    *,
+    ground: SocietyGround,
+    version: AlternateVersion,
+    arrival: ArrivalDescriptor,
+    input_seq: int,
+    dependency_refs: Sequence[dict[str, str]],
+    availability: str,
+    unavailable_reason: str | None,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    segment_blocked: SegmentBlocked,
+    standing: StandingPolicy,
+    routine: PurposefulRoutine | None = None,
+) -> dict[str, Any]:
+    """Compose a new made-world society at its pinned, region-local opening pose."""
+    if (
+        arrival.source.world_id != version.world_id
+        or arrival.source.version_id != version.version_id
+        or arrival.source.source_snapshot_id != ground.snapshot_id
+        or arrival.region_id != ground.region_id
+    ):
+        raise ValueError("arrival source does not belong to this authored ground and version")
+    x, _, z = arrival.position_local_mm
+    arrived_ground = replace(ground, arrival_x_mm=x, arrival_z_mm=z)
+    return _authored_ground_with_routine(
+        AUTHORED_GROUND_COMPOSITION_V4,
+        ground=arrived_ground,
+        version=version,
+        input_seq=input_seq,
+        dependency_refs=dependency_refs,
+        availability=availability,
+        unavailable_reason=unavailable_reason,
+        reviewed_affordances=reviewed_affordances,
+        segment_blocked=segment_blocked,
+        standing=standing,
+        routine=routine,
+        arrival=arrival,
+    )
+
+
+def _authored_ground_with_routine(
+    composition: str,
+    *,
+    ground: SocietyGround,
+    version: AlternateVersion,
+    input_seq: int,
+    dependency_refs: Sequence[dict[str, str]],
+    availability: str,
+    unavailable_reason: str | None,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    segment_blocked: SegmentBlocked,
+    standing: StandingPolicy,
+    routine: PurposefulRoutine | None,
+    arrival: ArrivalDescriptor | None = None,
+) -> dict[str, Any]:
     chosen = purposeful_routine() if routine is None else routine
     catalog = world_object_catalog()
     check_object_kinds(chosen, catalog)
@@ -841,7 +913,7 @@ def build_authored_ground_society_input_v3(
         return {"activity": chosen.at_object(item.reviewed["affordance"], kind).key}
 
     document = _authored_ground_input(
-        AUTHORED_GROUND_COMPOSITION_V3,
+        composition,
         activity,
         ground=ground,
         version=version,
@@ -855,6 +927,8 @@ def build_authored_ground_society_input_v3(
     )
     del document["document_sha256"]
     document["routine"] = chosen.binding()
+    if arrival is not None:
+        document["arrival"] = arrival.model_dump(mode="json")
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     return document

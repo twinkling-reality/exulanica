@@ -162,7 +162,7 @@ export {
   mapCameraState,
 } from './atlas-binding.js';
 export { ownedDistrictCameraState, ownedDistrictOverviewCameraState } from './camera-views.js';
-export { openingIsland, type OpeningPlacements } from './opening-region.js';
+export { openingIsland, type OpeningPlacements, type ServedArrivalPose } from './opening-region.js';
 export { drawDeclaredFloors, type DeclaredFloorSpec, type DrawnDeclaredFloors } from './declared-floor.js';
 export {
   type GeneratedSocietyHost,

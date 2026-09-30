@@ -60,6 +60,15 @@ training outputs establish this delivery and lineage behaviour, not reconstructi
 the real mask stage rebuilds a changed source and the trained asset built from the prior source
 stays refused.
 
+A saved world's v4 arrival can retain one successful scene job after a later job becomes the
+scene's current graph build. The job-bound build claim is separate from the scene's functional
+current-rung claim. The entry-scoped reader requires the stored world, version, source snapshot,
+scene, job and exact pose, placement and gate digests; it checks every immutable job member and
+current source right before serving metadata or trained bytes. A withdrawn member retracts that
+build claim, including a member the reconstruction did not register. Ordinary graph and geometry
+reads continue to select the current build. A retained claim does not preserve permission after
+withdrawal or purge.
+
 ## Authorization instant and ordering
 
 Snapshot metadata is read in a REPEATABLE READ, READ ONLY transaction. The explicit-time predicates

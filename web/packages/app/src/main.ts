@@ -44,7 +44,8 @@ import {
   developmentToken,
   PREVIEW_NYC_OPEN_DATA_ADMISSION_ID,
 } from './config.js';
-import { buildScene } from './scene.js';
+import { buildScene, prioritizeOwnedArrival } from './scene.js';
+import { ARRIVAL_PRESENTATION } from './arrival-presentation.js';
 import { buildCredentialGate } from './ui/credential-gate.js';
 import type { AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
@@ -531,8 +532,10 @@ async function mount(): Promise<void> {
         undrawable: new Map(),
       }
     : buildScene(
-        current,
-        1,
+        state.arrivalVerified && state.activeWorldEntry?.arrival != null
+          ? prioritizeOwnedArrival(current, state.activeWorldEntry.arrival.regionId)
+          : current,
+        ARRIVAL_PRESENTATION.layout_scale_milli / 1000,
         new Map(),
         new Map(),
         reconstructionsOf(state, state.pointMaps, state.placedPointMaps),

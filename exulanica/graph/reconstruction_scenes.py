@@ -316,16 +316,19 @@ select distinct on (s.scene_id)
        gate.content_sha256 as gate_sha256,
        projection.digests as projection_digests
   from reconstruction_scene s
+  cross join (select %s::uuid as retained_job_id) requested
   left join reconstruction_scene_job j
     on j.workspace_id = s.workspace_id
-   and j.job_id = s.current_job_id
+   and j.job_id = coalesce(requested.retained_job_id,s.current_job_id)
    and j.status = 'succeeded'
   join assertion a
     on a.workspace_id = s.workspace_id
    and a.subject_ref ->> 'type' = 'scene'
    and a.subject_ref ->> 'id' = s.scene_id::text
-   and a.status = 'active'
-   and (s.current_job_id is null or a.assertion_id = j.rung_assertion_id)
+   and ((requested.retained_job_id is null and a.status = 'active'
+         and (s.current_job_id is null or a.assertion_id = j.rung_assertion_id))
+     or (requested.retained_job_id is not null and a.status in ('active','superseded')
+         and a.assertion_id = j.rung_assertion_id))
   join predicate p
     on p.predicate_id = a.predicate_id
    and p.key = %s
@@ -381,6 +384,14 @@ select distinct on (s.scene_id)
  where s.workspace_id = %s
    and (%s::uuid is null or s.scene_id = %s::uuid)
    and not tombstone_blocks_scene(s.workspace_id, s.scene_id)
+   and (requested.retained_job_id is null or exists (
+     select 1 from assertion build join predicate bp on bp.predicate_id=build.predicate_id
+     where build.workspace_id=s.workspace_id and build.status='active'
+       and bp.key='reconstruction_scene_build_rung_is'
+       and build.subject_ref->>'type'='scene'
+       and build.subject_ref->>'id'=s.scene_id::text
+       and build.subject_ref->>'job_id'=j.job_id::text
+       and build.object_value-'job_id'=a.object_value))
  order by s.scene_id, a.asserted_at desc, a.assertion_id desc,
           j.completed_at desc nulls last, j.job_id desc
 """
@@ -392,6 +403,7 @@ def reconstruction_scene_rows(
     store: ContentAddressedStore | None,
     *,
     scene_id: uuid.UUID | None = None,
+    retained_job_id: uuid.UUID | None = None,
 ) -> list[ReconstructionSceneRow]:
     """Return live scene claims, exposing placements only when their receipt chain verifies.
 
@@ -404,6 +416,7 @@ def reconstruction_scene_rows(
     rows = connection.execute(
         _SCENES,
         (
+            retained_job_id,
             RECONSTRUCTION_SCENE_RUNG_PREDICATE,
             SCENE_PROJECTION_KIND,
             workspace,
@@ -411,7 +424,10 @@ def reconstruction_scene_rows(
             scene_id,
         ),
     ).fetchall()
-    return [_scene_row(connection, workspace, row, store) for row in rows]
+    return [
+        _scene_row(connection, workspace, row, store, retained_job_id=retained_job_id)
+        for row in rows
+    ]
 
 
 def _scene_row(
@@ -419,6 +435,8 @@ def _scene_row(
     workspace: uuid.UUID,
     row: dict[str, Any],
     store: ContentAddressedStore | None,
+    *,
+    retained_job_id: uuid.UUID | None = None,
 ) -> ReconstructionSceneRow:
     scene_id = row["scene_id"]
     members = _members(connection, workspace, scene_id, row["job_id"])
@@ -839,7 +857,15 @@ def _scene_row(
             else "No verified posed point map bytes are available, so source photographs are "
             "displayed."
         )
-    trained = trained_geometry_row(connection, workspace, scene_id, pose_digest, decision, store)
+    trained = trained_geometry_row(
+        connection,
+        workspace,
+        scene_id,
+        pose_digest,
+        decision,
+        store,
+        retained_job_id=retained_job_id,
+    )
     if trained is not None and trained.state == "available":
         substrate = "gaussian_splats"
         displayed_rung = max(claim.rung or 4, 3)

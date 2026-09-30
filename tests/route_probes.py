@@ -703,6 +703,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         "is the same bytes for everyone, and what a workspace spends is its own delivery ledger",
     ),
     "/world-entries/{entry_id}": Owned(build.world_entry),
+    "/world-entries/{entry_id}/arrival/scene-geometry/{artifact_id}": Owned(build.trained_scene),
     "/world-read/places/{place_id}": Owned(build.world_read_place),
     "/world-read/scenes/{scene_id}": Owned(build.reconstruction_scene),
     "/world-write/scenes/{scene_id}": Owned(build.reconstruction_scene),

@@ -506,11 +506,15 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
         "superseded_builds": 1,
     }
     assertion_counts = repository.connection.execute(
-        "select count(*) as count,count(*) filter (where status='active') as active "
-        "from assertion where workspace_id=%s and subject_ref->>'id'=%s",
+        "select p.key,count(*) as count,count(*) filter (where a.status='active') as active "
+        "from assertion a join predicate p using(predicate_id) "
+        "where a.workspace_id=%s and a.subject_ref->>'id'=%s group by p.key",
         (repository.workspace_id, str(first.scene_id)),
-    ).fetchone()
-    assert assertion_counts == {"count": 2, "active": 1}
+    ).fetchall()
+    assert {row["key"]: (row["count"], row["active"]) for row in assertion_counts} == {
+        "reconstruction_scene_rung_is": (2, 1),
+        "reconstruction_scene_build_rung_is": (2, 2),
+    }
     package = project_world_package(
         repository.connection,
         workspace_id=repository.workspace_id,
@@ -522,6 +526,11 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
     reconstruction = json.loads(
         (package.output / "reconstruction/artifacts.json").read_text(encoding="utf-8")
     )
+    graph = json.loads((package.output / "memory/graph.json").read_text(encoding="utf-8"))
+    assert all(
+        claim["predicate"] != "reconstruction_scene_build_rung_is"
+        for claim in graph["assertions"]
+    ), "the job-bound arrival claim is private to saved entry reads"
     assert len(reconstruction["rung_claims"]) == 1
     assert len([item for item in reconstruction["items"] if item["scene"] is not None]) == 3
     with (

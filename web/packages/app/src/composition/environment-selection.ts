@@ -1782,6 +1782,9 @@ export function mountEnvironmentSelection(
    * where the world has neither, or its region is not drawn.
    */
   async function societyRegion(entry: NonNullable<SessionState['activeWorldEntry']>): Promise<string | null> {
+    if (entry.arrivalUnavailableReason != null || deps.state.arrivalUnavailableReason != null) {
+      throw new Error('arrival_source_unavailable');
+    }
     if (entry.authoredScene != null) return entry.authoredScene.region.regionId;
     const binding = deps.state.atlas?.binding;
     // A generated world's people live in the one region its entry declares, in the city's frame
@@ -1797,7 +1800,10 @@ export function mountEnvironmentSelection(
       if (error instanceof ApiError && error.status === 404) return null;
       throw error;
     });
-    const regionId = stored?.regionId
+    if (entry.arrival != null && !deps.state.arrivalVerified) {
+      throw new Error('arrival_source_unavailable');
+    }
+    const regionId = entry.arrival?.regionId ?? stored?.regionId
       ?? openingIsland(deps.scene, deps.state.placementRegionIds ?? [])?.islandId ?? null;
     if (regionId === null) return null;
     return hostRegionSociety(binding, regionId as IslandId) === null ? null : regionId;

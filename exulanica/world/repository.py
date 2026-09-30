@@ -810,6 +810,35 @@ class WorldStyleRepository:
         lapsed = self._lapsed(rows)
         return tuple(self._source_from_row(row, store, lapsed) for row in rows)
 
+    def source_capture_binding(
+        self, source_snapshot_id: uuid.UUID, capture_id: uuid.UUID
+    ) -> tuple[str, str] | None:
+        """The current source region and viewer digest for an owned capture, from rows only.
+
+        An arrival reader checks the viewer bytes before the asset lock, then compares this
+        binding again under it. This method deliberately performs no store access.
+        """
+        digest = self._source_topology_digest(None, source_snapshot_id)
+        rows = self._source_rows(digest)
+        lapsed = self._lapsed(rows)
+        matches = [row for row in rows if capture_id in (row["capture_ids"] or ())]
+        if len(matches) != 1:
+            return None
+        row = matches[0]
+        if (
+            row["region_id"] is None
+            or row["evidence_span_id"] is None
+            or row["tombstoned"]
+            or not row["live_capture"]
+            or capture_id in lapsed
+            or row["purged_at"] is not None
+            or row["storage_key"] is None
+            or row["blob_sha256"] is None
+            or row["viewer_sha256"] is None
+        ):
+            return None
+        return row["region_id"], bytes(row["viewer_sha256"]).hex()
+
     def require_source_media(
         self,
         source_id: uuid.UUID,
@@ -1746,6 +1775,7 @@ class WorldStyleRepository:
             capture_ids=(
                 tuple(row["capture_ids"]) if row["live_capture"] and not row["tombstoned"] else ()
             ),
+            viewer_sha256=bytes(row["viewer_sha256"]).hex() if available else None,
         )
 
 

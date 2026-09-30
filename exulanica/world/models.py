@@ -151,3 +151,5 @@ class WorldSourceMedia:
     captured_at: dt.datetime | None
     captured_at_uncertainty_ms: int | None
     capture_ids: tuple[uuid.UUID, ...] = ()
+    # Internal read-ahead binding. API views deliberately expose only the authorized media path.
+    viewer_sha256: str | None = None

@@ -174,6 +174,9 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       ...(generatedTile === undefined ? {} : { generatedTile }),
       ...(generatedWorld == null ? {} : { generatedTile: generatedWorld }),
       ...(state.placementRegionIds === undefined ? {} : { placementRegionIds: state.placementRegionIds }),
+      ...(state.arrivalVerified && state.activeWorldEntry?.arrival != null
+        ? { servedArrival: state.activeWorldEntry.arrival }
+        : {}),
       ...(state.activeWorldEntry?.authoredScene === null ||
           state.activeWorldEntry?.authoredScene === undefined
         ? {}

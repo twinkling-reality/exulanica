@@ -23,6 +23,11 @@ rendered geometry does not establish historical facts.
    small square stand on. The world's people live on the floor of one region, and the world's owner
    can choose the models that decide for them ([people and models in a world](simulation.md)).
 
+A made world's saved entry serves the authorized region and source revision where its society
+began. The page opens at that source's region-local viewpoint and direction and checks that the
+geometry it loaded matches the entry. If the source loses permission or cannot be read, the world
+still opens with its available geometry, while its people are unavailable with a named reason.
+
 ## What reconstruction recovers
 
 Intake supports still images. Reconstruction quality and available movement depend on source

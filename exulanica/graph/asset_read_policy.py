@@ -80,8 +80,9 @@ select j.job_id,j.build_inputs,a.content_sha256,
        gate.content_sha256 as gate_sha256,placement.content_sha256 as placement_sha256,
        j.rung_assertion_id
 from reconstruction_scene s
+cross join (select %s::uuid as retained_job_id) requested
 join reconstruction_scene_job j on j.workspace_id=s.workspace_id
-  and j.job_id=s.current_job_id and j.status='succeeded'
+  and j.job_id=coalesce(requested.retained_job_id,s.current_job_id) and j.status='succeeded'
 join artifact a on a.workspace_id=j.workspace_id and a.artifact_id=j.pose_receipt_artifact_id
   and a.purged_at is null and not a.needs_repair
 join artifact gate on gate.workspace_id=j.workspace_id and gate.artifact_id=j.gate_artifact_id
@@ -90,8 +91,18 @@ join artifact placement on placement.workspace_id=j.workspace_id
   and placement.artifact_id=j.placement_artifact_id
   and placement.purged_at is null and not placement.needs_repair
 join assertion claim on claim.workspace_id=j.workspace_id
-  and claim.assertion_id=j.rung_assertion_id and claim.status='active'
+  and claim.assertion_id=j.rung_assertion_id
 where s.workspace_id=%s and s.scene_id=%s
+  and ((requested.retained_job_id is null and claim.status='active')
+    or (requested.retained_job_id is not null and claim.status in ('active','superseded')
+      and exists (select 1 from assertion build
+        join predicate p on p.predicate_id=build.predicate_id
+        where build.workspace_id=j.workspace_id and build.status='active'
+          and p.key='reconstruction_scene_build_rung_is'
+          and build.subject_ref->>'type'='scene'
+          and build.subject_ref->>'id'=s.scene_id::text
+          and build.subject_ref->>'job_id'=j.job_id::text
+          and build.object_value-'job_id'=claim.object_value)))
 """
 
 
@@ -262,9 +273,11 @@ def scene_inputs(
     workspace: uuid.UUID,
     scene_id: uuid.UUID,
     store: ContentAddressedStore,
+    *,
+    retained_job_id: uuid.UUID | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]] | None:
-    """Buffer the current pose manifest; absence is not invented legacy lineage."""
-    row = connection.execute(_SCENE_BINDING, (workspace, scene_id)).fetchone()
+    """Buffer the current or explicitly pinned, still-authorized pose manifest."""
+    row = connection.execute(_SCENE_BINDING, (retained_job_id, workspace, scene_id)).fetchone()
     if row is None or row["content_sha256"] is None:
         return None
     blob = BlobId(bytes(row["content_sha256"]))
@@ -297,11 +310,13 @@ def scene_allowed(
     scene_id: uuid.UUID,
     buffered: tuple[dict[str, Any], dict[str, Any]] | None,
     at: dt.datetime,
+    *,
+    retained_job_id: uuid.UUID | None = None,
 ) -> bool:
     if buffered is None:
         return False
     row, manifest = buffered
-    current = connection.execute(_SCENE_BINDING, (workspace, scene_id)).fetchone()
+    current = connection.execute(_SCENE_BINDING, (retained_job_id, workspace, scene_id)).fetchone()
     if current != row:
         return False
     for key in ("pose_id", "gate_id", "placement_id"):

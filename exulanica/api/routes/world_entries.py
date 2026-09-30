@@ -6,10 +6,14 @@ import datetime as dt
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from exulanica.api.arrival_source import (
+    authorized_arrival_descriptor,
+    authorized_retained_scene,
+)
 from exulanica.api.dependencies import (
     CurrentSession,
     ReadOnlyConnection,
@@ -17,6 +21,9 @@ from exulanica.api.dependencies import (
     get_services,
 )
 from exulanica.api.services import Services
+from exulanica.errors import BlobNotFoundError, IntegrityError, TombstonedError
+from exulanica.graph.payload import ReconstructionSceneRow
+from exulanica.graph.scene_geometry import read_scene_geometry
 from exulanica.world import (
     InvalidStructuralData,
     SavedWorldCandidate,
@@ -26,6 +33,7 @@ from exulanica.world import (
     SourceAttachmentSelection,
     StaleSavedWorldEntry,
 )
+from exulanica.world.arrival_selection import ArrivalDescriptor, RetainedScenePin
 from exulanica.world.saved_entries import SourceRebindRequired, WorldTakesNoPhotographs
 from exulanica.world.source_membership_events import (
     MembershipEventConflict,
@@ -164,6 +172,10 @@ class SavedWorldEntryView(BaseModel):
     #: Whether photographs may be added to this world, by its kind: false for a world generated
     #: from a recipe, which adding photographs to is refused by name.
     takes_photographs: bool
+    #: Present only for a society whose v4 genesis pinned this exact authorized first frame.
+    arrival: ArrivalDescriptor | None = None
+    arrival_unavailable_reason: Literal["arrival_source_unavailable"] | None = None
+    arrival_scene: ReconstructionSceneRow | None = None
 
 
 class CreateSavedWorldEntryBody(BaseModel):
@@ -312,7 +324,11 @@ class SavedWorldCandidateView(BaseModel):
 
 
 def _view(entry: SavedWorldEntry) -> SavedWorldEntryView:
-    values = {field: getattr(entry, field) for field in SavedWorldEntryView.model_fields}
+    values = {
+        field: getattr(entry, field)
+        for field in SavedWorldEntryView.model_fields
+        if hasattr(entry, field)
+    }
     if isinstance(entry.authored_scene, AuthoredStarterScene):
         values["authored_scene"] = AuthoredStarterSceneView.model_validate(entry.authored_scene)
     if entry.declared_floor is not None:
@@ -421,8 +437,130 @@ def entry(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> SavedWorldEntryView:
-    return _view(
-        SavedWorldEntryRepository(connection, session.workspace_id, services.store).entry(entry_id)
+    saved = SavedWorldEntryRepository(connection, session.workspace_id, services.store).entry(
+        entry_id
+    )
+    view = _view(saved)
+    if saved.source_kind != "personal":
+        return view
+    row = connection.execute(
+        "select i.document from world_society s join world_society_input i "
+        "on i.workspace_id=s.workspace_id and i.society_id=s.society_id and i.input_seq=1 "
+        "where s.workspace_id=%s and s.world_id=%s and s.version_id=%s",
+        (session.workspace_id, saved.world_id, saved.authored_version_id),
+    ).fetchone()
+    if (
+        row is None
+        or row["document"].get("profile") != "exulanica.society-input/authored-ground-v4"
+    ):
+        return view
+    try:
+        descriptor = ArrivalDescriptor.model_validate(row["document"]["arrival"])
+        available = authorized_arrival_descriptor(
+            connection, session.workspace_id, descriptor, services.store
+        )
+    except (KeyError, ValueError):
+        available = False
+    scene = None
+    if available and isinstance(descriptor.source, RetainedScenePin):
+        scene = authorized_retained_scene(
+            connection, session.workspace_id, descriptor.source, services.store
+        )
+        if scene is None:
+            available = False
+        elif scene.trained_geometry is not None and scene.trained_geometry.reference is not None:
+            scene = scene.model_copy(deep=True)
+            trained_copy = scene.trained_geometry
+            assert trained_copy is not None and trained_copy.reference is not None
+            trained_copy.reference.href = (
+                f"/world-entries/{entry_id}/arrival/scene-geometry/{trained_copy.artifact_id}"
+            )
+        if available and not authorized_arrival_descriptor(
+            connection, session.workspace_id, descriptor, services.store
+        ):
+            available = False
+    return view.model_copy(
+        update={
+            "arrival": descriptor if available else None,
+            "arrival_unavailable_reason": None if available else "arrival_source_unavailable",
+            "arrival_scene": scene if available else None,
+        }
+    )
+
+
+@router.get("/{entry_id}/arrival/scene-geometry/{artifact_id}")
+def arrival_scene_geometry(
+    entry_id: Annotated[uuid.UUID, Path()],
+    artifact_id: Annotated[uuid.UUID, Path()],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> Response:
+    """Serve only the trained artifact of this entry's currently authorized v4 build."""
+    saved = SavedWorldEntryRepository(connection, session.workspace_id, services.store).entry(
+        entry_id
+    )
+    row = connection.execute(
+        "select i.document from world_society s join world_society_input i "
+        "on i.workspace_id=s.workspace_id and i.society_id=s.society_id and i.input_seq=1 "
+        "where s.workspace_id=%s and s.world_id=%s and s.version_id=%s",
+        (session.workspace_id, saved.world_id, saved.authored_version_id),
+    ).fetchone()
+    if (
+        row is None
+        or row["document"].get("profile") != "exulanica.society-input/authored-ground-v4"
+    ):
+        return JSONResponse(
+            status_code=404, content={"code": "unknown_reference", "detail": "no arrival build"}
+        )
+    descriptor = ArrivalDescriptor.model_validate(row["document"]["arrival"])
+    pin = descriptor.source
+    if not isinstance(pin, RetainedScenePin) or not authorized_arrival_descriptor(
+        connection, session.workspace_id, descriptor, services.store
+    ):
+        return JSONResponse(
+            status_code=404, content={"code": "unknown_reference", "detail": "no arrival build"}
+        )
+    scene = authorized_retained_scene(connection, session.workspace_id, pin, services.store)
+    if (
+        scene is None
+        or scene.trained_geometry is None
+        or scene.trained_geometry.artifact_id != artifact_id
+    ):
+        return JSONResponse(
+            status_code=404, content={"code": "unknown_reference", "detail": "no arrival artifact"}
+        )
+    try:
+        found = read_scene_geometry(
+            connection,
+            session.workspace_id,
+            artifact_id,
+            services.store,
+            retained_job_id=pin.job_id,
+        )
+    except (BlobNotFoundError, IntegrityError, TombstonedError, ValueError):
+        found = None
+    if found is None or found.content_sha256 != scene.trained_geometry.content_sha256:
+        return JSONResponse(
+            status_code=404,
+            content={"code": "unknown_reference", "detail": "arrival artifact unavailable"},
+        )
+    if not authorized_arrival_descriptor(
+        connection, session.workspace_id, descriptor, services.store
+    ):
+        return JSONResponse(
+            status_code=404,
+            content={"code": "unknown_reference", "detail": "arrival artifact unavailable"},
+        )
+    return Response(
+        content=found.payload,
+        media_type="application/octet-stream",
+        headers={
+            "ETag": f'"{found.content_sha256}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Accept-Ranges": "none",
+        },
     )
 
 

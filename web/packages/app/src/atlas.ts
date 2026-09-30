@@ -43,7 +43,7 @@ import type {
   TrainedSceneGeometry,
   RecoveredSceneCamera,
 } from '@exulanica/atlas-react/playcanvas';
-import { AtlasBinding, describeWorldKind, type WorldKind } from '@exulanica/atlas-react/playcanvas';
+import { AtlasBinding, describeWorldKind, type WorldKind, type ServedArrivalPose } from '@exulanica/atlas-react/playcanvas';
 
 export interface MountedAtlas {
   readonly binding: AtlasBinding;
@@ -89,6 +89,7 @@ export async function mountAtlas(
     readonly authoredPointMaps?: readonly AuthoredPointMapPlacement[];
     /** Where the person's placements are, which decides the region the world opens in. */
     readonly placementRegionIds?: readonly string[];
+    readonly servedArrival?: ServedArrivalPose;
   },
   beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
@@ -117,6 +118,9 @@ export async function mountAtlas(
     ...(presentation?.placementRegionIds === undefined
       ? {}
       : { placementRegionIds: presentation.placementRegionIds }),
+    ...(presentation?.servedArrival === undefined
+      ? {}
+      : { servedArrival: presentation.servedArrival }),
     ...(presentation === undefined
       ? {}
       : {

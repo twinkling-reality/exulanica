@@ -38,9 +38,18 @@ def trained_geometry_row(
     pose_digest: str,
     decision: SceneGateDecision,
     store: ContentAddressedStore,
+    *,
+    retained_job_id: uuid.UUID | None = None,
 ) -> SceneTrainedGeometryRow | None:
-    buffered = scene_inputs(connection, workspace, scene_id, store)
-    if not scene_allowed(connection, workspace, scene_id, buffered, evaluation_time(connection)):
+    buffered = scene_inputs(connection, workspace, scene_id, store, retained_job_id=retained_job_id)
+    if not scene_allowed(
+        connection,
+        workspace,
+        scene_id,
+        buffered,
+        evaluation_time(connection),
+        retained_job_id=retained_job_id,
+    ):
         return None
     assert buffered is not None
     if (
@@ -182,6 +191,8 @@ def read_scene_geometry(
     workspace: uuid.UUID,
     artifact_id: uuid.UUID,
     store: ContentAddressedStore,
+    *,
+    retained_job_id: uuid.UUID | None = None,
 ) -> GeometryBytes | None:
     row: dict[str, Any] | None = connection.execute(
         "select a.content_sha256,a.byte_size,a.purged_at,a.scene_id,"
@@ -190,15 +201,33 @@ def read_scene_geometry(
         "person_withdrawal_blocks_artifact(a.workspace_id,a.artifact_id) as withdrawn "
         "from artifact a join reconstruction_scene s on s.workspace_id=a.workspace_id "
         "and s.scene_id=a.scene_id join reconstruction_scene_job j "
-        "on j.workspace_id=s.workspace_id and j.job_id=s.current_job_id and j.status='succeeded' "
+        "on j.workspace_id=s.workspace_id and j.job_id=coalesce(%s::uuid,s.current_job_id) "
+        "and j.status='succeeded' "
         "join assertion claim on claim.workspace_id=j.workspace_id "
-        "and claim.assertion_id=j.rung_assertion_id and claim.status='active' "
+        "and claim.assertion_id=j.rung_assertion_id "
         "join artifact gate on gate.workspace_id=j.workspace_id "
         "and gate.artifact_id=j.gate_artifact_id and gate.purged_at is null "
         "join artifact pose on pose.workspace_id=j.workspace_id "
         "and pose.artifact_id=j.pose_receipt_artifact_id and pose.purged_at is null "
-        "where a.workspace_id=%s and a.artifact_id=%s and a.kind=%s",
-        (workspace, artifact_id, TRAINED_GEOMETRY_KIND),
+        "where a.workspace_id=%s and a.artifact_id=%s and a.kind=%s "
+        "and ((%s::uuid is null and claim.status='active') "
+        "or (%s::uuid is not null and claim.status in ('active','superseded') "
+        "and exists (select 1 from assertion build join predicate p "
+        "on p.predicate_id=build.predicate_id "
+        "where build.workspace_id=s.workspace_id and build.status='active' "
+        "and p.key='reconstruction_scene_build_rung_is' "
+        "and build.subject_ref->>'type'='scene' "
+        "and build.subject_ref->>'id'=s.scene_id::text "
+        "and build.subject_ref->>'job_id'=j.job_id::text "
+        "and build.object_value-'job_id'=claim.object_value)))",
+        (
+            retained_job_id,
+            workspace,
+            artifact_id,
+            TRAINED_GEOMETRY_KIND,
+            retained_job_id,
+            retained_job_id,
+        ),
     ).fetchone()
     if row is None:
         return None
@@ -206,7 +235,13 @@ def read_scene_geometry(
         raise TombstonedError("this reconstructed scene was withdrawn")
     decision = validate_scene_gate_decision(store.get(BlobId(bytes(row["gate_sha256"]))))
     current = trained_geometry_row(
-        connection, workspace, row["scene_id"], bytes(row["pose_sha256"]).hex(), decision, store
+        connection,
+        workspace,
+        row["scene_id"],
+        bytes(row["pose_sha256"]).hex(),
+        decision,
+        store,
+        retained_job_id=retained_job_id,
     )
     if current is None or current.artifact_id != artifact_id:
         return None
@@ -214,7 +249,9 @@ def read_scene_geometry(
     data = store.get(digest)
     if len(data) != row["byte_size"]:
         raise IntegrityError("trained scene byte size disagrees with its artifact row")
-    buffered = scene_inputs(connection, workspace, row["scene_id"], store)
+    buffered = scene_inputs(
+        connection, workspace, row["scene_id"], store, retained_job_id=retained_job_id
+    )
     if (
         buffered is None
         or buffered[0]["content_sha256"] != row["pose_sha256"]
@@ -222,7 +259,14 @@ def read_scene_geometry(
     ):
         return None
     with final_check(connection) as at:
-        if not scene_allowed(connection, workspace, row["scene_id"], buffered, at):
+        if not scene_allowed(
+            connection,
+            workspace,
+            row["scene_id"],
+            buffered,
+            at,
+            retained_job_id=retained_job_id,
+        ):
             return None
         current_row = connection.execute(
             "select content_sha256,scene_id,byte_size,kind,"

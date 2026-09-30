@@ -14,6 +14,7 @@ from exulanica.movement.registry import WALKING
 from exulanica.movement.steps import step_of
 from exulanica.movement.walking import WALKING_MODULE
 from exulanica.movement.walking import routes_from as _paths
+from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.society import (
     SOCIETY_NAMESPACE,
     SOCIETY_POPULATION,
@@ -34,6 +35,7 @@ from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_INPUT,
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
+    AUTHORED_GROUND_INPUT_V4,
     AUTHORED_GROUND_INPUTS,
     LIVING_INPUTS,
     LOCAL_FAILURE_INPUTS,
@@ -79,6 +81,7 @@ NAVIGATION_PROFILES = {
     AUTHORED_GROUND_INPUT: "authored-ground-lattice/v1",
     AUTHORED_GROUND_INPUT_V2: "authored-ground-lattice/v1",
     AUTHORED_GROUND_INPUT_V3: "authored-ground-lattice/v1",
+    AUTHORED_GROUND_INPUT_V4: "authored-ground-lattice/v1",
     WALKING_SURFACES_INPUT: "city-walking-surfaces/v1",
     WALKING_SURFACES_INPUT_V2: "city-walking-surfaces/v1",
 }
@@ -92,6 +95,7 @@ FRAME_NAMES = {
     AUTHORED_GROUND_INPUT: "authored-ground-local-mm",
     AUTHORED_GROUND_INPUT_V2: "authored-ground-local-mm",
     AUTHORED_GROUND_INPUT_V3: "authored-ground-local-mm",
+    AUTHORED_GROUND_INPUT_V4: "authored-ground-local-mm",
     WALKING_SURFACES_INPUT: WALKING_SURFACES_FRAME,
     WALKING_SURFACES_INPUT_V2: WALKING_SURFACES_FRAME,
 }
@@ -110,6 +114,7 @@ WORLD_TARGET_ORIGINS: Final = {
 PLACE_INPUTS = (
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
+    AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
 )
@@ -243,9 +248,22 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         fields.add("population")
     if document.get("profile") in LIVING_INPUTS:
         fields.add("living")
+    if document.get("profile") == AUTHORED_GROUND_INPUT_V4:
+        fields.add("arrival")
     _require(set(document) == fields, "invalid society input fields")
     profile = document["profile"]
     _require(profile in NAVIGATION_PROFILES, "unsupported society input profile")
+    if profile == AUTHORED_GROUND_INPUT_V4:
+        arrival = ArrivalDescriptor.model_validate(document["arrival"])
+        _require(arrival.source.world_id == document["world_id"], "arrival world mismatch")
+        _require(
+            str(arrival.source.version_id) == document["version_id"], "arrival version mismatch"
+        )
+        point = [arrival.position_local_mm[0], arrival.position_local_mm[2]]
+        _require(
+            document["navigation"]["arrival_mm"] == point,
+            "arrival pose and navigation disagree",
+        )
     routine = routine_of(document)
     _require(_integer(document["input_seq"], 1, 2**53 - 1), "invalid input sequence")
     _require(all(_text(document[k]) for k in ("world_id", "district_id")), "invalid input scope")
@@ -638,6 +656,12 @@ def validate_input_successor(previous: dict[str, Any], current: dict[str, Any]) 
             >= AUTHORED_GROUND_INPUTS.index(previous["profile"]),
             "input profile moved backwards",
         )
+        if AUTHORED_GROUND_INPUT_V4 in (previous["profile"], current["profile"]):
+            _require(
+                previous["profile"] == current["profile"],
+                "v4 arrival belongs to a new society and keeps its profile",
+            )
+            _require(previous["arrival"] == current["arrival"], "arrival pin changed")
         # A society's area is part of what the society is, like its seed. An edit changes what is
         # in the area, never where the area is.
         _require(

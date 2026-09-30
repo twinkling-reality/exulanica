@@ -262,6 +262,22 @@ export class GeometryClient {
     this.#observer = observer;
   }
 
+  /** The exact standalone OPM a v4 entry pinned, independent of the workspace's newest list. */
+  async loadPinnedPointMap(pin: {
+    readonly artifactId: string; readonly contentSha256: string; readonly byteSize: number;
+  }): Promise<PointMap | null> {
+    const digest = globalThis.crypto?.subtle;
+    if (digest === undefined || !/^[0-9a-f-]{36}$/u.test(pin.artifactId)) return null;
+    try {
+      const response = await this.#transport(BYTES_TIMEOUT_MS).getBytes(`/geometry/${pin.artifactId}`);
+      const bytes = await response.arrayBuffer();
+      if (await verify(digest, bytes, pin.contentSha256, pin.byteSize) !== null) return null;
+      return decodeOpm(bytes);
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Load every region's geometry, in the order the server returned it.
    *
@@ -814,8 +830,9 @@ export class GeometryClient {
         } else if (trained.container !== 'sog/1') {
           report('unsupported_container', 'This build reads trained scene bundles in sog/1.');
         } else if (reference.authorization !== 'workspace-bearer'
-          || reference.href !== `/scene-geometry/${trained.artifactId}`
-          || !/^\/scene-geometry\/[0-9a-f-]{36}$/u.test(reference.href)
+          || (reference.href !== `/scene-geometry/${trained.artifactId}`
+            && !/^\/world-entries\/[0-9a-f-]{36}\/arrival\/scene-geometry\/[0-9a-f-]{36}$/u.test(reference.href))
+          || !reference.href.endsWith(`/${trained.artifactId}`)
           || reference.contentSha256 !== trained.contentSha256) {
           report('error', 'The trained scene reference failed its provenance check.');
         } else if (digest === undefined) {

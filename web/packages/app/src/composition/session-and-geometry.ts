@@ -23,6 +23,7 @@ import {
   trainedSceneFootprint,
 } from '@exulanica/atlas-react/playcanvas';
 import { worldArtProfile } from '@exulanica/presentation';
+import { matchesServedLocalPose, retainedSceneRecord } from '../arrival-presentation.js';
 
 import { credentials, previewCredentials } from '../config.js';
 import { EvidenceCache } from '../evidence.js';
@@ -344,7 +345,37 @@ export async function mountSessionGeometry(deps: {
     env.shell.setAttribute('aria-busy', 'true');
     env.shell.append(loading);
     try {
-      await loadGeometry(env, state, deps.credentials, deps.snapshot);
+      state.arrivalVerified = false;
+      state.arrivalUnavailableReason = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const active = state.activeWorldEntry;
+        if (active?.sourceKind === 'personal' && state.worldEntries !== null) {
+          try {
+            const fresh = await state.worldEntries.entry(active.entryId);
+            if (fresh.worldId !== active.worldId || fresh.authoredVersionId !== active.authoredVersionId) {
+              throw new Error('The saved world entry changed its authored version.');
+            }
+            state.activeWorldEntry = fresh;
+          } catch {
+            state.activeWorldEntry = Object.freeze({ ...active,
+              arrival: null, arrivalScene: null,
+              arrivalUnavailableReason: 'arrival_source_unavailable' });
+            state.arrivalUnavailableReason = 'arrival_source_unavailable';
+          }
+        }
+        await loadGeometry(env, state, deps.credentials, deps.snapshot);
+        if (state.activeWorldEntry?.arrival == null || state.arrivalVerified) break;
+      }
+      if (state.activeWorldEntry?.arrival != null && !state.arrivalVerified) {
+        state.arrivalUnavailableReason = 'arrival_source_unavailable';
+        state.activeWorldEntry = Object.freeze({ ...state.activeWorldEntry,
+          arrival: null, arrivalScene: null,
+          arrivalUnavailableReason: 'arrival_source_unavailable' });
+        await loadGeometry(env, state, deps.credentials, deps.snapshot);
+      }
+      if (state.activeWorldEntry?.arrivalUnavailableReason != null) {
+        state.arrivalUnavailableReason = state.activeWorldEntry.arrivalUnavailableReason;
+      }
       // After the region geometry and before the mount: what a person placed in their own world
       // is read from that world's version, not from the workspace's list of every estimate.
       await loadAuthoredPointMaps(state, deps.credentials);
@@ -476,14 +507,27 @@ export async function loadGeometry(
 ): Promise<void> {
   env.browserMeasurement?.beginGeometryLoad();
   try {
+    state.arrivalVerified = false;
     const client = new GeometryClient(where, (measurement) => {
       env.browserMeasurement?.recordGeometry(measurement);
     });
-    const regions = regionsByCapture(from.islands);
-    const scenes = from.reconstructionScenes ?? [];
+    const regions = new Map(regionsByCapture(from.islands));
+    const arrival = state.activeWorldEntry?.arrival ?? null;
+    const currentScenes = from.reconstructionScenes ?? [];
+    const retained = arrival?.source.profile === 'exulanica.arrival-scene-pin/v1'
+      && state.activeWorldEntry?.arrivalScene != null
+      ? retainedSceneRecord(state.activeWorldEntry.arrivalScene, arrival.regionId) : null;
+    const scenes = retained === null ? currentScenes
+      : [...currentScenes.filter((scene) => scene.sceneId !== retained.sceneId), retained];
     // Regions already chose one scene each; the loader draws those and reports the rest.
     const displayed = new Set(from.islands.flatMap((island) =>
       island.reconstructionSceneId == null ? [] : [island.reconstructionSceneId]));
+    if (retained !== null) {
+      const island = from.islands.find((value) => value.islandId === arrival!.regionId);
+      if (island?.reconstructionSceneId != null) displayed.delete(island.reconstructionSceneId);
+      displayed.add(retained.sceneId);
+      for (const member of retained.members) regions.set(member.captureId, arrival!.regionId as IslandId);
+    }
     const sceneGeometry = await client.loadScenes(scenes, regions, state.heldPointMaps, displayed);
     state.notDrawnScenes = new Set(sceneGeometry.issues
       .filter((issue) => issue.state === 'not_displayed' && issue.sceneId !== undefined)
@@ -493,10 +537,28 @@ export async function loadGeometry(
     );
     const held = new Map([...(state.heldPointMaps ?? []), ...sceneGeometry.byArtifact]);
     const legacyGeometry = await client.load(regions, held, sceneCaptures);
-    state.pointMaps = new Map([...legacyGeometry.pointMaps, ...sceneGeometry.pointMaps]);
-    state.placedPointMaps = sceneGeometry.placedPointMaps;
-    state.trainedGeometry = sceneGeometry.trainedGeometry;
-    state.recoveredCameras = sceneGeometry.recoveredCameras;
+    const pointMaps = new Map([...legacyGeometry.pointMaps, ...sceneGeometry.pointMaps]);
+    let placed = sceneGeometry.placedPointMaps;
+    let trained = sceneGeometry.trainedGeometry;
+    let recovered = sceneGeometry.recoveredCameras;
+    if (arrival !== null && retained === null) {
+      const chosen = arrival.regionId as IslandId;
+      pointMaps.delete(chosen);
+      placed = placed.filter((value) => value.islandId !== chosen);
+      trained = trained.filter((value) => value.islandId !== chosen);
+      recovered = recovered.filter((value) => value.islandId !== chosen);
+      if (arrival.source.profile === 'exulanica.arrival-point-map-pin/v1') {
+        const pin = arrival.source;
+        const map = await client.loadPinnedPointMap({
+          artifactId: pin.artifactId!, contentSha256: pin.contentSha256!, byteSize: pin.byteSize!,
+        });
+        if (map !== null) pointMaps.set(chosen, map);
+      }
+    }
+    state.pointMaps = pointMaps;
+    state.placedPointMaps = placed;
+    state.trainedGeometry = trained;
+    state.recoveredCameras = recovered;
     state.heldPointMaps = new Map([...legacyGeometry.byArtifact, ...sceneGeometry.byArtifact]);
     state.geometryNotices = geometryNoticesFor([
       ...sceneGeometry.issues,
@@ -508,6 +570,27 @@ export async function loadGeometry(
     ]);
     env.browserMeasurement?.endGeometryLoad(state.geometryIssues);
     state.displayFrames = sceneGeometry.displayFrames;
+    if (arrival !== null) {
+      const source = arrival.source;
+      state.arrivalVerified = from.islands.some((island) => island.islandId === arrival.regionId)
+        && source.worldId === state.activeWorldEntry?.worldId
+        && source.versionId === state.activeWorldEntry?.authoredVersionId
+        && source.sourceSnapshotId === state.activeWorldEntry?.sourceSnapshotId
+        && source.regionId === arrival.regionId
+        && (source.profile === 'exulanica.arrival-photograph-pin/v1'
+          || source.profile === 'exulanica.arrival-point-map-pin/v1'
+            && pointMaps.has(arrival.regionId as IslandId)
+          || source.profile === 'exulanica.arrival-scene-pin/v1'
+            && retained !== null
+            && retained.sceneId === source.sceneId
+            && retained.poseReceiptSha256 === source.poseReceiptSha256
+            && retained.placementReceiptSha256 === source.placementReceiptSha256
+            && retained.gateDigest === source.gateReceiptSha256
+            && matchesServedLocalPose(
+              reconstructionsOf(state, state.pointMaps, state.placedPointMaps)
+                .get(arrival.regionId as IslandId), arrival,
+            ));
+    }
     state.reconstructionRungs = reconstructionRungsFor(
       scenes, sceneGeometry.renderingByScene, state.notDrawnScenes, state.displayFrames,
     );

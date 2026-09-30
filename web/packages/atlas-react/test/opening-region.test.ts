@@ -3,7 +3,7 @@ import {
   atlasVec3, buildNavigationWorld, islandId, localVec3, makeIsland, makeScene, placement,
   type Island,
 } from '@exulanica/atlas-core';
-import { initialAtlasCameraState, recoveredCameraState } from '../src/playcanvas/camera-views.js';
+import { initialAtlasCameraState, recoveredCameraState, servedArrivalCameraState } from '../src/playcanvas/camera-views.js';
 import { openingIsland } from '../src/playcanvas/opening-region.js';
 
 /*
@@ -74,6 +74,29 @@ describe('the opening camera stands in that region', () => {
     const start = initialAtlasCameraState(scene, buildNavigationWorld(scene), ['region:kept']);
     expect(start).toEqual(recoveredCameraState(
       reconstructed, reconstructed.viewpointLocal, reconstructed.viewpointForwardLocal!,
+    ));
+  });
+
+  it('transforms a served region-local pose through a non-unit island placement', () => {
+    const reconstructed = makeIsland({
+      islandId: islandId('region:pinned'), createdAt: 0,
+      placement: placement(atlasVec3(12, 0, -8), 0.6, 1.5),
+      rung: 3, scaleIsMetric: false, footprintRadiusLocal: 7,
+      viewpointLocal: localVec3(0, 1.6, 0),
+      anchors: [], layoutEntities: new Set(),
+    });
+    const scene = makeScene([NEWEST, reconstructed], 1, 1);
+    const actual = servedArrivalCameraState(scene, {
+      regionId: 'region:pinned',
+      positionLocalMm: [2000, 1600, 3000],
+      forwardLocalMillionths: [0, 0, -1000000],
+    });
+    const expected = recoveredCameraState(
+      reconstructed, localVec3(2, 1.6, 3), localVec3(0, 0, -1),
+    );
+    expect(actual).toEqual(expected);
+    expect(actual).not.toEqual(recoveredCameraState(
+      reconstructed, localVec3(2, 1.6, 3 / 1.5), localVec3(0, 0, -1),
     ));
   });
 });

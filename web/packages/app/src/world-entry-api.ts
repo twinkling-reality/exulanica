@@ -1,6 +1,6 @@
 /** Exact, durable workspace entries into personal authored worlds, and the worlds they name. */
 
-import { Transport, type TransportOptions } from '@exulanica/graph-client';
+import { Transport, type GraphPayload, type TransportOptions } from '@exulanica/graph-client';
 import { worldPath } from './world-scope.js';
 
 /**
@@ -152,6 +152,34 @@ export interface SavedWorldEntry {
    * optional so entries built elsewhere need not name it.
    */
   readonly generatedGround?: GeneratedGround | null;
+  readonly arrival?: SavedArrivalDescriptor | null;
+  readonly arrivalUnavailableReason?: 'arrival_source_unavailable' | null;
+  readonly arrivalScene?: GraphPayload['reconstruction_scenes'][number] | null;
+}
+
+export interface SavedArrivalDescriptor {
+  readonly profile: 'exulanica.arrival-descriptor/v1';
+  readonly presentationPolicy: 'exulanica.arrival-presentation/v1';
+  readonly regionId: string;
+  readonly positionLocalMm: readonly [number, number, number];
+  readonly forwardLocalMillionths: readonly [number, number, number];
+  readonly source: {
+    readonly profile: 'exulanica.arrival-scene-pin/v1' | 'exulanica.arrival-point-map-pin/v1'
+      | 'exulanica.arrival-photograph-pin/v1';
+    readonly worldId: string;
+    readonly versionId: string;
+    readonly sourceSnapshotId: string;
+    readonly regionId: string;
+    readonly sceneId?: string;
+    readonly jobId?: string;
+    readonly poseReceiptSha256?: string;
+    readonly placementReceiptSha256?: string;
+    readonly gateReceiptSha256?: string;
+    readonly captureId?: string;
+    readonly artifactId?: string;
+    readonly contentSha256?: string;
+    readonly byteSize?: number;
+  };
 }
 
 /** A recipe a world can be generated from, as the server offers it. */
@@ -781,6 +809,14 @@ function parseEntry(value: unknown): SavedWorldEntry {
     throw new TypeError('Only an authored world entry carries an authored starter scene.');
   }
   const generatedGround = parseGeneratedGround(row['generated_ground']);
+  const arrival = parseSavedArrival(row['arrival']);
+  const arrivalUnavailableReason = row['arrival_unavailable_reason'];
+  if (arrivalUnavailableReason !== undefined && arrivalUnavailableReason !== null
+    && arrivalUnavailableReason !== 'arrival_source_unavailable') {
+    throw new TypeError('The saved arrival has an unknown unavailability reason.');
+  }
+  const arrivalScene = row['arrival_scene'] == null ? null
+    : record(row['arrival_scene'], 'arrival scene') as unknown as GraphPayload['reconstruction_scenes'][number];
   // Only a generated world declares a generated ground, and an available one always does. One
   // whose receipt no longer generates what it recorded is served unavailable, with the reason
   // named and no ground, so the rest of the list still reads.
@@ -816,6 +852,61 @@ function parseEntry(value: unknown): SavedWorldEntry {
     takesPhotographs: flag(row['takes_photographs'], 'photograph capability'),
     declaredFloor: parseDeclaredFloor(row['declared_floor']),
     generatedGround,
+    arrival,
+    arrivalUnavailableReason: arrivalUnavailableReason ?? null,
+    arrivalScene,
+  });
+}
+
+function parseSavedArrival(value: unknown): SavedArrivalDescriptor | null {
+  if (value == null) return null;
+  const row = record(value, 'saved arrival');
+  const source = record(row['source'], 'saved arrival source');
+  if (row['profile'] !== 'exulanica.arrival-descriptor/v1'
+    || row['presentation_policy'] !== 'exulanica.arrival-presentation/v1') {
+    throw new TypeError('The saved arrival presentation policy is unsupported.');
+  }
+  const sourceProfile = source['profile'];
+  if (sourceProfile !== 'exulanica.arrival-scene-pin/v1'
+    && sourceProfile !== 'exulanica.arrival-point-map-pin/v1'
+    && sourceProfile !== 'exulanica.arrival-photograph-pin/v1') {
+    throw new TypeError('The saved arrival source is unsupported.');
+  }
+  const position = row['position_local_mm'];
+  const forward = row['forward_local_millionths'];
+  if (!Array.isArray(position) || position.length !== 3 || !Array.isArray(forward) || forward.length !== 3) {
+    throw new TypeError('The saved arrival pose is invalid.');
+  }
+  const base = {
+    profile: sourceProfile as SavedArrivalDescriptor['source']['profile'],
+    worldId: text(source['world_id'], 'arrival world'),
+    versionId: text(source['version_id'], 'arrival version'),
+    sourceSnapshotId: text(source['source_snapshot_id'], 'arrival snapshot'),
+    regionId: text(source['region_id'], 'arrival source region'),
+  };
+  const pin = sourceProfile === 'exulanica.arrival-scene-pin/v1' ? {
+    ...base,
+    sceneId: text(source['scene_id'], 'arrival scene'),
+    jobId: text(source['job_id'], 'arrival job'),
+    poseReceiptSha256: sha256(source['pose_receipt_sha256'], 'arrival pose receipt'),
+    placementReceiptSha256: sha256(source['placement_receipt_sha256'], 'arrival placement receipt'),
+    gateReceiptSha256: sha256(source['gate_receipt_sha256'], 'arrival gate receipt'),
+  } : sourceProfile === 'exulanica.arrival-point-map-pin/v1' ? {
+    ...base,
+    captureId: text(source['capture_id'], 'arrival capture'),
+    artifactId: text(source['artifact_id'], 'arrival point map'),
+    contentSha256: sha256(source['content_sha256'], 'arrival point map digest'),
+    byteSize: integer(source['byte_size'], 'arrival point map size'),
+  } : { ...base, captureId: text(source['capture_id'], 'arrival capture') };
+  const positionLocalMm = position.map((item) => integer(item, 'arrival position'));
+  const forwardLocalMillionths = forward.map((item) => integer(item, 'arrival direction'));
+  return Object.freeze({
+    profile: 'exulanica.arrival-descriptor/v1',
+    presentationPolicy: 'exulanica.arrival-presentation/v1',
+    regionId: text(row['region_id'], 'arrival region'),
+    positionLocalMm: Object.freeze(positionLocalMm) as unknown as SavedArrivalDescriptor['positionLocalMm'],
+    forwardLocalMillionths: Object.freeze(forwardLocalMillionths) as unknown as SavedArrivalDescriptor['forwardLocalMillionths'],
+    source: Object.freeze(pin),
   });
 }
 

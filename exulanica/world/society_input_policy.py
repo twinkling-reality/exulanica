@@ -20,11 +20,15 @@ AUTHORED_GROUND_COMPOSITION_V2 = "exulanica.society-composition/authored-ground-
 #: object's kind in place of a fixed duration. It never rewrites a stored authored-ground-v2 input;
 #: an input that records no routine is read under the rules it was recorded with.
 AUTHORED_GROUND_COMPOSITION_V3 = "exulanica.society-composition/authored-ground-v3"
+#: A new made-world society stands at the world-owned opening source its saved version pins.
+#: Existing v3 societies keep the region-origin rule recorded in their inputs.
+AUTHORED_GROUND_COMPOSITION_V4 = "exulanica.society-composition/authored-ground-v4"
 LEGACY_INPUT = "exulanica.society-input/v1"
 LOCAL_INPUT = "exulanica.society-input/v2"
 AUTHORED_GROUND_INPUT = "exulanica.society-input/authored-ground-v1"
 AUTHORED_GROUND_INPUT_V2 = "exulanica.society-input/authored-ground-v2"
 AUTHORED_GROUND_INPUT_V3 = "exulanica.society-input/authored-ground-v3"
+AUTHORED_GROUND_INPUT_V4 = "exulanica.society-input/authored-ground-v4"
 #: A saved world whose own records state its walking surfaces (a world generated from the city
 #: grammar): the society walks those surfaces, the world's premises and benches are its activities,
 #: and the input records the population its ground's rule derived (migration 0118).
@@ -55,6 +59,7 @@ _PAIRS = (
     (AUTHORED_GROUND_COMPOSITION, AUTHORED_GROUND_INPUT),
     (AUTHORED_GROUND_COMPOSITION_V2, AUTHORED_GROUND_INPUT_V2),
     (AUTHORED_GROUND_COMPOSITION_V3, AUTHORED_GROUND_INPUT_V3),
+    (AUTHORED_GROUND_COMPOSITION_V4, AUTHORED_GROUND_INPUT_V4),
     (WALKING_SURFACES_COMPOSITION, WALKING_SURFACES_INPUT),
     (WALKING_SURFACES_COMPOSITION_V2, WALKING_SURFACES_INPUT_V2),
 )
@@ -65,6 +70,7 @@ LOCAL_FAILURE_COMPOSITIONS = (
     AUTHORED_GROUND_COMPOSITION,
     AUTHORED_GROUND_COMPOSITION_V2,
     AUTHORED_GROUND_COMPOSITION_V3,
+    AUTHORED_GROUND_COMPOSITION_V4,
     WALKING_SURFACES_COMPOSITION,
     WALKING_SURFACES_COMPOSITION_V2,
 )
@@ -73,6 +79,7 @@ LOCAL_FAILURE_INPUTS = (
     AUTHORED_GROUND_INPUT,
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
+    AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
 )
@@ -82,6 +89,7 @@ AUTHORED_GROUND_INPUTS: Final = (
     AUTHORED_GROUND_INPUT,
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
+    AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
 )
@@ -89,6 +97,7 @@ AUTHORED_GROUND_INPUTS: Final = (
 #: records none and is read under the routine the society was first released with.
 ROUTINE_INPUTS: Final = (
     AUTHORED_GROUND_INPUT_V3,
+    AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
 )
@@ -118,6 +127,7 @@ LOCAL_RECORD_REASONS: Final[Mapping[str, frozenset[str]]] = {
     AUTHORED_GROUND_INPUT: frozenset({UNREACHABLE}),
     AUTHORED_GROUND_INPUT_V2: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
     AUTHORED_GROUND_INPUT_V3: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
+    AUTHORED_GROUND_INPUT_V4: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
     # A world that states its walking surfaces joins no object its person placed to them, and a
     # place of its own too close to another's is not stood at: either activity is unreachable.
     WALKING_SURFACES_INPUT: frozenset({UNREACHABLE}),
@@ -127,6 +137,7 @@ LOCAL_RECORD_REASONS: Final[Mapping[str, frozenset[str]]] = {
 UNREAD_PLACEMENT_REASONS: Final[Mapping[str, frozenset[str]]] = {
     AUTHORED_GROUND_INPUT_V2: frozenset({NO_AUTHORED_FRAME}),
     AUTHORED_GROUND_INPUT_V3: frozenset({NO_AUTHORED_FRAME}),
+    AUTHORED_GROUND_INPUT_V4: frozenset({NO_AUTHORED_FRAME}),
     WALKING_SURFACES_INPUT: frozenset({NO_AUTHORED_FRAME}),
     WALKING_SURFACES_INPUT_V2: frozenset({NO_AUTHORED_FRAME}),
 }

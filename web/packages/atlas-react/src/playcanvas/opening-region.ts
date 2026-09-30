@@ -27,6 +27,14 @@ export interface OpeningPlacements {
    * scene's first region.
    */
   readonly placementRegionIds?: readonly string[];
+  /** Server-owned v4 pose after its source revision has been verified for this render. */
+  readonly servedArrival?: ServedArrivalPose;
+}
+
+export interface ServedArrivalPose {
+  readonly regionId: string;
+  readonly positionLocalMm: readonly [number, number, number];
+  readonly forwardLocalMillionths: readonly [number, number, number];
 }
 
 /** The region a world of scene regions opens in, or undefined for a scene with no region. */

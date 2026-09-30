@@ -10754,6 +10754,74 @@
     }
    }
   },
+  "/world-entries/{entry_id}/arrival/scene-geometry/{artifact_id}": {
+   "get": {
+    "tags": [
+     "world-entries"
+    ],
+    "summary": "Arrival Scene Geometry",
+    "description": "Serve only the trained artifact of this entry's currently authorized v4 build.",
+    "operationId": "arrival_scene_geometry_world_entries__entry_id__arrival_scene_geometry__artifact_id__get",
+    "parameters": [
+     {
+      "name": "entry_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entry Id"
+      }
+     },
+     {
+      "name": "artifact_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Artifact Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world-entries/{entry_id}/source-attachments": {
    "post": {
     "tags": [
@@ -13875,6 +13943,93 @@
      "summary"
     ],
     "title": "ArrangementView"
+   },
+   "ArrivalDescriptor": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.arrival-descriptor/v1",
+      "title": "Profile"
+     },
+     "presentation_policy": {
+      "type": "string",
+      "const": "exulanica.arrival-presentation/v1",
+      "title": "Presentation Policy"
+     },
+     "region_id": {
+      "type": "string",
+      "minLength": 1,
+      "title": "Region Id"
+     },
+     "position_local_mm": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Position Local Mm"
+     },
+     "forward_local_millionths": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Forward Local Millionths"
+     },
+     "source": {
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/RetainedScenePin"
+       },
+       {
+        "$ref": "#/components/schemas/PointMapArrivalPin"
+       },
+       {
+        "$ref": "#/components/schemas/PhotographArrivalPin"
+       }
+      ],
+      "title": "Source",
+      "discriminator": {
+       "propertyName": "profile",
+       "mapping": {
+        "exulanica.arrival-photograph-pin/v1": "#/components/schemas/PhotographArrivalPin",
+        "exulanica.arrival-point-map-pin/v1": "#/components/schemas/PointMapArrivalPin",
+        "exulanica.arrival-scene-pin/v1": "#/components/schemas/RetainedScenePin"
+       }
+      }
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "presentation_policy",
+     "region_id",
+     "position_local_mm",
+     "forward_local_millionths",
+     "source"
+    ],
+    "title": "ArrivalDescriptor",
+    "description": "Region-local opening pose and exact source under the versioned display policy."
    },
    "AssertionRow": {
     "properties": {
@@ -20711,6 +20866,52 @@
     "title": "PhotoPointMapSourceBody",
     "description": "The depth estimate reached through this world's current membership of a photograph.\n\nThe same two identifiers ``source_attachment`` carries, deliberately: the reference is how the\nserver finds the photograph, the review it was added under and the world that may use it. What\ndiffers is what is asked for, and that is the ``kind``."
    },
+   "PhotographArrivalPin": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.arrival-photograph-pin/v1",
+      "title": "Profile"
+     },
+     "world_id": {
+      "type": "string",
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "source_snapshot_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Source Snapshot Id"
+     },
+     "region_id": {
+      "type": "string",
+      "minLength": 1,
+      "title": "Region Id"
+     },
+     "capture_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Capture Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "world_id",
+     "version_id",
+     "source_snapshot_id",
+     "region_id",
+     "capture_id"
+    ],
+    "title": "PhotographArrivalPin",
+    "description": "The source-photograph fallback when an owned region has no authorized geometry."
+   },
    "PlaceBridgeRequest": {
     "properties": {
      "canonical_place_id": {
@@ -21136,6 +21337,70 @@
     ],
     "title": "PlaceableAssetView",
     "description": "A reviewed asset as the registry reads serve it, with what inhabitants do with it."
+   },
+   "PointMapArrivalPin": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.arrival-point-map-pin/v1",
+      "title": "Profile"
+     },
+     "world_id": {
+      "type": "string",
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "source_snapshot_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Source Snapshot Id"
+     },
+     "region_id": {
+      "type": "string",
+      "minLength": 1,
+      "title": "Region Id"
+     },
+     "capture_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Capture Id"
+     },
+     "artifact_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Artifact Id"
+     },
+     "content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Content Sha256"
+     },
+     "byte_size": {
+      "type": "integer",
+      "exclusiveMinimum": 0.0,
+      "title": "Byte Size"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "world_id",
+     "version_id",
+     "source_snapshot_id",
+     "region_id",
+     "capture_id",
+     "artifact_id",
+     "content_sha256",
+     "byte_size"
+    ],
+    "title": "PointMapArrivalPin",
+    "description": "One exact standalone estimate of an owned photograph."
    },
    "PrepareExperimentBody": {
     "properties": {
@@ -22389,6 +22654,76 @@
     ],
     "title": "RestAmenityIntervention"
    },
+   "RetainedScenePin": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.arrival-scene-pin/v1",
+      "title": "Profile"
+     },
+     "world_id": {
+      "type": "string",
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "source_snapshot_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Source Snapshot Id"
+     },
+     "region_id": {
+      "type": "string",
+      "minLength": 1,
+      "title": "Region Id"
+     },
+     "scene_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Scene Id"
+     },
+     "job_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Job Id"
+     },
+     "pose_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Pose Receipt Sha256"
+     },
+     "placement_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Placement Receipt Sha256"
+     },
+     "gate_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Gate Receipt Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "world_id",
+     "version_id",
+     "source_snapshot_id",
+     "region_id",
+     "scene_id",
+     "job_id",
+     "pose_receipt_sha256",
+     "placement_receipt_sha256",
+     "gate_receipt_sha256"
+    ],
+    "title": "RetainedScenePin",
+    "description": "The exact scene build a v4 society and its entry share."
+   },
    "ReviewSourceRow": {
     "properties": {
      "kind": {
@@ -23133,6 +23468,38 @@
      "takes_photographs": {
       "type": "boolean",
       "title": "Takes Photographs"
+     },
+     "arrival": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ArrivalDescriptor"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "arrival_unavailable_reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "const": "arrival_source_unavailable"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Arrival Unavailable Reason"
+     },
+     "arrival_scene": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ReconstructionSceneRow"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,
