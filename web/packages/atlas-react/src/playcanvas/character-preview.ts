@@ -114,8 +114,8 @@ export class CharacterPreview {
     app.setCanvasResolution(pc.RESOLUTION_AUTO);
     app.scene.ambientLight = new pc.Color(.6, .58, .64);
     const camera = new pc.Entity('character-inspection-camera');
-    // The studio panel's own dark tone (#101a20), so its light text stays readable over the stage.
-    camera.addComponent('camera', { clearColor: new pc.Color(.063, .102, .125), fov: 34, nearClip: .05, farClip: 40, toneMapping: pc.TONEMAP_ACES });
+    // The stage material is owned by CSS so it can follow the active world profile and contrast mode.
+    camera.addComponent('camera', { clearColor: new pc.Color(0, 0, 0, 0), fov: 34, nearClip: .05, farClip: 40, toneMapping: pc.TONEMAP_ACES });
     app.root.addChild(camera);
     const key = new pc.Entity('character-key-light');
     key.addComponent('light', { type: 'directional', intensity: .9, color: new pc.Color(1, .94, .9) });

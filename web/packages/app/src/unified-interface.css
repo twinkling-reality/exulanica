@@ -200,7 +200,7 @@
      * A surface that composes its own transform must include this token, or it will drop off
      * the shared axis.
      */
-    --plate-tilt: perspective(200rem) rotateY(-5deg);
+    --plate-tilt: var(--ui-plane-transform);
     position: fixed;
     inset: auto;
     top: 50%;

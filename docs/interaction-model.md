@@ -337,9 +337,11 @@ lock in traversal and dismisses the Companion only after its converse-mode excha
 Companion, `M` Map (only the camera changes, into Atlas Map presentation), `O` Customize (the
 world's appearance) and `?` Settings (display, accessibility, movement and the complete controls
 guide). `H` opens the World menu (`web/packages/app/src/ui/world-menu.ts`), which lists the same
-surfaces beside World and, where the host offers them, Compare, Attempts and Create. Customize and Settings are the only centred system surfaces, and only one major surface
-may own the cursor at a time. Customize's Return action opens the world directly; its `O` and Escape shortcuts return to the
-preceding surface. Closing Settings returns to its prior surface and detail.
+surfaces beside World and, where the host offers them, Compare, Attempts and Create. Library,
+Character, Customize and Settings use the same right-anchored reading-plane angle and material
+roles. Only one major surface may own the cursor at a time. Customize's Return action opens the
+world directly; its `O` and Escape shortcuts return to the preceding surface. Closing Settings
+returns to its prior surface and detail.
 
 **DECISION: a world opens in one complete look, not a list of unfinished themes.** Aeroheart
 (`origin-landscape@1`) is the one supported world profile; Survey Relief is an experimental
@@ -428,8 +430,9 @@ conversation lifecycle. Confirmation keeps its staged proposal boundary; Escape 
 the same handler as Cancel and returns focus to the opening control. World panels release pointer
 lock before focusing their controls.
 
-Application sheets apply a fixed cool-neutral reading palette and consistent control
-geometry. This does not alter world materials, scene identity or the versioned world-profile
+Application reading surfaces share one profile-derived paper, ink, header, angle and title scale.
+Their geometry is defined by presentation tokens and their content may use different layouts.
+This does not alter world materials, scene identity or the versioned world-profile
 schema. High contrast and reduced-motion overrides remain authoritative. Broader theme authority
 across world profiles still needs visual acceptance; this application pass does not establish
 arbitrary user-supplied interface themes. The desktop viewport restriction remains in force.

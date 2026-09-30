@@ -95,6 +95,13 @@
   --ui-chromatic-ink: #242033;
   --ui-chromatic-paper: #fbf9fc;
   --ui-chromatic-accent: #475687;
+  --chromatic-ink-soft: color-mix(in srgb, var(--ui-chromatic-ink) 82%, var(--ui-chromatic-paper));
+  --chromatic-ink-faint: color-mix(in srgb, var(--ui-chromatic-ink) 67%, var(--ui-chromatic-paper));
+  --chromatic-edge: color-mix(in srgb, var(--ui-chromatic-ink) 26%, transparent);
+  --chromatic-head:
+    radial-gradient(ellipse 80% 120% at 90% 5%, var(--ui-spectrum-orange), transparent 72%),
+    radial-gradient(ellipse 110% 100% at 15% 100%, var(--ui-spectrum-rose), transparent 68%),
+    linear-gradient(115deg, color-mix(in oklch, var(--ui-spectrum-violet) 45%, white), var(--ui-spectrum-violet));
   --ui-font-body: "Avenir Next", "Segoe UI Variable", ui-sans-serif, system-ui, sans-serif;
   --ui-font-display: "Avenir Next", "Segoe UI Variable Display", ui-sans-serif, system-ui, sans-serif;
   --ui-font-utility: ui-monospace, "SFMono-Regular", Consolas, monospace;
@@ -116,10 +123,11 @@
   --radius-chromatic: 18px;
   --radius-menu: 18px;
   --ui-plane-depth: 1400px;
-  --ui-plane-yaw: 5deg;
-  --ui-menu-depth: 1000px;
-  --ui-menu-yaw: -12deg;
+  --ui-plane-yaw: -10deg;
+  --ui-plane-transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw));
   --ui-plane-right: 5vw;
+  --ui-plane-title: 300 clamp(29px, 3vw, 40px)/1.08 "Helvetica Neue", var(--ui-font-display);
+  --ui-plane-title-tracking: -.055em;
   --radius-pill: 999px;
   /*
    * The Companion's surfaces are captions over a live world, not cards. A caption is square: the

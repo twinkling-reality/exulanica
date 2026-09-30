@@ -14,14 +14,7 @@
 }
 #shell :is(
   .world-menu,
-  .world-panel,
-  .world-recipes,
-  .index-workspace.rail,
-  .detail,
-  .settings-view.system-overlay,
-  .atlas-instrument.options-view.system-overlay,
-  .companion-encounter[data-state='open'],
-  .character-studio
+  .companion-encounter[data-state='open']
 ) {
   --ink: #edf5f2;
   --ink-soft: #d2ded9;
@@ -36,14 +29,7 @@
 }
 :root[data-contrast='high'] #shell :is(
   .world-menu,
-  .world-panel,
-  .world-recipes,
-  .index-workspace.rail,
-  .detail,
-  .settings-view.system-overlay,
-  .atlas-instrument.options-view.system-overlay,
-  .companion-encounter[data-state='open'],
-  .character-studio
+  .companion-encounter[data-state='open']
 ) {
   --ink: #fff;
   --ink-soft: #e4eeea;
@@ -62,12 +48,12 @@
 #shell .world-heading h2 { margin: 0; max-width: 18ch; font: 300 21px/1.12 var(--ui-font-display); letter-spacing: -.035em; }
 .world-source-label, #shell .world-heading .living-world-fixture { width: max-content; margin: 0; padding: 2px 6px; border: 1px solid var(--edge); border-radius: 999px; color: var(--ink-soft); background: color-mix(in srgb, var(--surface) 72%, transparent); font: 600 9px/1.35 var(--ui-font-body); letter-spacing: .03em; }
 .world-local-nav { display: none; gap: 4px; width: max-content; padding: 4px; border: 1px solid color-mix(in srgb, var(--edge) 76%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--atlas-plane) 91%, transparent); box-shadow: var(--app-shadow); backdrop-filter: blur(16px); }
-.world-workspace[data-panel] .world-local-nav { position: fixed; display: flex; top: 5vh; right: var(--ui-plane-right); z-index: 14; transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw)); transform-origin: right center; }
+.world-workspace[data-panel] .world-local-nav { position: fixed; display: flex; top: 5vh; right: var(--ui-plane-right); z-index: 14; transform: var(--ui-plane-transform); transform-origin: right center; }
 #shell .world-workspace button { min-height: 34px; padding: 7px 11px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 5px; font-size: 12px; font-weight: 550; }
 #shell .world-workspace button:hover { background: var(--surface); border-color: var(--accent); }
 #shell .world-workspace button[aria-expanded='true'] { color: var(--ink); background: color-mix(in srgb, var(--raised) 72%, transparent); border-color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--raised) 78%, transparent); }
 #shell .world-workspace button:disabled { color: var(--ink-faint); background: var(--surface); opacity: .75; }
-.world-panel { position: fixed; right: var(--ui-plane-right); top: 12vh; z-index: 12; width: min(440px, 42vw); max-height: calc(100dvh - 20vh); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw)); transform-origin: right center; --inspector-ink: var(--ink); --inspector-muted: var(--ink-soft); }
+.world-panel { position: fixed; right: var(--ui-plane-right); top: 12vh; z-index: 12; width: min(440px, 42vw); max-height: calc(100dvh - 20vh); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: var(--radius-chromatic); box-shadow: var(--app-shadow); transform: var(--ui-plane-transform); transform-origin: right center; --inspector-ink: var(--ink); --inspector-muted: var(--ink-soft); }
 #shell .world-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
 #shell .world-panel-heading h2 { margin: 0; color: var(--ink); font: 450 21px/1.2 var(--ui-font-display); letter-spacing: -.025em; }
 #shell .world-panel-close { font-size: 12px; min-height: 34px; padding: 7px 10px; }
@@ -123,26 +109,28 @@
 #shell .world-heading h2 { overflow-wrap: anywhere; }
 #shell .world-heading { max-height: 162px; overflow: auto; }
 #shell[data-primary='index'] .index-workspace.rail {
-  inset: 6vh 5vw 7vh auto;
+  inset: 6vh var(--ui-plane-right) 7vh auto;
   width: min(720px, 58vw);
   height: auto;
   max-width: none;
   margin: 0;
   translate: none;
-  transform: none;
+  transform: var(--ui-plane-transform);
+  transform-origin: right center;
   background: var(--atlas-plane);
 }
 #shell[data-primary='index'] .index-workspace.rail[data-detail-open='true'] {
-  right: calc(5vw + min(330px, 31vw));
-  width: min(430px, 42vw);
+  right: calc(var(--ui-plane-right) + 45vw);
+  width: 41vw;
 }
 #shell[data-primary='index'] > .detail {
-  inset: 6vh 5vw 7vh auto;
-  width: min(320px, 30vw);
+  inset: 6vh var(--ui-plane-right) 7vh auto;
+  width: 43vw;
   height: auto;
   max-height: none;
   translate: none;
-  transform: none;
+  transform: var(--ui-plane-transform);
+  transform-origin: right center;
   border: 1px solid var(--edge);
   border-radius: 4px;
   background: var(--atlas-plane);
@@ -154,14 +142,14 @@
 #shell[data-primary='index'] .index-workspace { grid-template-columns: minmax(0, 1fr); }
 #shell .index-workspace .index-foot { grid-column: 1 / -1; }
 #shell .settings-view.system-overlay, #shell .atlas-instrument.options-view.system-overlay {
-  inset: 6vh 5vw 7vh auto;
+  inset: 6vh var(--ui-plane-right) 7vh auto;
   width: min(720px, 58vw);
   max-width: none;
   height: auto;
   max-height: none;
   margin: 0;
   translate: none;
-  transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw));
+  transform: var(--ui-plane-transform);
   transform-origin: right center;
   background: var(--atlas-plane);
 }
@@ -521,18 +509,10 @@
   border: 1px solid var(--edge);
   border-radius: 4px;
   box-shadow: var(--app-shadow);
-  transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw));
+  transform: var(--ui-plane-transform);
   transform-origin: right center;
 }
 #shell .atlas-instrument.options-view.system-overlay {
-  --ink: var(--ui-chromatic-ink);
-  --ink-soft: var(--chromatic-ink-soft);
-  --ink-faint: var(--chromatic-ink-faint);
-  --accent: var(--ui-chromatic-accent);
-  --edge: var(--chromatic-edge);
-  --surface: #ffffff;
-  --raised: #ffffff;
-  --atlas-plane: var(--ui-chromatic-paper);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -707,16 +687,6 @@
 #shell .settings-actions .command-action-label { color: var(--ink); font-size: 13px; font-weight: 600; }
 #shell .settings-actions kbd { color: var(--ink); border-color: var(--edge); background: #fff; font-size: 12px; }
 
-#shell {
-  /* The world profile supplies decorative pigment separately from provenance marks. */
-  --chromatic-ink-soft: color-mix(in srgb, var(--ui-chromatic-ink) 82%, var(--ui-chromatic-paper));
-  --chromatic-ink-faint: color-mix(in srgb, var(--ui-chromatic-ink) 67%, var(--ui-chromatic-paper));
-  --chromatic-edge: color-mix(in srgb, var(--ui-chromatic-ink) 26%, transparent);
-  --chromatic-head:
-    radial-gradient(ellipse 80% 120% at 90% 5%, var(--ui-spectrum-orange), transparent 72%),
-    radial-gradient(ellipse 110% 100% at 15% 100%, var(--ui-spectrum-rose), transparent 68%),
-    linear-gradient(115deg, color-mix(in oklch, var(--ui-spectrum-violet) 45%, white), var(--ui-spectrum-violet));
-}
 #shell .world-menu {
   position: fixed;
   inset: 0;
@@ -736,7 +706,7 @@
   gap: 12px;
   width: min(760px, 58vw);
   pointer-events: auto;
-  transform: perspective(var(--ui-menu-depth)) rotateY(var(--ui-menu-yaw));
+  transform: var(--ui-plane-transform);
   transform-origin: right center;
 }
 #shell .world-menu-grid {
@@ -895,22 +865,46 @@
 #shell .world-recipes-reason summary { color: var(--accent); cursor: pointer; }
 #shell .world-recipes-reason p { margin-top: 8px; }
 #shell .world-recipes-actions { position: sticky; bottom: -24px; display: flex; gap: 8px; padding: 12px 0; background: var(--atlas-plane); border-top: 1px solid var(--edge); }
-/* Reading surfaces share the menu's pigment roles while keeping their controls on paper. */
-#shell :is(.settings-view.system-overlay, .atlas-instrument.options-view.system-overlay, .world-recipes, .world-panel) {
+/* One reading material for every destination; dialogs share the material but remain flat. */
+#shell :is(
+  .index-workspace.rail,
+  .detail,
+  .settings-view.system-overlay,
+  .atlas-instrument.options-view.system-overlay,
+  .world-panel,
+  .world-recipes,
+  .character-studio,
+  .society-comparison,
+  .confirm
+) {
   --ink: var(--ui-chromatic-ink);
   --ink-soft: var(--chromatic-ink-soft);
   --ink-faint: var(--chromatic-ink-faint);
   --accent: var(--ui-chromatic-accent);
+  --focus: #24516a;
   --edge: var(--chromatic-edge);
   --surface: #fff;
   --raised: #fff;
   --atlas-plane: var(--ui-chromatic-paper);
+  --app-shadow: 0 18px 52px #24374838;
   color: var(--ink);
   background: var(--atlas-plane);
+  border: 1px solid var(--edge);
   border-radius: var(--radius-chromatic);
+  box-shadow: var(--app-shadow);
   backdrop-filter: none;
 }
-:root[data-contrast='high'] #shell :is(.settings-view.system-overlay, .atlas-instrument.options-view.system-overlay, .world-recipes, .world-panel) {
+:root[data-contrast='high'] #shell :is(
+  .index-workspace.rail,
+  .detail,
+  .settings-view.system-overlay,
+  .atlas-instrument.options-view.system-overlay,
+  .world-panel,
+  .world-recipes,
+  .character-studio,
+  .society-comparison,
+  .confirm
+) {
   --ink: #09262d;
   --ink-soft: #263f47;
   --ink-faint: #3c555c;
@@ -919,6 +913,44 @@
   color: var(--ink);
 }
 #shell .settings-view.system-overlay .settings-head { background: var(--chromatic-head); }
+#shell :is(
+  .index-workspace .index-head,
+  .character-studio .character-header,
+  .society-comparison .comparison-head
+) {
+  background: var(--chromatic-head);
+  border-bottom: 1px solid var(--edge);
+}
+#shell :is(
+  .index-head h1,
+  .character-header h1,
+  .settings-head h1,
+  .options-view .overlay-head h1,
+  .world-panel-heading h2,
+  .comparison-head h2
+) {
+  margin: 0;
+  color: var(--ink);
+  font: var(--ui-plane-title);
+  letter-spacing: var(--ui-plane-title-tracking);
+  text-transform: none;
+}
+#shell .index-workspace .index-head { padding: 22px 28px; }
+#shell .index-results .rail-row { min-height: 68px; }
+#shell .index-results .rail-name { font-size: 1.08rem; }
+#shell .index-foot { flex-wrap: wrap; gap: 8px 16px; }
+#shell .index-foot .provenance-legend { gap: 5px 10px; }
+#shell .index-foot .legend-item,
+#shell .index-foot .index-keys { font-size: 12px; }
+#shell .index-workspace[data-detail-open='true'] .index-keys { display: none; }
+#shell .index-workspace[data-detail-open='true'] .index-results .rail-row {
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+}
+#shell .index-workspace[data-detail-open='true'] .rail-kind { grid-column: 1; grid-row: 1; }
+#shell .index-workspace[data-detail-open='true'] .rail-name { grid-column: 2; grid-row: 1; }
+#shell .index-workspace[data-detail-open='true'] .rail-presence { grid-column: 2 / 4; grid-row: 2; }
+#shell .index-workspace[data-detail-open='true'] .triad { grid-column: 3; grid-row: 1; }
 #shell .world-recipes-parameter { border-radius: 16px; }
 #shell .world-panel { border-radius: var(--radius-chromatic); }
 #shell .world-panel > .world-panel-heading {
@@ -927,7 +959,7 @@
   background: var(--chromatic-head);
   border-radius: var(--radius-chromatic) var(--radius-chromatic) 0 0;
 }
-#shell .world-panel-heading h2 { font: 300 30px/1 "Helvetica Neue", var(--ui-font-display); letter-spacing: -.055em; }
+#shell .world-panel-heading h2 { font: var(--ui-plane-title); letter-spacing: var(--ui-plane-title-tracking); }
 #shell .world-panel > details {
   margin-top: 10px;
   padding: 8px 12px;
