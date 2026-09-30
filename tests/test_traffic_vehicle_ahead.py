@@ -21,14 +21,18 @@ from typing import Any
 import pytest
 from exulanica.traffic import simulation
 from exulanica.world import traffic_episodes
-from exulanica.world.generated_worlds import compose_specified_world
+from exulanica.world.generated_worlds import compose_generated_world
 from exulanica.world.traffic_episodes import prepared, traffic_input
+from exulanica.world.world_recipes import load_world_recipes
 
 #: Where the lock was measured (lane W5's departures sample): the preset, the world identity and
 #: the departure window it locked at.
 PRESET = "market_town"
 WORLD_ID = "world:generated:departures-4"
 DEPARTURE_STEPS = 600
+#: The recipe catalog version the town was made under when the lock was measured: specification
+#: v2 (recipe catalog version 3) draws every preset town afresh, so the town is read at version 2.
+RECIPE_CATALOG_VERSION = 2
 #: The reasons a trip is refused as it is requested (simulation._start_trip); a trip blocked for
 #: any other reason waited past the stall limit.
 _START_REASONS = frozenset(
@@ -47,7 +51,12 @@ _START_REASONS = frozenset(
 def _episode(monkeypatch, guard) -> tuple[dict[str, Any], int, list[dict[str, Any]]]:
     """Episode 0 of the town with ``guard`` as the rule: its trip summary, how many times the
     rule held a vehicle, and the revocations it made."""
-    composed = compose_specified_world(PRESET, None, WORLD_ID)
+    [recipe] = [
+        recipe
+        for recipe in load_world_recipes(catalog_version=RECIPE_CATALOG_VERSION)
+        if recipe.key == PRESET
+    ]
+    composed = compose_generated_world(recipe, WORLD_ID)
     value = traffic_input(
         world_id=WORLD_ID,
         version_id=composed.receipt_sha256,
