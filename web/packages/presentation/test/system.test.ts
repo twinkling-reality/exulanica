@@ -96,6 +96,9 @@ describe('Exulanica presentation system', () => {
       }
     }
     expect(css.match(/--field-image:/g)).toHaveLength(1);
-    expect(css).not.toContain('radial-gradient');
+    const fieldImage = css.match(/--field-image:\s*([^;]+);/)?.[1];
+    expect(fieldImage).toBeDefined();
+    // The directional world field stays linear; interface materials may use other gradients.
+    expect(fieldImage).not.toContain('radial-gradient');
   });
 });
