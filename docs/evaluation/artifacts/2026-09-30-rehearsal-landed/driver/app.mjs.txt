@@ -1,0 +1,177 @@
+// What the rehearsal needs to know about the application's own surfaces, in one place: how a page
+// load passes the credential gate, when the world is ready, and how a person reaches the panels.
+// Selectors are the product's own classes and accessible names; a label a person reads is matched
+// by its text only where the product offers nothing else.
+
+import { setTimeout as sleep } from 'node:timers/promises';
+
+// How long a page load may take to reach the gate or a mounted world. The application fetches its
+// graph, saved world, style catalog and geometry before it mounts; this is an allowance for a busy
+// machine, not a measurement.
+const MOUNT_TIMEOUT_MS = 90_000;
+// A write the page confirms: the world's own check and the write together.
+const WRITE_TIMEOUT_MS = 30_000;
+
+/** A visible button whose trimmed text is exactly `text`, inside `scope` (an expression). */
+export const BUTTON = (text, scope = 'document') =>
+  `[...${scope}.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(text)} && b.checkVisibility())`;
+/** A visible button whose text starts with `text`, for labels that carry a count or a key. */
+export const BUTTON_STARTING = (text, scope = 'document') =>
+  `[...${scope}.querySelectorAll('button')].find(b => b.textContent.trim().startsWith(${JSON.stringify(text)}) && b.checkVisibility())`;
+export const TITLE_FIELD = `document.querySelector('input[aria-label="World title"]')`;
+export const OBJECT_PANEL = `document.querySelector('aside.object-placement')`;
+export const OPEN_CONFIRM = `document.querySelector('aside.confirm:not([hidden])')`;
+export const WORLD_MENU_BUTTON = `document.querySelector('button.world-open-menu')`;
+export const menuEntry = (command) => `document.querySelector('section.world-menu button.world-menu-entry[data-command="${command}"]')`;
+
+/** The world is mounted: the booting mark is gone and the title field is on the page. */
+export const WORLD_READY = `(() => { const shell = document.querySelector('#shell');
+  return !!shell && !shell.hasAttribute('data-booting') && !document.querySelector('#shell .startup-thinking')
+    && !!document.querySelector('input[aria-label="World title"]'); })()`;
+/** The list of saved worlds the application shows when a person has more than one. */
+export const SAVED_WORLD_LIST = `document.querySelector('main.world-entry-gate')`;
+const GATE_OR_WORLD = `document.querySelector('form.credential-gate') ? 'gate'
+  : (${WORLD_READY} ? 'world' : (${SAVED_WORLD_LIST} ? 'list'
+    : (document.querySelector('#shell')?.getAttribute('data-world-state') || null)))`;
+const WORLD_OR_LIST = `${WORLD_READY} ? 'world' : (${SAVED_WORLD_LIST} ? 'list' : null)`;
+
+/**
+ * The saved world a page load should open when the application asks which: the one a step names,
+ * else the one the person is working in (`open_entry_id`, set when a made world opens), else the
+ * starter the arrival saved.
+ */
+export const openEntryId = (ctx, entryId) => entryId ?? ctx.facts.open_entry_id ?? ctx.facts.entry_id ?? null;
+
+/** Choose a saved world in the list by the title the API holds for it, and wait for it to open. */
+export async function chooseSavedWorld(ctx, entryId) {
+  const { page } = ctx;
+  const wanted = openEntryId(ctx, entryId);
+  const listed = await ctx.api('GET', '/world-entries');
+  const entry = (Array.isArray(listed.body) ? listed.body : []).find((e) => e.entry_id === wanted);
+  if (entry === undefined) throw new Error(`the list of saved worlds was shown and no saved world ${wanted} is listed`);
+  await page.click(`[...document.querySelectorAll('main.world-entry-gate button.world-entry-choice')]
+    .find(b => b.querySelector('.world-entry-choice-title')?.textContent === ${JSON.stringify(entry.title)})`, `the saved world "${entry.title}"`);
+  await waitForWorld(page);
+  return entry;
+}
+
+/**
+ * Load the application and pass its credential gate with the run's token, the way an operator
+ * does: the production build keeps no token, so every page load asks again. When the person has
+ * more than one saved world the application lists them, and the world `entryId` names (see
+ * `openEntryId`) is chosen there, or, with `choose: false`, the list is left open. Returns what
+ * the first surface was, or 'list' when the list was left open.
+ */
+export async function enter(ctx, load, entryId, { choose = true } = {}) {
+  const { page } = ctx;
+  // A reload leaves the old document answering for a moment, and the old document was a ready
+  // world; waiting for a new time origin makes every read below read the new page.
+  const before = await page.evaluate('performance.timeOrigin').catch(() => null);
+  await load();
+  await page.waitFor(`performance.timeOrigin !== ${JSON.stringify(before)}`, MOUNT_TIMEOUT_MS, 'the new page to load');
+  const first = await page.waitFor(GATE_OR_WORLD, MOUNT_TIMEOUT_MS, 'the credential gate, a world or the list of saved worlds');
+  let next = first;
+  if (first === 'gate') {
+    await page.typeInto(`document.querySelector('input[aria-label="Access token"]')`, ctx.token);
+    await page.click(`document.querySelector('button[aria-label="Enter Exulanica"]')`, 'Enter Exulanica');
+    next = await page.waitFor(WORLD_OR_LIST, MOUNT_TIMEOUT_MS, 'a world or the list of saved worlds');
+  } else if (first !== 'world' && first !== 'list') {
+    throw new Error(`the application opened on its "${first}" surface instead of a world`);
+  }
+  // More than one saved world: the application asks which, as it asks a person. A step that reads
+  // the list itself stops there.
+  if (next === 'list' && !choose) return 'list';
+  if (next === 'list') await chooseSavedWorld(ctx, entryId);
+  await waitForWorld(page);
+  return first;
+}
+
+export async function waitForWorld(page) {
+  const state = await page.waitFor(`${WORLD_READY} ? 'ready' : (document.querySelector('#shell')?.getAttribute('data-world-state') === 'error' ? 'error' : null)`,
+    MOUNT_TIMEOUT_MS, 'the world to mount');
+  if (state === 'error') {
+    const said = await page.evaluate(`document.querySelector('#shell')?.innerText.slice(0, 300) ?? ''`);
+    throw new Error(`the world did not load: ${said}`);
+  }
+  // Two frames after the mark clears, so the renderer has drawn what the state says.
+  await sleep(1200);
+}
+
+export const open = (ctx, entryId) => enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), entryId);
+export const reload = (ctx, entryId) => enter(ctx, () => ctx.page.reload(), entryId);
+
+/**
+ * A saved world and the version it opens at, read with the run's token: the one `entryId` names,
+ * else the one the person is working in (`openEntryId`), else the person's only one.
+ */
+export async function savedWorld(ctx, entryId) {
+  const listed = await ctx.api('GET', '/world-entries');
+  if (listed.status !== 200 || !Array.isArray(listed.body)) {
+    throw new Error(`GET /world-entries answered ${listed.status}`);
+  }
+  const entries = listed.body;
+  const wanted = openEntryId(ctx, entryId);
+  const entry = wanted === null
+    ? (entries.length === 1 ? entries[0] : null)
+    : entries.find((e) => e.entry_id === wanted) ?? null;
+  const version = entry === null ? null : (await ctx.api('GET',
+    `/world/versions/${entry.authored_version_id}?world_id=${encodeURIComponent(entry.world_id)}`)).body;
+  return { entries, entry, version };
+}
+
+export const liveObjects = (version) => (version?.objects ?? []).filter((o) => !o.removed);
+
+/** Give the world canvas the keyboard with a trusted click on a point where the canvas is on top. */
+export async function focusCanvas(page) {
+  const point = await page.evaluate(`(() => {
+    const atlas = document.getElementById('atlas');
+    const candidates = [[0.5, 0.85], [0.25, 0.85], [0.75, 0.85], [0.5, 0.65], [0.15, 0.5]];
+    for (const [fx, fy] of candidates) {
+      const x = Math.round(innerWidth * fx), y = Math.round(innerHeight * fy);
+      if (document.elementFromPoint(x, y) === atlas) return { x, y };
+    }
+    return null; })()`);
+  if (point !== null) await page.clickAt(point.x, point.y);
+  await sleep(300);
+  return { point, focused: await page.evaluate(`document.activeElement?.id === 'atlas'`) };
+}
+
+/** Open the World menu and choose one of its entries by the product's command name. */
+export async function chooseMenu(page, command) {
+  await page.click(WORLD_MENU_BUTTON, 'the World menu');
+  await page.waitFor(`${menuEntry(command)}?.checkVisibility() ?? false`, 10_000, `the ${command} entry of the World menu`);
+  await page.click(menuEntry(command), `the World menu's ${command} entry`);
+}
+
+/** Wait for the confirmation the page shows before a write, and return its text. */
+export async function confirmation(page, what) {
+  await page.waitFor(`${OPEN_CONFIRM}?.checkVisibility() ?? false`, WRITE_TIMEOUT_MS, `the confirmation before ${what}`);
+  return page.evaluate(`${OPEN_CONFIRM}.innerText`);
+}
+
+/** Press Confirm in the open confirmation once it is enabled, and wait for it to close. */
+export async function confirm(page, what) {
+  const button = `${OPEN_CONFIRM}?.querySelector('.confirm-actions button.primary')`;
+  await page.waitFor(`!!(${button}) && !(${button}).disabled`, WRITE_TIMEOUT_MS, `Confirm to be offered for ${what}`);
+  await page.click(button, `Confirm (${what})`);
+  await page.waitFor(`!(${OPEN_CONFIRM}) || !${OPEN_CONFIRM}.checkVisibility()`, WRITE_TIMEOUT_MS, `the confirmation for ${what} to close`);
+}
+
+export async function openObjects(page) {
+  if (!await page.evaluate(`${OBJECT_PANEL}?.checkVisibility() ?? false`)) {
+    await page.click(`document.querySelector('aside.world-identity button.world-add-object')`, 'Add object');
+  }
+  await page.waitFor(`${OBJECT_PANEL}?.checkVisibility() ?? false`, 10_000, 'the objects panel');
+}
+
+/** The rows of the objects panel as a person reads them: title and motion words. */
+export const objectRows = (page) => page.evaluate(`[...document.querySelectorAll('aside.object-placement li.object-placement-item')]
+  .map(li => ({ title: li.querySelector('.object-placement-choose strong')?.textContent.trim() ?? null,
+    motion: li.querySelector('.object-placement-motion')?.textContent.trim() ?? null,
+    selected: li.dataset.selected ?? null }))`);
+
+/** The status line of the objects panel. */
+export const objectStatus = (page) => page.evaluate(`document.querySelector('aside.object-placement p.object-placement-status')?.textContent.trim() ?? null`);
+
+/** The first placeholder a saved-name resolver should have replaced, or null. */
+export const PLACEHOLDER = /\[(?:person|voice|place|object|conversation|event) [A-Z]+\]/i;

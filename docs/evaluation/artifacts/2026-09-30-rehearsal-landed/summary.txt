@@ -1,0 +1,90 @@
+STEP                                         STATUS          REASON
+clean-start                                  passed          
+access-gate                                  passed          
+enter-owned-starter                          passed          
+read-about-this-place                        passed          
+start-with-small-square                      passed          
+name-world                                   passed          
+explore-walk                                 passed          
+place-reviewed-object                        passed          
+move-object                                  passed          
+inspect-object                               passed          
+give-bounded-motion                          passed          
+trigger-stop-reset                           passed          
+refuse-unsupported-behaviour                 passed          
+creation-survives-reload                     passed          
+undo-last-change                             passed          
+change-appearance                            passed          
+appearance-survives-reload                   passed          
+restore-original-appearance                  passed          
+furnish-small-square                         passed          
+bring-in-inhabitants                         passed          
+choose-model-for-a-group                     passed          
+play-and-watch-walking                       passed          
+inspect-an-inhabitant                        passed          
+inspect-a-model-decision                     passed          
+model-chose-stand-or-talk                    passed          
+birds-fly-and-perch                          passed          
+object-in-use                                passed          
+pause-playback                               passed          
+open-close-photo-intake                      passed          
+upload-synthetic-photographs                 passed          
+authorize-admission-in-app                   passed          
+grant-model-rights-in-app                    passed          
+confirm-proposed-place                       passed          
+review-photographs-in-app                    passed          
+wait-for-depth-and-grouping                  passed          
+make-world-from-photographs                  passed          
+photo-jobs-end-cleanly                       passed          
+ask-grounded-question                        passed          
+open-cited-photograph                        passed          
+unanswerable-question-abstains               passed          
+companion-refuses-unsupported-change         passed          
+refused-answer-redrawn-after-reload          passed          
+companion-proposes-appearance-change         passed          
+accepted-answer-redrawn-after-reload         passed          
+developer-client-walkthrough                 passed          
+returning-user-reopens                       passed          
+return-to-made-world                         passed          
+made-world-takes-new-photograph              passed          
+reconstruct-scene-geometry                   not_available   What this rehearsal runs, and what it cannot. It runs main's production derivative worker with its depth model (runtime.derivative_worker: MoGe-2 on this machin
+observe-a-person-and-footage                 not_available   A person's use of the experience and the demonstration footage are observed and recorded by a person; this rehearsal keeps a screenshot of each step as its own 
+furnish-made-world                           passed          
+made-world-hosts-people                      passed          
+make-town-with-values                        passed          
+people-cross-tile-seams                      passed          
+vehicles-drive-the-town                      passed          
+choose-model-for-a-town-group                passed          
+compare-town-group                           failed          Error: waited 30000 ms for the comparison start form; last saw null |     at Object.waitFor (file://<rehearsal-tree>/scripts/rehearsal/cdp.mjs:224:13) |     at 
+ask-what-happened                            failed          did not hold: answer-drawn, composer-outcome-shown
+describe-town-and-use-the-draft              passed          
+compare-view-shows-the-pair                  not_reachable   requires compare-town-group, which was failed
+developer-client-reads-the-comparison        not_reachable   requires compare-town-group, which was failed
+export-judge-seed                            passed          
+restore-judge-seed-into-a-fresh-stack        passed          
+
+GATE                                         STATUS              FIRST FAILURE (OWNER AREA)
+milestone:A world to run                     passed_in_part      
+                                             In part: the market town and the drafted town are made from the catalogs and opened; the town's people are seen moving by the society's reads and drawn, and their walking pace is sampled only in the starter's square.
+milestone:A model per group                  passed_in_part      
+                                             In part: one group of the starter's people and one of the town's are each decided by one open model and the others by their routine; the people are not split into several named groups each under its own model, and a refused proposal is seen only when the model makes one.
+milestone:Recorded decisions                 not_reachable       
+milestone:Swap and compare                   failed              compare-town-group (comparisons from the application: web/packages/app/src/ui/society-comparison-start.ts and web/packages/app/src/composition/society-comparison-mount.ts; exulanica/api/routes/society_comparisons.py, exulanica/api/society_comparison_start.py and exulanica/api/society_comparison_runner.py)
+milestone:Honest difference                  not_served          The rehearsal's comparison runs on one development seed, which is never judged: a verdict bounding a difference between models by its same-model control pair is given only on held-out seeds, which a rehearsal does not spend.
+milestone:Independent reading                not_reachable       
+foundation:World entry                       passed_on_stand_in  
+                                             Passed on a review the rehearsal driver gave in place of a person; it is not a person's review.
+foundation:Durable creation                  passed              
+foundation:Inspection                        passed              
+foundation:Bounded interaction               passed              
+foundation:Companion interaction             failed              ask-what-happened (the Companion's people answers: exulanica/selection/society_question.py and web/packages/app/src/companion-ask-api.ts)
+foundation:Developer proof                   passed              
+foundation:Personal-media path               not_available       
+delivery:Usable world                        passed_in_part      
+                                             In part: the town's people are watched moving by the society's reads and drawn, and vehicles by the traffic reads; the separate diagnosis of world, simulation and rendering failures is by each step's owner area.
+delivery:Models in their roles               passed_in_part      
+                                             In part: one group's decisions come from its named model and the others' from their routine, in the starter and in the town; a refused proposal is seen only when the model makes one.
+delivery:Swap and compare                    failed              compare-town-group (comparisons from the application: web/packages/app/src/ui/society-comparison-start.ts and web/packages/app/src/composition/society-comparison-mount.ts; exulanica/api/routes/society_comparisons.py, exulanica/api/society_comparison_start.py and exulanica/api/society_comparison_runner.py)
+delivery:Persistence and replay              not_reachable       
+delivery:Independent use                     not_reachable       
+delivery:Release rehearsal                   not_available       

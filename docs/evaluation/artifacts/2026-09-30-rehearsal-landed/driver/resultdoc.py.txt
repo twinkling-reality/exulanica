@@ -1,0 +1,235 @@
+"""The result document of one rehearsal run, assembled from what each step reported.
+
+``assemble`` takes the step list, its gates and the outcome each runner reported, and returns the
+document ``result.schema.json`` describes. It is the one place that decides a step's final status:
+
+*   a step the step list declares ``not_available`` is reported as such, with its reason;
+*   a step no runner reported is ``not_reachable``, with the reason the orchestrator recorded (its
+    page session ended, a step it requires did not pass), never a missing line;
+*   a step reported ``passed`` stays passed only when every observable the step list declares for it
+    was checked and held, and nothing undeclared was reported. A runner therefore cannot pass a step
+    by checking less than the data says, or by checking something the data does not say.
+
+The gate table then gives each gate the owning document states the worst status of its steps
+(``GATE_ORDER``) and names the first failed step that serves it, with that step's owner area, so a
+failure can be routed without reading the run.
+
+A step that gives a stand-in the step list states (``stand_ins``: an action the rehearsal driver
+performs in place of a person), or requires one that does, carries each such stand-in's statement,
+and a gate any of its steps rests on one for never reports a plain pass: it reports
+``passed_on_stand_in`` with the stand-in's own qualification.
+
+A gate the step list names in ``gates_in_part`` (its steps rehearse only part of what it asks)
+never reports a plain pass either: it reports ``passed_in_part`` with what its steps leave out.
+A gate no step serves, which the step list must name in ``unserved_gates`` with its reason, is
+reported ``not_served`` with that reason, never omitted.
+
+A step's evidence keeps every request and response body up to ``RECORDED_BODY_BYTES`` whole and
+a larger one by its SHA-256 and size (``recorded_evidence``). A check reads whole bodies while the
+run is live and writes what it read into its observations, which are kept whole, and the gate table
+reads only statuses, so no check and no gate reads a body the document keeps by digest.
+Standard library only.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+from steplist import STATUSES, Gate, stand_ins_of
+
+RESULT_PROFILE = "exulanica.rehearsal-result/v1"
+#: A gate's status is the first of these that any of its steps has.
+GATE_ORDER = ("failed", "not_reachable", "not_available", "passed")
+#: What a gate that would pass reports instead when a step serving it rests on a stand-in.
+STAND_IN_PASS = "passed_on_stand_in"
+#: What a gate that would pass reports instead when its steps rehearse only part of it.
+IN_PART_PASS = "passed_in_part"
+#: What a gate no step serves reports, with the step list's reason.
+NOT_SERVED = "not_served"
+#: The largest request or response body, in UTF-8 as JSON writes it, a step's evidence keeps whole.
+#: Rehearsal 7's result held 25.6 MB of page traffic, society reads of up to 245 KB repeated at
+#: every poll (finding #67); keeping bodies over 4 KiB by digest makes the same document 2.5 MB
+#: (measured by re-recording docs/evaluation/artifacts/2026-09-29-rehearsal-models-and-comparison/
+#: result.json under this rule). The driver's own API helper already keeps 4,000 characters of a
+#: body that is not JSON, the same order.
+RECORDED_BODY_BYTES = 4096
+#: The fields of a recorded request that hold a body.
+BODY_FIELDS = ("request_body", "response_body")
+
+
+def recorded_body(value: Any) -> Any:
+    """A body as the document keeps it: whole up to ``RECORDED_BODY_BYTES``, else its digest."""
+    if value is None:
+        return None
+    text = (
+        value if isinstance(value, str) else json.dumps(value, sort_keys=True, ensure_ascii=False)
+    )
+    data = text.encode("utf-8")
+    if len(data) <= RECORDED_BODY_BYTES:
+        return value
+    return {"recorded_by_digest": {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}}
+
+
+def recorded_evidence(evidence: Any) -> Any:
+    """``evidence`` with every body field anywhere inside it passed through ``recorded_body``."""
+    if isinstance(evidence, Mapping):
+        return {
+            key: recorded_body(value) if key in BODY_FIELDS else recorded_evidence(value)
+            for key, value in evidence.items()
+        }
+    if isinstance(evidence, list):
+        return [recorded_evidence(item) for item in evidence]
+    return evidence
+
+
+def _declared(step: Mapping[str, Any]) -> list[dict[str, str]]:
+    return [
+        {"kind": kind, "id": observable["id"], "says": observable["says"]}
+        for kind, observables in step["expect"].items()
+        for observable in observables
+    ]
+
+
+def _settle(step: Mapping[str, Any], outcome: Mapping[str, Any]) -> dict[str, Any]:
+    """The outcome with the declared-versus-observed rule applied to a reported pass."""
+    settled = dict(outcome)
+    status = settled.get("status")
+    if status not in STATUSES or status == "not_available":
+        settled["status"] = "failed"
+        settled["reason"] = (
+            f"the runner reported the status {status!r}, which a runner may not report"
+        )
+        return settled
+    if status != "passed":
+        return settled
+    declared = {observable["id"] for observable in _declared(step)}
+    observations = settled.get("observations", [])
+    reported = {observation.get("id") for observation in observations}
+    missing = sorted(declared - reported)
+    extra = sorted(str(identifier) for identifier in reported - declared)
+    broken = sorted(
+        str(observation.get("id"))
+        for observation in observations
+        if observation.get("ok") is not True
+    )
+    reasons = []
+    if missing:
+        reasons.append(f"declared but not checked: {', '.join(missing)}")
+    if extra:
+        reasons.append(f"checked but not declared in the step list: {', '.join(extra)}")
+    if broken:
+        reasons.append(f"did not hold: {', '.join(broken)}")
+    if reasons:
+        settled["status"] = "failed"
+        settled["reason"] = "; ".join(reasons)
+    return settled
+
+
+def assemble(
+    steps: Mapping[str, Any],
+    gates: Sequence[Gate],
+    outcomes: Mapping[str, Mapping[str, Any]],
+    unreached: Mapping[str, str],
+    run: Mapping[str, Any],
+) -> dict[str, Any]:
+    """The run's result document. ``unreached`` gives the reason for a step no runner reported."""
+    reported_steps: list[dict[str, Any]] = []
+    stated = steps.get("stand_ins", {})
+    resting = stand_ins_of(steps)
+    for step in steps["steps"]:
+        base = {
+            "id": step["id"],
+            "action": step["action"],
+            "gates": list(step["gates"]),
+            "session": step.get("session"),
+            "owner_area": step["owner_area"],
+            "expect": _declared(step),
+            "stand_ins": [
+                {"key": key, "statement": stated[key]["statement"]} for key in resting[step["id"]]
+            ],
+        }
+        if step.get("not_available") is not None:
+            outcome: dict[str, Any] = {"status": "not_available", "reason": step["not_available"]}
+        elif step["id"] in outcomes:
+            outcome = _settle(step, outcomes[step["id"]])
+        else:
+            outcome = {
+                "status": "not_reachable",
+                "reason": unreached.get(step["id"], "no runner reported this step"),
+            }
+        outcome.setdefault("observations", [])
+        outcome["evidence"] = recorded_evidence(outcome.get("evidence", {}))
+        reported_steps.append(base | outcome)
+
+    by_id = {step["id"]: step for step in reported_steps}
+    unserved = steps.get("unserved_gates", {})
+    in_part = steps.get("gates_in_part", {})
+    table = []
+    for gate in gates:
+        serving = [step for step in reported_steps if gate.key in step["gates"]]
+        if not serving:
+            table.append(
+                {
+                    "gate": gate.key,
+                    "name": gate.name,
+                    "document": gate.document,
+                    "heading": gate.heading,
+                    "status": NOT_SERVED,
+                    "reason": unserved.get(gate.key, "the step list names no step for it"),
+                    "stand_ins": [],
+                    "qualification": [],
+                    "steps": [],
+                    "first_failure": None,
+                }
+            )
+            continue
+        statuses = {step["status"] for step in serving}
+        first_failure = next((s for s in serving if s["status"] == "failed"), None)
+        rests_on = sorted({key for s in serving for key in resting[s["id"]]})
+        status = next(status for status in GATE_ORDER if status in statuses)
+        passed_as = status
+        if status == "passed" and gate.key in in_part:
+            passed_as = IN_PART_PASS
+        elif status == "passed" and rests_on:
+            passed_as = STAND_IN_PASS
+        table.append(
+            {
+                "gate": gate.key,
+                "name": gate.name,
+                "document": gate.document,
+                "heading": gate.heading,
+                # The worst status of the steps that serve it: a failure anywhere is the gate's
+                # failure, whatever step list order puts ahead of it. A pass that rests on a
+                # stand-in is never reported as a plain pass.
+                "status": passed_as,
+                "stand_ins": rests_on,
+                # Words about a pass, so only on one: a gate that failed says why it failed.
+                "qualification": ([f"In part: {in_part[gate.key]}"] if gate.key in in_part else [])
+                + [stated[key]["gate_qualification"] for key in rests_on]
+                if status == "passed"
+                else [],
+                "steps": [{"id": s["id"], "status": s["status"]} for s in serving],
+                "first_failure": None
+                if first_failure is None
+                else {
+                    "step": first_failure["id"],
+                    "reason": first_failure.get("reason"),
+                    "owner_area": by_id[first_failure["id"]]["owner_area"],
+                },
+            }
+        )
+    counts = {
+        status: sum(1 for s in reported_steps if s["status"] == status) for status in STATUSES
+    }
+    return {
+        "profile": RESULT_PROFILE,
+        "steps_profile": steps["profile"],
+        "steps_version": steps["version"],
+        "run": dict(run),
+        "summary": counts,
+        "steps": reported_steps,
+        "gates": table,
+    }
