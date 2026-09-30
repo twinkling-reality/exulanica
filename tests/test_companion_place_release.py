@@ -261,11 +261,11 @@ def _cases():
             yield path, "the call site alone"
 
 
-def _disable(monkeypatch, *, call_site: bool, boundary: bool) -> None:
+def _disable(monkeypatch, path: str, *, call_site: bool, boundary: bool) -> None:
     if not call_site:
-        monkeypatch.setattr(
-            sys.modules["exulanica.selection.request_names"], "redact_names", _unreplaced
-        )
+        # Every module the path's own call site replaces names in, as the registry names them.
+        for module in CALL_SITE_REPLACES[path]:
+            monkeypatch.setattr(sys.modules[module], "redact_names", _unreplaced)
     if not boundary:
         monkeypatch.setattr(WorkspaceRequestPolicy, "_withheld", lambda *args, **kwargs: ())
 
@@ -275,7 +275,7 @@ def test_no_persons_name_leaves_on_any_path_with_every_place_use_allowed(
     world, monkeypatch, path, layer
 ):
     call_site, boundary = LAYERS[layer]
-    _disable(monkeypatch, call_site=call_site, boundary=boundary)
+    _disable(monkeypatch, path, call_site=call_site, boundary=boundary)
     run, _ = SCENARIOS[path]
     transport = run(_allow_every_use(world))
 
@@ -293,7 +293,7 @@ def test_no_persons_name_leaves_on_any_path_with_every_place_use_allowed(
 @pytest.mark.parametrize("path", sorted(CALL_SITE_REPLACES))
 def test_with_both_layers_off_the_persons_name_would_leave(world, monkeypatch, path):
     """The control for the test above: its detector sees a person's name when nothing holds it."""
-    _disable(monkeypatch, call_site=False, boundary=False)
+    _disable(monkeypatch, path, call_site=False, boundary=False)
     run, _ = SCENARIOS[path]
     transport = run(_allow_every_use(world))
     own = [
