@@ -157,7 +157,7 @@
       "expect": {
         "page": [
           {"id": "starter-opens", "says": "The world canvas opens directly with the world title field, the World menu, Add object and Add photos; there is no introductory form."},
-          {"id": "first-use-card", "says": "The first-use card says the world is empty and offers Start building."},
+          {"id": "first-use-card", "says": "The first-use card welcomes the person to their world and offers Meet your Companion."},
           {"id": "renderer-mounted", "says": "The canvas reports its engine and at least one mounted world module."}
         ],
         "api": [
@@ -207,7 +207,7 @@
       "owner_area": "the first-use card: web/packages/app/src/ui/first-use-guidance.ts and the first-use actions in web/packages/app/src/main.ts; the square: proposeArrangement in web/packages/app/src/composition/objects.ts and exulanica/world/arrangements.py; taking back: POST /world/versions/{version_id}/objects/undo",
       "expect": {
         "page": [
-          {"id": "card-offers-square", "says": "The welcome card of the empty starter offers Start with a small square beside Start building."},
+          {"id": "card-offers-square", "says": "The welcome card of the empty starter offers Start with a small square beside Meet your Companion."},
           {"id": "card-asks-role", "says": "Pressing it asks what the square is to the person, offering each role the Create panel offers, and writes nothing."},
           {"id": "confirm-before-write", "says": "Choosing the role opens a confirmation stating the server's preview of the square, and Confirm is offered only once that preview is ready; nothing is written before Confirm."},
           {"id": "taken-back-one-at-a-time", "says": "Each confirmed press of Take back the last change removes one object from the objects panel, until it lists none, and the welcome card does not come back."}
@@ -870,8 +870,8 @@
         "page": [
           {"id": "answer-shown", "says": "The Companion shows an answer, not a failure, whose own sentences state what the sign says."},
           {"id": "names-restored", "says": "The answer names the place as the person saved it; no placeholder such as [place A] is shown."},
-          {"id": "executed-model-shown", "says": "The answer says which model answered and how long it took."},
-          {"id": "citation-offered", "says": "The answer offers the photograph it rests on."}
+          {"id": "executed-model-shown", "says": "Opening Answer details and sources visibly shows which model answered and how long it took."},
+          {"id": "citation-offered", "says": "Opening Answer details and sources visibly offers the photograph the answer rests on."}
         ],
         "api": [
           {"id": "grounded-execution", "says": "POST /selection/ask answered with at least one clause citing evidence; its execution block names the model that composed the answer, and every call's role, requested model and cost."}
@@ -946,7 +946,7 @@
       "expect": {
         "page": [
           {"id": "same-words-redrawn", "says": "After a reload the Companion redraws the answer it remembers with the same words it drew when it answered."},
-          {"id": "same-provenance-redrawn", "says": "It redraws the same provenance line."}
+          {"id": "same-provenance-redrawn", "says": "Opening the remembered answer's details redraws the same visible provenance line."}
         ],
         "api": [
           {"id": "memory-holds-the-answer", "says": "GET /companion/memory/recent holds the answer, newest, in the words the Companion drew."}
@@ -986,7 +986,7 @@
       "expect": {
         "page": [
           {"id": "same-words-redrawn", "says": "After a reload the Companion redraws the answer it remembers with the same words it drew when it answered."},
-          {"id": "same-provenance-redrawn", "says": "It redraws the same provenance line."}
+          {"id": "same-provenance-redrawn", "says": "Opening the remembered answer's details redraws the same visible provenance line."}
         ],
         "api": [
           {"id": "memory-holds-the-answer", "says": "GET /companion/memory/recent holds the answer, newest, in the words the Companion drew."}
@@ -1321,8 +1321,8 @@
       "owner_area": "the Companion's people answers: exulanica/selection/society_question.py and web/packages/app/src/companion-ask-api.ts",
       "expect": {
         "page": [
-          {"id": "town-answer-cites-activity", "says": "The Companion answers with at least one cited simulation activity line and a simulation-minute span from this town, rather than an empty or no-words fallback."},
-          {"id": "answer-drawn", "says": "The Companion draws an answer with a provenance line after the answer composer completed; a fallback after its failure does not satisfy this hosted-answer check."}
+          {"id": "town-answer-cites-activity", "says": "Opening the answer's details visibly shows at least one cited simulation activity line and a simulation-minute span from this town, rather than an empty or no-words fallback."},
+          {"id": "answer-drawn", "says": "The Companion draws an answer and visibly shows its provenance when details are opened after the answer composer completed; a fallback after its failure does not satisfy this hosted-answer check."}
         ],
         "api": [
           {"id": "town-events-recorded", "says": "Before asking, the same saved town and version expose at least one recorded society event for the answer to describe."},

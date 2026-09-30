@@ -110,7 +110,7 @@ async function enterOwnedStarter(ctx) {
   if (!await page.evaluate(WORLD_READY)) await open(ctx);
   const surface = await page.evaluate(`(() => {
     const visible = (e) => !!e && e.checkVisibility();
-    const start = [...document.querySelectorAll('button.companion-prompt-button')].find(b => b.textContent.trim() === 'Start building');
+    const start = [...document.querySelectorAll('button.companion-prompt-button')].find(b => b.textContent.trim() === 'Meet your Companion');
     return {
       title: document.querySelector('input[aria-label="World title"]')?.value ?? null,
       world_menu: visible(document.querySelector('button.world-open-menu')),
@@ -119,7 +119,7 @@ async function enterOwnedStarter(ctx) {
       canvas: visible(document.getElementById('atlas')),
       visible_forms: [...document.querySelectorAll('#shell form')].filter(f => f.checkVisibility()).map(f => f.className),
       first_use: document.querySelector('.companion-prompt-statement')?.textContent.trim() ?? null,
-      start_building: visible(start),
+      meet_companion: visible(start),
       atlas: { ...document.getElementById('atlas')?.dataset },
     }; })()`);
   // The title form and the Companion's own composer are part of the world; anything else would be
@@ -128,8 +128,8 @@ async function enterOwnedStarter(ctx) {
     .filter((name) => !String(name).includes('world-title-form') && !String(name).includes('companion-composer'));
   ctx.observe('starter-opens', surface.title !== null && surface.world_menu && surface.add_object && surface.add_photos
     && surface.canvas && otherForms.length === 0, surface);
-  ctx.observe('first-use-card', Boolean(surface.first_use) && surface.start_building,
-    { statement: surface.first_use, start_building: surface.start_building });
+  ctx.observe('first-use-card', Boolean(surface.first_use) && surface.meet_companion,
+    { statement: surface.first_use, meet_companion: surface.meet_companion });
   ctx.observe('renderer-mounted', Boolean(surface.atlas.engine) && Number(surface.atlas.worldModules) >= 1, surface.atlas);
   await ctx.screenshot('starter', 'the starter world on first entry, with the first-use card');
 
@@ -667,7 +667,7 @@ async function startWithSmallSquare(ctx) {
   const { card_action: offer, origin_role: role } = ctx.parameters;
   const offered = await page.waitFor(`(() => { const b = [...document.querySelectorAll('button.companion-prompt-button')]
     .filter(b => b.checkVisibility()).map(b => b.textContent.trim()); return b.length ? b : null; })()`, SETTLE_MS, 'the first-use card').catch(() => []);
-  ctx.observe('card-offers-square', offered.includes(offer) && offered.includes('Start building'), { offered });
+  ctx.observe('card-offers-square', offered.includes(offer) && offered.includes('Meet your Companion'), { offered });
   await ctx.screenshot('card', 'the welcome card of the empty starter');
   const before = await savedWorld(ctx);
   const roles = await createPanelRoles(page);
@@ -719,7 +719,7 @@ async function startWithSmallSquare(ctx) {
     version: pick(final.version, ['state_sha256', 'edit_seq']) });
   const card = await cardButtons(page);
   ctx.observe('taken-back-one-at-a-time', counts.every((n, i) => n === applied.added.length - i) && !card.includes(offer)
-    && !card.includes('Start building'), { listed_after_each: counts, card_after: card });
+    && !card.includes('Meet your Companion'), { listed_after_each: counts, card_after: card });
   await ctx.screenshot('taken-back', 'the objects panel after the square was taken back');
   await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
 }
@@ -1984,6 +1984,17 @@ const SPEECH = `document.querySelector('aside.companion-encounter .companion-spe
 // Companion lane's runs); "place I" is left alone because it is also English ("the place I saw").
 const BARE_PLACEHOLDER = /\b(?:place|Place|PLACE|person|Person|PERSON) (?!I\b)[A-Z]\b/;
 const COMPOSER = `[...document.querySelectorAll('aside.companion-encounter form.companion-composer input')].find(i => i.checkVisibility())`;
+const ANSWER_DETAILS = `document.querySelector('aside.companion-encounter details.companion-answer-details')`;
+
+/** Open the answer's own disclosure before asserting that its sources are visible to a person. */
+async function revealAnswerDetails(page) {
+  if (!await page.evaluate(`!!(${ANSWER_DETAILS})`)) return false;
+  if (!await page.evaluate(`(${ANSWER_DETAILS}).open`)) {
+    await page.click(`${ANSWER_DETAILS}.querySelector('summary')`, 'Answer details and sources');
+  }
+  await page.waitFor(`(${ANSWER_DETAILS})?.open === true`, 10_000, 'answer details to open');
+  return true;
+}
 
 async function openCompanion(page) {
   if (await page.evaluate(`document.querySelector('aside.companion-encounter')?.dataset.state === 'open'`)) return;
@@ -1996,8 +2007,11 @@ async function ask(ctx, question) {
   const { page } = ctx;
   await openCompanion(page);
   if (!await page.evaluate(`!!(${COMPOSER})`)) {
-    // A pending turn keeps the composer behind "Other…", which is how a person asks their own question.
-    await page.click(`document.querySelector('aside.companion-encounter button.companion-other-reveal')`, 'Other…');
+    // First use offers an explicit ask; a pending turn offers the same path behind Other.
+    const greetingAsk = `[...document.querySelectorAll('aside.companion-encounter .companion-greeting-actions button')]
+      .find(b => b.checkVisibility() && b.textContent.trim() === 'Ask a question')`;
+    if (await page.evaluate(`!!(${greetingAsk})`)) await page.click(greetingAsk, 'Ask a question');
+    else await page.click(`document.querySelector('aside.companion-encounter button.companion-other-reveal')`, 'Other…');
   }
   await page.waitFor(`!!(${COMPOSER})`, 10_000, 'the question field');
   const asksBefore = (await responses(ctx, 'POST', '/api/selection/ask')).length;
@@ -2016,13 +2030,19 @@ async function ask(ctx, question) {
     30_000, 'the Companion to draw its reply');
   // The answer may be drawn before its packet is read; the chips follow the packet.
   await sleep(1500);
+  if (await page.evaluate(`!!(${ANSWER_DETAILS}) && !(${ANSWER_DETAILS}).open`)) {
+    await ctx.screenshot('caption', 'the Companion answer as a compact caption before its details are opened');
+  }
+  await revealAnswerDetails(page);
   // The answer is its clauses; the speech also echoes the question, which must not count as an answer.
   const face = await page.evaluate(`(() => { const s = ${SPEECH};
     return { mode: s?.dataset.mode ?? null, abstained: s?.hasAttribute('data-abstained') ?? false,
       text: s?.innerText.trim() ?? '',
       clauses: [...(s?.querySelectorAll('p.companion-utterance') ?? [])].map(p => p.textContent.trim()),
       provenance: s?.querySelector('p.companion-provenance')?.textContent.trim() ?? null,
-      chips: [...document.querySelectorAll('aside.companion-encounter button.companion-evidence-chip')].map(b => ({ text: b.textContent.trim(), disabled: b.disabled })) }; })()`);
+      provenance_visible: s?.querySelector('p.companion-provenance')?.checkVisibility() ?? false,
+      chips: [...document.querySelectorAll('aside.companion-encounter button.companion-evidence-chip')].map(b =>
+        ({ text: b.textContent.trim(), disabled: b.disabled, visible: b.checkVisibility() })) }; })()`);
   const asked = (await responses(ctx, 'POST', '/api/selection/ask')).slice(asksBefore);
   const classified = (await responses(ctx, 'POST', '/api/selection/appearance')).slice(appearanceBefore);
   const answer = asked.at(-1)?.response_body ?? null;
@@ -2042,9 +2062,11 @@ async function askGroundedQuestion(ctx) {
   const reasoning = (answer?.execution?.calls ?? []).filter((c) => String(c.role).startsWith('reasoning_'));
   // The provenance line names a model as a person reads it (Manifest.model_name), not by its identifier.
   const served = reasoning.at(-1)?.served_model_name ?? null;
-  ctx.observe('executed-model-shown', face.provenance !== null && served !== null && face.provenance.includes(served),
-    { provenance: face.provenance, served_model_name: served, served_model: reasoning.at(-1)?.served_model ?? null });
-  ctx.observe('citation-offered', face.chips.some((c) => !c.disabled), face.chips);
+  ctx.observe('executed-model-shown', face.provenance_visible && face.provenance !== null
+    && served !== null && face.provenance.includes(served),
+    { provenance: face.provenance, visible: face.provenance_visible,
+      served_model_name: served, served_model: reasoning.at(-1)?.served_model ?? null });
+  ctx.observe('citation-offered', face.chips.some((c) => !c.disabled && c.visible), face.chips);
   const clauses = answer?.answer?.clauses ?? [];
   const calls = answer?.execution?.calls ?? [];
   const composed = reasoning.at(-1) ?? null;
@@ -2059,7 +2081,9 @@ async function askGroundedQuestion(ctx) {
 
 async function openCitedPhotograph(ctx) {
   const { page } = ctx;
-  await page.click(`[...document.querySelectorAll('aside.companion-encounter button.companion-evidence-chip')].find(b => !b.disabled)`, 'the first citation');
+  await revealAnswerDetails(page);
+  await page.click(`[...document.querySelectorAll('aside.companion-encounter button.companion-evidence-chip')]
+    .find(b => !b.disabled && b.checkVisibility())`, 'the first citation');
   const evidence = await page.waitFor(`(() => { const e = document.querySelector('aside.companion-encounter section.companion-evidence');
     const state = e?.dataset.evidence; if (!state || state === 'opening') return null;
     const img = e.querySelector('figure.companion-evidence-figure img');
@@ -2226,6 +2250,7 @@ const speechSeen = (page) => page.evaluate(`(() => { const s = ${SPEECH};
     utterances: [...(s?.querySelectorAll('p.companion-utterance') ?? [])].map(p => p.textContent.trim()),
     echo: s?.querySelector('p.companion-question-echo')?.textContent.trim() ?? null,
     provenance: s?.querySelector('p.companion-provenance')?.textContent.trim() ?? null,
+    provenance_visible: s?.querySelector('p.companion-provenance')?.checkVisibility() ?? false,
     text: s?.innerText.trim() ?? '' }; })()`);
 
 // The words of the one control the Companion's accepted proposal names, and never offers on a refusal.
@@ -2242,8 +2267,9 @@ async function companionRefusesUnsupportedChange(ctx) {
   ctx.observe('refused-in-one-answer', face.mode === 'answer' && drawn.utterances.length > 0 && !CUSTOMIZE_WORDS.test(face.text)
     && memory.length === 1 && sameWords(memory[0].answer_text, drawn.utterances),
   { drawn, remembered: memory.map((a) => pick(a, ['answer_id', 'answer_text', 'composed', 'served_model_name', 'latency_ms'])) });
-  ctx.observe('refusal-provenance', named !== null && (drawn.provenance ?? '').startsWith(`${named} read that in `),
-    { provenance: drawn.provenance, served_model_name: named });
+  ctx.observe('refusal-provenance', drawn.provenance_visible && named !== null
+    && (drawn.provenance ?? '').startsWith(`${named} read that in `),
+    { provenance: drawn.provenance, visible: drawn.provenance_visible, served_model_name: named });
   ctx.observe('refusal-recorded', status === 200 && classification?.classification === 'appearance' && classification?.proposal === null
     && classification?.refusal?.code === ctx.parameters.refusal_code && memory[0]?.composed === 'refused',
   { status, classification: classification?.classification ?? null, refusal: classification?.refusal ?? null,
@@ -2265,6 +2291,10 @@ async function answerRedrawnAfterReload(ctx) {
   const drawn = await page.waitFor(`(() => { const s = ${SPEECH}; return s?.dataset.mode === 'answer'
     && document.querySelector('aside.companion-encounter')?.getAttribute('data-remembered') === 'true' ? true : null; })()`,
   SETTLE_MS, 'the remembered answer to be drawn').catch(() => false);
+  if (await page.evaluate(`!!(${ANSWER_DETAILS}) && !(${ANSWER_DETAILS}).open`)) {
+    await ctx.screenshot('remembered-caption', 'the remembered answer as a compact caption');
+  }
+  await revealAnswerDetails(page);
   const now = await speechSeen(page);
   const memory = await remembered(ctx, earlier.utterance);
   // The words, not their paragraphs: a remembered answer is kept as one text (its memory's answer_text).
@@ -2273,8 +2303,9 @@ async function answerRedrawnAfterReload(ctx) {
     && words(now.utterances) === words(earlier.drawn.utterances) && now.echo === earlier.drawn.echo,
   { before: pick(earlier.drawn, ['utterances', 'echo']), after: pick(now, ['utterances', 'echo', 'remembered']),
     same_paragraphs: same(now.utterances, earlier.drawn.utterances) });
-  ctx.observe('same-provenance-redrawn', drawn === true && now.provenance !== null && now.provenance === earlier.drawn.provenance,
-    { before: earlier.drawn.provenance, after: now.provenance });
+  ctx.observe('same-provenance-redrawn', drawn === true && now.provenance_visible
+    && now.provenance !== null && now.provenance === earlier.drawn.provenance,
+    { before: earlier.drawn.provenance, after: now.provenance, visible: now.provenance_visible });
   ctx.observe('memory-holds-the-answer', memory.length >= 1 && sameWords(memory[0].answer_text, earlier.drawn.utterances),
     memory.map((a) => pick(a, ['answer_id', 'asked_at', 'answer_text', 'composed', 'served_model_name', 'latency_ms'])));
   await ctx.screenshot('remembered', 'the Companion after a reload, redrawing the answer it remembers');
@@ -2993,14 +3024,15 @@ async function askWhatHappened(ctx) {
   ctx.observe('town-answer-cites-activity', recorded.length > 0 && face.mode === 'answer'
     && !face.abstained && citedActivity.length > 0
     && clauses.some((clause) => /simulat(?:ion|ed).*minute/i.test(clause.text ?? ''))
-    && face.chips.some((chip) => !chip.disabled)
+    && face.chips.some((chip) => !chip.disabled && chip.visible)
     && !/no words for|Nothing has been recorded/.test(words),
   { world_id: entry.world_id, version_id: entry.authored_version_id,
     recorded_count: recorded.length, cited_clauses: citedActivity.map((clause) =>
       pick(clause, ['text', 'citations'])), face: pick(face, ['mode', 'abstained', 'clauses', 'chips']) });
   ctx.observe('answer-drawn', face.mode === 'answer' && face.clauses.length > 0
-    && composed && !saidEnded && Boolean(face.provenance),
-  { face: pick(face, ['mode', 'clauses', 'provenance']), composer: last === null ? null : pick(last, ['outcome', 'model_id', 'model_name', 'served_model_name', 'duration_ms', 'latency_ms']) });
+    && composed && !saidEnded && Boolean(face.provenance) && face.provenance_visible,
+  { face: pick(face, ['mode', 'clauses', 'provenance', 'provenance_visible']),
+    composer: last === null ? null : pick(last, ['outcome', 'model_id', 'model_name', 'served_model_name', 'duration_ms', 'latency_ms']) });
   ctx.observe('composer-outcome-shown', status === 200 && last !== null && composed && !saidEnded,
   { status, composer_calls: calls.map((c) => pick(c, ['outcome', 'model_id', 'served_model_name', 'latency_ms'])), named,
     composer_ended_without_answer: ended && saidEnded,
