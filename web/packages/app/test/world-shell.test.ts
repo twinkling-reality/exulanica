@@ -21,13 +21,13 @@ describe('the Atlas shell', () => {
     expect(updateWorldShell(options, { type: 'show-world' })).toEqual(initialWorldShell());
   });
 
-  it('opens a recorded comparison as a temporary menu destination', () => {
+  it('opens a receipt lookup inside Compare and returns to Compare', () => {
     const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
-    const experiment = updateWorldShell(menu, { type: 'toggle-experiment' });
-    expect(experiment.primary).toBe('experiment');
-    expect(updateWorldShell(experiment, { type: 'toggle-experiment' })).toEqual(menu);
     const compare = updateWorldShell(menu, { type: 'toggle-compare' });
     expect(compare.primary).toBe('compare');
+    const experiment = updateWorldShell(compare, { type: 'toggle-experiment' });
+    expect(experiment.primary).toBe('experiment');
+    expect(updateWorldShell(experiment, { type: 'toggle-experiment' })).toEqual(compare);
     expect(updateWorldShell(compare, { type: 'toggle-compare' })).toEqual(menu);
   });
 

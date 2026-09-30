@@ -7,8 +7,7 @@ describe('World menu', () => {
     const onResume = vi.fn();
     const onCommand = vi.fn();
     const onWorld = vi.fn();
-    const onExperiment = vi.fn();
-    const menu = buildWorldMenu({ preview: true, onResume, onWorld, onExperiment, onCommand });
+    const menu = buildWorldMenu({ preview: true, onResume, onWorld, onCommand });
     document.body.append(menu.root);
     menu.setVisible(true);
 
@@ -19,24 +18,21 @@ describe('World menu', () => {
     menu.root.querySelector<HTMLButtonElement>('[data-command=world]')!.click();
     expect(onWorld).toHaveBeenCalledOnce();
     menu.root.querySelector<HTMLButtonElement>('[data-command=character]')!.click();
-    menu.root.querySelector<HTMLButtonElement>('[data-command=experiment]')!.click();
     menu.root.querySelector<HTMLButtonElement>('[data-command=controls]')!.click();
     menu.root.querySelector<HTMLButtonElement>('.world-menu-rail-action')!.click();
 
     expect(onCommand).toHaveBeenNthCalledWith(1, 'character');
     expect(onCommand).toHaveBeenNthCalledWith(2, 'controls');
-    expect(onExperiment).toHaveBeenCalledOnce();
     expect(onResume).toHaveBeenCalledOnce();
   });
 
-  it('does not offer recorded results without an active saved-world binding', () => {
+  it('does not offer comparison without an active saved-world binding', () => {
     const menu = buildWorldMenu({
       preview: true,
       onResume: vi.fn(),
       onWorld: vi.fn(),
       onCommand: vi.fn(),
     });
-    expect(menu.root.querySelector('[data-command=experiment]')).toBeNull();
     expect(menu.root.querySelector('[data-command=compare]')).toBeNull();
   });
 
@@ -68,15 +64,16 @@ describe('World menu', () => {
 
   it('keeps the short menu titles distinct and names each action', () => {
     const menu = buildWorldMenu({
-      preview: false, onResume: vi.fn(), onWorld: vi.fn(), onExperiment: vi.fn(),
+      preview: false, onResume: vi.fn(), onWorld: vi.fn(),
       onCompare: vi.fn(), onMakeWorld: vi.fn(), onCommand: vi.fn(),
     });
     const labels = [...menu.root.querySelectorAll('.world-menu-entry-label')]
       .map((node) => node.textContent);
     expect(labels).toEqual([
-      'World', 'Character', 'Library', 'Map', 'Attempts', 'Compare', 'Create',
-      'Companion', 'Design', 'Settings',
+      'World', 'Character', 'Library', 'Map', 'Compare', 'Companion', 'Create',
+      'Design', 'Settings',
     ]);
+    expect(menu.root.querySelector('[data-command=experiment]')).toBeNull();
     expect(menu.root.querySelector('[data-command=options]')?.getAttribute('aria-label'))
       .toBe('Customize world');
     expect([...menu.root.querySelectorAll('.world-menu-entry:has(svg)')]
@@ -90,16 +87,15 @@ describe('World menu', () => {
 
   it('moves focus through the visible mosaic rather than four fixed list positions', () => {
     const menu = buildWorldMenu({
-      preview: false, onResume: vi.fn(), onWorld: vi.fn(), onExperiment: vi.fn(),
+      preview: false, onResume: vi.fn(), onWorld: vi.fn(),
       onCompare: vi.fn(), onMakeWorld: vi.fn(), onCommand: vi.fn(),
     });
     document.body.append(menu.root);
     const entries = [...menu.root.querySelectorAll<HTMLButtonElement>('.world-menu-entry')];
     const boxes = [
       [0, 0, 200, 200], [200, 0, 400, 100], [200, 100, 300, 200],
-      [300, 100, 400, 200], [0, 200, 100, 300], [100, 200, 200, 300],
-      [200, 200, 300, 300], [0, 300, 200, 400], [300, 200, 400, 300],
-      [200, 300, 400, 400],
+      [300, 100, 400, 200], [0, 200, 200, 300], [200, 200, 400, 300],
+      [0, 300, 100, 400], [100, 300, 200, 400], [200, 300, 400, 400],
     ];
     entries.forEach((entry, index) => {
       const [left, top, right, bottom] = boxes[index]!;
@@ -121,11 +117,11 @@ describe('World menu', () => {
     expect(document.activeElement).toBe(entries[4]);
     move('ArrowUp');
     expect(document.activeElement).toBe(entries[0]);
-    entries[6]!.focus();
+    entries[4]!.focus();
     move('ArrowRight');
-    expect(document.activeElement).toBe(entries[8]);
+    expect(document.activeElement).toBe(entries[5]);
     move('ArrowDown');
-    expect(document.activeElement).toBe(entries[9]);
+    expect(document.activeElement).toBe(entries[8]);
   });
 
   it('is hidden and inert outside the menu state', () => {

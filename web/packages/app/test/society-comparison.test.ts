@@ -4,6 +4,7 @@
 // only the three comparison documents, and drops a response a newer choice has overtaken.
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@exulanica/graph-client';
 import { mountSocietyComparison } from '../src/composition/society-comparison-mount.js';
 import {
   parseComparison,
@@ -55,6 +56,19 @@ const day = (read: ComparisonResult): ComparisonDay => ({
 });
 
 describe('the Compare view', () => {
+  it('keeps receipt lookup as a secondary action in Compare', () => {
+    const onRecordedResult = vi.fn();
+    const shown = buildSocietyComparisonView({
+      onClose: vi.fn(), onComparison: vi.fn(), onDay: vi.fn(), onRecordedResult,
+    });
+    document.body.append(shown.root);
+    views.push(shown);
+    const receipt = shown.root.querySelector<HTMLButtonElement>('.comparison-receipt');
+    expect(receipt?.textContent).toBe('Open a result from a receipt');
+    receipt?.click();
+    expect(onRecordedResult).toHaveBeenCalledOnce();
+  });
+
   it('reads a difference inside its interval as no measured difference, from the verdict alone', () => {
     const inside = result((document) => {
       document['phase'] = 'held_out';
@@ -166,6 +180,75 @@ describe('the Compare view', () => {
 });
 
 describe('the Compare view\'s reads', () => {
+  it('explains when a world has no accessible society without exposing the API error', async () => {
+    const absent = new ApiError(404, 'unknown_reference', 'no such society');
+    const client = {
+      list: vi.fn(async () => { throw absent; }),
+      read: vi.fn(),
+      run: vi.fn(),
+      plan: vi.fn(async () => { throw absent; }),
+    };
+    const mounted = mountSocietyComparison({
+      getWorldId: () => 'world:authored:x', getVersionId: () => 'v', client,
+      onClose: vi.fn(), onRecordedResult: vi.fn(),
+    });
+    document.body.append(mounted.root);
+    mounted.setVisible(true);
+    await vi.waitFor(() => expect(mounted.root.querySelector('.comparison-list')?.textContent)
+      .toContain('Comparisons are not available in this world'));
+    expect(mounted.root.querySelector('.comparison-list')?.textContent)
+      .toContain('Use Return to leave Compare.');
+    expect(mounted.root.querySelector('.comparison-start')?.hasAttribute('hidden')).toBe(true);
+    expect(mounted.root.textContent).not.toContain('unknown_reference');
+    expect(mounted.root.querySelector('.comparison-receipt')).not.toBeNull();
+    mounted.dispose();
+  });
+
+  it('does not turn other missing comparison resources into the no-society state', async () => {
+    const absent = new ApiError(404, 'unknown_reference', 'no such world resource');
+    const mounted = mountSocietyComparison({
+      getWorldId: () => 'world:authored:x', getVersionId: () => 'v',
+      client: { list: async () => { throw absent; }, read: vi.fn(), run: vi.fn() },
+      onClose: vi.fn(),
+    });
+    document.body.append(mounted.root);
+    mounted.setVisible(true);
+    await vi.waitFor(() => expect(mounted.root.querySelector('.comparison-list')?.textContent)
+      .toContain('The comparisons could not be read'));
+    expect(mounted.root.querySelector('.comparison-list')?.textContent)
+      .not.toContain('Comparisons are not available in this world');
+    mounted.dispose();
+  });
+
+  it('restores the start surface when a later visit has a different error', async () => {
+    const noSociety = new ApiError(404, 'unknown_reference', 'no such society');
+    const otherMissing = new ApiError(404, 'unknown_reference', 'no such world resource');
+    let error = noSociety;
+    const mounted = mountSocietyComparison({
+      getWorldId: () => 'world:authored:x', getVersionId: () => 'v',
+      client: {
+        list: async () => { throw error; },
+        read: vi.fn(), run: vi.fn(),
+        plan: async () => { throw error; },
+      },
+      onClose: vi.fn(),
+    });
+    document.body.append(mounted.root);
+    mounted.setVisible(true);
+    await vi.waitFor(() => expect(mounted.root.querySelector('.comparison-start')?.hasAttribute('hidden'))
+      .toBe(true));
+    mounted.setVisible(false);
+    error = otherMissing;
+    mounted.setVisible(true);
+    await vi.waitFor(() => expect(mounted.root.querySelector('.comparison-list')?.textContent)
+      .toContain('The comparisons could not be read'));
+    await vi.waitFor(() => expect(mounted.root.querySelector('.comparison-start')?.hasAttribute('hidden'))
+      .toBe(false));
+    expect(mounted.root.querySelector('.comparison-list')?.textContent)
+      .toContain('unknown_reference: no such world resource');
+    mounted.dispose();
+  });
+
   it('opens the newest comparison, its first seed and first two models, and nothing else', async () => {
     const listed = parseComparisons(golden.listing);
     const read = result();

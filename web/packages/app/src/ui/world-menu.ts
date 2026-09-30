@@ -66,7 +66,6 @@ export function buildWorldMenu(options: {
   readonly preview: boolean;
   readonly onResume: () => void;
   readonly onWorld: () => void;
-  readonly onExperiment?: () => void;
   /** Opens the comparisons of the models that ran this world's people; absent with no world. */
   readonly onCompare?: () => void;
   /** Offers the recipes a new world can be generated from; absent where no worlds are saved. */
@@ -83,14 +82,14 @@ export function buildWorldMenu(options: {
   let activate = (action: () => void): void => action();
 
   const entry = (
-    command: AtlasCommand | 'world' | 'experiment' | 'compare' | 'make',
+    command: AtlasCommand | 'world' | 'compare' | 'make',
     label: string,
     detail: string,
     key: string,
     className = '',
     accessibleName?: string,
   ): HTMLButtonElement => {
-    const icon = command === 'world' || command === 'experiment' || command === 'compare'
+    const icon = command === 'world' || command === 'compare'
       || command === 'make' ? [] : [commandIcon(command)];
     const button = el('button', {
       type: 'button',
@@ -105,9 +104,7 @@ export function buildWorldMenu(options: {
     ]);
     button.addEventListener('click', () => activate(command === 'world'
       ? options.onWorld
-      : command === 'experiment'
-        ? options.onExperiment!
-        : command === 'compare'
+      : command === 'compare'
           ? options.onCompare!
           : command === 'make'
             ? options.onMakeWorld!
@@ -125,16 +122,13 @@ export function buildWorldMenu(options: {
     entry('character', 'Character', 'Appearance and identity', 'K', 'world-menu-character'),
     entry('index', 'Library', 'People and sources', 'I', 'world-menu-library'),
     entry('map', 'Map', 'Regions and orientation', 'M', 'world-menu-map'),
-    ...(options.onExperiment === undefined ? [] : [
-      entry('experiment', 'Attempts', 'Recorded runs', '', 'world-menu-experiment', 'Recorded comparison'),
-    ]),
     ...(options.onCompare === undefined ? [] : [
-      entry('compare', 'Compare', 'Models, same starting world', '', 'world-menu-compare', 'Compare models'),
+      entry('compare', 'Compare', 'See what each model chose', '', 'world-menu-compare', 'Compare models'),
     ]),
+    entry('companion', 'Companion', 'Ask and act', 'X', 'world-menu-companion'),
     ...(options.onMakeWorld === undefined ? [] : [
       entry('make', 'Create', say('worldMenu.make.detail'), '', 'world-menu-make', say('worldMenu.make')),
     ]),
-    entry('companion', 'Companion', 'Ask and act', 'X', 'world-menu-companion'),
     entry('options', 'Design', 'Light and material', 'O', 'world-menu-customize', 'Customize world'),
     entry('controls', 'Settings', 'Display and controls', '?', 'world-menu-settings'),
   ]);

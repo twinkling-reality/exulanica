@@ -409,6 +409,7 @@ function differencesList(result: ComparisonResult): HTMLElement {
 /** The Compare view. Every choice is a handler: the view reads nothing itself. */
 export function buildSocietyComparisonView(handlers: {
   readonly onClose: () => void;
+  readonly onRecordedResult?: () => void;
   readonly onComparison: (comparisonId: string) => void;
   readonly onDay: (day: ComparisonDay) => void;
 }): SocietyComparisonView {
@@ -418,6 +419,10 @@ export function buildSocietyComparisonView(handlers: {
   const dayPart = el('section', { class: 'comparison-day' });
   const closer = el('button', { type: 'button', class: 'comparison-close', text: '← Return' });
   closer.addEventListener('click', () => handlers.onClose());
+  const receipt = el('button', {
+    type: 'button', class: 'comparison-receipt', text: 'Open a result from a receipt',
+  });
+  receipt.addEventListener('click', () => handlers.onRecordedResult?.());
   const root = el('section', {
     class: 'society-comparison',
     role: 'dialog',
@@ -430,11 +435,15 @@ export function buildSocietyComparisonView(handlers: {
         el('h2', { id: 'society-comparison-title', class: 'comparison-title', text: 'Compare models' }),
         el('p', {
           class: 'comparison-note',
-          text: 'The same hour of this world, decided by different open models, replayed from what each run recorded. Reading a comparison asks no model; starting one asks the models you choose, within the bound you set.',
+          text: 'Give the same people the same starting hour, then see what each model chose.',
         }),
       ]),
     ]),
-    el('div', { class: 'comparison-scroll' }, [startSlot, list, summary, dayPart]),
+    el('div', { class: 'comparison-scroll' }, [
+      startSlot, list,
+      ...(handlers.onRecordedResult === undefined ? [] : [receipt]),
+      summary, dayPart,
+    ]),
   ]);
   root.hidden = true;
   let frame = 0;
@@ -455,7 +464,7 @@ export function buildSocietyComparisonView(handlers: {
     showList(listings, selected) {
       if (listings.length === 0) {
         state(list, 'No comparison of this world yet',
-          'Start one above, or run the local compare command; this view reads what each recorded.');
+          'Start a comparison above to see what different models chose for the same people.');
         return;
       }
       replace(list, [

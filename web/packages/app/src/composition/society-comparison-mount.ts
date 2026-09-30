@@ -51,6 +51,8 @@ export interface SocietyComparisonMountOptions {
   /** A fresh id for a comparison's start; left out, the browser's own. */
   readonly newId?: () => string;
   readonly onClose: () => void;
+  /** Opens the older receipt lookup from within Compare. */
+  readonly onRecordedResult?: () => void;
 }
 
 export interface MountedSocietyComparison {
@@ -61,6 +63,10 @@ export interface MountedSocietyComparison {
 
 const failure = (error: unknown): string =>
   error instanceof Error && error.message.length > 0 ? error.message : 'The server did not answer.';
+/** The society route uses the same response when a society is absent or inaccessible. */
+const societyUnavailable = (error: unknown): boolean =>
+  error instanceof ApiError && error.status === 404 && error.code === 'unknown_reference'
+  && error.message === 'unknown_reference: no such society';
 
 export function mountSocietyComparison(options: SocietyComparisonMountOptions): MountedSocietyComparison {
   let generation = 0;
@@ -134,7 +140,11 @@ export function mountSocietyComparison(options: SocietyComparisonMountOptions): 
       followProgress(listings);
       if (newest !== null) await openComparison(versionId, newest);
     } catch (error) {
-      if (current(token)) view.status('list', 'The comparisons could not be read', failure(error));
+      if (!current(token)) return;
+      if (societyUnavailable(error)) {
+        view.status('list', 'Comparisons are not available in this world',
+          'Use Return to leave Compare. Try again in a world where comparisons are available.');
+      } else view.status('list', 'The comparisons could not be read', failure(error));
     }
   };
 
@@ -144,9 +154,18 @@ export function mountSocietyComparison(options: SocietyComparisonMountOptions): 
     const token = ++planning;
     try {
       const offered = await port.plan(versionId, selection);
-      if (!disposed && token === planning) form.showPlan(offered);
+      if (!disposed && token === planning) {
+        form.root.hidden = false;
+        form.showPlan(offered);
+      }
     } catch (error) {
-      if (!disposed && token === planning) form.status('refused', failure(error));
+      if (!disposed && token === planning) {
+        if (societyUnavailable(error)) form.root.hidden = true;
+        else {
+          form.root.hidden = false;
+          form.status('refused', failure(error));
+        }
+      }
     }
   };
 
@@ -227,6 +246,7 @@ export function mountSocietyComparison(options: SocietyComparisonMountOptions): 
 
   const view = buildSocietyComparisonView({
     onClose: () => options.onClose(),
+    ...(options.onRecordedResult === undefined ? {} : { onRecordedResult: options.onRecordedResult }),
     onComparison: (comparisonId) => {
       const versionId = options.getVersionId();
       if (versionId === null) return;

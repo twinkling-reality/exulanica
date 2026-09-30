@@ -813,9 +813,6 @@
 }
 #shell .world-menu-companion :is(.world-menu-entry-detail, kbd) { color: var(--ui-chromatic-paper); }
 #shell :is(.world-menu-customize, .world-menu-settings) .atlas-command-icon { color: var(--ui-chromatic-accent); }
-#shell :is(.world-menu-experiment, .world-menu-compare, .world-menu-make) {
-  border-block-start: 3px solid var(--ui-chromatic-accent);
-}
 #shell .world-menu-entry:hover,
 #shell .world-menu-entry:focus-visible {
   border-color: var(--ui-chromatic-ink);
@@ -833,7 +830,7 @@
   white-space: nowrap;
 }
 @media (min-width: 60.0625rem) and (max-width: 68rem) {
-  #shell :is(.world-menu-experiment, .world-menu-compare) .world-menu-entry-label {
+  #shell .world-menu-compare .world-menu-entry-label {
     font-size: clamp(21px, 2.2vw, 24px);
   }
 }
@@ -958,8 +955,7 @@
 #shell .world-menu-character { grid-column: span 2; --field-main: var(--ui-spectrum-violet); --field-counter: var(--ui-spectrum-rose); --light-x: 12%; --light-y: 105%; --pigment-x: 90%; --pigment-y: -10%; }
 #shell .world-menu-library { --field-main: var(--ui-spectrum-blue); --field-counter: var(--ui-spectrum-violet); --pigment-x: 96%; --pigment-y: 0%; }
 #shell .world-menu-map { --field-main: var(--ui-spectrum-green); --field-counter: var(--ui-spectrum-blue); --pigment-x: 92%; --pigment-y: 4%; }
-#shell .world-menu-experiment,
-#shell .world-menu-compare { --field-main: var(--ui-spectrum-orange); --field-counter: var(--ui-spectrum-rose); --pigment-x: 90%; --pigment-y: 0%; }
+#shell .world-menu-compare { grid-column: span 2; --field-main: var(--ui-spectrum-orange); --field-counter: var(--ui-spectrum-rose); --pigment-x: 90%; --pigment-y: 0%; }
 #shell .world-menu-make { --field-main: var(--ui-spectrum-rose); --field-counter: var(--ui-spectrum-orange); --light-x: 88%; --light-y: 125%; --pigment-x: 0%; --pigment-y: -10%; }
 #shell .world-menu-companion { grid-column: span 2; }
 #shell .world-menu-settings { grid-column: span 2; }

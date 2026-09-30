@@ -981,7 +981,6 @@ async function mount(): Promise<void> {
       environmentSelection.openPanel('details');
     },
     ...(state.activeWorldEntry === null ? {} : {
-      onExperiment: () => dispatchShell({ type: 'toggle-experiment' }),
       onCompare: () => dispatchShell({ type: 'toggle-compare' }),
     }),
     ...(state.worldEntries === null ? {} : {
@@ -1006,6 +1005,7 @@ async function mount(): Promise<void> {
     getVersionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
     credentials: currentCredentials,
     onClose: () => dispatchShell({ type: 'toggle-compare' }),
+    onRecordedResult: () => dispatchShell({ type: 'toggle-experiment' }),
   });
   state.disposeSocietyComparison = societyComparison === null
     ? null
