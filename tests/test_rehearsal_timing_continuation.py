@@ -11,12 +11,23 @@ import time
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "rehearsal"))
 
 import rehearse  # noqa: E402
 import steplist  # noqa: E402
 import timing_phase  # noqa: E402
+
+
+def test_browser_capture_requires_both_shared_slots_in_gpu_then_quiet_order():
+    gpu = Path("/slots/gpu")
+    quiet = Path("/slots/quiet")
+    command = ["node", "session.mjs"]
+    assert rehearse.browser_slot_command(gpu, quiet, command) == [str(gpu), str(quiet), *command]
+    with pytest.raises(rehearse.Refused, match="both GPU and quiet slots"):
+        rehearse.browser_slot_command(gpu, None, command)
 
 
 def _step(name: str) -> dict:

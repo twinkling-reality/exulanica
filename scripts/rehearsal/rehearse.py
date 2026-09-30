@@ -165,6 +165,13 @@ def main_checkout(tree: Path) -> Path:
     return Path(git(tree, "rev-parse", "--path-format=absolute", "--git-common-dir")).parent
 
 
+def browser_slot_command(gpu: Path | None, quiet: Path | None, command: list[str]) -> list[str]:
+    """Acquire GPU before quiet for every browser capture, including functional steps."""
+    if gpu is None or quiet is None:
+        raise Refused("browser capture requires both GPU and quiet slots")
+    return [str(gpu), str(quiet), *command]
+
+
 def load_module(name: str, path: Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
@@ -315,6 +322,8 @@ class Run:
         )
         gpu_slot = Path(arguments.gpu_slot or checkout / ".exulanica/bin/gpu-slot")
         self.gpu_slot = gpu_slot if gpu_slot.exists() else None
+        quiet_slot = checkout / ".exulanica/bin/quiet-slot"
+        self.quiet_slot = quiet_slot if quiet_slot.exists() else None
         self.steps, self.gates = steplist.load_checked()
         self.total_bound, self.bound, self.worker_bound = run_bounds(
             self.steps, arguments.bound_usd
@@ -636,8 +645,7 @@ class Run:
         if self.gpu_slot is None:
             self.timing_phase = {"status": "slot_unavailable", "reason": "no GPU slot is available"}
             return
-        quiet = main_checkout(REHEARSAL_TREE) / ".exulanica" / "bin" / "quiet-slot"
-        if not quiet.is_file():
+        if self.quiet_slot is None:
             self.timing_phase = {
                 "status": "slot_unavailable",
                 "reason": "no quiet slot is available",
@@ -686,7 +694,7 @@ class Run:
         receipt_file = directory / "timing-receipt.json"
         command = [
             str(self.gpu_slot),
-            str(quiet),
+            str(self.quiet_slot),
             sys.executable,
             str(HERE / "timing_phase.py"),
             "--plan",
@@ -850,9 +858,9 @@ class Run:
         }
         plan_file = directory / "plan.json"
         plan_file.write_text(json.dumps(plan, indent=2))
-        command = ["node", str(SESSION_DRIVER), str(plan_file)]
-        if self.gpu_slot is not None:
-            command = [str(self.gpu_slot), *command]
+        command = browser_slot_command(
+            self.gpu_slot, self.quiet_slot, ["node", str(SESSION_DRIVER), str(plan_file)]
+        )
         started = time.monotonic()
         log = (directory / "session.log").open("ab")
         process = subprocess.Popen(
